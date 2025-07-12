@@ -1,4 +1,5 @@
 use super::ResourceLoader;
+use crate::cg::types::*;
 use crate::node::schema::*;
 use crate::window::application::HostEvent;
 use async_trait::async_trait;
@@ -147,8 +148,8 @@ pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
         .iter()
         .filter_map(|(_, n)| match n {
             Node::Rectangle(rect) => match (&rect.fill, &rect.stroke) {
-                (Paint::Image(img), _) => Some(img._ref.clone()),
-                (_, Paint::Image(img)) => Some(img._ref.clone()),
+                (Paint::Image(img), _) => Some(img.hash.clone()),
+                (_, Paint::Image(img)) => Some(img.hash.clone()),
                 _ => None,
             },
             _ => None,

@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -25,7 +26,7 @@ async fn demo_images() -> Scene {
         height: 200.0,
     };
     rect1.fill = Paint::Image(ImagePaint {
-        _ref: image_url.clone(),
+        hash: image_url.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
@@ -45,13 +46,13 @@ async fn demo_images() -> Scene {
         height: 200.0,
     };
     rect2.fill = Paint::Image(ImagePaint {
-        _ref: image_url.clone(),
+        hash: image_url.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
     });
     rect2.stroke = Paint::Image(ImagePaint {
-        _ref: image_url.clone(),
+        hash: image_url.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
@@ -72,7 +73,7 @@ async fn demo_images() -> Scene {
         opacity: 1.0,
     });
     rect3.stroke = Paint::Image(ImagePaint {
-        _ref: image_url.clone(),
+        hash: image_url.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
@@ -88,7 +89,7 @@ async fn demo_images() -> Scene {
         height: 200.0,
     };
     rect4.fill = Paint::Image(ImagePaint {
-        _ref: image_url.clone(),
+        hash: image_url.clone(),
         opacity: 1.0,
         // Rotate the image 45 degrees with BoxFit::None to showcase the paint transform
         transform: AffineTransform {

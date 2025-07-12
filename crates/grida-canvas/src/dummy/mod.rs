@@ -1,3 +1,4 @@
+use crate::cg::types::*;
 use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
 
 /// Load a simple demo scene with a few colored rectangles.

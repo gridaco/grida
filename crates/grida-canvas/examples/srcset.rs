@@ -1,10 +1,9 @@
 use skia_safe::canvas::SrcRectConstraint;
-use skia_safe::{Canvas, Color, Image, Paint, Rect, Surface};
+use skia_safe::{surfaces, Color, Image, Paint, Rect};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
 struct ImageBenchmark {
-    original: Image,
     scaled_versions: Vec<(f32, Image)>, // (scale_factor, image)
 }
 
@@ -25,7 +24,7 @@ impl ImageBenchmark {
 
             // Create a surface for the scaled image
             let mut surface =
-                Surface::new_raster_n32_premul((width, height)).expect("Failed to create surface");
+                surfaces::raster_n32_premul((width, height)).expect("Failed to create surface");
             let canvas = surface.canvas();
 
             // Clear the surface
@@ -49,10 +48,7 @@ impl ImageBenchmark {
             scaled_versions.push((scale, scaled_image));
         }
 
-        Self {
-            original,
-            scaled_versions,
-        }
+        Self { scaled_versions }
     }
 
     fn benchmark_rendering(
@@ -64,7 +60,7 @@ impl ImageBenchmark {
 
         // Create a surface for rendering
         let mut surface =
-            Surface::new_raster_n32_premul((800, 600)).expect("Failed to create surface");
+            surfaces::raster_n32_premul((800, 600)).expect("Failed to create surface");
         let canvas = surface.canvas();
 
         // Calculate grid layout

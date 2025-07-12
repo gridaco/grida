@@ -1,10 +1,9 @@
+use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::painter::cvt;
-use core::str;
-use math2::box_fit::BoxFit;
+use crate::sk::mappings::ToSkPath;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
-use serde::Deserialize;
 
 pub type NodeId = String;
 
@@ -34,390 +33,10 @@ impl Point {
     }
 }
 
-/// Boolean path operation.
-#[derive(Debug, Clone, Copy)]
-pub enum BooleanPathOperation {
-    Union,        // A ∪ B
-    Intersection, // A ∩ B
-    Difference,   // A - B
-    Xor,          // A ⊕ B
-}
-
-impl From<BooleanPathOperation> for skia_safe::PathOp {
-    fn from(op: BooleanPathOperation) -> Self {
-        match op {
-            BooleanPathOperation::Union => skia_safe::PathOp::Union,
-            BooleanPathOperation::Intersection => skia_safe::PathOp::Intersect,
-            BooleanPathOperation::Difference => skia_safe::PathOp::Difference,
-            BooleanPathOperation::Xor => skia_safe::PathOp::XOR,
-        }
-    }
-}
-
-/// Stroke alignment.
-///
-/// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
-/// - [Figma](https://www.figma.com/plugin-docs/api/properties/nodes-strokealign/)
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum StrokeAlign {
-    Inside,
-    Center,
-    Outside,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Color(pub u8, pub u8, pub u8, pub u8);
-
-/// Represents filter effects inspired by SVG `<filter>` primitives.
-///
-/// See also:
-/// - https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow
-/// - https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feGaussianBlur
-#[derive(Debug, Clone)]
-pub enum FilterEffect {
-    /// Drop shadow filter: offset + blur + color
-    DropShadow(FeDropShadow),
-
-    /// Gaussian blur filter: blur only
-    GaussianBlur(FeGaussianBlur),
-
-    /// Background blur filter: blur only
-    BackdropBlur(FeBackdropBlur),
-}
-
-/// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
-#[derive(Debug, Clone, Copy)]
-pub struct FeBackdropBlur {
-    /// Blur radius in logical pixels.
-    pub radius: f32,
-}
-
-/// A drop shadow filter effect (`<feDropShadow>`)
-#[derive(Debug, Clone, Copy)]
-pub struct FeDropShadow {
-    /// Horizontal shadow offset in px
-    pub dx: f32,
-
-    /// Vertical shadow offset in px
-    pub dy: f32,
-
-    /// Blur radius (`stdDeviation` in SVG)
-    pub blur: f32,
-
-    /// Shadow color (includes alpha)
-    pub color: Color,
-}
-
-/// A standalone blur filter effect (`<feGaussianBlur>`)
-#[derive(Debug, Clone, Copy)]
-pub struct FeGaussianBlur {
-    /// Blur radius (`stdDeviation` in SVG)
-    pub radius: f32,
-}
-
-/// Blend modes for compositing layers, compatible with Skia and SVG/CSS.
-///
-/// - SVG: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/mix-blend-mode
-/// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
-/// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BlendMode {
-    // Skia: kSrcOver, CSS: normal
-    Normal,
-
-    // Skia: kMultiply
-    Multiply,
-    // Skia: kScreen
-    Screen,
-    // Skia: kOverlay
-    Overlay,
-    // Skia: kDarken
-    Darken,
-    // Skia: kLighten
-    Lighten,
-    // Skia: kColorDodge
-    ColorDodge,
-    // Skia: kColorBurn
-    ColorBurn,
-    // Skia: kHardLight
-    HardLight,
-    // Skia: kSoftLight
-    SoftLight,
-    // Skia: kDifference
-    Difference,
-    // Skia: kExclusion
-    Exclusion,
-    // Skia: kHue
-    Hue,
-    // Skia: kSaturation
-    Saturation,
-    // Skia: kColor
-    Color,
-    // Skia: kLuminosity
-    Luminosity,
-
-    /// Like `Normal`, but means no blending at all (pass-through).
-    /// This is Figma-specific, and typically treated the same as `Normal`.
-    PassThrough,
-}
-
-impl From<BlendMode> for skia_safe::BlendMode {
-    fn from(mode: BlendMode) -> Self {
-        use skia_safe::BlendMode::*;
-        match mode {
-            BlendMode::Normal => SrcOver,
-            BlendMode::Multiply => Multiply,
-            BlendMode::Screen => Screen,
-            BlendMode::Overlay => Overlay,
-            BlendMode::Darken => Darken,
-            BlendMode::Lighten => Lighten,
-            BlendMode::ColorDodge => ColorDodge,
-            BlendMode::ColorBurn => ColorBurn,
-            BlendMode::HardLight => HardLight,
-            BlendMode::SoftLight => SoftLight,
-            BlendMode::Difference => Difference,
-            BlendMode::Exclusion => Exclusion,
-            BlendMode::Hue => Hue,
-            BlendMode::Saturation => Saturation,
-            BlendMode::Color => Color,
-            BlendMode::Luminosity => Luminosity,
-            BlendMode::PassThrough => SrcOver, // fallback
-        }
-    }
-}
-
-/// Text Transform (Text Case)
-/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-transform)
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
-pub enum TextTransform {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "uppercase")]
-    Uppercase,
-    #[serde(rename = "lowercase")]
-    Lowercase,
-    #[serde(rename = "capitalize")]
-    Capitalize,
-}
-
-/// Supported text decoration modes.
-///
-/// Only `Underline` and `None` are supported in the current version.
-///
-/// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html)  
-/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration)
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
-pub enum TextDecoration {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "underline")]
-    Underline,
-    #[serde(rename = "overline")]
-    Overline,
-    #[serde(rename = "line-through")]
-    LineThrough,
-}
-
-impl From<TextDecoration> for skia_safe::textlayout::TextDecoration {
-    fn from(mode: TextDecoration) -> Self {
-        match mode {
-            TextDecoration::None => skia_safe::textlayout::TextDecoration::NO_DECORATION,
-            TextDecoration::Underline => skia_safe::textlayout::TextDecoration::UNDERLINE,
-            TextDecoration::Overline => skia_safe::textlayout::TextDecoration::OVERLINE,
-            TextDecoration::LineThrough => skia_safe::textlayout::TextDecoration::LINE_THROUGH,
-        }
-    }
-}
-
-/// Supported horizontal text alignment.
-///
-/// Does not include `Start` or `End`, as they are not supported currently.
-///
-/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-align)  
-/// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextAlign.html)
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
-pub enum TextAlign {
-    #[serde(rename = "left")]
-    Left,
-    #[serde(rename = "right")]
-    Right,
-    #[serde(rename = "center")]
-    Center,
-    #[serde(rename = "justify")]
-    Justify,
-}
-
-impl From<TextAlign> for skia_safe::textlayout::TextAlign {
-    fn from(mode: TextAlign) -> Self {
-        use skia_safe::textlayout::TextAlign::*;
-        match mode {
-            TextAlign::Left => Left,
-            TextAlign::Right => Right,
-            TextAlign::Center => Center,
-            TextAlign::Justify => Justify,
-        }
-    }
-}
-
-/// Supported vertical alignment values for text.
-///
-/// In CSS, this maps to `align-content`.
-///
-/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/align-content)  
-/// - [Konva](https://konvajs.org/api/Konva.Text.html#verticalAlign)
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
-pub enum TextAlignVertical {
-    #[serde(rename = "top")]
-    Top,
-    #[serde(rename = "center")]
-    Center,
-    #[serde(rename = "bottom")]
-    Bottom,
-}
-
-/// Font weight value (1-1000).
-///
-/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight)  
-/// - [Flutter](https://api.flutter.dev/flutter/dart-ui/FontWeight-class.html)  
-/// - [OpenType spec](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass)
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
-pub struct FontWeight(pub u32);
-
-impl FontWeight {
-    /// Creates a new font weight value.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The font weight value (1-1000)
-    ///
-    /// # Panics
-    ///
-    /// Panics if the value is not between 1 and 1000.
-    pub fn new(value: u32) -> Self {
-        assert!(
-            value >= 1 && value <= 1000,
-            "Font weight must be between 1 and 1000"
-        );
-        Self(value)
-    }
-
-    /// Returns the font weight value.
-    pub fn value(&self) -> u32 {
-        self.0
-    }
-
-    pub fn default() -> Self {
-        Self(400)
-    }
-}
-
-/// A set of style properties that can be applied to a text or text span.
-#[derive(Debug, Clone)]
-pub struct TextStyle {
-    /// Text decoration (e.g. underline or none).
-    pub text_decoration: TextDecoration,
-
-    /// Optional font family name (e.g. "Roboto").
-    pub font_family: String,
-
-    /// Font size in logical pixels.
-    pub font_size: f32,
-
-    /// Font weight (100–900).
-    pub font_weight: FontWeight,
-
-    /// Font italic style.
-    pub italic: bool,
-
-    /// Additional spacing between characters, in logical pixels.  
-    /// Default is `0.0`.
-    pub letter_spacing: Option<f32>,
-
-    /// Line height
-    pub line_height: Option<f32>,
-
-    /// Text transform (e.g. uppercase, lowercase, capitalize)
-    pub text_transform: TextTransform,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct GradientStop {
-    /// 0.0 = start, 1.0 = end
-    pub offset: f32,
-    pub color: Color,
-}
-
-#[derive(Debug, Clone)]
-pub enum Paint {
-    Solid(SolidPaint),
-    LinearGradient(LinearGradientPaint),
-    RadialGradient(RadialGradientPaint),
-    Image(ImagePaint),
-}
-
-#[derive(Debug, Clone)]
-pub struct SolidPaint {
-    pub color: Color,
-    pub opacity: f32,
-}
-
-#[derive(Debug, Clone)]
-pub struct LinearGradientPaint {
-    pub transform: AffineTransform,
-    pub stops: Vec<GradientStop>,
-    pub opacity: f32,
-}
-
-#[derive(Debug, Clone)]
-pub struct RadialGradientPaint {
-    pub transform: AffineTransform,
-    pub stops: Vec<GradientStop>,
-    pub opacity: f32,
-}
-
-#[derive(Debug, Clone)]
-pub struct ImagePaint {
-    pub transform: AffineTransform,
-    pub _ref: String,
-    pub fit: BoxFit,
-    pub opacity: f32,
-}
-
 #[derive(Debug, Clone)]
 pub struct Size {
     pub width: f32,
     pub height: f32,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RectangularCornerRadius {
-    pub tl: f32,
-    pub tr: f32,
-    pub bl: f32,
-    pub br: f32,
-}
-
-impl RectangularCornerRadius {
-    pub fn zero() -> Self {
-        Self::all(0.0)
-    }
-
-    pub fn all(value: f32) -> Self {
-        Self {
-            tl: value,
-            tr: value,
-            bl: value,
-            br: value,
-        }
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.tl == 0.0 && self.tr == 0.0 && self.bl == 0.0 && self.br == 0.0
-    }
-
-    pub fn is_uniform(&self) -> bool {
-        self.tl == self.tr && self.tl == self.bl && self.tl == self.br
-    }
 }
 
 // region: Scene
@@ -447,7 +66,7 @@ pub enum Node {
     RegularStarPolygon(RegularStarPolygonNode),
     Line(LineNode),
     TextSpan(TextSpanNode),
-    Path(PathNode),
+    Path(SVGPathNode),
     BooleanOperation(BooleanPathOperationNode),
     Image(ImageNode),
 }
@@ -508,7 +127,7 @@ pub enum IntrinsicSizeNode {
     RegularStarPolygon(RegularStarPolygonNode),
     Line(LineNode),
     TextSpan(TextSpanNode),
-    Path(PathNode),
+    Path(SVGPathNode),
     Image(ImageNode),
 }
 
@@ -522,7 +141,7 @@ pub enum LeafNode {
     RegularStarPolygon(RegularStarPolygonNode),
     Line(LineNode),
     TextSpan(TextSpanNode),
-    Path(PathNode),
+    Path(SVGPathNode),
     Image(ImageNode),
 }
 
@@ -652,7 +271,7 @@ pub struct ImageNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
-    pub _ref: String,
+    pub hash: String,
 }
 
 impl ImageNode {
@@ -716,7 +335,7 @@ pub struct BooleanPathOperationNode {
 /// SVG Path compatible path node.
 ///
 #[derive(Debug, Clone)]
-pub struct PathNode {
+pub struct SVGPathNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
     pub fill: Paint,
@@ -770,8 +389,8 @@ pub struct PolygonNode {
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
-impl PolygonNode {
-    pub fn to_path(&self) -> skia_safe::Path {
+impl ToSkPath for PolygonNode {
+    fn to_sk_path(&self) -> skia_safe::Path {
         cvt::sk_polygon_path(&self.points, self.corner_radius)
     }
 }

@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::{
     node::schema::*,
@@ -15,7 +16,6 @@ use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{gpu, Surface};
-use std::sync::Arc;
 use std::{ffi::CString, num::NonZeroU32};
 use winit::{
     event::{Event, WindowEvent},
@@ -228,7 +228,7 @@ fn main() {
         gl_config,
         fb_info,
         mut gr_context,
-        scale_factor,
+        _scale_factor,
     ) = init_window(800, 600);
 
     // Create renderer
@@ -272,21 +272,6 @@ fn main() {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                // Recreate GL surface
-                let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
-                    window
-                        .raw_window_handle()
-                        .expect("Failed to get window handle"),
-                    NonZeroU32::new(size.width).unwrap(),
-                    NonZeroU32::new(size.height).unwrap(),
-                );
-                let new_gl_surface = unsafe {
-                    gl_config
-                        .display()
-                        .create_window_surface(&gl_config, &attrs)
-                        .expect("Could not create gl window surface")
-                };
-
                 // Recreate Skia surface
                 let backend_render_target = gpu::backend_render_targets::make_gl(
                     (size.width as i32, size.height as i32),

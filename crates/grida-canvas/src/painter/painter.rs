@@ -3,9 +3,11 @@ use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
 use crate::cache::geometry::GeometryCache;
 use crate::cache::{paragraph::ParagraphCache, vector_path::VectorPathCache};
+use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::runtime::repository::{FontRepository, ImageRepository};
+use crate::sk::mappings::ToSkPath;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
 use std::cell::RefCell;
@@ -220,7 +222,7 @@ impl<'a> Painter<'a> {
             Paint::Image(image_paint) => {
                 let images = self.images.borrow();
                 if let Some(image) =
-                    images.get_by_size(&image_paint._ref, shape.rect.width(), shape.rect.height())
+                    images.get_by_size(&image_paint.hash, shape.rect.width(), shape.rect.height())
                 {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
@@ -301,7 +303,7 @@ impl<'a> Painter<'a> {
             Paint::Image(image_paint) => {
                 let images = self.images.borrow();
                 if let Some(image) =
-                    images.get_by_size(&image_paint._ref, shape.rect.width(), shape.rect.height())
+                    images.get_by_size(&image_paint.hash, shape.rect.width(), shape.rect.height())
                 {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
@@ -398,7 +400,7 @@ impl<'a> Painter<'a> {
                     self.with_blendmode(node.blend_mode, || {
                         // convert the image itself to a paint
                         let image_paint = Paint::Image(ImagePaint {
-                            _ref: node._ref.clone(),
+                            hash: node.hash.clone(),
                             opacity: node.opacity,
                             transform: AffineTransform::identity(),
                             fit: math2::box_fit::BoxFit::Cover,
@@ -461,7 +463,7 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw a PathNode (SVG path data)
-    fn draw_path_node(&self, node: &PathNode) {
+    fn draw_path_node(&self, node: &SVGPathNode) {
         self.with_transform(&node.transform.matrix, || {
             let path = self.cached_path(&node.base.id, &node.data);
             let shape = PainterShape::from_path((*path).clone());
@@ -485,7 +487,7 @@ impl<'a> Painter<'a> {
     /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
     fn draw_polygon_node(&self, node: &PolygonNode) {
         self.with_transform(&node.transform.matrix, || {
-            let path = node.to_path();
+            let path = node.to_sk_path();
             let shape = PainterShape::from_path(path.clone());
             self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
                 self.with_opacity(node.opacity, || {

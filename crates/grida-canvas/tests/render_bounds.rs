@@ -1,4 +1,5 @@
 use cg::cache::geometry::GeometryCache;
+use cg::cg::types::*;
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
 use math2::transform::AffineTransform;
 

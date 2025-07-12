@@ -1,4 +1,5 @@
 use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
+use crate::cg::types::*;
 use crate::node::schema::*;
 use crate::painter::layer::Layer;
 use crate::painter::{cvt, Painter};

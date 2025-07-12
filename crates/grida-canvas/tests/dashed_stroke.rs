@@ -1,4 +1,4 @@
-use cg::node::schema::StrokeAlign;
+use cg::cg::types::*;
 use cg::painter::geometry::stroke_geometry;
 use skia_safe::Path;
 

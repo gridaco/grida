@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -66,7 +67,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let mut bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNode {
             base: BaseNode {
                 id: "bool_union_1".to_string(),
                 name: "Union Operation".to_string(),
@@ -149,7 +150,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let mut bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNode {
             base: BaseNode {
                 id: "bool_intersection_1".to_string(),
                 name: "Intersection Operation".to_string(),
@@ -232,7 +233,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let mut bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNode {
             base: BaseNode {
                 id: "bool_difference_1".to_string(),
                 name: "Difference Operation".to_string(),
@@ -315,7 +316,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let mut bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNode {
             base: BaseNode {
                 id: "bool_xor_1".to_string(),
                 name: "XOR Operation".to_string(),

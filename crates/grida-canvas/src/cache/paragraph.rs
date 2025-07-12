@@ -1,4 +1,5 @@
-use crate::node::schema::{NodeId, Paint, Size, TextAlign, TextAlignVertical, TextStyle};
+use crate::cg::types::*;
+use crate::node::schema::{NodeId, Size};
 use crate::painter::{cvt, make_textstyle};
 use crate::runtime::repository::FontRepository;
 use skia_safe::textlayout;

@@ -5,7 +5,7 @@ use std::io::Write;
 fn main() {
     // Create an SVG canvas of size 400x400
     let canvas_bounds = Rect::from_wh(400.0, 400.0);
-    let mut canvas = svg::Canvas::new(canvas_bounds, None);
+    let canvas = svg::Canvas::new(canvas_bounds, None);
 
     // Draw a blue filled rectangle
     let mut paint = Paint::default();

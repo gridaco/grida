@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod cg;
 pub mod devtools;
 pub mod dummy;
 pub mod export;
@@ -11,6 +12,7 @@ pub mod os;
 pub mod painter;
 pub mod resource;
 pub mod runtime;
+pub mod sk;
 pub mod sys;
 pub mod text;
 pub mod window;

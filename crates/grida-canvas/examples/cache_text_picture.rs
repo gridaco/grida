@@ -1,7 +1,7 @@
 use skia_safe::textlayout::{
     FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, TextStyle,
 };
-use skia_safe::{Color, Picture, PictureRecorder, Point, Rect, Surface};
+use skia_safe::{surfaces, Color, Picture, PictureRecorder, Point, Rect, Surface};
 use std::time::{Duration, Instant};
 
 fn make_paragraph(fc: &FontCollection, text: &str, width: f32, font_size: f32) -> Paragraph {
@@ -75,7 +75,7 @@ fn main() {
 
     let width = 1200;
     let height = 2000;
-    let mut surface = Surface::new_raster_n32_premul((width, height)).unwrap();
+    let mut surface = surfaces::raster_n32_premul((width, height)).unwrap();
     let pic = make_picture(&fc, &texts, width as f32, height as f32);
 
     const FRAMES: usize = 500; // Increased number of frames for better statistics

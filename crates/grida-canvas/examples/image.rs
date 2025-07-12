@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -28,7 +29,7 @@ async fn demo_image() -> Scene {
     rect1.transform = AffineTransform::identity();
     rect1.size = image8ksize.clone();
     rect1.fill = Paint::Image(ImagePaint {
-        _ref: image8k.clone(),
+        hash: image8k.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,

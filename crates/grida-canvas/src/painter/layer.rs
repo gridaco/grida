@@ -3,6 +3,7 @@ use super::geometry::{
     PainterShape,
 };
 use crate::cache::geometry::GeometryCache;
+use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use math2::transform::AffineTransform;

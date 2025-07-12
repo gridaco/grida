@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::export::{export_node_as, ExportAs};
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
 use math2::transform::AffineTransform;
