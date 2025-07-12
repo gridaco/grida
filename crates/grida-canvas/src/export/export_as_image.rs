@@ -40,8 +40,8 @@ pub fn export_node_as_image(
     r.load_scene(scene.clone());
     let image = r.snapshot();
 
-    #[allow(deprecated)]
-    let Some(data) = image.encode_to_data(skfmt) else {
+    let Some(data) = image.encode(None, skfmt, None) else {
+        r.free();
         return None;
     };
 

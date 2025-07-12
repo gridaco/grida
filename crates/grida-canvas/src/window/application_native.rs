@@ -13,7 +13,6 @@ use glutin::{
     surface::{Surface as GlutinSurface, WindowSurface},
 };
 use std::num::NonZeroU32;
-#[allow(deprecated)]
 use std::sync::Arc;
 use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::Key;

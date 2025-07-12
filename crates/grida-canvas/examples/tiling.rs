@@ -1,4 +1,4 @@
-use skia_safe::{Canvas, Color, Image, Paint, Picture, PictureRecorder, Rect, Surface};
+use skia_safe::{surfaces, Canvas, Color, Image, Paint, Picture, PictureRecorder, Rect};
 use std::path::Path;
 
 struct TiledScene {
@@ -55,7 +55,7 @@ impl TiledScene {
         for row in 0..rows {
             for col in 0..cols {
                 // Create a surface for this tile
-                let mut surface = Surface::new_raster_n32_premul((tile_size, tile_size))
+                let mut surface = surfaces::raster_n32_premul((tile_size, tile_size))
                     .expect("Failed to create surface for tile");
                 let canvas = surface.canvas();
 
@@ -91,7 +91,7 @@ fn save_tiles(tiles: &[Image], output_dir: &str) {
 
     for (i, tile) in tiles.iter().enumerate() {
         let file_path = output_path.join(format!("tile_{:03}.png", i));
-        if let Some(data) = tile.encode_to_data(skia_safe::EncodedImageFormat::PNG) {
+        if let Some(data) = tile.encode(None, skia_safe::EncodedImageFormat::PNG, None) {
             std::fs::write(file_path, data.as_bytes()).expect("Failed to write tile");
         }
     }
