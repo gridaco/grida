@@ -392,7 +392,7 @@ impl<'a> Painter<'a> {
     fn draw_rect_node(&self, node: &RectangleNode) {
         self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Rectangle(node.clone()));
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            self.draw_shape_with_effect(node.effects.first(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fills(&shape, &node.fills);
@@ -414,7 +414,7 @@ impl<'a> Painter<'a> {
         self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Image(node.clone()));
 
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            self.draw_shape_with_effect(node.effects.first(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         // convert the image itself to a paint
@@ -444,7 +444,7 @@ impl<'a> Painter<'a> {
     fn draw_ellipse_node(&self, node: &EllipseNode) {
         self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Ellipse(node.clone()));
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            self.draw_shape_with_effect(node.effects.first(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fills(&shape, &node.fills);
@@ -488,7 +488,7 @@ impl<'a> Painter<'a> {
         self.with_transform(&node.transform.matrix, || {
             let path = self.cached_path(&node.base.id, &node.data);
             let shape = PainterShape::from_path((*path).clone());
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            self.draw_shape_with_effect(node.effects.first(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fill(&shape, &node.fill);
@@ -512,7 +512,7 @@ impl<'a> Painter<'a> {
         self.with_transform(&node.transform.matrix, || {
             let path = node.to_sk_path();
             let shape = PainterShape::from_path(path.clone());
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            self.draw_shape_with_effect(node.effects.first(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fills(&shape, &node.fills);
@@ -627,7 +627,7 @@ impl<'a> Painter<'a> {
                 let shape = build_shape(&IntrinsicSizeNode::Container(node.clone()));
 
                 // Draw effects first (if any) - these won't be clipped
-                self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                self.draw_shape_with_effect(node.effects.first(), &shape, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fills(&shape, &node.fills);
                         self.draw_strokes(
@@ -708,7 +708,7 @@ impl<'a> Painter<'a> {
     ) {
         self.with_transform(&node.transform.matrix, || {
             if let Some(shape) = boolean_operation_shape(node, repository, cache) {
-                self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                self.draw_shape_with_effect(node.effects.first(), &shape, || {
                     self.with_opacity(node.opacity, || {
                         self.with_blendmode(node.blend_mode, || {
                             self.draw_fill(&shape, &node.fill);

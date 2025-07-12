@@ -506,7 +506,7 @@ impl From<IOContainerNode> for ContainerNode {
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effect: None,
+            effects: vec![],
             children: node.children,
             opacity: node.opacity,
             clip: true,
@@ -576,7 +576,7 @@ impl From<IOEllipseNode> for Node {
             stroke_width: node.stroke_width.unwrap_or(0.0),
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effect: None,
+            effects: vec![],
             opacity: node.opacity,
         })
     }
@@ -606,7 +606,7 @@ impl From<IORectangleNode> for Node {
             stroke_width: node.stroke_width.unwrap_or(0.0),
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effect: None,
+            effects: vec![],
             opacity: node.opacity,
         })
     }
@@ -638,7 +638,7 @@ impl From<IOVectorNode> for Node {
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: node.opacity,
-            effect: None,
+            effects: vec![],
         })
     }
 }
@@ -691,6 +691,7 @@ impl From<IOLineNode> for Node {
             stroke_dash_array: None,
             opacity: node.opacity,
             blend_mode: BlendMode::Normal,
+            effects: vec![],
         })
     }
 }
@@ -720,7 +721,7 @@ impl From<IOPathNode> for Node {
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: node.opacity,
-            effect: None,
+            effects: vec![],
         })
     }
 }

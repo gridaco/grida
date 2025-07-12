@@ -68,7 +68,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: vec![],
         }
     }
 
@@ -85,7 +85,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: vec![],
         }
     }
 
@@ -104,6 +104,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
+            effects: vec![],
         }
     }
 
@@ -164,7 +165,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: vec![],
             clip: true,
         }
     }
@@ -182,7 +183,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: vec![],
         }
     }
 
@@ -201,7 +202,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: vec![],
         }
     }
 
@@ -220,7 +221,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: vec![],
         }
     }
 
@@ -237,7 +238,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: vec![],
         }
     }
 
@@ -255,7 +256,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: vec![],
             hash: String::new(),
         }
     }

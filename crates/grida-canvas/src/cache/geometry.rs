@@ -165,7 +165,7 @@ impl GeometryCache {
                         0.0
                     },
                     n.stroke_align,
-                    n.effect.as_ref(),
+                    n.effects.as_ref(),
                 );
 
                 let entry = GeometryEntry {
@@ -196,7 +196,7 @@ impl GeometryCache {
                         0.0
                     },
                     n.stroke_align,
-                    n.effect.as_ref(),
+                    n.effects.as_ref(),
                 );
 
                 for child_id in &n.children {
@@ -405,36 +405,40 @@ fn stroke_outset(align: StrokeAlign, width: f32) -> f32 {
     }
 }
 
+fn compute_render_bounds_from_effects(bounds: Rectangle, effects: &Vec<FilterEffect>) -> Rectangle {
+    let mut bounds = bounds;
+    for effect in effects {
+        // union the bounds with the effect bounds
+        bounds = rect::union(&[bounds, compute_render_bounds_from_effect(bounds, &effect)]);
+    }
+    bounds
+}
+
+fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -> Rectangle {
+    match effect {
+        FilterEffect::GaussianBlur(blur) => inflate_rect(bounds, blur.radius),
+        FilterEffect::BackdropBlur(blur) => inflate_rect(bounds, blur.radius),
+        FilterEffect::DropShadow(shadow) => inflate_rect(
+            Rectangle {
+                x: bounds.x + shadow.dx,
+                y: bounds.y + shadow.dy,
+                width: bounds.width,
+                height: bounds.height,
+            },
+            shadow.blur,
+        ),
+    }
+}
+
 fn compute_render_bounds_from_style(
     world_bounds: Rectangle,
     stroke_width: f32,
     stroke_align: StrokeAlign,
-    effect: Option<&FilterEffect>,
+    effects: &Vec<FilterEffect>,
 ) -> Rectangle {
     let mut bounds = inflate_rect(world_bounds, stroke_outset(stroke_align, stroke_width));
 
-    if let Some(effect) = effect {
-        match effect {
-            FilterEffect::GaussianBlur(blur) => {
-                bounds = inflate_rect(bounds, blur.radius);
-            }
-            FilterEffect::BackdropBlur(blur) => {
-                bounds = inflate_rect(bounds, blur.radius);
-            }
-            FilterEffect::DropShadow(shadow) => {
-                let shadow_rect = inflate_rect(
-                    Rectangle {
-                        x: world_bounds.x + shadow.dx,
-                        y: world_bounds.y + shadow.dy,
-                        width: world_bounds.width,
-                        height: world_bounds.height,
-                    },
-                    shadow.blur,
-                );
-                bounds = rect::union(&[bounds, shadow_rect]);
-            }
-        }
-    }
+    bounds = compute_render_bounds_from_effects(bounds, effects);
 
     bounds
 }
@@ -445,55 +449,55 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            n.effects.as_ref(),
         ),
         Node::Ellipse(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            n.effects.as_ref(),
         ),
         Node::Polygon(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            n.effects.as_ref(),
         ),
         Node::RegularPolygon(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            n.effects.as_ref(),
         ),
         Node::RegularStarPolygon(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            n.effects.as_ref(),
         ),
         Node::SVGPath(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            n.effects.as_ref(),
         ),
         Node::Image(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            n.effects.as_ref(),
         ),
         Node::Line(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.get_stroke_align(),
-            None,
+            &n.effects,
         ),
         Node::TextSpan(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width.unwrap_or(0.0),
             n.stroke_align,
-            None,
+            &vec![],
         ),
         Node::Container(n) => compute_render_bounds_from_style(
             world_bounds,
@@ -503,7 +507,7 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
                 0.0
             },
             n.stroke_align,
-            n.effect.as_ref(),
+            n.effects.as_ref(),
         ),
         Node::Error(_) => world_bounds,
         Node::Group(_) | Node::BooleanOperation(_) => world_bounds,

@@ -441,16 +441,16 @@ impl FigmaConverter {
         map_option(align).unwrap_or(TextAlignVertical::Top)
     }
 
-    /// Convert Figma's effects to our FilterEffect
-    fn convert_effects(effects: Option<&Vec<Effect>>) -> Option<FilterEffect> {
-        // If no effects, return None
-        let effects = effects?;
-        if effects.is_empty() {
-            return None;
-        }
+    /// Convert Figma's effects to our FilterEffect vector
+    fn convert_effects(effects: Option<&Vec<Effect>>) -> Vec<FilterEffect> {
+        // If no effects, return empty vector
+        let effects = match effects {
+            Some(effects) if !effects.is_empty() => effects,
+            _ => return Vec::new(),
+        };
 
-        // Filter visible effects first
-        let visible_effects: Vec<&Effect> = effects
+        // Filter visible effects and convert them
+        effects
             .iter()
             .filter(|effect| match effect {
                 Effect::DropShadow(drop_shadow) => drop_shadow.visible,
@@ -459,34 +459,22 @@ impl FigmaConverter {
                 Effect::InnerShadow(inner_shadow) => inner_shadow.visible,
                 _ => true,
             })
-            .collect();
-
-        // Find the first valid effect
-        for effect in visible_effects {
-            match effect {
-                Effect::DropShadow(drop_shadow) => {
-                    return Some(FilterEffect::DropShadow(FeDropShadow {
-                        dx: drop_shadow.offset.x as f32,
-                        dy: drop_shadow.offset.y as f32,
-                        blur: drop_shadow.radius as f32,
-                        color: Self::convert_color(&drop_shadow.color),
-                    }));
-                }
-                Effect::LayerBlur(blur) => {
-                    return Some(FilterEffect::GaussianBlur(FeGaussianBlur {
-                        radius: blur.radius as f32,
-                    }));
-                }
-                Effect::BackgroundBlur(blur) => {
-                    return Some(FilterEffect::BackdropBlur(FeBackdropBlur {
-                        radius: blur.radius as f32,
-                    }));
-                }
-                _ => continue, // Skip unsupported effects
-            }
-        }
-
-        None // No valid effects found
+            .filter_map(|effect| match effect {
+                Effect::DropShadow(drop_shadow) => Some(FilterEffect::DropShadow(FeDropShadow {
+                    dx: drop_shadow.offset.x as f32,
+                    dy: drop_shadow.offset.y as f32,
+                    blur: drop_shadow.radius as f32,
+                    color: Self::convert_color(&drop_shadow.color),
+                })),
+                Effect::LayerBlur(blur) => Some(FilterEffect::GaussianBlur(FeGaussianBlur {
+                    radius: blur.radius as f32,
+                })),
+                Effect::BackgroundBlur(blur) => Some(FilterEffect::BackdropBlur(FeBackdropBlur {
+                    radius: blur.radius as f32,
+                })),
+                _ => None, // Skip unsupported effects
+            })
+            .collect()
     }
 
     /// Convert Figma's slice to our SliceNode
@@ -548,7 +536,7 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effect: Self::convert_effects(Some(&component.effects)),
+            effects: Self::convert_effects(Some(&component.effects)),
             children,
             opacity: Self::convert_opacity(component.visible),
             clip: component.clips_content,
@@ -645,7 +633,7 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effect: Self::convert_effects(Some(&instance.effects)),
+            effects: Self::convert_effects(Some(&instance.effects)),
             children,
             opacity: Self::convert_opacity(instance.visible),
             clip: instance.clips_content,
@@ -677,7 +665,7 @@ impl FigmaConverter {
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: Self::convert_opacity(section.visible),
-            effect: None,
+            effects: vec![],
             clip: false,
         }))
     }
@@ -804,7 +792,7 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effect: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(Some(&origin.effects)),
             children,
             opacity: Self::convert_opacity(origin.visible),
             clip: origin.clips_content,
@@ -931,7 +919,7 @@ impl FigmaConverter {
                     stroke_dash_array: None,
                     opacity: Self::convert_opacity(origin.visible),
                     blend_mode: Self::convert_blend_mode(origin.blend_mode),
-                    effect: Self::convert_effects(Some(&origin.effects)),
+                    effects: Self::convert_effects(Some(&origin.effects)),
                 });
                 children.push(self.repository.insert(path_node));
                 path_index += 1;
@@ -961,7 +949,7 @@ impl FigmaConverter {
                     stroke_dash_array: None,
                     opacity: Self::convert_opacity(origin.visible),
                     blend_mode: Self::convert_blend_mode(origin.blend_mode),
-                    effect: Self::convert_effects(Some(&origin.effects)),
+                    effects: Self::convert_effects(Some(&origin.effects)),
                 });
                 children.push(self.repository.insert(path_node));
                 path_index += 1;
@@ -984,7 +972,7 @@ impl FigmaConverter {
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effect: None,
+            effects: vec![],
             children,
             opacity: Self::convert_opacity(origin.visible),
             clip: false,
@@ -1046,7 +1034,7 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effect: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(Some(&origin.effects)),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
         }))
@@ -1084,7 +1072,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effect: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(Some(&origin.effects)),
         }))
     }
 
@@ -1119,6 +1107,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            effects: Self::convert_effects(Some(&origin.effects)),
         }))
     }
 
@@ -1154,7 +1143,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effect: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(Some(&origin.effects)),
         }))
     }
 
@@ -1191,7 +1180,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effect: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(Some(&origin.effects)),
         }))
     }
 
@@ -1227,7 +1216,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effect: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(Some(&origin.effects)),
         }))
     }
 
@@ -1259,7 +1248,7 @@ impl FigmaConverter {
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effect: None,
+            effects: vec![],
             children,
             opacity: 1.0,
             clip: origin.clips_content,

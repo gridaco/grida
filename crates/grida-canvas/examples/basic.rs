@@ -23,12 +23,12 @@ async fn demo_basic() -> Scene {
     };
     image_node.corner_radius = RectangularCornerRadius::all(20.0);
     image_node.stroke_width = 2.0;
-    image_node.effect = Some(FilterEffect::DropShadow(FeDropShadow {
+    image_node.effects = vec![FilterEffect::DropShadow(FeDropShadow {
         dx: 4.0,
         dy: 4.0,
         blur: 8.0,
         color: Color(0, 0, 0, 77),
-    }));
+    })];
     image_node.hash = demo_image_id.to_string();
 
     // Create a test rectangle node with linear gradient
@@ -45,12 +45,12 @@ async fn demo_basic() -> Scene {
         opacity: 1.0,
     }));
     rect_node.stroke_width = 2.0;
-    rect_node.effect = Some(FilterEffect::DropShadow(FeDropShadow {
+    rect_node.effects = vec![FilterEffect::DropShadow(FeDropShadow {
         dx: 4.0,
         dy: 4.0,
         blur: 8.0,
         color: Color(0, 0, 0, 77),
-    }));
+    })];
 
     // Create a test ellipse node with radial gradient and a visible stroke
     let mut ellipse_node = nf.create_ellipse_node();

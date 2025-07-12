@@ -37,15 +37,15 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effect: if with_effects {
-                Some(FilterEffect::DropShadow(FeDropShadow {
+            effects: if with_effects {
+                vec![FilterEffect::DropShadow(FeDropShadow {
                     dx: 2.0,
                     dy: 2.0,
                     blur: 4.0,
                     color: Color(0, 0, 0, 128),
-                }))
+                })]
             } else {
-                None
+                vec![]
             },
         };
 
