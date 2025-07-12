@@ -14,7 +14,10 @@ type ExportConstraints = {
   value: number;
 };
 
-type ExportAs = {
+type ExportAs = ExportAsImage | ExportAsPDF | ExportAsSVG;
+type ExportAsPDF = { format: "PDF" };
+type ExportAsSVG = { format: "SVG" };
+type ExportAsImage = {
   format: "PNG" | "JPEG" | "WEBP" | "BMP";
   constraints: ExportConstraints;
 };
@@ -239,19 +242,20 @@ export class Grida2D {
     this._free_string(fmt_ptr, fmt_len);
 
     if (outptr === 0) {
-      throw new Error("Failed to export node as PNG");
+      throw new Error(`Failed to export node as ${format.format}`);
     }
 
     // Read the length from the first 4 bytes (little-endian u32)
     const lengthBytes = this.module.HEAPU8.slice(outptr, outptr + 4);
-    const dataLength = new Uint32Array(lengthBytes.buffer, lengthBytes.byteOffset, 1)[0];
-    
+    const dataLength = new Uint32Array(
+      lengthBytes.buffer,
+      lengthBytes.byteOffset,
+      1
+    )[0];
+
     // Read the actual data starting after the length prefix
-    const data = this.module.HEAPU8.slice(
-      outptr + 4,
-      outptr + 4 + dataLength
-    );
-    
+    const data = this.module.HEAPU8.slice(outptr + 4, outptr + 4 + dataLength);
+
     // Free the entire allocated block (length + data)
     this.module._deallocate(outptr, 4 + dataLength);
 
@@ -332,4 +336,3 @@ export class Grida2D {
     this.module._devtools_rendering_set_show_ruler(this.appptr, show);
   }
 }
-

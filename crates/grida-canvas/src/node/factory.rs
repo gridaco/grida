@@ -89,7 +89,7 @@ impl NodeFactory {
             },
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            _data_stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,

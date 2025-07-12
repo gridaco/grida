@@ -540,9 +540,17 @@ impl Renderer {
         let height = surface.height() as f32;
         let mut canvas = surface.canvas();
         let frame = self.frame(self.camera.rect(), 1.0, true);
-        let draw = self.draw_nocache(&mut canvas, &frame, None, width, height);
+        let _ = self.draw_nocache(&mut canvas, &frame, None, width, height);
 
         surface.image_snapshot()
+    }
+
+    /// Render the current scene onto the provided canvas. This is useful for
+    /// exporting the scene using alternate backends such as PDF.
+    pub fn render_to_canvas(&self, canvas: &Canvas, width: f32, height: f32) {
+        let frame = self.frame(self.camera.rect(), 1.0, true);
+        let background = self.scene.as_ref().and_then(|s| s.background_color);
+        let _ = self.draw_nocache(canvas, &frame, background, width, height);
     }
 }
 

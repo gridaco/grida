@@ -2,13 +2,12 @@ use skia_safe::textlayout::FontCollection;
 use skia_safe::textlayout::{
     ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection, TextStyle, TypefaceFontProvider,
 };
-use skia_safe::{Color, Font, FontMgr, Paint, Point, Surface};
+use skia_safe::{surfaces, Color, Font, FontMgr, Paint, Point};
 use std::fs;
 
 fn main() {
     // Create a surface to draw on
-    #[allow(deprecated)]
-    let mut surface = Surface::new_raster_n32_premul((400, 800)).unwrap();
+    let mut surface = surfaces::raster_n32_premul((400, 800)).unwrap();
     let canvas = surface.canvas();
 
     // Clear the canvas with white background
@@ -111,10 +110,9 @@ fn main() {
 
     // Save the result to a PNG file
     let image = surface.image_snapshot();
-    #[allow(deprecated)]
     let data = image
-        .encode_to_data(skia_safe::EncodedImageFormat::PNG)
+        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     let bytes = data.as_bytes();
-    std::fs::write("text_output.png", bytes).unwrap();
+    std::fs::write("goldens/fonts.png", bytes).unwrap();
 }

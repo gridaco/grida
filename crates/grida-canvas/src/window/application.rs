@@ -72,12 +72,29 @@ pub enum HostEvent {
     LoadScene(Scene),
 }
 
+pub struct Clipboard {
+    pub(crate) data: Option<Vec<u8>>,
+}
+
+impl Default for Clipboard {
+    fn default() -> Self {
+        Self { data: None }
+    }
+}
+
+impl Clipboard {
+    pub(crate) fn set_data(&mut self, data: Vec<u8>) {
+        self.data = Some(data);
+    }
+}
+
 /// Shared application logic independent of the final target.
 pub struct UnknownTargetApplication {
     pub(crate) debug: bool,
     pub(crate) verbose: bool,
     pub(crate) clock: clock::EventLoopClock,
     pub(crate) timer: TimerMgr,
+    pub(crate) clipboard: Clipboard,
     pub(crate) scheduler: scheduler::FrameScheduler,
     pub(crate) request_redraw: crate::runtime::scene::RequestRedrawCallback,
     pub(crate) renderer: Renderer,
@@ -97,6 +114,7 @@ pub struct UnknownTargetApplication {
     pub(crate) devtools_rendering_show_hit_overlay: bool,
     pub(crate) devtools_rendering_show_ruler: bool,
     pub(crate) queue_stable_debounce_millis: u64,
+
     /// timer id for debouncing stable frame queues
     queue_stable_timer: Option<crate::sys::timer::TimerId>,
 }
@@ -167,17 +185,8 @@ impl ApplicationApi for UnknownTargetApplication {
                 if let Some(id) = self.devtools_selection.clone() {
                     let exported = self.export_node_as(&id, ExportAs::png());
                     if let Some(exported) = exported {
-                        // non wasm32
-                        #[cfg(not(target_arch = "wasm32"))]
-                        {
-                            // save to file
-
-                            use std::io::Write;
-                            let path = format!("exported_{}.png", id);
-                            let mut file = std::fs::File::create(path).unwrap();
-                            file.write_all(exported.data()).unwrap();
-                            return true;
-                        }
+                        self.clipboard.set_data(exported.data().to_vec());
+                        return true;
                     }
                 }
             }
@@ -328,6 +337,7 @@ impl UnknownTargetApplication {
             debug,
             verbose: false,
             clock: clock::EventLoopClock::new(),
+            clipboard: Clipboard::default(),
             request_redraw,
             renderer,
             state,

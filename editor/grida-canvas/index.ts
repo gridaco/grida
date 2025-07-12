@@ -1709,5 +1709,7 @@ export namespace editor.api {
 
   export interface IExportPluginActions {
     exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
+    exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array>;
+    exportNodeAs(node_id: string, format: "SVG"): Promise<string>;
   }
 }

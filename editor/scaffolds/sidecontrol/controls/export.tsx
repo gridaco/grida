@@ -43,6 +43,13 @@ import { exportWithP666 } from "@/grida-canvas-plugin-p666";
 import { exportAsImage } from "@/grida-canvas/backends/dom-export";
 import { useCurrentEditor } from "@/grida-canvas-react";
 
+const mimes = {
+  PNG: "image/png",
+  JPEG: "image/jpeg",
+  PDF: "application/pdf",
+  SVG: "image/svg+xml",
+} as const;
+
 export function ExportNodeControl({
   node_id,
   name,
@@ -57,56 +64,62 @@ export function ExportNodeControl({
     refreshkey: true,
   });
 
-  const onExport = async (format: "SVG" | "PNG" | "JPEG") => {
-    if (format === "SVG") {
-      toast.error("SVG export is not supported yet");
-      return;
-    }
-    const task = new Promise<Blob>(async (resolve, reject) => {
+  const exportHandler = (
+    dataPromise: Promise<Uint8Array | string>,
+    format: "SVG" | "PDF" | "PNG" | "JPEG"
+  ): Promise<Blob> => {
+    return new Promise<Blob>(async (resolve, reject) => {
       try {
-        const data = await editor.exportNodeAs(node_id, format);
-        const blob = new Blob([data], {
-          type: `image/${format.toLowerCase()}`,
-        });
-        return resolve(blob);
-
-        // const result = await exportAsImage(node_id, format);
-        // if (!result) {
-        //   throw new Error("Failed to export");
-        // }
-
-        // await fetch(result.url)
-        //   .then((res) => res.blob())
-        //   .then((blob) => {
-        //     resolve(blob);
-        //   })
-        //   .catch((e) => {
-        //     reject(e);
-        //   });
+        const data = await dataPromise;
+        const blob = new Blob([data], { type: mimes[format] });
+        resolve(blob);
       } catch (e) {
         reject(e);
       }
     });
+  };
 
-    toast.promise(task, {
-      loading: "Exporting...",
-      success: "Exported",
-      error: "Failed to export",
-    });
+  const onExport = async (format: "SVG" | "PDF" | "PNG" | "JPEG") => {
+    let task: Promise<Blob>;
 
-    task.then((blob) => {
-      saveAs(blob, `${name}.${format.toLowerCase()}`);
-    });
+    switch (format) {
+      case "JPEG":
+      case "PNG":
+        task = exportHandler(editor.exportNodeAs(node_id, format), format);
+        break;
+      case "PDF":
+        task = exportHandler(editor.exportNodeAs(node_id, format), format);
+        break;
+      case "SVG":
+        task = exportHandler(editor.exportNodeAs(node_id, format), format);
+        break;
+    }
+
+    if (task) {
+      toast.promise(task, {
+        loading: "Exporting...",
+        success: "Exported",
+        error: "Failed to export",
+      });
+
+      task.then((blob) => {
+        saveAs(blob, `${name}.${format.toLowerCase()}`);
+      });
+    } else {
+      toast.error("Export is not supported yet");
+    }
   };
 
   return (
     <>
-      <AdvancedExportDialog
-        {...advancedExportDialog.props}
-        key={advancedExportDialog.refreshkey}
-        defaultName={name}
-        node_id={node_id}
-      />
+      {editor.backend === "dom" && (
+        <AdvancedExportDialog
+          {...advancedExportDialog.props}
+          key={advancedExportDialog.refreshkey}
+          defaultName={name}
+          node_id={node_id}
+        />
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -141,11 +154,18 @@ export function ExportNodeControl({
           <DropdownMenuItem onSelect={() => onExport("SVG")}>
             SVG
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={advancedExportDialog.openDialog}>
-            <CodeIcon className="size-3.5" />
-            Advanced
+          <DropdownMenuItem onSelect={() => onExport("PDF")}>
+            PDF
           </DropdownMenuItem>
+          {editor.backend === "dom" && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={advancedExportDialog.openDialog}>
+                <CodeIcon className="size-3.5" />
+                Advanced
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </>

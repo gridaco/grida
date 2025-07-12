@@ -58,7 +58,7 @@ impl From<BooleanPathOperation> for skia_safe::PathOp {
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
 /// - [Figma](https://www.figma.com/plugin-docs/api/properties/nodes-strokealign/)
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum StrokeAlign {
     Inside,
     Center,
@@ -625,10 +625,17 @@ pub struct LineNode {
     pub size: Size, // height is always 0 (ignored)
     pub stroke: Paint,
     pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
+    pub _data_stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+}
+
+impl LineNode {
+    /// line's stoke align is no-op, it's always center. this value is ignored, but will be affected when line transforms to a path.
+    pub fn get_stroke_align(&self) -> StrokeAlign {
+        StrokeAlign::Center
+    }
 }
 
 #[derive(Debug, Clone)]

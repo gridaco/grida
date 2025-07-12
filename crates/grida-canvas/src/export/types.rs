@@ -3,6 +3,8 @@ use serde::Deserialize;
 #[derive(Clone, Deserialize)]
 #[serde(tag = "type", content = "value")]
 pub enum ExportConstraints {
+    #[serde(rename = "NONE")]
+    None,
     #[serde(rename = "SCALE")]
     Scale(f32),
     #[serde(rename = "WIDTH")]
@@ -40,6 +42,16 @@ pub struct ExportAsBMP {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct ExportAsPDF {
+    // pdf export does not support constraints
+}
+
+#[derive(Clone, Deserialize)]
+pub struct ExportAsSVG {
+    // svg export does not support constraints
+}
+
+#[derive(Clone, Deserialize)]
 #[serde(tag = "format")]
 pub enum ExportAs {
     #[serde(rename = "PNG")]
@@ -50,6 +62,43 @@ pub enum ExportAs {
     WEBP(ExportAsWEBP),
     #[serde(rename = "BMP")]
     BMP(ExportAsBMP),
+    #[serde(rename = "PDF")]
+    PDF(ExportAsPDF),
+    #[serde(rename = "SVG")]
+    SVG(ExportAsSVG),
+}
+
+#[derive(Clone)]
+pub enum ExportAsImage {
+    PNG(ExportAsPNG),
+    JPEG(ExportAsJPEG),
+    WEBP(ExportAsWEBP),
+    BMP(ExportAsBMP),
+}
+
+impl ExportAsImage {
+    pub fn get_constraints(&self) -> &ExportConstraints {
+        match self {
+            ExportAsImage::PNG(config) => &config.constraints,
+            ExportAsImage::JPEG(config) => &config.constraints,
+            ExportAsImage::WEBP(config) => &config.constraints,
+            ExportAsImage::BMP(config) => &config.constraints,
+        }
+    }
+}
+
+impl TryFrom<ExportAs> for ExportAsImage {
+    type Error = ();
+
+    fn try_from(value: ExportAs) -> Result<Self, ()> {
+        match value {
+            ExportAs::PNG(x) => Ok(Self::PNG(x)),
+            ExportAs::JPEG(x) => Ok(Self::JPEG(x)),
+            ExportAs::WEBP(x) => Ok(Self::WEBP(x)),
+            ExportAs::BMP(x) => Ok(Self::BMP(x)),
+            _ => Err(()),
+        }
+    }
 }
 
 impl ExportAs {
@@ -60,6 +109,29 @@ impl ExportAs {
     pub fn jpeg(constraints: ExportConstraints) -> Self {
         Self::JPEG(ExportAsJPEG { constraints })
     }
+
+    pub fn pdf() -> Self {
+        Self::PDF(ExportAsPDF {})
+    }
+
+    pub fn svg() -> Self {
+        Self::SVG(ExportAsSVG {})
+    }
+
+    pub fn is_format_image(&self) -> bool {
+        matches!(
+            self,
+            ExportAs::PNG(_) | ExportAs::JPEG(_) | ExportAs::WEBP(_) | ExportAs::BMP(_)
+        )
+    }
+
+    pub fn is_format_pdf(&self) -> bool {
+        matches!(self, ExportAs::PDF(_))
+    }
+
+    pub fn is_format_svg(&self) -> bool {
+        matches!(self, ExportAs::SVG(_))
+    }
 }
 
 impl ExportAs {
@@ -69,6 +141,8 @@ impl ExportAs {
             ExportAs::JPEG(config) => &config.constraints,
             ExportAs::WEBP(config) => &config.constraints,
             ExportAs::BMP(config) => &config.constraints,
+            ExportAs::PDF(_) => &ExportConstraints::None,
+            ExportAs::SVG(_) => &ExportConstraints::None,
         }
     }
 }

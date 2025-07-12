@@ -482,9 +482,12 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
             n.stroke_align,
             n.effect.as_ref(),
         ),
-        Node::Line(n) => {
-            compute_render_bounds_from_style(world_bounds, n.stroke_width, n.stroke_align, None)
-        }
+        Node::Line(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.get_stroke_align(),
+            None,
+        ),
         Node::TextSpan(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width.unwrap_or(0.0),

@@ -57,3 +57,36 @@ export class CanvasWasmImageExportInterfaceProvider
     return data.data;
   }
 }
+
+export class CanvasWasmPDFExportInterfaceProvider
+  implements editor.api.IDocumentPDFExportInterfaceProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Grida2D
+  ) {}
+
+  async exportNodeAsPDF(node_id: string): Promise<Uint8Array> {
+    const data = await this.surface.exportNodeAs(node_id, {
+      format: "PDF",
+    });
+    return data.data;
+  }
+}
+
+export class CanvasWasmSVGExportInterfaceProvider
+  implements editor.api.IDocumentSVGExportInterfaceProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Grida2D
+  ) {}
+
+  async exportNodeAsSVG(node_id: string): Promise<string> {
+    const data = await this.surface.exportNodeAs(node_id, {
+      format: "SVG",
+    });
+    const str = new TextDecoder("utf-8").decode(data.data);
+    return str;
+  }
+}

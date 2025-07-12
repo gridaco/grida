@@ -13,7 +13,6 @@ use glutin::{
     surface::{Surface as GlutinSurface, WindowSurface},
 };
 use std::num::NonZeroU32;
-#[allow(deprecated)]
 use std::sync::Arc;
 use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::Key;
@@ -188,7 +187,23 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
 
         match handle_window_event(&event, &self.modifiers) {
             cmd => {
-                self.app.command(cmd);
+                let ok = self.app.command(cmd.clone());
+
+                if ok {
+                    match cmd.clone() {
+                        ApplicationCommand::TryCopyAsPNG => {
+                            {
+                                // save to file
+                                use std::io::Write;
+                                let path = format!("clipboard.png");
+                                let mut file = std::fs::File::create(path).unwrap();
+                                file.write_all(self.app.clipboard.data.as_ref().unwrap())
+                                    .unwrap();
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     }
