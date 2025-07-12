@@ -60,7 +60,7 @@ fn path_hit_testing_uses_contains() {
     let mut path_node = nf.create_path_node();
     path_node.data = "M0 0 L10 0 L10 10 Z".into();
     let path_id = path_node.base.id.clone();
-    repo.insert(Node::Path(path_node.clone()));
+    repo.insert(Node::SVGPath(path_node.clone()));
 
     let scene = Scene {
         id: "scene".into(),

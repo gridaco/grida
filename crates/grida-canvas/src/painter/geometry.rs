@@ -349,7 +349,7 @@ pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
             n.clone(),
         ))),
         Node::Line(n) => Some(build_shape(&IntrinsicSizeNode::Line(n.clone()))),
-        Node::Path(n) => Some(build_shape(&IntrinsicSizeNode::Path(n.clone()))),
+        Node::SVGPath(n) => Some(build_shape(&IntrinsicSizeNode::Path(n.clone()))),
         Node::Image(n) => Some(build_shape(&IntrinsicSizeNode::Image(n.clone()))),
         Node::Error(n) => Some(build_shape(&IntrinsicSizeNode::Error(n.clone()))),
         _ => None,

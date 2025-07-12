@@ -912,7 +912,7 @@ impl FigmaConverter {
         // Convert fill geometries to path nodes
         if let Some(fill_geometries) = &origin.fill_geometry {
             for geometry in fill_geometries {
-                let path_node = Node::Path(SVGPathNode {
+                let path_node = Node::SVGPath(SVGPathNode {
                     base: BaseNode {
                         id: format!("{}-path-{}", origin.id, path_index),
                         name: format!("{}-path-{}", origin.name, path_index),
@@ -942,7 +942,7 @@ impl FigmaConverter {
         // stroke paint should be applied to the path, not stroke, as the stroke geometry is the baked path of the stroke.
         if let Some(stroke_geometries) = &origin.stroke_geometry {
             for geometry in stroke_geometries {
-                let path_node = Node::Path(SVGPathNode {
+                let path_node = Node::SVGPath(SVGPathNode {
                     base: BaseNode {
                         id: format!("{}-path-{}", origin.id, path_index),
                         name: format!("{}-path-{}", origin.name, path_index),

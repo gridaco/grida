@@ -13,7 +13,7 @@ async fn demo_strokes() -> Scene {
     root_container_node.base.name = "Root Container".to_string();
     root_container_node.size = Size {
         width: 1000.0,
-        height: 1000.0,
+        height: 1200.0,
     };
 
     let mut repository = NodeRepository::new();
@@ -374,6 +374,177 @@ async fn demo_strokes() -> Scene {
         rect.stroke_dash_array = Some(vec![20.0, 10.0, 5.0, 10.0]); // Complex dash pattern
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
+    }
+
+    // Multiple Strokes Demo Row
+    {
+        // Rectangle with multiple solid strokes (layered strokes)
+        let mut rect = nf.create_rectangle_node();
+        rect.base.name = "Multiple Solid Strokes".to_string();
+        rect.transform = AffineTransform::new(start_x, 1000.0, 0.0);
+        rect.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.set_fill(Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 0),
+            opacity: 1.0,
+        }));
+        rect.strokes = vec![
+            Paint::Solid(SolidPaint {
+                color: Color(255, 0, 0, 255), // Red outer stroke
+                opacity: 1.0,
+            }),
+            Paint::Solid(SolidPaint {
+                color: Color(0, 255, 0, 255), // Green middle stroke
+                opacity: 0.8,
+            }),
+            Paint::Solid(SolidPaint {
+                color: Color(0, 0, 255, 255), // Blue inner stroke
+                opacity: 0.6,
+            }),
+        ];
+        rect.stroke_width = 12.0; // Thick stroke to show layering
+        all_shape_ids.push(rect.base.id.clone());
+        repository.insert(Node::Rectangle(rect));
+
+        // Rectangle with solid + gradient strokes
+        let mut rect = nf.create_rectangle_node();
+        rect.base.name = "Solid + Gradient Strokes".to_string();
+        rect.transform = AffineTransform::new(start_x + spacing, 1000.0, 0.0);
+        rect.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.set_fill(Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 0),
+            opacity: 1.0,
+        }));
+        rect.strokes = vec![
+            Paint::Solid(SolidPaint {
+                color: Color(255, 255, 0, 255), // Yellow base stroke
+                opacity: 1.0,
+            }),
+            Paint::LinearGradient(LinearGradientPaint {
+                transform: AffineTransform::from_rotatation(45.0),
+                stops: vec![
+                    GradientStop {
+                        offset: 0.0,
+                        color: Color(255, 0, 255, 255), // Magenta
+                    },
+                    GradientStop {
+                        offset: 1.0,
+                        color: Color(0, 255, 255, 255), // Cyan
+                    },
+                ],
+                opacity: 0.7,
+            }),
+        ];
+        rect.stroke_width = 10.0;
+        all_shape_ids.push(rect.base.id.clone());
+        repository.insert(Node::Rectangle(rect));
+
+        // Ellipse with multiple gradient strokes
+        let mut ellipse = nf.create_ellipse_node();
+        ellipse.base.name = "Multiple Gradient Strokes".to_string();
+        ellipse.transform = AffineTransform::new(start_x + spacing * 2.0, 1000.0, 0.0);
+        ellipse.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        ellipse.fills = vec![Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 0),
+            opacity: 1.0,
+        })];
+        ellipse.strokes = vec![
+            Paint::RadialGradient(RadialGradientPaint {
+                transform: AffineTransform::identity(),
+                stops: vec![
+                    GradientStop {
+                        offset: 0.0,
+                        color: Color(255, 0, 0, 255), // Red center
+                    },
+                    GradientStop {
+                        offset: 1.0,
+                        color: Color(255, 0, 0, 0), // Transparent edge
+                    },
+                ],
+                opacity: 1.0,
+            }),
+            Paint::LinearGradient(LinearGradientPaint {
+                transform: AffineTransform::from_rotatation(90.0),
+                stops: vec![
+                    GradientStop {
+                        offset: 0.0,
+                        color: Color(0, 255, 0, 255), // Green
+                    },
+                    GradientStop {
+                        offset: 1.0,
+                        color: Color(0, 255, 0, 0), // Transparent
+                    },
+                ],
+                opacity: 0.8,
+            }),
+        ];
+        ellipse.stroke_width = 12.0;
+        all_shape_ids.push(ellipse.base.id.clone());
+        repository.insert(Node::Ellipse(ellipse));
+
+        // Polygon with complex multi-stroke pattern
+        let mut polygon = nf.create_regular_polygon_node();
+        polygon.base.name = "Complex Multi-Stroke".to_string();
+        polygon.transform = AffineTransform::new(start_x + spacing * 3.0, 1000.0, 0.0);
+        polygon.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        polygon.point_count = 5; // Pentagon
+        polygon.fills = vec![Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 0),
+            opacity: 1.0,
+        })];
+        polygon.strokes = vec![
+            Paint::Solid(SolidPaint {
+                color: Color(128, 0, 128, 255), // Purple base
+                opacity: 1.0,
+            }),
+            Paint::LinearGradient(LinearGradientPaint {
+                transform: AffineTransform::from_rotatation(30.0),
+                stops: vec![
+                    GradientStop {
+                        offset: 0.0,
+                        color: Color(255, 255, 255, 255), // White
+                    },
+                    GradientStop {
+                        offset: 1.0,
+                        color: Color(255, 255, 255, 0), // Transparent
+                    },
+                ],
+                opacity: 0.6,
+            }),
+            Paint::RadialGradient(RadialGradientPaint {
+                transform: AffineTransform {
+                    matrix: [[0.7, 0.0, 0.15], [0.0, 0.7, 0.15]],
+                },
+                stops: vec![
+                    GradientStop {
+                        offset: 0.0,
+                        color: Color(255, 255, 0, 255), // Yellow highlight
+                    },
+                    GradientStop {
+                        offset: 1.0,
+                        color: Color(255, 255, 0, 0), // Transparent
+                    },
+                ],
+                opacity: 0.5,
+            }),
+        ];
+        polygon.stroke_width = 15.0; // Very thick to show all layers
+        polygon.stroke_dash_array = Some(vec![8.0, 4.0]); // Dashed pattern
+        all_shape_ids.push(polygon.base.id.clone());
+        repository.insert(Node::RegularPolygon(polygon));
     }
 
     // Set up the root container

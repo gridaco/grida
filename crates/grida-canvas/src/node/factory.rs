@@ -1,6 +1,6 @@
 use super::schema::*;
 use crate::cg::types::*;
-use math2::transform::AffineTransform;
+use math2::{box_fit::BoxFit, transform::AffineTransform};
 use uuid::Uuid;
 
 /// Factory for creating nodes with default values
@@ -42,6 +42,16 @@ impl NodeFactory {
             color,
             opacity: 1.0,
         })
+    }
+
+    fn default_image_paint() -> ImagePaint {
+        ImagePaint {
+            // TODO: use the built in image hash
+            hash: String::new(),
+            opacity: 1.0,
+            transform: AffineTransform::identity(),
+            fit: BoxFit::Cover,
+        }
     }
 
     /// Creates a new rectangle node with default values
@@ -238,7 +248,7 @@ impl NodeFactory {
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
-            fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
+            fill: Self::default_image_paint(),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,

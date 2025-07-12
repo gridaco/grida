@@ -771,7 +771,7 @@ impl<'a> Painter<'a> {
             Node::Image(n) => {
                 self.draw_image_node(n);
             }
-            Node::Path(n) => self.draw_path_node(n),
+            Node::SVGPath(n) => self.draw_path_node(n),
             Node::BooleanOperation(n) => {
                 self.draw_boolean_operation_node_recursively(n, repository, cache)
             }

@@ -48,6 +48,8 @@ pub enum IONode {
     Ellipse(IOEllipseNode),
     #[serde(rename = "rectangle")]
     Rectangle(IORectangleNode),
+    #[serde(rename = "line")]
+    Line(IOLineNode),
     #[serde(other)]
     Unknown,
 }
@@ -73,7 +75,7 @@ pub struct IOContainerNode {
     pub height: serde_json::Value,
     pub children: Vec<String>,
     pub expanded: Option<bool>,
-    pub fill: Option<Fill>,
+    pub fill: Option<IOPaint>,
     pub border: Option<Border>,
     pub style: Option<HashMap<String, serde_json::Value>>,
     #[serde(
@@ -152,7 +154,7 @@ pub struct IOTextNode {
     pub bottom: Option<f32>,
     pub width: serde_json::Value,
     pub height: serde_json::Value,
-    pub fill: Option<Fill>,
+    pub fill: Option<IOPaint>,
     pub style: Option<HashMap<String, serde_json::Value>>,
     pub text: String,
     #[serde(rename = "textAlign", default = "default_text_align")]
@@ -192,7 +194,7 @@ pub struct IOVectorNode {
     pub top: f32,
     pub width: f32,
     pub height: f32,
-    pub fill: Option<Fill>,
+    pub fill: Option<IOPaint>,
     pub paths: Option<Vec<IOPath>>,
 }
 
@@ -218,6 +220,33 @@ pub struct IOVectorNetwork {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct IOLineNode {
+    pub id: String,
+    pub name: String,
+    #[serde(default = "default_active")]
+    pub active: bool,
+    #[serde(default = "default_locked")]
+    pub locked: bool,
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
+    #[serde(default = "default_rotation")]
+    pub rotation: f32,
+    #[serde(rename = "zIndex", default = "default_z_index")]
+    pub z_index: i32,
+    pub position: Option<String>,
+    pub left: f32,
+    pub top: f32,
+    pub width: f32,
+    pub height: f32,
+    pub fill: Option<IOPaint>,
+    #[serde(rename = "strokeWidth")]
+    pub stroke_width: Option<f32>,
+    #[serde(rename = "strokeCap")]
+    pub stroke_cap: Option<String>,
+    pub stroke: Option<IOPaint>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct IOPathNode {
     pub id: String,
     pub name: String,
@@ -238,9 +267,12 @@ pub struct IOPathNode {
     pub height: f32,
     #[serde(rename = "vectorNetwork")]
     pub vector_network: Option<IOVectorNetwork>,
-    pub fill: Option<Fill>,
+    pub fill: Option<IOPaint>,
     #[serde(rename = "strokeWidth")]
     pub stroke_width: Option<f32>,
+    #[serde(rename = "strokeCap")]
+    pub stroke_cap: Option<String>,
+    pub stroke: Option<IOPaint>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -262,11 +294,12 @@ pub struct IOEllipseNode {
     pub top: f32,
     pub width: f32,
     pub height: f32,
-    pub fill: Option<Fill>,
+    pub fill: Option<IOPaint>,
     #[serde(rename = "strokeWidth")]
     pub stroke_width: Option<f32>,
     #[serde(rename = "strokeCap")]
     pub stroke_cap: Option<String>,
+    pub stroke: Option<IOPaint>,
     pub effects: Option<Vec<serde_json::Value>>,
 }
 
@@ -289,11 +322,12 @@ pub struct IORectangleNode {
     pub top: f32,
     pub width: f32,
     pub height: f32,
-    pub fill: Option<Fill>,
+    pub fill: Option<IOPaint>,
     #[serde(rename = "strokeWidth")]
     pub stroke_width: Option<f32>,
     #[serde(rename = "strokeCap")]
     pub stroke_cap: Option<String>,
+    pub stroke: Option<IOPaint>,
     pub effects: Option<Vec<serde_json::Value>>,
     #[serde(
         rename = "cornerRadius",
@@ -320,7 +354,7 @@ impl From<IOGradientStop> for GradientStop {
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
-pub enum Fill {
+pub enum IOPaint {
     #[serde(rename = "solid")]
     Solid { color: Option<RGBA> },
     #[serde(rename = "linear_gradient")]
@@ -406,14 +440,14 @@ impl From<RGBA> for Color {
     }
 }
 
-impl From<Option<Fill>> for Paint {
-    fn from(fill: Option<Fill>) -> Self {
+impl From<Option<IOPaint>> for Paint {
+    fn from(fill: Option<IOPaint>) -> Self {
         match fill {
-            Some(Fill::Solid { color }) => Paint::Solid(SolidPaint {
+            Some(IOPaint::Solid { color }) => Paint::Solid(SolidPaint {
                 color: color.map_or(Color(0, 0, 0, 0), |c| c.into()),
                 opacity: 1.0,
             }),
-            Some(Fill::LinearGradient {
+            Some(IOPaint::LinearGradient {
                 transform, stops, ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
@@ -425,7 +459,7 @@ impl From<Option<Fill>> for Paint {
                     opacity: 1.0,
                 })
             }
-            Some(Fill::RadialGradient {
+            Some(IOPaint::RadialGradient {
                 transform, stops, ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
@@ -583,7 +617,7 @@ impl From<IOVectorNode> for Node {
         let transform = AffineTransform::new(node.left, node.top, node.rotation);
 
         // For vector nodes, we'll create a path node with the path data
-        Node::Path(SVGPathNode {
+        Node::SVGPath(SVGPathNode {
             base: BaseNode {
                 id: node.id,
                 name: node.name,
@@ -636,6 +670,31 @@ fn vector_network_to_path(vn: &IOVectorNetwork) -> String {
     d
 }
 
+impl From<IOLineNode> for Node {
+    fn from(node: IOLineNode) -> Self {
+        let transform = AffineTransform::new(node.left, node.top, node.rotation);
+
+        Node::Line(LineNode {
+            base: BaseNode {
+                id: node.id,
+                name: node.name,
+                active: node.active,
+            },
+            transform,
+            size: Size {
+                width: node.width,
+                height: 0.0,
+            },
+            strokes: vec![node.stroke.into()],
+            stroke_width: node.stroke_width.unwrap_or(0.0),
+            _data_stroke_align: StrokeAlign::Center,
+            stroke_dash_array: None,
+            opacity: node.opacity,
+            blend_mode: BlendMode::Normal,
+        })
+    }
+}
+
 impl From<IOPathNode> for Node {
     fn from(node: IOPathNode) -> Self {
         let transform = AffineTransform::new(node.left, node.top, node.rotation);
@@ -646,7 +705,7 @@ impl From<IOPathNode> for Node {
             .map(|vn| vector_network_to_path(vn))
             .unwrap_or_else(String::new);
 
-        Node::Path(SVGPathNode {
+        Node::SVGPath(SVGPathNode {
             base: BaseNode {
                 id: node.id,
                 name: node.name,
@@ -675,6 +734,7 @@ impl From<IONode> for Node {
             IONode::Path(path) => path.into(),
             IONode::Ellipse(ellipse) => ellipse.into(),
             IONode::Rectangle(rectangle) => rectangle.into(),
+            IONode::Line(line) => line.into(),
             IONode::Unknown => Node::Error(ErrorNode {
                 base: BaseNode {
                     id: "unknown".to_string(),

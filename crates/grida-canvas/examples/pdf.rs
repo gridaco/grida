@@ -224,7 +224,7 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     }));
     all_node_ids.push(path.base.id.clone());
-    repo.insert(Node::Path(path));
+    repo.insert(Node::SVGPath(path));
 
     // Line with gradient stroke
     let mut line = nf.create_line_node();

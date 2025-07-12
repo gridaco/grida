@@ -43,7 +43,7 @@ pub trait ApplicationApi {
     fn devtools_rendering_set_show_hit_testing(&mut self, show: bool);
     fn devtools_rendering_set_show_ruler(&mut self, show: bool);
 
-    /// Load a scene from a JSON string using the `io_json` parser.
+    /// Load a scene from a JSON string using the `io_grida` parser.
     fn load_scene_json(&mut self, json: &str);
 
     // static demo scenes
@@ -266,11 +266,11 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn load_scene_json(&mut self, json: &str) {
-        use crate::io::io_json;
+        use crate::io::io_grida;
         use math2::transform::AffineTransform;
 
-        let Ok(file) = io_json::parse(json) else {
-            let err = io_json::parse(json).unwrap_err();
+        let Ok(file) = io_grida::parse(json) else {
+            let err = io_grida::parse(json).unwrap_err();
             eprintln!("failed to parse scene json: {}", err);
             return;
         };

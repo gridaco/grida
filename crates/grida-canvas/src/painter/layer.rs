@@ -416,7 +416,7 @@ impl LayerList {
                     text_align: n.text_align,
                     text_align_vertical: n.text_align_vertical,
                 })),
-                Node::Path(n) => {
+                Node::SVGPath(n) => {
                     let shape = build_shape(&IntrinsicSizeNode::Path(n.clone()));
                     let stroke_path = if n.stroke_width > 0.0 {
                         Some(stroke_geometry(
@@ -464,7 +464,7 @@ impl LayerList {
                             shape,
                             effects: n.effect.clone().into_iter().collect(),
                             strokes: vec![n.stroke.clone()],
-                            fills: vec![n.fill.clone()],
+                            fills: vec![Paint::Image(n.fill.clone())],
                             stroke_path,
                             clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },

@@ -152,7 +152,7 @@ async fn demo_shapes() -> Scene {
             opacity: 1.0,
         });
         all_shape_ids.push(path.base.id.clone());
-        repository.insert(Node::Path(path));
+        repository.insert(Node::SVGPath(path));
     }
 
     // Star Polygon Row - demonstrating different point counts and inner radius variations

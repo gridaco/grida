@@ -211,7 +211,7 @@ async fn demo_basic() -> Scene {
     repository.insert(Node::TextSpan(text_span_node));
     repository.insert(Node::Line(line_node));
     repository.insert(Node::Image(image_node));
-    repository.insert(Node::Path(path_node));
+    repository.insert(Node::SVGPath(path_node));
 
     // Now set up the shapes group with the IDs we collected
     shapes_group_node.children = vec![rect_id, ellipse_id, polygon_id, regular_polygon_id];

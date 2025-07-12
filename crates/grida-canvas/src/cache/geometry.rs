@@ -1,6 +1,6 @@
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
-use crate::node::schema::{GeometryMixin, IntrinsicSizeNode, Node, NodeId, Scene};
+use crate::node::schema::{IntrinsicSizeNode, Node, NodeGeometryMixin, NodeId, Scene};
 use math2::rect;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
@@ -226,7 +226,7 @@ impl GeometryCache {
             }
             _ => {
                 let intrinsic_node = Box::new(match node {
-                    Node::Path(n) => IntrinsicSizeNode::Path(n.clone()),
+                    Node::SVGPath(n) => IntrinsicSizeNode::Path(n.clone()),
                     Node::Rectangle(n) => IntrinsicSizeNode::Rectangle(n.clone()),
                     Node::Ellipse(n) => IntrinsicSizeNode::Ellipse(n.clone()),
                     Node::Polygon(n) => IntrinsicSizeNode::Polygon(n.clone()),
@@ -471,7 +471,7 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
             n.stroke_align,
             n.effect.as_ref(),
         ),
-        Node::Path(n) => compute_render_bounds_from_style(
+        Node::SVGPath(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
