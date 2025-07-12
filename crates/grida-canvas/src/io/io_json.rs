@@ -468,7 +468,7 @@ impl From<IOContainerNode> for ContainerNode {
                 .corner_radius
                 .unwrap_or(RectangularCornerRadius::zero()),
             fills: vec![node.fill.into()],
-            stroke: None,
+            strokes: vec![],
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
@@ -538,10 +538,7 @@ impl From<IOEllipseNode> for Node {
                 height: node.height,
             },
             fills: vec![node.fill.into()],
-            stroke: Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
-                opacity: 1.0,
-            }),
+            strokes: vec![],
             stroke_width: node.stroke_width.unwrap_or(0.0),
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
@@ -571,10 +568,7 @@ impl From<IORectangleNode> for Node {
                 .corner_radius
                 .unwrap_or(RectangularCornerRadius::zero()),
             fills: vec![node.fill.into()],
-            stroke: Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
-                opacity: 1.0,
-            }),
+            strokes: vec![],
             stroke_width: node.stroke_width.unwrap_or(0.0),
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
@@ -605,10 +599,7 @@ impl From<IOVectorNode> for Node {
                     .collect::<Vec<String>>()
                     .join(" ")
             }),
-            stroke: Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
-                opacity: 1.0,
-            }),
+            stroke: None,
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
@@ -665,10 +656,7 @@ impl From<IOPathNode> for Node {
             transform,
             fill: node.fill.into(),
             data,
-            stroke: Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
-                opacity: 1.0,
-            }),
+            stroke: None,
             stroke_width: node.stroke_width.unwrap_or(0.0),
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,

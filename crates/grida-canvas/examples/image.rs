@@ -34,10 +34,10 @@ async fn demo_image() -> Scene {
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
     }));
-    rect1.stroke = Paint::Solid(SolidPaint {
+    rect1.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     rect1.stroke_width = 2.0;
 
     let mut repository = NodeRepository::new();

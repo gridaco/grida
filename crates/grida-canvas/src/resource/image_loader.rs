@@ -154,9 +154,11 @@ pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
                         urls.push(img.hash.clone());
                     }
                 }
-                // Check stroke for image paint
-                if let Paint::Image(img) = &rect.stroke {
-                    urls.push(img.hash.clone());
+                // Check strokes for image paints
+                for stroke in &rect.strokes {
+                    if let Paint::Image(img) = stroke {
+                        urls.push(img.hash.clone());
+                    }
                 }
             }
             _ => {}

@@ -101,10 +101,10 @@ async fn demo_basic() -> Scene {
         color: Color(255, 200, 0, 255), // Orange fill
         opacity: 1.0,
     })];
-    polygon_node.stroke = Paint::Solid(SolidPaint {
+    polygon_node.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255), // Black stroke
         opacity: 1.0,
-    });
+    })];
     polygon_node.stroke_width = 5.0;
 
     // Create a test regular polygon node (hexagon)
@@ -156,10 +156,10 @@ async fn demo_basic() -> Scene {
     path_node.base.name = "Test Path".to_string();
     path_node.transform = AffineTransform::new(550.0, 300.0, 0.0);
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
-    path_node.stroke = Paint::Solid(SolidPaint {
+    path_node.stroke = Some(Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255), // Red stroke
         opacity: 1.0,
-    });
+    }));
     path_node.stroke_width = 4.0;
 
     // Create a test line node with solid color
@@ -171,10 +171,10 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 0.0, // ignored
     };
-    line_node.stroke = Paint::Solid(SolidPaint {
+    line_node.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 255, 0, 255), // Green color
         opacity: 1.0,
-    });
+    })];
     line_node.stroke_width = 4.0;
 
     // Create a group node for the shapes (rectangle, ellipse, polygon)

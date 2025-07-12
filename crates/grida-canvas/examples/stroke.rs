@@ -42,10 +42,10 @@ async fn demo_strokes() -> Scene {
         }));
 
         // Solid color stroke
-        rect.stroke = Paint::Solid(SolidPaint {
+        rect.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255), // Black stroke
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 8.0; // Thick stroke to make alignment visible
 
         // Set different alignments
@@ -78,10 +78,10 @@ async fn demo_strokes() -> Scene {
         }));
 
         // Solid color stroke
-        rect.stroke = Paint::Solid(SolidPaint {
+        rect.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255), // Black stroke
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = (i + 1) as f32 * 2.0; // Increasing stroke width
         rect.stroke_align = StrokeAlign::Center;
 
@@ -104,10 +104,10 @@ async fn demo_strokes() -> Scene {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
         }));
-        rect.stroke = Paint::Solid(SolidPaint {
+        rect.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 4.0;
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -124,10 +124,10 @@ async fn demo_strokes() -> Scene {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
         })];
-        ellipse.stroke = Paint::Solid(SolidPaint {
+        ellipse.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
-        });
+        })];
         ellipse.stroke_width = 4.0;
         all_shape_ids.push(ellipse.base.id.clone());
         repository.insert(Node::Ellipse(ellipse));
@@ -145,10 +145,10 @@ async fn demo_strokes() -> Scene {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
         })];
-        polygon.stroke = Paint::Solid(SolidPaint {
+        polygon.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
-        });
+        })];
         polygon.stroke_width = 4.0;
         all_shape_ids.push(polygon.base.id.clone());
         repository.insert(Node::RegularPolygon(polygon));
@@ -167,10 +167,10 @@ async fn demo_strokes() -> Scene {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
         })];
-        star.stroke = Paint::Solid(SolidPaint {
+        star.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
-        });
+        })];
         star.stroke_width = 4.0;
         all_shape_ids.push(star.base.id.clone());
         repository.insert(Node::RegularStarPolygon(star));
@@ -194,10 +194,10 @@ async fn demo_strokes() -> Scene {
         }));
 
         // Solid color stroke
-        rect.stroke = Paint::Solid(SolidPaint {
+        rect.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 4.0;
 
         // Add different effects
@@ -235,10 +235,10 @@ async fn demo_strokes() -> Scene {
         }));
 
         // Solid color stroke
-        rect.stroke = Paint::Solid(SolidPaint {
+        rect.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 4.0;
 
         // Add different dash patterns
@@ -269,7 +269,7 @@ async fn demo_strokes() -> Scene {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
         }));
-        rect.stroke = Paint::LinearGradient(LinearGradientPaint {
+        rect.strokes = vec![Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::new(0.0, 0.0, 0.0),
             stops: vec![
                 GradientStop {
@@ -282,7 +282,7 @@ async fn demo_strokes() -> Scene {
                 },
             ],
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 8.0;
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -300,7 +300,7 @@ async fn demo_strokes() -> Scene {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
         }));
-        rect.stroke = Paint::RadialGradient(RadialGradientPaint {
+        rect.strokes = vec![Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::new(base_size / 2.0, base_size / 2.0, 0.0),
             stops: vec![
                 GradientStop {
@@ -313,7 +313,7 @@ async fn demo_strokes() -> Scene {
                 },
             ],
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 8.0;
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -331,7 +331,7 @@ async fn demo_strokes() -> Scene {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
         }));
-        rect.stroke = Paint::RadialGradient(RadialGradientPaint {
+        rect.strokes = vec![Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::new(base_size / 2.0, base_size / 2.0, 0.0),
             stops: vec![
                 GradientStop {
@@ -348,7 +348,7 @@ async fn demo_strokes() -> Scene {
                 },
             ],
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 8.0;
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -366,10 +366,10 @@ async fn demo_strokes() -> Scene {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
         }));
-        rect.stroke = Paint::Solid(SolidPaint {
+        rect.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(255, 128, 0, 255), // Orange
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 8.0;
         rect.stroke_dash_array = Some(vec![20.0, 10.0, 5.0, 10.0]); // Complex dash pattern
         all_shape_ids.push(rect.base.id.clone());

@@ -31,10 +31,10 @@ async fn demo_images() -> Scene {
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
     }));
-    rect1.stroke = Paint::Solid(SolidPaint {
+    rect1.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     rect1.stroke_width = 2.0;
 
     // Second example: Rectangle with ImagePaint fill and stroke
@@ -51,12 +51,12 @@ async fn demo_images() -> Scene {
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
     }));
-    rect2.stroke = Paint::Image(ImagePaint {
+    rect2.strokes = vec![Paint::Image(ImagePaint {
         hash: image_url.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
-    });
+    })];
     rect2.stroke_width = 10.0;
 
     // Third example: Rectangle with ImagePaint stroke only
@@ -72,12 +72,12 @@ async fn demo_images() -> Scene {
         color: Color(240, 240, 240, 255),
         opacity: 1.0,
     }));
-    rect3.stroke = Paint::Image(ImagePaint {
+    rect3.strokes = vec![Paint::Image(ImagePaint {
         hash: image_url.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
-    });
+    })];
     rect3.stroke_width = 10.0;
 
     // Fourth example: Rectangle with ImagePaint fill using a custom transform

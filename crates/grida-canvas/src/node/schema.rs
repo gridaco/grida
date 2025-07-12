@@ -186,8 +186,18 @@ pub trait FillsMixin {
     fn set_fills(&mut self, fills: Vec<Paint>);
 }
 
+pub trait StrokesMixin {
+    fn set_stroke(&mut self, stroke: Paint);
+    fn set_strokes(&mut self, strokes: Vec<Paint>);
+}
+
 pub trait GeometryMixin {
     fn rect(&self) -> Rectangle;
+    /// if there is any valud stroke that should be taken into account for rendering, return true.
+    /// stroke_width > 0.0 and at least one stroke with opacity > 0.0.
+    fn has_stroke_geometry(&self) -> bool;
+
+    fn render_stroke_width(&self) -> f32;
 }
 
 #[derive(Debug, Clone)]
@@ -198,7 +208,7 @@ pub struct ContainerNode {
     pub corner_radius: RectangularCornerRadius,
     pub children: Vec<NodeId>,
     pub fills: Vec<Paint>,
-    pub stroke: Option<Paint>,
+    pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -227,6 +237,18 @@ impl GeometryMixin for ContainerNode {
             height: self.size.height,
         }
     }
+
+    fn has_stroke_geometry(&self) -> bool {
+        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+    }
+
+    fn render_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width
+        } else {
+            0.0
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -236,7 +258,7 @@ pub struct RectangleNode {
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
     pub fills: Vec<Paint>,
-    pub stroke: Paint,
+    pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -264,6 +286,18 @@ impl GeometryMixin for RectangleNode {
             height: self.size.height,
         }
     }
+
+    fn has_stroke_geometry(&self) -> bool {
+        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+    }
+
+    fn render_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width
+        } else {
+            0.0
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -271,7 +305,7 @@ pub struct LineNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
     pub size: Size, // height is always 0 (ignored)
-    pub stroke: Paint,
+    pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub _data_stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -313,6 +347,19 @@ impl GeometryMixin for ImageNode {
             height: self.size.height,
         }
     }
+
+    fn has_stroke_geometry(&self) -> bool {
+        // TODO: implement this
+        true
+    }
+
+    fn render_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width
+        } else {
+            0.0
+        }
+    }
 }
 
 /// A node representing an ellipse shape.
@@ -325,7 +372,7 @@ pub struct EllipseNode {
     pub transform: AffineTransform,
     pub size: Size,
     pub fills: Vec<Paint>,
-    pub stroke: Paint,
+    pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -351,6 +398,18 @@ impl GeometryMixin for EllipseNode {
             y: 0.0,
             width: self.size.width,
             height: self.size.height,
+        }
+    }
+
+    fn has_stroke_geometry(&self) -> bool {
+        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+    }
+
+    fn render_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width
+        } else {
+            0.0
         }
     }
 }
@@ -380,7 +439,7 @@ pub struct SVGPathNode {
     pub transform: AffineTransform,
     pub fill: Paint,
     pub data: String,
-    pub stroke: Paint,
+    pub stroke: Option<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -416,7 +475,7 @@ pub struct PolygonNode {
     pub fills: Vec<Paint>,
 
     /// The stroke paint used to outline the polygon.
-    pub stroke: Paint,
+    pub strokes: Vec<Paint>,
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
@@ -436,6 +495,16 @@ impl FillsMixin for PolygonNode {
 
     fn set_fills(&mut self, fills: Vec<Paint>) {
         self.fills = fills;
+    }
+}
+
+impl StrokesMixin for PolygonNode {
+    fn set_stroke(&mut self, stroke: Paint) {
+        self.strokes = vec![stroke];
+    }
+
+    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+        self.strokes = strokes;
     }
 }
 
@@ -478,7 +547,7 @@ pub struct RegularPolygonNode {
     pub fills: Vec<Paint>,
 
     /// The stroke paint used to outline the polygon.
-    pub stroke: Paint,
+    pub strokes: Vec<Paint>,
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
@@ -507,6 +576,18 @@ impl GeometryMixin for RegularPolygonNode {
             y: 0.0,
             width: self.size.width,
             height: self.size.height,
+        }
+    }
+
+    fn has_stroke_geometry(&self) -> bool {
+        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+    }
+
+    fn render_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width
+        } else {
+            0.0
         }
     }
 }
@@ -540,7 +621,7 @@ impl RegularPolygonNode {
             points,
             corner_radius: self.corner_radius,
             fills: self.fills.clone(),
-            stroke: self.stroke.clone(),
+            strokes: self.strokes.clone(),
             stroke_width: self.stroke_width,
             stroke_align: self.stroke_align,
             opacity: self.opacity,
@@ -589,7 +670,7 @@ pub struct RegularStarPolygonNode {
     pub fills: Vec<Paint>,
 
     /// The stroke paint used to outline the polygon.
-    pub stroke: Paint,
+    pub strokes: Vec<Paint>,
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
@@ -620,6 +701,19 @@ impl GeometryMixin for RegularStarPolygonNode {
             height: self.size.height,
         }
     }
+
+    fn has_stroke_geometry(&self) -> bool {
+        // TODO: implement this
+        true
+    }
+
+    fn render_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width
+        } else {
+            0.0
+        }
+    }
 }
 
 impl RegularStarPolygonNode {
@@ -648,7 +742,7 @@ impl RegularStarPolygonNode {
             points,
             corner_radius: self.corner_radius,
             fills: self.fills.clone(),
-            stroke: self.stroke.clone(),
+            strokes: self.strokes.clone(),
             stroke_width: self.stroke_width,
             stroke_align: self.stroke_align,
             opacity: self.opacity,

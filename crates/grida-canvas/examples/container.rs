@@ -22,10 +22,10 @@ async fn demo_clip() -> Scene {
         color: Color(240, 100, 100, 255), // Light red
         opacity: 1.0,
     }));
-    container.stroke = Some(Paint::Solid(SolidPaint {
+    container.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(200, 50, 50, 255), // Darker red
         opacity: 1.0,
-    }));
+    })];
     container.effect = Some(FilterEffect::DropShadow(FeDropShadow {
         dx: 0.0,
         dy: 0.0,
@@ -47,10 +47,10 @@ async fn demo_clip() -> Scene {
         color: Color(100, 200, 100, 255), // Light green
         opacity: 1.0,
     })];
-    ellipse.stroke = Paint::Solid(SolidPaint {
+    ellipse.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(50, 150, 50, 255), // Darker green
         opacity: 1.0,
-    });
+    })];
     ellipse.stroke_width = 2.0;
 
     // Add nodes to repository and collect their IDs

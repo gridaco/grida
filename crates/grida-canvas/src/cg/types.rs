@@ -246,6 +246,17 @@ pub enum Paint {
     Image(ImagePaint),
 }
 
+impl Paint {
+    pub fn opacity(&self) -> f32 {
+        match self {
+            Paint::Solid(solid) => solid.opacity,
+            Paint::LinearGradient(gradient) => gradient.opacity,
+            Paint::RadialGradient(gradient) => gradient.opacity,
+            Paint::Image(image) => image.opacity,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SolidPaint {
     pub color: Color,

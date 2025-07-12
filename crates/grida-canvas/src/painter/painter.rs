@@ -271,6 +271,19 @@ impl<'a> Painter<'a> {
         }
     }
 
+    fn draw_strokes(
+        &self,
+        shape: &PainterShape,
+        strokes: &Vec<Paint>,
+        stroke_width: f32,
+        stroke_align: StrokeAlign,
+        stroke_dash_array: Option<&Vec<f32>>,
+    ) {
+        for stroke in strokes {
+            self.draw_stroke(shape, stroke, stroke_width, stroke_align, stroke_dash_array);
+        }
+    }
+
     /// Draw stroke for a shape using given paint.
     fn draw_stroke(
         &self,
@@ -383,9 +396,9 @@ impl<'a> Painter<'a> {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fills(&shape, &node.fills);
-                        self.draw_stroke(
+                        self.draw_strokes(
                             &shape,
-                            &node.stroke,
+                            &node.strokes,
                             node.stroke_width,
                             node.stroke_align,
                             node.stroke_dash_array.as_ref(),
@@ -435,9 +448,9 @@ impl<'a> Painter<'a> {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fills(&shape, &node.fills);
-                        self.draw_stroke(
+                        self.draw_strokes(
                             &shape,
-                            &node.stroke,
+                            &node.strokes,
                             node.stroke_width,
                             node.stroke_align,
                             node.stroke_dash_array.as_ref(),
@@ -455,14 +468,16 @@ impl<'a> Painter<'a> {
 
             self.with_opacity(node.opacity, || {
                 self.with_blendmode(node.blend_mode, || {
-                    let paint = cvt::sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
-                    let stroke_path = stroke_geometry(
-                        &shape.to_path(),
-                        node.stroke_width,
-                        node.get_stroke_align(),
-                        node.stroke_dash_array.as_ref(),
-                    );
-                    self.canvas.draw_path(&stroke_path, &paint);
+                    for stroke in &node.strokes {
+                        let paint = cvt::sk_paint(stroke, node.opacity, (node.size.width, 0.0));
+                        let stroke_path = stroke_geometry(
+                            &shape.to_path(),
+                            node.stroke_width,
+                            node.get_stroke_align(),
+                            node.stroke_dash_array.as_ref(),
+                        );
+                        self.canvas.draw_path(&stroke_path, &paint);
+                    }
                 });
             });
         });
@@ -477,13 +492,15 @@ impl<'a> Painter<'a> {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fill(&shape, &node.fill);
-                        self.draw_stroke(
-                            &shape,
-                            &node.stroke,
-                            node.stroke_width,
-                            node.stroke_align,
-                            node.stroke_dash_array.as_ref(),
-                        );
+                        if let Some(stroke) = &node.stroke {
+                            self.draw_stroke(
+                                &shape,
+                                stroke,
+                                node.stroke_width,
+                                node.stroke_align,
+                                node.stroke_dash_array.as_ref(),
+                            );
+                        }
                     });
                 });
             });
@@ -499,9 +516,9 @@ impl<'a> Painter<'a> {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fills(&shape, &node.fills);
-                        self.draw_stroke(
+                        self.draw_strokes(
                             &shape,
-                            &node.stroke,
+                            &node.strokes,
                             node.stroke_width,
                             node.stroke_align,
                             node.stroke_dash_array.as_ref(),
@@ -613,15 +630,13 @@ impl<'a> Painter<'a> {
                 self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fills(&shape, &node.fills);
-                        if let Some(stroke) = &node.stroke {
-                            self.draw_stroke(
-                                &shape,
-                                stroke,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        }
+                        self.draw_strokes(
+                            &shape,
+                            &node.strokes,
+                            node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
+                        );
                     });
                 });
 

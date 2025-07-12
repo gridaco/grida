@@ -378,21 +378,23 @@ impl FigmaConverter {
         })
     }
 
-    /// Convert Figma's strokes to our Paint
-    fn convert_strokes(&self, strokes: Option<&Option<Vec<FigmaPaint>>>) -> Option<Paint> {
-        strokes.and_then(|s| s.as_ref()).and_then(|paints| {
-            // Filter out invisible paints and get the first visible one
-            paints
-                .iter()
-                .filter(|paint| match paint {
-                    FigmaPaint::SolidPaint(solid) => solid.visible.unwrap_or(true),
-                    FigmaPaint::GradientPaint(gradient) => gradient.visible.unwrap_or(true),
-                    FigmaPaint::ImagePaint(image) => image.visible.unwrap_or(true),
-                    _ => true,
-                })
-                .next()
-                .map(|paint| self.convert_paint(paint))
-        })
+    /// Convert Figma's strokes to our Paint vector
+    fn convert_strokes(&self, strokes: Option<&Option<Vec<FigmaPaint>>>) -> Vec<Paint> {
+        strokes
+            .and_then(|s| s.as_ref())
+            .map_or(Vec::new(), |paints| {
+                // Filter out invisible paints and convert visible ones
+                paints
+                    .iter()
+                    .filter(|paint| match paint {
+                        FigmaPaint::SolidPaint(solid) => solid.visible.unwrap_or(true),
+                        FigmaPaint::GradientPaint(gradient) => gradient.visible.unwrap_or(true),
+                        FigmaPaint::ImagePaint(image) => image.visible.unwrap_or(true),
+                        _ => true,
+                    })
+                    .map(|paint| self.convert_paint(paint))
+                    .collect()
+            })
     }
 
     /// Convert Figma's stroke align to our StrokeAlign
@@ -533,7 +535,7 @@ impl FigmaConverter {
                 component.rectangle_corner_radii.as_ref(),
             ),
             fills: self.convert_fills(Some(&component.fills.as_ref())),
-            stroke: self.convert_strokes(Some(&component.strokes)),
+            strokes: self.convert_strokes(Some(&component.strokes)),
             stroke_width: component.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 component
@@ -630,7 +632,7 @@ impl FigmaConverter {
                 instance.rectangle_corner_radii.as_ref(),
             ),
             fills: self.convert_fills(Some(&instance.fills.as_ref())),
-            stroke: self.convert_strokes(Some(&instance.strokes)),
+            strokes: self.convert_strokes(Some(&instance.strokes)),
             stroke_width: instance.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 instance
@@ -670,7 +672,7 @@ impl FigmaConverter {
             corner_radius: RectangularCornerRadius::zero(),
             children,
             fills: self.convert_fills(Some(&section.fills.as_ref())),
-            stroke: None,
+            strokes: vec![],
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
@@ -789,7 +791,7 @@ impl FigmaConverter {
                 origin.rectangle_corner_radii.as_ref(),
             ),
             fills: self.convert_fills(Some(&origin.fills.as_ref())),
-            stroke: self.convert_strokes(Some(&origin.strokes)),
+            strokes: self.convert_strokes(Some(&origin.strokes)),
             stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 origin
@@ -895,7 +897,7 @@ impl FigmaConverter {
                 .first()
                 .cloned()
                 .unwrap_or(BLACK),
-            stroke: self.convert_strokes(Some(&origin.strokes)),
+            stroke: self.convert_strokes(Some(&origin.strokes)).first().cloned(),
             stroke_width: Some(origin.stroke_weight.unwrap_or(0.0) as f32),
             stroke_align: StrokeAlign::Inside,
             opacity: Self::convert_opacity(origin.visible),
@@ -923,10 +925,7 @@ impl FigmaConverter {
                         .cloned()
                         .unwrap_or(TRANSPARENT),
                     data: geometry.path.clone(),
-                    stroke: Paint::Solid(SolidPaint {
-                        color: Color(0, 0, 0, 0),
-                        opacity: 0.0,
-                    }),
+                    stroke: None,
                     stroke_width: 0.0,
                     stroke_align: StrokeAlign::Inside,
                     stroke_dash_array: None,
@@ -952,9 +951,11 @@ impl FigmaConverter {
                     transform: AffineTransform::identity(),
                     fill: self
                         .convert_strokes(Some(&origin.strokes))
+                        .first()
+                        .cloned()
                         .unwrap_or(TRANSPARENT),
                     data: geometry.path.clone(),
-                    stroke: TRANSPARENT,
+                    stroke: None,
                     stroke_width: 0.0,
                     stroke_align: StrokeAlign::Inside,
                     stroke_dash_array: None,
@@ -979,7 +980,7 @@ impl FigmaConverter {
             size: Self::convert_size(origin.size.as_ref()),
             corner_radius: RectangularCornerRadius::zero(),
             fills: vec![TRANSPARENT],
-            stroke: None,
+            strokes: vec![],
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
@@ -1032,7 +1033,7 @@ impl FigmaConverter {
                 .first()
                 .cloned()
                 .unwrap_or(TRANSPARENT),
-            stroke: self.convert_strokes(Some(&origin.strokes)),
+            stroke: self.convert_strokes(Some(&origin.strokes)).first().cloned(),
             stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 origin
@@ -1068,9 +1069,7 @@ impl FigmaConverter {
             inner_radius: 0.4,  // Default inner radius to 0.4 (40% of outer radius)
             corner_radius: 0.0, // Figma stars don't have corner radius
             fills: self.convert_fills(Some(&origin.fills)),
-            stroke: self
-                .convert_strokes(Some(&origin.strokes))
-                .unwrap_or(TRANSPARENT),
+            strokes: self.convert_strokes(Some(&origin.strokes)),
             stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 origin
@@ -1102,9 +1101,10 @@ impl FigmaConverter {
             },
             transform,
             size,
-            stroke: self
+            strokes: self
                 .convert_strokes(Some(&origin.strokes))
-                .unwrap_or(TRANSPARENT),
+                .into_iter()
+                .collect(),
             stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             _data_stroke_align: Self::convert_stroke_align(
                 origin
@@ -1139,9 +1139,7 @@ impl FigmaConverter {
             transform,
             size,
             fills: self.convert_fills(Some(&origin.fills)),
-            stroke: self
-                .convert_strokes(Some(&origin.strokes))
-                .unwrap_or(TRANSPARENT),
+            strokes: self.convert_strokes(Some(&origin.strokes)),
             stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 origin
@@ -1178,9 +1176,7 @@ impl FigmaConverter {
             point_count: 3,
             corner_radius: origin.corner_radius.unwrap_or(0.0) as f32,
             fills: self.convert_fills(Some(&origin.fills)),
-            stroke: self
-                .convert_strokes(Some(&origin.strokes))
-                .unwrap_or(TRANSPARENT),
+            strokes: self.convert_strokes(Some(&origin.strokes)),
             stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 origin
@@ -1216,9 +1212,7 @@ impl FigmaConverter {
                 origin.rectangle_corner_radii.as_ref(),
             ),
             fills: self.convert_fills(Some(&origin.fills)),
-            stroke: self
-                .convert_strokes(Some(&origin.strokes))
-                .unwrap_or(TRANSPARENT),
+            strokes: self.convert_strokes(Some(&origin.strokes)),
             stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 origin
@@ -1261,7 +1255,7 @@ impl FigmaConverter {
                 origin.rectangle_corner_radii.as_ref(),
             ),
             fills: self.convert_fills(None),
-            stroke: None,
+            strokes: vec![],
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,

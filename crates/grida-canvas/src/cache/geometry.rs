@@ -190,7 +190,7 @@ impl GeometryCache {
                 let mut union_world_bounds = world_bounds;
                 let render_bounds = compute_render_bounds_from_style(
                     world_bounds,
-                    if n.stroke.is_some() {
+                    if n.has_stroke_geometry() {
                         n.stroke_width
                     } else {
                         0.0
@@ -497,7 +497,7 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
         ),
         Node::Container(n) => compute_render_bounds_from_style(
             world_bounds,
-            if n.stroke.is_some() {
+            if n.has_stroke_geometry() {
                 n.stroke_width
             } else {
                 0.0

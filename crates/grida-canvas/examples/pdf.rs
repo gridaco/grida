@@ -107,10 +107,10 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     }));
     rect_gradient.stroke_width = 3.0;
-    rect_gradient.stroke = Paint::Solid(SolidPaint {
+    rect_gradient.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     rect_gradient.effect = Some(FilterEffect::DropShadow(FeDropShadow {
         dx: 5.0,
         dy: 5.0,
@@ -147,10 +147,10 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     })];
     ellipse_radial.stroke_width = 4.0;
-    ellipse_radial.stroke = Paint::Solid(SolidPaint {
+    ellipse_radial.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     all_node_ids.push(ellipse_radial.base.id.clone());
     repo.insert(Node::Ellipse(ellipse_radial));
 
@@ -174,10 +174,10 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     })];
     hexagon.stroke_width = 3.0;
-    hexagon.stroke = Paint::Solid(SolidPaint {
+    hexagon.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(255, 255, 255, 255),
         opacity: 1.0,
-    });
+    })];
     hexagon.effect = Some(FilterEffect::DropShadow(FeDropShadow {
         dx: 3.0,
         dy: 3.0,
@@ -202,10 +202,10 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     })];
     star.stroke_width = 2.0;
-    star.stroke = Paint::Solid(SolidPaint {
+    star.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(139, 69, 19, 255), // Brown
         opacity: 1.0,
-    });
+    })];
     all_node_ids.push(star.base.id.clone());
     repo.insert(Node::RegularStarPolygon(star));
 
@@ -219,10 +219,10 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     });
     path.stroke_width = 2.0;
-    path.stroke = Paint::Solid(SolidPaint {
+    path.stroke = Some(Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
-    });
+    }));
     all_node_ids.push(path.base.id.clone());
     repo.insert(Node::Path(path));
 
@@ -234,7 +234,7 @@ async fn demo_scene() -> Scene {
         width: 200.0,
         height: 0.0,
     };
-    line.stroke = Paint::LinearGradient(LinearGradientPaint {
+    line.strokes = vec![Paint::LinearGradient(LinearGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -251,7 +251,7 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
-    });
+    })];
     line.stroke_width = 8.0;
     all_node_ids.push(line.base.id.clone());
     repo.insert(Node::Line(line));
@@ -270,10 +270,10 @@ async fn demo_scene() -> Scene {
         opacity: 0.8,
     })];
     octagon.stroke_width = 3.0;
-    octagon.stroke = Paint::Solid(SolidPaint {
+    octagon.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     all_node_ids.push(octagon.base.id.clone());
     repo.insert(Node::RegularPolygon(octagon));
 

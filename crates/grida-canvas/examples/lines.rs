@@ -31,10 +31,10 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_basic.stroke = Paint::Solid(SolidPaint {
+    line_basic.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     line_basic.stroke_width = 2.0;
     ids.push(line_basic.base.id.clone());
     repo.insert(Node::Line(line_basic));
@@ -47,10 +47,10 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_outside.stroke = Paint::Solid(SolidPaint {
+    line_outside.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     line_outside.stroke_width = 8.0;
     line_outside._data_stroke_align = StrokeAlign::Outside;
     ids.push(line_outside.base.id.clone());
@@ -64,10 +64,10 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_dashed.stroke = Paint::Solid(SolidPaint {
+    line_dashed.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 255, 255),
         opacity: 1.0,
-    });
+    })];
     line_dashed.stroke_width = 4.0;
     line_dashed.stroke_dash_array = Some(vec![10.0, 5.0]);
     ids.push(line_dashed.base.id.clone());
@@ -81,7 +81,7 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_gradient.stroke = Paint::LinearGradient(LinearGradientPaint {
+    line_gradient.strokes = vec![Paint::LinearGradient(LinearGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -94,7 +94,7 @@ async fn demo_lines() -> Scene {
             },
         ],
         opacity: 1.0,
-    });
+    })];
     line_gradient.stroke_width = 6.0;
     ids.push(line_gradient.base.id.clone());
     repo.insert(Node::Line(line_gradient));
@@ -108,10 +108,10 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_rotated.stroke = Paint::Solid(SolidPaint {
+    line_rotated.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 128, 128, 255),
         opacity: 1.0,
-    });
+    })];
     line_rotated.stroke_width = 4.0;
     ids.push(line_rotated.base.id.clone());
     repo.insert(Node::Line(line_rotated));
