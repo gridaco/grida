@@ -95,7 +95,7 @@ async fn demo_basic() -> Scene {
     let mut polygon_node = nf.create_polygon_node();
     polygon_node.base.name = "Test Polygon".to_string();
     polygon_node.blend_mode = BlendMode::Screen;
-    polygon_node.transform = AffineTransform::new(800.0, 50.0, 0.0);
+    polygon_node.transform = AffineTransform::new(600.0, 50.0, 0.0);
     polygon_node.points = pentagon_points;
     polygon_node.fills = vec![Paint::Solid(SolidPaint {
         color: Color(255, 200, 0, 255), // Orange fill

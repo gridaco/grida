@@ -267,7 +267,6 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn load_scene_json(&mut self, json: &str) {
         use crate::io::io_grida;
-        use math2::transform::AffineTransform;
 
         let Ok(file) = io_grida::parse(json) else {
             let err = io_grida::parse(json).unwrap_err();
