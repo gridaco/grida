@@ -240,7 +240,7 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             path.line_to((n.size.width, 0.0));
             PainterShape::from_path(path)
         }
-        IntrinsicSizeNode::Path(n) => {
+        IntrinsicSizeNode::SVGPath(n) => {
             if let Some(path) = Path::from_svg(&n.data) {
                 PainterShape::from_path(path)
             } else {
@@ -248,6 +248,7 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
                 PainterShape::from_rect(Rect::new(0.0, 0.0, 0.0, 0.0))
             }
         }
+        IntrinsicSizeNode::Vector(n) => PainterShape::from_path(n.network.clone().into()),
         IntrinsicSizeNode::Container(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             let r = n.corner_radius;
@@ -349,7 +350,7 @@ pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
             n.clone(),
         ))),
         Node::Line(n) => Some(build_shape(&IntrinsicSizeNode::Line(n.clone()))),
-        Node::SVGPath(n) => Some(build_shape(&IntrinsicSizeNode::Path(n.clone()))),
+        Node::SVGPath(n) => Some(build_shape(&IntrinsicSizeNode::SVGPath(n.clone()))),
         Node::Image(n) => Some(build_shape(&IntrinsicSizeNode::Image(n.clone()))),
         Node::Error(n) => Some(build_shape(&IntrinsicSizeNode::Error(n.clone()))),
         _ => None,

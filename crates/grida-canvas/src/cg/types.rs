@@ -60,6 +60,12 @@ pub enum BlendMode {
     PassThrough,
 }
 
+impl Default for BlendMode {
+    fn default() -> Self {
+        BlendMode::Normal
+    }
+}
+
 /// Stroke alignment.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  

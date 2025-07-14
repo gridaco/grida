@@ -1,3 +1,4 @@
+pub use super::geometry::*;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::painter::cvt;
@@ -67,6 +68,7 @@ pub enum Node {
     Line(LineNode),
     TextSpan(TextSpanNode),
     SVGPath(SVGPathNode),
+    Vector(VectorNode),
     BooleanOperation(BooleanPathOperationNode),
     Image(ImageNode),
 }
@@ -91,6 +93,7 @@ impl NodeTrait for Node {
             Node::Line(n) => n.base.id.clone(),
             Node::TextSpan(n) => n.base.id.clone(),
             Node::SVGPath(n) => n.base.id.clone(),
+            Node::Vector(n) => n.base.id.clone(),
             Node::BooleanOperation(n) => n.base.id.clone(),
             Node::Image(n) => n.base.id.clone(),
         }
@@ -109,6 +112,7 @@ impl NodeTrait for Node {
             Node::Line(n) => n.base.name.clone(),
             Node::TextSpan(n) => n.base.name.clone(),
             Node::SVGPath(n) => n.base.name.clone(),
+            Node::Vector(n) => n.base.name.clone(),
             Node::BooleanOperation(n) => n.base.name.clone(),
             Node::Image(n) => n.base.name.clone(),
         }
@@ -146,7 +150,8 @@ pub enum IntrinsicSizeNode {
     RegularStarPolygon(RegularStarPolygonNode),
     Line(LineNode),
     TextSpan(TextSpanNode),
-    Path(SVGPathNode),
+    SVGPath(SVGPathNode),
+    Vector(VectorNode),
     Image(ImageNode),
 }
 
@@ -160,7 +165,8 @@ pub enum LeafNode {
     RegularStarPolygon(RegularStarPolygonNode),
     Line(LineNode),
     TextSpan(TextSpanNode),
-    Path(SVGPathNode),
+    SVGPath(SVGPathNode),
+    Vector(VectorNode),
     Image(ImageNode),
 }
 
@@ -427,6 +433,29 @@ pub struct BooleanPathOperationNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: Vec<FilterEffect>,
+}
+
+///
+/// Vector Network Node.
+///
+#[derive(Debug, Clone)]
+pub struct VectorNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub network: VectorNetwork,
+    pub strokes: Vec<Paint>,
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
+    pub opacity: f32,
+    pub blend_mode: BlendMode,
+    pub effects: Vec<FilterEffect>,
+}
+
+impl ToSkPath for VectorNode {
+    fn to_sk_path(&self) -> skia_safe::Path {
+        self.network.clone().into()
+    }
 }
 
 ///

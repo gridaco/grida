@@ -483,6 +483,27 @@ impl<'a> Painter<'a> {
         });
     }
 
+    fn draw_vector_node(&self, node: &VectorNode) {
+        self.with_transform(&node.transform.matrix, || {
+            let shape = PainterShape::from_path(node.network.clone().into());
+            self.draw_shape_with_effect(node.effects.first(), &shape, || {
+                self.with_opacity(node.opacity, || {
+                    self.with_blendmode(node.blend_mode, || {
+                        // TODO: fills
+                        // self.draw_fills(&shape, fills);
+                        self.draw_strokes(
+                            &shape,
+                            &node.strokes,
+                            node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
+                        );
+                    });
+                });
+            });
+        });
+    }
+
     /// Draw a PathNode (SVG path data)
     fn draw_path_node(&self, node: &SVGPathNode) {
         self.with_transform(&node.transform.matrix, || {
@@ -746,7 +767,8 @@ impl<'a> Painter<'a> {
             LeafNode::Image(n) => {
                 self.draw_image_node(n);
             }
-            LeafNode::Path(n) => self.draw_path_node(n),
+            LeafNode::Vector(n) => self.draw_vector_node(n),
+            LeafNode::SVGPath(n) => self.draw_path_node(n),
             LeafNode::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
         }
     }
@@ -771,6 +793,7 @@ impl<'a> Painter<'a> {
             Node::Image(n) => {
                 self.draw_image_node(n);
             }
+            Node::Vector(n) => self.draw_vector_node(n),
             Node::SVGPath(n) => self.draw_path_node(n),
             Node::BooleanOperation(n) => {
                 self.draw_boolean_operation_node_recursively(n, repository, cache)

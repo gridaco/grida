@@ -417,7 +417,7 @@ impl LayerList {
                     text_align_vertical: n.text_align_vertical,
                 })),
                 Node::SVGPath(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::Path(n.clone()));
+                    let shape = build_shape(&IntrinsicSizeNode::SVGPath(n.clone()));
                     let stroke_path = if n.stroke_width > 0.0 {
                         Some(stroke_geometry(
                             &shape.to_path(),
@@ -438,6 +438,33 @@ impl LayerList {
                             effects: n.effects.clone().into_iter().collect(),
                             strokes: n.stroke.clone().into_iter().collect(),
                             fills: vec![n.fill.clone()],
+                            stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                        },
+                    }))
+                }
+                Node::Vector(n) => {
+                    let shape = build_shape(&IntrinsicSizeNode::Vector(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        base: PainterPictureLayerBase {
+                            id: n.base.id.clone(),
+                            z_index: out.len(),
+                            opacity: parent_opacity * n.opacity,
+                            transform,
+                            shape,
+                            effects: n.effects.clone().into_iter().collect(),
+                            strokes: n.strokes.clone().into_iter().collect(),
+                            fills: vec![],
                             stroke_path,
                             clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },

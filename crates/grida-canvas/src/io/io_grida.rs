@@ -219,6 +219,24 @@ pub struct IOVectorNetwork {
     pub segments: Vec<IOVectorNetworkSegment>,
 }
 
+impl From<IOVectorNetwork> for VectorNetwork {
+    fn from(network: IOVectorNetwork) -> Self {
+        VectorNetwork {
+            vertices: network.vertices.into_iter().map(|v| v.p).collect(),
+            segments: network
+                .segments
+                .into_iter()
+                .map(|s| VectorNetworkSegment {
+                    a: s.a,
+                    b: s.b,
+                    ta: Some(s.ta),
+                    tb: Some(s.tb),
+                })
+                .collect(),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct IOLineNode {
     pub id: String,
@@ -643,33 +661,6 @@ impl From<IOVectorNode> for Node {
     }
 }
 
-fn vector_network_to_path(vn: &IOVectorNetwork) -> String {
-    if vn.vertices.is_empty() {
-        return String::new();
-    }
-
-    let mut d = String::new();
-    let first = vn
-        .segments
-        .get(0)
-        .map(|s| vn.vertices[s.a].p)
-        .unwrap_or([0.0, 0.0]);
-    d.push_str(&format!("M{} {}", first[0], first[1]));
-
-    for seg in &vn.segments {
-        let a = vn.vertices[seg.a].p;
-        let b = vn.vertices[seg.b].p;
-        let c1 = [a[0] + seg.ta[0], a[1] + seg.ta[1]];
-        let c2 = [b[0] + seg.tb[0], b[1] + seg.tb[1]];
-        d.push_str(&format!(
-            " C{} {},{} {},{} {}",
-            c1[0], c1[1], c2[0], c2[1], b[0], b[1]
-        ));
-    }
-
-    d
-}
-
 impl From<IOLineNode> for Node {
     fn from(node: IOLineNode) -> Self {
         let transform = AffineTransform::new(node.left, node.top, node.rotation);
@@ -700,13 +691,7 @@ impl From<IOPathNode> for Node {
     fn from(node: IOPathNode) -> Self {
         let transform = AffineTransform::new(node.left, node.top, node.rotation);
 
-        let data = node
-            .vector_network
-            .as_ref()
-            .map(|vn| vector_network_to_path(vn))
-            .unwrap_or_else(String::new);
-
-        Node::SVGPath(SVGPathNode {
+        Node::Vector(VectorNode {
             base: BaseNode {
                 id: node.id,
                 name: node.name,
@@ -714,9 +699,8 @@ impl From<IOPathNode> for Node {
             },
             blend_mode: BlendMode::Normal,
             transform,
-            fill: node.fill.into(),
-            data,
-            stroke: None,
+            network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
+            strokes: vec![node.stroke.into()],
             stroke_width: node.stroke_width.unwrap_or(0.0),
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
