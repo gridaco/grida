@@ -214,7 +214,7 @@ async fn demo_blendmode() -> Scene {
         label.text = format!("{:?}", blend_mode);
         label.text_style = TextStyle {
             text_decoration: TextDecoration::None,
-            font_family: "Arial".to_string(),
+            font_family: "".to_string(),
             font_size: 14.0,
             font_weight: FontWeight::new(700),
             italic: false,

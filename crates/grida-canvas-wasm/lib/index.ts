@@ -32,6 +32,14 @@ export default async function init(
   );
 }
 
+interface CreateWebGLCanvasSurfaceOptions {
+  /**
+   * when true, built-in fonts will be used for text rendering, even if the font family and style does not match.
+   * @default true
+   */
+  fontFallback?: boolean;
+}
+
 class ApplicationFactory {
   private readonly module: createGridaCanvas.GridaCanvasWasmBindings;
 
@@ -39,7 +47,10 @@ class ApplicationFactory {
     this.module = module;
   }
 
-  createWebGLCanvasSurface(canvas: HTMLCanvasElement) {
+  createWebGLCanvasSurface(
+    canvas: HTMLCanvasElement,
+    options: CreateWebGLCanvasSurfaceOptions = { fontFallback: true }
+  ) {
     const context = canvas.getContext("webgl2", {
       antialias: true,
       depth: true,
@@ -55,7 +66,11 @@ class ApplicationFactory {
       majorVersion: 2,
     });
     this.module.GL.makeContextCurrent(handle);
-    const ptr = this.module._init(canvas.width, canvas.height);
+    const ptr = this.module._init(
+      canvas.width,
+      canvas.height,
+      options.fontFallback
+    );
     const _ = new Grida2D(this.module, ptr);
     _.resize(canvas.width, canvas.height);
 

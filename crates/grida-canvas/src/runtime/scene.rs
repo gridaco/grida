@@ -22,6 +22,21 @@ use std::time::{Duration, Instant};
 /// Callback type used to request a redraw from the host window.
 pub type RequestRedrawCallback = Arc<dyn Fn()>;
 
+/// Options controlling renderer behaviour.
+#[derive(Clone, Copy)]
+pub struct RendererOptions {
+    /// When true, built-in fonts will be registered as fallbacks.
+    pub font_fallback: bool,
+}
+
+impl Default for RendererOptions {
+    fn default() -> Self {
+        Self {
+            font_fallback: false,
+        }
+    }
+}
+
 /// Type alias for tile information in frame planning
 pub type FramePlanTileInfo = RegionTileInfo;
 
@@ -111,7 +126,19 @@ impl Renderer {
         request_redraw: Option<RequestRedrawCallback>,
         camera: Camera2D,
     ) -> Self {
-        let font_repository = FontRepository::new();
+        Self::new_with_options(backend, request_redraw, camera, RendererOptions::default())
+    }
+
+    pub fn new_with_options(
+        backend: Backend,
+        request_redraw: Option<RequestRedrawCallback>,
+        camera: Camera2D,
+        options: RendererOptions,
+    ) -> Self {
+        let mut font_repository = FontRepository::new();
+        if options.font_fallback {
+            font_repository.add(crate::fonts::allerta::allerta_bytes(), "Allerta");
+        }
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
         let image_repository = Rc::new(RefCell::new(image_repository));

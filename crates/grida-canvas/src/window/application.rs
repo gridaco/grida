@@ -325,9 +325,11 @@ impl UnknownTargetApplication {
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
         request_redraw: Option<crate::runtime::scene::RequestRedrawCallback>,
+        options: crate::runtime::scene::RendererOptions,
     ) -> Self {
         let request_redraw = request_redraw.unwrap_or_else(|| std::sync::Arc::new(|| {}));
-        let renderer = Renderer::new(backend, Some(request_redraw.clone()), camera);
+        let renderer =
+            Renderer::new_with_options(backend, Some(request_redraw.clone()), camera, options);
 
         let debug = false;
 

@@ -3,7 +3,7 @@ use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;
-use cg::runtime::scene::{Backend, Renderer};
+use cg::runtime::scene::{Backend, Renderer, RendererOptions};
 use math2::{rect::Rectangle, transform::AffineTransform};
 use skia_safe::{pdf, Size as SkSize};
 use std::fs::File;
@@ -33,7 +33,7 @@ async fn demo_scene() -> Scene {
     title_text.text = "Grida Canvas PDF Demo".to_string();
     title_text.text_style = TextStyle {
         text_decoration: TextDecoration::None,
-        font_family: "Arial".to_string(),
+        font_family: "".to_string(),
         font_size: 36.0,
         font_weight: FontWeight::new(700),
         italic: false,
@@ -62,7 +62,7 @@ async fn demo_scene() -> Scene {
         "Rich content demonstration with shapes, gradients, and effects".to_string();
     subtitle_text.text_style = TextStyle {
         text_decoration: TextDecoration::None,
-        font_family: "Arial".to_string(),
+        font_family: "".to_string(),
         font_size: 18.0,
         font_weight: FontWeight::new(400),
         italic: true,
@@ -288,7 +288,7 @@ async fn demo_scene() -> Scene {
     description_text.text = "This PDF demonstrates various rendering capabilities including gradients, shapes, text, and effects.".to_string();
     description_text.text_style = TextStyle {
         text_decoration: TextDecoration::None,
-        font_family: "Arial".to_string(),
+        font_family: "".to_string(),
         font_size: 14.0,
         font_weight: FontWeight::new(400),
         italic: false,
@@ -332,10 +332,13 @@ async fn main() {
     let width = 900.0;
     let height = 750.0;
 
-    let mut renderer = Renderer::new(
+    let mut renderer = Renderer::new_with_options(
         Backend::new_from_raster(width as i32, height as i32),
         None,
         Camera2D::new_from_bounds(Rectangle::from_xywh(0.0, 0.0, scene_width, scene_height)),
+        RendererOptions {
+            font_fallback: true,
+        },
     );
     renderer.load_scene(scene);
 

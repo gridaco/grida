@@ -3,7 +3,7 @@ use cg::node::factory::NodeFactory;
 use cg::{
     node::schema::*,
     runtime::camera::Camera2D,
-    runtime::scene::{Backend, Renderer},
+    runtime::scene::{Backend, Renderer, RendererOptions},
 };
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
@@ -232,7 +232,7 @@ fn main() {
 
     // Create renderer
     let window_ptr = &window as *const Window;
-    let mut renderer = Renderer::new(
+    let mut renderer = Renderer::new_with_options(
         Backend::GL(surface_ptr),
         Some(std::sync::Arc::new(move || unsafe {
             (*window_ptr).request_redraw();
@@ -241,6 +241,9 @@ fn main() {
             width: 800.0,
             height: 600.0,
         }),
+        RendererOptions {
+            font_fallback: true,
+        },
     );
 
     // Create static scene

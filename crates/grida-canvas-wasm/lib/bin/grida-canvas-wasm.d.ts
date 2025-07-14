@@ -52,7 +52,11 @@ declare namespace createGridaCanvas {
     // ====================================================================================================
     // INITIALIZATION
     // ====================================================================================================
-    _init(width: number, height: number): GridaCanvasWebGlApplicationPtr;
+    _init(
+      width: number,
+      height: number,
+      cfg_font_fallback: boolean
+    ): GridaCanvasWebGlApplicationPtr;
 
     // ====================================================================================================
     // APPLICATION METHODS

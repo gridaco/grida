@@ -10,6 +10,11 @@ use skia_safe::{Font, FontMgr};
 static GEIST_MONO_REGULAR: &[u8] =
     include_bytes!("../../fonts/GeistMono/static/GeistMono-Regular.ttf");
 
+/// Return the raw bytes of the embedded GeistMono font.
+pub fn geistmono_bytes() -> &'static [u8] {
+    GEIST_MONO_REGULAR
+}
+
 pub fn geistmono(size: f32) -> Font {
     let font_mgr = FontMgr::new();
 

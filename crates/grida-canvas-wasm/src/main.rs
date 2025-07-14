@@ -29,8 +29,18 @@ pub unsafe fn __str_from_ptr_len(ptr: *const u8, len: usize) -> Option<String> {
 }
 
 #[no_mangle]
-pub extern "C" fn init(width: i32, height: i32) -> Box<EmscriptenApplication> {
-    Box::new(EmscriptenApplication::new(width, height))
+pub extern "C" fn init(
+    width: i32,
+    height: i32,
+    cfg_font_fallback: bool,
+) -> Box<EmscriptenApplication> {
+    Box::new(EmscriptenApplication::new(
+        width,
+        height,
+        cg::runtime::scene::RendererOptions {
+            font_fallback: cfg_font_fallback,
+        },
+    ))
 }
 
 #[no_mangle]

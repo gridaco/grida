@@ -9,6 +9,11 @@ use skia_safe::{Font, FontMgr};
 /// build time.
 static ALLERTA_REGULAR: &[u8] = include_bytes!("../../fonts/Allerta/Allerta-Regular.ttf");
 
+/// Return the raw bytes of the embedded Allerta font.
+pub fn allerta_bytes() -> &'static [u8] {
+    ALLERTA_REGULAR
+}
+
 pub fn allerta(size: f32) -> Font {
     let font_mgr = FontMgr::new();
 

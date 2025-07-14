@@ -2,6 +2,7 @@ use crate::resource::font_loader::FontMessage;
 use crate::resource::image_loader::ImageMessage;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
+use crate::runtime::scene::RendererOptions;
 use crate::window::application::ApplicationApi;
 use crate::window::application::UnknownTargetApplication;
 use crate::window::command::ApplicationCommand;
@@ -174,7 +175,7 @@ impl ApplicationApi for EmscriptenApplication {
 
 impl EmscriptenApplication {
     /// Create a new [`EmscriptenApplication`] with an initialized renderer.
-    pub fn new(width: i32, height: i32) -> Self {
+    pub fn new(width: i32, height: i32, options: RendererOptions) -> Self {
         init_gl();
         let mut gpu_state = create_gpu_state();
         let surface = state::create_surface(&mut gpu_state, width, height);
@@ -193,8 +194,9 @@ impl EmscriptenApplication {
         });
 
         let backend = Backend::GL(state.surface_mut_ptr());
-        let base =
-            UnknownTargetApplication::new(state, backend, camera, 120, image_rx, font_rx, None);
+        let base = UnknownTargetApplication::new(
+            state, backend, camera, 120, image_rx, font_rx, None, options,
+        );
         let app = Self { base };
 
         #[cfg(target_os = "emscripten")]

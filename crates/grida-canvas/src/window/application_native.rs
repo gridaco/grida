@@ -91,6 +91,22 @@ impl NativeApplication {
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
     ) -> (Self, EventLoop<HostEvent>) {
+        Self::new_with_options(
+            width,
+            height,
+            image_rx,
+            font_rx,
+            crate::runtime::scene::RendererOptions::default(),
+        )
+    }
+
+    pub fn new_with_options(
+        width: i32,
+        height: i32,
+        image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+        font_rx: mpsc::UnboundedReceiver<FontMessage>,
+        options: crate::runtime::scene::RendererOptions,
+    ) -> (Self, EventLoop<HostEvent>) {
         let WinitResult {
             mut state,
             el,
@@ -123,6 +139,7 @@ impl NativeApplication {
                 image_rx,
                 font_rx,
                 Some(redraw_cb),
+                options,
             ),
             gl_surface,
             gl_context,
