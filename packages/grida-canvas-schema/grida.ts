@@ -661,27 +661,6 @@ export namespace grida.program.css {
   export type LengthPercentage = Length | Percentage;
 
   /**
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/blend-mode
-   */
-  export type BlendMode =
-    | "normal"
-    | "multiply"
-    | "screen"
-    | "overlay"
-    | "darken"
-    | "lighten"
-    | "color-dodge"
-    | "color-burn"
-    | "hard-light"
-    | "soft-light"
-    | "difference"
-    | "exclusion"
-    | "hue"
-    | "saturation"
-    | "color"
-    | "luminosity";
-
-  /**
    * Partially supported CSS border model.
    * - each border can have different width
    * - color is shared
@@ -1038,6 +1017,13 @@ export namespace grida.program.nodes {
        * @default 1
        */
       opacity: number;
+    }
+
+    export interface IBlendMode {
+      /**
+       * @default "normal"
+       */
+      blendMode?: cg.BlendMode;
     }
 
     export interface IZIndex {
@@ -1592,6 +1578,7 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
@@ -1624,6 +1611,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1670,6 +1658,7 @@ export namespace grida.program.nodes {
       i.IStroke,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation {
     readonly type: "line";
@@ -1701,6 +1690,7 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1737,6 +1727,7 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1872,6 +1863,7 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
+            blendMode: "normal",
             zIndex: 0,
             rotation: 0,
             width: 0,

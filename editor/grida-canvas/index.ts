@@ -1344,6 +1344,7 @@ export namespace editor.api {
     changeNodeStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
     changeNodeFit(node_id: NodeID, fit: cg.BoxFit): void;
     changeNodeOpacity(node_id: NodeID, opacity: editor.api.NumberChange): void;
+    changeNodeBlendMode(node_id: NodeID, blendMode: cg.BlendMode): void;
     changeNodeRotation(
       node_id: NodeID,
       rotation: editor.api.NumberChange

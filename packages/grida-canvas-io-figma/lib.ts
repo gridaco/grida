@@ -71,10 +71,7 @@ export namespace iofigma {
         NONZERO: "nonzero",
       };
 
-      export const blendModeMap: Record<
-        BlendMode,
-        grida.program.css.BlendMode
-      > = {
+      export const blendModeMap: Record<BlendMode, cg.BlendMode> = {
         PASS_THROUGH: "normal", // No blending, default behavior.
         NORMAL: "normal", // Matches the default blend mode.
         DARKEN: "darken",
@@ -619,6 +616,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.blendModeMap[node.blendMode],
               zIndex: 0,
               type: "rectangle",
               //
@@ -650,6 +648,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.blendModeMap[node.blendMode],
               zIndex: 0,
               type: "ellipse",
               //
@@ -681,6 +680,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.blendModeMap[node.blendMode],
               zIndex: 0,
               type: "line",
               position: "absolute",
@@ -740,6 +740,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.blendModeMap[node.blendMode],
               zIndex: 0,
               type: "vector",
               //

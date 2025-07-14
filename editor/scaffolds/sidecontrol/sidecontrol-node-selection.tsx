@@ -45,6 +45,7 @@ import { LengthPercentageControl } from "./controls/length-percentage";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
+import { BlendModeControl } from "./controls/blend-mode";
 import {
   useComputedNode,
   useCurrentEditor,
@@ -697,6 +698,7 @@ function SelectedNodeProperties({
     text: node.text,
     type: node.type,
     opacity: node.opacity,
+    blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
     fill: node.fill,
     stroke: node.stroke,
@@ -743,6 +745,7 @@ function SelectedNodeProperties({
     component_id,
     type,
     opacity,
+    blendMode,
     cornerRadius,
     fill,
     stroke,
@@ -1056,6 +1059,13 @@ function SelectedNodeProperties({
               <OpacityControl
                 value={opacity as any}
                 onValueCommit={actions.opacity}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Blend Mode</PropertyLineLabel>
+              <BlendModeControl
+                value={blendMode}
+                onValueChange={actions.blendMode}
               />
             </PropertyLine>
             {supports.cornerRadius(node.type) && (

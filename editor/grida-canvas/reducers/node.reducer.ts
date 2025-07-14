@@ -131,6 +131,12 @@ const safe_properties: Partial<
       draft.opacity = ranged(0, value, 1);
     },
   }),
+  blendMode: defineNodeProperty<"blendMode">({
+    assert: (node) => typeof node.blendMode === "string",
+    apply: (draft, value, prev) => {
+      draft.blendMode = value;
+    },
+  }),
   fill: defineNodeProperty<"fill">({
     assert: (node) =>
       node.type === "vector" ||

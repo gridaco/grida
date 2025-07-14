@@ -1163,6 +1163,13 @@ export class Editor
       }
     });
   }
+  changeNodeBlendMode(node_id: editor.NodeID, blendMode: cg.BlendMode): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      blendMode,
+    });
+  }
   changeNodeRotation(node_id: string, rotation: editor.api.NumberChange) {
     requestAnimationFrame(() => {
       try {

@@ -124,6 +124,27 @@ export namespace cg {
   };
 
   /**
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/blend-mode
+   */
+  export type BlendMode =
+    | "normal"
+    | "multiply"
+    | "screen"
+    | "overlay"
+    | "darken"
+    | "lighten"
+    | "color-dodge"
+    | "color-burn"
+    | "hard-light"
+    | "soft-light"
+    | "difference"
+    | "exclusion"
+    | "hue"
+    | "saturation"
+    | "color"
+    | "luminosity";
+
+  /**
    * Defines a single path
    *
    * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Element/path

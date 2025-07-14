@@ -177,6 +177,8 @@ export function useNodeActions(node_id: string | undefined) {
       // stylable
       opacity: (change: editor.api.NumberChange) =>
         instance.changeNodeOpacity(node_id, change),
+      blendMode: (value: cg.BlendMode) =>
+        instance.changeNodeBlendMode(node_id, value),
       rotation: (change: editor.api.NumberChange) =>
         instance.changeNodeRotation(node_id, change),
       width: (value: grida.program.css.LengthPercentage | "auto") =>
