@@ -7,20 +7,20 @@ use skia_safe::{Font, FontMgr};
 /// system fonts are not available.  To ensure that devtools overlays are
 /// always rendered with a valid typeface we embed a lightweight font at
 /// build time.
-static ALLERTA_REGULAR: &[u8] = include_bytes!("../../fonts/Allerta/Allerta-Regular.ttf");
+static GEIST_VARIABLE_TTF: &[u8] = include_bytes!("../../fonts/Geist/Geist-VariableFont_wght.ttf");
 
-/// Return the raw bytes of the embedded Allerta font.
-pub fn allerta_bytes() -> &'static [u8] {
-    ALLERTA_REGULAR
+/// Return the raw bytes of the embedded GeistMono font.
+pub fn geist_bytes() -> &'static [u8] {
+    GEIST_VARIABLE_TTF
 }
 
-pub fn allerta(size: f32) -> Font {
+pub fn sk_font_geist(size: f32) -> Font {
     let font_mgr = FontMgr::new();
 
     // Create a typeface from the embedded font data. This always
     // succeeds on both native and WASM targets because the bytes are bundled
     // with the binary at compile time.
-    if let Some(tf) = font_mgr.new_from_data(ALLERTA_REGULAR, None) {
+    if let Some(tf) = font_mgr.new_from_data(GEIST_VARIABLE_TTF, None) {
         return Font::new(tf, size);
     }
 

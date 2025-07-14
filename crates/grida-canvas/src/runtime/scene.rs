@@ -137,7 +137,8 @@ impl Renderer {
     ) -> Self {
         let mut font_repository = FontRepository::new();
         if options.font_fallback {
-            font_repository.add(crate::fonts::allerta::allerta_bytes(), "Allerta");
+            font_repository.add(crate::fonts::geist::geist_bytes(), "Geist");
+            font_repository.add(crate::fonts::geistmono::geistmono_bytes(), "GeistMono");
         }
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();

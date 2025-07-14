@@ -1,4 +1,4 @@
-use crate::fonts::geistmono::geistmono;
+use crate::fonts::geistmono::sk_font_geistmono;
 use crate::sys::clock::Ticker;
 use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
 
@@ -19,7 +19,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = geistmono(16.0);
+    static FONT: Font = sk_font_geistmono(16.0);
 }
 
 impl StatsOverlay {

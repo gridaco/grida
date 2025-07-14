@@ -6,24 +6,9 @@
 
 type TODO = unknown;
 
-export default function init(
-  opts?: GridaCanvasInitOptions
-): Promise<Grida2DScene>;
-
-export interface GridaCanvasInitOptions {
-  /**
-   * This callback will be invoked when the loader needs to fetch a file (e.g.
-   * the blob of WASM code). The correct url prefix should be applied.
-   * @param file - the name of the file that is about to be loaded.
-   *
-   * @example
-   * ```ts
-   * locateFile: (file) => `https://unpkg.com/@grida/canvas-wasm@$latest/bin/${file}`,
-   * locateFile: (file) => `custom-binary-path/${file}`,
-   * ```
-   */
-  locateFile(file: string): string;
-}
+// export default function init(
+//   opts?: GridaCanvasModuleInitOptions
+// ): Promise<Grida2DScene>;
 
 /**
  * Vector2: [x, y]

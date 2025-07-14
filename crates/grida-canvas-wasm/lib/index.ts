@@ -1,5 +1,20 @@
 import createGridaCanvas from "./bin/grida-canvas-wasm";
-import { GridaCanvasInitOptions } from "./api";
+import { version } from "../package.json";
+
+export interface GridaCanvasModuleInitOptions {
+  /**
+   * This callback will be invoked when the loader needs to fetch a file (e.g.
+   * the blob of WASM code). The correct url prefix should be applied.
+   * @param file - the name of the file that is about to be loaded.
+   *
+   * @example
+   * ```ts
+   * locateFile: (file) => `https://unpkg.com/@grida/canvas-wasm@$latest/bin/${file}`,
+   * locateFile: (file) => `custom-binary-path/${file}`,
+   * ```
+   */
+  locateFile(file: string, version: string): string;
+}
 
 type Transform2D = [[number, number, number], [number, number, number]];
 type Rectangle = {
@@ -23,9 +38,13 @@ type ExportAsImage = {
 };
 
 export default async function init(
-  opts?: GridaCanvasInitOptions
+  opts?: GridaCanvasModuleInitOptions
 ): Promise<ApplicationFactory> {
-  const bindings = await createGridaCanvas({ locateFile: opts?.locateFile });
+  const bindings = await createGridaCanvas({
+    locateFile: opts?.locateFile
+      ? (file, __scriptDirectory) => opts?.locateFile(file, version)
+      : undefined,
+  });
 
   return new ApplicationFactory(
     bindings as createGridaCanvas.GridaCanvasWasmBindings

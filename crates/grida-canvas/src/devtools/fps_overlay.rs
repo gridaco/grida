@@ -1,4 +1,4 @@
-use crate::fonts::geistmono::geistmono;
+use crate::fonts::geistmono::sk_font_geistmono;
 use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
 
 pub struct FpsMeter;
@@ -18,7 +18,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = geistmono(36.0);
+    static FONT: Font = sk_font_geistmono(36.0);
 }
 
 impl FpsMeter {

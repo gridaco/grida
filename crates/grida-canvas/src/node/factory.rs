@@ -120,7 +120,7 @@ impl NodeFactory {
             text: String::new(),
             text_style: TextStyle {
                 text_decoration: TextDecoration::None,
-                font_family: String::from(""),
+                font_family: String::from("Geist"),
                 font_size: 16.0,
                 font_weight: FontWeight::default(),
                 italic: false,

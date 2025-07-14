@@ -21,6 +21,16 @@ pub struct IODocument {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct CSSBoxShadow {
+    pub color: RGBA,
+    pub offset: [f32; 2],
+    #[serde(default)]
+    pub blur: f32,
+    #[serde(default)]
+    pub spread: f32,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct IOScene {
     pub id: String,
     pub name: String,
@@ -55,6 +65,56 @@ pub enum IONode {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct IOUnknownNode {
+    pub id: String,
+    pub name: String,
+    #[serde(default = "default_active")]
+    pub active: bool,
+    #[serde(default = "default_locked")]
+    pub locked: bool,
+    pub expanded: Option<bool>,
+    pub children: Option<Vec<String>>,
+    // blend
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
+    #[serde(rename = "blendMode", default = "BlendMode::default")]
+    pub blend_mode: BlendMode,
+    #[serde(rename = "zIndex", default = "default_z_index")]
+    pub z_index: i32,
+    // css
+    pub position: Option<String>,
+    pub left: f32,
+    pub top: f32,
+    #[serde(default = "default_rotation")]
+    pub rotation: f32,
+    pub border: Option<CSSBorder>,
+    // geometry
+    pub width: f32,
+    pub height: f32,
+    #[serde(
+        rename = "cornerRadius",
+        deserialize_with = "deserialize_corner_radius",
+        default = "default_corner_radius"
+    )]
+    pub corner_radius: Option<RectangularCornerRadius>,
+    // fill
+    pub fill: Option<IOPaint>,
+    // stroke
+    #[serde(rename = "strokeWidth")]
+    pub stroke_width: Option<f32>,
+    #[serde(rename = "strokeCap")]
+    pub stroke_cap: Option<String>,
+    pub stroke: Option<IOPaint>,
+    // effects
+    #[serde(rename = "boxShadow")]
+    pub box_shadow: Option<CSSBoxShadow>,
+    pub effects: Option<Vec<serde_json::Value>>,
+    // vector
+    #[serde(rename = "vectorNetwork")]
+    pub vector_network: Option<IOVectorNetwork>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct IOContainerNode {
     pub id: String,
     pub name: String,
@@ -78,8 +138,10 @@ pub struct IOContainerNode {
     pub children: Vec<String>,
     pub expanded: Option<bool>,
     pub fill: Option<IOPaint>,
-    pub border: Option<Border>,
+    pub border: Option<CSSBorder>,
     pub style: Option<HashMap<String, serde_json::Value>>,
+    #[serde(rename = "boxShadow")]
+    pub box_shadow: Option<CSSBoxShadow>,
     #[serde(
         rename = "cornerRadius",
         deserialize_with = "deserialize_corner_radius",
@@ -160,6 +222,8 @@ pub struct IOTextNode {
     pub height: serde_json::Value,
     pub fill: Option<IOPaint>,
     pub style: Option<HashMap<String, serde_json::Value>>,
+    #[serde(rename = "boxShadow")]
+    pub box_shadow: Option<CSSBoxShadow>,
     pub text: String,
     #[serde(rename = "textAlign", default = "default_text_align")]
     pub text_align: TextAlign,
@@ -201,7 +265,7 @@ pub struct IOVectorNode {
     pub width: f32,
     pub height: f32,
     pub fill: Option<IOPaint>,
-    pub paths: Option<Vec<IOPath>>,
+    pub paths: Option<Vec<SVGPath>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -360,6 +424,8 @@ pub struct IORectangleNode {
     #[serde(rename = "strokeCap")]
     pub stroke_cap: Option<String>,
     pub stroke: Option<IOPaint>,
+    #[serde(rename = "boxShadow")]
+    pub box_shadow: Option<CSSBoxShadow>,
     pub effects: Option<Vec<serde_json::Value>>,
     #[serde(
         rename = "cornerRadius",
@@ -404,7 +470,7 @@ pub enum IOPaint {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Border {
+pub struct CSSBorder {
     #[serde(rename = "borderWidth")]
     pub border_width: Option<f32>,
     #[serde(rename = "borderColor")]
@@ -414,7 +480,7 @@ pub struct Border {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct IOPath {
+pub struct SVGPath {
     pub d: String,
     #[serde(rename = "fillRule")]
     pub fill_rule: String,
@@ -469,6 +535,17 @@ pub fn parse(file: &str) -> Result<IOCanvasFile, serde_json::Error> {
 impl From<RGBA> for Color {
     fn from(color: RGBA) -> Self {
         Color(color.r, color.g, color.b, (color.a * 255.0) as u8)
+    }
+}
+
+impl From<CSSBoxShadow> for FeDropShadow {
+    fn from(box_shadow: CSSBoxShadow) -> Self {
+        FeDropShadow {
+            dx: box_shadow.offset[0],
+            dy: box_shadow.offset[1],
+            blur: box_shadow.blur,
+            color: box_shadow.color.into(),
+        }
     }
 }
 
@@ -638,7 +715,11 @@ impl From<IORectangleNode> for Node {
             stroke_width: node.stroke_width.unwrap_or(0.0),
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effects: vec![],
+            effects: node
+                .box_shadow
+                .into_iter()
+                .map(|box_shadow| FilterEffect::DropShadow(box_shadow.into()))
+                .collect(),
             opacity: node.opacity,
         })
     }
