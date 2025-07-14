@@ -64,6 +64,8 @@ pub struct IOContainerNode {
     pub locked: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(rename = "blendMode", default = "BlendMode::default")]
+    pub blend_mode: BlendMode,
     #[serde(default = "default_rotation")]
     pub rotation: f32,
     #[serde(rename = "zIndex", default = "default_z_index")]
@@ -143,6 +145,8 @@ pub struct IOTextNode {
     pub locked: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(rename = "blendMode", default = "BlendMode::default")]
+    pub blend_mode: BlendMode,
     #[serde(default = "default_rotation")]
     pub rotation: f32,
     #[serde(rename = "zIndex", default = "default_z_index")]
@@ -185,6 +189,8 @@ pub struct IOVectorNode {
     pub locked: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(rename = "blendMode", default = "BlendMode::default")]
+    pub blend_mode: BlendMode,
     #[serde(default = "default_rotation")]
     pub rotation: f32,
     #[serde(rename = "zIndex", default = "default_z_index")]
@@ -247,6 +253,8 @@ pub struct IOLineNode {
     pub locked: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(rename = "blendMode", default = "BlendMode::default")]
+    pub blend_mode: BlendMode,
     #[serde(default = "default_rotation")]
     pub rotation: f32,
     #[serde(rename = "zIndex", default = "default_z_index")]
@@ -274,6 +282,8 @@ pub struct IOPathNode {
     pub locked: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(rename = "blendMode", default = "BlendMode::default")]
+    pub blend_mode: BlendMode,
     #[serde(default = "default_rotation")]
     pub rotation: f32,
     #[serde(rename = "zIndex", default = "default_z_index")]
@@ -303,6 +313,8 @@ pub struct IOEllipseNode {
     pub locked: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(rename = "blendMode", default = "BlendMode::default")]
+    pub blend_mode: BlendMode,
     #[serde(default = "default_rotation")]
     pub rotation: f32,
     #[serde(rename = "zIndex", default = "default_z_index")]
@@ -331,6 +343,8 @@ pub struct IORectangleNode {
     pub locked: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(rename = "blendMode", default = "BlendMode::default")]
+    pub blend_mode: BlendMode,
     #[serde(default = "default_rotation")]
     pub rotation: f32,
     #[serde(rename = "zIndex", default = "default_z_index")]
@@ -513,7 +527,7 @@ impl From<IOContainerNode> for ContainerNode {
                 name: node.name,
                 active: node.active,
             },
-            blend_mode: BlendMode::Normal,
+            blend_mode: node.blend_mode,
             transform: AffineTransform::new(node.left, node.top, node.rotation),
             size: Size { width, height },
             corner_radius: node
@@ -548,7 +562,7 @@ impl From<IOTextNode> for TextSpanNode {
                 name: node.name,
                 active: node.active,
             },
-            blend_mode: BlendMode::Normal,
+            blend_mode: node.blend_mode,
             transform: AffineTransform::new(node.left, node.top, node.rotation),
             size: Size { width, height },
             text: node.text,
@@ -583,7 +597,7 @@ impl From<IOEllipseNode> for Node {
                 name: node.name,
                 active: node.active,
             },
-            blend_mode: BlendMode::Normal,
+            blend_mode: node.blend_mode,
             transform,
             size: Size {
                 width: node.width,
@@ -610,7 +624,7 @@ impl From<IORectangleNode> for Node {
                 name: node.name,
                 active: node.active,
             },
-            blend_mode: BlendMode::Normal,
+            blend_mode: node.blend_mode,
             transform,
             size: Size {
                 width: node.width,
@@ -641,7 +655,7 @@ impl From<IOVectorNode> for Node {
                 name: node.name,
                 active: node.active,
             },
-            blend_mode: BlendMode::Normal,
+            blend_mode: node.blend_mode,
             transform,
             fill: node.fill.into(),
             data: node.paths.map_or("".to_string(), |paths| {
@@ -681,7 +695,7 @@ impl From<IOLineNode> for Node {
             _data_stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
             opacity: node.opacity,
-            blend_mode: BlendMode::Normal,
+            blend_mode: node.blend_mode,
             effects: vec![],
         })
     }
@@ -697,7 +711,7 @@ impl From<IOPathNode> for Node {
                 name: node.name,
                 active: node.active,
             },
-            blend_mode: BlendMode::Normal,
+            blend_mode: node.blend_mode,
             transform,
             fill: Some(node.fill.into()),
             network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),

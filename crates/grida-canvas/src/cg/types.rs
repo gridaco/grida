@@ -19,44 +19,60 @@ pub enum BooleanPathOperation {
 /// - SVG: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/mix-blend-mode
 /// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
 /// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 pub enum BlendMode {
     // Skia: kSrcOver, CSS: normal
+    #[serde(rename = "normal")]
     Normal,
-
     // Skia: kMultiply
+    #[serde(rename = "multiply")]
     Multiply,
     // Skia: kScreen
+    #[serde(rename = "screen")]
     Screen,
     // Skia: kOverlay
+    #[serde(rename = "overlay")]
     Overlay,
     // Skia: kDarken
+    #[serde(rename = "darken")]
     Darken,
     // Skia: kLighten
+    #[serde(rename = "lighten")]
     Lighten,
     // Skia: kColorDodge
+    #[serde(rename = "color-dodge")]
     ColorDodge,
     // Skia: kColorBurn
+    #[serde(rename = "color-burn")]
     ColorBurn,
     // Skia: kHardLight
+    #[serde(rename = "hard-light")]
     HardLight,
     // Skia: kSoftLight
+    #[serde(rename = "soft-light")]
     SoftLight,
     // Skia: kDifference
+    #[serde(rename = "difference")]
     Difference,
     // Skia: kExclusion
+    #[serde(rename = "exclusion")]
     Exclusion,
     // Skia: kHue
+    #[serde(rename = "hue")]
     Hue,
     // Skia: kSaturation
+    #[serde(rename = "saturation")]
     Saturation,
     // Skia: kColor
+    #[serde(rename = "color")]
     Color,
     // Skia: kLuminosity
+    #[serde(rename = "luminosity")]
     Luminosity,
 
     /// Like `Normal`, but means no blending at all (pass-through).
     /// This is Figma-specific, and typically treated the same as `Normal`.
+    #[serde(rename = "pass-through")]
     PassThrough,
 }
 
@@ -105,6 +121,12 @@ impl RectangularCornerRadius {
 
     pub fn is_uniform(&self) -> bool {
         self.tl == self.tr && self.tl == self.bl && self.tl == self.br
+    }
+}
+
+impl Default for RectangularCornerRadius {
+    fn default() -> Self {
+        Self::zero()
     }
 }
 

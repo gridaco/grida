@@ -807,32 +807,34 @@ impl<'a> Painter<'a> {
     pub fn draw_layer(&self, layer: &PainterPictureLayer) {
         match layer {
             PainterPictureLayer::Shape(shape_layer) => {
-                self.with_transform(&shape_layer.base.transform.matrix, || {
-                    let shape = &shape_layer.base.shape;
-                    let effect = shape_layer.base.effects.first();
-                    let clip_path = &shape_layer.base.clip_path;
-                    let draw_content = || {
-                        self.with_opacity(shape_layer.base.opacity, || {
-                            if shape.is_closed() {
-                                for fill in &shape_layer.base.fills {
-                                    self.draw_fill(shape, fill);
+                self.with_blendmode(shape_layer.base.blend_mode, || {
+                    self.with_transform(&shape_layer.base.transform.matrix, || {
+                        let shape = &shape_layer.base.shape;
+                        let effect = shape_layer.base.effects.first();
+                        let clip_path = &shape_layer.base.clip_path;
+                        let draw_content = || {
+                            self.with_opacity(shape_layer.base.opacity, || {
+                                if shape.is_closed() {
+                                    for fill in &shape_layer.base.fills {
+                                        self.draw_fill(shape, fill);
+                                    }
                                 }
-                            }
-                            for stroke in &shape_layer.base.strokes {
-                                if let Some(path) = &shape_layer.base.stroke_path {
-                                    self.draw_stroke_path(shape, stroke, path);
+                                for stroke in &shape_layer.base.strokes {
+                                    if let Some(path) = &shape_layer.base.stroke_path {
+                                        self.draw_stroke_path(shape, stroke, path);
+                                    }
                                 }
-                            }
-                        });
-                    };
-                    if let Some(clip) = clip_path {
-                        self.canvas.save();
-                        self.canvas.clip_path(clip, None, true);
-                        self.draw_shape_with_effect(effect, shape, draw_content);
-                        self.canvas.restore();
-                    } else {
-                        self.draw_shape_with_effect(effect, shape, draw_content);
-                    }
+                            });
+                        };
+                        if let Some(clip) = clip_path {
+                            self.canvas.save();
+                            self.canvas.clip_path(clip, None, true);
+                            self.draw_shape_with_effect(effect, shape, draw_content);
+                            self.canvas.restore();
+                        } else {
+                            self.draw_shape_with_effect(effect, shape, draw_content);
+                        }
+                    });
                 });
             }
             PainterPictureLayer::Text(text_layer) => {
