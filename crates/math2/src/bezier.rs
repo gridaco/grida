@@ -1,4 +1,4 @@
-use super::rect::{from_points, Rectangle};
+use super::rect::Rectangle;
 use super::vector2::Vector2;
 
 /// Represents a cubic Bézier curve segment with absolute control points.
@@ -49,7 +49,7 @@ fn cubic_eval(p0: f32, p1: f32, p2: f32, p3: f32, t: f32) -> f32 {
 pub fn get_bbox(segment: &CubicBezierWithTangents) -> Rectangle {
     let CubicBezierWithTangents { a, b, ta, tb } = *segment;
     if ta[0] == 0.0 && ta[1] == 0.0 && tb[0] == 0.0 && tb[1] == 0.0 {
-        return from_points(&[a, b]);
+        return Rectangle::from_points(&[a, b]);
     }
     let c1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
     let c2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];

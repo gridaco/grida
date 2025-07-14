@@ -50,13 +50,13 @@ pub use raster::{
 pub use rect::boolean::subtract as rect_boolean_subtract;
 pub use rect::{
     align as rect_align, align_a as rect_align_a, aspect_ratio, axis_projection_intersection,
-    contains, contains_point, distribute_evenly as rect_distribute_evenly, from_points,
-    get_cardinal_point, get_center, get_gaps as rect_get_gaps, get_relative_transform,
-    get_scale_factors, get_uniform_gap as rect_get_uniform_gap, inset as rect_inset, intersection,
-    intersects, is_identical as rect_identical, is_uniform as rect_uniform, offset,
-    pad as rect_pad, positive as rect_positive, quantize as rect_quantize, rotate as rect_rotate,
-    tile as rect_tile, to_9points, to_9points_chunk, transform as rect_transform, union, AlignKind,
-    Alignment, CardinalDirection, Rect9Points, Rectangle, RectangleSide, Sides,
+    contains, contains_point, distribute_evenly as rect_distribute_evenly, get_cardinal_point,
+    get_center, get_gaps as rect_get_gaps, get_relative_transform, get_scale_factors,
+    get_uniform_gap as rect_get_uniform_gap, inset as rect_inset, intersection, intersects,
+    is_identical as rect_identical, is_uniform as rect_uniform, offset, pad as rect_pad,
+    positive as rect_positive, quantize as rect_quantize, rotate as rect_rotate, tile as rect_tile,
+    to_9points, to_9points_chunk, transform as rect_transform, union, AlignKind, Alignment,
+    CardinalDirection, Rect9Points, Rectangle, RectangleSide, Sides,
 };
 pub use region::{difference as region_difference, subtract as region_subtract, Region};
 pub use snap::axis::{
