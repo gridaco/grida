@@ -246,7 +246,6 @@ async fn demo_blendmode() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Blend Mode Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
         background_color: Some(Color(240, 240, 240, 255)),

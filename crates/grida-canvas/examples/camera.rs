@@ -62,7 +62,6 @@ fn create_static_scene() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Test Scene".to_string(),
-        transform: AffineTransform::identity(),
         children: vec!["root".to_string()],
         nodes: repository,
         background_color: Some(Color(255, 255, 255, 255)),

@@ -577,7 +577,6 @@ mod tests {
         let scene = Scene {
             id: "scene".into(),
             name: "test".into(),
-            transform: AffineTransform::identity(),
             children: vec![rect_id.clone()],
             nodes: repo,
             background_color: None,

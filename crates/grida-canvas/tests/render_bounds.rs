@@ -17,7 +17,6 @@ fn stroke_affects_render_bounds() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![rect_id.clone()],
         nodes: repo,
         background_color: None,
@@ -44,7 +43,6 @@ fn gaussian_blur_expands_render_bounds() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![rect_id.clone()],
         nodes: repo,
         background_color: None,
@@ -76,7 +74,6 @@ fn drop_shadow_expands_render_bounds() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![rect_id.clone()],
         nodes: repo,
         background_color: None,

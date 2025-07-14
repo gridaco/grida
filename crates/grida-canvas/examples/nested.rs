@@ -86,7 +86,6 @@ async fn demo_nested() -> Scene {
     Scene {
         id: "nested".to_string(),
         name: "Nested Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![current_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

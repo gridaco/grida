@@ -362,7 +362,6 @@ async fn demo_booleans() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Boolean Operations Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

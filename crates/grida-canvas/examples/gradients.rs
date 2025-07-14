@@ -159,7 +159,6 @@ async fn demo_gradients() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Gradients Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

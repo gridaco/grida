@@ -45,7 +45,7 @@ impl GeometryCache {
 
     pub fn from_scene(scene: &Scene) -> Self {
         let mut cache = Self::new();
-        let root_world = scene.transform;
+        let root_world = AffineTransform::identity();
         for child in &scene.children {
             Self::build_recursive(child, &scene.nodes, &root_world, None, &mut cache);
         }

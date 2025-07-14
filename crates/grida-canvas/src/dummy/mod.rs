@@ -51,7 +51,6 @@ pub(crate) fn create_dummy_scene() -> Scene {
     Scene {
         id: "dummy".to_string(),
         name: "Dummy Scene".to_string(),
-        transform: math2::transform::AffineTransform::identity(),
         children: vec![rect1_id, rect2_id, rect3_id],
         nodes,
         background_color: Some(Color(240, 240, 240, 255)),
@@ -92,7 +91,6 @@ pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
     Scene {
         id: "benchmark".to_string(),
         name: "Benchmark Scene".to_string(),
-        transform: math2::transform::AffineTransform::identity(),
         children,
         nodes,
         background_color: Some(Color(255, 255, 255, 255)),

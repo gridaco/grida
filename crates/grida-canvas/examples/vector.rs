@@ -305,7 +305,6 @@ async fn demo_vectors() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Fills Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_id],
         nodes: repository,
         background_color: Some(Color(240, 240, 240, 255)),

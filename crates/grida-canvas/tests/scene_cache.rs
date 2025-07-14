@@ -30,7 +30,6 @@ fn layers_in_rect_include_partially_visible_nested() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![container_id.clone()],
         nodes: repo,
         background_color: None,

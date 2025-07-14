@@ -27,7 +27,6 @@ fn test_pdf_export() {
     let scene = Scene {
         id: "test_scene".into(),
         name: "Test Scene".into(),
-        transform: AffineTransform::identity(),
         children: vec![rect_id.clone()],
         nodes: repo,
         background_color: Some(Color(255, 255, 255, 255)), // White background

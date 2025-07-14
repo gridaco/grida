@@ -45,7 +45,6 @@ pub struct Size {
 pub struct Scene {
     pub id: String,
     pub name: String,
-    pub transform: AffineTransform,
     pub children: Vec<NodeId>,
     pub nodes: NodeRepository,
     pub background_color: Option<Color>,

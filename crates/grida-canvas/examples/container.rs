@@ -66,7 +66,6 @@ async fn demo_clip() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Simple Container Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![container_id],
         nodes: repository,
         background_color: None,

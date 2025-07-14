@@ -313,7 +313,6 @@ async fn demo_scene() -> Scene {
     Scene {
         id: "scene".into(),
         name: "PDF Demo".into(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repo,
         background_color: Some(Color(255, 255, 255, 255)),

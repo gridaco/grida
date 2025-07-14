@@ -30,7 +30,6 @@ fn create_scene(t: f32) -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Animated".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![rect_id],
         nodes: repo,
         background_color: Some(Color(255, 255, 255, 255)),

@@ -117,7 +117,6 @@ async fn demo_images() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Images Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

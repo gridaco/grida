@@ -63,7 +63,6 @@ async fn demo_n_shapes(n: usize) -> Scene {
     Scene {
         id: "scene".to_string(),
         name: format!("{} Shapes Performance Test", n),
-        transform: AffineTransform::identity(),
         children: all_shape_ids,
         nodes: repository,
         background_color: None,

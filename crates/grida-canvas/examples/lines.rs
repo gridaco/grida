@@ -124,7 +124,6 @@ async fn demo_lines() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "LineNode Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_id],
         nodes: repo,
         background_color: Some(Color(250, 250, 250, 255)),

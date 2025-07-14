@@ -295,7 +295,6 @@ impl ApplicationApi for UnknownTargetApplication {
             let scene = crate::node::schema::Scene {
                 id: scene_id,
                 name: scene.name.clone(),
-                transform: AffineTransform::identity(),
                 children: scene.children.clone(),
                 nodes,
                 background_color: scene.background_color.clone().map(Into::into),

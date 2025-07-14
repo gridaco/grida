@@ -29,7 +29,6 @@ fn hit_first_returns_topmost() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![container_id.clone()],
         nodes: repo,
         background_color: None,
@@ -65,7 +64,6 @@ fn path_hit_testing_uses_contains() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![path_id.clone()],
         nodes: repo,
         background_color: None,
@@ -114,7 +112,6 @@ fn intersects_returns_all_nodes_in_rect() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![container_id.clone()],
         nodes: repo,
         background_color: None,
