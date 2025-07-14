@@ -45,8 +45,6 @@ function resolveNumberChangeValue(
   }
 }
 
-export type EditorContentRenderingBackend = "dom" | "canvas";
-
 type WithEditorInstance<T> = T | ((editor: Editor) => T);
 
 function isWithEditorFunction<T>(
@@ -81,7 +79,7 @@ export class Editor
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
 
-  readonly backend: EditorContentRenderingBackend;
+  readonly backend: editor.EditorContentRenderingBackend;
   readonly viewport: domapi.DOMViewportApi;
   _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
   get geometry() {
@@ -118,7 +116,7 @@ export class Editor
     plugins = {},
     onCreate,
   }: {
-    backend: EditorContentRenderingBackend;
+    backend: editor.EditorContentRenderingBackend;
     viewportElement: string | HTMLElement;
     contentElement: string | HTMLElement | Grida2D;
     geometry:

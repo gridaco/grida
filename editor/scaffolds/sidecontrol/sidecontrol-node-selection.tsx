@@ -70,6 +70,7 @@ import {
   useCurrentSelection,
   useSelectionPaints,
   useSelectionState,
+  useBackendState,
 } from "@/grida-canvas-react/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
@@ -170,7 +171,7 @@ function SelectionMixedProperties({
   config?: ControlsConfig;
 }) {
   const scene = useCurrentSceneState();
-
+  const backend = useBackendState();
   const {
     selection: ids,
     nodes,
@@ -234,9 +235,13 @@ function SelectionMixedProperties({
   const types = new Set(nodes.map((n) => n.type));
   const _types = Array.from(types);
 
-  const supports_corner_radius = _types.some((t) => supports.cornerRadius(t));
-  const supports_stroke = _types.some((t) => supports.stroke(t));
-  const supports_stroke_cap = _types.some((t) => supports.strokeCap(t));
+  const supports_corner_radius = _types.some((t) =>
+    supports.cornerRadius(t, { backend })
+  );
+  const supports_stroke = _types.some((t) => supports.stroke(t, { backend }));
+  const supports_stroke_cap = _types.some((t) =>
+    supports.strokeCap(t, { backend })
+  );
   const has_container = types.has("container");
   const has_flex_container =
     has_container && nodes.some((n) => "layout" in n && n.layout === "flex");
@@ -683,6 +688,7 @@ function SelectedNodeProperties({
     (state) => state.document.properties
   );
   const { debug } = useEditorFlagsState();
+  const backend = useBackendState();
 
   const actions = useNodeActions(node_id)!;
 
@@ -1068,7 +1074,7 @@ function SelectedNodeProperties({
                 onValueChange={actions.blendMode}
               />
             </PropertyLine>
-            {supports.cornerRadius(node.type) && (
+            {supports.cornerRadius(node.type, { backend }) && (
               <PropertyLine>
                 <PropertyLineLabel>Radius</PropertyLineLabel>
                 <CornerRadiusControl
@@ -1077,7 +1083,7 @@ function SelectedNodeProperties({
                 />
               </PropertyLine>
             )}
-            {supports.border(node.type) && (
+            {supports.border(node.type, { backend }) && (
               <PropertyLine>
                 <PropertyLineLabel>Border</PropertyLineLabel>
                 <BorderControl value={border} onValueChange={actions.border} />
@@ -1097,7 +1103,7 @@ function SelectedNodeProperties({
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        {supports.stroke(node.type) && (
+        {supports.stroke(node.type, { backend }) && (
           <SidebarSection className="border-b pb-4">
             <SidebarSectionHeaderItem>
               <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
@@ -1118,7 +1124,9 @@ function SelectedNodeProperties({
                   onValueCommit={actions.strokeWidth}
                 />
               </PropertyLine>
-              <PropertyLine hidden={!supports.strokeCap(node.type)}>
+              <PropertyLine
+                hidden={!supports.strokeCap(node.type, { backend })}
+              >
                 <PropertyLineLabel>Cap</PropertyLineLabel>
                 <StrokeCapControl
                   value={strokeCap}
@@ -1129,7 +1137,7 @@ function SelectedNodeProperties({
           </SidebarSection>
         )}
         <SidebarSection
-          hidden={!supports.boxShadow(type)}
+          hidden={!supports.boxShadow(node.type, { backend })}
           className="border-b pb-4"
         >
           <SidebarSectionHeaderItem>

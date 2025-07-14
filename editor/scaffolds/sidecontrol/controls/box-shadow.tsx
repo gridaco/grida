@@ -54,15 +54,16 @@ export function BoxShadowControl({
               className="rounded-sm"
             />
             <span className="ms-2 text-start text-xs flex-1">Shadow</span>
-            <button
+            <span
+              role="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove();
               }}
-              className="px-1 py-1 me-0.5 text-muted-foreground"
+              className="px-1 py-1 me-0.5 text-muted-foreground cursor-pointer"
             >
               <Cross2Icon className="w-3.5 h-3.5" />
-            </button>
+            </span>
           </InputContainer>
         </PopoverTrigger>
       ) : (
@@ -160,7 +161,7 @@ export function BoxShadowControl({
               />
             </PropertyLine>
             <PropertyLine>
-              <PropertyLineLabel>Spread</PropertyLineLabel>
+              <PropertyLineLabel>Color</PropertyLineLabel>
               <RGBAColorControl
                 value={value.color}
                 onValueChange={(v) => onValueChange?.({ ...value, color: v })}

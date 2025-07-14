@@ -15,6 +15,8 @@ import grida from "@grida/schema";
 export { type Action };
 
 export namespace editor {
+  export type EditorContentRenderingBackend = "dom" | "canvas";
+
   /**
    * Creates a throttled function that only invokes the provided function at most once per every `limit` milliseconds.
    * When `options.trailing` is true, the function will be called one more time after the limit period to ensure the last change is processed.

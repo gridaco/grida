@@ -754,6 +754,11 @@ export function useCurrentSceneState(): UseSceneState {
   return useSceneState(scene_id);
 }
 
+export function useBackendState() {
+  const editor = useCurrentEditor();
+  return editor.backend;
+}
+
 export function useTransformState() {
   const editor = useCurrentEditor();
   const transform = useEditorState(editor, (state) => state.transform);

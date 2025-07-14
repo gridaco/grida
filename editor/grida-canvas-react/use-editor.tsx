@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Editor, EditorContentRenderingBackend } from "@/grida-canvas/editor";
+import { Editor } from "@/grida-canvas/editor";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector";
 import type { editor } from "@/grida-canvas";
@@ -32,7 +32,7 @@ const __DEFAULT_STATE: editor.state.IEditorStateInit = {
 
 export function useEditor(
   init?: editor.state.IEditorStateInit,
-  backend: EditorContentRenderingBackend = "dom"
+  backend: editor.EditorContentRenderingBackend = "dom"
 ) {
   const [_editor] = React.useState(() => {
     switch (backend) {
