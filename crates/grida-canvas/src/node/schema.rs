@@ -442,6 +442,7 @@ pub struct BooleanPathOperationNode {
 pub struct VectorNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
+    pub fill: Option<Paint>,
     pub network: VectorNetwork,
     pub strokes: Vec<Paint>,
     pub stroke_width: f32,

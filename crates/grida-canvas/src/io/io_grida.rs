@@ -699,6 +699,7 @@ impl From<IOPathNode> for Node {
             },
             blend_mode: BlendMode::Normal,
             transform,
+            fill: Some(node.fill.into()),
             network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
             strokes: vec![node.stroke.into()],
             stroke_width: node.stroke_width.unwrap_or(0.0),

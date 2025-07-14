@@ -269,6 +269,50 @@ pub struct SolidPaint {
     pub opacity: f32,
 }
 
+impl SolidPaint {
+    pub fn transparent() -> Self {
+        Self {
+            color: Color(0, 0, 0, 0),
+            opacity: 0.0,
+        }
+    }
+
+    pub fn black() -> Self {
+        Self {
+            color: Color(0, 0, 0, 255),
+            opacity: 1.0,
+        }
+    }
+
+    pub fn white() -> Self {
+        Self {
+            color: Color(255, 255, 255, 255),
+            opacity: 1.0,
+        }
+    }
+
+    pub fn red() -> Self {
+        Self {
+            color: Color(255, 0, 0, 255),
+            opacity: 1.0,
+        }
+    }
+
+    pub fn blue() -> Self {
+        Self {
+            color: Color(0, 0, 255, 255),
+            opacity: 1.0,
+        }
+    }
+
+    pub fn green() -> Self {
+        Self {
+            color: Color(0, 255, 0, 255),
+            opacity: 1.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct GradientStop {
     /// 0.0 = start, 1.0 = end

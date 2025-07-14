@@ -489,8 +489,9 @@ impl<'a> Painter<'a> {
             self.draw_shape_with_effect(node.effects.first(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
-                        // TODO: fills
-                        // self.draw_fills(&shape, fills);
+                        if let Some(fill) = &node.fill {
+                            self.draw_fill(&shape, fill);
+                        }
                         self.draw_strokes(
                             &shape,
                             &node.strokes,
@@ -812,8 +813,10 @@ impl<'a> Painter<'a> {
                     let clip_path = &shape_layer.base.clip_path;
                     let draw_content = || {
                         self.with_opacity(shape_layer.base.opacity, || {
-                            for fill in &shape_layer.base.fills {
-                                self.draw_fill(shape, fill);
+                            if shape.is_closed() {
+                                for fill in &shape_layer.base.fills {
+                                    self.draw_fill(shape, fill);
+                                }
                             }
                             for stroke in &shape_layer.base.strokes {
                                 if let Some(path) = &shape_layer.base.stroke_path {

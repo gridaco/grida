@@ -464,7 +464,7 @@ impl LayerList {
                             shape,
                             effects: n.effects.clone().into_iter().collect(),
                             strokes: n.strokes.clone().into_iter().collect(),
-                            fills: vec![],
+                            fills: n.fill.clone().into_iter().collect(),
                             stroke_path,
                             clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },

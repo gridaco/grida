@@ -183,6 +183,14 @@ impl PainterShape {
 
         path
     }
+
+    pub fn is_closed(&self) -> bool {
+        if let Some(path) = &self.path {
+            path.is_last_contour_closed()
+        } else {
+            true
+        }
+    }
 }
 
 pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
