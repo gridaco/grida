@@ -1,4 +1,4 @@
-<div style="text-align:center"><img src="./branding/github-cover.png"/></div>
+<div style="text-align:center"><img src="../branding/github-cover.png"/></div>
 
 # Opensource Design Tool for the world.
 
@@ -29,7 +29,7 @@ This project, `Grida` is under development with preview technologies. We are loo
 
 ## Docs
 
-Read the Grida usage docs [here](./docs)
+Read the Grida usage docs [here](../docs)
 
 ## Workspace
 
@@ -45,7 +45,7 @@ scripting built in with js/ts sdk and add-on plugin
 
 ## Structure - Packages & Modules
 
-![](./branding/project-maps.png)
+![](../branding/project-maps.png)
 
 **GRAPHICS ENGINE**
 
@@ -141,9 +141,9 @@ Here are some concepts that do not exist on current design tools, but only at im
 
 We'de love to have you change the industry together. _Read below documentations before submitting a PR._
 
-- [contributing.md](./CONTRIBUTING.md)
+- [contributing.md](../CONTRIBUTING.md)
 - [working with submodule packages](https://github.com/gridaco/.github/blob/main/contributing/working-with-submodules.md)
-- [how Grida repo `/packages` are structured](./packages)
+- [how Grida repo `/packages` are structured](../packages)
 
 ### Building
 
