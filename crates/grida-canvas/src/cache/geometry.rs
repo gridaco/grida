@@ -420,15 +420,17 @@ fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -
     match effect {
         FilterEffect::LayerBlur(blur) => inflate_rect(bounds, blur.radius),
         FilterEffect::BackdropBlur(blur) => inflate_rect(bounds, blur.radius),
-        FilterEffect::DropShadow(shadow) => inflate_rect(
-            Rectangle {
-                x: bounds.x + shadow.dx,
-                y: bounds.y + shadow.dy,
-                width: bounds.width,
-                height: bounds.height,
-            },
-            shadow.blur,
-        ),
+        FilterEffect::DropShadow(shadow) => {
+            // Apply spread by inflating the bounds, then offset and blur
+            let mut rect = if shadow.spread != 0.0 {
+                inflate_rect(bounds, shadow.spread)
+            } else {
+                bounds
+            };
+            rect.x += shadow.dx;
+            rect.y += shadow.dy;
+            inflate_rect(rect, shadow.blur)
+        }
         // no inflation for inner shadow
         FilterEffect::InnerShadow(_shadow) => bounds,
     }
