@@ -1170,19 +1170,10 @@ export namespace grida.program.nodes {
       fill?: T | undefined;
     }
 
-    /**
-     * Node that supports box-shadow
-     */
-    export interface IBoxShadow {
-      boxShadow?: cg.BoxShadow;
-    }
-
-    export interface IFilterBlur {
-      filterBlur?: cg.FeGaussianBlur;
-    }
-
-    export interface IFilterBackdropBlur {
-      filterBackdropBlur?: cg.FeGaussianBlur;
+    export interface IEffects {
+      feBlur?: cg.FeGaussianBlur;
+      feBackdropBlur?: cg.FeGaussianBlur;
+      feDropShadow?: cg.BoxShadow;
     }
 
     /**
@@ -1209,11 +1200,6 @@ export namespace grida.program.nodes {
       border?: css.Border | undefined;
     }
 
-    export interface IEffects {
-      //
-      effects: Array<cg.FilterEffects>;
-    }
-
     export interface IStylable<S extends Record<string, unknown>> {
       style: S;
     }
@@ -1229,9 +1215,6 @@ export namespace grida.program.nodes {
         IPositioning,
         ICSSDimension,
         IFill<props.PropsPaintValue>,
-        IBoxShadow,
-        IFilterBlur,
-        IFilterBackdropBlur,
         ICSSBorder {
       /**
        * TODO: rename to css
@@ -1422,6 +1405,7 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
+      i.IEffects,
       i.IHrefable,
       i.IMouseCursor,
       i.ITextNodeStyle,
@@ -1443,6 +1427,7 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
+      i.IEffects,
       i.IBoxFit,
       i.IHrefable,
       i.IMouseCursor,
@@ -1514,6 +1499,7 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
+      i.IEffects,
       i.IHrefable,
       i.IMouseCursor,
       i.IExpandable,
@@ -1884,7 +1870,6 @@ export namespace grida.program.nodes {
             cornerRadius: 0,
             strokeWidth: 0,
             strokeCap: "butt",
-            effects: [],
             ...prototype,
             id: id,
           } satisfies RectangleNode;

@@ -725,9 +725,9 @@ function SelectedNodeProperties({
     border: node.border,
     //
     padding: node.padding,
-    boxShadow: node.boxShadow,
-    filterBlur: node.filterBlur,
-    filterBackdropBlur: node.filterBackdropBlur,
+    fe_drop_shadow: node.feDropShadow,
+    fe_blur: node.feBlur,
+    fe_backdrop_blur: node.feBackdropBlur,
 
     //
     layout: node.layout,
@@ -774,9 +774,9 @@ function SelectedNodeProperties({
     border,
     //
     padding,
-    boxShadow,
-    filterBlur,
-    filterBackdropBlur,
+    fe_drop_shadow: feDropShadow,
+    fe_blur: feBlur,
+    fe_backdrop_blur: feBackdropBlur,
     //
     layout,
     direction,
@@ -1151,18 +1151,18 @@ function SelectedNodeProperties({
             <PropertyLine>
               <PropertyLineLabel>Shadow</PropertyLineLabel>
               <BoxShadowControl
-                value={boxShadow}
+                value={feDropShadow}
                 onValueChange={actions.boxShadow}
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Blur</PropertyLineLabel>
-              <FeBlurControl value={filterBlur} onValueChange={actions.blur} />
+              <FeBlurControl value={feBlur} onValueChange={actions.blur} />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Backdrop Blur</PropertyLineLabel>
               <FeBlurControl
-                value={filterBackdropBlur}
+                value={feBackdropBlur}
                 onValueChange={actions.backdropBlur}
               />
             </PropertyLine>

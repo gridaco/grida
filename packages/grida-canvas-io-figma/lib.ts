@@ -628,7 +628,6 @@ export namespace iofigma {
               fill: first_visible_fill
                 ? paint(first_visible_fill, context.gradient_id_generator)
                 : undefined,
-              effects: [], // TODO:
               strokeWidth: strokeWeight ?? 0,
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
@@ -664,7 +663,6 @@ export namespace iofigma {
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-              effects: [], // TODO:
             } satisfies grida.program.nodes.EllipseNode;
           }
           case "BOOLEAN_OPERATION": {

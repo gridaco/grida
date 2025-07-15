@@ -1378,9 +1378,9 @@ export namespace editor.api {
       node_id: NodeID,
       padding: grida.program.nodes.i.IPadding["padding"]
     ): void;
-    changeNodeBoxShadow(node_id: NodeID, boxShadow?: cg.BoxShadow): void;
-    changeNodeBlur(node_id: NodeID, effect?: cg.FeGaussianBlur): void;
-    changeNodeBackdropBlur(node_id: NodeID, effect?: cg.FeGaussianBlur): void;
+    changeNodeFeDropShadow(node_id: NodeID, boxShadow?: cg.BoxShadow): void;
+    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeGaussianBlur): void;
+    changeNodeFeBackdropBlur(node_id: NodeID, effect?: cg.FeGaussianBlur): void;
     changeContainerNodeLayout(
       node_id: NodeID,
       layout: grida.program.nodes.i.IFlexContainer["layout"]

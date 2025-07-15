@@ -43,14 +43,13 @@ export namespace css {
       Partial<grida.program.nodes.i.IPositioning> &
       Partial<grida.program.nodes.i.ICSSDimension> &
       Partial<grida.program.nodes.i.IFill<cg.Paint>> &
-      Partial<grida.program.nodes.i.IBoxShadow> &
       Partial<grida.program.nodes.i.ICSSBorder> &
       Partial<grida.program.nodes.i.IMouseCursor> &
       Partial<grida.program.nodes.i.IRectangleCorner> &
       Partial<grida.program.nodes.i.IBoxFit> &
       Partial<grida.program.nodes.i.IComputedTextNodeStyle> &
       Partial<grida.program.nodes.i.IPadding> &
-      Partial<grida.program.nodes.i.IBoxShadow> &
+      Partial<grida.program.nodes.i.IEffects> &
       Partial<grida.program.nodes.i.IFlexContainer>,
     config: {
       hasTextStyle: boolean;
@@ -76,7 +75,7 @@ export namespace css {
       //
       padding,
       //
-      boxShadow,
+      feDropShadow: boxShadow,
       //
       layout,
       direction,

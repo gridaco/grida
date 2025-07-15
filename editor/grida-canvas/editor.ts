@@ -1408,27 +1408,27 @@ export class Editor
     });
   }
 
-  changeNodeBoxShadow(node_id: string, boxShadow?: cg.BoxShadow) {
+  changeNodeFeDropShadow(node_id: string, effect?: cg.BoxShadow) {
     requestAnimationFrame(() => {
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        boxShadow,
+        feDropShadow: effect,
       });
     });
   }
 
-  changeNodeBlur(node_id: string, effect?: cg.FeGaussianBlur) {
+  changeNodeFeBlur(node_id: string, effect?: cg.FeGaussianBlur) {
     requestAnimationFrame(() => {
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        filterBlur: effect,
+        feBlur: effect,
       });
     });
   }
 
-  changeNodeBackdropBlur(
+  changeNodeFeBackdropBlur(
     node_id: editor.NodeID,
     effect?: cg.FeGaussianBlur
   ): void {
@@ -1436,7 +1436,7 @@ export class Editor
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        filterBackdropBlur: effect,
+        feBackdropBlur: effect,
       });
     });
   }

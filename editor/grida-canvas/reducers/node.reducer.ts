@@ -260,22 +260,22 @@ const safe_properties: Partial<
       draft.strokeCap = value;
     },
   }),
-  boxShadow: defineNodeProperty<"boxShadow">({
+  feDropShadow: defineNodeProperty<"feDropShadow">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.boxShadow = value;
+      draft.feDropShadow = value;
     },
   }),
-  filterBlur: defineNodeProperty<"filterBlur">({
+  feBlur: defineNodeProperty<"feBlur">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.filterBlur = value;
+      draft.feBlur = value;
     },
   }),
-  filterBackdropBlur: defineNodeProperty<"filterBackdropBlur">({
+  feBackdropBlur: defineNodeProperty<"feBackdropBlur">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.filterBackdropBlur = value;
+      draft.feBackdropBlur = value;
     },
   }),
   zIndex: defineNodeProperty<"zIndex">({

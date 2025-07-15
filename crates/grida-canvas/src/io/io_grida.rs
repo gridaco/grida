@@ -6,23 +6,83 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
-pub struct IOCanvasFile {
+pub struct JSONCanvasFile {
     pub version: String,
-    pub document: IODocument,
+    pub document: JSONDocument,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct IODocument {
+pub struct JSONDocument {
     pub bitmaps: HashMap<String, serde_json::Value>,
     pub properties: HashMap<String, serde_json::Value>,
-    pub nodes: HashMap<String, IONode>,
-    pub scenes: HashMap<String, IOScene>,
+    pub nodes: HashMap<String, JSONNode>,
+    pub scenes: HashMap<String, JSONScene>,
     pub entry_scene_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CSSBoxShadow {
-    pub color: RGBA,
+pub struct JSONGradientStop {
+    pub offset: f32,
+    pub color: JSONRGBA,
+}
+
+impl From<JSONGradientStop> for GradientStop {
+    fn from(stop: JSONGradientStop) -> Self {
+        GradientStop {
+            offset: stop.offset,
+            color: stop.color.into(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum JSONPaint {
+    #[serde(rename = "solid")]
+    Solid { color: Option<JSONRGBA> },
+    #[serde(rename = "linear_gradient")]
+    LinearGradient {
+        id: Option<String>,
+        transform: Option<[[f32; 3]; 2]>,
+        stops: Vec<JSONGradientStop>,
+    },
+    #[serde(rename = "radial_gradient")]
+    RadialGradient {
+        id: Option<String>,
+        transform: Option<[[f32; 3]; 2]>,
+        stops: Vec<JSONGradientStop>,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CSSBorder {
+    #[serde(rename = "borderWidth")]
+    pub border_width: Option<f32>,
+    #[serde(rename = "borderColor")]
+    pub border_color: Option<JSONRGBA>,
+    #[serde(rename = "borderStyle")]
+    pub border_style: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SVGPath {
+    pub d: String,
+    #[serde(rename = "fillRule")]
+    pub fill_rule: String,
+    pub fill: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct JSONRGBA {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: f32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONFeDropShadow {
+    pub color: JSONRGBA,
     pub offset: [f32; 2],
     #[serde(default)]
     pub blur: f32,
@@ -30,134 +90,170 @@ pub struct CSSBoxShadow {
     pub spread: f32,
 }
 
+impl From<JSONRGBA> for Color {
+    fn from(color: JSONRGBA) -> Self {
+        Color(color.r, color.g, color.b, (color.a * 255.0) as u8)
+    }
+}
+
+impl From<JSONFeDropShadow> for FeDropShadow {
+    fn from(box_shadow: JSONFeDropShadow) -> Self {
+        FeDropShadow {
+            dx: box_shadow.offset[0],
+            dy: box_shadow.offset[1],
+            blur: box_shadow.blur,
+            spread: box_shadow.spread,
+            color: box_shadow.color.into(),
+        }
+    }
+}
+
+impl From<Option<JSONPaint>> for Paint {
+    fn from(fill: Option<JSONPaint>) -> Self {
+        match fill {
+            Some(JSONPaint::Solid { color }) => Paint::Solid(SolidPaint {
+                color: color.map_or(Color(0, 0, 0, 0), |c| c.into()),
+                opacity: 1.0,
+            }),
+            Some(JSONPaint::LinearGradient {
+                transform, stops, ..
+            }) => {
+                let stops = stops.into_iter().map(|s| s.into()).collect();
+                Paint::LinearGradient(LinearGradientPaint {
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    stops,
+                    opacity: 1.0,
+                })
+            }
+            Some(JSONPaint::RadialGradient {
+                transform, stops, ..
+            }) => {
+                let stops = stops.into_iter().map(|s| s.into()).collect();
+                Paint::RadialGradient(RadialGradientPaint {
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    stops,
+                    opacity: 1.0,
+                })
+            }
+            None => Paint::Solid(SolidPaint {
+                color: Color(0, 0, 0, 0),
+                opacity: 1.0,
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
-pub struct IOScene {
+pub struct JSONScene {
     pub id: String,
     pub name: String,
     #[serde(rename = "type")]
     pub type_name: String,
     pub children: Vec<String>,
     #[serde(rename = "backgroundColor")]
-    pub background_color: Option<RGBA>,
+    pub background_color: Option<JSONRGBA>,
     pub guides: Option<Vec<serde_json::Value>>,
     pub constraints: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
-pub enum IONode {
-    #[serde(rename = "container")]
-    Container(IOContainerNode),
-    #[serde(rename = "text")]
-    Text(IOTextNode),
-    #[serde(rename = "vector")]
-    Vector(IOVectorNode),
-    #[serde(rename = "path")]
-    Path(IOPathNode),
-    #[serde(rename = "ellipse")]
-    Ellipse(IOEllipseNode),
-    #[serde(rename = "rectangle")]
-    Rectangle(IORectangleNode),
-    #[serde(rename = "line")]
-    Line(IOLineNode),
-    #[serde(other)]
-    Unknown,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IOUnknownNode {
+pub struct JSONUnknownNodeProperties {
     pub id: String,
     pub name: String,
     #[serde(default = "default_active")]
     pub active: bool,
     #[serde(default = "default_locked")]
     pub locked: bool,
-    pub expanded: Option<bool>,
-    pub children: Option<Vec<String>>,
     // blend
-    #[serde(default = "default_opacity")]
+    #[serde(rename = "opacity", default = "default_opacity")]
     pub opacity: f32,
     #[serde(rename = "blendMode", default = "BlendMode::default")]
     pub blend_mode: BlendMode,
     #[serde(rename = "zIndex", default = "default_z_index")]
     pub z_index: i32,
     // css
+    #[serde(rename = "position")]
     pub position: Option<String>,
+    #[serde(rename = "left")]
     pub left: f32,
+    #[serde(rename = "top")]
     pub top: f32,
-    #[serde(default = "default_rotation")]
+    #[serde(rename = "right")]
+    pub right: Option<f32>,
+    #[serde(rename = "bottom")]
+    pub bottom: Option<f32>,
+    #[serde(rename = "rotation", default = "default_rotation")]
     pub rotation: f32,
+    #[serde(rename = "border")]
     pub border: Option<CSSBorder>,
+    #[serde(rename = "style")]
+    pub style: Option<HashMap<String, serde_json::Value>>,
     // geometry
+    #[serde(rename = "width", deserialize_with = "de_css_length")]
     pub width: f32,
+    #[serde(rename = "height", deserialize_with = "de_css_length")]
     pub height: f32,
-    #[serde(
-        rename = "cornerRadius",
-        deserialize_with = "deserialize_corner_radius",
-        default = "default_corner_radius"
-    )]
+    #[serde(rename = "cornerRadius", deserialize_with = "de_corner_radius")]
     pub corner_radius: Option<RectangularCornerRadius>,
     // fill
-    pub fill: Option<IOPaint>,
+    #[serde(rename = "fill")]
+    pub fill: Option<JSONPaint>,
     // stroke
-    #[serde(rename = "strokeWidth")]
-    pub stroke_width: Option<f32>,
+    #[serde(rename = "strokeWidth", default = "default_stroke_width")]
+    pub stroke_width: f32,
     #[serde(rename = "strokeCap")]
     pub stroke_cap: Option<String>,
-    pub stroke: Option<IOPaint>,
+    #[serde(rename = "stroke")]
+    pub stroke: Option<JSONPaint>,
     // effects
-    #[serde(rename = "boxShadow")]
-    pub box_shadow: Option<CSSBoxShadow>,
-    #[serde(rename = "filterBlur")]
-    pub filter_blur: Option<FeGaussianBlur>,
-    #[serde(rename = "filterBackdropBlur")]
-    pub filter_backdrop_blur: Option<FeGaussianBlur>,
-    pub effects: Option<Vec<serde_json::Value>>,
+    #[serde(rename = "feDropShadow")]
+    pub fe_drop_shadow: Option<JSONFeDropShadow>,
+    #[serde(rename = "feBlur")]
+    pub fe_blur: Option<FeGaussianBlur>,
+    #[serde(rename = "feBackdropBlur")]
+    pub fe_backdrop_blur: Option<FeGaussianBlur>,
     // vector
     #[serde(rename = "vectorNetwork")]
-    pub vector_network: Option<IOVectorNetwork>,
+    pub vector_network: Option<JSONVectorNetwork>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct IOContainerNode {
-    pub id: String,
-    pub name: String,
-    #[serde(default = "default_active")]
-    pub active: bool,
-    #[serde(default = "default_locked")]
-    pub locked: bool,
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
-    #[serde(rename = "blendMode", default = "BlendMode::default")]
-    pub blend_mode: BlendMode,
-    #[serde(default = "default_rotation")]
-    pub rotation: f32,
-    #[serde(rename = "zIndex", default = "default_z_index")]
-    pub z_index: i32,
-    pub position: Option<String>,
-    pub left: f32,
-    pub top: f32,
-    pub width: serde_json::Value,
-    pub height: serde_json::Value,
-    pub children: Vec<String>,
+#[serde(tag = "type")]
+pub enum JSONNode {
+    #[serde(rename = "container")]
+    Container(JSONContainerNode),
+    #[serde(rename = "vector")]
+    Vector(JSONVectorNode),
+    #[serde(rename = "path")]
+    Path(JSONPathNode),
+    #[serde(rename = "ellipse")]
+    Ellipse(JSONEllipseNode),
+    #[serde(rename = "rectangle")]
+    Rectangle(JSONRectangleNode),
+    #[serde(rename = "line")]
+    Line(JSONLineNode),
+    #[serde(rename = "text")]
+    Text(JSONTextNode),
+    Unknown(JSONUnknownNodeProperties),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONContainerNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "expanded")]
     pub expanded: Option<bool>,
-    pub fill: Option<IOPaint>,
-    pub border: Option<CSSBorder>,
-    pub style: Option<HashMap<String, serde_json::Value>>,
-    #[serde(rename = "boxShadow")]
-    pub box_shadow: Option<CSSBoxShadow>,
-    #[serde(rename = "filterBlur")]
-    pub filter_blur: Option<FeGaussianBlur>,
-    #[serde(rename = "filterBackdropBlur")]
-    pub filter_backdrop_blur: Option<FeGaussianBlur>,
-    #[serde(
-        rename = "cornerRadius",
-        deserialize_with = "deserialize_corner_radius",
-        default = "default_corner_radius"
-    )]
-    pub corner_radius: Option<RectangularCornerRadius>,
-    pub padding: Option<serde_json::Value>,
+    #[serde(rename = "children")]
+    pub children: Option<Vec<String>>,
+
+    // layout
     pub layout: Option<String>,
+    pub padding: Option<serde_json::Value>,
     pub direction: Option<String>,
     #[serde(rename = "mainAxisAlignment")]
     pub main_axis_alignment: Option<String>,
@@ -169,9 +265,394 @@ pub struct IOContainerNode {
     pub cross_axis_gap: Option<f32>,
 }
 
-fn deserialize_corner_radius<'de, D>(
-    deserializer: D,
-) -> Result<Option<RectangularCornerRadius>, D::Error>
+#[derive(Debug, Deserialize)]
+pub struct JSONTextNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    pub text: String,
+    #[serde(rename = "textAlign", default = "default_text_align")]
+    pub text_align: TextAlign,
+    #[serde(rename = "textAlignVertical", default = "default_text_align_vertical")]
+    pub text_align_vertical: TextAlignVertical,
+    #[serde(rename = "textDecoration", default = "default_text_decoration")]
+    pub text_decoration: TextDecoration,
+    #[serde(rename = "lineHeight")]
+    pub line_height: Option<f32>,
+    #[serde(rename = "letterSpacing")]
+    pub letter_spacing: Option<f32>,
+    #[serde(rename = "fontSize")]
+    pub font_size: Option<f32>,
+    #[serde(rename = "fontFamily")]
+    pub font_family: Option<String>,
+    #[serde(rename = "fontWeight", default = "default_font_weight")]
+    pub font_weight: FontWeight,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONVectorNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    pub paths: Option<Vec<SVGPath>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONVectorNetworkVertex {
+    pub p: [f32; 2],
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONVectorNetworkSegment {
+    pub a: usize,
+    pub b: usize,
+    pub ta: [f32; 2],
+    pub tb: [f32; 2],
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONVectorNetwork {
+    #[serde(default)]
+    pub vertices: Vec<JSONVectorNetworkVertex>,
+    #[serde(default)]
+    pub segments: Vec<JSONVectorNetworkSegment>,
+}
+
+impl From<JSONVectorNetwork> for VectorNetwork {
+    fn from(network: JSONVectorNetwork) -> Self {
+        VectorNetwork {
+            vertices: network.vertices.into_iter().map(|v| v.p).collect(),
+            segments: network
+                .segments
+                .into_iter()
+                .map(|s| VectorNetworkSegment {
+                    a: s.a,
+                    b: s.b,
+                    ta: Some(s.ta),
+                    tb: Some(s.tb),
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONLineNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONPathNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "vectorNetwork")]
+    pub vector_network: Option<JSONVectorNetwork>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONEllipseNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONRectangleNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+}
+
+// Default value functions
+fn default_active() -> bool {
+    true
+}
+fn default_locked() -> bool {
+    false
+}
+fn default_opacity() -> f32 {
+    1.0
+}
+fn default_rotation() -> f32 {
+    0.0
+}
+fn default_z_index() -> i32 {
+    0
+}
+fn default_text_align() -> TextAlign {
+    TextAlign::Left
+}
+fn default_text_align_vertical() -> TextAlignVertical {
+    TextAlignVertical::Top
+}
+fn default_text_decoration() -> TextDecoration {
+    TextDecoration::None
+}
+fn default_font_weight() -> FontWeight {
+    FontWeight::new(400)
+}
+fn default_stroke_width() -> f32 {
+    0.0
+}
+
+pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
+    serde_json::from_str(file)
+}
+
+impl From<JSONContainerNode> for ContainerNode {
+    fn from(node: JSONContainerNode) -> Self {
+        ContainerNode {
+            base: BaseNode {
+                id: node.base.id,
+                name: node.base.name,
+                active: node.base.active,
+            },
+            blend_mode: node.base.blend_mode,
+            transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
+            size: Size {
+                width: node.base.width,
+                height: node.base.height,
+            },
+            corner_radius: node
+                .base
+                .corner_radius
+                .unwrap_or(RectangularCornerRadius::zero()),
+            fills: vec![node.base.fill.into()],
+            strokes: vec![],
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
+            effects: merge_effects(
+                node.base.fe_drop_shadow,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+            children: node.children.unwrap_or_default(),
+            opacity: node.base.opacity,
+            clip: true,
+        }
+    }
+}
+
+impl From<JSONTextNode> for TextSpanNode {
+    fn from(node: JSONTextNode) -> Self {
+        let width = node.base.width;
+        let height = node.base.height;
+        TextSpanNode {
+            base: BaseNode {
+                id: node.base.id,
+                name: node.base.name,
+                active: node.base.active,
+            },
+            blend_mode: node.base.blend_mode,
+            transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
+            size: Size { width, height },
+            text: node.text,
+            text_style: TextStyle {
+                text_decoration: node.text_decoration,
+                font_family: node.font_family.unwrap_or_else(|| "Inter".to_string()),
+                font_size: node.font_size.unwrap_or(14.0),
+                font_weight: node.font_weight,
+                italic: false,
+                letter_spacing: node.letter_spacing,
+                line_height: node.line_height,
+                text_transform: TextTransform::None,
+            },
+            text_align: node.text_align,
+            text_align_vertical: node.text_align_vertical,
+            fill: node.base.fill.into(),
+            stroke: None,
+            stroke_width: None,
+            stroke_align: StrokeAlign::Inside,
+            opacity: node.base.opacity,
+            effects: LayerEffects::new_empty(),
+        }
+    }
+}
+
+impl From<JSONEllipseNode> for Node {
+    fn from(node: JSONEllipseNode) -> Self {
+        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+
+        Node::Ellipse(EllipseNode {
+            base: BaseNode {
+                id: node.base.id,
+                name: node.base.name,
+                active: node.base.active,
+            },
+            blend_mode: node.base.blend_mode,
+            transform,
+            size: Size {
+                width: node.base.width,
+                height: node.base.height,
+            },
+            fills: vec![node.base.fill.into()],
+            strokes: vec![],
+            stroke_width: node.base.stroke_width,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
+            effects: LayerEffects::new_empty(),
+            opacity: node.base.opacity,
+        })
+    }
+}
+
+impl From<JSONRectangleNode> for Node {
+    fn from(node: JSONRectangleNode) -> Self {
+        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+
+        Node::Rectangle(RectangleNode {
+            base: BaseNode {
+                id: node.base.id,
+                name: node.base.name,
+                active: node.base.active,
+            },
+            blend_mode: node.base.blend_mode,
+            transform,
+            size: Size {
+                width: node.base.width,
+                height: node.base.height,
+            },
+            corner_radius: node
+                .base
+                .corner_radius
+                .unwrap_or(RectangularCornerRadius::zero()),
+            fills: vec![node.base.fill.into()],
+            strokes: vec![],
+            stroke_width: node.base.stroke_width,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
+            effects: merge_effects(
+                node.base.fe_drop_shadow,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+            opacity: node.base.opacity,
+        })
+    }
+}
+
+impl From<JSONVectorNode> for Node {
+    fn from(node: JSONVectorNode) -> Self {
+        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+
+        // For vector nodes, we'll create a path node with the path data
+        Node::SVGPath(SVGPathNode {
+            base: BaseNode {
+                id: node.base.id,
+                name: node.base.name,
+                active: node.base.active,
+            },
+            blend_mode: node.base.blend_mode,
+            transform,
+            fill: node.base.fill.into(),
+            data: node.paths.map_or("".to_string(), |paths| {
+                paths
+                    .iter()
+                    .map(|path| path.d.clone())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            }),
+            stroke: None,
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
+            opacity: node.base.opacity,
+            effects: LayerEffects::new_empty(),
+        })
+    }
+}
+
+impl From<JSONLineNode> for Node {
+    fn from(node: JSONLineNode) -> Self {
+        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+
+        Node::Line(LineNode {
+            base: BaseNode {
+                id: node.base.id,
+                name: node.base.name,
+                active: node.base.active,
+            },
+            transform,
+            size: Size {
+                width: node.base.width,
+                height: 0.0,
+            },
+            strokes: vec![node.base.stroke.into()],
+            stroke_width: node.base.stroke_width,
+            _data_stroke_align: StrokeAlign::Center,
+            stroke_dash_array: None,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            effects: LayerEffects::new_empty(),
+        })
+    }
+}
+
+impl From<JSONPathNode> for Node {
+    fn from(node: JSONPathNode) -> Self {
+        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+
+        Node::Vector(VectorNode {
+            base: BaseNode {
+                id: node.base.id,
+                name: node.base.name,
+                active: node.base.active,
+            },
+            blend_mode: node.base.blend_mode,
+            transform,
+            fill: Some(node.base.fill.into()),
+            network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
+            strokes: vec![node.base.stroke.into()],
+            stroke_width: node.base.stroke_width,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
+            opacity: node.base.opacity,
+            effects: LayerEffects::new_empty(),
+        })
+    }
+}
+
+impl From<JSONNode> for Node {
+    fn from(node: JSONNode) -> Self {
+        match node {
+            JSONNode::Container(container) => Node::Container(container.into()),
+            JSONNode::Text(text) => Node::TextSpan(text.into()),
+            JSONNode::Vector(vector) => vector.into(),
+            JSONNode::Path(path) => path.into(),
+            JSONNode::Ellipse(ellipse) => ellipse.into(),
+            JSONNode::Rectangle(rectangle) => rectangle.into(),
+            JSONNode::Line(line) => line.into(),
+            JSONNode::Unknown(unknown) => Node::Error(ErrorNode {
+                base: BaseNode {
+                    id: unknown.id,
+                    name: unknown.name,
+                    active: unknown.active,
+                },
+                transform: AffineTransform::identity(),
+                size: Size {
+                    width: unknown.width,
+                    height: unknown.height,
+                },
+                opacity: unknown.opacity,
+                error: "Unknown node".to_string(),
+            }),
+        }
+    }
+}
+
+fn de_css_length<'de, D>(deserializer: D) -> Result<f32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Value = Deserialize::deserialize(deserializer)?;
+    match value {
+        Value::Number(n) => Ok(n.as_f64().unwrap_or(0.0) as f32),
+        _ => Ok(0.0),
+    }
+}
+
+fn de_corner_radius<'de, D>(deserializer: D) -> Result<Option<RectangularCornerRadius>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -205,662 +686,19 @@ where
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct IOTextNode {
-    pub id: String,
-    pub name: String,
-    #[serde(default = "default_active")]
-    pub active: bool,
-    #[serde(default = "default_locked")]
-    pub locked: bool,
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
-    #[serde(rename = "blendMode", default = "BlendMode::default")]
-    pub blend_mode: BlendMode,
-    #[serde(default = "default_rotation")]
-    pub rotation: f32,
-    #[serde(rename = "zIndex", default = "default_z_index")]
-    pub z_index: i32,
-    pub position: Option<String>,
-    pub left: f32,
-    pub top: f32,
-    pub right: Option<f32>,
-    pub bottom: Option<f32>,
-    pub width: serde_json::Value,
-    pub height: serde_json::Value,
-    pub fill: Option<IOPaint>,
-    pub style: Option<HashMap<String, serde_json::Value>>,
-    #[serde(rename = "boxShadow")]
-    pub box_shadow: Option<CSSBoxShadow>,
-    #[serde(rename = "filterBlur")]
-    pub filter_blur: Option<FeGaussianBlur>,
-    #[serde(rename = "filterBackdropBlur")]
-    pub filter_backdrop_blur: Option<FeGaussianBlur>,
-    pub text: String,
-    #[serde(rename = "textAlign", default = "default_text_align")]
-    pub text_align: TextAlign,
-    #[serde(rename = "textAlignVertical", default = "default_text_align_vertical")]
-    pub text_align_vertical: TextAlignVertical,
-    #[serde(rename = "textDecoration", default = "default_text_decoration")]
-    pub text_decoration: TextDecoration,
-    #[serde(rename = "lineHeight")]
-    pub line_height: Option<f32>,
-    #[serde(rename = "letterSpacing")]
-    pub letter_spacing: Option<f32>,
-    #[serde(rename = "fontSize")]
-    pub font_size: Option<f32>,
-    #[serde(rename = "fontFamily")]
-    pub font_family: Option<String>,
-    #[serde(rename = "fontWeight", default = "default_font_weight")]
-    pub font_weight: FontWeight,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IOVectorNode {
-    pub id: String,
-    pub name: String,
-    #[serde(default = "default_active")]
-    pub active: bool,
-    #[serde(default = "default_locked")]
-    pub locked: bool,
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
-    #[serde(rename = "blendMode", default = "BlendMode::default")]
-    pub blend_mode: BlendMode,
-    #[serde(default = "default_rotation")]
-    pub rotation: f32,
-    #[serde(rename = "zIndex", default = "default_z_index")]
-    pub z_index: i32,
-    pub position: Option<String>,
-    pub left: f32,
-    pub top: f32,
-    pub width: f32,
-    pub height: f32,
-    pub fill: Option<IOPaint>,
-    pub paths: Option<Vec<SVGPath>>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IOVectorNetworkVertex {
-    pub p: [f32; 2],
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IOVectorNetworkSegment {
-    pub a: usize,
-    pub b: usize,
-    pub ta: [f32; 2],
-    pub tb: [f32; 2],
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IOVectorNetwork {
-    #[serde(default)]
-    pub vertices: Vec<IOVectorNetworkVertex>,
-    #[serde(default)]
-    pub segments: Vec<IOVectorNetworkSegment>,
-}
-
-impl From<IOVectorNetwork> for VectorNetwork {
-    fn from(network: IOVectorNetwork) -> Self {
-        VectorNetwork {
-            vertices: network.vertices.into_iter().map(|v| v.p).collect(),
-            segments: network
-                .segments
-                .into_iter()
-                .map(|s| VectorNetworkSegment {
-                    a: s.a,
-                    b: s.b,
-                    ta: Some(s.ta),
-                    tb: Some(s.tb),
-                })
-                .collect(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IOLineNode {
-    pub id: String,
-    pub name: String,
-    #[serde(default = "default_active")]
-    pub active: bool,
-    #[serde(default = "default_locked")]
-    pub locked: bool,
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
-    #[serde(rename = "blendMode", default = "BlendMode::default")]
-    pub blend_mode: BlendMode,
-    #[serde(default = "default_rotation")]
-    pub rotation: f32,
-    #[serde(rename = "zIndex", default = "default_z_index")]
-    pub z_index: i32,
-    pub position: Option<String>,
-    pub left: f32,
-    pub top: f32,
-    pub width: f32,
-    pub height: f32,
-    pub fill: Option<IOPaint>,
-    #[serde(rename = "strokeWidth")]
-    pub stroke_width: Option<f32>,
-    #[serde(rename = "strokeCap")]
-    pub stroke_cap: Option<String>,
-    pub stroke: Option<IOPaint>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IOPathNode {
-    pub id: String,
-    pub name: String,
-    #[serde(default = "default_active")]
-    pub active: bool,
-    #[serde(default = "default_locked")]
-    pub locked: bool,
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
-    #[serde(rename = "blendMode", default = "BlendMode::default")]
-    pub blend_mode: BlendMode,
-    #[serde(default = "default_rotation")]
-    pub rotation: f32,
-    #[serde(rename = "zIndex", default = "default_z_index")]
-    pub z_index: i32,
-    pub position: Option<String>,
-    pub left: f32,
-    pub top: f32,
-    pub width: f32,
-    pub height: f32,
-    #[serde(rename = "vectorNetwork")]
-    pub vector_network: Option<IOVectorNetwork>,
-    pub fill: Option<IOPaint>,
-    #[serde(rename = "strokeWidth")]
-    pub stroke_width: Option<f32>,
-    #[serde(rename = "strokeCap")]
-    pub stroke_cap: Option<String>,
-    pub stroke: Option<IOPaint>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IOEllipseNode {
-    pub id: String,
-    pub name: String,
-    #[serde(default = "default_active")]
-    pub active: bool,
-    #[serde(default = "default_locked")]
-    pub locked: bool,
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
-    #[serde(rename = "blendMode", default = "BlendMode::default")]
-    pub blend_mode: BlendMode,
-    #[serde(default = "default_rotation")]
-    pub rotation: f32,
-    #[serde(rename = "zIndex", default = "default_z_index")]
-    pub z_index: i32,
-    pub position: Option<String>,
-    pub left: f32,
-    pub top: f32,
-    pub width: f32,
-    pub height: f32,
-    pub fill: Option<IOPaint>,
-    #[serde(rename = "strokeWidth")]
-    pub stroke_width: Option<f32>,
-    #[serde(rename = "strokeCap")]
-    pub stroke_cap: Option<String>,
-    pub stroke: Option<IOPaint>,
-    pub effects: Option<Vec<serde_json::Value>>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IORectangleNode {
-    pub id: String,
-    pub name: String,
-    #[serde(default = "default_active")]
-    pub active: bool,
-    #[serde(default = "default_locked")]
-    pub locked: bool,
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
-    #[serde(rename = "blendMode", default = "BlendMode::default")]
-    pub blend_mode: BlendMode,
-    #[serde(default = "default_rotation")]
-    pub rotation: f32,
-    #[serde(rename = "zIndex", default = "default_z_index")]
-    pub z_index: i32,
-    pub position: Option<String>,
-    pub left: f32,
-    pub top: f32,
-    pub width: f32,
-    pub height: f32,
-    pub fill: Option<IOPaint>,
-    #[serde(rename = "strokeWidth")]
-    pub stroke_width: Option<f32>,
-    #[serde(rename = "strokeCap")]
-    pub stroke_cap: Option<String>,
-    pub stroke: Option<IOPaint>,
-    #[serde(rename = "boxShadow")]
-    pub box_shadow: Option<CSSBoxShadow>,
-    #[serde(rename = "filterBlur")]
-    pub filter_blur: Option<FeGaussianBlur>,
-    #[serde(rename = "filterBackdropBlur")]
-    pub filter_backdrop_blur: Option<FeGaussianBlur>,
-    pub effects: Option<Vec<serde_json::Value>>,
-    #[serde(
-        rename = "cornerRadius",
-        deserialize_with = "deserialize_corner_radius",
-        default = "default_corner_radius"
-    )]
-    pub corner_radius: Option<RectangularCornerRadius>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct IOGradientStop {
-    pub offset: f32,
-    pub color: RGBA,
-}
-
-impl From<IOGradientStop> for GradientStop {
-    fn from(stop: IOGradientStop) -> Self {
-        GradientStop {
-            offset: stop.offset,
-            color: stop.color.into(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
-pub enum IOPaint {
-    #[serde(rename = "solid")]
-    Solid { color: Option<RGBA> },
-    #[serde(rename = "linear_gradient")]
-    LinearGradient {
-        id: Option<String>,
-        transform: Option<[[f32; 3]; 2]>,
-        stops: Vec<IOGradientStop>,
-    },
-    #[serde(rename = "radial_gradient")]
-    RadialGradient {
-        id: Option<String>,
-        transform: Option<[[f32; 3]; 2]>,
-        stops: Vec<IOGradientStop>,
-    },
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CSSBorder {
-    #[serde(rename = "borderWidth")]
-    pub border_width: Option<f32>,
-    #[serde(rename = "borderColor")]
-    pub border_color: Option<RGBA>,
-    #[serde(rename = "borderStyle")]
-    pub border_style: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SVGPath {
-    pub d: String,
-    #[serde(rename = "fillRule")]
-    pub fill_rule: String,
-    pub fill: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct RGBA {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-    pub a: f32,
-}
-
-// Default value functions
-fn default_active() -> bool {
-    true
-}
-fn default_locked() -> bool {
-    false
-}
-fn default_opacity() -> f32 {
-    1.0
-}
-fn default_rotation() -> f32 {
-    0.0
-}
-fn default_z_index() -> i32 {
-    0
-}
-fn default_text_align() -> TextAlign {
-    TextAlign::Left
-}
-fn default_text_align_vertical() -> TextAlignVertical {
-    TextAlignVertical::Top
-}
-fn default_text_decoration() -> TextDecoration {
-    TextDecoration::None
-}
-fn default_font_weight() -> FontWeight {
-    FontWeight::new(400)
-}
-
-fn default_corner_radius() -> Option<RectangularCornerRadius> {
-    None
-}
-
-pub fn parse(file: &str) -> Result<IOCanvasFile, serde_json::Error> {
-    serde_json::from_str(file)
-}
-
-impl From<RGBA> for Color {
-    fn from(color: RGBA) -> Self {
-        Color(color.r, color.g, color.b, (color.a * 255.0) as u8)
-    }
-}
-
-impl From<CSSBoxShadow> for FeDropShadow {
-    fn from(box_shadow: CSSBoxShadow) -> Self {
-        FeDropShadow {
-            dx: box_shadow.offset[0],
-            dy: box_shadow.offset[1],
-            blur: box_shadow.blur,
-            spread: box_shadow.spread,
-            color: box_shadow.color.into(),
-        }
-    }
-}
-
-impl From<Option<IOPaint>> for Paint {
-    fn from(fill: Option<IOPaint>) -> Self {
-        match fill {
-            Some(IOPaint::Solid { color }) => Paint::Solid(SolidPaint {
-                color: color.map_or(Color(0, 0, 0, 0), |c| c.into()),
-                opacity: 1.0,
-            }),
-            Some(IOPaint::LinearGradient {
-                transform, stops, ..
-            }) => {
-                let stops = stops.into_iter().map(|s| s.into()).collect();
-                Paint::LinearGradient(LinearGradientPaint {
-                    transform: transform
-                        .map(|m| AffineTransform { matrix: m })
-                        .unwrap_or_else(AffineTransform::identity),
-                    stops,
-                    opacity: 1.0,
-                })
-            }
-            Some(IOPaint::RadialGradient {
-                transform, stops, ..
-            }) => {
-                let stops = stops.into_iter().map(|s| s.into()).collect();
-                Paint::RadialGradient(RadialGradientPaint {
-                    transform: transform
-                        .map(|m| AffineTransform { matrix: m })
-                        .unwrap_or_else(AffineTransform::identity),
-                    stops,
-                    opacity: 1.0,
-                })
-            }
-            None => Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 0),
-                opacity: 1.0,
-            }),
-        }
-    }
-}
-
-impl From<IOContainerNode> for ContainerNode {
-    fn from(node: IOContainerNode) -> Self {
-        let width = match node.width {
-            Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
-            _ => 0.0,
-        };
-        let height = match node.height {
-            Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
-            _ => 0.0,
-        };
-        ContainerNode {
-            base: BaseNode {
-                id: node.id,
-                name: node.name,
-                active: node.active,
-            },
-            blend_mode: node.blend_mode,
-            transform: AffineTransform::new(node.left, node.top, node.rotation),
-            size: Size { width, height },
-            corner_radius: node
-                .corner_radius
-                .unwrap_or(RectangularCornerRadius::zero()),
-            fills: vec![node.fill.into()],
-            strokes: vec![],
-            stroke_width: 0.0,
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            effects: merge_effects(node.box_shadow, node.filter_blur, node.filter_backdrop_blur),
-            children: node.children,
-            opacity: node.opacity,
-            clip: true,
-        }
-    }
-}
-
-impl From<IOTextNode> for TextSpanNode {
-    fn from(node: IOTextNode) -> Self {
-        let width = match node.width {
-            Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
-            _ => 0.0,
-        };
-        let height = match node.height {
-            Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
-            _ => 0.0,
-        };
-        TextSpanNode {
-            base: BaseNode {
-                id: node.id,
-                name: node.name,
-                active: node.active,
-            },
-            blend_mode: node.blend_mode,
-            transform: AffineTransform::new(node.left, node.top, node.rotation),
-            size: Size { width, height },
-            text: node.text,
-            text_style: TextStyle {
-                text_decoration: node.text_decoration,
-                font_family: node.font_family.unwrap_or_else(|| "Inter".to_string()),
-                font_size: node.font_size.unwrap_or(14.0),
-                font_weight: node.font_weight,
-                italic: false,
-                letter_spacing: node.letter_spacing,
-                line_height: node.line_height,
-                text_transform: TextTransform::None,
-            },
-            text_align: node.text_align,
-            text_align_vertical: node.text_align_vertical,
-            fill: node.fill.into(),
-            stroke: None,
-            stroke_width: None,
-            stroke_align: StrokeAlign::Inside,
-            opacity: node.opacity,
-            effects: LayerEffects::new_empty(),
-        }
-    }
-}
-
-impl From<IOEllipseNode> for Node {
-    fn from(node: IOEllipseNode) -> Self {
-        let transform = AffineTransform::new(node.left, node.top, node.rotation);
-
-        Node::Ellipse(EllipseNode {
-            base: BaseNode {
-                id: node.id,
-                name: node.name,
-                active: node.active,
-            },
-            blend_mode: node.blend_mode,
-            transform,
-            size: Size {
-                width: node.width,
-                height: node.height,
-            },
-            fills: vec![node.fill.into()],
-            strokes: vec![],
-            stroke_width: node.stroke_width.unwrap_or(0.0),
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            effects: LayerEffects::new_empty(),
-            opacity: node.opacity,
-        })
-    }
-}
-
-impl From<IORectangleNode> for Node {
-    fn from(node: IORectangleNode) -> Self {
-        let transform = AffineTransform::new(node.left, node.top, node.rotation);
-
-        Node::Rectangle(RectangleNode {
-            base: BaseNode {
-                id: node.id,
-                name: node.name,
-                active: node.active,
-            },
-            blend_mode: node.blend_mode,
-            transform,
-            size: Size {
-                width: node.width,
-                height: node.height,
-            },
-            corner_radius: node
-                .corner_radius
-                .unwrap_or(RectangularCornerRadius::zero()),
-            fills: vec![node.fill.into()],
-            strokes: vec![],
-            stroke_width: node.stroke_width.unwrap_or(0.0),
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            effects: merge_effects(node.box_shadow, node.filter_blur, node.filter_backdrop_blur),
-            opacity: node.opacity,
-        })
-    }
-}
-
-impl From<IOVectorNode> for Node {
-    fn from(node: IOVectorNode) -> Self {
-        let transform = AffineTransform::new(node.left, node.top, node.rotation);
-
-        // For vector nodes, we'll create a path node with the path data
-        Node::SVGPath(SVGPathNode {
-            base: BaseNode {
-                id: node.id,
-                name: node.name,
-                active: node.active,
-            },
-            blend_mode: node.blend_mode,
-            transform,
-            fill: node.fill.into(),
-            data: node.paths.map_or("".to_string(), |paths| {
-                paths
-                    .iter()
-                    .map(|path| path.d.clone())
-                    .collect::<Vec<String>>()
-                    .join(" ")
-            }),
-            stroke: None,
-            stroke_width: 0.0,
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            opacity: node.opacity,
-            effects: LayerEffects::new_empty(),
-        })
-    }
-}
-
-impl From<IOLineNode> for Node {
-    fn from(node: IOLineNode) -> Self {
-        let transform = AffineTransform::new(node.left, node.top, node.rotation);
-
-        Node::Line(LineNode {
-            base: BaseNode {
-                id: node.id,
-                name: node.name,
-                active: node.active,
-            },
-            transform,
-            size: Size {
-                width: node.width,
-                height: 0.0,
-            },
-            strokes: vec![node.stroke.into()],
-            stroke_width: node.stroke_width.unwrap_or(0.0),
-            _data_stroke_align: StrokeAlign::Center,
-            stroke_dash_array: None,
-            opacity: node.opacity,
-            blend_mode: node.blend_mode,
-            effects: LayerEffects::new_empty(),
-        })
-    }
-}
-
-impl From<IOPathNode> for Node {
-    fn from(node: IOPathNode) -> Self {
-        let transform = AffineTransform::new(node.left, node.top, node.rotation);
-
-        Node::Vector(VectorNode {
-            base: BaseNode {
-                id: node.id,
-                name: node.name,
-                active: node.active,
-            },
-            blend_mode: node.blend_mode,
-            transform,
-            fill: Some(node.fill.into()),
-            network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
-            strokes: vec![node.stroke.into()],
-            stroke_width: node.stroke_width.unwrap_or(0.0),
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            opacity: node.opacity,
-            effects: LayerEffects::new_empty(),
-        })
-    }
-}
-
-impl From<IONode> for Node {
-    fn from(node: IONode) -> Self {
-        match node {
-            IONode::Container(container) => Node::Container(container.into()),
-            IONode::Text(text) => Node::TextSpan(text.into()),
-            IONode::Vector(vector) => vector.into(),
-            IONode::Path(path) => path.into(),
-            IONode::Ellipse(ellipse) => ellipse.into(),
-            IONode::Rectangle(rectangle) => rectangle.into(),
-            IONode::Line(line) => line.into(),
-            IONode::Unknown => Node::Error(ErrorNode {
-                base: BaseNode {
-                    id: "unknown".to_string(),
-                    name: "Unknown Node".to_string(),
-                    active: false,
-                },
-                transform: AffineTransform::identity(),
-                size: Size {
-                    width: 100.0,
-                    height: 100.0,
-                },
-                opacity: 1.0,
-                error: "Unknown node".to_string(),
-            }),
-        }
-    }
-}
-
 fn merge_effects(
-    box_shadow: Option<CSSBoxShadow>,
-    filter_blur: Option<FeGaussianBlur>,
-    filter_backdrop_blur: Option<FeGaussianBlur>,
+    fe_drop_shadow: Option<JSONFeDropShadow>,
+    fe_blur: Option<FeGaussianBlur>,
+    fe_backdrop_blur: Option<FeGaussianBlur>,
 ) -> LayerEffects {
     let mut effects = LayerEffects::new_empty();
-    if let Some(filter_blur) = filter_blur {
+    if let Some(filter_blur) = fe_blur {
         effects.blur = Some(filter_blur);
     }
-    if let Some(filter_backdrop_blur) = filter_backdrop_blur {
+    if let Some(filter_backdrop_blur) = fe_backdrop_blur {
         effects.backdrop_blur = Some(filter_backdrop_blur);
     }
-    if let Some(box_shadow) = box_shadow {
+    if let Some(box_shadow) = fe_drop_shadow {
         effects
             .shadows
             .push(FilterShadowEffect::DropShadow(box_shadow.into()));
@@ -880,7 +718,7 @@ mod tests {
             eprintln!("test resource not found: {}", path);
             return;
         };
-        let parsed: IOCanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
+        let parsed: JSONCanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
 
         assert_eq!(parsed.version, "0.0.1-beta.1+20250303");
         assert!(
@@ -921,13 +759,13 @@ mod tests {
             }
         }"#;
 
-        let parsed: IOCanvasFile = serde_json::from_str(json_without_corner_radius)
+        let parsed: JSONCanvasFile = serde_json::from_str(json_without_corner_radius)
             .expect("failed to parse JSON without cornerRadius");
 
         // Verify that the rectangle node was parsed successfully
-        if let Some(IONode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
+        if let Some(JSONNode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
             // corner_radius should be None when not present in JSON
-            assert!(rect_node.corner_radius.is_none());
+            assert!(rect_node.base.corner_radius.is_none());
         } else {
             panic!("Expected rectangle node not found");
         }
@@ -963,14 +801,14 @@ mod tests {
             }
         }"#;
 
-        let parsed: IOCanvasFile = serde_json::from_str(json_with_corner_radius)
+        let parsed: JSONCanvasFile = serde_json::from_str(json_with_corner_radius)
             .expect("failed to parse JSON with cornerRadius");
 
         // Verify that the rectangle node was parsed successfully with cornerRadius
-        if let Some(IONode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
+        if let Some(JSONNode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
             // corner_radius should be Some when present in JSON
-            assert!(rect_node.corner_radius.is_some());
-            if let Some(corner_radius) = &rect_node.corner_radius {
+            assert!(rect_node.base.corner_radius.is_some());
+            if let Some(corner_radius) = &rect_node.base.corner_radius {
                 assert_eq!(corner_radius.tl, 10.0);
                 assert_eq!(corner_radius.tr, 10.0);
                 assert_eq!(corner_radius.bl, 10.0);
