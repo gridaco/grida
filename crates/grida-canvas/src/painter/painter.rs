@@ -217,9 +217,7 @@ impl<'a> Painter<'a> {
             path = spread_shape;
         }
 
-        // Clip to the shape so shadow appears inside
         canvas.save();
-        canvas.clip_path(&path, None, true);
 
         // Draw shadow on a separate layer so we can clear the center
         canvas.save_layer(&SaveLayerRec::default());
@@ -230,6 +228,8 @@ impl<'a> Painter<'a> {
         clear_paint.set_blend_mode(skia_safe::BlendMode::DstOut);
         clear_paint.set_anti_alias(true);
         canvas.draw_path(&path, &clear_paint);
+        // Clip to the shape so shadow appears inside
+        canvas.clip_path(&path, None, true);
 
         canvas.restore();
         canvas.restore();
@@ -462,8 +462,8 @@ impl<'a> Painter<'a> {
                 draw_content();
             }
             Some(FilterEffect::InnerShadow(shadow)) => {
-                self.draw_inner_shadow(shape, shadow);
                 draw_content();
+                self.draw_inner_shadow(shape, shadow);
             }
             Some(FilterEffect::BackdropBlur(blur)) => {
                 self.draw_backdrop_blur(shape, blur);

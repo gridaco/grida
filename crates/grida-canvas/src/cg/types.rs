@@ -390,6 +390,12 @@ pub enum FilterEffect {
     BackdropBlur(FeGaussianBlur),
 }
 
+#[derive(Debug, Clone)]
+pub enum FilterShadowEffect {
+    DropShadow(FeDropShadow),
+    InnerShadow(FeDropShadow),
+}
+
 /// A drop shadow (box-shadow) filter effect (`<feDropShadow>` + spread radius)
 /// See also:
 /// - https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow
