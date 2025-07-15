@@ -171,6 +171,8 @@ export function useNodeActions(node_id: string | undefined) {
       ) => instance.changeNodeStroke(node_id, value),
       strokeWidth: (change: editor.api.NumberChange) =>
         instance.changeNodeStrokeWidth(node_id, change),
+      strokeAlign: (value: cg.StrokeAlign) =>
+        instance.changeNodeStrokeAlign(node_id, value),
       strokeCap: (value: cg.StrokeCap) =>
         instance.changeNodeStrokeCap(node_id, value),
       fit: (value: cg.BoxFit) => instance.changeNodeFit(node_id, value),
@@ -215,11 +217,11 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
       //   changeNodeStyle(node_id, "margin", value),
-      boxShadow: (value?: cg.BoxShadow) =>
+      feDropShadow: (value?: cg.BoxShadow) =>
         instance.changeNodeFeDropShadow(node_id, value),
-      blur: (value?: cg.FeGaussianBlur) =>
+      feBlur: (value?: cg.FeGaussianBlur) =>
         instance.changeNodeFeBlur(node_id, value),
-      backdropBlur: (value?: cg.FeGaussianBlur) =>
+      feBackdropBlur: (value?: cg.FeGaussianBlur) =>
         instance.changeNodeFeBackdropBlur(node_id, value),
 
       // layout

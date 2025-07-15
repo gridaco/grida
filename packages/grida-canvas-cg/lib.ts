@@ -193,6 +193,12 @@ export namespace cg {
   export type StrokeCap = "butt" | "round" | "square";
 
   /**
+   * @see https://www.figma.com/plugin-docs/api/properties/nodes-strokealign/
+   * @see https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html
+   */
+  export type StrokeAlign = "center" | "inside" | "outside";
+
+  /**
    *
    * Supported text decoration modes
    *

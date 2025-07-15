@@ -205,6 +205,8 @@ pub struct JSONUnknownNodeProperties {
     // stroke
     #[serde(rename = "strokeWidth", default = "default_stroke_width")]
     pub stroke_width: f32,
+    #[serde(rename = "strokeAlign")]
+    pub stroke_align: Option<StrokeAlign>,
     #[serde(rename = "strokeCap")]
     pub stroke_cap: Option<String>,
     #[serde(rename = "stroke")]
@@ -418,9 +420,9 @@ impl From<JSONContainerNode> for ContainerNode {
                 .corner_radius
                 .unwrap_or(RectangularCornerRadius::zero()),
             fills: vec![node.base.fill.into()],
-            strokes: vec![],
+            strokes: vec![node.base.stroke.into()],
             stroke_width: 0.0,
-            stroke_align: StrokeAlign::Inside,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             effects: merge_effects(
                 node.base.fe_drop_shadow,
@@ -463,7 +465,7 @@ impl From<JSONTextNode> for TextSpanNode {
             fill: node.base.fill.into(),
             stroke: None,
             stroke_width: None,
-            stroke_align: StrokeAlign::Inside,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             opacity: node.base.opacity,
             effects: LayerEffects::new_empty(),
         }
@@ -487,9 +489,9 @@ impl From<JSONEllipseNode> for Node {
                 height: node.base.height,
             },
             fills: vec![node.base.fill.into()],
-            strokes: vec![],
+            strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
-            stroke_align: StrokeAlign::Inside,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             effects: LayerEffects::new_empty(),
             opacity: node.base.opacity,
@@ -518,9 +520,9 @@ impl From<JSONRectangleNode> for Node {
                 .corner_radius
                 .unwrap_or(RectangularCornerRadius::zero()),
             fills: vec![node.base.fill.into()],
-            strokes: vec![],
+            strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
-            stroke_align: StrokeAlign::Inside,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             effects: merge_effects(
                 node.base.fe_drop_shadow,
@@ -555,7 +557,7 @@ impl From<JSONVectorNode> for Node {
             }),
             stroke: None,
             stroke_width: 0.0,
-            stroke_align: StrokeAlign::Inside,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             opacity: node.base.opacity,
             effects: LayerEffects::new_empty(),
@@ -580,7 +582,7 @@ impl From<JSONLineNode> for Node {
             },
             strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
-            _data_stroke_align: StrokeAlign::Center,
+            _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
             stroke_dash_array: None,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode,
@@ -605,7 +607,7 @@ impl From<JSONPathNode> for Node {
             network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
             strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
-            stroke_align: StrokeAlign::Inside,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             opacity: node.base.opacity,
             effects: LayerEffects::new_empty(),

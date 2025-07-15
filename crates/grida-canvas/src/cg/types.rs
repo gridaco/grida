@@ -86,10 +86,13 @@ impl Default for BlendMode {
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
 /// - [Figma](https://www.figma.com/plugin-docs/api/properties/nodes-strokealign/)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub enum StrokeAlign {
+    #[serde(rename = "inside")]
     Inside,
+    #[serde(rename = "center")]
     Center,
+    #[serde(rename = "outside")]
     Outside,
 }
 

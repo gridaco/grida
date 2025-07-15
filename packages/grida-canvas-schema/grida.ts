@@ -771,6 +771,8 @@ export namespace grida.program.nodes {
     | LineNode
     | RectangleNode
     | EllipseNode
+    // | RegularPolygonNode
+    // | RegularStarPolygonNode
     | ComponentNode
     | InstanceNode
     | TemplateInstanceNode;
@@ -1191,6 +1193,11 @@ export namespace grida.program.nodes {
       strokeWidth: number;
 
       /**
+       * stroke alignment - takes effect when stroke is set
+       */
+      strokeAlign?: cg.StrokeAlign;
+
+      /**
        * @default "butt"
        */
       strokeCap: cg.StrokeCap;
@@ -1598,6 +1605,41 @@ export namespace grida.program.nodes {
    * @deprecated - not ready - do not use in production
    */
   export type ComputedVectorNode = VectorNode;
+
+  export interface RegularPolygonNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IHrefable,
+      i.IMouseCursor,
+      i.IPositioning,
+      i.IFixedDimension,
+      i.IOpacity,
+      i.IBlendMode,
+      i.IZIndex,
+      i.IRotation,
+      i.IFill<cg.Paint>,
+      i.IStroke {
+    readonly type: "regular-polygon";
+    pointCount: number;
+  }
+
+  export interface RegularStarPolygonNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IHrefable,
+      i.IMouseCursor,
+      i.IPositioning,
+      i.IFixedDimension,
+      i.IOpacity,
+      i.IBlendMode,
+      i.IZIndex,
+      i.IRotation,
+      i.IFill<cg.Paint>,
+      i.IStroke {
+    readonly type: "regular-star-polygon";
+    pointCount: number;
+    innerRadius: number;
+  }
 
   export interface PathNode
     extends i.IBaseNode,

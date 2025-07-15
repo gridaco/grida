@@ -1246,6 +1246,15 @@ export class Editor
       return;
     }
   }
+
+  changeNodeStrokeAlign(node_id: string, strokeAlign: cg.StrokeAlign) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeAlign,
+    });
+  }
+
   changeNodeStrokeCap(node_id: string, strokeCap: cg.StrokeCap) {
     this.dispatch({
       type: "node/change/*",

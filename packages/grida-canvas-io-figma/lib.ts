@@ -38,6 +38,15 @@ export namespace iofigma {
         WASHI_TAPE_6: undefined,
       };
 
+      export const strokeAlignMap: Record<
+        NonNullable<LineNode["strokeAlign"]>,
+        cg.StrokeAlign | undefined
+      > = {
+        CENTER: "center",
+        INSIDE: "inside",
+        OUTSIDE: "outside",
+      };
+
       export const textAlignMap: Record<
         NonNullable<TypeStyle["textAlignHorizontal"]>,
         cg.TextAlign | undefined
@@ -254,7 +263,7 @@ export namespace iofigma {
       ): grida.program.nodes.Node | undefined {
         switch (node.type) {
           case "SECTION": {
-            const { fills, strokes, strokeWeight } = node;
+            const { fills, strokes, strokeWeight, strokeAlign } = node;
 
             const first_visible_fill = first_visible(fills);
             const first_visible_stroke = strokes
@@ -668,7 +677,7 @@ export namespace iofigma {
           case "BOOLEAN_OPERATION": {
           }
           case "LINE": {
-            const { fills, strokeWeight, strokeCap } = node;
+            const { fills, strokeWeight, strokeCap, strokeAlign } = node;
             const first_visible_stroke = first_visible(node.strokes ?? []);
 
             return {
@@ -686,6 +695,9 @@ export namespace iofigma {
                 ? paint(first_visible_stroke, context.gradient_id_generator)
                 : undefined,
               strokeWidth: strokeWeight ?? 0,
+              strokeAlign: strokeAlign
+                ? (map.strokeAlignMap[strokeAlign] ?? "inside")
+                : "inside",
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",

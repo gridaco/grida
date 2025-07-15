@@ -22,14 +22,14 @@ import { RGBAColorControl } from "./color";
 
 type BoxShadow = cg.BoxShadow;
 
-const default_box_shadow: BoxShadow = {
+const default_shadow: BoxShadow = {
   color: { r: 0, g: 0, b: 0, a: 0.25 },
   offset: [0, 4],
   blur: 4,
   spread: 0,
 };
 
-export function BoxShadowControl({
+export function FeShadowControl({
   value,
   onValueChange,
 }: {
@@ -37,7 +37,7 @@ export function BoxShadowControl({
   onValueChange?: (value?: BoxShadow) => void;
 }) {
   const onAdd = () => {
-    onValueChange?.(default_box_shadow);
+    onValueChange?.(default_shadow);
   };
 
   const onRemove = () => {

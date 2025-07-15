@@ -250,12 +250,17 @@ const safe_properties: Partial<
       draft.strokeWidth = ranged(0, value);
     },
   }),
-  strokeCap: defineNodeProperty<"strokeCap">({
+  strokeAlign: defineNodeProperty<"strokeAlign">({
     assert: (node) =>
       node.type === "path" ||
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse",
+    apply: (draft, value, prev) => {
+      draft.strokeAlign = value;
+    },
+  }),
+  strokeCap: defineNodeProperty<"strokeCap">({
     apply: (draft, value, prev) => {
       draft.strokeCap = value;
     },

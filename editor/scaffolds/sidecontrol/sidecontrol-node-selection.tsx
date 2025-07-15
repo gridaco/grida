@@ -18,7 +18,7 @@ import { BorderControl } from "./controls/border";
 import { FillControl } from "./controls/fill";
 import { StringValueControl } from "./controls/string-value";
 import { PaddingControl } from "./controls/padding";
-import { BoxShadowControl } from "./controls/box-shadow";
+import { FeShadowControl } from "./controls/fe-shadow";
 import { GapControl } from "./controls/gap";
 import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
 import { MainAxisAlignmentControl } from "./controls/main-axis-alignment";
@@ -93,6 +93,7 @@ import {
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 import { dq } from "@/grida-canvas/query";
 import { FeBlurControl } from "./controls/fe-blur";
+import { StrokeAlignControl } from "./controls/stroke-align";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -710,6 +711,7 @@ function SelectedNodeProperties({
     fill: node.fill,
     stroke: node.stroke,
     strokeWidth: node.strokeWidth,
+    strokeAlign: node.strokeAlign,
     strokeCap: node.strokeCap,
     fit: node.fit,
     fontFamily: node.fontFamily,
@@ -725,9 +727,9 @@ function SelectedNodeProperties({
     border: node.border,
     //
     padding: node.padding,
-    fe_drop_shadow: node.feDropShadow,
-    fe_blur: node.feBlur,
-    fe_backdrop_blur: node.feBackdropBlur,
+    feDropShadow: node.feDropShadow,
+    feBlur: node.feBlur,
+    feBackdropBlur: node.feBackdropBlur,
 
     //
     layout: node.layout,
@@ -759,6 +761,7 @@ function SelectedNodeProperties({
     fill,
     stroke,
     strokeWidth,
+    strokeAlign,
     strokeCap,
     fit,
     fontFamily,
@@ -774,9 +777,9 @@ function SelectedNodeProperties({
     border,
     //
     padding,
-    fe_drop_shadow: feDropShadow,
-    fe_blur: feBlur,
-    fe_backdrop_blur: feBackdropBlur,
+    feDropShadow,
+    feBlur,
+    feBackdropBlur,
     //
     layout,
     direction,
@@ -1065,17 +1068,17 @@ function SelectedNodeProperties({
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
-              <PropertyLineLabel>Opacity</PropertyLineLabel>
-              <OpacityControl
-                value={opacity as any}
-                onValueCommit={actions.opacity}
-              />
-            </PropertyLine>
-            <PropertyLine>
               <PropertyLineLabel>Blend Mode</PropertyLineLabel>
               <BlendModeControl
                 value={blendMode}
                 onValueChange={actions.blendMode}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Opacity</PropertyLineLabel>
+              <OpacityControl
+                value={opacity as any}
+                onValueCommit={actions.opacity}
               />
             </PropertyLine>
             {supports.cornerRadius(node.type, { backend }) && (
@@ -1128,6 +1131,13 @@ function SelectedNodeProperties({
                   onValueCommit={actions.strokeWidth}
                 />
               </PropertyLine>
+              <PropertyLine hidden={!stroke}>
+                <PropertyLineLabel>Align</PropertyLineLabel>
+                <StrokeAlignControl
+                  value={strokeAlign}
+                  onValueChange={actions.strokeAlign}
+                />
+              </PropertyLine>
               <PropertyLine
                 hidden={!supports.strokeCap(node.type, { backend })}
               >
@@ -1150,20 +1160,20 @@ function SelectedNodeProperties({
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Shadow</PropertyLineLabel>
-              <BoxShadowControl
+              <FeShadowControl
                 value={feDropShadow}
-                onValueChange={actions.boxShadow}
+                onValueChange={actions.feDropShadow}
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Blur</PropertyLineLabel>
-              <FeBlurControl value={feBlur} onValueChange={actions.blur} />
+              <FeBlurControl value={feBlur} onValueChange={actions.feBlur} />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Backdrop Blur</PropertyLineLabel>
               <FeBlurControl
                 value={feBackdropBlur}
-                onValueChange={actions.backdropBlur}
+                onValueChange={actions.feBackdropBlur}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
