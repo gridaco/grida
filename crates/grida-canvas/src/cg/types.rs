@@ -382,18 +382,12 @@ pub enum FilterEffect {
     /// the shadow is clipped to the shape
     InnerShadow(FeDropShadow),
 
-    /// Gaussian blur filter: blur only
-    GaussianBlur(FeGaussianBlur),
+    /// Layer blur filter
+    LayerBlur(FeGaussianBlur),
 
-    /// Background blur filter: blur only
-    BackdropBlur(FeBackdropBlur),
-}
-
-/// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
-#[derive(Debug, Clone, Copy)]
-pub struct FeBackdropBlur {
-    /// Blur radius in logical pixels.
-    pub radius: f32,
+    /// Background blur filter
+    /// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
+    BackdropBlur(FeGaussianBlur),
 }
 
 /// A drop shadow (box-shadow) filter effect (`<feDropShadow>` + spread radius)
@@ -422,7 +416,7 @@ pub struct FeDropShadow {
 }
 
 /// A standalone blur filter effect (`<feGaussianBlur>`)
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub struct FeGaussianBlur {
     /// Blur radius (`stdDeviation` in SVG)
     pub radius: f32,

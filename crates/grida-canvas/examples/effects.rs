@@ -89,7 +89,7 @@ async fn demo_effects() -> Scene {
                 color: Color(200, 200, 200, 255), // White
                 opacity: 1.0,
             }));
-            rect.effects = vec![FilterEffect::GaussianBlur(FeGaussianBlur {
+            rect.effects = vec![FilterEffect::LayerBlur(FeGaussianBlur {
                 radius: 4.0 * (i + 1) as f32,
             })];
             all_effect_ids.push(rect.base.id.clone());
@@ -108,7 +108,7 @@ async fn demo_effects() -> Scene {
                 color: Color(200, 200, 200, 255), // White
                 opacity: 1.0,
             })];
-            polygon.effects = vec![FilterEffect::GaussianBlur(FeGaussianBlur {
+            polygon.effects = vec![FilterEffect::LayerBlur(FeGaussianBlur {
                 radius: 4.0 * (i + 1) as f32,
             })];
             all_effect_ids.push(polygon.base.id.clone());
@@ -161,7 +161,7 @@ async fn demo_effects() -> Scene {
                 color: Color(255, 255, 255, 128), // Semi-transparent white
                 opacity: 1.0,
             }));
-            blur_rect.effects = vec![FilterEffect::BackdropBlur(FeBackdropBlur {
+            blur_rect.effects = vec![FilterEffect::BackdropBlur(FeGaussianBlur {
                 radius: 8.0 * (i + 1) as f32,
             })];
             all_effect_ids.push(blur_rect.base.id.clone());
@@ -180,7 +180,7 @@ async fn demo_effects() -> Scene {
                 color: Color(255, 255, 255, 128), // Semi-transparent white
                 opacity: 1.0,
             })];
-            blur_polygon.effects = vec![FilterEffect::BackdropBlur(FeBackdropBlur {
+            blur_polygon.effects = vec![FilterEffect::BackdropBlur(FeGaussianBlur {
                 radius: 8.0 * (i + 1) as f32,
             })];
             all_effect_ids.push(blur_polygon.base.id.clone());

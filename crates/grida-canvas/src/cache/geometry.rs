@@ -418,7 +418,7 @@ fn compute_render_bounds_from_effects(bounds: Rectangle, effects: &Vec<FilterEff
 
 fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -> Rectangle {
     match effect {
-        FilterEffect::GaussianBlur(blur) => inflate_rect(bounds, blur.radius),
+        FilterEffect::LayerBlur(blur) => inflate_rect(bounds, blur.radius),
         FilterEffect::BackdropBlur(blur) => inflate_rect(bounds, blur.radius),
         FilterEffect::DropShadow(shadow) => inflate_rect(
             Rectangle {

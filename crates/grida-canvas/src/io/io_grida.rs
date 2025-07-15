@@ -108,6 +108,8 @@ pub struct IOUnknownNode {
     // effects
     #[serde(rename = "boxShadow")]
     pub box_shadow: Option<CSSBoxShadow>,
+    #[serde(rename = "filterBlur")]
+    pub filter_blur: Option<FeGaussianBlur>,
     pub effects: Option<Vec<serde_json::Value>>,
     // vector
     #[serde(rename = "vectorNetwork")]
@@ -142,6 +144,8 @@ pub struct IOContainerNode {
     pub style: Option<HashMap<String, serde_json::Value>>,
     #[serde(rename = "boxShadow")]
     pub box_shadow: Option<CSSBoxShadow>,
+    #[serde(rename = "filterBlur")]
+    pub filter_blur: Option<FeGaussianBlur>,
     #[serde(
         rename = "cornerRadius",
         deserialize_with = "deserialize_corner_radius",
@@ -224,6 +228,8 @@ pub struct IOTextNode {
     pub style: Option<HashMap<String, serde_json::Value>>,
     #[serde(rename = "boxShadow")]
     pub box_shadow: Option<CSSBoxShadow>,
+    #[serde(rename = "filterBlur")]
+    pub filter_blur: Option<FeGaussianBlur>,
     pub text: String,
     #[serde(rename = "textAlign", default = "default_text_align")]
     pub text_align: TextAlign,
@@ -426,6 +432,8 @@ pub struct IORectangleNode {
     pub stroke: Option<IOPaint>,
     #[serde(rename = "boxShadow")]
     pub box_shadow: Option<CSSBoxShadow>,
+    #[serde(rename = "filterBlur")]
+    pub filter_blur: Option<FeGaussianBlur>,
     pub effects: Option<Vec<serde_json::Value>>,
     #[serde(
         rename = "cornerRadius",
@@ -616,7 +624,7 @@ impl From<IOContainerNode> for ContainerNode {
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effects: vec![],
+            effects: merge_effects(node.box_shadow, node.filter_blur),
             children: node.children,
             opacity: node.opacity,
             clip: true,
@@ -716,11 +724,7 @@ impl From<IORectangleNode> for Node {
             stroke_width: node.stroke_width.unwrap_or(0.0),
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effects: node
-                .box_shadow
-                .into_iter()
-                .map(|box_shadow| FilterEffect::DropShadow(box_shadow.into()))
-                .collect(),
+            effects: merge_effects(node.box_shadow, node.filter_blur),
             opacity: node.opacity,
         })
     }
@@ -833,6 +837,20 @@ impl From<IONode> for Node {
             }),
         }
     }
+}
+
+fn merge_effects(
+    box_shadow: Option<CSSBoxShadow>,
+    filter_blur: Option<FeGaussianBlur>,
+) -> Vec<FilterEffect> {
+    let mut effects = vec![];
+    if let Some(box_shadow) = box_shadow {
+        effects.push(FilterEffect::DropShadow(box_shadow.into()));
+    }
+    if let Some(filter_blur) = filter_blur {
+        effects.push(FilterEffect::LayerBlur(filter_blur));
+    }
+    effects
 }
 
 #[cfg(test)]

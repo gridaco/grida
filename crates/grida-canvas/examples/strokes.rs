@@ -209,8 +209,8 @@ async fn demo_strokes() -> Scene {
                 spread: 0.0,
                 color: Color(0, 0, 0, 128),
             })],
-            1 => vec![FilterEffect::GaussianBlur(FeGaussianBlur { radius: 2.0 })],
-            2 => vec![FilterEffect::BackdropBlur(FeBackdropBlur { radius: 4.0 })],
+            1 => vec![FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 })],
+            2 => vec![FilterEffect::BackdropBlur(FeGaussianBlur { radius: 4.0 })],
             _ => unreachable!(),
         };
 
