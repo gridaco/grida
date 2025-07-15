@@ -1177,6 +1177,14 @@ export namespace grida.program.nodes {
       boxShadow?: cg.BoxShadow;
     }
 
+    export interface IFilterBlur {
+      filterBlur?: cg.FeGaussianBlur;
+    }
+
+    export interface IFilterBackdropBlur {
+      filterBackdropBlur?: cg.FeGaussianBlur;
+    }
+
     /**
      * Node that supports stroke with color - such as rectangle, ellipse, etc.
      *
@@ -1222,6 +1230,8 @@ export namespace grida.program.nodes {
         ICSSDimension,
         IFill<props.PropsPaintValue>,
         IBoxShadow,
+        IFilterBlur,
+        IFilterBackdropBlur,
         ICSSBorder {
       /**
        * TODO: rename to css

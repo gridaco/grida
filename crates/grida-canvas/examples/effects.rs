@@ -38,13 +38,13 @@ async fn demo_effects() -> Scene {
                 color: Color(255, 255, 255, 255), // White
                 opacity: 1.0,
             }));
-            rect.effects = vec![FilterEffect::DropShadow(FeDropShadow {
+            rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
                 dx: 4.0,
                 dy: 4.0,
                 blur: 4.0 * (i + 1) as f32,
                 spread: 0.0,
                 color: Color(0, 0, 0, 128),
-            })];
+            })]);
             all_effect_ids.push(rect.base.id.clone());
             repository.insert(Node::Rectangle(rect));
         } else {
@@ -61,13 +61,14 @@ async fn demo_effects() -> Scene {
                 color: Color(255, 255, 255, 255), // White
                 opacity: 1.0,
             })];
-            polygon.effects = vec![FilterEffect::DropShadow(FeDropShadow {
-                dx: 4.0,
-                dy: 4.0,
-                blur: 4.0 * (i + 1) as f32,
-                spread: 4.0,
-                color: Color(0, 0, 0, 128),
-            })];
+            polygon.effects =
+                LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+                    dx: 4.0,
+                    dy: 4.0,
+                    blur: 4.0 * (i + 1) as f32,
+                    spread: 4.0,
+                    color: Color(0, 0, 0, 128),
+                })]);
             all_effect_ids.push(polygon.base.id.clone());
             repository.insert(Node::RegularPolygon(polygon));
         }
@@ -89,9 +90,10 @@ async fn demo_effects() -> Scene {
                 color: Color(200, 200, 200, 255), // White
                 opacity: 1.0,
             }));
-            rect.effects = vec![FilterEffect::LayerBlur(FeGaussianBlur {
-                radius: 4.0 * (i + 1) as f32,
-            })];
+            rect.effects =
+                LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
+                    radius: 4.0 * (i + 1) as f32,
+                })]);
             all_effect_ids.push(rect.base.id.clone());
             repository.insert(Node::Rectangle(rect));
         } else {
@@ -108,9 +110,10 @@ async fn demo_effects() -> Scene {
                 color: Color(200, 200, 200, 255), // White
                 opacity: 1.0,
             })];
-            polygon.effects = vec![FilterEffect::LayerBlur(FeGaussianBlur {
-                radius: 4.0 * (i + 1) as f32,
-            })];
+            polygon.effects =
+                LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
+                    radius: 4.0 * (i + 1) as f32,
+                })]);
             all_effect_ids.push(polygon.base.id.clone());
             repository.insert(Node::RegularPolygon(polygon));
         }
@@ -161,9 +164,10 @@ async fn demo_effects() -> Scene {
                 color: Color(255, 255, 255, 128), // Semi-transparent white
                 opacity: 1.0,
             }));
-            blur_rect.effects = vec![FilterEffect::BackdropBlur(FeGaussianBlur {
-                radius: 8.0 * (i + 1) as f32,
-            })];
+            blur_rect.effects =
+                LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeGaussianBlur {
+                    radius: 8.0 * (i + 1) as f32,
+                })]);
             all_effect_ids.push(blur_rect.base.id.clone());
             repository.insert(Node::Rectangle(blur_rect));
         } else {
@@ -180,9 +184,10 @@ async fn demo_effects() -> Scene {
                 color: Color(255, 255, 255, 128), // Semi-transparent white
                 opacity: 1.0,
             })];
-            blur_polygon.effects = vec![FilterEffect::BackdropBlur(FeGaussianBlur {
-                radius: 8.0 * (i + 1) as f32,
-            })];
+            blur_polygon.effects =
+                LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeGaussianBlur {
+                    radius: 8.0 * (i + 1) as f32,
+                })]);
             all_effect_ids.push(blur_polygon.base.id.clone());
             repository.insert(Node::RegularPolygon(blur_polygon));
         }
@@ -204,13 +209,14 @@ async fn demo_effects() -> Scene {
                 color: Color(240, 240, 240, 255), // Light gray
                 opacity: 1.0,
             }));
-            rect.effects = vec![FilterEffect::InnerShadow(FeDropShadow {
-                dx: 2.0,
-                dy: 2.0,
-                blur: 3.0 * (i + 1) as f32,
-                spread: 0.0,
-                color: Color(0, 0, 0, 100),
-            })];
+            rect.effects =
+                LayerEffects::from_array(vec![FilterEffect::InnerShadow(FeDropShadow {
+                    dx: 2.0,
+                    dy: 2.0,
+                    blur: 3.0 * (i + 1) as f32,
+                    spread: 0.0,
+                    color: Color(0, 0, 0, 100),
+                })]);
             all_effect_ids.push(rect.base.id.clone());
             repository.insert(Node::Rectangle(rect));
         } else {
@@ -227,13 +233,14 @@ async fn demo_effects() -> Scene {
                 color: Color(240, 240, 240, 255), // Light gray
                 opacity: 1.0,
             })];
-            polygon.effects = vec![FilterEffect::InnerShadow(FeDropShadow {
-                dx: 2.0,
-                dy: 2.0,
-                blur: 3.0 * (i + 1) as f32,
-                spread: 1.0,
-                color: Color(0, 0, 0, 100),
-            })];
+            polygon.effects =
+                LayerEffects::from_array(vec![FilterEffect::InnerShadow(FeDropShadow {
+                    dx: 2.0,
+                    dy: 2.0,
+                    blur: 3.0 * (i + 1) as f32,
+                    spread: 1.0,
+                    color: Color(0, 0, 0, 100),
+                })]);
             all_effect_ids.push(polygon.base.id.clone());
             repository.insert(Node::RegularPolygon(polygon));
         }

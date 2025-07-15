@@ -45,6 +45,49 @@ pub struct LayerEffects {
     pub shadows: Vec<FilterShadowEffect>,
 }
 
+impl LayerEffects {
+    pub fn new_empty() -> Self {
+        Self {
+            blur: None,
+            backdrop_blur: None,
+            shadows: vec![],
+        }
+    }
+
+    /// Convert a list of filter effects into a layer effects object.
+    /// if multiple effects that is not supported, the last effect will be used.
+    pub fn from_array(effects: Vec<FilterEffect>) -> Self {
+        let mut layer_effects = Self::new_empty();
+        for effect in effects {
+            match effect {
+                FilterEffect::LayerBlur(blur) => layer_effects.blur = Some(blur),
+                FilterEffect::BackdropBlur(blur) => layer_effects.backdrop_blur = Some(blur),
+                FilterEffect::DropShadow(shadow) => layer_effects
+                    .shadows
+                    .push(FilterShadowEffect::DropShadow(shadow)),
+                FilterEffect::InnerShadow(shadow) => layer_effects
+                    .shadows
+                    .push(FilterShadowEffect::InnerShadow(shadow)),
+            }
+        }
+        layer_effects
+    }
+
+    #[deprecated(note = "will be removed")]
+    pub fn fallback_first_any_effect(&self) -> Option<FilterEffect> {
+        if let Some(blur) = self.blur {
+            return Some(FilterEffect::LayerBlur(blur));
+        }
+        if let Some(backdrop_blur) = self.backdrop_blur {
+            return Some(FilterEffect::BackdropBlur(backdrop_blur));
+        }
+        if !self.shadows.is_empty() {
+            return Some(self.shadows.last().unwrap().clone().into());
+        }
+        None
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Size {
     pub width: f32,
@@ -230,7 +273,7 @@ pub struct ContainerNode {
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
     pub clip: bool,
 }
 
@@ -280,7 +323,7 @@ pub struct RectangleNode {
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
 }
 
 impl NodeFillsMixin for RectangleNode {
@@ -327,7 +370,7 @@ pub struct LineNode {
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
 }
 
 impl LineNode {
@@ -350,7 +393,7 @@ pub struct ImageNode {
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
     pub hash: String,
 }
 
@@ -393,7 +436,7 @@ pub struct EllipseNode {
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
 }
 
 impl NodeFillsMixin for EllipseNode {
@@ -442,7 +485,7 @@ pub struct BooleanPathOperationNode {
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
 }
 
 ///
@@ -460,7 +503,7 @@ pub struct VectorNode {
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
 }
 
 impl ToSkPath for VectorNode {
@@ -484,7 +527,7 @@ pub struct SVGPathNode {
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
 }
 
 /// A polygon shape defined by a list of absolute 2D points, following the SVG `<polygon>` model.
@@ -523,7 +566,7 @@ pub struct PolygonNode {
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
@@ -594,7 +637,7 @@ pub struct RegularPolygonNode {
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
@@ -717,7 +760,7 @@ pub struct RegularStarPolygonNode {
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: BlendMode,
-    pub effects: Vec<FilterEffect>,
+    pub effects: LayerEffects,
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
@@ -829,6 +872,7 @@ pub struct TextSpanNode {
     /// Overall node opacity.
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub effects: LayerEffects,
 }
 
 #[derive(Debug, Clone)]

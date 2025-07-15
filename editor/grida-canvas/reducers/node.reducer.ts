@@ -266,6 +266,18 @@ const safe_properties: Partial<
       draft.boxShadow = value;
     },
   }),
+  filterBlur: defineNodeProperty<"filterBlur">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.filterBlur = value;
+    },
+  }),
+  filterBackdropBlur: defineNodeProperty<"filterBackdropBlur">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.filterBackdropBlur = value;
+    },
+  }),
   zIndex: defineNodeProperty<"zIndex">({
     assert: (node) => typeof node.zIndex === "number",
     apply: (draft, value, prev) => {

@@ -396,6 +396,15 @@ pub enum FilterShadowEffect {
     InnerShadow(FeDropShadow),
 }
 
+impl Into<FilterEffect> for FilterShadowEffect {
+    fn into(self) -> FilterEffect {
+        match self {
+            FilterShadowEffect::DropShadow(shadow) => FilterEffect::DropShadow(shadow),
+            FilterShadowEffect::InnerShadow(shadow) => FilterEffect::InnerShadow(shadow),
+        }
+    }
+}
+
 /// A drop shadow (box-shadow) filter effect (`<feDropShadow>` + spread radius)
 /// See also:
 /// - https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow

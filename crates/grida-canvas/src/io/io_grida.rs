@@ -677,6 +677,7 @@ impl From<IOTextNode> for TextSpanNode {
             stroke_width: None,
             stroke_align: StrokeAlign::Inside,
             opacity: node.opacity,
+            effects: LayerEffects::new_empty(),
         }
     }
 }
@@ -702,7 +703,7 @@ impl From<IOEllipseNode> for Node {
             stroke_width: node.stroke_width.unwrap_or(0.0),
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
             opacity: node.opacity,
         })
     }
@@ -764,7 +765,7 @@ impl From<IOVectorNode> for Node {
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: node.opacity,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         })
     }
 }
@@ -790,7 +791,7 @@ impl From<IOLineNode> for Node {
             stroke_dash_array: None,
             opacity: node.opacity,
             blend_mode: node.blend_mode,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         })
     }
 }
@@ -814,7 +815,7 @@ impl From<IOPathNode> for Node {
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: node.opacity,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         })
     }
 }
@@ -851,16 +852,18 @@ fn merge_effects(
     box_shadow: Option<CSSBoxShadow>,
     filter_blur: Option<FeGaussianBlur>,
     filter_backdrop_blur: Option<FeGaussianBlur>,
-) -> Vec<FilterEffect> {
-    let mut effects = vec![];
-    if let Some(box_shadow) = box_shadow {
-        effects.push(FilterEffect::DropShadow(box_shadow.into()));
-    }
+) -> LayerEffects {
+    let mut effects = LayerEffects::new_empty();
     if let Some(filter_blur) = filter_blur {
-        effects.push(FilterEffect::LayerBlur(filter_blur));
+        effects.blur = Some(filter_blur);
     }
     if let Some(filter_backdrop_blur) = filter_backdrop_blur {
-        effects.push(FilterEffect::BackdropBlur(filter_backdrop_blur));
+        effects.backdrop_blur = Some(filter_backdrop_blur);
+    }
+    if let Some(box_shadow) = box_shadow {
+        effects
+            .shadows
+            .push(FilterShadowEffect::DropShadow(box_shadow.into()));
     }
     effects
 }

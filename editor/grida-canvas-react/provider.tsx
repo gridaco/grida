@@ -217,6 +217,10 @@ export function useNodeActions(node_id: string | undefined) {
       //   changeNodeStyle(node_id, "margin", value),
       boxShadow: (value?: cg.BoxShadow) =>
         instance.changeNodeBoxShadow(node_id, value),
+      blur: (value?: cg.FeGaussianBlur) =>
+        instance.changeNodeBlur(node_id, value),
+      backdropBlur: (value?: cg.FeGaussianBlur) =>
+        instance.changeNodeBackdropBlur(node_id, value),
 
       // layout
       layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>

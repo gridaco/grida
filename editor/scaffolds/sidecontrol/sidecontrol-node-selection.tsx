@@ -92,6 +92,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 import { dq } from "@/grida-canvas/query";
+import { FeBlurControl } from "./controls/fe-blur";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -725,6 +726,8 @@ function SelectedNodeProperties({
     //
     padding: node.padding,
     boxShadow: node.boxShadow,
+    filterBlur: node.filterBlur,
+    filterBackdropBlur: node.filterBackdropBlur,
 
     //
     layout: node.layout,
@@ -772,7 +775,8 @@ function SelectedNodeProperties({
     //
     padding,
     boxShadow,
-
+    filterBlur,
+    filterBackdropBlur,
     //
     layout,
     direction,
@@ -1149,6 +1153,17 @@ function SelectedNodeProperties({
               <BoxShadowControl
                 value={boxShadow}
                 onValueChange={actions.boxShadow}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Blur</PropertyLineLabel>
+              <FeBlurControl value={filterBlur} onValueChange={actions.blur} />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Backdrop Blur</PropertyLineLabel>
+              <FeBlurControl
+                value={filterBackdropBlur}
+                onValueChange={actions.backdropBlur}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>

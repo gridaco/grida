@@ -202,15 +202,19 @@ async fn demo_strokes() -> Scene {
 
         // Add different effects
         rect.effects = match i {
-            0 => vec![FilterEffect::DropShadow(FeDropShadow {
+            0 => LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
                 dx: 4.0,
                 dy: 4.0,
                 blur: 4.0,
                 spread: 0.0,
                 color: Color(0, 0, 0, 128),
-            })],
-            1 => vec![FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 })],
-            2 => vec![FilterEffect::BackdropBlur(FeGaussianBlur { radius: 4.0 })],
+            })]),
+            1 => LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
+                radius: 2.0,
+            })]),
+            2 => LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeGaussianBlur {
+                radius: 4.0,
+            })]),
             _ => unreachable!(),
         };
 

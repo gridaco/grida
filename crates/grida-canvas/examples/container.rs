@@ -26,13 +26,13 @@ async fn demo_clip() -> Scene {
         color: Color(200, 50, 50, 255), // Darker red
         opacity: 1.0,
     })];
-    container.effects = vec![FilterEffect::DropShadow(FeDropShadow {
+    container.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
         dx: 0.0,
         dy: 0.0,
         blur: 10.0,
         spread: 0.0,
         color: Color(0, 0, 0, 255),
-    })];
+    })]);
     container.clip = true;
     container.stroke_width = 2.0;
 

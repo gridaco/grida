@@ -55,7 +55,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
-                effects: vec![],
+                effects: LayerEffects::new_empty(),
             };
 
             ids.push(vector_node_1_tri_open.base.id.clone());
@@ -100,7 +100,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
-                effects: vec![],
+                effects: LayerEffects::new_empty(),
             };
 
             ids.push(vector_node_2_tri_closed.base.id.clone());
@@ -149,7 +149,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
-                effects: vec![],
+                effects: LayerEffects::new_empty(),
             };
 
             ids.push(vector_node_3.base.id.clone());
@@ -194,7 +194,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
-                effects: vec![],
+                effects: LayerEffects::new_empty(),
             };
 
             ids.push(vector_node_4.base.id.clone());
@@ -247,7 +247,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
-                effects: vec![],
+                effects: LayerEffects::new_empty(),
             };
 
             ids.push(vector_node_1_5.base.id.clone());
@@ -289,7 +289,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
-                effects: vec![],
+                effects: LayerEffects::new_empty(),
             };
 
             ids.push(vector_node_5.base.id.clone());

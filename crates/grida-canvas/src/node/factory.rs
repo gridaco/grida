@@ -68,7 +68,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         }
     }
 
@@ -85,7 +85,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         }
     }
 
@@ -104,7 +104,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         }
     }
 
@@ -136,6 +136,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
+            effects: LayerEffects::new_empty(),
         }
     }
 
@@ -165,7 +166,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
             clip: true,
         }
     }
@@ -183,7 +184,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         }
     }
 
@@ -202,7 +203,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         }
     }
 
@@ -221,7 +222,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         }
     }
 
@@ -238,7 +239,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
         }
     }
 
@@ -256,7 +257,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
             hash: String::new(),
         }
     }

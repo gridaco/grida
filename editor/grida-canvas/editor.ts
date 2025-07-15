@@ -1418,6 +1418,29 @@ export class Editor
     });
   }
 
+  changeNodeBlur(node_id: string, effect?: cg.FeGaussianBlur) {
+    requestAnimationFrame(() => {
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        filterBlur: effect,
+      });
+    });
+  }
+
+  changeNodeBackdropBlur(
+    node_id: editor.NodeID,
+    effect?: cg.FeGaussianBlur
+  ): void {
+    requestAnimationFrame(() => {
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        filterBackdropBlur: effect,
+      });
+    });
+  }
+
   changeContainerNodeLayout(
     node_id: string,
     layout: grida.program.nodes.i.IFlexContainer["layout"]
