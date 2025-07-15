@@ -188,6 +188,57 @@ async fn demo_effects() -> Scene {
         }
     }
 
+    // Row 4: Inner Shadow Variations
+    for i in 0..6 {
+        if i < 3 {
+            // First three shapes as rectangles
+            let mut rect = nf.create_rectangle_node();
+            rect.base.name = format!("Inner Shadow Rect {}", i + 1);
+            rect.transform = AffineTransform::new(start_x + spacing * i as f32, 700.0, 0.0);
+            rect.size = Size {
+                width: base_size,
+                height: base_size,
+            };
+            rect.corner_radius = RectangularCornerRadius::all(20.0);
+            rect.set_fill(Paint::Solid(SolidPaint {
+                color: Color(240, 240, 240, 255), // Light gray
+                opacity: 1.0,
+            }));
+            rect.effects = vec![FilterEffect::InnerShadow(FeDropShadow {
+                dx: 2.0,
+                dy: 2.0,
+                blur: 3.0 * (i + 1) as f32,
+                spread: 0.0,
+                color: Color(0, 0, 0, 100),
+            })];
+            all_effect_ids.push(rect.base.id.clone());
+            repository.insert(Node::Rectangle(rect));
+        } else {
+            // Last three shapes as regular polygons
+            let mut polygon = nf.create_regular_polygon_node();
+            polygon.base.name = format!("Inner Shadow Polygon {}", i + 1);
+            polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 700.0, 0.0);
+            polygon.size = Size {
+                width: base_size,
+                height: base_size,
+            };
+            polygon.point_count = i + 3;
+            polygon.fills = vec![Paint::Solid(SolidPaint {
+                color: Color(240, 240, 240, 255), // Light gray
+                opacity: 1.0,
+            })];
+            polygon.effects = vec![FilterEffect::InnerShadow(FeDropShadow {
+                dx: 2.0,
+                dy: 2.0,
+                blur: 3.0 * (i + 1) as f32,
+                spread: 1.0,
+                color: Color(0, 0, 0, 100),
+            })];
+            all_effect_ids.push(polygon.base.id.clone());
+            repository.insert(Node::RegularPolygon(polygon));
+        }
+    }
+
     // Set up the root container
     root_container_node.children = vec![vivid_gradient_rect_id];
     root_container_node.children.extend(all_effect_ids);

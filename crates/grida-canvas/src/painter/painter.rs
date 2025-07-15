@@ -182,6 +182,59 @@ impl<'a> Painter<'a> {
         canvas.draw_path(&path, &shadow_paint);
     }
 
+    /// Draw an inner shadow clipped to the given shape.
+    fn draw_inner_shadow(&self, shape: &PainterShape, shadow: &FeDropShadow) {
+        let canvas = self.canvas;
+
+        let Color(r, g, b, a) = shadow.color;
+        let color = skia_safe::Color::from_argb(a, r, g, b);
+        let spread = shadow.spread;
+
+        let image_filter = skia_safe::image_filters::drop_shadow(
+            (shadow.dx, shadow.dy),
+            (shadow.blur, shadow.blur),
+            color,
+            None,
+            None,
+            None,
+        );
+
+        let mut shadow_paint = SkPaint::default();
+        shadow_paint.set_color(color);
+        shadow_paint.set_image_filter(image_filter);
+        shadow_paint.set_anti_alias(true);
+
+        let mut path = shape.to_path().clone();
+        if spread != 0.0 {
+            let mut spread_shape = path.clone();
+            let b = spread_shape.bounds();
+            let width = b.width();
+            let height = b.height();
+            let scale_x = (width + 2.0 * spread) / width;
+            let scale_y = (height + 2.0 * spread) / height;
+            let matrix = skia_safe::Matrix::scale((scale_x, scale_y));
+            spread_shape.transform(&matrix);
+            path = spread_shape;
+        }
+
+        // Clip to the shape so shadow appears inside
+        canvas.save();
+        canvas.clip_path(&path, None, true);
+
+        // Draw shadow on a separate layer so we can clear the center
+        canvas.save_layer(&SaveLayerRec::default());
+        canvas.draw_path(&path, &shadow_paint);
+
+        // Clear the inner area, leaving only the blurred edge
+        let mut clear_paint = SkPaint::default();
+        clear_paint.set_blend_mode(skia_safe::BlendMode::DstOut);
+        clear_paint.set_anti_alias(true);
+        canvas.draw_path(&path, &clear_paint);
+
+        canvas.restore();
+        canvas.restore();
+    }
+
     /// Draw a backdrop blur: blur what's behind the shape.
     fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeGaussianBlur) {
         let canvas = self.canvas;
@@ -408,8 +461,9 @@ impl<'a> Painter<'a> {
                 self.draw_shadow(shape, shadow);
                 draw_content();
             }
-            Some(FilterEffect::InnerShadow(_shadow)) => {
-                todo!("inner shadow");
+            Some(FilterEffect::InnerShadow(shadow)) => {
+                self.draw_inner_shadow(shape, shadow);
+                draw_content();
             }
             Some(FilterEffect::BackdropBlur(blur)) => {
                 self.draw_backdrop_blur(shape, blur);
