@@ -544,6 +544,7 @@ impl From<CSSBoxShadow> for FeDropShadow {
             dx: box_shadow.offset[0],
             dy: box_shadow.offset[1],
             blur: box_shadow.blur,
+            spread: box_shadow.spread,
             color: box_shadow.color.into(),
         }
     }

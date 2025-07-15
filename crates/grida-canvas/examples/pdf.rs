@@ -115,6 +115,7 @@ async fn demo_scene() -> Scene {
         dx: 5.0,
         dy: 5.0,
         blur: 10.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 100),
     })];
     all_node_ids.push(rect_gradient.base.id.clone());
@@ -182,6 +183,7 @@ async fn demo_scene() -> Scene {
         dx: 3.0,
         dy: 3.0,
         blur: 8.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 150),
     })];
     all_node_ids.push(hexagon.base.id.clone());

@@ -27,6 +27,7 @@ async fn demo_basic() -> Scene {
         dx: 4.0,
         dy: 4.0,
         blur: 8.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 77),
     })];
     image_node.hash = demo_image_id.to_string();
@@ -49,6 +50,7 @@ async fn demo_basic() -> Scene {
         dx: 4.0,
         dy: 4.0,
         blur: 8.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 77),
     })];
 

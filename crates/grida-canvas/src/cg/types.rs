@@ -375,8 +375,12 @@ pub struct ImagePaint {
 /// - https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feGaussianBlur
 #[derive(Debug, Clone)]
 pub enum FilterEffect {
-    /// Drop shadow filter: offset + blur + color
+    /// Drop shadow filter: offset + blur + spread + color
     DropShadow(FeDropShadow),
+
+    /// Inner shadow filter: offset + blur + spread + color
+    /// the shadow is clipped to the shape
+    InnerShadow(FeDropShadow),
 
     /// Gaussian blur filter: blur only
     GaussianBlur(FeGaussianBlur),
@@ -392,7 +396,12 @@ pub struct FeBackdropBlur {
     pub radius: f32,
 }
 
-/// A drop shadow filter effect (`<feDropShadow>`)
+/// A drop shadow (box-shadow) filter effect (`<feDropShadow>` + spread radius)
+/// See also:
+/// - https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow
+/// - https://developer.mozilla.org/en-US/docs/Web/CSS/box-shadow
+/// - https://www.figma.com/plugin-docs/api/Effect/#dropshadoweffect
+/// - https://api.flutter.dev/flutter/painting/BoxShadow-class.html
 #[derive(Debug, Clone, Copy)]
 pub struct FeDropShadow {
     /// Horizontal shadow offset in px
@@ -403,6 +412,10 @@ pub struct FeDropShadow {
 
     /// Blur radius (`stdDeviation` in SVG)
     pub blur: f32,
+
+    /// Spread radius in px
+    /// applies outset to the src rect
+    pub spread: f32,
 
     /// Shadow color (includes alpha)
     pub color: Color,

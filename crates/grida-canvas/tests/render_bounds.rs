@@ -66,6 +66,7 @@ fn drop_shadow_expands_render_bounds() {
         dx: 5.0,
         dy: 5.0,
         blur: 10.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 255),
     })];
     let rect_id = rect.base.id.clone();

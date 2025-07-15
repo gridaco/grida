@@ -125,24 +125,44 @@ impl<'a> Painter<'a> {
         let canvas = self.canvas;
         let Color(r, g, b, a) = shadow.color;
         let color = skia_safe::Color::from_argb(a, r, g, b);
+        let spread = shadow.spread;
 
         // Create drop shadow filter
         let image_filter = skia_safe::image_filters::drop_shadow(
-            (shadow.dx, shadow.dy),     // offset as tuple
-            (shadow.blur, shadow.blur), // sigma as tuple
-            color,                      // color
-            None,                       // color_space
-            None,                       // input
-            None,                       // crop_rect
+            (shadow.dx, shadow.dy),
+            (shadow.blur, shadow.blur),
+            color,
+            None,
+            None,
+            None,
         );
 
         // Create paint with the drop shadow filter
         let mut shadow_paint = SkPaint::default();
+        shadow_paint.set_color(color);
         shadow_paint.set_image_filter(image_filter);
         shadow_paint.set_anti_alias(true);
 
+        let mut path = shape.to_path().clone();
+        // Apply spread radius
+        if spread != 0.0 {
+            // TODO:
+            // 1. need to make the matrix center origined
+            // 2. need to apply offset to the input path as well
+
+            let mut spread_shape = path.clone();
+            let _b = spread_shape.bounds();
+            let width = _b.width();
+            let height = _b.height();
+            let scale_x = (width + 2.0 * spread) / width;
+            let scale_y = (height + 2.0 * spread) / height;
+            let matrix = skia_safe::Matrix::scale((scale_x, scale_y));
+            spread_shape.transform(&matrix);
+            path = spread_shape;
+        }
+
         // Draw the shadow using the shape's path
-        canvas.draw_path(&shape.to_path(), &shadow_paint);
+        canvas.draw_path(&path, &shadow_paint);
     }
 
     /// Draw a backdrop blur: blur what's behind the shape.
@@ -370,6 +390,9 @@ impl<'a> Painter<'a> {
             Some(FilterEffect::DropShadow(shadow)) => {
                 self.draw_shadow(shape, shadow);
                 draw_content();
+            }
+            Some(FilterEffect::InnerShadow(_shadow)) => {
+                todo!("inner shadow");
             }
             Some(FilterEffect::BackdropBlur(blur)) => {
                 self.draw_backdrop_blur(shape, blur);

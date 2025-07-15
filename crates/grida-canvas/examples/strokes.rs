@@ -206,6 +206,7 @@ async fn demo_strokes() -> Scene {
                 dx: 4.0,
                 dy: 4.0,
                 blur: 4.0,
+                spread: 0.0,
                 color: Color(0, 0, 0, 128),
             })],
             1 => vec![FilterEffect::GaussianBlur(FeGaussianBlur { radius: 2.0 })],

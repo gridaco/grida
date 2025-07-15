@@ -30,6 +30,7 @@ async fn demo_clip() -> Scene {
         dx: 0.0,
         dy: 0.0,
         blur: 10.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 255),
     })];
     container.clip = true;
