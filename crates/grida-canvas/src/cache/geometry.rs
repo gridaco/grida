@@ -429,6 +429,8 @@ fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -
             },
             shadow.blur,
         ),
+        // no inflation for inner shadow
+        FilterEffect::InnerShadow(_shadow) => bounds,
     }
 }
 
