@@ -1,6 +1,7 @@
 use super::cvt;
 use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
+use super::shadow;
 use crate::cache::geometry::GeometryCache;
 use crate::cache::{paragraph::ParagraphCache, vector_path::VectorPathCache};
 use crate::cg::types::*;
@@ -122,117 +123,12 @@ impl<'a> Painter<'a> {
 
     /// Draw a drop shadow behind the content using a shape.
     fn draw_shadow(&self, shape: &PainterShape, shadow: &FeDropShadow) {
-        let canvas = self.canvas;
-        let Color(r, g, b, a) = shadow.color;
-        let color = skia_safe::Color::from_argb(a, r, g, b);
-        let spread = shadow.spread;
-
-        // only apply offset directly to the shadow filter if there is no spread
-        let filter_offset = if spread == 0.0 {
-            (shadow.dx, shadow.dy)
-        } else {
-            (0.0, 0.0)
-        };
-
-        // Create drop shadow filter. Since we offset the path itself, the filter
-        // uses a zero offset and only applies the blur.
-        let image_filter = skia_safe::image_filters::drop_shadow(
-            filter_offset,
-            (shadow.blur, shadow.blur),
-            color,
-            None,
-            None,
-            None,
-        );
-
-        // Create paint with the drop shadow filter
-        let mut shadow_paint = SkPaint::default();
-        shadow_paint.set_color(color);
-        shadow_paint.set_image_filter(image_filter);
-        shadow_paint.set_anti_alias(true);
-
-        let mut path = shape.to_path().clone();
-
-        // Apply spread by scaling around the center of the path and then
-        // translate by the shadow's offset. `inflate` does not work for paths,
-        // so we simulate it via matrix transforms.
-        if spread != 0.0 {
-            let b = path.bounds();
-            let width = b.width();
-            let height = b.height();
-            if width > 0.0 && height > 0.0 {
-                let cx = b.left() + width / 2.0;
-                let cy = b.top() + height / 2.0;
-
-                let mut scale_x = 1.0;
-                let mut scale_y = 1.0;
-                if spread != 0.0 {
-                    scale_x = (width + 2.0 * spread) / width;
-                    scale_y = (height + 2.0 * spread) / height;
-                }
-
-                let tx = cx * (1.0 - scale_x) + shadow.dx;
-                let ty = cy * (1.0 - scale_y) + shadow.dy;
-                let matrix = skia_safe::Matrix::from_affine(&[scale_x, 0.0, 0.0, scale_y, tx, ty]);
-                path.transform(&matrix);
-            }
-        }
-
-        // Draw the shadow using the shape's path
-        canvas.draw_path(&path, &shadow_paint);
+        shadow::draw_drop_shadow(self.canvas, shape, shadow);
     }
 
     /// Draw an inner shadow clipped to the given shape.
     fn draw_inner_shadow(&self, shape: &PainterShape, shadow: &FeDropShadow) {
-        let canvas = self.canvas;
-
-        let Color(r, g, b, a) = shadow.color;
-        let color = skia_safe::Color::from_argb(a, r, g, b);
-        let spread = shadow.spread;
-
-        let image_filter = skia_safe::image_filters::drop_shadow(
-            (shadow.dx, shadow.dy),
-            (shadow.blur, shadow.blur),
-            color,
-            None,
-            None,
-            None,
-        );
-
-        let mut shadow_paint = SkPaint::default();
-        shadow_paint.set_color(color);
-        shadow_paint.set_image_filter(image_filter);
-        shadow_paint.set_anti_alias(true);
-
-        let mut path = shape.to_path().clone();
-        if spread != 0.0 {
-            let mut spread_shape = path.clone();
-            let b = spread_shape.bounds();
-            let width = b.width();
-            let height = b.height();
-            let scale_x = (width + 2.0 * spread) / width;
-            let scale_y = (height + 2.0 * spread) / height;
-            let matrix = skia_safe::Matrix::scale((scale_x, scale_y));
-            spread_shape.transform(&matrix);
-            path = spread_shape;
-        }
-
-        canvas.save();
-
-        // Draw shadow on a separate layer so we can clear the center
-        canvas.save_layer(&SaveLayerRec::default());
-        canvas.draw_path(&path, &shadow_paint);
-
-        // Clear the inner area, leaving only the blurred edge
-        let mut clear_paint = SkPaint::default();
-        clear_paint.set_blend_mode(skia_safe::BlendMode::DstOut);
-        clear_paint.set_anti_alias(true);
-        canvas.draw_path(&path, &clear_paint);
-        // Clip to the shape so shadow appears inside
-        canvas.clip_path(&path, None, true);
-
-        canvas.restore();
-        canvas.restore();
+        shadow::draw_inner_shadow(self.canvas, shape, shadow);
     }
 
     /// Draw a backdrop blur: blur what's behind the shape.
