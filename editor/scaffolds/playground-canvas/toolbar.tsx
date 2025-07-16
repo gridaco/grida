@@ -194,6 +194,8 @@ export function PlaygroundToolbar() {
               { value: "rectangle", label: "Rectangle", shortcut: "R" },
               { value: "ellipse", label: "Ellipse", shortcut: "O" },
               { value: "line", label: "Line", shortcut: "L" },
+              { value: "polygon", label: "Polygon" },
+              { value: "star", label: "Star" },
               { value: "image", label: "Image" },
             ]}
             onValueChange={(v) => {
