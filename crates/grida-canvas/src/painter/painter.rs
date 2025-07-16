@@ -132,7 +132,7 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw a backdrop blur: blur what's behind the shape.
-    fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeBlur) {
+    fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeGaussianBlur) {
         let canvas = self.canvas;
         // 1) Build a Gaussian‐blur filter for the backdrop
         let Some(image_filter) =

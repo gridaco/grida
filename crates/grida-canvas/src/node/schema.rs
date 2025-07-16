@@ -38,9 +38,9 @@ impl Point {
 pub struct LayerEffects {
     /// single layer blur is supported per layer
     /// layer blur is applied after all other effects
-    pub blur: Option<FeBlur>,
+    pub blur: Option<FeGaussianBlur>,
     /// single backdrop blur is supported per layer
-    pub backdrop_blur: Option<FeBlur>,
+    pub backdrop_blur: Option<FeGaussianBlur>,
     /// multiple shadows are supported per layer (drop shadow, inner shadow)
     pub shadows: Vec<FilterShadowEffect>,
 }

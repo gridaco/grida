@@ -394,11 +394,11 @@ pub enum FilterEffect {
     InnerShadow(FeShadow),
 
     /// Layer blur filter
-    LayerBlur(FeBlur),
+    LayerBlur(FeGaussianBlur),
 
     /// Background blur filter
     /// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
-    BackdropBlur(FeBlur),
+    BackdropBlur(FeGaussianBlur),
 }
 
 #[derive(Debug, Clone)]
@@ -450,8 +450,25 @@ pub struct FeShadow {
 
 /// A standalone blur filter effect (`<feGaussianBlur>`)
 #[derive(Debug, Clone, Copy, Deserialize)]
-pub struct FeBlur {
+pub struct FeGaussianBlur {
     /// Blur radius (`stdDeviation` in SVG)
     pub radius: f32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct FeProgressiveBlur {
+    // start offset
+    pub x1: f32,
+    pub y1: f32,
+
+    // end offset
+    pub x2: f32,
+    pub y2: f32,
+
+    // start radius
+    pub radius: f32,
+
+    // end radius
+    pub radius2: f32,
 }
 // #endregion
