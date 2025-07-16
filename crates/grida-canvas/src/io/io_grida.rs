@@ -197,7 +197,11 @@ pub struct JSONUnknownNodeProperties {
     pub width: f32,
     #[serde(rename = "height", deserialize_with = "de_css_length")]
     pub height: f32,
-    #[serde(rename = "cornerRadius", deserialize_with = "de_corner_radius")]
+    #[serde(
+        rename = "cornerRadius",
+        default,
+        deserialize_with = "de_corner_radius"
+    )]
     pub corner_radius: Option<RectangularCornerRadius>,
     // fill
     #[serde(rename = "fill")]
@@ -409,7 +413,6 @@ impl From<JSONContainerNode> for ContainerNode {
                 name: node.base.name,
                 active: node.base.active,
             },
-            blend_mode: node.base.blend_mode,
             transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
             size: Size {
                 width: node.base.width,
@@ -424,13 +427,14 @@ impl From<JSONContainerNode> for ContainerNode {
             stroke_width: 0.0,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            blend_mode: node.base.blend_mode,
+            opacity: node.base.opacity,
             effects: merge_effects(
                 node.base.fe_drop_shadow,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
             children: node.children.unwrap_or_default(),
-            opacity: node.base.opacity,
             clip: true,
         }
     }
@@ -446,7 +450,6 @@ impl From<JSONTextNode> for TextSpanNode {
                 name: node.base.name,
                 active: node.base.active,
             },
-            blend_mode: node.base.blend_mode,
             transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
             size: Size { width, height },
             text: node.text,
@@ -466,8 +469,13 @@ impl From<JSONTextNode> for TextSpanNode {
             stroke: None,
             stroke_width: None,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
-            effects: LayerEffects::new_empty(),
+            effects: merge_effects(
+                node.base.fe_drop_shadow,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
         }
     }
 }
@@ -482,7 +490,6 @@ impl From<JSONEllipseNode> for Node {
                 name: node.base.name,
                 active: node.base.active,
             },
-            blend_mode: node.base.blend_mode,
             transform,
             size: Size {
                 width: node.base.width,
@@ -493,8 +500,13 @@ impl From<JSONEllipseNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            effects: LayerEffects::new_empty(),
+            blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
+            effects: merge_effects(
+                node.base.fe_drop_shadow,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
         })
     }
 }
@@ -509,7 +521,6 @@ impl From<JSONRectangleNode> for Node {
                 name: node.base.name,
                 active: node.base.active,
             },
-            blend_mode: node.base.blend_mode,
             transform,
             size: Size {
                 width: node.base.width,
@@ -524,12 +535,13 @@ impl From<JSONRectangleNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            blend_mode: node.base.blend_mode,
+            opacity: node.base.opacity,
             effects: merge_effects(
                 node.base.fe_drop_shadow,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
-            opacity: node.base.opacity,
         })
     }
 }
@@ -545,7 +557,6 @@ impl From<JSONVectorNode> for Node {
                 name: node.base.name,
                 active: node.base.active,
             },
-            blend_mode: node.base.blend_mode,
             transform,
             fill: node.base.fill.into(),
             data: node.paths.map_or("".to_string(), |paths| {
@@ -559,8 +570,13 @@ impl From<JSONVectorNode> for Node {
             stroke_width: 0.0,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
-            effects: LayerEffects::new_empty(),
+            effects: merge_effects(
+                node.base.fe_drop_shadow,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
         })
     }
 }
@@ -584,9 +600,13 @@ impl From<JSONLineNode> for Node {
             stroke_width: node.base.stroke_width,
             _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
             stroke_dash_array: None,
-            opacity: node.base.opacity,
             blend_mode: node.base.blend_mode,
-            effects: LayerEffects::new_empty(),
+            opacity: node.base.opacity,
+            effects: merge_effects(
+                node.base.fe_drop_shadow,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
         })
     }
 }
@@ -601,7 +621,6 @@ impl From<JSONPathNode> for Node {
                 name: node.base.name,
                 active: node.base.active,
             },
-            blend_mode: node.base.blend_mode,
             transform,
             fill: Some(node.base.fill.into()),
             network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
@@ -609,8 +628,13 @@ impl From<JSONPathNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
-            effects: LayerEffects::new_empty(),
+            effects: merge_effects(
+                node.base.fe_drop_shadow,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
         })
     }
 }
