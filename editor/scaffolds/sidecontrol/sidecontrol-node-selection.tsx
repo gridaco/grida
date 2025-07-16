@@ -712,10 +712,7 @@ function SelectedNodeProperties({
     blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
     fill: node.fill,
-    stroke: node.stroke,
-    strokeWidth: node.strokeWidth,
-    strokeAlign: node.strokeAlign,
-    strokeCap: node.strokeCap,
+
     fit: node.fit,
     fontFamily: node.fontFamily,
     fontWeight: node.fontWeight,
@@ -730,10 +727,6 @@ function SelectedNodeProperties({
     border: node.border,
     //
     padding: node.padding,
-    feDropShadow: node.feDropShadows,
-    feInnerShadow: node.feInnerShadows,
-    feBlur: node.feBlur,
-    feBackdropBlur: node.feBackdropBlur,
 
     //
     layout: node.layout,
@@ -763,10 +756,7 @@ function SelectedNodeProperties({
     blendMode,
     cornerRadius,
     fill,
-    stroke,
-    strokeWidth,
-    strokeAlign,
-    strokeCap,
+
     fit,
     fontFamily,
     fontWeight,
@@ -781,10 +771,6 @@ function SelectedNodeProperties({
     border,
     //
     padding,
-    feDropShadow,
-    feInnerShadow,
-    feBlur,
-    feBackdropBlur,
     //
     layout,
     direction,
@@ -1116,44 +1102,14 @@ function SelectedNodeProperties({
           </SidebarMenuSectionContent>
         </SidebarSection>
         {supports.stroke(node.type, { backend }) && (
-          <SidebarSection className="border-b pb-4">
-            <SidebarSectionHeaderItem>
-              <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
-            </SidebarSectionHeaderItem>
-            <SidebarMenuSectionContent className="space-y-2">
-              <PropertyLine>
-                <PropertyLineLabel>Color</PropertyLineLabel>
-                <PaintControl
-                  value={stroke}
-                  onValueChange={actions.stroke}
-                  removable
-                />
-              </PropertyLine>
-              <PropertyLine hidden={!stroke}>
-                <PropertyLineLabel>Width</PropertyLineLabel>
-                <StrokeWidthControl
-                  value={strokeWidth}
-                  onValueCommit={actions.strokeWidth}
-                />
-              </PropertyLine>
-              <PropertyLine hidden={!stroke}>
-                <PropertyLineLabel>Align</PropertyLineLabel>
-                <StrokeAlignControl
-                  value={strokeAlign}
-                  onValueChange={actions.strokeAlign}
-                />
-              </PropertyLine>
-              <PropertyLine
-                hidden={!supports.strokeCap(node.type, { backend })}
-              >
-                <PropertyLineLabel>Cap</PropertyLineLabel>
-                <StrokeCapControl
-                  value={strokeCap}
-                  onValueChange={actions.strokeCap}
-                />
-              </PropertyLine>
-            </SidebarMenuSectionContent>
-          </SidebarSection>
+          <SectionStrokes
+            node_id={node_id}
+            config={{
+              stroke_cap: !supports.strokeCap(node.type, { backend })
+                ? "off"
+                : "on",
+            }}
+          />
         )}
         <SectionEffects node_id={node_id} />
         <SidebarSection
@@ -1304,6 +1260,69 @@ function SectionDimension({ node_id }: { node_id: string }) {
   );
 }
 
+function SectionStrokes({
+  node_id,
+  config = {
+    stroke_cap: "on",
+  },
+}: {
+  node_id: string;
+  config?: {
+    stroke_cap: "on" | "off";
+  };
+}) {
+  const { stroke, strokeWidth, strokeAlign, strokeCap } = useNodeState(
+    node_id,
+    (node) => ({
+      stroke: node.stroke,
+      strokeWidth: node.strokeWidth,
+      strokeAlign: node.strokeAlign,
+      strokeCap: node.strokeCap,
+    })
+  );
+
+  const actions = useNodeActions(node_id)!;
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Color</PropertyLineLabel>
+          <PaintControl
+            value={stroke}
+            onValueChange={actions.stroke}
+            removable
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Width</PropertyLineLabel>
+          <StrokeWidthControl
+            value={strokeWidth}
+            onValueCommit={actions.strokeWidth}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Align</PropertyLineLabel>
+          <StrokeAlignControl
+            value={strokeAlign}
+            onValueChange={actions.strokeAlign}
+          />
+        </PropertyLine>
+        <PropertyLine hidden={config.stroke_cap === "off"}>
+          <PropertyLineLabel>Cap</PropertyLineLabel>
+          <StrokeCapControl
+            value={strokeCap}
+            onValueChange={actions.strokeCap}
+          />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
 function SectionEffects({ node_id }: { node_id: string }) {
   const backend = useBackendState();
   const instance = useCurrentEditor();
@@ -1315,8 +1334,6 @@ function SectionEffects({ node_id }: { node_id: string }) {
       feBlur: node.feBlur,
       feBackdropBlur: node.feBackdropBlur,
     }));
-
-  const actions = useNodeActions(node_id)!;
 
   const effects = useMemo(() => {
     const effects: cg.FilterEffect[] = [];
@@ -1353,10 +1370,10 @@ function SectionEffects({ node_id }: { node_id: string }) {
       data-empty={empty}
       className="border-b pb-4 [&[data-empty='true']]:pb-0"
     >
-      <SidebarSectionHeaderItem>
+      <SidebarSectionHeaderItem onClick={onAddEffect}>
         <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
         <SidebarSectionHeaderActions>
-          <Button variant="ghost" size="xs" onClick={onAddEffect}>
+          <Button variant="ghost" size="xs">
             <PlusIcon className="size-3" />
           </Button>
         </SidebarSectionHeaderActions>

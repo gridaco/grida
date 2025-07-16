@@ -313,9 +313,11 @@ export function SidebarMenuSectionContent({
 export function SidebarSectionHeaderItem({
   className,
   children,
-}: React.PropsWithChildren<{ className?: string }>) {
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { className?: string }) {
   return (
     <div
+      {...props}
       className={cn(
         "relative group",
         "w-full px-2 py-1 my-1 rounded-sm hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
