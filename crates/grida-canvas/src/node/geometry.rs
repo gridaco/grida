@@ -29,13 +29,17 @@ pub struct VectorNetwork {
 
 impl VectorNetwork {
     pub fn bounds(&self) -> Rectangle {
-        Rectangle::from_points(
-            &self
-                .vertices
-                .iter()
-                .map(|v| [v[0], v[1]])
-                .collect::<Vec<_>>(),
-        )
+        if self.vertices.is_empty() {
+            Rectangle::empty()
+        } else {
+            Rectangle::from_points(
+                &self
+                    .vertices
+                    .iter()
+                    .map(|v| [v[0], v[1]])
+                    .collect::<Vec<_>>(),
+            )
+        }
     }
 }
 
@@ -56,8 +60,16 @@ impl Into<skia_safe::Path> for VectorNetwork {
         let vertices = &self.vertices;
         let segments = &self.segments;
 
+        // if no segments, return empty path
+        if segments.is_empty() {
+            return builder.snapshot();
+        }
+
         // initial M
-        let segment_first = segments.first().unwrap();
+        let segment_first = match segments.first() {
+            Some(seg) => seg,
+            None => return builder.snapshot(),
+        };
         let v_start = vertices[segment_first.a];
         builder.move_to(skia_safe::Point::new(v_start[0], v_start[1]));
 
@@ -80,9 +92,10 @@ impl Into<skia_safe::Path> for VectorNetwork {
         }
 
         // final Z (if closed)
-        let segment_last = segments.last().unwrap();
-        if segment_last.b == segment_first.a {
-            builder.close();
+        if let Some(segment_last) = segments.last() {
+            if segment_last.b == segment_first.a {
+                builder.close();
+            }
         }
 
         return builder.snapshot();
