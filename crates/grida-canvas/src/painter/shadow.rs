@@ -1,6 +1,9 @@
 use super::geometry::PainterShape;
 use crate::cg::types::FeShadow;
-use skia_safe::{self as sk, color_filters, image_filters, BlendMode, ColorMatrix, Paint, Path};
+use skia_safe::{
+    self as sk, color_filters, image_filters, BlendMode, BlurStyle, ColorMatrix, MaskFilter, Paint,
+    Path,
+};
 
 fn path_with_spread(path: &Path, spread: f32) -> Path {
     if spread == 0.0 {
@@ -41,35 +44,42 @@ pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeSh
         (g * 255.0) as u8,
         (b * 255.0) as u8,
     );
+    let mut path = shape.to_path();
     let spread = shadow.spread;
 
-    // only apply offset directly to the shadow filter if there is no spread
-    let filter_offset = if spread == 0.0 {
-        (shadow.dx, shadow.dy)
-    } else {
-        (0.0, 0.0)
-    };
-
-    let image_filter = image_filters::drop_shadow(
-        filter_offset,
-        (shadow.blur, shadow.blur),
-        color,
-        None,
-        None,
-        None,
-    );
-
-    let mut shadow_paint = Paint::default();
-    shadow_paint.set_color(color);
-    shadow_paint.set_image_filter(image_filter);
-    shadow_paint.set_anti_alias(true);
-
-    let mut path = shape.to_path();
     if spread != 0.0 {
         path = path_with_spread(&path, spread);
-    }
 
-    canvas.draw_path(&path, &shadow_paint);
+        // manual shadow rendering for spread > 0
+        let mut paint = Paint::default();
+        paint.set_color(color);
+        paint.set_anti_alias(true);
+        if let Some(mask) = MaskFilter::blur(BlurStyle::Normal, shadow.blur, None) {
+            paint.set_mask_filter(mask);
+        }
+
+        canvas.save();
+        canvas.translate((shadow.dx, shadow.dy));
+        canvas.draw_path(&path, &paint);
+        canvas.restore();
+    } else {
+        // fast path using Skia's drop_shadow filter when no spread is applied
+        let image_filter = image_filters::drop_shadow(
+            (shadow.dx, shadow.dy),
+            (shadow.blur, shadow.blur),
+            color,
+            None,
+            None,
+            None,
+        );
+
+        let mut shadow_paint = Paint::default();
+        shadow_paint.set_color(color);
+        shadow_paint.set_image_filter(image_filter);
+        shadow_paint.set_anti_alias(true);
+
+        canvas.draw_path(&path, &shadow_paint);
+    }
 }
 
 /// Draw an inner shadow clipped to the given shape.
@@ -91,6 +101,7 @@ pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeS
         0.0, 0.0, 0.0, a as f32 / 255.0, 0.0, //
     );
 
+    #[rustfmt::skip]
     let invert = ColorMatrix::new(
         1.0, 0.0, 0.0, 0.0, 0.0, //
         0.0, 1.0, 0.0, 0.0, 0.0, //

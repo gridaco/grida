@@ -65,7 +65,7 @@ async fn demo_effects() -> Scene {
                 dx: 4.0,
                 dy: 4.0,
                 blur: 4.0 * (i + 1) as f32,
-                spread: 4.0,
+                spread: 2.0 * (i + 1) as f32,
                 color: Color(0, 0, 0, 128),
             })]);
             all_effect_ids.push(polygon.base.id.clone());
@@ -233,7 +233,7 @@ async fn demo_effects() -> Scene {
                 dx: 2.0,
                 dy: 2.0,
                 blur: 3.0 * (i + 1) as f32,
-                spread: 1.0,
+                spread: 1.0 * (i + 1) as f32,
                 color: Color(0, 0, 0, 100),
             })]);
             all_effect_ids.push(polygon.base.id.clone());
