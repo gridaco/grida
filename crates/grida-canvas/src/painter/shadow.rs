@@ -1,9 +1,6 @@
 use super::geometry::PainterShape;
 use crate::cg::types::FeShadow;
-use skia_safe::{
-    self as sk, color_filters, image_filters, BlendMode, BlurStyle, ColorMatrix, MaskFilter, Paint,
-    Path,
-};
+use skia_safe::{self as sk, color_filters, image_filters, BlendMode, ColorMatrix, Paint};
 
 /// Draw a drop shadow behind the given shape on the provided canvas.
 pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
