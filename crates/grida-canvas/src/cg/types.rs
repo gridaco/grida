@@ -82,6 +82,14 @@ impl Default for BlendMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum FillRule {
+    #[serde(rename = "nonzero")]
+    NonZero,
+    #[serde(rename = "evenodd")]
+    EvenOdd,
+}
+
 /// Stroke alignment.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  

@@ -65,10 +65,10 @@ pub struct CSSBorder {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct SVGPath {
+pub struct JSONSVGPath {
     pub d: String,
     #[serde(rename = "fillRule")]
-    pub fill_rule: String,
+    pub fill_rule: FillRule,
     pub fill: String,
 }
 
@@ -236,7 +236,7 @@ pub enum JSONNode {
     #[serde(rename = "container")]
     Container(JSONContainerNode),
     #[serde(rename = "vector")]
-    Vector(JSONVectorNode),
+    Vector(JSONLegacyVectorNode),
     #[serde(rename = "path")]
     Path(JSONPathNode),
     #[serde(rename = "ellipse")]
@@ -299,11 +299,11 @@ pub struct JSONTextNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JSONVectorNode {
+pub struct JSONLegacyVectorNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
-    pub paths: Option<Vec<SVGPath>>,
+    pub paths: Option<Vec<JSONSVGPath>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -553,8 +553,8 @@ impl From<JSONRectangleNode> for Node {
     }
 }
 
-impl From<JSONVectorNode> for Node {
-    fn from(node: JSONVectorNode) -> Self {
+impl From<JSONLegacyVectorNode> for Node {
+    fn from(node: JSONLegacyVectorNode) -> Self {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         // For vector nodes, we'll create a path node with the path data
