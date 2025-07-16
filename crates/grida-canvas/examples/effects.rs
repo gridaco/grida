@@ -246,6 +246,137 @@ async fn demo_effects() -> Scene {
         }
     }
 
+    // Row 5: Multiple Effects Per Node
+    for i in 0..6 {
+        if i < 3 {
+            // First three shapes as rectangles with multiple effects
+            let mut rect = nf.create_rectangle_node();
+            rect.base.name = format!("Multiple Effects Rect {}", i + 1);
+            rect.transform = AffineTransform::new(start_x + spacing * i as f32, 950.0, 0.0);
+            rect.size = Size {
+                width: base_size,
+                height: base_size,
+            };
+            rect.corner_radius = RectangularCornerRadius::all(20.0);
+            rect.set_fill(Paint::Solid(SolidPaint {
+                color: Color(255, 255, 255, 255), // White
+                opacity: 1.0,
+            }));
+
+            // Combine multiple effects based on index
+            let effects = match i {
+                0 => vec![
+                    FilterEffect::DropShadow(FeDropShadow {
+                        dx: 6.0,
+                        dy: 6.0,
+                        blur: 8.0,
+                        spread: 0.0,
+                        color: Color(0, 0, 0, 100),
+                    }),
+                    FilterEffect::InnerShadow(FeDropShadow {
+                        dx: -2.0,
+                        dy: -2.0,
+                        blur: 4.0,
+                        spread: 0.0,
+                        color: Color(0, 0, 0, 80),
+                    }),
+                ],
+                1 => vec![
+                    FilterEffect::DropShadow(FeDropShadow {
+                        dx: 4.0,
+                        dy: 4.0,
+                        blur: 6.0,
+                        spread: 0.0,
+                        color: Color(0, 0, 0, 120),
+                    }),
+                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 }),
+                ],
+                2 => vec![
+                    FilterEffect::DropShadow(FeDropShadow {
+                        dx: 8.0,
+                        dy: 8.0,
+                        blur: 12.0,
+                        spread: 2.0,
+                        color: Color(0, 0, 0, 150),
+                    }),
+                    FilterEffect::InnerShadow(FeDropShadow {
+                        dx: -1.0,
+                        dy: -1.0,
+                        blur: 3.0,
+                        spread: 0.0,
+                        color: Color(255, 255, 255, 100),
+                    }),
+                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 1.0 }),
+                ],
+                _ => vec![],
+            };
+
+            rect.effects = LayerEffects::from_array(effects);
+            all_effect_ids.push(rect.base.id.clone());
+            repository.insert(Node::Rectangle(rect));
+        } else {
+            // Last three shapes as regular polygons with multiple effects
+            let mut polygon = nf.create_regular_polygon_node();
+            polygon.base.name = format!("Multiple Effects Polygon {}", i + 1);
+            polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 950.0, 0.0);
+            polygon.size = Size {
+                width: base_size,
+                height: base_size,
+            };
+            polygon.point_count = i + 3;
+            polygon.fills = vec![Paint::Solid(SolidPaint {
+                color: Color(255, 255, 255, 255), // White
+                opacity: 1.0,
+            })];
+
+            // Combine multiple effects based on index
+            let effects = match i {
+                3 => vec![
+                    FilterEffect::DropShadow(FeDropShadow {
+                        dx: 5.0,
+                        dy: 5.0,
+                        blur: 10.0,
+                        spread: 0.0,
+                        color: Color(0, 0, 0, 110),
+                    }),
+                    FilterEffect::BackdropBlur(FeGaussianBlur { radius: 4.0 }),
+                ],
+                4 => vec![
+                    FilterEffect::InnerShadow(FeDropShadow {
+                        dx: 3.0,
+                        dy: 3.0,
+                        blur: 6.0,
+                        spread: 0.0,
+                        color: Color(0, 0, 0, 90),
+                    }),
+                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 3.0 }),
+                ],
+                5 => vec![
+                    FilterEffect::DropShadow(FeDropShadow {
+                        dx: 10.0,
+                        dy: 10.0,
+                        blur: 15.0,
+                        spread: 3.0,
+                        color: Color(0, 0, 0, 180),
+                    }),
+                    FilterEffect::InnerShadow(FeDropShadow {
+                        dx: -2.0,
+                        dy: -2.0,
+                        blur: 5.0,
+                        spread: 0.0,
+                        color: Color(255, 255, 255, 120),
+                    }),
+                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 }),
+                ],
+                _ => vec![],
+            };
+
+            polygon.effects = LayerEffects::from_array(effects);
+            all_effect_ids.push(polygon.base.id.clone());
+            repository.insert(Node::RegularPolygon(polygon));
+        }
+    }
+
     // Set up the root container
     root_container_node.children = vec![vivid_gradient_rect_id];
     root_container_node.children.extend(all_effect_ids);
