@@ -23,7 +23,7 @@ async fn demo_basic() -> Scene {
     };
     image_node.corner_radius = RectangularCornerRadius::all(20.0);
     image_node.stroke_width = 2.0;
-    image_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+    image_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 4.0,
         dy: 4.0,
         blur: 8.0,
@@ -46,7 +46,7 @@ async fn demo_basic() -> Scene {
         opacity: 1.0,
     }));
     rect_node.stroke_width = 2.0;
-    rect_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+    rect_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 4.0,
         dy: 4.0,
         blur: 8.0,

@@ -1,5 +1,5 @@
 use super::geometry::PainterShape;
-use crate::cg::types::FeDropShadow;
+use crate::cg::types::FeShadow;
 use skia_safe::{self as sk, color_filters, image_filters, BlendMode, ColorMatrix, Paint, Path};
 
 fn path_with_spread(path: &Path, spread: f32) -> Path {
@@ -25,7 +25,7 @@ fn path_with_spread(path: &Path, spread: f32) -> Path {
 }
 
 /// Draw a drop shadow behind the given shape on the provided canvas.
-pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeDropShadow) {
+pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
     let sk::Color4f { r, g, b, a } = {
         let crate::cg::types::Color(r, g, b, a) = shadow.color;
         sk::Color4f::new(
@@ -73,21 +73,13 @@ pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeDr
 }
 
 /// Draw an inner shadow clipped to the given shape.
-pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeDropShadow) {
+pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
     let crate::cg::types::Color(r, g, b, a) = shadow.color;
     let spread = shadow.spread;
 
     let mut path = shape.to_path();
     if spread != 0.0 {
-        let b = path.bounds();
-        let width = b.width();
-        let height = b.height();
-        if width > 0.0 && height > 0.0 {
-            let scale_x = (width + 2.0 * spread) / width;
-            let scale_y = (height + 2.0 * spread) / height;
-            let matrix = sk::Matrix::scale((scale_x, scale_y));
-            path.transform(&matrix);
-        }
+        path = path_with_spread(&path, -spread);
     }
 
     // Construct color matrix selecting and colorizing the inverse alpha

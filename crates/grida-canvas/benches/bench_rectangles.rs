@@ -38,7 +38,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             effects: if with_effects {
-                LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+                LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
                     dx: 2.0,
                     dy: 2.0,
                     blur: 4.0,

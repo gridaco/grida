@@ -111,14 +111,13 @@ async fn demo_scene() -> Scene {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
     })];
-    rect_gradient.effects =
-        LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
-            dx: 5.0,
-            dy: 5.0,
-            blur: 10.0,
-            spread: 0.0,
-            color: Color(0, 0, 0, 100),
-        })]);
+    rect_gradient.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
+        dx: 5.0,
+        dy: 5.0,
+        blur: 10.0,
+        spread: 0.0,
+        color: Color(0, 0, 0, 100),
+    })]);
     all_node_ids.push(rect_gradient.base.id.clone());
     repo.insert(Node::Rectangle(rect_gradient));
 
@@ -180,7 +179,7 @@ async fn demo_scene() -> Scene {
         color: Color(255, 255, 255, 255),
         opacity: 1.0,
     })];
-    hexagon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+    hexagon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 3.0,
         dy: 3.0,
         blur: 8.0,

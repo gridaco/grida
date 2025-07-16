@@ -122,17 +122,17 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw a drop shadow behind the content using a shape.
-    fn draw_shadow(&self, shape: &PainterShape, shadow: &FeDropShadow) {
+    fn draw_shadow(&self, shape: &PainterShape, shadow: &FeShadow) {
         shadow::draw_drop_shadow(self.canvas, shape, shadow);
     }
 
     /// Draw an inner shadow clipped to the given shape.
-    fn draw_inner_shadow(&self, shape: &PainterShape, shadow: &FeDropShadow) {
+    fn draw_inner_shadow(&self, shape: &PainterShape, shadow: &FeShadow) {
         shadow::draw_inner_shadow(self.canvas, shape, shadow);
     }
 
     /// Draw a backdrop blur: blur what's behind the shape.
-    fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeGaussianBlur) {
+    fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeBlur) {
         let canvas = self.canvas;
         // 1) Build a Gaussian‐blur filter for the backdrop
         let Some(image_filter) =

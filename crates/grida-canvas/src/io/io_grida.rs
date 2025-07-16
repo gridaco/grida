@@ -97,9 +97,9 @@ impl From<JSONRGBA> for Color {
     }
 }
 
-impl From<JSONFeShadow> for FeDropShadow {
+impl From<JSONFeShadow> for FeShadow {
     fn from(box_shadow: JSONFeShadow) -> Self {
-        FeDropShadow {
+        FeShadow {
             dx: box_shadow.dx,
             dy: box_shadow.dy,
             blur: box_shadow.blur,
@@ -222,9 +222,9 @@ pub struct JSONUnknownNodeProperties {
     #[serde(rename = "feInnerShadows")]
     pub fe_inner_shadows: Option<Vec<JSONFeShadow>>,
     #[serde(rename = "feBlur")]
-    pub fe_blur: Option<FeGaussianBlur>,
+    pub fe_blur: Option<FeBlur>,
     #[serde(rename = "feBackdropBlur")]
-    pub fe_backdrop_blur: Option<FeGaussianBlur>,
+    pub fe_backdrop_blur: Option<FeBlur>,
     // vector
     #[serde(rename = "vectorNetwork")]
     pub vector_network: Option<JSONVectorNetwork>,
@@ -725,8 +725,8 @@ where
 fn merge_effects(
     fe_drop_shadows: Option<Vec<JSONFeShadow>>,
     fe_inner_shadows: Option<Vec<JSONFeShadow>>,
-    fe_blur: Option<FeGaussianBlur>,
-    fe_backdrop_blur: Option<FeGaussianBlur>,
+    fe_blur: Option<FeBlur>,
+    fe_backdrop_blur: Option<FeBlur>,
 ) -> LayerEffects {
     let mut effects = LayerEffects::new_empty();
     if let Some(filter_blur) = fe_blur {

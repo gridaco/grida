@@ -38,7 +38,7 @@ async fn demo_effects() -> Scene {
                 color: Color(255, 255, 255, 255), // White
                 opacity: 1.0,
             }));
-            rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+            rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
                 dx: 4.0,
                 dy: 4.0,
                 blur: 4.0 * (i + 1) as f32,
@@ -61,14 +61,13 @@ async fn demo_effects() -> Scene {
                 color: Color(255, 255, 255, 255), // White
                 opacity: 1.0,
             })];
-            polygon.effects =
-                LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
-                    dx: 4.0,
-                    dy: 4.0,
-                    blur: 4.0 * (i + 1) as f32,
-                    spread: 4.0,
-                    color: Color(0, 0, 0, 128),
-                })]);
+            polygon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
+                dx: 4.0,
+                dy: 4.0,
+                blur: 4.0 * (i + 1) as f32,
+                spread: 4.0,
+                color: Color(0, 0, 0, 128),
+            })]);
             all_effect_ids.push(polygon.base.id.clone());
             repository.insert(Node::RegularPolygon(polygon));
         }
@@ -90,10 +89,9 @@ async fn demo_effects() -> Scene {
                 color: Color(200, 200, 200, 255), // White
                 opacity: 1.0,
             }));
-            rect.effects =
-                LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
-                    radius: 4.0 * (i + 1) as f32,
-                })]);
+            rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeBlur {
+                radius: 4.0 * (i + 1) as f32,
+            })]);
             all_effect_ids.push(rect.base.id.clone());
             repository.insert(Node::Rectangle(rect));
         } else {
@@ -110,10 +108,9 @@ async fn demo_effects() -> Scene {
                 color: Color(200, 200, 200, 255), // White
                 opacity: 1.0,
             })];
-            polygon.effects =
-                LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
-                    radius: 4.0 * (i + 1) as f32,
-                })]);
+            polygon.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeBlur {
+                radius: 4.0 * (i + 1) as f32,
+            })]);
             all_effect_ids.push(polygon.base.id.clone());
             repository.insert(Node::RegularPolygon(polygon));
         }
@@ -165,7 +162,7 @@ async fn demo_effects() -> Scene {
                 opacity: 1.0,
             }));
             blur_rect.effects =
-                LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeGaussianBlur {
+                LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeBlur {
                     radius: 8.0 * (i + 1) as f32,
                 })]);
             all_effect_ids.push(blur_rect.base.id.clone());
@@ -185,7 +182,7 @@ async fn demo_effects() -> Scene {
                 opacity: 1.0,
             })];
             blur_polygon.effects =
-                LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeGaussianBlur {
+                LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeBlur {
                     radius: 8.0 * (i + 1) as f32,
                 })]);
             all_effect_ids.push(blur_polygon.base.id.clone());
@@ -209,14 +206,13 @@ async fn demo_effects() -> Scene {
                 color: Color(240, 240, 240, 255), // Light gray
                 opacity: 1.0,
             }));
-            rect.effects =
-                LayerEffects::from_array(vec![FilterEffect::InnerShadow(FeDropShadow {
-                    dx: 2.0,
-                    dy: 2.0,
-                    blur: 3.0 * (i + 1) as f32,
-                    spread: 0.0,
-                    color: Color(0, 0, 0, 100),
-                })]);
+            rect.effects = LayerEffects::from_array(vec![FilterEffect::InnerShadow(FeShadow {
+                dx: 2.0,
+                dy: 2.0,
+                blur: 3.0 * (i + 1) as f32,
+                spread: 0.0,
+                color: Color(0, 0, 0, 100),
+            })]);
             all_effect_ids.push(rect.base.id.clone());
             repository.insert(Node::Rectangle(rect));
         } else {
@@ -233,14 +229,13 @@ async fn demo_effects() -> Scene {
                 color: Color(240, 240, 240, 255), // Light gray
                 opacity: 1.0,
             })];
-            polygon.effects =
-                LayerEffects::from_array(vec![FilterEffect::InnerShadow(FeDropShadow {
-                    dx: 2.0,
-                    dy: 2.0,
-                    blur: 3.0 * (i + 1) as f32,
-                    spread: 1.0,
-                    color: Color(0, 0, 0, 100),
-                })]);
+            polygon.effects = LayerEffects::from_array(vec![FilterEffect::InnerShadow(FeShadow {
+                dx: 2.0,
+                dy: 2.0,
+                blur: 3.0 * (i + 1) as f32,
+                spread: 1.0,
+                color: Color(0, 0, 0, 100),
+            })]);
             all_effect_ids.push(polygon.base.id.clone());
             repository.insert(Node::RegularPolygon(polygon));
         }
@@ -266,14 +261,14 @@ async fn demo_effects() -> Scene {
             // Combine multiple effects based on index
             let effects = match i {
                 0 => vec![
-                    FilterEffect::DropShadow(FeDropShadow {
+                    FilterEffect::DropShadow(FeShadow {
                         dx: 6.0,
                         dy: 6.0,
                         blur: 8.0,
                         spread: 0.0,
                         color: Color(0, 0, 0, 100),
                     }),
-                    FilterEffect::InnerShadow(FeDropShadow {
+                    FilterEffect::InnerShadow(FeShadow {
                         dx: -2.0,
                         dy: -2.0,
                         blur: 4.0,
@@ -282,31 +277,31 @@ async fn demo_effects() -> Scene {
                     }),
                 ],
                 1 => vec![
-                    FilterEffect::DropShadow(FeDropShadow {
+                    FilterEffect::DropShadow(FeShadow {
                         dx: 4.0,
                         dy: 4.0,
                         blur: 6.0,
                         spread: 0.0,
                         color: Color(0, 0, 0, 120),
                     }),
-                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 }),
+                    FilterEffect::LayerBlur(FeBlur { radius: 2.0 }),
                 ],
                 2 => vec![
-                    FilterEffect::DropShadow(FeDropShadow {
+                    FilterEffect::DropShadow(FeShadow {
                         dx: 8.0,
                         dy: 8.0,
                         blur: 12.0,
                         spread: 2.0,
                         color: Color(0, 0, 0, 150),
                     }),
-                    FilterEffect::InnerShadow(FeDropShadow {
+                    FilterEffect::InnerShadow(FeShadow {
                         dx: -1.0,
                         dy: -1.0,
                         blur: 3.0,
                         spread: 0.0,
                         color: Color(255, 255, 255, 100),
                     }),
-                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 1.0 }),
+                    FilterEffect::LayerBlur(FeBlur { radius: 1.0 }),
                 ],
                 _ => vec![],
             };
@@ -332,41 +327,41 @@ async fn demo_effects() -> Scene {
             // Combine multiple effects based on index
             let effects = match i {
                 3 => vec![
-                    FilterEffect::DropShadow(FeDropShadow {
+                    FilterEffect::DropShadow(FeShadow {
                         dx: 5.0,
                         dy: 5.0,
                         blur: 10.0,
                         spread: 0.0,
                         color: Color(0, 0, 0, 110),
                     }),
-                    FilterEffect::BackdropBlur(FeGaussianBlur { radius: 4.0 }),
+                    FilterEffect::BackdropBlur(FeBlur { radius: 4.0 }),
                 ],
                 4 => vec![
-                    FilterEffect::InnerShadow(FeDropShadow {
+                    FilterEffect::InnerShadow(FeShadow {
                         dx: 3.0,
                         dy: 3.0,
                         blur: 6.0,
                         spread: 0.0,
                         color: Color(0, 0, 0, 90),
                     }),
-                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 3.0 }),
+                    FilterEffect::LayerBlur(FeBlur { radius: 3.0 }),
                 ],
                 5 => vec![
-                    FilterEffect::DropShadow(FeDropShadow {
+                    FilterEffect::DropShadow(FeShadow {
                         dx: 10.0,
                         dy: 10.0,
                         blur: 15.0,
                         spread: 3.0,
                         color: Color(0, 0, 0, 180),
                     }),
-                    FilterEffect::InnerShadow(FeDropShadow {
+                    FilterEffect::InnerShadow(FeShadow {
                         dx: -2.0,
                         dy: -2.0,
                         blur: 5.0,
                         spread: 0.0,
                         color: Color(255, 255, 255, 120),
                     }),
-                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 }),
+                    FilterEffect::LayerBlur(FeBlur { radius: 2.0 }),
                 ],
                 _ => vec![],
             };

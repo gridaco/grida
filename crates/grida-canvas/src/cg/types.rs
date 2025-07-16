@@ -379,24 +379,24 @@ pub struct ImagePaint {
 #[derive(Debug, Clone)]
 pub enum FilterEffect {
     /// Drop shadow filter: offset + blur + spread + color
-    DropShadow(FeDropShadow),
+    DropShadow(FeShadow),
 
     /// Inner shadow filter: offset + blur + spread + color
     /// the shadow is clipped to the shape
-    InnerShadow(FeDropShadow),
+    InnerShadow(FeShadow),
 
     /// Layer blur filter
-    LayerBlur(FeGaussianBlur),
+    LayerBlur(FeBlur),
 
     /// Background blur filter
     /// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
-    BackdropBlur(FeGaussianBlur),
+    BackdropBlur(FeBlur),
 }
 
 #[derive(Debug, Clone)]
 pub enum FilterShadowEffect {
-    DropShadow(FeDropShadow),
-    InnerShadow(FeDropShadow),
+    DropShadow(FeShadow),
+    InnerShadow(FeShadow),
 }
 
 impl Into<FilterEffect> for FilterShadowEffect {
@@ -408,14 +408,21 @@ impl Into<FilterEffect> for FilterShadowEffect {
     }
 }
 
-/// A drop shadow (box-shadow) filter effect (`<feDropShadow>` + spread radius)
+/// A shadow (box-shadow) filter effect (`<feDropShadow>` + spread radius)
+///
+/// Grida's standard shadow effect that supports
+/// - css box-shadow
+/// - css text-shadow
+/// - path-shadow (non-box) that supports css box-shadow properties
+/// - fully compatible with feDropShadow => [FeShadow] (but no backwards compatibility, since spread is not supported by SVG)
+///
 /// See also:
 /// - https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow
 /// - https://developer.mozilla.org/en-US/docs/Web/CSS/box-shadow
 /// - https://www.figma.com/plugin-docs/api/Effect/#dropshadoweffect
 /// - https://api.flutter.dev/flutter/painting/BoxShadow-class.html
 #[derive(Debug, Clone, Copy)]
-pub struct FeDropShadow {
+pub struct FeShadow {
     /// Horizontal shadow offset in px
     pub dx: f32,
 
@@ -426,7 +433,7 @@ pub struct FeDropShadow {
     pub blur: f32,
 
     /// Spread radius in px
-    /// applies outset to the src rect
+    /// applies outset (or inset if inner) to the src rect
     pub spread: f32,
 
     /// Shadow color (includes alpha)
@@ -435,7 +442,7 @@ pub struct FeDropShadow {
 
 /// A standalone blur filter effect (`<feGaussianBlur>`)
 #[derive(Debug, Clone, Copy, Deserialize)]
-pub struct FeGaussianBlur {
+pub struct FeBlur {
     /// Blur radius (`stdDeviation` in SVG)
     pub radius: f32,
 }

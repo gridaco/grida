@@ -113,7 +113,7 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     })];
     rect_gradient.effects =
-        LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+        LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
             dx: 5.0,
             dy: 5.0,
             blur: 10.0,
@@ -181,7 +181,7 @@ async fn demo_scene() -> Scene {
         color: Color(255, 255, 255, 255),
         opacity: 1.0,
     })];
-    hexagon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+    hexagon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 3.0,
         dy: 3.0,
         blur: 8.0,

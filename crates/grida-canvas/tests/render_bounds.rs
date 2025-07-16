@@ -36,9 +36,7 @@ fn gaussian_blur_expands_render_bounds() {
     let mut repo = NodeRepository::new();
 
     let mut rect = nf.create_rectangle_node();
-    rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
-        radius: 5.0,
-    })]);
+    rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeBlur { radius: 5.0 })]);
     let rect_id = rect.base.id.clone();
     repo.insert(Node::Rectangle(rect));
 
@@ -64,7 +62,7 @@ fn drop_shadow_expands_render_bounds() {
     let mut repo = NodeRepository::new();
 
     let mut rect = nf.create_rectangle_node();
-    rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+    rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 5.0,
         dy: 5.0,
         blur: 10.0,
@@ -96,7 +94,7 @@ fn drop_shadow_spread_expands_render_bounds() {
     let mut repo = NodeRepository::new();
 
     let mut rect = nf.create_rectangle_node();
-    rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeDropShadow {
+    rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 0.0,
         dy: 0.0,
         blur: 0.0,
