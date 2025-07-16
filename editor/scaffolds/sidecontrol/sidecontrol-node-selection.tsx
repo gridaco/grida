@@ -45,7 +45,7 @@ import { LengthPercentageControl } from "./controls/length-percentage";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
-import { BlendModeControl } from "./controls/blend-mode";
+import { BlendModeDropdown, BlendModeSelect } from "./controls/blend-mode";
 import {
   useComputedNode,
   useCurrentEditor,
@@ -53,6 +53,7 @@ import {
   useEditorState,
 } from "@/grida-canvas-react";
 import {
+  BlendingModeIcon,
   Crosshair2Icon,
   LockClosedIcon,
   LockOpen1Icon,
@@ -97,6 +98,11 @@ import { StrokeAlignControl } from "./controls/stroke-align";
 import cg from "@grida/cg";
 import { editor } from "@/grida-canvas";
 import { FeControl } from "./controls/fe";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -1056,15 +1062,14 @@ function SelectedNodeProperties({
         <SidebarSection hidden={!is_stylable} className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Blend Mode</PropertyLineLabel>
-              <BlendModeControl
+            <SidebarSectionHeaderActions>
+              <BlendModeDropdown
                 value={blendMode}
                 onValueChange={actions.blendMode}
               />
-            </PropertyLine>
+            </SidebarSectionHeaderActions>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Opacity</PropertyLineLabel>
               <OpacityControl
@@ -1112,29 +1117,31 @@ function SelectedNodeProperties({
           />
         )}
         <SectionEffects node_id={node_id} />
-        <SidebarSection
-          hidden={config.link === "off"}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Link To</PropertyLineLabel>
-              <HrefControl value={href} onValueChange={actions.href} />
-            </PropertyLine>
-            {href && (
+        {backend === "dom" && (
+          <SidebarSection
+            hidden={config.link === "off"}
+            className="border-b pb-4"
+          >
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuSectionContent className="space-y-2">
               <PropertyLine>
-                <PropertyLineLabel>New Tab</PropertyLineLabel>
-                <TargetBlankControl
-                  value={target}
-                  onValueChange={actions.target}
-                />
+                <PropertyLineLabel>Link To</PropertyLineLabel>
+                <HrefControl value={href} onValueChange={actions.href} />
               </PropertyLine>
-            )}
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+              {href && (
+                <PropertyLine>
+                  <PropertyLineLabel>New Tab</PropertyLineLabel>
+                  <TargetBlankControl
+                    value={target}
+                    onValueChange={actions.target}
+                  />
+                </PropertyLine>
+              )}
+            </SidebarMenuSectionContent>
+          </SidebarSection>
+        )}
         {/* #region selection colors */}
         <SelectionColors />
         {/* #endregion selection colors */}

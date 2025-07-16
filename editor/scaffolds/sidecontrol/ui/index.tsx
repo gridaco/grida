@@ -106,7 +106,7 @@ export function PropertyTextarea({
   );
 }
 
-type EnumItem<T extends string> =
+export type EnumItem<T extends string> =
   | T
   | {
       icon?: React.ReactNode;
@@ -114,6 +114,20 @@ type EnumItem<T extends string> =
       value: T;
       disabled?: boolean;
     };
+
+export function enumLabel<T extends string>(e: EnumItem<T>) {
+  if (typeof e === "string") return e;
+  return e.label ?? e.value;
+}
+
+export function enumValue<T extends string>(e: EnumItem<T>) {
+  if (typeof e === "string") return e;
+  return e.value;
+}
+
+export function enumEq<T extends string>(a: EnumItem<T>, b: EnumItem<T>) {
+  return enumValue(a) === enumValue(b);
+}
 
 export function PropertyEnum<T extends string>({
   enum: enums,
