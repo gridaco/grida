@@ -448,6 +448,12 @@ pub struct FeShadow {
     pub color: Color,
 }
 
+#[derive(Debug, Clone)]
+pub enum FeBlur {
+    Gaussian(FeGaussianBlur),
+    Progressive(FeProgressiveBlur),
+}
+
 /// A standalone blur filter effect (`<feGaussianBlur>`)
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct FeGaussianBlur {
