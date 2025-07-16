@@ -13,7 +13,7 @@ type Property =
   | "border"
   | "children"
   | "stroke"
-  | "boxShadow"
+  | "feDropShadow"
   | "strokeCap";
 
 type INodePropertiesConfig = {
@@ -58,7 +58,7 @@ const dom_supports: Record<Property, ReadonlyArray<NodeType>> = {
   border: ["container", "component", "instance", "image", "video"],
   children: ["container", "component", "instance"],
   stroke: ["path", "line", "rectangle", "ellipse"],
-  boxShadow: ["container", "component", "instance"],
+  feDropShadow: ["container", "component", "instance"],
   /**
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
    */
@@ -89,7 +89,7 @@ const canvas_supports: Record<Property, ReadonlyArray<NodeType>> = {
     "rectangle",
     "ellipse",
   ],
-  boxShadow: [
+  feDropShadow: [
     "container",
     "rectangle",
     "image",
@@ -150,12 +150,12 @@ export namespace supports {
         return canvas_supports.strokeCap.includes(type);
     }
   };
-  export const boxShadow = (type: NodeType, context: Context) => {
+  export const feDropShadow = (type: NodeType, context: Context) => {
     switch (context.backend) {
       case "dom":
-        return dom_supports.boxShadow.includes(type);
+        return dom_supports.feDropShadow.includes(type);
       case "canvas":
-        return canvas_supports.boxShadow.includes(type);
+        return canvas_supports.feDropShadow.includes(type);
     }
   };
 }

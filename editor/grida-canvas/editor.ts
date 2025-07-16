@@ -1417,36 +1417,67 @@ export class Editor
     });
   }
 
-  changeNodeFeDropShadow(node_id: string, effect?: cg.BoxShadow) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        feDropShadow: effect,
-      });
+  changeNodeFilterEffects(
+    node_id: editor.NodeID,
+    effects?: cg.FilterEffect[]
+  ): void {
+    const feBlur = effects?.find((effect) => effect.type === "layer-blur");
+    const feBackdropBlur = effects?.find(
+      (effect) => effect.type === "backdrop-blur"
+    );
+    const feDropShadows = effects?.filter(
+      (effect) => effect.type === "drop-shadow"
+    );
+    const feInnerShadows = effects?.filter(
+      (effect) => effect.type === "inner-shadow"
+    );
+
+    const i: grida.program.nodes.i.IEffects = {
+      feBackdropBlur: feBackdropBlur,
+      feBlur: feBlur,
+      feDropShadows: feDropShadows,
+      feInnerShadows: feInnerShadows,
+    };
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      ...i,
     });
   }
 
-  changeNodeFeBlur(node_id: string, effect?: cg.FeGaussianBlur) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        feBlur: effect,
-      });
+  changeNodeFeDropShadows(node_id: string, effects?: cg.FeDropShadow[]) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      feDropShadows: effects,
+    });
+  }
+
+  changeNodeFeInnerShadows(node_id: string, effects?: cg.FeInnerShadow[]) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      feInnerShadows: effects,
+    });
+  }
+
+  changeNodeFeBlur(node_id: string, effect?: cg.FeLayerBlur) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      feBlur: effect,
     });
   }
 
   changeNodeFeBackdropBlur(
     node_id: editor.NodeID,
-    effect?: cg.FeGaussianBlur
+    effect?: cg.FeBackdropBlur
   ): void {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        feBackdropBlur: effect,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      feBackdropBlur: effect,
     });
   }
 

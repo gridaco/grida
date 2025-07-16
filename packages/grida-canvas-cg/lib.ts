@@ -408,14 +408,72 @@ export namespace cg {
     spread: number;
   };
 
-  export type FilterEffects = FeDropShadow | FeGaussianBlur;
+  /**
+   *
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow
+   */
+  export type IFeShadow = {
+    /**
+     * offset-x
+     */
+    dx: number;
+
+    /**
+     * offset-y
+     */
+    dy: number;
+
+    /**
+     * blur radius
+     *
+     * a.k.a. stdDeviation in SVG <feDropShadow>
+     */
+    blur: number;
+
+    spread: number;
+
+    color: RGBA8888;
+    //
+  };
+
+  export type IFeGaussianBlur = {
+    /**
+     * blur radius
+     *
+     * a.k.a. stdDeviation in SVG <feGaussianBlur>
+     */
+    radius: number;
+  };
+
+  export type FilterEffect =
+    | FeDropShadow
+    | FeInnerShadow
+    | FeLayerBlur
+    | FeBackdropBlur;
+
+  export type FeDropShadow = IFeShadow & {
+    type: "drop-shadow";
+  };
+
+  export type FeInnerShadow = IFeShadow & {
+    type: "inner-shadow";
+  };
+
+  export type FeLayerBlur = IFeGaussianBlur & {
+    type: "layer-blur";
+  };
+
+  export type FeBackdropBlur = IFeGaussianBlur & {
+    type: "backdrop-blur";
+  };
 
   /**
    *
    *
    * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow
    */
-  export type FeDropShadow = {
+  export type SVGFeDropShadow = {
     type: "drop_shadow";
 
     /**
@@ -437,7 +495,7 @@ export namespace cg {
     //
   };
 
-  export type FeGaussianBlur = {
+  export type SVGFeGaussianBlur = {
     type: "blur";
 
     /**

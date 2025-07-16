@@ -75,7 +75,7 @@ export namespace css {
       //
       padding,
       //
-      feDropShadow: boxShadow,
+      feDropShadows,
       //
       layout,
       direction,
@@ -88,6 +88,9 @@ export namespace css {
       //
       style,
     } = styles;
+
+    // box-shadow - fallbacks from feDropShadow, first item.
+    const _fb_first_boxShadow = feDropShadows?.[0];
 
     let result: React.CSSProperties = {
       //
@@ -115,7 +118,14 @@ export namespace css {
       //
       padding: padding ? paddingToPaddingCSS(padding) : undefined,
       //
-      boxShadow: boxShadow ? boxShadowToCSS(boxShadow) : undefined,
+      boxShadow: _fb_first_boxShadow
+        ? boxShadowToCSS({
+            blur: _fb_first_boxShadow.blur,
+            color: _fb_first_boxShadow.color,
+            offset: [_fb_first_boxShadow.dx, _fb_first_boxShadow.dy],
+            spread: _fb_first_boxShadow.spread,
+          })
+        : undefined,
       //
       cursor: cursor,
       ...(border ? toReactCSSBorder(border) : {}),

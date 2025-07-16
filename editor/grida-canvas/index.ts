@@ -172,6 +172,18 @@ export namespace editor.config {
     spacing: 0,
     opacity: 1,
   };
+
+  export const DEFAULT_FE_SHADOW: cg.IFeShadow = {
+    color: { r: 0, g: 0, b: 0, a: 0.25 },
+    dx: 0,
+    dy: 4,
+    blur: 4,
+    spread: 0,
+  };
+
+  export const DEFAULT_FE_BLUR: cg.IFeGaussianBlur = {
+    radius: 4,
+  };
 }
 
 export namespace editor.state {
@@ -1379,9 +1391,17 @@ export namespace editor.api {
       node_id: NodeID,
       padding: grida.program.nodes.i.IPadding["padding"]
     ): void;
-    changeNodeFeDropShadow(node_id: NodeID, boxShadow?: cg.BoxShadow): void;
-    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeGaussianBlur): void;
-    changeNodeFeBackdropBlur(node_id: NodeID, effect?: cg.FeGaussianBlur): void;
+    changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
+    changeNodeFeDropShadows(node_id: NodeID, effect?: cg.FeDropShadow[]): void;
+    changeNodeFeInnerShadows(
+      node_id: NodeID,
+      effect?: cg.FeInnerShadow[]
+    ): void;
+    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeLayerBlur): void;
+    changeNodeFeBackdropBlur(
+      node_id: NodeID,
+      effect?: cg.IFeGaussianBlur
+    ): void;
     changeContainerNodeLayout(
       node_id: NodeID,
       layout: grida.program.nodes.i.IFlexContainer["layout"]

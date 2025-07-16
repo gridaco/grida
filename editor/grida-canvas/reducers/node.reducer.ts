@@ -265,20 +265,22 @@ const safe_properties: Partial<
       draft.strokeCap = value;
     },
   }),
-  feDropShadow: defineNodeProperty<"feDropShadow">({
-    assert: (node) => node.type === "container" || node.type === "component",
+  feDropShadows: defineNodeProperty<"feDropShadows">({
     apply: (draft, value, prev) => {
-      draft.feDropShadow = value;
+      draft.feDropShadows = value;
+    },
+  }),
+  feInnerShadows: defineNodeProperty<"feInnerShadows">({
+    apply: (draft, value, prev) => {
+      draft.feInnerShadows = value;
     },
   }),
   feBlur: defineNodeProperty<"feBlur">({
-    assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
       draft.feBlur = value;
     },
   }),
   feBackdropBlur: defineNodeProperty<"feBackdropBlur">({
-    assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
       draft.feBackdropBlur = value;
     },

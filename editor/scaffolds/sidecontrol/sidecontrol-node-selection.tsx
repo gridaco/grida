@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 
 import {
   SidebarMenuSectionContent,
   SidebarSection,
+  SidebarSectionHeaderActions,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
@@ -18,7 +19,6 @@ import { BorderControl } from "./controls/border";
 import { FillControl } from "./controls/fill";
 import { StringValueControl } from "./controls/string-value";
 import { PaddingControl } from "./controls/padding";
-import { FeShadowControl } from "./controls/fe-shadow";
 import { GapControl } from "./controls/gap";
 import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
 import { MainAxisAlignmentControl } from "./controls/main-axis-alignment";
@@ -56,6 +56,7 @@ import {
   Crosshair2Icon,
   LockClosedIcon,
   LockOpen1Icon,
+  PlusIcon,
 } from "@radix-ui/react-icons";
 import { supports } from "@/grida-canvas-utils/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
@@ -92,8 +93,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 import { dq } from "@/grida-canvas/query";
-import { FeBlurControl } from "./controls/fe-blur";
 import { StrokeAlignControl } from "./controls/stroke-align";
+import cg from "@grida/cg";
+import { editor } from "@/grida-canvas";
+import { FeControl } from "./controls/fe";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -727,7 +730,8 @@ function SelectedNodeProperties({
     border: node.border,
     //
     padding: node.padding,
-    feDropShadow: node.feDropShadow,
+    feDropShadow: node.feDropShadows,
+    feInnerShadow: node.feInnerShadows,
     feBlur: node.feBlur,
     feBackdropBlur: node.feBackdropBlur,
 
@@ -778,6 +782,7 @@ function SelectedNodeProperties({
     //
     padding,
     feDropShadow,
+    feInnerShadow,
     feBlur,
     feBackdropBlur,
     //
@@ -1150,34 +1155,7 @@ function SelectedNodeProperties({
             </SidebarMenuSectionContent>
           </SidebarSection>
         )}
-        <SidebarSection
-          hidden={!supports.boxShadow(node.type, { backend })}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Shadow</PropertyLineLabel>
-              <FeShadowControl
-                value={feDropShadow}
-                onValueChange={actions.feDropShadow}
-              />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Blur</PropertyLineLabel>
-              <FeBlurControl value={feBlur} onValueChange={actions.feBlur} />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Backdrop Blur</PropertyLineLabel>
-              <FeBlurControl
-                value={feBackdropBlur}
-                onValueChange={actions.feBackdropBlur}
-              />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+        <SectionEffects node_id={node_id} />
         <SidebarSection
           hidden={config.link === "off"}
           className="border-b pb-4"
@@ -1322,6 +1300,91 @@ function SectionDimension({ node_id }: { node_id: string }) {
           />
         </PropertyLine>
       </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function SectionEffects({ node_id }: { node_id: string }) {
+  const backend = useBackendState();
+  const instance = useCurrentEditor();
+  const { type, feDropShadow, feInnerShadow, feBlur, feBackdropBlur } =
+    useNodeState(node_id, (node) => ({
+      type: node.type,
+      feDropShadow: node.feDropShadows,
+      feInnerShadow: node.feInnerShadows,
+      feBlur: node.feBlur,
+      feBackdropBlur: node.feBackdropBlur,
+    }));
+
+  const actions = useNodeActions(node_id)!;
+
+  const effects = useMemo(() => {
+    const effects: cg.FilterEffect[] = [];
+    if (feDropShadow) {
+      effects.push(...feDropShadow);
+    }
+    if (feInnerShadow) {
+      effects.push(...feInnerShadow);
+    }
+    if (feBlur) {
+      effects.push(feBlur);
+    }
+    if (feBackdropBlur) {
+      effects.push(feBackdropBlur);
+    }
+    return effects;
+  }, [feDropShadow, feInnerShadow, feBlur, feBackdropBlur]);
+
+  const onAddEffect = useCallback(() => {
+    instance.changeNodeFilterEffects(node_id, [
+      ...effects,
+      {
+        type: "drop-shadow",
+        ...editor.config.DEFAULT_FE_SHADOW,
+      },
+    ]);
+  }, [effects, instance, node_id]);
+
+  const empty = effects.length === 0;
+
+  return (
+    <SidebarSection
+      hidden={!supports.feDropShadow(type, { backend })}
+      data-empty={empty}
+      className="border-b pb-4 [&[data-empty='true']]:pb-0"
+    >
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
+        <SidebarSectionHeaderActions>
+          <Button variant="ghost" size="xs" onClick={onAddEffect}>
+            <PlusIcon className="size-3" />
+          </Button>
+        </SidebarSectionHeaderActions>
+      </SidebarSectionHeaderItem>
+      {!empty && (
+        <SidebarMenuSectionContent className="space-y-2">
+          {effects.map((effect, index) => (
+            <PropertyLine key={index}>
+              <FeControl
+                value={effect}
+                onValueChange={(value) => {
+                  instance.changeNodeFilterEffects(node_id, [
+                    ...effects.slice(0, index),
+                    value,
+                    ...effects.slice(index + 1),
+                  ]);
+                }}
+                onRemove={() => {
+                  instance.changeNodeFilterEffects(node_id, [
+                    ...effects.slice(0, index),
+                    ...effects.slice(index + 1),
+                  ]);
+                }}
+              />
+            </PropertyLine>
+          ))}
+        </SidebarMenuSectionContent>
+      )}
     </SidebarSection>
   );
 }
