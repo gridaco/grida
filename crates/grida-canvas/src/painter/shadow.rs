@@ -5,28 +5,6 @@ use skia_safe::{
     Path,
 };
 
-fn path_with_spread(path: &Path, spread: f32) -> Path {
-    if spread == 0.0 {
-        return path.clone();
-    }
-    let bounds = path.bounds();
-    let width = bounds.width();
-    let height = bounds.height();
-    if width == 0.0 || height == 0.0 {
-        return path.clone();
-    }
-    let cx = bounds.left() + width / 2.0;
-    let cy = bounds.top() + height / 2.0;
-    let scale_x = (width + 2.0 * spread) / width;
-    let scale_y = (height + 2.0 * spread) / height;
-    let tx = cx * (1.0 - scale_x);
-    let ty = cy * (1.0 - scale_y);
-    let matrix = sk::Matrix::from_affine(&[scale_x, 0.0, 0.0, scale_y, tx, ty]);
-    let mut p = path.clone();
-    p.transform(&matrix);
-    p
-}
-
 /// Draw a drop shadow behind the given shape on the provided canvas.
 pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
     let sk::Color4f { r, g, b, a } = {
@@ -44,24 +22,29 @@ pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeSh
         (g * 255.0) as u8,
         (b * 255.0) as u8,
     );
-    let mut path = shape.to_path();
+    let path = shape.to_path();
     let spread = shadow.spread;
 
     if spread != 0.0 {
-        path = path_with_spread(&path, spread);
-
-        // manual shadow rendering for spread > 0
         let mut paint = Paint::default();
         paint.set_color(color);
         paint.set_anti_alias(true);
-        if let Some(mask) = MaskFilter::blur(BlurStyle::Normal, shadow.blur, None) {
-            paint.set_mask_filter(mask);
+
+        let mut filter = if spread > 0.0 {
+            image_filters::dilate((spread, spread), None, None)
+        } else {
+            image_filters::erode((-spread, -spread), None, None)
+        }
+        .unwrap();
+
+        if shadow.blur > 0.0 {
+            filter = image_filters::blur((shadow.blur, shadow.blur), None, filter, None).unwrap();
         }
 
-        canvas.save();
-        canvas.translate((shadow.dx, shadow.dy));
+        let filter = image_filters::offset((shadow.dx, shadow.dy), filter, None).unwrap();
+        paint.set_image_filter(filter);
+
         canvas.draw_path(&path, &paint);
-        canvas.restore();
     } else {
         // fast path using Skia's drop_shadow filter when no spread is applied
         let image_filter = image_filters::drop_shadow(
@@ -87,10 +70,7 @@ pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeS
     let crate::cg::types::Color(r, g, b, a) = shadow.color;
     let spread = shadow.spread;
 
-    let mut path = shape.to_path();
-    if spread != 0.0 {
-        path = path_with_spread(&path, -spread);
-    }
+    let path = shape.to_path();
 
     // Construct color matrix selecting and colorizing the inverse alpha
     #[rustfmt::skip]
@@ -111,8 +91,14 @@ pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeS
 
     cm.pre_concat(&invert);
 
-    let cf = image_filters::color_filter(color_filters::matrix(&cm, None), None, None).unwrap();
-    let blurred = image_filters::blur((shadow.blur, shadow.blur), None, cf, None).unwrap();
+    let mut filter =
+        image_filters::color_filter(color_filters::matrix(&cm, None), None, None).unwrap();
+    if spread > 0.0 {
+        filter = image_filters::dilate((spread, spread), filter, None).unwrap();
+    } else if spread < 0.0 {
+        filter = image_filters::erode((-spread, -spread), filter, None).unwrap();
+    }
+    let blurred = image_filters::blur((shadow.blur, shadow.blur), None, filter, None).unwrap();
     let offset = image_filters::offset((shadow.dx, shadow.dy), blurred, None).unwrap();
     let masked = image_filters::blend(BlendMode::DstIn, offset, None, None).unwrap();
     let inner_shadow = image_filters::merge([Some(masked)].into_iter(), None).unwrap();
