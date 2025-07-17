@@ -1,7 +1,6 @@
 use cg::cg::types::FeProgressiveBlur;
 use skia_safe::{
-    self as sk, image_filters, surfaces, BlendMode, Canvas, Color, Paint, Point, Rect, Shader,
-    TileMode,
+    self as sk, image_filters, surfaces, BlendMode, Color, Paint, Point, Rect, Shader, TileMode,
 };
 
 fn apply_progressive_blur(canvas: &sk::Canvas, base: &sk::Image, pb: &FeProgressiveBlur) {
@@ -108,7 +107,11 @@ fn main() {
 
     let image = surface.image_snapshot();
     let data = image
-        .encode_to_data(skia_safe::EncodedImageFormat::PNG)
+        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write("goldens/progressive_blur_backdrop.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        "goldens/progressive_blur_backdrop_multipass.png",
+        data.as_bytes(),
+    )
+    .unwrap();
 }

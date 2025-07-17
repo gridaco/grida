@@ -3,7 +3,6 @@ use cg::io::io_grida::parse;
 use cg::node::schema::*;
 use cg::window;
 use clap::Parser;
-use math2::transform::AffineTransform;
 use std::fs;
 
 #[derive(Parser)]

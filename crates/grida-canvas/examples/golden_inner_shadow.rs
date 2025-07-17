@@ -1,4 +1,4 @@
-use skia_safe::{color_filters, image_filters, ColorFilter, ColorMatrix};
+use skia_safe::{color_filters, image_filters, ColorMatrix};
 use skia_safe::{surfaces, BlendMode, Color, Paint, Rect};
 
 fn main() {
@@ -22,31 +22,20 @@ fn main() {
     let shadow_color = Color::from_argb(128, 0, 0, 0);
 
     // Construct color matrix to select and colorize inverse alpha
+    #[rustfmt::skip]
     let mut cm = ColorMatrix::new(
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        shadow_color.r() as f32 / 255.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        shadow_color.g() as f32 / 255.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        shadow_color.b() as f32 / 255.0,
-        0.0,
-        0.0,
-        0.0,
-        shadow_color.a() as f32 / 255.0,
-        0.0,
+        0.0, 0.0, 0.0, 0.0, shadow_color.r() as f32 / 255.0,
+        0.0, 0.0, 0.0, 0.0, shadow_color.g() as f32 / 255.0,
+        0.0, 0.0, 0.0, 0.0, shadow_color.b() as f32 / 255.0,
+        0.0, 0.0, 0.0, shadow_color.a() as f32 / 255.0, 0.0,
     );
+
+    #[rustfmt::skip]
     let invert = ColorMatrix::new(
-        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        -1.0, 1.0,
+        1.0, 0.0, 0.0, 0.0, 0.0, //
+        0.0, 1.0, 0.0, 0.0, 0.0, //
+        0.0, 0.0, 1.0, 0.0, 0.0, //
+        0.0, 0.0, 0.0, -1.0, 1.0,
     );
     cm.pre_concat(&invert);
 
@@ -68,7 +57,7 @@ fn main() {
     // Save result
     let image = surface.image_snapshot();
     let data = image
-        .encode_to_data(skia_safe::EncodedImageFormat::PNG)
+        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
     std::fs::write("goldens/inner_shadow.png", data.as_bytes()).unwrap();
 }

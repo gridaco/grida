@@ -587,7 +587,6 @@ impl Renderer {
 mod tests {
     use super::*;
     use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::Size};
-    use math2::transform::AffineTransform;
 
     #[test]
     fn picture_recorded_with_layer_bounds() {
