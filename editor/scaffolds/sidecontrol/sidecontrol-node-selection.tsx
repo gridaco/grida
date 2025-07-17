@@ -1349,10 +1349,16 @@ function SectionEffects({ node_id }: { node_id: string }) {
       effects.push(...feShadows);
     }
     if (feBlur) {
-      effects.push(feBlur);
+      effects.push({
+        type: "filter-blur",
+        blur: feBlur,
+      });
     }
     if (feBackdropBlur) {
-      effects.push(feBackdropBlur);
+      effects.push({
+        type: "backdrop-filter-blur",
+        blur: feBackdropBlur,
+      });
     }
     return effects;
   }, [feShadows, feBlur, feBackdropBlur]);

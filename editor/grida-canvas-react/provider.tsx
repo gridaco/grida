@@ -220,7 +220,7 @@ export function useNodeActions(node_id: string | undefined) {
       feShadows: (value?: cg.FeShadow[]) =>
         instance.changeNodeFeShadows(node_id, value),
       feBlur: (value?: cg.FeBlur) => instance.changeNodeFeBlur(node_id, value),
-      feBackdropBlur: (value?: cg.FeBackdropBlur) =>
+      feBackdropBlur: (value?: cg.FeBlur) =>
         instance.changeNodeFeBackdropBlur(node_id, value),
 
       // layout

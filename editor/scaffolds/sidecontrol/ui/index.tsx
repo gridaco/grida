@@ -195,8 +195,14 @@ export function PropertyEnumToggle<T extends string>({
         const value = typeof e === "string" ? e : e.value;
         const label = typeof e === "string" ? e : e.label;
         const icon = typeof e === "string" ? undefined : e.icon;
+        const disabled = typeof e === "string" ? false : e.disabled;
         return (
-          <ToggleGroupItem key={value} value={value} title={label}>
+          <ToggleGroupItem
+            key={value}
+            value={value}
+            title={label}
+            disabled={disabled}
+          >
             {icon}
           </ToggleGroupItem>
         );
@@ -236,11 +242,13 @@ export function PropertyEnumTabs<T extends string>({
           const label = typeof e === "string" ? e : e.label;
           const icon = typeof e === "string" ? undefined : e.icon;
           const hasIcon = typeof e === "string" ? false : !!e.icon;
+          const disabled = typeof e === "string" ? false : e.disabled;
           return (
             <TabsTrigger
               key={value}
               value={value}
               title={label}
+              disabled={disabled}
               className="text-xs p-0.5"
             >
               {hasIcon && icon && <>{icon}</>}

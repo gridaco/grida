@@ -1174,7 +1174,7 @@ export namespace grida.program.nodes {
 
     export interface IEffects {
       feBlur?: cg.FeBlur;
-      feBackdropBlur?: cg.FeBackdropBlur;
+      feBackdropBlur?: cg.FeBlur;
       feShadows?: cg.FeShadow[];
     }
 

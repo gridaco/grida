@@ -1421,10 +1421,12 @@ export class Editor
     node_id: editor.NodeID,
     effects?: cg.FilterEffect[]
   ): void {
-    const feBlur = effects?.find((effect) => effect.type === "filter-blur");
+    const feBlur = effects?.find(
+      (effect) => effect.type === "filter-blur"
+    )?.blur;
     const feBackdropBlur = effects?.find(
       (effect) => effect.type === "backdrop-filter-blur"
-    );
+    )?.blur;
     const feShadows = effects?.filter((effect) => effect.type === "shadow");
 
     const i: grida.program.nodes.i.IEffects = {
@@ -1456,10 +1458,7 @@ export class Editor
     });
   }
 
-  changeNodeFeBackdropBlur(
-    node_id: editor.NodeID,
-    effect?: cg.FeBackdropBlur
-  ): void {
+  changeNodeFeBackdropBlur(node_id: editor.NodeID, effect?: cg.FeBlur): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,

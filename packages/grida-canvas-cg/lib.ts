@@ -459,23 +459,27 @@ export namespace cg {
     radius2: number;
   }
 
-  // export type FeProgressiveBlur = IFeProgressiveBlur & {
-  //   type: "progressive-blur";
-  // };
+  export type FeProgressiveBlur = IFeProgressiveBlur & {
+    type: "progressive-blur";
+  };
 
-  export type FilterEffect = FeShadow | FeBlur | FeBackdropBlur;
+  export type FilterEffect = FeShadow | FeLayerBlur | FeBackdropBlur;
 
   export type FeShadow = IFeShadow & {
     type: "shadow";
     inset?: boolean;
   };
 
-  export type FeBlur = IFeGaussianBlur & {
+  export type FeBlur = FeGaussianBlur | FeProgressiveBlur;
+
+  export type FeLayerBlur = {
     type: "filter-blur";
+    blur: FeBlur;
   };
 
-  export type FeBackdropBlur = IFeGaussianBlur & {
+  export type FeBackdropBlur = {
     type: "backdrop-filter-blur";
+    blur: FeBlur;
   };
 
   /**

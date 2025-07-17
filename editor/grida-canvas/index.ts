@@ -181,8 +181,17 @@ export namespace editor.config {
     spread: 0,
   };
 
-  export const DEFAULT_FE_BLUR: cg.IFeGaussianBlur = {
+  export const DEFAULT_FE_GAUSSIAN_BLUR: cg.IFeGaussianBlur = {
     radius: 4,
+  };
+
+  export const DEFAULT_FE_PROGRESSIVE_BLUR: cg.IFeProgressiveBlur = {
+    x1: 0.5,
+    y1: 0,
+    x2: 0.5,
+    y2: 1,
+    radius: 0,
+    radius2: 4,
   };
 }
 

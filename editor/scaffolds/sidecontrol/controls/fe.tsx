@@ -29,6 +29,7 @@ import {
 import { RGBAColorControl } from "./color";
 import { editor } from "@/grida-canvas";
 import { Button } from "@/components/ui-editor/button";
+import { mergeDefinedProperties } from "./utils/merge";
 
 function getIcon(fe: cg.FilterEffect) {
   switch (fe.type) {
@@ -71,17 +72,20 @@ export function FeControl({
             value={value.type}
             onValueChange={(type) => {
               switch (type) {
-                case "filter-blur":
-                case "backdrop-filter-blur": {
+                case "shadow": {
                   onValueChange?.({
-                    ...editor.config.DEFAULT_FE_BLUR,
+                    ...editor.config.DEFAULT_FE_SHADOW,
                     type,
                   });
                   break;
                 }
-                case "shadow": {
+                case "filter-blur":
+                case "backdrop-filter-blur": {
                   onValueChange?.({
-                    ...editor.config.DEFAULT_FE_SHADOW,
+                    blur: {
+                      type: "blur",
+                      ...editor.config.DEFAULT_FE_GAUSSIAN_BLUR,
+                    },
                     type,
                   });
                   break;
@@ -113,9 +117,9 @@ export function FeControl({
           value={value}
           onValueChange={(properties) => {
             onValueChange?.({
-              ...value,
               ...properties,
-            });
+              type: value.type,
+            } as cg.FilterEffect);
           }}
         />
       </PopoverContent>
@@ -131,16 +135,95 @@ function FeProperties({
   onValueChange?: (value: Omit<cg.FilterEffect, "type">) => void;
 }) {
   switch (value?.type) {
-    case "backdrop-filter-blur":
-    case "filter-blur": {
+    case "filter-blur":
+    case "backdrop-filter-blur": {
       return (
-        <FeGaussianBlurProperties value={value} onValueChange={onValueChange} />
+        <FeBlurProperties
+          value={value.blur}
+          onValueChange={(b) => {
+            onValueChange?.({ ...value, blur: b });
+          }}
+        />
       );
     }
     case "shadow": {
       return <FeShadowProperties value={value} onValueChange={onValueChange} />;
     }
   }
+}
+
+function FeBlurProperties({
+  value,
+  onValueChange,
+}: {
+  value: cg.FeBlur;
+  onValueChange?: (value: cg.FeBlur) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <PropertyEnumTabs<cg.FeBlur["type"]>
+        enum={[
+          { label: "Normal", value: "blur" },
+          { label: "Progressive", value: "progressive-blur", disabled: true },
+        ]}
+        value={value.type}
+        onValueChange={(type) => {
+          switch (type) {
+            case "blur": {
+              onValueChange?.({
+                ...value,
+                type,
+              } as cg.FeGaussianBlur);
+            }
+            case "progressive-blur": {
+              const __v = value as Partial<cg.IFeProgressiveBlur>;
+              const v = mergeDefinedProperties<cg.FeProgressiveBlur>(
+                editor.config.DEFAULT_FE_PROGRESSIVE_BLUR,
+                __v as Partial<cg.IFeProgressiveBlur>,
+                { type: "progressive-blur" },
+                {
+                  x1: __v.x1 ?? undefined,
+                  y1: __v.y1 ?? undefined,
+                  x2: __v.x2 ?? undefined,
+                  y2: __v.y2 ?? undefined,
+                  radius: __v.radius,
+                  radius2: __v.radius2 ?? undefined,
+                }
+              );
+
+              onValueChange?.(v as cg.FeProgressiveBlur);
+            }
+          }
+        }}
+      />
+      {value.type === "blur" && (
+        <FeGaussianBlurProperties
+          value={value}
+          onValueChange={(b) => {
+            const fe: cg.FeGaussianBlur = {
+              type: "blur",
+              radius: b.radius,
+            };
+
+            onValueChange?.(fe);
+          }}
+        />
+      )}
+      {value.type === "progressive-blur" && (
+        <FeProgressiveBlurProperties
+          value={value}
+          onValueChange={(b) => {
+            const fe: cg.FeProgressiveBlur = {
+              type: "progressive-blur",
+              ...b,
+            };
+
+            onValueChange?.(fe);
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
 function FeGaussianBlurProperties({
@@ -158,6 +241,35 @@ function FeGaussianBlurProperties({
           mode="fixed"
           value={value?.radius}
           onValueCommit={(v) => onValueChange?.({ ...value, radius: v || 0 })}
+        />
+      </PropertyLine>
+    </div>
+  );
+}
+
+function FeProgressiveBlurProperties({
+  value,
+  onValueChange,
+}: {
+  value: cg.IFeProgressiveBlur;
+  onValueChange?: (value: cg.IFeProgressiveBlur) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <PropertyLine>
+        <PropertyLineLabel>Start</PropertyLineLabel>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value?.radius}
+          onValueCommit={(v) => onValueChange?.({ ...value, radius: v || 0 })}
+        />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabel>End</PropertyLineLabel>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value?.radius}
+          onValueCommit={(v) => onValueChange?.({ ...value, radius2: v || 0 })}
         />
       </PropertyLine>
     </div>
