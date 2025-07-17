@@ -75,7 +75,7 @@ export namespace css {
       //
       padding,
       //
-      feDropShadows,
+      feShadows,
       //
       layout,
       direction,
@@ -90,7 +90,7 @@ export namespace css {
     } = styles;
 
     // box-shadow - fallbacks from feDropShadow, first item.
-    const _fb_first_boxShadow = feDropShadows?.[0];
+    const _fb_first_boxShadow = feShadows?.[0];
 
     let result: React.CSSProperties = {
       //
@@ -119,12 +119,15 @@ export namespace css {
       padding: padding ? paddingToPaddingCSS(padding) : undefined,
       //
       boxShadow: _fb_first_boxShadow
-        ? boxShadowToCSS({
-            blur: _fb_first_boxShadow.blur,
-            color: _fb_first_boxShadow.color,
-            offset: [_fb_first_boxShadow.dx, _fb_first_boxShadow.dy],
-            spread: _fb_first_boxShadow.spread,
-          })
+        ? boxShadowToCSS(
+            {
+              blur: _fb_first_boxShadow.blur,
+              color: _fb_first_boxShadow.color,
+              offset: [_fb_first_boxShadow.dx, _fb_first_boxShadow.dy],
+              spread: _fb_first_boxShadow.spread,
+            },
+            _fb_first_boxShadow.inset
+          )
         : undefined,
       //
       cursor: cursor,
@@ -262,10 +265,10 @@ export namespace css {
     };
   }
 
-  function boxShadowToCSS(boxShadow: cg.BoxShadow): string {
+  function boxShadowToCSS(boxShadow: cg.BoxShadow, inset?: boolean): string {
     const { color, offset = [0, 0], blur = 0, spread = 0 } = boxShadow;
 
-    return `${offset[0]}px ${offset[1]}px ${blur}px ${spread}px ${toRGBAString(color)}`;
+    return `${inset ? "inset " : ""}${offset[0]}px ${offset[1]}px ${blur}px ${spread}px ${toRGBAString(color)}`;
   }
 
   export function toFillString(paint: cg.Paint): string {

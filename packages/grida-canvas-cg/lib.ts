@@ -413,7 +413,7 @@ export namespace cg {
    *
    * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow
    */
-  export type IFeShadow = {
+  export interface IFeShadow {
     /**
      * offset-x
      */
@@ -435,37 +435,47 @@ export namespace cg {
 
     color: RGBA8888;
     //
-  };
+  }
 
-  export type IFeGaussianBlur = {
+  export interface IFeGaussianBlur {
     /**
      * blur radius
      *
      * a.k.a. stdDeviation in SVG <feGaussianBlur>
      */
     radius: number;
+  }
+
+  export type FeGaussianBlur = IFeGaussianBlur & {
+    type: "blur";
   };
 
-  export type FilterEffect =
-    | FeDropShadow
-    | FeInnerShadow
-    | FeLayerBlur
-    | FeBackdropBlur;
+  export interface IFeProgressiveBlur {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    radius: number;
+    radius2: number;
+  }
 
-  export type FeDropShadow = IFeShadow & {
-    type: "drop-shadow";
+  // export type FeProgressiveBlur = IFeProgressiveBlur & {
+  //   type: "progressive-blur";
+  // };
+
+  export type FilterEffect = FeShadow | FeBlur | FeBackdropBlur;
+
+  export type FeShadow = IFeShadow & {
+    type: "shadow";
+    inset?: boolean;
   };
 
-  export type FeInnerShadow = IFeShadow & {
-    type: "inner-shadow";
-  };
-
-  export type FeLayerBlur = IFeGaussianBlur & {
-    type: "layer-blur";
+  export type FeBlur = IFeGaussianBlur & {
+    type: "filter-blur";
   };
 
   export type FeBackdropBlur = IFeGaussianBlur & {
-    type: "backdrop-blur";
+    type: "backdrop-filter-blur";
   };
 
   /**

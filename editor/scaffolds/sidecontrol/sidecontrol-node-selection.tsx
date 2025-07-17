@@ -1333,22 +1333,20 @@ function SectionStrokes({
 function SectionEffects({ node_id }: { node_id: string }) {
   const backend = useBackendState();
   const instance = useCurrentEditor();
-  const { type, feDropShadow, feInnerShadow, feBlur, feBackdropBlur } =
-    useNodeState(node_id, (node) => ({
+  const { type, feShadows, feBlur, feBackdropBlur } = useNodeState(
+    node_id,
+    (node) => ({
       type: node.type,
-      feDropShadow: node.feDropShadows,
-      feInnerShadow: node.feInnerShadows,
+      feShadows: node.feShadows,
       feBlur: node.feBlur,
       feBackdropBlur: node.feBackdropBlur,
-    }));
+    })
+  );
 
   const effects = useMemo(() => {
     const effects: cg.FilterEffect[] = [];
-    if (feDropShadow) {
-      effects.push(...feDropShadow);
-    }
-    if (feInnerShadow) {
-      effects.push(...feInnerShadow);
+    if (feShadows) {
+      effects.push(...feShadows);
     }
     if (feBlur) {
       effects.push(feBlur);
@@ -1357,13 +1355,13 @@ function SectionEffects({ node_id }: { node_id: string }) {
       effects.push(feBackdropBlur);
     }
     return effects;
-  }, [feDropShadow, feInnerShadow, feBlur, feBackdropBlur]);
+  }, [feShadows, feBlur, feBackdropBlur]);
 
   const onAddEffect = useCallback(() => {
     instance.changeNodeFilterEffects(node_id, [
       ...effects,
       {
-        type: "drop-shadow",
+        type: "shadow",
         ...editor.config.DEFAULT_FE_SHADOW,
       },
     ]);

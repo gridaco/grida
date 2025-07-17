@@ -13,7 +13,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { PropertyEnum, PropertyLine, PropertyLineLabel } from "../ui";
+import {
+  PropertyEnum,
+  PropertyEnumTabs,
+  PropertyLine,
+  PropertyLineLabel,
+} from "../ui";
 import InputPropertyNumber from "../ui/number";
 import {
   BoxIcon,
@@ -25,12 +30,20 @@ import { RGBAColorControl } from "./color";
 import { editor } from "@/grida-canvas";
 import { Button } from "@/components/ui-editor/button";
 
-const icons = {
-  "layer-blur": BoxIcon,
-  "backdrop-blur": BoxIcon,
-  "inner-shadow": ShadowInnerIcon,
-  "drop-shadow": ShadowOuterIcon,
-} as const;
+function getIcon(fe: cg.FilterEffect) {
+  switch (fe.type) {
+    case "filter-blur":
+    case "backdrop-filter-blur": {
+      return BoxIcon;
+    }
+    case "shadow": {
+      if (fe.inset) {
+        return ShadowInnerIcon;
+      }
+      return ShadowOuterIcon;
+    }
+  }
+}
 
 export function FeControl({
   value,
@@ -41,7 +54,7 @@ export function FeControl({
   onValueChange?: (value: cg.FilterEffect) => void;
   onRemove?: () => void;
 }) {
-  const Icon = icons[value.type];
+  const Icon = getIcon(value);
   return (
     <Popover>
       <div className="flex items-center w-full gap-2">
@@ -49,26 +62,24 @@ export function FeControl({
           <Icon />
         </PopoverTrigger>
         <div className="flex items-center flex-1/2">
-          <PropertyEnum
+          <PropertyEnum<cg.FilterEffect["type"]>
             enum={[
-              { label: "Layer Blur", value: "layer-blur" },
-              { label: "Backdrop Blur", value: "backdrop-blur" },
-              { label: "Inner Shadow", value: "inner-shadow" },
-              { label: "Drop Shadow", value: "drop-shadow" },
+              { label: "Layer Blur", value: "filter-blur" },
+              { label: "Backdrop Blur", value: "backdrop-filter-blur" },
+              { label: "Shadow", value: "shadow" },
             ]}
             value={value.type}
             onValueChange={(type) => {
               switch (type) {
-                case "backdrop-blur":
-                case "layer-blur": {
+                case "filter-blur":
+                case "backdrop-filter-blur": {
                   onValueChange?.({
                     ...editor.config.DEFAULT_FE_BLUR,
                     type,
                   });
                   break;
                 }
-                case "drop-shadow":
-                case "inner-shadow": {
+                case "shadow": {
                   onValueChange?.({
                     ...editor.config.DEFAULT_FE_SHADOW,
                     type,
@@ -120,22 +131,19 @@ function FeProperties({
   onValueChange?: (value: Omit<cg.FilterEffect, "type">) => void;
 }) {
   switch (value?.type) {
-    case "layer-blur": {
-      return <FeBlurProperties value={value} onValueChange={onValueChange} />;
+    case "backdrop-filter-blur":
+    case "filter-blur": {
+      return (
+        <FeGaussianBlurProperties value={value} onValueChange={onValueChange} />
+      );
     }
-    case "backdrop-blur": {
-      return <FeBlurProperties value={value} onValueChange={onValueChange} />;
-    }
-    case "inner-shadow": {
-      return <FeShadowProperties value={value} onValueChange={onValueChange} />;
-    }
-    case "drop-shadow": {
+    case "shadow": {
       return <FeShadowProperties value={value} onValueChange={onValueChange} />;
     }
   }
 }
 
-function FeBlurProperties({
+function FeGaussianBlurProperties({
   value,
   onValueChange,
 }: {
@@ -160,11 +168,23 @@ function FeShadowProperties({
   value,
   onValueChange,
 }: {
-  value: cg.IFeShadow;
-  onValueChange?: (value: cg.IFeShadow) => void;
+  value: Omit<cg.FeShadow, "type">;
+  onValueChange?: (value: Omit<cg.FeShadow, "type">) => void;
 }) {
   return (
     <div className="space-y-2">
+      <PropertyLine>
+        <PropertyEnumTabs<"inner-shadow" | "drop-shadow">
+          enum={[
+            { label: "Drop", value: "drop-shadow" },
+            { label: "Inner", value: "inner-shadow" },
+          ]}
+          value={value.inset ? "inner-shadow" : "drop-shadow"}
+          onValueChange={(v) => {
+            onValueChange?.({ ...value, inset: v === "inner-shadow" });
+          }}
+        />
+      </PropertyLine>
       <PropertyLine>
         <PropertyLineLabel>Preset</PropertyLineLabel>
         <Select
@@ -178,6 +198,7 @@ function FeShadowProperties({
               blur: preset.value.blur,
               spread: preset.value.spread,
               color: preset.value.color,
+              inset: false,
             });
           }}
         >
@@ -197,7 +218,7 @@ function FeShadowProperties({
         </Select>
       </PropertyLine>
       <PropertyLine>
-        <PropertyLineLabel>X</PropertyLineLabel>
+        <PropertyLineLabel>Offset X</PropertyLineLabel>
         <InputPropertyNumber
           mode="fixed"
           value={value.dx}
@@ -210,7 +231,7 @@ function FeShadowProperties({
         />
       </PropertyLine>
       <PropertyLine>
-        <PropertyLineLabel>Y</PropertyLineLabel>
+        <PropertyLineLabel>Offset Y</PropertyLineLabel>
         <InputPropertyNumber
           mode="fixed"
           value={value.dy}

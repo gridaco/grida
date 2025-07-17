@@ -89,6 +89,8 @@ pub struct JSONFeShadow {
     pub blur: f32,
     #[serde(default)]
     pub spread: f32,
+    #[serde(default)]
+    pub inset: bool,
 }
 
 impl From<JSONRGBA> for Color {
@@ -217,10 +219,8 @@ pub struct JSONUnknownNodeProperties {
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
     // effects
-    #[serde(rename = "feDropShadows")]
-    pub fe_drop_shadows: Option<Vec<JSONFeShadow>>,
-    #[serde(rename = "feInnerShadows")]
-    pub fe_inner_shadows: Option<Vec<JSONFeShadow>>,
+    #[serde(rename = "feShadows")]
+    pub fe_shadows: Option<Vec<JSONFeShadow>>,
     #[serde(rename = "feBlur")]
     pub fe_blur: Option<FeGaussianBlur>,
     #[serde(rename = "feBackdropBlur")]
@@ -433,8 +433,7 @@ impl From<JSONContainerNode> for ContainerNode {
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
             effects: merge_effects(
-                node.base.fe_drop_shadows,
-                node.base.fe_inner_shadows,
+                node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
@@ -476,8 +475,7 @@ impl From<JSONTextNode> for TextSpanNode {
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
             effects: merge_effects(
-                node.base.fe_drop_shadows,
-                node.base.fe_inner_shadows,
+                node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
@@ -508,8 +506,7 @@ impl From<JSONEllipseNode> for Node {
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
             effects: merge_effects(
-                node.base.fe_drop_shadows,
-                node.base.fe_inner_shadows,
+                node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
@@ -544,8 +541,7 @@ impl From<JSONRectangleNode> for Node {
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
             effects: merge_effects(
-                node.base.fe_drop_shadows,
-                node.base.fe_inner_shadows,
+                node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
@@ -580,8 +576,7 @@ impl From<JSONLegacyVectorNode> for Node {
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
             effects: merge_effects(
-                node.base.fe_drop_shadows,
-                node.base.fe_inner_shadows,
+                node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
@@ -611,8 +606,7 @@ impl From<JSONLineNode> for Node {
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
             effects: merge_effects(
-                node.base.fe_drop_shadows,
-                node.base.fe_inner_shadows,
+                node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
@@ -640,8 +634,7 @@ impl From<JSONPathNode> for Node {
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
             effects: merge_effects(
-                node.base.fe_drop_shadows,
-                node.base.fe_inner_shadows,
+                node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
@@ -723,8 +716,7 @@ where
 }
 
 fn merge_effects(
-    fe_drop_shadows: Option<Vec<JSONFeShadow>>,
-    fe_inner_shadows: Option<Vec<JSONFeShadow>>,
+    fe_shadows: Option<Vec<JSONFeShadow>>,
     fe_blur: Option<FeGaussianBlur>,
     fe_backdrop_blur: Option<FeGaussianBlur>,
 ) -> LayerEffects {
@@ -735,18 +727,17 @@ fn merge_effects(
     if let Some(filter_backdrop_blur) = fe_backdrop_blur {
         effects.backdrop_blur = Some(filter_backdrop_blur);
     }
-    if let Some(shadows) = fe_inner_shadows {
+    if let Some(shadows) = fe_shadows {
         for shadow in shadows {
-            effects
-                .shadows
-                .push(FilterShadowEffect::InnerShadow(shadow.into()));
-        }
-    }
-    if let Some(shadows) = fe_drop_shadows {
-        for shadow in shadows {
-            effects
-                .shadows
-                .push(FilterShadowEffect::DropShadow(shadow.into()));
+            if shadow.inset {
+                effects
+                    .shadows
+                    .push(FilterShadowEffect::InnerShadow(shadow.into()));
+            } else {
+                effects
+                    .shadows
+                    .push(FilterShadowEffect::DropShadow(shadow.into()));
+            }
         }
     }
     effects

@@ -1392,12 +1392,8 @@ export namespace editor.api {
       padding: grida.program.nodes.i.IPadding["padding"]
     ): void;
     changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
-    changeNodeFeDropShadows(node_id: NodeID, effect?: cg.FeDropShadow[]): void;
-    changeNodeFeInnerShadows(
-      node_id: NodeID,
-      effect?: cg.FeInnerShadow[]
-    ): void;
-    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeLayerBlur): void;
+    changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;
+    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeBlur): void;
     changeNodeFeBackdropBlur(
       node_id: NodeID,
       effect?: cg.IFeGaussianBlur

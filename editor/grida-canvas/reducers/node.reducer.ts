@@ -265,14 +265,9 @@ const safe_properties: Partial<
       draft.strokeCap = value;
     },
   }),
-  feDropShadows: defineNodeProperty<"feDropShadows">({
+  feShadows: defineNodeProperty<"feShadows">({
     apply: (draft, value, prev) => {
-      draft.feDropShadows = value;
-    },
-  }),
-  feInnerShadows: defineNodeProperty<"feInnerShadows">({
-    apply: (draft, value, prev) => {
-      draft.feInnerShadows = value;
+      draft.feShadows = value;
     },
   }),
   feBlur: defineNodeProperty<"feBlur">({

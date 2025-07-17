@@ -217,12 +217,9 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
       //   changeNodeStyle(node_id, "margin", value),
-      feDropShadows: (value?: cg.FeDropShadow[]) =>
-        instance.changeNodeFeDropShadows(node_id, value),
-      feInnerShadows: (value?: cg.FeInnerShadow[]) =>
-        instance.changeNodeFeInnerShadows(node_id, value),
-      feBlur: (value?: cg.FeLayerBlur) =>
-        instance.changeNodeFeBlur(node_id, value),
+      feShadows: (value?: cg.FeShadow[]) =>
+        instance.changeNodeFeShadows(node_id, value),
+      feBlur: (value?: cg.FeBlur) => instance.changeNodeFeBlur(node_id, value),
       feBackdropBlur: (value?: cg.FeBackdropBlur) =>
         instance.changeNodeFeBackdropBlur(node_id, value),
 
