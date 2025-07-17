@@ -396,6 +396,9 @@ pub enum FilterEffect {
     /// Layer blur filter
     LayerBlur(FeGaussianBlur),
 
+    /// Progressive blur filter: varying blur from start to end
+    ProgressiveBlur(FeProgressiveBlur),
+
     /// Background blur filter
     /// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
     BackdropBlur(FeGaussianBlur),

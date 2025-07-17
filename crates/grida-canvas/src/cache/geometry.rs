@@ -423,6 +423,11 @@ fn compute_render_bounds_from_effects(bounds: Rectangle, effects: &LayerEffects)
 fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -> Rectangle {
     match effect {
         FilterEffect::LayerBlur(blur) => inflate_rect(bounds, blur.radius),
+        FilterEffect::ProgressiveBlur(blur) => {
+            // Use the maximum radius to ensure the bounds cover the entire blur effect
+            let max_radius = blur.radius.max(blur.radius2);
+            inflate_rect(bounds, max_radius)
+        }
         FilterEffect::BackdropBlur(blur) => inflate_rect(bounds, blur.radius),
         FilterEffect::DropShadow(shadow) => {
             // Apply spread by inflating the bounds, then offset and blur

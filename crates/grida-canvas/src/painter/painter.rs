@@ -1,16 +1,18 @@
-use super::cvt;
-use super::geometry::*;
-use super::layer::{LayerList, PainterPictureLayer};
-use super::shadow;
 use crate::cache::geometry::GeometryCache;
 use crate::cache::{paragraph::ParagraphCache, vector_path::VectorPathCache};
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
+use crate::painter::{cvt, shadow};
+use crate::painter::geometry::*;
+use crate::painter::layer::{LayerList, PainterPictureLayer};
 use crate::runtime::repository::{FontRepository, ImageRepository};
 use crate::sk::mappings::ToSkPath;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
-use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
+use skia_safe::{
+    self as sk, canvas::SaveLayerRec, image_filters, textlayout, Paint as SkPaint, Path, Point, 
+    Shader, TileMode, BlendMode as SkBlendMode,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -77,13 +79,14 @@ impl<'a> Painter<'a> {
 
     /// If blend mode is not Normal, wrap drawing in a save_layer with blend mode; else draw directly.
     fn with_blendmode<F: FnOnce()>(&self, blend_mode: BlendMode, f: F) {
-        let canvas = self.canvas;
         if blend_mode != BlendMode::Normal {
+            let sk_blend_mode: SkBlendMode = blend_mode.into();
             let mut paint = SkPaint::default();
-            paint.set_blend_mode(blend_mode.into());
-            canvas.save_layer(&SaveLayerRec::default().paint(&paint));
+            paint.set_blend_mode(sk_blend_mode);
+            self.canvas
+                .save_layer(&SaveLayerRec::default().paint(&paint));
             f();
-            canvas.restore();
+            self.canvas.restore();
         } else {
             f();
         }
@@ -152,6 +155,78 @@ impl<'a> Painter<'a> {
         // We don't draw any content here—just pushing and popping the layer
         canvas.restore(); // pop the SaveLayer
         canvas.restore(); // pop the clip
+    }
+
+    /// Apply progressive blur using multipass technique with Skia's built-in blur filters.
+    /// This approach is GPU-accelerated and avoids pixel manipulation in Rust.
+    fn apply_progressive_blur<F: Fn()>(&self, pb: &FeProgressiveBlur, draw_content: F) {
+        let canvas = self.canvas;
+        
+        // First draw content normally to establish the base layer
+        draw_content();
+        
+        // Now apply the multipass progressive blur over the drawn content
+        let steps = 8;
+        
+        for i in 0..steps {
+            // Calculate blur radius for this step (exponential progression)
+            let mut radius = pb.radius * 2.0_f32.powi(i as i32);
+            if radius > pb.radius2 {
+                radius = pb.radius2;
+            }
+            
+            // Skip if radius is too small  
+            if radius <= 0.5 {
+                continue;
+            }
+            
+            // Create gradient mask for this step
+            let start = i as f32 * 0.125;
+            let fade_in_end = (start + 0.125).min(1.0);
+            let constant_end = (start + 0.25).min(1.0);
+            let fade_out_end = (start + 0.375).min(1.0);
+
+            let colors = [
+                sk::Color::from_argb(0, 0, 0, 0),     // transparent
+                sk::Color::from_argb(255, 0, 0, 0),   // opaque black
+                sk::Color::from_argb(255, 0, 0, 0),   // opaque black
+                sk::Color::from_argb(0, 0, 0, 0),     // transparent
+            ];
+            let positions = [start, fade_in_end, constant_end, fade_out_end];
+
+            // Create linear gradient shader for masking
+            let Some(mask_shader) = Shader::linear_gradient(
+                (Point::new(pb.x1, pb.y1), Point::new(pb.x2, pb.y2)),
+                &colors[..],
+                Some(&positions[..]),
+                TileMode::Clamp,
+                None,
+                None,
+            ) else {
+                continue;
+            };
+
+            // Create blur filter for this step
+            let Some(blur_filter) = image_filters::blur((radius, radius), None, None, None) else {
+                continue;
+            };
+
+            // Apply blur effect using save layer with backdrop filter
+            canvas.save_layer(&SaveLayerRec::default().backdrop(&blur_filter));
+            
+            // Apply gradient mask using DstIn blend mode
+            let mut mask_paint = SkPaint::default();
+            mask_paint.set_shader(mask_shader);
+            mask_paint.set_blend_mode(SkBlendMode::DstIn);
+            canvas.draw_paint(&mask_paint);
+            
+            canvas.restore();
+
+            // Stop if we've reached the maximum radius
+            if radius >= pb.radius2 {
+                break;
+            }
+        }
     }
 
     fn cached_path(&self, id: &NodeId, data: &str) -> Rc<Path> {
@@ -372,7 +447,10 @@ impl<'a> Painter<'a> {
             }
         };
 
-        if let Some(layer_blur) = effects.blur {
+        // Progressive blur takes precedence over regular blur if both are present
+        if let Some(progressive_blur) = &effects.progressive_blur {
+            self.apply_progressive_blur(progressive_blur, apply_effects);
+        } else if let Some(layer_blur) = effects.blur {
             self.with_layer_blur(layer_blur.radius, apply_effects);
         } else {
             apply_effects();

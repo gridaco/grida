@@ -1,104 +1,87 @@
-use cg::cg::types::FeProgressiveBlur;
-use skia_safe::{
-    self as sk, image_filters, surfaces, BlendMode, Color, Paint, Point, Rect, Shader, TileMode,
+use cg::cg::types::*;
+use cg::node::factory::NodeFactory;
+use cg::node::repository::NodeRepository;
+use cg::node::schema::*;
+use cg::window;
+use math2::transform::AffineTransform;
+
+static BLUR_EFFECT: FeProgressiveBlur = FeProgressiveBlur {
+    x1: 0.0,
+    y1: 0.0,
+    x2: 400.0,
+    y2: 400.0,
+    radius: 0.0,
+    radius2: 50.0,
 };
 
-fn apply_progressive_blur(canvas: &sk::Canvas, base: &sk::Image, pb: &FeProgressiveBlur) {
-    let steps = 8;
-    for i in 0..steps {
-        let mut radius = pb.radius * 2.0_f32.powi(i as i32);
-        if radius > pb.radius2 {
-            radius = pb.radius2;
-        }
-        let start = i as f32 * 0.125;
-        let fade_in_end = (start + 0.125).min(1.0);
-        let constant_end = (start + 0.25).min(1.0);
-        let fade_out_end = (start + 0.375).min(1.0);
+async fn demo_progressive_blur_multipass() -> Scene {
+    let nf = NodeFactory::new();
+    let mut repository = NodeRepository::new();
 
-        let colors = [
-            Color::from_argb(0, 0, 0, 0),
-            Color::from_argb(255, 0, 0, 0),
-            Color::from_argb(255, 0, 0, 0),
-            Color::from_argb(0, 0, 0, 0),
-        ];
-        let positions = [start, fade_in_end, constant_end, fade_out_end];
+    // Create a root container
+    let mut root_container = nf.create_container_node();
+    root_container.size = Size {
+        width: 400.0,
+        height: 400.0,
+    };
+    root_container.base.name = "Root Container".to_string();
 
-        let shader = Shader::linear_gradient(
-            (Point::new(pb.x1, pb.y1), Point::new(pb.x2, pb.y2)),
-            &colors[..],
-            Some(&positions[..]),
-            TileMode::Clamp,
-            None,
-            None,
-        )
-        .unwrap();
+    // Create some shapes to demonstrate the progressive blur effect
+    let mut circle = nf.create_ellipse_node();
+    circle.base.name = "Blurred Circle".to_string();
+    circle.transform = AffineTransform::new(50.0, 50.0, 0.0);
+    circle.size = Size {
+        width: 300.0,
+        height: 300.0,
+    };
+    circle.set_fill(Paint::RadialGradient(RadialGradientPaint {
+        transform: AffineTransform::identity(),
+        stops: vec![
+            GradientStop {
+                offset: 0.0,
+                color: Color(255, 100, 100, 255), // Red center
+            },
+            GradientStop {
+                offset: 0.5,
+                color: Color(100, 255, 100, 255), // Green middle
+            },
+            GradientStop {
+                offset: 1.0,
+                color: Color(100, 100, 255, 255), // Blue edge
+            },
+        ],
+        opacity: 1.0,
+    }));
+    
+    // Apply progressive blur effect
+    circle.effects = LayerEffects::from_array(vec![
+        FilterEffect::ProgressiveBlur(BLUR_EFFECT)
+    ]);
 
-        let mut blur_paint = Paint::default();
-        blur_paint
-            .set_image_filter(image_filters::blur((radius, radius), None, None, None).unwrap());
+    // Add nodes to repository
+    let circle_id = circle.base.id.clone();
+    let root_id = root_container.base.id.clone();
 
-        canvas.save_layer(&Default::default());
-        canvas.draw_image(base, (0, 0), Some(&blur_paint));
+    repository.insert(Node::Ellipse(circle));
 
-        let mut mask_paint = Paint::default();
-        mask_paint.set_shader(shader);
-        mask_paint.set_blend_mode(BlendMode::DstIn);
-        canvas.draw_paint(&mask_paint);
-        canvas.restore();
+    // Set up container hierarchy
+    root_container.children = vec![circle_id];
+    repository.insert(Node::Container(root_container));
 
-        if radius >= pb.radius2 {
-            break;
-        }
+    Scene {
+        repository,
+        entry: root_id,
+        background_color: Some(Color(240, 240, 240, 255)),
     }
 }
 
-fn main() {
-    let (width, height) = (400, 400);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
-    {
-        let canvas = surface.canvas();
-        canvas.clear(Color::WHITE);
-
-        // draw background gradient
-        let bg_shader = Shader::linear_gradient(
-            (Point::new(0.0, 0.0), Point::new(0.0, height as f32)),
-            &[Color::RED, Color::BLUE][..],
-            Some(&[0.0, 1.0][..]),
-            TileMode::Clamp,
-            None,
-            None,
-        )
-        .unwrap();
-        let mut bg_paint = Paint::default();
-        bg_paint.set_shader(bg_shader);
-        canvas.draw_rect(Rect::from_wh(width as f32, height as f32), &bg_paint);
-
-        // some foreground rectangle
-        let mut fg_paint = Paint::default();
-        fg_paint.set_color(Color::from_argb(200, 255, 255, 255));
-        canvas.draw_rect(Rect::from_xywh(50.0, 50.0, 300.0, 300.0), &fg_paint);
-    }
-
-    let base_image = surface.image_snapshot();
-    {
-        let canvas = surface.canvas();
-        apply_progressive_blur(
-            canvas,
-            &base_image,
-            &FeProgressiveBlur {
-                x1: 0.0,
-                y1: 0.0,
-                x2: 0.0,
-                y2: height as f32,
-                radius: 0.5,
-                radius2: 64.0,
-            },
-        );
-    }
-
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write("goldens/progressive_blur_multipass.png", data.as_bytes()).unwrap();
+#[tokio::main]
+async fn main() {
+    let scene = demo_progressive_blur_multipass().await;
+    
+    window::run_with_scene(
+        scene,
+        "Progressive Blur Multipass Example".to_string(),
+    )
+    .await;
 }

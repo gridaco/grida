@@ -39,6 +39,8 @@ pub struct LayerEffects {
     /// single layer blur is supported per layer
     /// layer blur is applied after all other effects
     pub blur: Option<FeGaussianBlur>,
+    /// single progressive blur is supported per layer
+    pub progressive_blur: Option<FeProgressiveBlur>,
     /// single backdrop blur is supported per layer
     pub backdrop_blur: Option<FeGaussianBlur>,
     /// multiple shadows are supported per layer (drop shadow, inner shadow)
@@ -51,6 +53,7 @@ impl LayerEffects {
             blur: None,
             backdrop_blur: None,
             shadows: vec![],
+            progressive_blur: None,
         }
     }
 
@@ -61,6 +64,7 @@ impl LayerEffects {
         for effect in effects {
             match effect {
                 FilterEffect::LayerBlur(blur) => layer_effects.blur = Some(blur),
+                FilterEffect::ProgressiveBlur(blur) => layer_effects.progressive_blur = Some(blur),
                 FilterEffect::BackdropBlur(blur) => layer_effects.backdrop_blur = Some(blur),
                 FilterEffect::DropShadow(shadow) => layer_effects
                     .shadows
