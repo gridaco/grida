@@ -95,7 +95,7 @@ pub struct JSONFeShadow {
 
 impl From<JSONRGBA> for Color {
     fn from(color: JSONRGBA) -> Self {
-        Color(color.r, color.g, color.b, (color.a * 255.0) as u8)
+        Color(color.r, color.g, color.b, (color.a * 255.0).round() as u8)
     }
 }
 
@@ -701,10 +701,11 @@ where
                         .map(|v| v.as_f64().unwrap_or(0.0) as f32)
                         .collect();
                     Ok(Some(RectangularCornerRadius {
+                        /* top-left | top-right | bottom-right | bottom-left */
                         tl: values[0],
                         tr: values[1],
-                        bl: values[2],
-                        br: values[3],
+                        br: values[2],
+                        bl: values[3],
                     }))
                 } else {
                     Ok(None)
