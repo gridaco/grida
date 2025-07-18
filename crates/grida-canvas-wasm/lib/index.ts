@@ -1,5 +1,20 @@
 import createGridaCanvas from "./bin/grida-canvas-wasm";
-import { GridaCanvasInitOptions } from "./api";
+import { version } from "../package.json";
+
+export interface GridaCanvasModuleInitOptions {
+  /**
+   * This callback will be invoked when the loader needs to fetch a file (e.g.
+   * the blob of WASM code). The correct url prefix should be applied.
+   * @param file - the name of the file that is about to be loaded.
+   *
+   * @example
+   * ```ts
+   * locateFile: (file) => `https://unpkg.com/@grida/canvas-wasm@$latest/bin/${file}`,
+   * locateFile: (file) => `custom-binary-path/${file}`,
+   * ```
+   */
+  locateFile(file: string, version: string): string;
+}
 
 type Transform2D = [[number, number, number], [number, number, number]];
 type Rectangle = {
@@ -23,13 +38,25 @@ type ExportAsImage = {
 };
 
 export default async function init(
-  opts?: GridaCanvasInitOptions
+  opts?: GridaCanvasModuleInitOptions
 ): Promise<ApplicationFactory> {
-  const bindings = await createGridaCanvas({ locateFile: opts?.locateFile });
+  const bindings = await createGridaCanvas({
+    locateFile: opts?.locateFile
+      ? (file, __scriptDirectory) => opts?.locateFile(file, version)
+      : undefined,
+  });
 
   return new ApplicationFactory(
     bindings as createGridaCanvas.GridaCanvasWasmBindings
   );
+}
+
+interface CreateWebGLCanvasSurfaceOptions {
+  /**
+   * when true, built-in fonts will be used for text rendering, even if the font family and style does not match.
+   * @default true
+   */
+  fontFallback?: boolean;
 }
 
 class ApplicationFactory {
@@ -39,7 +66,10 @@ class ApplicationFactory {
     this.module = module;
   }
 
-  createWebGLCanvasSurface(canvas: HTMLCanvasElement) {
+  createWebGLCanvasSurface(
+    canvas: HTMLCanvasElement,
+    options: CreateWebGLCanvasSurfaceOptions = { fontFallback: true }
+  ) {
     const context = canvas.getContext("webgl2", {
       antialias: true,
       depth: true,
@@ -55,7 +85,11 @@ class ApplicationFactory {
       majorVersion: 2,
     });
     this.module.GL.makeContextCurrent(handle);
-    const ptr = this.module._init(canvas.width, canvas.height);
+    const ptr = this.module._init(
+      canvas.width,
+      canvas.height,
+      options.fontFallback
+    );
     const _ = new Grida2D(this.module, ptr);
     _.resize(canvas.width, canvas.height);
 

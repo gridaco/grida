@@ -13,6 +13,7 @@ import grida from "@grida/schema";
 import { cn } from "@/components/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
 import type { TMixed } from "../controls/utils/types";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function PropertyLine({
   children,
@@ -106,7 +107,7 @@ export function PropertyTextarea({
   );
 }
 
-type EnumItem<T extends string> =
+export type EnumItem<T extends string> =
   | T
   | {
       icon?: React.ReactNode;
@@ -114,6 +115,20 @@ type EnumItem<T extends string> =
       value: T;
       disabled?: boolean;
     };
+
+export function enumLabel<T extends string>(e: EnumItem<T>) {
+  if (typeof e === "string") return e;
+  return e.label ?? e.value;
+}
+
+export function enumValue<T extends string>(e: EnumItem<T>) {
+  if (typeof e === "string") return e;
+  return e.value;
+}
+
+export function enumEq<T extends string>(a: EnumItem<T>, b: EnumItem<T>) {
+  return enumValue(a) === enumValue(b);
+}
 
 export function PropertyEnum<T extends string>({
   enum: enums,
@@ -180,12 +195,68 @@ export function PropertyEnumToggle<T extends string>({
         const value = typeof e === "string" ? e : e.value;
         const label = typeof e === "string" ? e : e.label;
         const icon = typeof e === "string" ? undefined : e.icon;
+        const disabled = typeof e === "string" ? false : e.disabled;
         return (
-          <ToggleGroupItem key={value} value={value} title={label}>
+          <ToggleGroupItem
+            key={value}
+            value={value}
+            title={label}
+            disabled={disabled}
+          >
             {icon}
           </ToggleGroupItem>
         );
       })}
     </ToggleGroup>
+  );
+}
+
+export function PropertyEnumTabs<T extends string>({
+  enum: enums,
+  value,
+  onValueChange,
+  ...props
+}: Omit<
+  React.ComponentProps<typeof Tabs>,
+  "value" | "defaultValue" | "type" | "onValueChange"
+> & {
+  enum: EnumItem<T>[];
+  value?: TMixed<T>;
+  onValueChange?: (value: T) => void;
+}) {
+  const mixed = value === grida.mixed;
+
+  return (
+    <Tabs
+      value={mixed ? undefined : value}
+      {...props}
+      onValueChange={(v) => {
+        if (!v) return;
+        onValueChange?.(v as T);
+      }}
+      className="w-full"
+    >
+      <TabsList className="w-full h-7 p-0.5">
+        {enums.map((e) => {
+          const value = typeof e === "string" ? e : e.value;
+          const label = typeof e === "string" ? e : e.label;
+          const icon = typeof e === "string" ? undefined : e.icon;
+          const hasIcon = typeof e === "string" ? false : !!e.icon;
+          const disabled = typeof e === "string" ? false : e.disabled;
+          return (
+            <TabsTrigger
+              key={value}
+              value={value}
+              title={label}
+              disabled={disabled}
+              className="text-xs p-0.5"
+            >
+              {hasIcon && icon && <>{icon}</>}
+              {label ?? value}
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
+    </Tabs>
   );
 }

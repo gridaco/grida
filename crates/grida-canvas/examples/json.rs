@@ -1,8 +1,8 @@
-use cg::io::io_json::parse;
+use cg::cg::types::*;
+use cg::io::io_grida::parse;
 use cg::node::schema::*;
 use cg::window;
 use clap::Parser;
-use math2::transform::AffineTransform;
 use std::fs;
 
 #[derive(Parser)]
@@ -31,7 +31,6 @@ async fn load_scene_from_file(file_path: &str) -> Scene {
         nodes: nodes.into_iter().map(|(k, v)| (k, v.into())).collect(),
         id: scene_id,
         name: scene.name.clone(),
-        transform: AffineTransform::identity(),
         children: scene.children.clone(),
         background_color: Some(Color(230, 230, 230, 255)),
     }

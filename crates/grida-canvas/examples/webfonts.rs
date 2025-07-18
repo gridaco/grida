@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::helpers::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
@@ -140,7 +141,6 @@ async fn demo_webfonts() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Webfonts Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

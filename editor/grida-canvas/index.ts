@@ -15,6 +15,8 @@ import grida from "@grida/schema";
 export { type Action };
 
 export namespace editor {
+  export type EditorContentRenderingBackend = "dom" | "canvas";
+
   /**
    * Creates a throttled function that only invokes the provided function at most once per every `limit` milliseconds.
    * When `options.trailing` is true, the function will be called one more time after the limit period to ensure the last change is processed.
@@ -169,6 +171,27 @@ export namespace editor.config {
     size: [4, 4],
     spacing: 0,
     opacity: 1,
+  };
+
+  export const DEFAULT_FE_SHADOW: cg.IFeShadow = {
+    color: { r: 0, g: 0, b: 0, a: 0.25 },
+    dx: 0,
+    dy: 4,
+    blur: 4,
+    spread: 0,
+  };
+
+  export const DEFAULT_FE_GAUSSIAN_BLUR: cg.IFeGaussianBlur = {
+    radius: 4,
+  };
+
+  export const DEFAULT_FE_PROGRESSIVE_BLUR: cg.IFeProgressiveBlur = {
+    x1: 0.5,
+    y1: 0,
+    x2: 0.5,
+    y2: 1,
+    radius: 0,
+    radius2: 4,
   };
 }
 
@@ -1342,8 +1365,10 @@ export namespace editor.api {
       strokeWidth: editor.api.NumberChange
     ): void;
     changeNodeStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodeStrokeAlign(node_id: NodeID, strokeAlign: cg.StrokeAlign): void;
     changeNodeFit(node_id: NodeID, fit: cg.BoxFit): void;
     changeNodeOpacity(node_id: NodeID, opacity: editor.api.NumberChange): void;
+    changeNodeBlendMode(node_id: NodeID, blendMode: cg.BlendMode): void;
     changeNodeRotation(
       node_id: NodeID,
       rotation: editor.api.NumberChange
@@ -1375,7 +1400,13 @@ export namespace editor.api {
       node_id: NodeID,
       padding: grida.program.nodes.i.IPadding["padding"]
     ): void;
-    changeNodeBoxShadow(node_id: NodeID, boxShadow?: cg.BoxShadow): void;
+    changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
+    changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;
+    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeBlur): void;
+    changeNodeFeBackdropBlur(
+      node_id: NodeID,
+      effect?: cg.IFeGaussianBlur
+    ): void;
     changeContainerNodeLayout(
       node_id: NodeID,
       layout: grida.program.nodes.i.IFlexContainer["layout"]

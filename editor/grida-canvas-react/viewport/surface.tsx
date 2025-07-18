@@ -3,6 +3,7 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
+  useBackendState,
   useBrushState,
   useClipboardSync,
   useCurrentSceneState,
@@ -908,6 +909,7 @@ function NodeOverlay({
   borderWidth?: number;
 }) {
   const { scaleX, scaleY } = useTransformState();
+  const backend = useBackendState();
 
   const data = useSingleSelection(node_id);
 
@@ -963,8 +965,8 @@ function NodeOverlay({
                 )}
               </>
             )}
-            {supports.cornerRadius(node.type) &&
-              !supports.children(node.type) && (
+            {supports.cornerRadius(node.type, { backend }) &&
+              !supports.children(node.type, { backend }) && (
                 <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
               )}
             <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />

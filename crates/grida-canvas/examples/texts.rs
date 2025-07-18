@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -153,7 +154,6 @@ async fn demo_texts() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Text Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

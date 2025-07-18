@@ -29,8 +29,18 @@ pub unsafe fn __str_from_ptr_len(ptr: *const u8, len: usize) -> Option<String> {
 }
 
 #[no_mangle]
-pub extern "C" fn init(width: i32, height: i32) -> Box<EmscriptenApplication> {
-    Box::new(EmscriptenApplication::new(width, height))
+pub extern "C" fn init(
+    width: i32,
+    height: i32,
+    cfg_font_fallback: bool,
+) -> Box<EmscriptenApplication> {
+    Box::new(EmscriptenApplication::new(
+        width,
+        height,
+        cg::runtime::scene::RendererOptions {
+            font_fallback: cfg_font_fallback,
+        },
+    ))
 }
 
 #[no_mangle]
@@ -228,18 +238,18 @@ pub unsafe extern "C" fn export_node_as(
     if let Some(exported) = app.export_node_as(&id, fmt) {
         let data = exported.data();
         let data_len = data.len();
-        
+
         // Allocate memory for: [4 bytes for length] + [actual data]
         let total_size = 4 + data_len;
         let out = allocate(total_size) as *mut u8;
-        
+
         // Write the length as first 4 bytes (little-endian u32)
         let len_bytes = (data_len as u32).to_le_bytes();
         std::ptr::copy_nonoverlapping(len_bytes.as_ptr(), out, 4);
-        
+
         // Write the actual data after the length
         std::ptr::copy_nonoverlapping(data.as_ptr(), out.add(4), data_len);
-        
+
         return out;
     }
 
@@ -322,4 +332,3 @@ fn main() {}
 
 #[cfg(target_arch = "wasm32")]
 fn main() {}
-

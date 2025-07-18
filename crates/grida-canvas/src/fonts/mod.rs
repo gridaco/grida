@@ -1,2 +1,2 @@
-pub mod allerta;
+pub mod geist;
 pub mod geistmono;

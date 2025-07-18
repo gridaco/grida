@@ -43,14 +43,13 @@ export namespace css {
       Partial<grida.program.nodes.i.IPositioning> &
       Partial<grida.program.nodes.i.ICSSDimension> &
       Partial<grida.program.nodes.i.IFill<cg.Paint>> &
-      Partial<grida.program.nodes.i.IBoxShadow> &
       Partial<grida.program.nodes.i.ICSSBorder> &
       Partial<grida.program.nodes.i.IMouseCursor> &
       Partial<grida.program.nodes.i.IRectangleCorner> &
       Partial<grida.program.nodes.i.IBoxFit> &
       Partial<grida.program.nodes.i.IComputedTextNodeStyle> &
       Partial<grida.program.nodes.i.IPadding> &
-      Partial<grida.program.nodes.i.IBoxShadow> &
+      Partial<grida.program.nodes.i.IEffects> &
       Partial<grida.program.nodes.i.IFlexContainer>,
     config: {
       hasTextStyle: boolean;
@@ -76,7 +75,7 @@ export namespace css {
       //
       padding,
       //
-      boxShadow,
+      feShadows,
       //
       layout,
       direction,
@@ -89,6 +88,9 @@ export namespace css {
       //
       style,
     } = styles;
+
+    // box-shadow - fallbacks from feDropShadow, first item.
+    const _fb_first_boxShadow = feShadows?.[0];
 
     let result: React.CSSProperties = {
       //
@@ -116,7 +118,17 @@ export namespace css {
       //
       padding: padding ? paddingToPaddingCSS(padding) : undefined,
       //
-      boxShadow: boxShadow ? boxShadowToCSS(boxShadow) : undefined,
+      boxShadow: _fb_first_boxShadow
+        ? boxShadowToCSS(
+            {
+              blur: _fb_first_boxShadow.blur,
+              color: _fb_first_boxShadow.color,
+              offset: [_fb_first_boxShadow.dx, _fb_first_boxShadow.dy],
+              spread: _fb_first_boxShadow.spread,
+            },
+            _fb_first_boxShadow.inset
+          )
+        : undefined,
       //
       cursor: cursor,
       ...(border ? toReactCSSBorder(border) : {}),
@@ -253,10 +265,10 @@ export namespace css {
     };
   }
 
-  function boxShadowToCSS(boxShadow: cg.BoxShadow): string {
+  function boxShadowToCSS(boxShadow: cg.BoxShadow, inset?: boolean): string {
     const { color, offset = [0, 0], blur = 0, spread = 0 } = boxShadow;
 
-    return `${offset[0]}px ${offset[1]}px ${blur}px ${spread}px ${toRGBAString(color)}`;
+    return `${inset ? "inset " : ""}${offset[0]}px ${offset[1]}px ${blur}px ${spread}px ${toRGBAString(color)}`;
   }
 
   export function toFillString(paint: cg.Paint): string {

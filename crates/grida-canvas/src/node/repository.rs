@@ -30,7 +30,8 @@ impl NodeRepository {
             Node::RegularStarPolygon(n) => n.base.id.clone(),
             Node::Line(n) => n.base.id.clone(),
             Node::TextSpan(n) => n.base.id.clone(),
-            Node::Path(n) => n.base.id.clone(),
+            Node::SVGPath(n) => n.base.id.clone(),
+            Node::Vector(n) => n.base.id.clone(),
             Node::BooleanOperation(n) => n.base.id.clone(),
             Node::Image(n) => n.base.id.clone(),
         };

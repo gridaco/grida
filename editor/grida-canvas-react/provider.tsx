@@ -171,12 +171,16 @@ export function useNodeActions(node_id: string | undefined) {
       ) => instance.changeNodeStroke(node_id, value),
       strokeWidth: (change: editor.api.NumberChange) =>
         instance.changeNodeStrokeWidth(node_id, change),
+      strokeAlign: (value: cg.StrokeAlign) =>
+        instance.changeNodeStrokeAlign(node_id, value),
       strokeCap: (value: cg.StrokeCap) =>
         instance.changeNodeStrokeCap(node_id, value),
       fit: (value: cg.BoxFit) => instance.changeNodeFit(node_id, value),
       // stylable
       opacity: (change: editor.api.NumberChange) =>
         instance.changeNodeOpacity(node_id, change),
+      blendMode: (value: cg.BlendMode) =>
+        instance.changeNodeBlendMode(node_id, value),
       rotation: (change: editor.api.NumberChange) =>
         instance.changeNodeRotation(node_id, change),
       width: (value: grida.program.css.LengthPercentage | "auto") =>
@@ -213,8 +217,11 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
       //   changeNodeStyle(node_id, "margin", value),
-      boxShadow: (value?: cg.BoxShadow) =>
-        instance.changeNodeBoxShadow(node_id, value),
+      feShadows: (value?: cg.FeShadow[]) =>
+        instance.changeNodeFeShadows(node_id, value),
+      feBlur: (value?: cg.FeBlur) => instance.changeNodeFeBlur(node_id, value),
+      feBackdropBlur: (value?: cg.FeBlur) =>
+        instance.changeNodeFeBackdropBlur(node_id, value),
 
       // layout
       layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
@@ -750,6 +757,11 @@ export function useCurrentSceneState(): UseSceneState {
     return state.scene_id!;
   });
   return useSceneState(scene_id);
+}
+
+export function useBackendState() {
+  const editor = useCurrentEditor();
+  return editor.backend;
 }
 
 export function useTransformState() {

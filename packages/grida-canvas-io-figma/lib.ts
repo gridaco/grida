@@ -38,6 +38,15 @@ export namespace iofigma {
         WASHI_TAPE_6: undefined,
       };
 
+      export const strokeAlignMap: Record<
+        NonNullable<LineNode["strokeAlign"]>,
+        cg.StrokeAlign | undefined
+      > = {
+        CENTER: "center",
+        INSIDE: "inside",
+        OUTSIDE: "outside",
+      };
+
       export const textAlignMap: Record<
         NonNullable<TypeStyle["textAlignHorizontal"]>,
         cg.TextAlign | undefined
@@ -71,10 +80,7 @@ export namespace iofigma {
         NONZERO: "nonzero",
       };
 
-      export const blendModeMap: Record<
-        BlendMode,
-        grida.program.css.BlendMode
-      > = {
+      export const blendModeMap: Record<BlendMode, cg.BlendMode> = {
         PASS_THROUGH: "normal", // No blending, default behavior.
         NORMAL: "normal", // Matches the default blend mode.
         DARKEN: "darken",
@@ -257,7 +263,7 @@ export namespace iofigma {
       ): grida.program.nodes.Node | undefined {
         switch (node.type) {
           case "SECTION": {
-            const { fills, strokes, strokeWeight } = node;
+            const { fills, strokes, strokeWeight, strokeAlign } = node;
 
             const first_visible_fill = first_visible(fills);
             const first_visible_stroke = strokes
@@ -619,6 +625,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.blendModeMap[node.blendMode],
               zIndex: 0,
               type: "rectangle",
               //
@@ -630,7 +637,6 @@ export namespace iofigma {
               fill: first_visible_fill
                 ? paint(first_visible_fill, context.gradient_id_generator)
                 : undefined,
-              effects: [], // TODO:
               strokeWidth: strokeWeight ?? 0,
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
@@ -650,6 +656,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.blendModeMap[node.blendMode],
               zIndex: 0,
               type: "ellipse",
               //
@@ -665,13 +672,12 @@ export namespace iofigma {
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-              effects: [], // TODO:
             } satisfies grida.program.nodes.EllipseNode;
           }
           case "BOOLEAN_OPERATION": {
           }
           case "LINE": {
-            const { fills, strokeWeight, strokeCap } = node;
+            const { fills, strokeWeight, strokeCap, strokeAlign } = node;
             const first_visible_stroke = first_visible(node.strokes ?? []);
 
             return {
@@ -681,6 +687,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.blendModeMap[node.blendMode],
               zIndex: 0,
               type: "line",
               position: "absolute",
@@ -688,6 +695,9 @@ export namespace iofigma {
                 ? paint(first_visible_stroke, context.gradient_id_generator)
                 : undefined,
               strokeWidth: strokeWeight ?? 0,
+              strokeAlign: strokeAlign
+                ? (map.strokeAlignMap[strokeAlign] ?? "inside")
+                : "inside",
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
@@ -740,6 +750,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.blendModeMap[node.blendMode],
               zIndex: 0,
               type: "vector",
               //

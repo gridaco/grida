@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -33,10 +34,10 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(200, 200, 200, 255),
             opacity: 1.0,
-        });
+        }));
 
         let mut circle = nf.create_ellipse_node();
         circle.base.name = "Circle".to_string();
@@ -45,10 +46,10 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        circle.fill = Paint::Solid(SolidPaint {
+        circle.fills = vec![Paint::Solid(SolidPaint {
             color: Color(200, 200, 200, 255),
             opacity: 1.0,
-        });
+        })];
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -66,7 +67,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let mut bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNode {
             base: BaseNode {
                 id: "bool_union_1".to_string(),
                 name: "Union Operation".to_string(),
@@ -88,7 +89,7 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: LayerEffects::new_empty(),
         };
 
         // Collect IDs before moving nodes
@@ -116,10 +117,10 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        circle1.fill = Paint::Solid(SolidPaint {
+        circle1.fills = vec![Paint::Solid(SolidPaint {
             color: Color(200, 200, 200, 255),
             opacity: 1.0,
-        });
+        })];
 
         let mut circle2 = nf.create_ellipse_node();
         circle2.base.name = "Circle 2".to_string();
@@ -128,10 +129,10 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        circle2.fill = Paint::Solid(SolidPaint {
+        circle2.fills = vec![Paint::Solid(SolidPaint {
             color: Color(200, 200, 200, 255),
             opacity: 1.0,
-        });
+        })];
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -149,7 +150,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let mut bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNode {
             base: BaseNode {
                 id: "bool_intersection_1".to_string(),
                 name: "Intersection Operation".to_string(),
@@ -171,7 +172,7 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: LayerEffects::new_empty(),
         };
 
         // Collect IDs before moving nodes
@@ -199,10 +200,10 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        star.fill = Paint::Solid(SolidPaint {
+        star.fills = vec![Paint::Solid(SolidPaint {
             color: Color(200, 200, 200, 255),
             opacity: 1.0,
-        });
+        })];
 
         let mut rect = nf.create_rectangle_node();
         rect.base.name = "Rectangle".to_string();
@@ -211,10 +212,10 @@ async fn demo_booleans() -> Scene {
             width: base_size * 0.8,
             height: base_size * 0.8,
         };
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(200, 200, 200, 255),
             opacity: 1.0,
-        });
+        }));
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -232,7 +233,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let mut bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNode {
             base: BaseNode {
                 id: "bool_difference_1".to_string(),
                 name: "Difference Operation".to_string(),
@@ -254,7 +255,7 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: LayerEffects::new_empty(),
         };
 
         // Collect IDs before moving nodes
@@ -282,10 +283,10 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        square1.fill = Paint::Solid(SolidPaint {
+        square1.set_fill(Paint::Solid(SolidPaint {
             color: Color(200, 200, 200, 255),
             opacity: 1.0,
-        });
+        }));
 
         let mut square2 = nf.create_rectangle_node();
         square2.base.name = "Square 2".to_string();
@@ -294,10 +295,10 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        square2.fill = Paint::Solid(SolidPaint {
+        square2.set_fill(Paint::Solid(SolidPaint {
             color: Color(200, 200, 200, 255),
             opacity: 1.0,
-        });
+        }));
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -315,7 +316,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let mut bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNode {
             base: BaseNode {
                 id: "bool_xor_1".to_string(),
                 name: "XOR Operation".to_string(),
@@ -337,7 +338,7 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effect: None,
+            effects: LayerEffects::new_empty(),
         };
 
         // Collect IDs before moving nodes
@@ -361,7 +362,6 @@ async fn demo_booleans() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Boolean Operations Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

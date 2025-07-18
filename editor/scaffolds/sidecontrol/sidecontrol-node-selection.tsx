@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 
 import {
   SidebarMenuSectionContent,
   SidebarSection,
+  SidebarSectionHeaderActions,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
@@ -18,7 +19,6 @@ import { BorderControl } from "./controls/border";
 import { FillControl } from "./controls/fill";
 import { StringValueControl } from "./controls/string-value";
 import { PaddingControl } from "./controls/padding";
-import { BoxShadowControl } from "./controls/box-shadow";
 import { GapControl } from "./controls/gap";
 import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
 import { MainAxisAlignmentControl } from "./controls/main-axis-alignment";
@@ -45,6 +45,7 @@ import { LengthPercentageControl } from "./controls/length-percentage";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
+import { BlendModeDropdown, BlendModeSelect } from "./controls/blend-mode";
 import {
   useComputedNode,
   useCurrentEditor,
@@ -52,9 +53,11 @@ import {
   useEditorState,
 } from "@/grida-canvas-react";
 import {
+  BlendingModeIcon,
   Crosshair2Icon,
   LockClosedIcon,
   LockOpen1Icon,
+  PlusIcon,
 } from "@radix-ui/react-icons";
 import { supports } from "@/grida-canvas-utils/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
@@ -69,6 +72,7 @@ import {
   useCurrentSelection,
   useSelectionPaints,
   useSelectionState,
+  useBackendState,
 } from "@/grida-canvas-react/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
@@ -90,6 +94,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 import { dq } from "@/grida-canvas/query";
+import { StrokeAlignControl } from "./controls/stroke-align";
+import cg from "@grida/cg";
+import { editor } from "@/grida-canvas";
+import { FeControl } from "./controls/fe";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -169,7 +182,7 @@ function SelectionMixedProperties({
   config?: ControlsConfig;
 }) {
   const scene = useCurrentSceneState();
-
+  const backend = useBackendState();
   const {
     selection: ids,
     nodes,
@@ -233,9 +246,13 @@ function SelectionMixedProperties({
   const types = new Set(nodes.map((n) => n.type));
   const _types = Array.from(types);
 
-  const supports_corner_radius = _types.some((t) => supports.cornerRadius(t));
-  const supports_stroke = _types.some((t) => supports.stroke(t));
-  const supports_stroke_cap = _types.some((t) => supports.strokeCap(t));
+  const supports_corner_radius = _types.some((t) =>
+    supports.cornerRadius(t, { backend })
+  );
+  const supports_stroke = _types.some((t) => supports.stroke(t, { backend }));
+  const supports_stroke_cap = _types.some((t) =>
+    supports.strokeCap(t, { backend })
+  );
   const has_container = types.has("container");
   const has_flex_container =
     has_container && nodes.some((n) => "layout" in n && n.layout === "flex");
@@ -682,6 +699,7 @@ function SelectedNodeProperties({
     (state) => state.document.properties
   );
   const { debug } = useEditorFlagsState();
+  const backend = useBackendState();
 
   const actions = useNodeActions(node_id)!;
 
@@ -697,11 +715,10 @@ function SelectedNodeProperties({
     text: node.text,
     type: node.type,
     opacity: node.opacity,
+    blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
     fill: node.fill,
-    stroke: node.stroke,
-    strokeWidth: node.strokeWidth,
-    strokeCap: node.strokeCap,
+
     fit: node.fit,
     fontFamily: node.fontFamily,
     fontWeight: node.fontWeight,
@@ -716,7 +733,6 @@ function SelectedNodeProperties({
     border: node.border,
     //
     padding: node.padding,
-    boxShadow: node.boxShadow,
 
     //
     layout: node.layout,
@@ -743,11 +759,10 @@ function SelectedNodeProperties({
     component_id,
     type,
     opacity,
+    blendMode,
     cornerRadius,
     fill,
-    stroke,
-    strokeWidth,
-    strokeCap,
+
     fit,
     fontFamily,
     fontWeight,
@@ -762,8 +777,6 @@ function SelectedNodeProperties({
     border,
     //
     padding,
-    boxShadow,
-
     //
     layout,
     direction,
@@ -1049,6 +1062,12 @@ function SelectedNodeProperties({
         <SidebarSection hidden={!is_stylable} className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
+            <SidebarSectionHeaderActions>
+              <BlendModeDropdown
+                value={blendMode}
+                onValueChange={actions.blendMode}
+              />
+            </SidebarSectionHeaderActions>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
@@ -1058,7 +1077,7 @@ function SelectedNodeProperties({
                 onValueCommit={actions.opacity}
               />
             </PropertyLine>
-            {supports.cornerRadius(node.type) && (
+            {supports.cornerRadius(node.type, { backend }) && (
               <PropertyLine>
                 <PropertyLineLabel>Radius</PropertyLineLabel>
                 <CornerRadiusControl
@@ -1067,7 +1086,7 @@ function SelectedNodeProperties({
                 />
               </PropertyLine>
             )}
-            {supports.border(node.type) && (
+            {supports.border(node.type, { backend }) && (
               <PropertyLine>
                 <PropertyLineLabel>Border</PropertyLineLabel>
                 <BorderControl value={border} onValueChange={actions.border} />
@@ -1087,77 +1106,42 @@ function SelectedNodeProperties({
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        {supports.stroke(node.type) && (
-          <SidebarSection className="border-b pb-4">
+        {supports.stroke(node.type, { backend }) && (
+          <SectionStrokes
+            node_id={node_id}
+            config={{
+              stroke_cap: !supports.strokeCap(node.type, { backend })
+                ? "off"
+                : "on",
+            }}
+          />
+        )}
+        <SectionEffects node_id={node_id} />
+        {backend === "dom" && (
+          <SidebarSection
+            hidden={config.link === "off"}
+            className="border-b pb-4"
+          >
             <SidebarSectionHeaderItem>
-              <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
+              <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
             </SidebarSectionHeaderItem>
             <SidebarMenuSectionContent className="space-y-2">
               <PropertyLine>
-                <PropertyLineLabel>Color</PropertyLineLabel>
-                <PaintControl
-                  value={stroke}
-                  onValueChange={actions.stroke}
-                  removable
-                />
+                <PropertyLineLabel>Link To</PropertyLineLabel>
+                <HrefControl value={href} onValueChange={actions.href} />
               </PropertyLine>
-              <PropertyLine hidden={!stroke}>
-                <PropertyLineLabel>Width</PropertyLineLabel>
-                <StrokeWidthControl
-                  value={strokeWidth}
-                  onValueCommit={actions.strokeWidth}
-                />
-              </PropertyLine>
-              <PropertyLine hidden={!supports.strokeCap(node.type)}>
-                <PropertyLineLabel>Cap</PropertyLineLabel>
-                <StrokeCapControl
-                  value={strokeCap}
-                  onValueChange={actions.strokeCap}
-                />
-              </PropertyLine>
+              {href && (
+                <PropertyLine>
+                  <PropertyLineLabel>New Tab</PropertyLineLabel>
+                  <TargetBlankControl
+                    value={target}
+                    onValueChange={actions.target}
+                  />
+                </PropertyLine>
+              )}
             </SidebarMenuSectionContent>
           </SidebarSection>
         )}
-        <SidebarSection
-          hidden={!supports.boxShadow(type)}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Shadow</PropertyLineLabel>
-              <BoxShadowControl
-                value={boxShadow}
-                onValueChange={actions.boxShadow}
-              />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
-        <SidebarSection
-          hidden={config.link === "off"}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Link To</PropertyLineLabel>
-              <HrefControl value={href} onValueChange={actions.href} />
-            </PropertyLine>
-            {href && (
-              <PropertyLine>
-                <PropertyLineLabel>New Tab</PropertyLineLabel>
-                <TargetBlankControl
-                  value={target}
-                  onValueChange={actions.target}
-                />
-              </PropertyLine>
-            )}
-          </SidebarMenuSectionContent>
-        </SidebarSection>
         {/* #region selection colors */}
         <SelectionColors />
         {/* #endregion selection colors */}
@@ -1279,6 +1263,156 @@ function SectionDimension({ node_id }: { node_id: string }) {
           />
         </PropertyLine>
       </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function SectionStrokes({
+  node_id,
+  config = {
+    stroke_cap: "on",
+  },
+}: {
+  node_id: string;
+  config?: {
+    stroke_cap: "on" | "off";
+  };
+}) {
+  const { stroke, strokeWidth, strokeAlign, strokeCap } = useNodeState(
+    node_id,
+    (node) => ({
+      stroke: node.stroke,
+      strokeWidth: node.strokeWidth,
+      strokeAlign: node.strokeAlign,
+      strokeCap: node.strokeCap,
+    })
+  );
+
+  const actions = useNodeActions(node_id)!;
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Color</PropertyLineLabel>
+          <PaintControl
+            value={stroke}
+            onValueChange={actions.stroke}
+            removable
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Width</PropertyLineLabel>
+          <StrokeWidthControl
+            value={strokeWidth}
+            onValueCommit={actions.strokeWidth}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Align</PropertyLineLabel>
+          <StrokeAlignControl
+            value={strokeAlign}
+            onValueChange={actions.strokeAlign}
+          />
+        </PropertyLine>
+        <PropertyLine hidden={config.stroke_cap === "off"}>
+          <PropertyLineLabel>Cap</PropertyLineLabel>
+          <StrokeCapControl
+            value={strokeCap}
+            onValueChange={actions.strokeCap}
+          />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function SectionEffects({ node_id }: { node_id: string }) {
+  const backend = useBackendState();
+  const instance = useCurrentEditor();
+  const { type, feShadows, feBlur, feBackdropBlur } = useNodeState(
+    node_id,
+    (node) => ({
+      type: node.type,
+      feShadows: node.feShadows,
+      feBlur: node.feBlur,
+      feBackdropBlur: node.feBackdropBlur,
+    })
+  );
+
+  const effects = useMemo(() => {
+    const effects: cg.FilterEffect[] = [];
+    if (feShadows) {
+      effects.push(...feShadows);
+    }
+    if (feBlur) {
+      effects.push({
+        type: "filter-blur",
+        blur: feBlur,
+      });
+    }
+    if (feBackdropBlur) {
+      effects.push({
+        type: "backdrop-filter-blur",
+        blur: feBackdropBlur,
+      });
+    }
+    return effects;
+  }, [feShadows, feBlur, feBackdropBlur]);
+
+  const onAddEffect = useCallback(() => {
+    instance.changeNodeFilterEffects(node_id, [
+      ...effects,
+      {
+        type: "shadow",
+        ...editor.config.DEFAULT_FE_SHADOW,
+      },
+    ]);
+  }, [effects, instance, node_id]);
+
+  const empty = effects.length === 0;
+
+  return (
+    <SidebarSection
+      hidden={!supports.feDropShadow(type, { backend })}
+      data-empty={empty}
+      className="border-b pb-4 [&[data-empty='true']]:pb-0"
+    >
+      <SidebarSectionHeaderItem onClick={onAddEffect}>
+        <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
+        <SidebarSectionHeaderActions>
+          <Button variant="ghost" size="xs">
+            <PlusIcon className="size-3" />
+          </Button>
+        </SidebarSectionHeaderActions>
+      </SidebarSectionHeaderItem>
+      {!empty && (
+        <SidebarMenuSectionContent className="space-y-2">
+          {effects.map((effect, index) => (
+            <PropertyLine key={index}>
+              <FeControl
+                value={effect}
+                onValueChange={(value) => {
+                  instance.changeNodeFilterEffects(node_id, [
+                    ...effects.slice(0, index),
+                    value,
+                    ...effects.slice(index + 1),
+                  ]);
+                }}
+                onRemove={() => {
+                  instance.changeNodeFilterEffects(node_id, [
+                    ...effects.slice(0, index),
+                    ...effects.slice(index + 1),
+                  ]);
+                }}
+              />
+            </PropertyLine>
+          ))}
+        </SidebarMenuSectionContent>
+      )}
     </SidebarSection>
   );
 }

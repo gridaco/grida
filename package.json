@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "dev:packages": "turbo run dev --filter=./packages/*",
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",

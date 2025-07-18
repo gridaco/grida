@@ -1,8 +1,9 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;
-use cg::runtime::scene::{Backend, Renderer};
+use cg::runtime::scene::{Backend, Renderer, RendererOptions};
 use math2::{rect::Rectangle, transform::AffineTransform};
 use skia_safe::{pdf, Size as SkSize};
 use std::fs::File;
@@ -32,7 +33,7 @@ async fn demo_scene() -> Scene {
     title_text.text = "Grida Canvas PDF Demo".to_string();
     title_text.text_style = TextStyle {
         text_decoration: TextDecoration::None,
-        font_family: "Arial".to_string(),
+        font_family: "".to_string(),
         font_size: 36.0,
         font_weight: FontWeight::new(700),
         italic: false,
@@ -61,7 +62,7 @@ async fn demo_scene() -> Scene {
         "Rich content demonstration with shapes, gradients, and effects".to_string();
     subtitle_text.text_style = TextStyle {
         text_decoration: TextDecoration::None,
-        font_family: "Arial".to_string(),
+        font_family: "".to_string(),
         font_size: 18.0,
         font_weight: FontWeight::new(400),
         italic: true,
@@ -87,7 +88,7 @@ async fn demo_scene() -> Scene {
         height: 150.0,
     };
     rect_gradient.corner_radius = RectangularCornerRadius::all(20.0);
-    rect_gradient.fill = Paint::LinearGradient(LinearGradientPaint {
+    rect_gradient.set_fill(Paint::LinearGradient(LinearGradientPaint {
         transform: AffineTransform::from_rotatation(45.0),
         stops: vec![
             GradientStop {
@@ -104,18 +105,19 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
-    });
+    }));
     rect_gradient.stroke_width = 3.0;
-    rect_gradient.stroke = Paint::Solid(SolidPaint {
+    rect_gradient.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
-    });
-    rect_gradient.effect = Some(FilterEffect::DropShadow(FeDropShadow {
+    })];
+    rect_gradient.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 5.0,
         dy: 5.0,
         blur: 10.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 100),
-    }));
+    })]);
     all_node_ids.push(rect_gradient.base.id.clone());
     repo.insert(Node::Rectangle(rect_gradient));
 
@@ -127,7 +129,7 @@ async fn demo_scene() -> Scene {
         width: 180.0,
         height: 150.0,
     };
-    ellipse_radial.fill = Paint::RadialGradient(RadialGradientPaint {
+    ellipse_radial.fills = vec![Paint::RadialGradient(RadialGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -144,12 +146,12 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
-    });
+    })];
     ellipse_radial.stroke_width = 4.0;
-    ellipse_radial.stroke = Paint::Solid(SolidPaint {
+    ellipse_radial.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     all_node_ids.push(ellipse_radial.base.id.clone());
     repo.insert(Node::Ellipse(ellipse_radial));
 
@@ -168,21 +170,22 @@ async fn demo_scene() -> Scene {
     hexagon.base.name = "Hexagon".to_string();
     hexagon.transform = AffineTransform::new(550.0, 200.0, 0.0);
     hexagon.points = hexagon_points;
-    hexagon.fill = Paint::Solid(SolidPaint {
+    hexagon.fills = vec![Paint::Solid(SolidPaint {
         color: Color(128, 0, 255, 255),
         opacity: 1.0,
-    });
+    })];
     hexagon.stroke_width = 3.0;
-    hexagon.stroke = Paint::Solid(SolidPaint {
+    hexagon.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(255, 255, 255, 255),
         opacity: 1.0,
-    });
-    hexagon.effect = Some(FilterEffect::DropShadow(FeDropShadow {
+    })];
+    hexagon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 3.0,
         dy: 3.0,
         blur: 8.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 150),
-    }));
+    })]);
     all_node_ids.push(hexagon.base.id.clone());
     repo.insert(Node::Polygon(hexagon));
 
@@ -196,15 +199,15 @@ async fn demo_scene() -> Scene {
     };
     star.point_count = 5;
     star.inner_radius = 0.4;
-    star.fill = Paint::Solid(SolidPaint {
+    star.fills = vec![Paint::Solid(SolidPaint {
         color: Color(255, 215, 0, 255), // Gold
         opacity: 1.0,
-    });
+    })];
     star.stroke_width = 2.0;
-    star.stroke = Paint::Solid(SolidPaint {
+    star.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(139, 69, 19, 255), // Brown
         opacity: 1.0,
-    });
+    })];
     all_node_ids.push(star.base.id.clone());
     repo.insert(Node::RegularStarPolygon(star));
 
@@ -218,12 +221,12 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     });
     path.stroke_width = 2.0;
-    path.stroke = Paint::Solid(SolidPaint {
+    path.stroke = Some(Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
-    });
+    }));
     all_node_ids.push(path.base.id.clone());
-    repo.insert(Node::Path(path));
+    repo.insert(Node::SVGPath(path));
 
     // Line with gradient stroke
     let mut line = nf.create_line_node();
@@ -233,7 +236,7 @@ async fn demo_scene() -> Scene {
         width: 200.0,
         height: 0.0,
     };
-    line.stroke = Paint::LinearGradient(LinearGradientPaint {
+    line.strokes = vec![Paint::LinearGradient(LinearGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -250,7 +253,7 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
-    });
+    })];
     line.stroke_width = 8.0;
     all_node_ids.push(line.base.id.clone());
     repo.insert(Node::Line(line));
@@ -264,15 +267,15 @@ async fn demo_scene() -> Scene {
         height: 100.0,
     };
     octagon.point_count = 8;
-    octagon.fill = Paint::Solid(SolidPaint {
+    octagon.fills = vec![Paint::Solid(SolidPaint {
         color: Color(0, 255, 255, 255), // Cyan
         opacity: 0.8,
-    });
+    })];
     octagon.stroke_width = 3.0;
-    octagon.stroke = Paint::Solid(SolidPaint {
+    octagon.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     all_node_ids.push(octagon.base.id.clone());
     repo.insert(Node::RegularPolygon(octagon));
 
@@ -287,7 +290,7 @@ async fn demo_scene() -> Scene {
     description_text.text = "This PDF demonstrates various rendering capabilities including gradients, shapes, text, and effects.".to_string();
     description_text.text_style = TextStyle {
         text_decoration: TextDecoration::None,
-        font_family: "Arial".to_string(),
+        font_family: "".to_string(),
         font_size: 14.0,
         font_weight: FontWeight::new(400),
         italic: false,
@@ -312,7 +315,6 @@ async fn demo_scene() -> Scene {
     Scene {
         id: "scene".into(),
         name: "PDF Demo".into(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repo,
         background_color: Some(Color(255, 255, 255, 255)),
@@ -332,10 +334,13 @@ async fn main() {
     let width = 900.0;
     let height = 750.0;
 
-    let mut renderer = Renderer::new(
+    let mut renderer = Renderer::new_with_options(
         Backend::new_from_raster(width as i32, height as i32),
         None,
         Camera2D::new_from_bounds(Rectangle::from_xywh(0.0, 0.0, scene_width, scene_height)),
+        RendererOptions {
+            font_fallback: true,
+        },
     );
     renderer.load_scene(scene);
 

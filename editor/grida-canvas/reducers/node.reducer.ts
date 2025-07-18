@@ -131,6 +131,12 @@ const safe_properties: Partial<
       draft.opacity = ranged(0, value, 1);
     },
   }),
+  blendMode: defineNodeProperty<"blendMode">({
+    assert: (node) => typeof node.blendMode === "string",
+    apply: (draft, value, prev) => {
+      draft.blendMode = value;
+    },
+  }),
   fill: defineNodeProperty<"fill">({
     assert: (node) =>
       node.type === "vector" ||
@@ -244,20 +250,34 @@ const safe_properties: Partial<
       draft.strokeWidth = ranged(0, value);
     },
   }),
-  strokeCap: defineNodeProperty<"strokeCap">({
+  strokeAlign: defineNodeProperty<"strokeAlign">({
     assert: (node) =>
       node.type === "path" ||
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse",
     apply: (draft, value, prev) => {
+      draft.strokeAlign = value;
+    },
+  }),
+  strokeCap: defineNodeProperty<"strokeCap">({
+    apply: (draft, value, prev) => {
       draft.strokeCap = value;
     },
   }),
-  boxShadow: defineNodeProperty<"boxShadow">({
-    assert: (node) => node.type === "container" || node.type === "component",
+  feShadows: defineNodeProperty<"feShadows">({
     apply: (draft, value, prev) => {
-      draft.boxShadow = value;
+      draft.feShadows = value;
+    },
+  }),
+  feBlur: defineNodeProperty<"feBlur">({
+    apply: (draft, value, prev) => {
+      draft.feBlur = value;
+    },
+  }),
+  feBackdropBlur: defineNodeProperty<"feBackdropBlur">({
+    apply: (draft, value, prev) => {
+      draft.feBackdropBlur = value;
     },
   }),
   zIndex: defineNodeProperty<"zIndex">({

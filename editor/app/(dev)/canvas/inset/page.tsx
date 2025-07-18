@@ -46,7 +46,6 @@ export default function CanvasV2Page() {
             type: "solid",
             color: { r: 0, g: 0, b: 0, a: 1 },
           },
-          effects: [],
           strokeWidth: 0,
           strokeCap: "butt",
         },

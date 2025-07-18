@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -50,10 +51,10 @@ async fn demo_n_shapes(n: usize) -> Scene {
         // Convert HSV to RGB
         let (r, g, b) = hsv_to_rgb(hue, 1.0, 1.0);
 
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(r, g, b, 255),
             opacity: 1.0,
-        });
+        }));
 
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -62,7 +63,6 @@ async fn demo_n_shapes(n: usize) -> Scene {
     Scene {
         id: "scene".to_string(),
         name: format!("{} Shapes Performance Test", n),
-        transform: AffineTransform::identity(),
         children: all_shape_ids,
         nodes: repository,
         background_color: None,

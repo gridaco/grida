@@ -313,11 +313,13 @@ export function SidebarMenuSectionContent({
 export function SidebarSectionHeaderItem({
   className,
   children,
-}: React.PropsWithChildren<{ className?: string }>) {
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { className?: string }) {
   return (
     <div
+      {...props}
       className={cn(
-        "relative group",
+        "relative group/section-header",
         "w-full px-2 py-1 my-1 rounded-sm hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "flex justify-between items-center",
@@ -336,7 +338,7 @@ export function SidebarSectionHeaderLabel({
   return (
     <span
       className={cn(
-        "text-xs text-start font-normal text-muted-foreground overflow-hidden text-ellipsis group-hover:text-accent-foreground",
+        "text-xs text-start font-normal text-muted-foreground overflow-hidden text-ellipsis group-hover/section-header:text-accent-foreground",
         className
       )}
     >
@@ -348,11 +350,16 @@ export function SidebarSectionHeaderLabel({
 export function SidebarSectionHeaderActions({
   children,
   className,
-}: React.PropsWithChildren<{ className?: string }>) {
+  visibleOnHover = false,
+}: React.PropsWithChildren<{
+  className?: string;
+  visibleOnHover?: boolean;
+}>) {
   return (
     <span
       className={cn(
-        "flex justify-center invisible text-xs font-normal text-muted-foreground group-hover:visible",
+        "flex justify-center text-xs font-normal text-muted-foreground",
+        visibleOnHover && "invisible group-hover/section-header:visible",
         className
       )}
     >

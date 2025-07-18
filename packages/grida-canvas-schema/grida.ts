@@ -661,27 +661,6 @@ export namespace grida.program.css {
   export type LengthPercentage = Length | Percentage;
 
   /**
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/blend-mode
-   */
-  export type BlendMode =
-    | "normal"
-    | "multiply"
-    | "screen"
-    | "overlay"
-    | "darken"
-    | "lighten"
-    | "color-dodge"
-    | "color-burn"
-    | "hard-light"
-    | "soft-light"
-    | "difference"
-    | "exclusion"
-    | "hue"
-    | "saturation"
-    | "color"
-    | "luminosity";
-
-  /**
    * Partially supported CSS border model.
    * - each border can have different width
    * - color is shared
@@ -792,6 +771,8 @@ export namespace grida.program.nodes {
     | LineNode
     | RectangleNode
     | EllipseNode
+    // | RegularPolygonNode
+    // | RegularStarPolygonNode
     | ComponentNode
     | InstanceNode
     | TemplateInstanceNode;
@@ -1040,6 +1021,13 @@ export namespace grida.program.nodes {
       opacity: number;
     }
 
+    export interface IBlendMode {
+      /**
+       * @default "normal"
+       */
+      blendMode?: cg.BlendMode;
+    }
+
     export interface IZIndex {
       /**
        * z-index of the node.
@@ -1184,11 +1172,10 @@ export namespace grida.program.nodes {
       fill?: T | undefined;
     }
 
-    /**
-     * Node that supports box-shadow
-     */
-    export interface IBoxShadow {
-      boxShadow?: cg.BoxShadow;
+    export interface IEffects {
+      feBlur?: cg.FeBlur;
+      feBackdropBlur?: cg.FeBlur;
+      feShadows?: cg.FeShadow[];
     }
 
     /**
@@ -1206,6 +1193,11 @@ export namespace grida.program.nodes {
       strokeWidth: number;
 
       /**
+       * stroke alignment - takes effect when stroke is set
+       */
+      strokeAlign?: cg.StrokeAlign;
+
+      /**
        * @default "butt"
        */
       strokeCap: cg.StrokeCap;
@@ -1213,11 +1205,6 @@ export namespace grida.program.nodes {
 
     export interface ICSSBorder {
       border?: css.Border | undefined;
-    }
-
-    export interface IEffects {
-      //
-      effects: Array<cg.FilterEffects>;
     }
 
     export interface IStylable<S extends Record<string, unknown>> {
@@ -1235,7 +1222,6 @@ export namespace grida.program.nodes {
         IPositioning,
         ICSSDimension,
         IFill<props.PropsPaintValue>,
-        IBoxShadow,
         ICSSBorder {
       /**
        * TODO: rename to css
@@ -1426,6 +1412,7 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
+      i.IEffects,
       i.IHrefable,
       i.IMouseCursor,
       i.ITextNodeStyle,
@@ -1447,6 +1434,7 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
+      i.IEffects,
       i.IBoxFit,
       i.IHrefable,
       i.IMouseCursor,
@@ -1518,6 +1506,7 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
+      i.IEffects,
       i.IHrefable,
       i.IMouseCursor,
       i.IExpandable,
@@ -1592,6 +1581,7 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
@@ -1616,6 +1606,41 @@ export namespace grida.program.nodes {
    */
   export type ComputedVectorNode = VectorNode;
 
+  export interface RegularPolygonNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IHrefable,
+      i.IMouseCursor,
+      i.IPositioning,
+      i.IFixedDimension,
+      i.IOpacity,
+      i.IBlendMode,
+      i.IZIndex,
+      i.IRotation,
+      i.IFill<cg.Paint>,
+      i.IStroke {
+    readonly type: "regular-polygon";
+    pointCount: number;
+  }
+
+  export interface RegularStarPolygonNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IHrefable,
+      i.IMouseCursor,
+      i.IPositioning,
+      i.IFixedDimension,
+      i.IOpacity,
+      i.IBlendMode,
+      i.IZIndex,
+      i.IRotation,
+      i.IFill<cg.Paint>,
+      i.IStroke {
+    readonly type: "regular-star-polygon";
+    pointCount: number;
+    innerRadius: number;
+  }
+
   export interface PathNode
     extends i.IBaseNode,
       i.ISceneNode,
@@ -1624,6 +1649,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1670,6 +1696,7 @@ export namespace grida.program.nodes {
       i.IStroke,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation {
     readonly type: "line";
@@ -1701,6 +1728,7 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1737,6 +1765,7 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IOpacity,
+      i.IBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1872,6 +1901,7 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
+            blendMode: "normal",
             zIndex: 0,
             rotation: 0,
             width: 0,
@@ -1882,7 +1912,6 @@ export namespace grida.program.nodes {
             cornerRadius: 0,
             strokeWidth: 0,
             strokeCap: "butt",
-            effects: [],
             ...prototype,
             id: id,
           } satisfies RectangleNode;

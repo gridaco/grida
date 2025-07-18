@@ -2,12 +2,7 @@
 
 <img src="./cover.png" alt="Grida Canvas Rendering Backend Example" width="100%" />
 
-## Build
-
-```bash
-make build
-make build_release
-```
+Grida Canvas core graphics implements High-level Node & Property based Graphics API that supports mordern design techniques.
 
 ## Rendering
 

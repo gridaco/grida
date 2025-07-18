@@ -1,7 +1,9 @@
 use crate::cache::geometry::GeometryCache;
+use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::painter::cvt;
+use crate::sk::mappings::ToSkPath;
 use math2::transform::AffineTransform;
 use skia_safe::{
     path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, Point, RRect, Rect, StrokeRec,
@@ -181,6 +183,14 @@ impl PainterShape {
 
         path
     }
+
+    pub fn is_closed(&self) -> bool {
+        if let Some(path) = &self.path {
+            path.is_last_contour_closed()
+        } else {
+            true
+        }
+    }
 }
 
 pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
@@ -209,7 +219,7 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
         }
         IntrinsicSizeNode::Polygon(n) => {
             let path = if n.corner_radius > 0.0 {
-                n.to_path()
+                n.to_sk_path()
             } else {
                 let mut p = Path::new();
                 let mut iter = n.points.iter();
@@ -238,7 +248,7 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             path.line_to((n.size.width, 0.0));
             PainterShape::from_path(path)
         }
-        IntrinsicSizeNode::Path(n) => {
+        IntrinsicSizeNode::SVGPath(n) => {
             if let Some(path) = Path::from_svg(&n.data) {
                 PainterShape::from_path(path)
             } else {
@@ -246,6 +256,7 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
                 PainterShape::from_rect(Rect::new(0.0, 0.0, 0.0, 0.0))
             }
         }
+        IntrinsicSizeNode::Vector(n) => PainterShape::from_path(n.network.clone().into()),
         IntrinsicSizeNode::Container(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             let r = n.corner_radius;
@@ -347,7 +358,7 @@ pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
             n.clone(),
         ))),
         Node::Line(n) => Some(build_shape(&IntrinsicSizeNode::Line(n.clone()))),
-        Node::Path(n) => Some(build_shape(&IntrinsicSizeNode::Path(n.clone()))),
+        Node::SVGPath(n) => Some(build_shape(&IntrinsicSizeNode::SVGPath(n.clone()))),
         Node::Image(n) => Some(build_shape(&IntrinsicSizeNode::Image(n.clone()))),
         Node::Error(n) => Some(build_shape(&IntrinsicSizeNode::Error(n.clone()))),
         _ => None,

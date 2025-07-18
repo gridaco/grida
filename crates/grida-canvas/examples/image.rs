@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -27,16 +28,16 @@ async fn demo_image() -> Scene {
     rect1.base.name = "ImageFillRect".to_string();
     rect1.transform = AffineTransform::identity();
     rect1.size = image8ksize.clone();
-    rect1.fill = Paint::Image(ImagePaint {
-        _ref: image8k.clone(),
+    rect1.set_fill(Paint::Image(ImagePaint {
+        hash: image8k.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
-    });
-    rect1.stroke = Paint::Solid(SolidPaint {
+    }));
+    rect1.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255),
         opacity: 1.0,
-    });
+    })];
     rect1.stroke_width = 2.0;
 
     let mut repository = NodeRepository::new();
@@ -52,7 +53,6 @@ async fn demo_image() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Images Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

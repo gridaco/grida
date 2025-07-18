@@ -1,5 +1,8 @@
+use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
-use crate::node::schema::{FilterEffect, IntrinsicSizeNode, Node, NodeId, Scene, StrokeAlign};
+use crate::node::schema::{
+    IntrinsicSizeNode, LayerEffects, Node, NodeGeometryMixin, NodeId, Scene,
+};
 use math2::rect;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
@@ -44,7 +47,7 @@ impl GeometryCache {
 
     pub fn from_scene(scene: &Scene) -> Self {
         let mut cache = Self::new();
-        let root_world = scene.transform;
+        let root_world = AffineTransform::identity();
         for child in &scene.children {
             Self::build_recursive(child, &scene.nodes, &root_world, None, &mut cache);
         }
@@ -164,7 +167,7 @@ impl GeometryCache {
                         0.0
                     },
                     n.stroke_align,
-                    n.effect.as_ref(),
+                    &n.effects,
                 );
 
                 let entry = GeometryEntry {
@@ -189,13 +192,13 @@ impl GeometryCache {
                 let mut union_world_bounds = world_bounds;
                 let render_bounds = compute_render_bounds_from_style(
                     world_bounds,
-                    if n.stroke.is_some() {
+                    if n.has_stroke_geometry() {
                         n.stroke_width
                     } else {
                         0.0
                     },
                     n.stroke_align,
-                    n.effect.as_ref(),
+                    &n.effects,
                 );
 
                 for child_id in &n.children {
@@ -225,7 +228,8 @@ impl GeometryCache {
             }
             _ => {
                 let intrinsic_node = Box::new(match node {
-                    Node::Path(n) => IntrinsicSizeNode::Path(n.clone()),
+                    Node::SVGPath(n) => IntrinsicSizeNode::SVGPath(n.clone()),
+                    Node::Vector(n) => IntrinsicSizeNode::Vector(n.clone()),
                     Node::Rectangle(n) => IntrinsicSizeNode::Rectangle(n.clone()),
                     Node::Ellipse(n) => IntrinsicSizeNode::Ellipse(n.clone()),
                     Node::Polygon(n) => IntrinsicSizeNode::Polygon(n.clone()),
@@ -328,7 +332,8 @@ fn node_geometry(node: &IntrinsicSizeNode) -> (AffineTransform, Rectangle) {
                 height: n.size.height,
             },
         ),
-        IntrinsicSizeNode::Path(n) => (n.transform, path_bounds(&n.data)),
+        IntrinsicSizeNode::SVGPath(n) => (n.transform, path_bounds(&n.data)),
+        IntrinsicSizeNode::Vector(n) => (n.transform, n.network.bounds()),
         IntrinsicSizeNode::Image(n) => (n.transform, n.rect()),
     }
 }
@@ -404,36 +409,46 @@ fn stroke_outset(align: StrokeAlign, width: f32) -> f32 {
     }
 }
 
+fn compute_render_bounds_from_effects(bounds: Rectangle, effects: &LayerEffects) -> Rectangle {
+    let mut bounds = bounds;
+    if let Some(blur) = effects.blur {
+        bounds = inflate_rect(bounds, blur.radius);
+    }
+    for shadow in &effects.shadows {
+        bounds = compute_render_bounds_from_effect(bounds, &shadow.clone().into());
+    }
+    bounds
+}
+
+fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -> Rectangle {
+    match effect {
+        FilterEffect::LayerBlur(blur) => inflate_rect(bounds, blur.radius),
+        FilterEffect::BackdropBlur(blur) => inflate_rect(bounds, blur.radius),
+        FilterEffect::DropShadow(shadow) => {
+            // Apply spread by inflating the bounds, then offset and blur
+            let mut rect = if shadow.spread != 0.0 {
+                inflate_rect(bounds, shadow.spread)
+            } else {
+                bounds
+            };
+            rect.x += shadow.dx;
+            rect.y += shadow.dy;
+            inflate_rect(rect, shadow.blur)
+        }
+        // no inflation for inner shadow
+        FilterEffect::InnerShadow(_shadow) => bounds,
+    }
+}
+
 fn compute_render_bounds_from_style(
     world_bounds: Rectangle,
     stroke_width: f32,
     stroke_align: StrokeAlign,
-    effect: Option<&FilterEffect>,
+    effects: &LayerEffects,
 ) -> Rectangle {
     let mut bounds = inflate_rect(world_bounds, stroke_outset(stroke_align, stroke_width));
 
-    if let Some(effect) = effect {
-        match effect {
-            FilterEffect::GaussianBlur(blur) => {
-                bounds = inflate_rect(bounds, blur.radius);
-            }
-            FilterEffect::BackdropBlur(blur) => {
-                bounds = inflate_rect(bounds, blur.radius);
-            }
-            FilterEffect::DropShadow(shadow) => {
-                let shadow_rect = inflate_rect(
-                    Rectangle {
-                        x: world_bounds.x + shadow.dx,
-                        y: world_bounds.y + shadow.dy,
-                        width: world_bounds.width,
-                        height: world_bounds.height,
-                    },
-                    shadow.blur,
-                );
-                bounds = rect::union(&[bounds, shadow_rect]);
-            }
-        }
-    }
+    bounds = compute_render_bounds_from_effects(bounds, effects);
 
     bounds
 }
@@ -444,65 +459,71 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            &n.effects,
         ),
         Node::Ellipse(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            &n.effects,
         ),
         Node::Polygon(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            &n.effects,
         ),
         Node::RegularPolygon(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            &n.effects,
         ),
         Node::RegularStarPolygon(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            &n.effects,
         ),
-        Node::Path(n) => compute_render_bounds_from_style(
+        Node::SVGPath(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            &n.effects,
+        ),
+        Node::Vector(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.stroke_align,
+            &n.effects,
         ),
         Node::Image(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,
-            n.effect.as_ref(),
+            &n.effects,
         ),
         Node::Line(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.get_stroke_align(),
-            None,
+            &n.effects,
         ),
         Node::TextSpan(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width.unwrap_or(0.0),
             n.stroke_align,
-            None,
+            &LayerEffects::new_empty(),
         ),
         Node::Container(n) => compute_render_bounds_from_style(
             world_bounds,
-            if n.stroke.is_some() {
+            if n.has_stroke_geometry() {
                 n.stroke_width
             } else {
                 0.0
             },
             n.stroke_align,
-            n.effect.as_ref(),
+            &n.effects,
         ),
         Node::Error(_) => world_bounds,
         Node::Group(_) | Node::BooleanOperation(_) => world_bounds,

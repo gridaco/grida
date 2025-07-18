@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -17,20 +18,21 @@ async fn demo_clip() -> Scene {
         height: 300.0,
     };
     container.corner_radius = RectangularCornerRadius::all(20.0);
-    container.fill = Paint::Solid(SolidPaint {
+    container.set_fill(Paint::Solid(SolidPaint {
         color: Color(240, 100, 100, 255), // Light red
         opacity: 1.0,
-    });
-    container.stroke = Some(Paint::Solid(SolidPaint {
+    }));
+    container.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(200, 50, 50, 255), // Darker red
         opacity: 1.0,
-    }));
-    container.effect = Some(FilterEffect::DropShadow(FeDropShadow {
+    })];
+    container.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 0.0,
         dy: 0.0,
         blur: 10.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 255),
-    }));
+    })]);
     container.clip = true;
     container.stroke_width = 2.0;
 
@@ -42,14 +44,14 @@ async fn demo_clip() -> Scene {
         width: 300.0,
         height: 200.0,
     };
-    ellipse.fill = Paint::Solid(SolidPaint {
+    ellipse.fills = vec![Paint::Solid(SolidPaint {
         color: Color(100, 200, 100, 255), // Light green
         opacity: 1.0,
-    });
-    ellipse.stroke = Paint::Solid(SolidPaint {
+    })];
+    ellipse.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(50, 150, 50, 255), // Darker green
         opacity: 1.0,
-    });
+    })];
     ellipse.stroke_width = 2.0;
 
     // Add nodes to repository and collect their IDs
@@ -65,7 +67,6 @@ async fn demo_clip() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Simple Container Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![container_id],
         nodes: repository,
         background_color: None,

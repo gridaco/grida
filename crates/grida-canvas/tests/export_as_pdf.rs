@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::export::{export_node_as, ExportAs};
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
 use math2::transform::AffineTransform;
@@ -15,10 +16,10 @@ fn test_pdf_export() {
         height: 50.0,
     };
     rect.transform = AffineTransform::new(10.0, 10.0, 0.0);
-    rect.fill = Paint::Solid(SolidPaint {
+    rect.fills = vec![Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255), // Red
         opacity: 1.0,
-    });
+    })];
 
     let rect_id = rect.base.id.clone();
     repo.insert(Node::Rectangle(rect));
@@ -26,7 +27,6 @@ fn test_pdf_export() {
     let scene = Scene {
         id: "test_scene".into(),
         name: "Test Scene".into(),
-        transform: AffineTransform::identity(),
         children: vec![rect_id.clone()],
         nodes: repo,
         background_color: Some(Color(255, 255, 255, 255)), // White background

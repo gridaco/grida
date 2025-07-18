@@ -1,11 +1,14 @@
 use super::cvt;
 use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
+use super::shadow;
 use crate::cache::geometry::GeometryCache;
 use crate::cache::{paragraph::ParagraphCache, vector_path::VectorPathCache};
+use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::runtime::repository::{FontRepository, ImageRepository};
+use crate::sk::mappings::ToSkPath;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
 use std::cell::RefCell;
@@ -119,32 +122,17 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw a drop shadow behind the content using a shape.
-    fn draw_shadow(&self, shape: &PainterShape, shadow: &FeDropShadow) {
-        let canvas = self.canvas;
-        let Color(r, g, b, a) = shadow.color;
-        let color = skia_safe::Color::from_argb(a, r, g, b);
+    fn draw_shadow(&self, shape: &PainterShape, shadow: &FeShadow) {
+        shadow::draw_drop_shadow(self.canvas, shape, shadow);
+    }
 
-        // Create drop shadow filter
-        let image_filter = skia_safe::image_filters::drop_shadow(
-            (shadow.dx, shadow.dy),     // offset as tuple
-            (shadow.blur, shadow.blur), // sigma as tuple
-            color,                      // color
-            None,                       // color_space
-            None,                       // input
-            None,                       // crop_rect
-        );
-
-        // Create paint with the drop shadow filter
-        let mut shadow_paint = SkPaint::default();
-        shadow_paint.set_image_filter(image_filter);
-        shadow_paint.set_anti_alias(true);
-
-        // Draw the shadow using the shape's path
-        canvas.draw_path(&shape.to_path(), &shadow_paint);
+    /// Draw an inner shadow clipped to the given shape.
+    fn draw_inner_shadow(&self, shape: &PainterShape, shadow: &FeShadow) {
+        shadow::draw_inner_shadow(self.canvas, shape, shadow);
     }
 
     /// Draw a backdrop blur: blur what's behind the shape.
-    fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeBackdropBlur) {
+    fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeGaussianBlur) {
         let canvas = self.canvas;
         // 1) Build a Gaussian‐blur filter for the backdrop
         let Some(image_filter) =
@@ -213,6 +201,12 @@ impl<'a> Painter<'a> {
         }
     }
 
+    fn draw_fills(&self, shape: &PainterShape, fills: &Vec<Paint>) {
+        for fill in fills {
+            self.draw_fill(shape, fill);
+        }
+    }
+
     /// Draw fill for a shape using given paint.
     fn draw_fill(&self, shape: &PainterShape, fill: &Paint) {
         let canvas = self.canvas;
@@ -220,7 +214,7 @@ impl<'a> Painter<'a> {
             Paint::Image(image_paint) => {
                 let images = self.images.borrow();
                 if let Some(image) =
-                    images.get_by_size(&image_paint._ref, shape.rect.width(), shape.rect.height())
+                    images.get_by_size(&image_paint.hash, shape.rect.width(), shape.rect.height())
                 {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
@@ -263,6 +257,19 @@ impl<'a> Painter<'a> {
         }
     }
 
+    fn draw_strokes(
+        &self,
+        shape: &PainterShape,
+        strokes: &Vec<Paint>,
+        stroke_width: f32,
+        stroke_align: StrokeAlign,
+        stroke_dash_array: Option<&Vec<f32>>,
+    ) {
+        for stroke in strokes {
+            self.draw_stroke(shape, stroke, stroke_width, stroke_align, stroke_dash_array);
+        }
+    }
+
     /// Draw stroke for a shape using given paint.
     fn draw_stroke(
         &self,
@@ -301,7 +308,7 @@ impl<'a> Painter<'a> {
             Paint::Image(image_paint) => {
                 let images = self.images.borrow();
                 if let Some(image) =
-                    images.get_by_size(&image_paint._ref, shape.rect.width(), shape.rect.height())
+                    images.get_by_size(&image_paint.hash, shape.rect.width(), shape.rect.height())
                 {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
@@ -338,28 +345,37 @@ impl<'a> Painter<'a> {
         }
     }
 
-    /// Shared utility to handle effect drawing for shapes
-    fn draw_shape_with_effect<F: Fn()>(
+    /// Draw a shape applying all layer effects in the correct order.
+    fn draw_shape_with_effects<F: Fn()>(
         &self,
-        effect: Option<&FilterEffect>,
+        effects: &LayerEffects,
         shape: &PainterShape,
         draw_content: F,
     ) {
-        match effect {
-            Some(FilterEffect::DropShadow(shadow)) => {
-                self.draw_shadow(shape, shadow);
-                draw_content();
+        let apply_effects = || {
+            if let Some(blur) = effects.backdrop_blur {
+                self.draw_backdrop_blur(shape, &blur);
             }
-            Some(FilterEffect::BackdropBlur(blur)) => {
-                self.draw_backdrop_blur(shape, blur);
-                draw_content();
+
+            for shadow in &effects.shadows {
+                if let FilterShadowEffect::DropShadow(ds) = shadow {
+                    self.draw_shadow(shape, ds);
+                }
             }
-            Some(FilterEffect::GaussianBlur(blur)) => {
-                self.with_layer_blur(blur.radius, draw_content);
+
+            draw_content();
+
+            for shadow in &effects.shadows {
+                if let FilterShadowEffect::InnerShadow(is) = shadow {
+                    self.draw_inner_shadow(shape, is);
+                }
             }
-            None => {
-                draw_content();
-            }
+        };
+
+        if let Some(layer_blur) = effects.blur {
+            self.with_layer_blur(layer_blur.radius, apply_effects);
+        } else {
+            apply_effects();
         }
     }
 
@@ -371,13 +387,13 @@ impl<'a> Painter<'a> {
     fn draw_rect_node(&self, node: &RectangleNode) {
         self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Rectangle(node.clone()));
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            self.draw_shape_with_effects(&node.effects, &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
-                        self.draw_fill(&shape, &node.fill);
-                        self.draw_stroke(
+                        self.draw_fills(&shape, &node.fills);
+                        self.draw_strokes(
                             &shape,
-                            &node.stroke,
+                            &node.strokes,
                             node.stroke_width,
                             node.stroke_align,
                             node.stroke_dash_array.as_ref(),
@@ -393,12 +409,12 @@ impl<'a> Painter<'a> {
         self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Image(node.clone()));
 
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            self.draw_shape_with_effects(&node.effects, &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         // convert the image itself to a paint
                         let image_paint = Paint::Image(ImagePaint {
-                            _ref: node._ref.clone(),
+                            hash: node.hash.clone(),
                             opacity: node.opacity,
                             transform: AffineTransform::identity(),
                             fit: math2::box_fit::BoxFit::Cover,
@@ -423,13 +439,13 @@ impl<'a> Painter<'a> {
     fn draw_ellipse_node(&self, node: &EllipseNode) {
         self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Ellipse(node.clone()));
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            self.draw_shape_with_effects(&node.effects, &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
-                        self.draw_fill(&shape, &node.fill);
-                        self.draw_stroke(
+                        self.draw_fills(&shape, &node.fills);
+                        self.draw_strokes(
                             &shape,
-                            &node.stroke,
+                            &node.strokes,
                             node.stroke_width,
                             node.stroke_align,
                             node.stroke_dash_array.as_ref(),
@@ -447,31 +463,33 @@ impl<'a> Painter<'a> {
 
             self.with_opacity(node.opacity, || {
                 self.with_blendmode(node.blend_mode, || {
-                    let paint = cvt::sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
-                    let stroke_path = stroke_geometry(
-                        &shape.to_path(),
-                        node.stroke_width,
-                        node.get_stroke_align(),
-                        node.stroke_dash_array.as_ref(),
-                    );
-                    self.canvas.draw_path(&stroke_path, &paint);
+                    for stroke in &node.strokes {
+                        let paint = cvt::sk_paint(stroke, node.opacity, (node.size.width, 0.0));
+                        let stroke_path = stroke_geometry(
+                            &shape.to_path(),
+                            node.stroke_width,
+                            node.get_stroke_align(),
+                            node.stroke_dash_array.as_ref(),
+                        );
+                        self.canvas.draw_path(&stroke_path, &paint);
+                    }
                 });
             });
         });
     }
 
-    /// Draw a PathNode (SVG path data)
-    fn draw_path_node(&self, node: &PathNode) {
+    fn draw_vector_node(&self, node: &VectorNode) {
         self.with_transform(&node.transform.matrix, || {
-            let path = self.cached_path(&node.base.id, &node.data);
-            let shape = PainterShape::from_path((*path).clone());
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            let shape = PainterShape::from_path(node.network.clone().into());
+            self.draw_shape_with_effects(&node.effects, &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
-                        self.draw_fill(&shape, &node.fill);
-                        self.draw_stroke(
+                        if let Some(fill) = &node.fill {
+                            self.draw_fill(&shape, fill);
+                        }
+                        self.draw_strokes(
                             &shape,
-                            &node.stroke,
+                            &node.strokes,
                             node.stroke_width,
                             node.stroke_align,
                             node.stroke_dash_array.as_ref(),
@@ -482,18 +500,42 @@ impl<'a> Painter<'a> {
         });
     }
 
-    /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
-    fn draw_polygon_node(&self, node: &PolygonNode) {
+    /// Draw a PathNode (SVG path data)
+    fn draw_path_node(&self, node: &SVGPathNode) {
         self.with_transform(&node.transform.matrix, || {
-            let path = node.to_path();
-            let shape = PainterShape::from_path(path.clone());
-            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+            let path = self.cached_path(&node.base.id, &node.data);
+            let shape = PainterShape::from_path((*path).clone());
+            self.draw_shape_with_effects(&node.effects, &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
                         self.draw_fill(&shape, &node.fill);
-                        self.draw_stroke(
+                        if let Some(stroke) = &node.stroke {
+                            self.draw_stroke(
+                                &shape,
+                                stroke,
+                                node.stroke_width,
+                                node.stroke_align,
+                                node.stroke_dash_array.as_ref(),
+                            );
+                        }
+                    });
+                });
+            });
+        });
+    }
+
+    /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
+    fn draw_polygon_node(&self, node: &PolygonNode) {
+        self.with_transform(&node.transform.matrix, || {
+            let path = node.to_sk_path();
+            let shape = PainterShape::from_path(path.clone());
+            self.draw_shape_with_effects(&node.effects, &shape, || {
+                self.with_opacity(node.opacity, || {
+                    self.with_blendmode(node.blend_mode, || {
+                        self.draw_fills(&shape, &node.fills);
+                        self.draw_strokes(
                             &shape,
-                            &node.stroke,
+                            &node.strokes,
                             node.stroke_width,
                             node.stroke_align,
                             node.stroke_dash_array.as_ref(),
@@ -602,18 +644,16 @@ impl<'a> Painter<'a> {
                 let shape = build_shape(&IntrinsicSizeNode::Container(node.clone()));
 
                 // Draw effects first (if any) - these won't be clipped
-                self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                self.draw_shape_with_effects(&node.effects, &shape, || {
                     self.with_blendmode(node.blend_mode, || {
-                        self.draw_fill(&shape, &node.fill);
-                        if let Some(stroke) = &node.stroke {
-                            self.draw_stroke(
-                                &shape,
-                                stroke,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        }
+                        self.draw_fills(&shape, &node.fills);
+                        self.draw_strokes(
+                            &shape,
+                            &node.strokes,
+                            node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
+                        );
                     });
                 });
 
@@ -685,7 +725,7 @@ impl<'a> Painter<'a> {
     ) {
         self.with_transform(&node.transform.matrix, || {
             if let Some(shape) = boolean_operation_shape(node, repository, cache) {
-                self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                self.draw_shape_with_effects(&node.effects, &shape, || {
                     self.with_opacity(node.opacity, || {
                         self.with_blendmode(node.blend_mode, || {
                             self.draw_fill(&shape, &node.fill);
@@ -723,7 +763,8 @@ impl<'a> Painter<'a> {
             LeafNode::Image(n) => {
                 self.draw_image_node(n);
             }
-            LeafNode::Path(n) => self.draw_path_node(n),
+            LeafNode::Vector(n) => self.draw_vector_node(n),
+            LeafNode::SVGPath(n) => self.draw_path_node(n),
             LeafNode::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
         }
     }
@@ -748,7 +789,8 @@ impl<'a> Painter<'a> {
             Node::Image(n) => {
                 self.draw_image_node(n);
             }
-            Node::Path(n) => self.draw_path_node(n),
+            Node::Vector(n) => self.draw_vector_node(n),
+            Node::SVGPath(n) => self.draw_path_node(n),
             Node::BooleanOperation(n) => {
                 self.draw_boolean_operation_node_recursively(n, repository, cache)
             }
@@ -760,36 +802,40 @@ impl<'a> Painter<'a> {
     pub fn draw_layer(&self, layer: &PainterPictureLayer) {
         match layer {
             PainterPictureLayer::Shape(shape_layer) => {
-                self.with_transform(&shape_layer.base.transform.matrix, || {
-                    let shape = &shape_layer.base.shape;
-                    let effect = shape_layer.base.effects.first();
-                    let clip_path = &shape_layer.base.clip_path;
-                    let draw_content = || {
-                        self.with_opacity(shape_layer.base.opacity, || {
-                            for fill in &shape_layer.base.fills {
-                                self.draw_fill(shape, fill);
-                            }
-                            for stroke in &shape_layer.base.strokes {
-                                if let Some(path) = &shape_layer.base.stroke_path {
-                                    self.draw_stroke_path(shape, stroke, path);
+                self.with_blendmode(shape_layer.base.blend_mode, || {
+                    self.with_transform(&shape_layer.base.transform.matrix, || {
+                        let shape = &shape_layer.base.shape;
+                        let effect_ref = &shape_layer.base.effects;
+                        let clip_path = &shape_layer.base.clip_path;
+                        let draw_content = || {
+                            self.with_opacity(shape_layer.base.opacity, || {
+                                if shape.is_closed() {
+                                    for fill in &shape_layer.base.fills {
+                                        self.draw_fill(shape, fill);
+                                    }
                                 }
-                            }
-                        });
-                    };
-                    if let Some(clip) = clip_path {
-                        self.canvas.save();
-                        self.canvas.clip_path(clip, None, true);
-                        self.draw_shape_with_effect(effect, shape, draw_content);
-                        self.canvas.restore();
-                    } else {
-                        self.draw_shape_with_effect(effect, shape, draw_content);
-                    }
+                                for stroke in &shape_layer.base.strokes {
+                                    if let Some(path) = &shape_layer.base.stroke_path {
+                                        self.draw_stroke_path(shape, stroke, path);
+                                    }
+                                }
+                            });
+                        };
+                        if let Some(clip) = clip_path {
+                            self.canvas.save();
+                            self.canvas.clip_path(clip, None, true);
+                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
+                            self.canvas.restore();
+                        } else {
+                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
+                        }
+                    });
                 });
             }
             PainterPictureLayer::Text(text_layer) => {
                 self.with_transform(&text_layer.base.transform.matrix, || {
                     let shape = &text_layer.base.shape;
-                    let effect = text_layer.base.effects.first();
+                    let effect_ref = &text_layer.base.effects;
                     let clip_path = &text_layer.base.clip_path;
                     let draw_content = || {
                         self.with_opacity(text_layer.base.opacity, || {
@@ -800,6 +846,7 @@ impl<'a> Painter<'a> {
                                     width: shape.rect.width(),
                                     height: shape.rect.height(),
                                 },
+                                // TODO: support multiple fills for text
                                 match text_layer.base.fills.first() {
                                     Some(f) => f,
                                     None => return,
@@ -813,10 +860,10 @@ impl<'a> Painter<'a> {
                     if let Some(clip) = clip_path {
                         self.canvas.save();
                         self.canvas.clip_path(clip, None, true);
-                        self.draw_shape_with_effect(effect, shape, draw_content);
+                        self.draw_shape_with_effects(effect_ref, shape, draw_content);
                         self.canvas.restore();
                     } else {
-                        self.draw_shape_with_effect(effect, shape, draw_content);
+                        self.draw_shape_with_effects(effect_ref, shape, draw_content);
                     }
                 });
             }

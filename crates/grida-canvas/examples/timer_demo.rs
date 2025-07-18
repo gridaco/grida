@@ -24,7 +24,6 @@ fn main() {
 fn basic_timer_demo() {
     let mut timer_system = TimerMgr::new();
     let mut clock = EventLoopClock::new();
-    let start_time = std::time::Instant::now();
 
     let counter = Arc::new(Mutex::new(0));
     let counter_clone = counter.clone();

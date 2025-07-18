@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;
@@ -26,28 +27,26 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                 height: 100.0,
             },
             corner_radius: RectangularCornerRadius::zero(),
-            fill: Paint::Solid(SolidPaint {
+            fills: vec![Paint::Solid(SolidPaint {
                 color: Color(255, 0, 0, 255),
                 opacity: 1.0,
-            }),
-            stroke: Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
-                opacity: 1.0,
-            }),
+            })],
+            strokes: vec![],
             stroke_width: 1.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effect: if with_effects {
-                Some(FilterEffect::DropShadow(FeDropShadow {
+            effects: if with_effects {
+                LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
                     dx: 2.0,
                     dy: 2.0,
                     blur: 4.0,
+                    spread: 0.0,
                     color: Color(0, 0, 0, 128),
-                }))
+                })])
             } else {
-                None
+                LayerEffects::new_empty()
             },
         };
 
@@ -72,7 +71,6 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Test Scene".to_string(),
-        transform: AffineTransform::identity(),
         children: vec!["root".to_string()],
         nodes: repository,
         background_color: None,

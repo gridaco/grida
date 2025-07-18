@@ -29,7 +29,6 @@ fn hit_first_returns_topmost() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![container_id.clone()],
         nodes: repo,
         background_color: None,
@@ -60,12 +59,11 @@ fn path_hit_testing_uses_contains() {
     let mut path_node = nf.create_path_node();
     path_node.data = "M0 0 L10 0 L10 10 Z".into();
     let path_id = path_node.base.id.clone();
-    repo.insert(Node::Path(path_node.clone()));
+    repo.insert(Node::SVGPath(path_node.clone()));
 
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![path_id.clone()],
         nodes: repo,
         background_color: None,
@@ -114,7 +112,6 @@ fn intersects_returns_all_nodes_in_rect() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![container_id.clone()],
         nodes: repo,
         background_color: None,

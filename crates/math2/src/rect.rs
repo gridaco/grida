@@ -45,6 +45,35 @@ impl Rectangle {
         }
     }
 
+    /// Computes the smallest rectangle that encloses all provided points.
+    pub fn from_points(points: &[Vector2]) -> Self {
+        assert!(!points.is_empty(), "at least one point is required");
+        let mut min_x = f32::INFINITY;
+        let mut min_y = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+        for &[x, y] in points {
+            if x < min_x {
+                min_x = x;
+            }
+            if y < min_y {
+                min_y = y;
+            }
+            if x > max_x {
+                max_x = x;
+            }
+            if y > max_y {
+                max_y = y;
+            }
+        }
+        Self {
+            x: min_x,
+            y: min_y,
+            width: max_x - min_x,
+            height: max_y - min_y,
+        }
+    }
+
     pub fn empty() -> Self {
         Rectangle {
             x: 0.0,
@@ -147,35 +176,6 @@ impl Rectangle {
     /// used for ffi
     pub fn to_vec4(&self) -> Vector4 {
         [self.x, self.y, self.width, self.height]
-    }
-}
-
-/// Computes the smallest rectangle that encloses all provided points.
-pub fn from_points(points: &[Vector2]) -> Rectangle {
-    assert!(!points.is_empty(), "at least one point is required");
-    let mut min_x = f32::INFINITY;
-    let mut min_y = f32::INFINITY;
-    let mut max_x = f32::NEG_INFINITY;
-    let mut max_y = f32::NEG_INFINITY;
-    for &[x, y] in points {
-        if x < min_x {
-            min_x = x;
-        }
-        if y < min_y {
-            min_y = y;
-        }
-        if x > max_x {
-            max_x = x;
-        }
-        if y > max_y {
-            max_y = y;
-        }
-    }
-    Rectangle {
-        x: min_x,
-        y: min_y,
-        width: max_x - min_x,
-        height: max_y - min_y,
     }
 }
 
@@ -617,7 +617,7 @@ pub fn transform(rect: Rectangle, t: &AffineTransform) -> Rectangle {
         .iter()
         .map(|&p| super::vector2::transform(p, t))
         .collect();
-    from_points(&transformed)
+    Rectangle::from_points(&transformed)
 }
 
 /// Rotates the rectangle around its center and returns the bounding box.
@@ -639,7 +639,7 @@ pub fn rotate(rect: Rectangle, degrees: f32) -> Rectangle {
         rotate_point([rect.x, rect.y + rect.height]),
         rotate_point([rect.x + rect.width, rect.y + rect.height]),
     ];
-    from_points(&pts)
+    Rectangle::from_points(&pts)
 }
 
 /// Returns the requested cardinal point of the rectangle.

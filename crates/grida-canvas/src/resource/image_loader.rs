@@ -1,4 +1,5 @@
 use super::ResourceLoader;
+use crate::cg::types::*;
 use crate::node::schema::*;
 use crate::window::application::HostEvent;
 use async_trait::async_trait;
@@ -142,18 +143,29 @@ impl ResourceLoader for ImageLoader {
 
 /// Helper function to extract image URLs from a scene
 pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
-    scene
-        .nodes
-        .iter()
-        .filter_map(|(_, n)| match n {
-            Node::Rectangle(rect) => match (&rect.fill, &rect.stroke) {
-                (Paint::Image(img), _) => Some(img._ref.clone()),
-                (_, Paint::Image(img)) => Some(img._ref.clone()),
-                _ => None,
-            },
-            _ => None,
-        })
-        .collect()
+    let mut urls = Vec::new();
+
+    for (_, n) in scene.nodes.iter() {
+        match n {
+            Node::Rectangle(rect) => {
+                // Check fills for image paints
+                for fill in &rect.fills {
+                    if let Paint::Image(img) = fill {
+                        urls.push(img.hash.clone());
+                    }
+                }
+                // Check strokes for image paints
+                for stroke in &rect.strokes {
+                    if let Paint::Image(img) = stroke {
+                        urls.push(img.hash.clone());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    urls
 }
 
 /// Helper function to load all images in a scene

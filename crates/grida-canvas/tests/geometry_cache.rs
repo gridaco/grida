@@ -33,7 +33,6 @@ fn geometry_cache_builds_recursively() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![container_id.clone()],
         nodes: repo.clone(),
         background_color: None,
@@ -78,7 +77,6 @@ fn container_world_bounds_include_children() {
     let scene = Scene {
         id: "scene".into(),
         name: "test".into(),
-        transform: AffineTransform::identity(),
         children: vec![container_id.clone()],
         nodes: repo,
         background_color: None,

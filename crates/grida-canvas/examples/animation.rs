@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -19,17 +20,16 @@ fn create_scene(t: f32) -> Scene {
     rect.transform = AffineTransform::new(x, y, t);
     let r = ((t.sin() * 0.5 + 0.5) * 255.0) as u8;
     let g = ((t.cos() * 0.5 + 0.5) * 255.0) as u8;
-    rect.fill = Paint::Solid(SolidPaint {
+    rect.set_fill(Paint::Solid(SolidPaint {
         color: Color(r, g, 200, 255),
         opacity: 1.0,
-    });
+    }));
     let rect_id = rect.base.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     Scene {
         id: "scene".to_string(),
         name: "Animated".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![rect_id],
         nodes: repo,
         background_color: Some(Color(255, 255, 255, 255)),

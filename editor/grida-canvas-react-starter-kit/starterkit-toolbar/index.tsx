@@ -11,8 +11,9 @@ import {
   TextIcon,
   CaretDownIcon,
   EraserIcon,
+  StarIcon,
 } from "@radix-ui/react-icons";
-import { BrushIcon, PenToolIcon } from "lucide-react";
+import { BrushIcon, PenToolIcon, TriangleIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,6 +113,8 @@ export default function Toolbar() {
             { value: "rectangle", label: "Rectangle", shortcut: "R" },
             { value: "ellipse", label: "Ellipse", shortcut: "O" },
             { value: "line", label: "Line", shortcut: "L" },
+            { value: "polygon", label: "Polygon" },
+            { value: "star", label: "Star" },
             { value: "image", label: "Image" },
           ]}
           onValueChange={(v) => {
@@ -207,6 +210,10 @@ export function ToolIcon({
       return <BoxIcon {...props} />;
     case "ellipse":
       return <CircleIcon {...props} />;
+    case "polygon":
+      return <TriangleIcon {...props} />;
+    case "star":
+      return <StarIcon {...props} />;
     case "line":
       return <SlashIcon {...props} />;
     case "pencil":

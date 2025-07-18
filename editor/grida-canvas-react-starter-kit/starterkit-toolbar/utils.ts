@@ -6,6 +6,8 @@ export type ToolbarToolType =
   | "rectangle"
   | "ellipse"
   | "text"
+  | "polygon"
+  | "star"
   | "container"
   | "image"
   | "line"

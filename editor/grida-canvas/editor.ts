@@ -45,8 +45,6 @@ function resolveNumberChangeValue(
   }
 }
 
-export type EditorContentRenderingBackend = "dom" | "canvas";
-
 type WithEditorInstance<T> = T | ((editor: Editor) => T);
 
 function isWithEditorFunction<T>(
@@ -81,7 +79,7 @@ export class Editor
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
 
-  readonly backend: EditorContentRenderingBackend;
+  readonly backend: editor.EditorContentRenderingBackend;
   readonly viewport: domapi.DOMViewportApi;
   _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
   get geometry() {
@@ -118,7 +116,7 @@ export class Editor
     plugins = {},
     onCreate,
   }: {
-    backend: EditorContentRenderingBackend;
+    backend: editor.EditorContentRenderingBackend;
     viewportElement: string | HTMLElement;
     contentElement: string | HTMLElement | Grida2D;
     geometry:
@@ -1163,6 +1161,13 @@ export class Editor
       }
     });
   }
+  changeNodeBlendMode(node_id: editor.NodeID, blendMode: cg.BlendMode): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      blendMode,
+    });
+  }
   changeNodeRotation(node_id: string, rotation: editor.api.NumberChange) {
     requestAnimationFrame(() => {
       try {
@@ -1241,6 +1246,15 @@ export class Editor
       return;
     }
   }
+
+  changeNodeStrokeAlign(node_id: string, strokeAlign: cg.StrokeAlign) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeAlign,
+    });
+  }
+
   changeNodeStrokeCap(node_id: string, strokeCap: cg.StrokeCap) {
     this.dispatch({
       type: "node/change/*",
@@ -1403,13 +1417,52 @@ export class Editor
     });
   }
 
-  changeNodeBoxShadow(node_id: string, boxShadow?: cg.BoxShadow) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        boxShadow,
-      });
+  changeNodeFilterEffects(
+    node_id: editor.NodeID,
+    effects?: cg.FilterEffect[]
+  ): void {
+    const feBlur = effects?.find(
+      (effect) => effect.type === "filter-blur"
+    )?.blur;
+    const feBackdropBlur = effects?.find(
+      (effect) => effect.type === "backdrop-filter-blur"
+    )?.blur;
+    const feShadows = effects?.filter((effect) => effect.type === "shadow");
+
+    const i: grida.program.nodes.i.IEffects = {
+      feBackdropBlur: feBackdropBlur,
+      feBlur: feBlur,
+      feShadows: feShadows,
+    };
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      ...i,
+    });
+  }
+
+  changeNodeFeShadows(node_id: string, effects?: cg.FeShadow[]) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      feShadows: effects,
+    });
+  }
+
+  changeNodeFeBlur(node_id: string, effect?: cg.FeBlur) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      feBlur: effect,
+    });
+  }
+
+  changeNodeFeBackdropBlur(node_id: editor.NodeID, effect?: cg.FeBlur): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      feBackdropBlur: effect,
     });
   }
 

@@ -28,7 +28,15 @@ where
     let (tx, rx) = mpsc::unbounded();
     let (font_tx, font_rx) = mpsc::unbounded();
 
-    let (mut app, el) = NativeApplication::new(width, height, rx, font_rx);
+    let (mut app, el) = NativeApplication::new_with_options(
+        width,
+        height,
+        rx,
+        font_rx,
+        crate::runtime::scene::RendererOptions {
+            font_fallback: true,
+        },
+    );
     let proxy = el.create_proxy();
 
     app.app.renderer.backend = Backend::GL(app.app.state.surface_mut_ptr());

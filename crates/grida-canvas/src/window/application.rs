@@ -43,7 +43,7 @@ pub trait ApplicationApi {
     fn devtools_rendering_set_show_hit_testing(&mut self, show: bool);
     fn devtools_rendering_set_show_ruler(&mut self, show: bool);
 
-    /// Load a scene from a JSON string using the `io_json` parser.
+    /// Load a scene from a JSON string using the `io_grida` parser.
     fn load_scene_json(&mut self, json: &str);
 
     // static demo scenes
@@ -266,11 +266,10 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn load_scene_json(&mut self, json: &str) {
-        use crate::io::io_json;
-        use math2::transform::AffineTransform;
+        use crate::io::io_grida;
 
-        let Ok(file) = io_json::parse(json) else {
-            let err = io_json::parse(json).unwrap_err();
+        let Ok(file) = io_grida::parse(json) else {
+            let err = io_grida::parse(json).unwrap_err();
             eprintln!("failed to parse scene json: {}", err);
             return;
         };
@@ -295,7 +294,6 @@ impl ApplicationApi for UnknownTargetApplication {
             let scene = crate::node::schema::Scene {
                 id: scene_id,
                 name: scene.name.clone(),
-                transform: AffineTransform::identity(),
                 children: scene.children.clone(),
                 nodes,
                 background_color: scene.background_color.clone().map(Into::into),
@@ -327,9 +325,11 @@ impl UnknownTargetApplication {
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
         request_redraw: Option<crate::runtime::scene::RequestRedrawCallback>,
+        options: crate::runtime::scene::RendererOptions,
     ) -> Self {
         let request_redraw = request_redraw.unwrap_or_else(|| std::sync::Arc::new(|| {}));
-        let renderer = Renderer::new(backend, Some(request_redraw.clone()), camera);
+        let renderer =
+            Renderer::new_with_options(backend, Some(request_redraw.clone()), camera, options);
 
         let debug = false;
 

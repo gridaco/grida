@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -22,13 +23,14 @@ async fn demo_basic() -> Scene {
     };
     image_node.corner_radius = RectangularCornerRadius::all(20.0);
     image_node.stroke_width = 2.0;
-    image_node.effect = Some(FilterEffect::DropShadow(FeDropShadow {
+    image_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 4.0,
         dy: 4.0,
         blur: 8.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 77),
-    }));
-    image_node._ref = demo_image_id.to_string();
+    })]);
+    image_node.hash = demo_image_id.to_string();
 
     // Create a test rectangle node with linear gradient
     let mut rect_node = nf.create_rectangle_node();
@@ -39,17 +41,18 @@ async fn demo_basic() -> Scene {
         height: 100.0,
     };
     rect_node.corner_radius = RectangularCornerRadius::all(10.0);
-    rect_node.fill = Paint::Solid(SolidPaint {
+    rect_node.set_fill(Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255), // Red fill
         opacity: 1.0,
-    });
+    }));
     rect_node.stroke_width = 2.0;
-    rect_node.effect = Some(FilterEffect::DropShadow(FeDropShadow {
+    rect_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 4.0,
         dy: 4.0,
         blur: 8.0,
+        spread: 0.0,
         color: Color(0, 0, 0, 77),
-    }));
+    })]);
 
     // Create a test ellipse node with radial gradient and a visible stroke
     let mut ellipse_node = nf.create_ellipse_node();
@@ -60,7 +63,7 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 200.0,
     };
-    ellipse_node.fill = Paint::RadialGradient(RadialGradientPaint {
+    ellipse_node.fills = vec![Paint::RadialGradient(RadialGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -77,7 +80,7 @@ async fn demo_basic() -> Scene {
             },
         ],
         opacity: 1.0,
-    });
+    })];
     ellipse_node.stroke_width = 6.0;
 
     // Create a test polygon node (pentagon)
@@ -94,16 +97,16 @@ async fn demo_basic() -> Scene {
     let mut polygon_node = nf.create_polygon_node();
     polygon_node.base.name = "Test Polygon".to_string();
     polygon_node.blend_mode = BlendMode::Screen;
-    polygon_node.transform = AffineTransform::new(800.0, 50.0, 0.0);
+    polygon_node.transform = AffineTransform::new(600.0, 50.0, 0.0);
     polygon_node.points = pentagon_points;
-    polygon_node.fill = Paint::Solid(SolidPaint {
+    polygon_node.fills = vec![Paint::Solid(SolidPaint {
         color: Color(255, 200, 0, 255), // Orange fill
         opacity: 1.0,
-    });
-    polygon_node.stroke = Paint::Solid(SolidPaint {
+    })];
+    polygon_node.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255), // Black stroke
         opacity: 1.0,
-    });
+    })];
     polygon_node.stroke_width = 5.0;
 
     // Create a test regular polygon node (hexagon)
@@ -116,10 +119,10 @@ async fn demo_basic() -> Scene {
         height: 200.0,
     };
     regular_polygon_node.point_count = 6; // hexagon
-    regular_polygon_node.fill = Paint::Solid(SolidPaint {
+    regular_polygon_node.fills = vec![Paint::Solid(SolidPaint {
         color: Color(0, 200, 255, 255), // Cyan fill
         opacity: 1.0,
-    });
+    })];
     regular_polygon_node.stroke_width = 4.0;
     regular_polygon_node.opacity = 0.5;
 
@@ -155,10 +158,10 @@ async fn demo_basic() -> Scene {
     path_node.base.name = "Test Path".to_string();
     path_node.transform = AffineTransform::new(550.0, 300.0, 0.0);
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
-    path_node.stroke = Paint::Solid(SolidPaint {
+    path_node.stroke = Some(Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255), // Red stroke
         opacity: 1.0,
-    });
+    }));
     path_node.stroke_width = 4.0;
 
     // Create a test line node with solid color
@@ -170,10 +173,10 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 0.0, // ignored
     };
-    line_node.stroke = Paint::Solid(SolidPaint {
+    line_node.strokes = vec![Paint::Solid(SolidPaint {
         color: Color(0, 255, 0, 255), // Green color
         opacity: 1.0,
-    });
+    })];
     line_node.stroke_width = 4.0;
 
     // Create a group node for the shapes (rectangle, ellipse, polygon)
@@ -210,7 +213,7 @@ async fn demo_basic() -> Scene {
     repository.insert(Node::TextSpan(text_span_node));
     repository.insert(Node::Line(line_node));
     repository.insert(Node::Image(image_node));
-    repository.insert(Node::Path(path_node));
+    repository.insert(Node::SVGPath(path_node));
 
     // Now set up the shapes group with the IDs we collected
     shapes_group_node.children = vec![rect_id, ellipse_id, polygon_id, regular_polygon_id];
@@ -225,7 +228,6 @@ async fn demo_basic() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

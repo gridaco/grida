@@ -1,4 +1,5 @@
 use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
+use crate::cg::types::*;
 use crate::node::schema::*;
 use crate::painter::layer::Layer;
 use crate::painter::{cvt, Painter};
@@ -20,6 +21,21 @@ use std::time::{Duration, Instant};
 
 /// Callback type used to request a redraw from the host window.
 pub type RequestRedrawCallback = Arc<dyn Fn()>;
+
+/// Options controlling renderer behaviour.
+#[derive(Clone, Copy)]
+pub struct RendererOptions {
+    /// When true, built-in fonts will be registered as fallbacks.
+    pub font_fallback: bool,
+}
+
+impl Default for RendererOptions {
+    fn default() -> Self {
+        Self {
+            font_fallback: false,
+        }
+    }
+}
 
 /// Type alias for tile information in frame planning
 pub type FramePlanTileInfo = RegionTileInfo;
@@ -110,7 +126,20 @@ impl Renderer {
         request_redraw: Option<RequestRedrawCallback>,
         camera: Camera2D,
     ) -> Self {
-        let font_repository = FontRepository::new();
+        Self::new_with_options(backend, request_redraw, camera, RendererOptions::default())
+    }
+
+    pub fn new_with_options(
+        backend: Backend,
+        request_redraw: Option<RequestRedrawCallback>,
+        camera: Camera2D,
+        options: RendererOptions,
+    ) -> Self {
+        let mut font_repository = FontRepository::new();
+        if options.font_fallback {
+            font_repository.add(crate::fonts::geist::geist_bytes(), "Geist");
+            font_repository.add(crate::fonts::geistmono::geistmono_bytes(), "GeistMono");
+        }
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
         let image_repository = Rc::new(RefCell::new(image_repository));
@@ -558,7 +587,6 @@ impl Renderer {
 mod tests {
     use super::*;
     use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::Size};
-    use math2::transform::AffineTransform;
 
     #[test]
     fn picture_recorded_with_layer_bounds() {
@@ -576,7 +604,6 @@ mod tests {
         let scene = Scene {
             id: "scene".into(),
             name: "test".into(),
-            transform: AffineTransform::identity(),
             children: vec![rect_id.clone()],
             nodes: repo,
             background_color: None,

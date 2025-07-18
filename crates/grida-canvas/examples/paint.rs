@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -32,7 +33,7 @@ async fn demo_paints() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::all(8.0);
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(
                 255 - (i * 25) as u8,
                 100 + (i * 15) as u8,
@@ -40,7 +41,7 @@ async fn demo_paints() -> Scene {
                 255,
             ),
             opacity: 1.0,
-        });
+        }));
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
@@ -60,7 +61,7 @@ async fn demo_paints() -> Scene {
         let angle = (i as f32 * 36.0) * std::f32::consts::PI / 180.0; // 0 to 360 degrees
         let transform = AffineTransform::new(0.0, 0.0, angle);
 
-        rect.fill = Paint::LinearGradient(LinearGradientPaint {
+        rect.set_fill(Paint::LinearGradient(LinearGradientPaint {
             transform,
             stops: vec![
                 GradientStop {
@@ -73,7 +74,7 @@ async fn demo_paints() -> Scene {
                 },
             ],
             opacity: 1.0,
-        });
+        }));
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
@@ -94,7 +95,7 @@ async fn demo_paints() -> Scene {
         let center_y = 0.2 + (i as f32 * 0.06); // 0.2 to 0.8
         let transform = AffineTransform::new(center_x * base_size, center_y * base_size, 0.0);
 
-        rect.fill = Paint::RadialGradient(RadialGradientPaint {
+        rect.set_fill(Paint::RadialGradient(RadialGradientPaint {
             transform,
             stops: vec![
                 GradientStop {
@@ -107,7 +108,7 @@ async fn demo_paints() -> Scene {
                 },
             ],
             opacity: 1.0,
-        });
+        }));
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
@@ -124,13 +125,13 @@ async fn demo_paints() -> Scene {
         rect.corner_radius = RectangularCornerRadius::all(8.0);
 
         // No fill
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0), // Transparent
             opacity: 1.0,
-        });
+        }));
 
         // Solid color stroke with varying colors
-        rect.stroke = Paint::Solid(SolidPaint {
+        rect.strokes = vec![Paint::Solid(SolidPaint {
             color: Color(
                 255 - (i * 25) as u8,
                 100 + (i * 15) as u8,
@@ -138,7 +139,7 @@ async fn demo_paints() -> Scene {
                 255,
             ),
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 4.0; // Consistent stroke width
 
         all_shape_ids.push(rect.base.id.clone());
@@ -157,16 +158,16 @@ async fn demo_paints() -> Scene {
         rect.corner_radius = RectangularCornerRadius::all(8.0);
 
         // No fill
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0), // Transparent
             opacity: 1.0,
-        });
+        }));
 
         // Create a linear gradient that changes angle based on index
         let angle = (i as f32 * 36.0) * std::f32::consts::PI / 180.0; // 0 to 360 degrees
         let transform = AffineTransform::new(0.0, 0.0, angle);
 
-        rect.stroke = Paint::LinearGradient(LinearGradientPaint {
+        rect.strokes = vec![Paint::LinearGradient(LinearGradientPaint {
             transform,
             stops: vec![
                 GradientStop {
@@ -179,7 +180,7 @@ async fn demo_paints() -> Scene {
                 },
             ],
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 4.0; // Consistent stroke width
 
         all_shape_ids.push(rect.base.id.clone());
@@ -198,17 +199,17 @@ async fn demo_paints() -> Scene {
         rect.corner_radius = RectangularCornerRadius::all(8.0);
 
         // No fill
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0), // Transparent
             opacity: 1.0,
-        });
+        }));
 
         // Create a radial gradient with varying center positions
         let center_x = 0.2 + (i as f32 * 0.06); // 0.2 to 0.8
         let center_y = 0.2 + (i as f32 * 0.06); // 0.2 to 0.8
         let transform = AffineTransform::new(center_x * base_size, center_y * base_size, 0.0);
 
-        rect.stroke = Paint::RadialGradient(RadialGradientPaint {
+        rect.strokes = vec![Paint::RadialGradient(RadialGradientPaint {
             transform,
             stops: vec![
                 GradientStop {
@@ -221,7 +222,7 @@ async fn demo_paints() -> Scene {
                 },
             ],
             opacity: 1.0,
-        });
+        })];
         rect.stroke_width = 4.0; // Consistent stroke width
 
         all_shape_ids.push(rect.base.id.clone());
@@ -236,7 +237,6 @@ async fn demo_paints() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Paints Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),

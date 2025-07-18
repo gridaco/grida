@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -33,7 +34,7 @@ async fn demo_shapes() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::all(0.0 + (i as f32 * 8.0)); // 0 to 72
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -41,7 +42,7 @@ async fn demo_shapes() -> Scene {
                 255,
             ), // Fading gray
             opacity: 1.0,
-        });
+        }));
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
@@ -55,7 +56,7 @@ async fn demo_shapes() -> Scene {
             width: base_size * (1.0 + (i as f32 * 0.1)), // 1.0x to 1.9x width
             height: base_size,
         };
-        ellipse.fill = Paint::Solid(SolidPaint {
+        ellipse.fills = vec![Paint::Solid(SolidPaint {
             color: Color(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -63,7 +64,7 @@ async fn demo_shapes() -> Scene {
                 255,
             ), // Fading gray
             opacity: 1.0,
-        });
+        })];
         all_shape_ids.push(ellipse.base.id.clone());
         repository.insert(Node::Ellipse(ellipse));
     }
@@ -87,7 +88,7 @@ async fn demo_shapes() -> Scene {
         polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
         polygon.points = points;
         polygon.corner_radius = 16.0;
-        polygon.fill = Paint::Solid(SolidPaint {
+        polygon.fills = vec![Paint::Solid(SolidPaint {
             color: Color(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -95,7 +96,7 @@ async fn demo_shapes() -> Scene {
                 255,
             ), // Fading gray
             opacity: 1.0,
-        });
+        })];
         all_shape_ids.push(polygon.base.id.clone());
         repository.insert(Node::Polygon(polygon));
     }
@@ -110,7 +111,7 @@ async fn demo_shapes() -> Scene {
             height: base_size,
         };
         regular_polygon.point_count = 3 + i; // 3 to 12 points
-        regular_polygon.fill = Paint::Solid(SolidPaint {
+        regular_polygon.fills = vec![Paint::Solid(SolidPaint {
             color: Color(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -118,7 +119,7 @@ async fn demo_shapes() -> Scene {
                 255,
             ), // Fading gray
             opacity: 1.0,
-        });
+        })];
         all_shape_ids.push(regular_polygon.base.id.clone());
         repository.insert(Node::RegularPolygon(regular_polygon));
     }
@@ -151,7 +152,7 @@ async fn demo_shapes() -> Scene {
             opacity: 1.0,
         });
         all_shape_ids.push(path.base.id.clone());
-        repository.insert(Node::Path(path));
+        repository.insert(Node::SVGPath(path));
     }
 
     // Star Polygon Row - demonstrating different point counts and inner radius variations
@@ -165,7 +166,7 @@ async fn demo_shapes() -> Scene {
         };
         star.point_count = 3 + i; // 3 to 12 points
         star.inner_radius = 0.7 - (i as f32 * 0.05); // 0.3 to 0.75 inner radius
-        star.fill = Paint::Solid(SolidPaint {
+        star.fills = vec![Paint::Solid(SolidPaint {
             color: Color(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -173,7 +174,7 @@ async fn demo_shapes() -> Scene {
                 255,
             ), // Fading gray
             opacity: 1.0,
-        });
+        })];
         all_shape_ids.push(star.base.id.clone());
         repository.insert(Node::RegularStarPolygon(star));
     }
@@ -186,7 +187,6 @@ async fn demo_shapes() -> Scene {
     Scene {
         id: "scene".to_string(),
         name: "Shapes Demo".to_string(),
-        transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
         background_color: Some(Color(250, 250, 250, 255)),
