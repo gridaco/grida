@@ -232,6 +232,7 @@ impl GeometryCache {
                     Node::Vector(n) => IntrinsicSizeNode::Vector(n.clone()),
                     Node::Rectangle(n) => IntrinsicSizeNode::Rectangle(n.clone()),
                     Node::Ellipse(n) => IntrinsicSizeNode::Ellipse(n.clone()),
+                    Node::Arc(n) => IntrinsicSizeNode::Arc(n.clone()),
                     Node::Polygon(n) => IntrinsicSizeNode::Polygon(n.clone()),
                     Node::RegularPolygon(n) => IntrinsicSizeNode::RegularPolygon(n.clone()),
                     Node::RegularStarPolygon(n) => IntrinsicSizeNode::RegularStarPolygon(n.clone()),
@@ -311,6 +312,7 @@ fn node_geometry(node: &IntrinsicSizeNode) -> (AffineTransform, Rectangle) {
         IntrinsicSizeNode::Container(n) => (n.transform, n.rect()),
         IntrinsicSizeNode::Rectangle(n) => (n.transform, n.rect()),
         IntrinsicSizeNode::Ellipse(n) => (n.transform, n.rect()),
+        IntrinsicSizeNode::Arc(n) => (n.transform, n.rect()),
         IntrinsicSizeNode::Polygon(n) => (n.transform, polygon_bounds(&n.points)),
         IntrinsicSizeNode::RegularPolygon(n) => (n.transform, n.rect()),
         IntrinsicSizeNode::RegularStarPolygon(n) => (n.transform, n.rect()),
@@ -468,6 +470,12 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
             &n.effects,
         ),
         Node::Polygon(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.stroke_align,
+            &n.effects,
+        ),
+        Node::Arc(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
             n.stroke_align,

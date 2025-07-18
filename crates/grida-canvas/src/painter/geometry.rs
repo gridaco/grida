@@ -217,6 +217,9 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             PainterShape::from_oval(rect)
         }
+        IntrinsicSizeNode::Arc(n) => {
+            todo!()
+        }
         IntrinsicSizeNode::Polygon(n) => {
             let path = if n.corner_radius > 0.0 {
                 n.to_sk_path()

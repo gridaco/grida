@@ -89,6 +89,13 @@ impl LayerEffects {
 }
 
 #[derive(Debug, Clone)]
+pub struct StrokeStyle {
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Size {
     pub width: f32,
     pub height: f32,
@@ -115,6 +122,7 @@ pub enum Node {
     Container(ContainerNode),
     Rectangle(RectangleNode),
     Ellipse(EllipseNode),
+    Arc(ArcNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
     RegularStarPolygon(RegularStarPolygonNode),
@@ -140,6 +148,7 @@ impl NodeTrait for Node {
             Node::Container(n) => n.base.id.clone(),
             Node::Rectangle(n) => n.base.id.clone(),
             Node::Ellipse(n) => n.base.id.clone(),
+            Node::Arc(n) => n.base.id.clone(),
             Node::Polygon(n) => n.base.id.clone(),
             Node::RegularPolygon(n) => n.base.id.clone(),
             Node::RegularStarPolygon(n) => n.base.id.clone(),
@@ -159,6 +168,7 @@ impl NodeTrait for Node {
             Node::Container(n) => n.base.name.clone(),
             Node::Rectangle(n) => n.base.name.clone(),
             Node::Ellipse(n) => n.base.name.clone(),
+            Node::Arc(n) => n.base.name.clone(),
             Node::Polygon(n) => n.base.name.clone(),
             Node::RegularPolygon(n) => n.base.name.clone(),
             Node::RegularStarPolygon(n) => n.base.name.clone(),
@@ -198,6 +208,7 @@ pub enum IntrinsicSizeNode {
     Container(ContainerNode),
     Rectangle(RectangleNode),
     Ellipse(EllipseNode),
+    Arc(ArcNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
     RegularStarPolygon(RegularStarPolygonNode),
@@ -213,6 +224,7 @@ pub enum LeafNode {
     Error(ErrorNode),
     Rectangle(RectangleNode),
     Ellipse(EllipseNode),
+    Arc(ArcNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
     RegularStarPolygon(RegularStarPolygonNode),
@@ -450,6 +462,68 @@ impl NodeFillsMixin for EllipseNode {
 }
 
 impl NodeGeometryMixin for EllipseNode {
+    fn rect(&self) -> Rectangle {
+        Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
+    }
+
+    fn has_stroke_geometry(&self) -> bool {
+        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+    }
+
+    fn render_bounds_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Arc Node.
+///
+///
+/// **3RD PARTY IMPLEMENTATIONS:**
+/// - https://konvajs.org/api/Konva.Arc.html
+/// - https://www.figma.com/plugin-docs/api/ArcData/
+///
+/// For details on arc mathematics, see: <https://mathworld.wolfram.com/Arc.html> (implementation varies)
+#[derive(Debug, Clone)]
+pub struct ArcNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub size: Size,
+    /// inner radius - 0 ~ 1
+    pub radius_a: f32,
+    /// start angle
+    pub angle_a: f32,
+    /// end angle
+    pub angle_b: f32,
+    pub fills: Vec<Paint>,
+    pub strokes: Vec<Paint>,
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
+    pub opacity: f32,
+    pub blend_mode: BlendMode,
+    pub effects: LayerEffects,
+}
+
+impl NodeFillsMixin for ArcNode {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
+}
+
+impl NodeGeometryMixin for ArcNode {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,

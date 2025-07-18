@@ -295,6 +295,9 @@ impl LayerList {
                         },
                     }))
                 }
+                Node::Arc(n) => {
+                    todo!()
+                }
                 Node::Polygon(n) => {
                     let shape = build_shape(&IntrinsicSizeNode::Polygon(n.clone()));
                     let stroke_path = if n.stroke_width > 0.0 {

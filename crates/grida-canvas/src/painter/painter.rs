@@ -456,6 +456,10 @@ impl<'a> Painter<'a> {
         });
     }
 
+    fn draw_arc_node(&self, node: &ArcNode) {
+        todo!()
+    }
+
     /// Draw a LineNode
     fn draw_line_node(&self, node: &LineNode) {
         self.with_transform(&node.transform.matrix, || {
@@ -756,6 +760,7 @@ impl<'a> Painter<'a> {
             LeafNode::Error(n) => self.draw_error_node(n),
             LeafNode::Rectangle(n) => self.draw_rect_node(n),
             LeafNode::Ellipse(n) => self.draw_ellipse_node(n),
+            LeafNode::Arc(n) => self.draw_arc_node(n),
             LeafNode::Polygon(n) => self.draw_polygon_node(n),
             LeafNode::RegularPolygon(n) => self.draw_regular_polygon_node(n),
             LeafNode::TextSpan(n) => self.draw_text_span_node(n),
@@ -782,6 +787,7 @@ impl<'a> Painter<'a> {
             Node::Container(n) => self.draw_container_node_recursively(n, repository, cache),
             Node::Rectangle(n) => self.draw_rect_node(n),
             Node::Ellipse(n) => self.draw_ellipse_node(n),
+            Node::Arc(n) => self.draw_arc_node(n),
             Node::Polygon(n) => self.draw_polygon_node(n),
             Node::RegularPolygon(n) => self.draw_regular_polygon_node(n),
             Node::TextSpan(n) => self.draw_text_span_node(n),

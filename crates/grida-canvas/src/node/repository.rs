@@ -1,4 +1,4 @@
-use crate::node::schema::{Node, NodeId};
+use crate::node::schema::{Node, NodeId, NodeTrait};
 use std::collections::HashMap;
 
 /// A repository for managing nodes with automatic ID indexing.
@@ -19,22 +19,7 @@ impl NodeRepository {
     /// Inserts a node into the repository, automatically indexing it by its ID.
     /// Returns the node's ID.
     pub fn insert(&mut self, node: Node) -> NodeId {
-        let id = match &node {
-            Node::Error(n) => n.base.id.clone(),
-            Node::Group(n) => n.base.id.clone(),
-            Node::Container(n) => n.base.id.clone(),
-            Node::Rectangle(n) => n.base.id.clone(),
-            Node::Ellipse(n) => n.base.id.clone(),
-            Node::Polygon(n) => n.base.id.clone(),
-            Node::RegularPolygon(n) => n.base.id.clone(),
-            Node::RegularStarPolygon(n) => n.base.id.clone(),
-            Node::Line(n) => n.base.id.clone(),
-            Node::TextSpan(n) => n.base.id.clone(),
-            Node::SVGPath(n) => n.base.id.clone(),
-            Node::Vector(n) => n.base.id.clone(),
-            Node::BooleanOperation(n) => n.base.id.clone(),
-            Node::Image(n) => n.base.id.clone(),
-        };
+        let id = node.id();
         self.nodes.insert(id.clone(), node);
         id
     }
