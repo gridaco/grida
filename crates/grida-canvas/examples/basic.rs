@@ -15,7 +15,7 @@ async fn demo_basic() -> Scene {
 
     // Create a test image node with URL
     let mut image_node = nf.create_image_node();
-    image_node.base.name = "Test Image".to_string();
+    image_node.name = Some("Test Image".to_string());
     image_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
     image_node.size = Size {
         width: 200.0,
@@ -34,7 +34,7 @@ async fn demo_basic() -> Scene {
 
     // Create a test rectangle node with linear gradient
     let mut rect_node = nf.create_rectangle_node();
-    rect_node.base.name = "Test Rectangle".to_string();
+    rect_node.name = Some("Test Rectangle".to_string());
     rect_node.transform = AffineTransform::new(300.0, 50.0, 0.0);
     rect_node.size = Size {
         width: 200.0,
@@ -56,7 +56,7 @@ async fn demo_basic() -> Scene {
 
     // Create a test ellipse node with radial gradient and a visible stroke
     let mut ellipse_node = nf.create_ellipse_node();
-    ellipse_node.base.name = "Test Ellipse".to_string();
+    ellipse_node.name = Some("Test Ellipse".to_string());
     ellipse_node.blend_mode = BlendMode::Multiply;
     ellipse_node.transform = AffineTransform::new(550.0, 50.0, 0.0);
     ellipse_node.size = Size {
@@ -95,7 +95,7 @@ async fn demo_basic() -> Scene {
         .collect::<Vec<_>>();
 
     let mut polygon_node = nf.create_polygon_node();
-    polygon_node.base.name = "Test Polygon".to_string();
+    polygon_node.name = Some("Test Polygon".to_string());
     polygon_node.blend_mode = BlendMode::Screen;
     polygon_node.transform = AffineTransform::new(600.0, 50.0, 0.0);
     polygon_node.points = pentagon_points;
@@ -111,7 +111,7 @@ async fn demo_basic() -> Scene {
 
     // Create a test regular polygon node (hexagon)
     let mut regular_polygon_node = nf.create_regular_polygon_node();
-    regular_polygon_node.base.name = "Test Regular Polygon".to_string();
+    regular_polygon_node.name = Some("Test Regular Polygon".to_string());
     regular_polygon_node.blend_mode = BlendMode::Overlay;
     regular_polygon_node.transform = AffineTransform::new(50.0, 300.0, 0.0);
     regular_polygon_node.size = Size {
@@ -128,7 +128,7 @@ async fn demo_basic() -> Scene {
 
     // Create a test text span node
     let mut text_span_node = nf.create_text_span_node();
-    text_span_node.base.name = "Test Text".to_string();
+    text_span_node.name = Some("Test Text".to_string());
     text_span_node.transform = AffineTransform::new(300.0, 300.0, 0.0);
     text_span_node.size = Size {
         width: 300.0,
@@ -155,7 +155,7 @@ async fn demo_basic() -> Scene {
 
     // Create a test path node
     let mut path_node = nf.create_path_node();
-    path_node.base.name = "Test Path".to_string();
+    path_node.name = Some("Test Path".to_string());
     path_node.transform = AffineTransform::new(550.0, 300.0, 0.0);
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
     path_node.stroke = Some(Paint::Solid(SolidPaint {
@@ -166,7 +166,7 @@ async fn demo_basic() -> Scene {
 
     // Create a test line node with solid color
     let mut line_node = nf.create_line_node();
-    line_node.base.name = "Test Line".to_string();
+    line_node.name = Some("Test Line".to_string());
     line_node.opacity = 0.8;
     line_node.transform = AffineTransform::new(800.0, 300.0, 0.0);
     line_node.size = Size {
@@ -181,7 +181,7 @@ async fn demo_basic() -> Scene {
 
     // Create a group node for the shapes (rectangle, ellipse, polygon)
     let mut shapes_group_node = nf.create_group_node();
-    shapes_group_node.base.name = "Shapes Group".to_string();
+    shapes_group_node.name = Some("Shapes Group".to_string());
     shapes_group_node.transform = AffineTransform::new(0.0, 0.0, 0.0);
 
     // Create a root container node containing the shapes group, text, and line
@@ -190,20 +190,20 @@ async fn demo_basic() -> Scene {
         width: 1080.0,
         height: 1080.0,
     };
-    root_container_node.base.name = "Root Container".to_string();
+    root_container_node.name = Some("Root Container".to_string());
 
     // Create a node map and add all nodes
     let mut repository = NodeRepository::new();
 
     // First, collect all the IDs we'll need
-    let rect_id = rect_node.base.id.clone();
-    let ellipse_id = ellipse_node.base.id.clone();
-    let polygon_id = polygon_node.base.id.clone();
-    let regular_polygon_id = regular_polygon_node.base.id.clone();
-    let text_span_id = text_span_node.base.id.clone();
-    let line_id = line_node.base.id.clone();
-    let image_id = image_node.base.id.clone();
-    let path_id = path_node.base.id.clone();
+    let rect_id = rect_node.id.clone();
+    let ellipse_id = ellipse_node.id.clone();
+    let polygon_id = polygon_node.id.clone();
+    let regular_polygon_id = regular_polygon_node.id.clone();
+    let text_span_id = text_span_node.id.clone();
+    let line_id = line_node.id.clone();
+    let image_id = image_node.id.clone();
+    let path_id = path_node.id.clone();
 
     // Now add all nodes to the map
     repository.insert(Node::Rectangle(rect_node));
@@ -217,12 +217,12 @@ async fn demo_basic() -> Scene {
 
     // Now set up the shapes group with the IDs we collected
     shapes_group_node.children = vec![rect_id, ellipse_id, polygon_id, regular_polygon_id];
-    let shapes_group_id = shapes_group_node.base.id.clone();
+    let shapes_group_id = shapes_group_node.id.clone();
     repository.insert(Node::Group(shapes_group_node));
 
     // Finally set up the root container with all IDs
     root_container_node.children = vec![shapes_group_id, text_span_id, line_id, path_id, image_id];
-    let root_container_id = root_container_node.base.id.clone();
+    let root_container_id = root_container_node.id.clone();
     repository.insert(Node::Container(root_container_node));
 
     Scene {

@@ -1,5 +1,5 @@
 use cg::cg::types::*;
-use cg::node::schema::{ArcNode, BaseNode, LayerEffects, Size};
+use cg::node::schema::{ArcNode, LayerEffects, Size};
 use math2::transform::AffineTransform;
 use skia_safe::{surfaces, Color as SkColor, Paint as SkPaint, PaintStyle, Path, Rect};
 
@@ -52,11 +52,9 @@ fn build_arc_path(node: &ArcNode) -> Path {
 
 fn main() {
     let node = ArcNode {
-        base: BaseNode {
-            id: "1".into(),
-            name: "arc".into(),
-            active: true,
-        },
+        id: "1".into(),
+        name: Some("arc".into()),
+        active: true,
         transform: AffineTransform::identity(),
         size: Size {
             width: 200.0,

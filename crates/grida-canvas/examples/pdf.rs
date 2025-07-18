@@ -14,7 +14,7 @@ async fn demo_scene() -> Scene {
 
     // Create a root container
     let mut root_container = nf.create_container_node();
-    root_container.base.name = "Root Container".to_string();
+    root_container.name = Some("Root Container".to_string());
     root_container.size = Size {
         width: 900.0,
         height: 700.0,
@@ -24,7 +24,7 @@ async fn demo_scene() -> Scene {
 
     // Title text
     let mut title_text = nf.create_text_span_node();
-    title_text.base.name = "Title".to_string();
+    title_text.name = Some("Title".to_string());
     title_text.transform = AffineTransform::new(50.0, 50.0, 0.0);
     title_text.size = Size {
         width: 700.0,
@@ -47,12 +47,12 @@ async fn demo_scene() -> Scene {
         color: Color(50, 50, 50, 255),
         opacity: 1.0,
     });
-    all_node_ids.push(title_text.base.id.clone());
+    all_node_ids.push(title_text.id.clone());
     repo.insert(Node::TextSpan(title_text));
 
     // Subtitle text
     let mut subtitle_text = nf.create_text_span_node();
-    subtitle_text.base.name = "Subtitle".to_string();
+    subtitle_text.name = Some("Subtitle".to_string());
     subtitle_text.transform = AffineTransform::new(50.0, 120.0, 0.0);
     subtitle_text.size = Size {
         width: 700.0,
@@ -76,12 +76,12 @@ async fn demo_scene() -> Scene {
         color: Color(100, 100, 100, 255),
         opacity: 1.0,
     });
-    all_node_ids.push(subtitle_text.base.id.clone());
+    all_node_ids.push(subtitle_text.id.clone());
     repo.insert(Node::TextSpan(subtitle_text));
 
     // Rectangle with gradient fill
     let mut rect_gradient = nf.create_rectangle_node();
-    rect_gradient.base.name = "Gradient Rectangle".to_string();
+    rect_gradient.name = Some("Gradient Rectangle".to_string());
     rect_gradient.transform = AffineTransform::new(50.0, 200.0, 0.0);
     rect_gradient.size = Size {
         width: 200.0,
@@ -118,12 +118,12 @@ async fn demo_scene() -> Scene {
         spread: 0.0,
         color: Color(0, 0, 0, 100),
     })]);
-    all_node_ids.push(rect_gradient.base.id.clone());
+    all_node_ids.push(rect_gradient.id.clone());
     repo.insert(Node::Rectangle(rect_gradient));
 
     // Ellipse with radial gradient
     let mut ellipse_radial = nf.create_ellipse_node();
-    ellipse_radial.base.name = "Radial Ellipse".to_string();
+    ellipse_radial.name = Some("Radial Ellipse".to_string());
     ellipse_radial.transform = AffineTransform::new(300.0, 200.0, 0.0);
     ellipse_radial.size = Size {
         width: 180.0,
@@ -152,7 +152,7 @@ async fn demo_scene() -> Scene {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
     })];
-    all_node_ids.push(ellipse_radial.base.id.clone());
+    all_node_ids.push(ellipse_radial.id.clone());
     repo.insert(Node::Ellipse(ellipse_radial));
 
     // Polygon (hexagon)
@@ -167,7 +167,7 @@ async fn demo_scene() -> Scene {
         .collect::<Vec<_>>();
 
     let mut hexagon = nf.create_polygon_node();
-    hexagon.base.name = "Hexagon".to_string();
+    hexagon.name = Some("Hexagon".to_string());
     hexagon.transform = AffineTransform::new(550.0, 200.0, 0.0);
     hexagon.points = hexagon_points;
     hexagon.fills = vec![Paint::Solid(SolidPaint {
@@ -186,12 +186,12 @@ async fn demo_scene() -> Scene {
         spread: 0.0,
         color: Color(0, 0, 0, 150),
     })]);
-    all_node_ids.push(hexagon.base.id.clone());
+    all_node_ids.push(hexagon.id.clone());
     repo.insert(Node::Polygon(hexagon));
 
     // Star polygon
     let mut star = nf.create_regular_star_polygon_node();
-    star.base.name = "Star".to_string();
+    star.name = Some("Star".to_string());
     star.transform = AffineTransform::new(50.0, 400.0, 0.0);
     star.size = Size {
         width: 120.0,
@@ -208,12 +208,12 @@ async fn demo_scene() -> Scene {
         color: Color(139, 69, 19, 255), // Brown
         opacity: 1.0,
     })];
-    all_node_ids.push(star.base.id.clone());
+    all_node_ids.push(star.id.clone());
     repo.insert(Node::RegularStarPolygon(star));
 
     // Path (complex shape)
     let mut path = nf.create_path_node();
-    path.base.name = "Complex Path".to_string();
+    path.name = Some("Complex Path".to_string());
     path.transform = AffineTransform::new(220.0, 400.0, 0.0);
     path.data = "M50,0 L61,35 L98,35 L68,57 L79,91 L50,71 L21,91 L32,57 L2,35 L39,35 Z".to_string();
     path.fill = Paint::Solid(SolidPaint {
@@ -225,12 +225,12 @@ async fn demo_scene() -> Scene {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
     }));
-    all_node_ids.push(path.base.id.clone());
+    all_node_ids.push(path.id.clone());
     repo.insert(Node::SVGPath(path));
 
     // Line with gradient stroke
     let mut line = nf.create_line_node();
-    line.base.name = "Gradient Line".to_string();
+    line.name = Some("Gradient Line".to_string());
     line.transform = AffineTransform::new(400.0, 400.0, 0.0);
     line.size = Size {
         width: 200.0,
@@ -255,12 +255,12 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     })];
     line.stroke_width = 8.0;
-    all_node_ids.push(line.base.id.clone());
+    all_node_ids.push(line.id.clone());
     repo.insert(Node::Line(line));
 
     // Regular polygon (octagon)
     let mut octagon = nf.create_regular_polygon_node();
-    octagon.base.name = "Octagon".to_string();
+    octagon.name = Some("Octagon".to_string());
     octagon.transform = AffineTransform::new(650.0, 400.0, 0.0);
     octagon.size = Size {
         width: 100.0,
@@ -276,12 +276,12 @@ async fn demo_scene() -> Scene {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
     })];
-    all_node_ids.push(octagon.base.id.clone());
+    all_node_ids.push(octagon.id.clone());
     repo.insert(Node::RegularPolygon(octagon));
 
     // Description text
     let mut description_text = nf.create_text_span_node();
-    description_text.base.name = "Description".to_string();
+    description_text.name = Some("Description".to_string());
     description_text.transform = AffineTransform::new(50.0, 550.0, 0.0);
     description_text.size = Size {
         width: 700.0,
@@ -304,12 +304,12 @@ async fn demo_scene() -> Scene {
         color: Color(80, 80, 80, 255),
         opacity: 1.0,
     });
-    all_node_ids.push(description_text.base.id.clone());
+    all_node_ids.push(description_text.id.clone());
     repo.insert(Node::TextSpan(description_text));
 
     // Set up the root container
     root_container.children = all_node_ids;
-    let root_container_id = root_container.base.id.clone();
+    let root_container_id = root_container.id.clone();
     repo.insert(Node::Container(root_container));
 
     Scene {

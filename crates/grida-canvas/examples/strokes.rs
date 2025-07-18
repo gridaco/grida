@@ -10,7 +10,7 @@ async fn demo_strokes() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.base.name = "Root Container".to_string();
+    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1000.0,
         height: 1200.0,
@@ -27,7 +27,7 @@ async fn demo_strokes() -> Scene {
     // Stroke Alignment Demo Row
     for i in 0..3 {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Stroke Alignment {}", i + 1);
+        rect.name = Some(format!("Stroke Alignment {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 100.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -56,14 +56,13 @@ async fn demo_strokes() -> Scene {
             _ => unreachable!(),
         };
 
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
     // Stroke Width Demo Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Stroke Width {}", i + 1);
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 250.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -85,7 +84,7 @@ async fn demo_strokes() -> Scene {
         rect.stroke_width = (i + 1) as f32 * 2.0; // Increasing stroke width
         rect.stroke_align = StrokeAlign::Center;
 
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
@@ -93,7 +92,7 @@ async fn demo_strokes() -> Scene {
     {
         // Rectangle
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = "Rectangle Stroke".to_string();
+        rect.name = Some("Rectangle Stroke".to_string());
         rect.transform = AffineTransform::new(start_x, 400.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -109,12 +108,12 @@ async fn demo_strokes() -> Scene {
             opacity: 1.0,
         })];
         rect.stroke_width = 4.0;
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
 
         // Ellipse
         let mut ellipse = nf.create_ellipse_node();
-        ellipse.base.name = "Ellipse Stroke".to_string();
+        ellipse.name = Some("Ellipse Stroke".to_string());
         ellipse.transform = AffineTransform::new(start_x + spacing, 400.0, 0.0);
         ellipse.size = Size {
             width: base_size,
@@ -129,12 +128,12 @@ async fn demo_strokes() -> Scene {
             opacity: 1.0,
         })];
         ellipse.stroke_width = 4.0;
-        all_shape_ids.push(ellipse.base.id.clone());
+        all_shape_ids.push(ellipse.id.clone());
         repository.insert(Node::Ellipse(ellipse));
 
         // Regular Polygon (Hexagon)
         let mut polygon = nf.create_regular_polygon_node();
-        polygon.base.name = "Hexagon Stroke".to_string();
+        polygon.name = Some("Hexagon Stroke".to_string());
         polygon.transform = AffineTransform::new(start_x + spacing * 2.0, 400.0, 0.0);
         polygon.size = Size {
             width: base_size,
@@ -150,12 +149,12 @@ async fn demo_strokes() -> Scene {
             opacity: 1.0,
         })];
         polygon.stroke_width = 4.0;
-        all_shape_ids.push(polygon.base.id.clone());
+        all_shape_ids.push(polygon.id.clone());
         repository.insert(Node::RegularPolygon(polygon));
 
         // Star
         let mut star = nf.create_regular_star_polygon_node();
-        star.base.name = "Star Stroke".to_string();
+        star.name = Some("Star Stroke".to_string());
         star.transform = AffineTransform::new(start_x + spacing * 3.0, 400.0, 0.0);
         star.size = Size {
             width: base_size,
@@ -172,14 +171,14 @@ async fn demo_strokes() -> Scene {
             opacity: 1.0,
         })];
         star.stroke_width = 4.0;
-        all_shape_ids.push(star.base.id.clone());
+        all_shape_ids.push(star.id.clone());
         repository.insert(Node::RegularStarPolygon(star));
     }
 
     // Stroke with Effects Row
     for i in 0..3 {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Stroke with Effect {}", i + 1);
+        rect.name = Some(format!("Stroke with Effect {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 550.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -218,14 +217,14 @@ async fn demo_strokes() -> Scene {
             _ => unreachable!(),
         };
 
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
     // Stroke Dash Array Demo Row
     for i in 0..4 {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Stroke Dash Array {}", i + 1);
+        rect.name = Some(format!("Stroke Dash Array {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 700.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -255,7 +254,7 @@ async fn demo_strokes() -> Scene {
             _ => unreachable!(),
         };
 
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
@@ -263,7 +262,7 @@ async fn demo_strokes() -> Scene {
     {
         // Linear Gradient Stroke
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = "Linear Gradient Stroke".to_string();
+        rect.name = Some("Linear Gradient Stroke".to_string());
         rect.transform = AffineTransform::new(start_x, 850.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -289,12 +288,12 @@ async fn demo_strokes() -> Scene {
             opacity: 1.0,
         })];
         rect.stroke_width = 8.0;
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
 
         // Radial Gradient Stroke
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = "Radial Gradient Stroke".to_string();
+        rect.name = Some("Radial Gradient Stroke".to_string());
         rect.transform = AffineTransform::new(start_x + spacing, 850.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -320,12 +319,12 @@ async fn demo_strokes() -> Scene {
             opacity: 1.0,
         })];
         rect.stroke_width = 8.0;
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
 
         // Conic Gradient Stroke
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = "Conic Gradient Stroke".to_string();
+        rect.name = Some("Conic Gradient Stroke".to_string());
         rect.transform = AffineTransform::new(start_x + spacing * 2.0, 850.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -355,12 +354,12 @@ async fn demo_strokes() -> Scene {
             opacity: 1.0,
         })];
         rect.stroke_width = 8.0;
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
 
         // Multi-color Solid Stroke
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = "Multi-color Stroke".to_string();
+        rect.name = Some("Multi-color Stroke".to_string());
         rect.transform = AffineTransform::new(start_x + spacing * 3.0, 850.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -377,7 +376,7 @@ async fn demo_strokes() -> Scene {
         })];
         rect.stroke_width = 8.0;
         rect.stroke_dash_array = Some(vec![20.0, 10.0, 5.0, 10.0]); // Complex dash pattern
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
@@ -385,7 +384,7 @@ async fn demo_strokes() -> Scene {
     {
         // Rectangle with multiple solid strokes (layered strokes)
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = "Multiple Solid Strokes".to_string();
+        rect.name = Some("Multiple Solid Strokes".to_string());
         rect.transform = AffineTransform::new(start_x, 1000.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -411,12 +410,12 @@ async fn demo_strokes() -> Scene {
             }),
         ];
         rect.stroke_width = 12.0; // Thick stroke to show layering
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
 
         // Rectangle with solid + gradient strokes
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = "Solid + Gradient Strokes".to_string();
+        rect.name = Some("Solid + Gradient Strokes".to_string());
         rect.transform = AffineTransform::new(start_x + spacing, 1000.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -448,12 +447,12 @@ async fn demo_strokes() -> Scene {
             }),
         ];
         rect.stroke_width = 10.0;
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
 
         // Ellipse with multiple gradient strokes
         let mut ellipse = nf.create_ellipse_node();
-        ellipse.base.name = "Multiple Gradient Strokes".to_string();
+        ellipse.name = Some("Multiple Gradient Strokes".to_string());
         ellipse.transform = AffineTransform::new(start_x + spacing * 2.0, 1000.0, 0.0);
         ellipse.size = Size {
             width: base_size,
@@ -494,12 +493,12 @@ async fn demo_strokes() -> Scene {
             }),
         ];
         ellipse.stroke_width = 12.0;
-        all_shape_ids.push(ellipse.base.id.clone());
+        all_shape_ids.push(ellipse.id.clone());
         repository.insert(Node::Ellipse(ellipse));
 
         // Polygon with complex multi-stroke pattern
         let mut polygon = nf.create_regular_polygon_node();
-        polygon.base.name = "Complex Multi-Stroke".to_string();
+        polygon.name = Some("Complex Multi-Stroke".to_string());
         polygon.transform = AffineTransform::new(start_x + spacing * 3.0, 1000.0, 0.0);
         polygon.size = Size {
             width: base_size,
@@ -548,13 +547,13 @@ async fn demo_strokes() -> Scene {
         ];
         polygon.stroke_width = 15.0; // Very thick to show all layers
         polygon.stroke_dash_array = Some(vec![8.0, 4.0]); // Dashed pattern
-        all_shape_ids.push(polygon.base.id.clone());
+        all_shape_ids.push(polygon.id.clone());
         repository.insert(Node::RegularPolygon(polygon));
     }
 
     // Set up the root container
     root_container_node.children.extend(all_shape_ids);
-    let root_container_id = root_container_node.base.id.clone();
+    let root_container_id = root_container_node.id.clone();
     repository.insert(Node::Container(root_container_node));
 
     Scene {

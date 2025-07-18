@@ -16,11 +16,9 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         ids.push(id.clone());
 
         let rect = RectangleNode {
-            base: BaseNode {
-                id: id.clone(),
-                name: format!("Rectangle {}", i),
-                active: true,
-            },
+            id: id.clone(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Size {
                 width: 100.0,
@@ -55,11 +53,9 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
 
     // Create root group
     let root_group = GroupNode {
-        base: BaseNode {
-            id: "root".to_string(),
-            name: "Root Group".to_string(),
-            active: true,
-        },
+        id: "root".to_string(),
+        name: Some("Root Group".to_string()),
+        active: true,
         transform: AffineTransform::identity(),
         children: ids.clone(),
         opacity: 1.0,

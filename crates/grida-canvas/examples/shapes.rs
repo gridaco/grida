@@ -10,7 +10,7 @@ async fn demo_shapes() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.base.name = "Root Container".to_string();
+    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1080.0,
         height: 1080.0,
@@ -27,7 +27,7 @@ async fn demo_shapes() -> Scene {
     // Rectangle Row - demonstrating corner radius variations
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Rectangle {}", i + 1);
+        rect.name = Some(format!("Rectangle {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 100.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -43,14 +43,14 @@ async fn demo_shapes() -> Scene {
             ), // Fading gray
             opacity: 1.0,
         }));
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
     // Ellipse Row - demonstrating width/height ratio variations
     for i in 0..items_per_row {
         let mut ellipse = nf.create_ellipse_node();
-        ellipse.base.name = format!("Ellipse {}", i + 1);
+        ellipse.name = Some(format!("Ellipse {}", i + 1));
         ellipse.transform = AffineTransform::new(start_x + spacing * i as f32, 200.0, 0.0);
         ellipse.size = Size {
             width: base_size * (1.0 + (i as f32 * 0.1)), // 1.0x to 1.9x width
@@ -65,7 +65,7 @@ async fn demo_shapes() -> Scene {
             ), // Fading gray
             opacity: 1.0,
         })];
-        all_shape_ids.push(ellipse.base.id.clone());
+        all_shape_ids.push(ellipse.id.clone());
         repository.insert(Node::Ellipse(ellipse));
     }
 
@@ -84,7 +84,7 @@ async fn demo_shapes() -> Scene {
             .collect::<Vec<_>>();
 
         let mut polygon = nf.create_polygon_node();
-        polygon.base.name = format!("Polygon {}", i + 1);
+        polygon.name = Some(format!("Polygon {}", i + 1));
         polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
         polygon.points = points;
         polygon.corner_radius = 16.0;
@@ -97,14 +97,14 @@ async fn demo_shapes() -> Scene {
             ), // Fading gray
             opacity: 1.0,
         })];
-        all_shape_ids.push(polygon.base.id.clone());
+        all_shape_ids.push(polygon.id.clone());
         repository.insert(Node::Polygon(polygon));
     }
 
     // Regular Polygon Row - demonstrating point count variations
     for i in 0..items_per_row {
         let mut regular_polygon = nf.create_regular_polygon_node();
-        regular_polygon.base.name = format!("Regular Polygon {}", i + 1);
+        regular_polygon.name = Some(format!("Regular Polygon {}", i + 1));
         regular_polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 400.0, 0.0);
         regular_polygon.size = Size {
             width: base_size,
@@ -120,7 +120,7 @@ async fn demo_shapes() -> Scene {
             ), // Fading gray
             opacity: 1.0,
         })];
-        all_shape_ids.push(regular_polygon.base.id.clone());
+        all_shape_ids.push(regular_polygon.id.clone());
         repository.insert(Node::RegularPolygon(regular_polygon));
     }
 
@@ -139,7 +139,7 @@ async fn demo_shapes() -> Scene {
     ];
     for (i, data) in path_data.iter().enumerate() {
         let mut path = nf.create_path_node();
-        path.base.name = format!("Path {}", i + 1);
+        path.name = Some(format!("Path {}", i + 1));
         path.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         path.data = data.to_string();
         path.fill = Paint::Solid(SolidPaint {
@@ -151,14 +151,14 @@ async fn demo_shapes() -> Scene {
             ), // Fading gray
             opacity: 1.0,
         });
-        all_shape_ids.push(path.base.id.clone());
+        all_shape_ids.push(path.id.clone());
         repository.insert(Node::SVGPath(path));
     }
 
     // Star Polygon Row - demonstrating different point counts and inner radius variations
     for i in 0..items_per_row {
         let mut star = nf.create_regular_star_polygon_node();
-        star.base.name = format!("Star Polygon {}", i + 1);
+        star.name = Some(format!("Star Polygon {}", i + 1));
         star.transform = AffineTransform::new(start_x + spacing * i as f32, 600.0, 0.0);
         star.size = Size {
             width: base_size,
@@ -175,13 +175,13 @@ async fn demo_shapes() -> Scene {
             ), // Fading gray
             opacity: 1.0,
         })];
-        all_shape_ids.push(star.base.id.clone());
+        all_shape_ids.push(star.id.clone());
         repository.insert(Node::RegularStarPolygon(star));
     }
 
     // Set up the root container
     root_container_node.children.extend(all_shape_ids);
-    let root_container_id = root_container_node.base.id.clone();
+    let root_container_id = root_container_node.id.clone();
     repository.insert(Node::Container(root_container_node));
 
     Scene {

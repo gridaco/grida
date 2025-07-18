@@ -29,7 +29,6 @@ async fn demo_n_shapes(n: usize) -> Scene {
         let col = (i as i32) % grid_width;
 
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Shape_{}", i);
         rect.transform = AffineTransform::new(
             start_x + (col as f32 * (shape_size + spacing)),
             start_y + (row as f32 * (shape_size + spacing)),
@@ -56,7 +55,7 @@ async fn demo_n_shapes(n: usize) -> Scene {
             opacity: 1.0,
         }));
 
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 

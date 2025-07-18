@@ -24,7 +24,7 @@ fn create_scene(t: f32) -> Scene {
         color: Color(r, g, 200, 255),
         opacity: 1.0,
     }));
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     Scene {

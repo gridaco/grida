@@ -188,7 +188,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity,
                             blend_mode: n.blend_mode,
@@ -198,7 +198,7 @@ impl LayerList {
                             strokes: n.strokes.clone(),
                             fills: n.fills.clone(),
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }));
                     for child in &n.children {
@@ -220,7 +220,7 @@ impl LayerList {
                         };
                         out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                             base: PainterPictureLayerBase {
-                                id: n.base.id.clone(),
+                                id: n.id.clone(),
                                 z_index: out.len(),
                                 opacity,
                                 blend_mode: n.blend_mode,
@@ -230,7 +230,7 @@ impl LayerList {
                                 strokes: n.stroke.clone().into_iter().collect(),
                                 fills: vec![n.fill.clone()],
                                 stroke_path,
-                                clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                                clip_path: Self::compute_clip_path(&n.id, repo, cache),
                             },
                         }));
                     } else {
@@ -253,7 +253,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
@@ -263,7 +263,7 @@ impl LayerList {
                             strokes: n.strokes.clone(),
                             fills: n.fills.clone(),
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }))
                 }
@@ -281,7 +281,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
@@ -291,7 +291,7 @@ impl LayerList {
                             strokes: n.strokes.clone(),
                             fills: n.fills.clone(),
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }))
                 }
@@ -312,7 +312,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
@@ -322,7 +322,7 @@ impl LayerList {
                             strokes: n.strokes.clone(),
                             fills: n.fills.clone(),
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }))
                 }
@@ -340,7 +340,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
@@ -350,7 +350,7 @@ impl LayerList {
                             strokes: n.strokes.clone(),
                             fills: n.fills.clone(),
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }))
                 }
@@ -368,7 +368,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
@@ -378,7 +378,7 @@ impl LayerList {
                             strokes: n.strokes.clone(),
                             fills: n.fills.clone(),
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }))
                 }
@@ -396,7 +396,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
@@ -406,13 +406,13 @@ impl LayerList {
                             strokes: n.strokes.clone(),
                             fills: vec![],
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }))
                 }
                 Node::TextSpan(n) => out.push(PainterPictureLayer::Text(PainterPictureTextLayer {
                     base: PainterPictureLayerBase {
-                        id: n.base.id.clone(),
+                        id: n.id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -422,7 +422,7 @@ impl LayerList {
                         strokes: n.stroke.clone().into_iter().collect(),
                         fills: vec![n.fill.clone()],
                         stroke_path: None,
-                        clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                        clip_path: Self::compute_clip_path(&n.id, repo, cache),
                     },
                     text: n.text.clone(),
                     text_style: n.text_style.clone(),
@@ -443,7 +443,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
@@ -453,7 +453,7 @@ impl LayerList {
                             strokes: n.stroke.clone().into_iter().collect(),
                             fills: vec![n.fill.clone()],
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }))
                 }
@@ -471,7 +471,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
@@ -481,7 +481,7 @@ impl LayerList {
                             strokes: n.strokes.clone(),
                             fills: n.fill.clone().into_iter().collect(),
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }))
                 }
@@ -499,7 +499,7 @@ impl LayerList {
                     };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.base.id.clone(),
+                            id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
@@ -509,13 +509,13 @@ impl LayerList {
                             strokes: vec![n.stroke.clone()],
                             fills: vec![Paint::Image(n.fill.clone())],
                             stroke_path,
-                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
                     }))
                 }
                 Node::Error(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.base.id.clone(),
+                        id: n.id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: BlendMode::Normal,
@@ -525,7 +525,7 @@ impl LayerList {
                         strokes: vec![],
                         fills: vec![],
                         stroke_path: None,
-                        clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                        clip_path: Self::compute_clip_path(&n.id, repo, cache),
                     },
                 })),
             }

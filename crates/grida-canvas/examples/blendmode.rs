@@ -15,7 +15,7 @@ async fn demo_blendmode() -> Scene {
         width: 2000.0,
         height: 4000.0,
     };
-    root_container_node.base.name = "Root Container".to_string();
+    root_container_node.name = Some("Root Container".to_string());
 
     let mut all_blendmode_ids = Vec::new();
     let spacing = 400.0;
@@ -50,7 +50,7 @@ async fn demo_blendmode() -> Scene {
 
         // Create background with radial gradient
         let mut background = nf.create_rectangle_node();
-        background.base.name = format!("Background {}", i);
+        background.name = Some(format!("Background {}", i));
         background.transform = AffineTransform::new(x, y, 0.0);
         background.size = Size {
             width: base_size,
@@ -78,12 +78,12 @@ async fn demo_blendmode() -> Scene {
             opacity: 1.0,
         }));
 
-        let background_id = background.base.id.clone();
+        let background_id = background.id.clone();
         repository.insert(Node::Rectangle(background));
 
         // Create a sweep gradient overlay (similar to C++ example's sweep gradient)
         let mut sweep_overlay = nf.create_rectangle_node();
-        sweep_overlay.base.name = format!("Sweep Overlay {}", i);
+        sweep_overlay.name = Some(format!("Sweep Overlay {}", i));
         sweep_overlay.transform = AffineTransform::new(x, y, 0.0);
         sweep_overlay.size = Size {
             width: base_size,
@@ -132,12 +132,12 @@ async fn demo_blendmode() -> Scene {
             opacity: 0.3, // Make it subtle
         }));
 
-        let sweep_overlay_id = sweep_overlay.base.id.clone();
+        let sweep_overlay_id = sweep_overlay.id.clone();
         repository.insert(Node::Rectangle(sweep_overlay));
 
         // Create a group for the colored circles with the specific blend mode
         let mut circle_group = nf.create_group_node();
-        circle_group.base.name = format!("Circle Group {}", i);
+        circle_group.name = Some(format!("Circle Group {}", i));
         circle_group.transform = AffineTransform::new(x, y, 0.0);
         circle_group.blend_mode = *blend_mode;
 
@@ -148,7 +148,7 @@ async fn demo_blendmode() -> Scene {
 
         // Green circle (top)
         let mut green_circle = nf.create_ellipse_node();
-        green_circle.base.name = format!("Green Circle {}", i);
+        green_circle.name = Some(format!("Green Circle {}", i));
         green_circle.transform = AffineTransform::new(base_size / 2.0, circle_radius, 0.0);
         green_circle.size = Size {
             width: circle_radius * 2.0,
@@ -159,13 +159,13 @@ async fn demo_blendmode() -> Scene {
             opacity: 1.0,
         }));
         green_circle.blend_mode = BlendMode::Normal; // Plus equivalent
-        let green_circle_id = green_circle.base.id.clone();
+        let green_circle_id = green_circle.id.clone();
         repository.insert(Node::Ellipse(green_circle));
         circle_ids.push(green_circle_id);
 
         // Red circle (bottom left)
         let mut red_circle = nf.create_ellipse_node();
-        red_circle.base.name = format!("Red Circle {}", i);
+        red_circle.name = Some(format!("Red Circle {}", i));
         red_circle.transform = AffineTransform::new(circle_radius, base_size - circle_radius, 0.0);
         red_circle.size = Size {
             width: circle_radius * 2.0,
@@ -176,13 +176,13 @@ async fn demo_blendmode() -> Scene {
             opacity: 1.0,
         }));
         red_circle.blend_mode = BlendMode::Normal; // Plus equivalent
-        let red_circle_id = red_circle.base.id.clone();
+        let red_circle_id = red_circle.id.clone();
         repository.insert(Node::Ellipse(red_circle));
         circle_ids.push(red_circle_id);
 
         // Blue circle (bottom right)
         let mut blue_circle = nf.create_ellipse_node();
-        blue_circle.base.name = format!("Blue Circle {}", i);
+        blue_circle.name = Some(format!("Blue Circle {}", i));
         blue_circle.transform =
             AffineTransform::new(base_size - circle_radius, base_size - circle_radius, 0.0);
         blue_circle.size = Size {
@@ -194,18 +194,18 @@ async fn demo_blendmode() -> Scene {
             opacity: 1.0,
         }));
         blue_circle.blend_mode = BlendMode::Normal; // Plus equivalent
-        let blue_circle_id = blue_circle.base.id.clone();
+        let blue_circle_id = blue_circle.id.clone();
         repository.insert(Node::Ellipse(blue_circle));
         circle_ids.push(blue_circle_id);
 
         // Set up the circle group
         circle_group.children = circle_ids;
-        let circle_group_id = circle_group.base.id.clone();
+        let circle_group_id = circle_group.id.clone();
         repository.insert(Node::Group(circle_group));
 
         // Create a text label for the blend mode
         let mut label = nf.create_text_span_node();
-        label.base.name = format!("Label {}", i);
+        label.name = Some(format!("Label {}", i));
         label.transform = AffineTransform::new(x + 10.0, y + 10.0, 0.0);
         label.size = Size {
             width: base_size - 20.0,
@@ -228,7 +228,7 @@ async fn demo_blendmode() -> Scene {
             color: Color(0, 0, 0, 255), // Black text
             opacity: 1.0,
         });
-        let label_id = label.base.id.clone();
+        let label_id = label.id.clone();
         repository.insert(Node::TextSpan(label));
 
         // Add all elements for this blend mode
@@ -240,7 +240,7 @@ async fn demo_blendmode() -> Scene {
 
     // Set up the root container
     root_container_node.children = all_blendmode_ids;
-    let root_container_id = root_container_node.base.id.clone();
+    let root_container_id = root_container_node.id.clone();
     repository.insert(Node::Container(root_container_node));
 
     Scene {

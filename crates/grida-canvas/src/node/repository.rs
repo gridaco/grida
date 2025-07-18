@@ -85,17 +85,15 @@ impl FromIterator<(NodeId, Node)> for NodeRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::schema::{BaseNode, ErrorNode, Size};
+    use crate::node::schema::{ErrorNode, Size};
 
     #[test]
     fn node_repository_basic() {
         let mut repo = NodeRepository::new();
         let node = Node::Error(ErrorNode {
-            base: BaseNode {
-                id: "1".to_string(),
-                name: "err".to_string(),
-                active: true,
-            },
+            id: "1".to_string(),
+            name: Some("err".to_string()),
+            active: true,
             transform: math2::transform::AffineTransform::identity(),
             size: Size {
                 width: 10.0,

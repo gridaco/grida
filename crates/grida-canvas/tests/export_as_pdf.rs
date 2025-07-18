@@ -10,7 +10,7 @@ fn test_pdf_export() {
     let mut repo = NodeRepository::new();
 
     let mut rect = nf.create_rectangle_node();
-    rect.base.name = "Test Rectangle".to_string();
+    rect.name = Some("Test Rectangle".to_string());
     rect.size = Size {
         width: 100.0,
         height: 50.0,
@@ -21,7 +21,7 @@ fn test_pdf_export() {
         opacity: 1.0,
     })];
 
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     let scene = Scene {

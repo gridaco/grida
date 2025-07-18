@@ -11,7 +11,7 @@ async fn demo_booleans() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.base.name = "Root Container".to_string();
+    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1080.0,
         height: 1080.0,
@@ -28,7 +28,7 @@ async fn demo_booleans() -> Scene {
 
         // Create shapes
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = "Rectangle".to_string();
+        rect.name = Some("Rectangle".to_string());
         rect.transform = AffineTransform::new(start_x, y_offset, 0.0);
         rect.size = Size {
             width: base_size,
@@ -40,7 +40,7 @@ async fn demo_booleans() -> Scene {
         }));
 
         let mut circle = nf.create_ellipse_node();
-        circle.base.name = "Circle".to_string();
+        circle.name = Some("Circle".to_string());
         circle.transform = AffineTransform::new(start_x + spacing, y_offset, 0.0);
         circle.size = Size {
             width: base_size,
@@ -53,7 +53,7 @@ async fn demo_booleans() -> Scene {
 
         // Add description text
         let mut text = nf.create_text_span_node();
-        text.base.name = "Description".to_string();
+        text.name = Some("Description".to_string());
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0); // Moved text up slightly
         text.size = Size {
             width: 500.0, // Increased width for better text display
@@ -68,14 +68,12 @@ async fn demo_booleans() -> Scene {
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNode {
-            base: BaseNode {
-                id: "bool_union_1".to_string(),
-                name: "Union Operation".to_string(),
-                active: true,
-            },
+            id: "bool_union_1".to_string(),
+            name: Some("Union Operation".to_string()),
+            active: true,
             transform: AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0),
             op: BooleanPathOperation::Union,
-            children: vec![rect.base.id.clone(), circle.base.id.clone()],
+            children: vec![rect.id.clone(), circle.id.clone()],
             fill: Paint::Solid(SolidPaint {
                 color: Color(100, 100, 200, 255),
                 opacity: 1.0,
@@ -93,10 +91,10 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(rect.base.id.clone());
-        all_shape_ids.push(circle.base.id.clone());
-        all_shape_ids.push(text.base.id.clone());
-        all_shape_ids.push(bool_node.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
+        all_shape_ids.push(circle.id.clone());
+        all_shape_ids.push(text.id.clone());
+        all_shape_ids.push(bool_node.id.clone());
 
         // Insert all nodes
         repository.insert(Node::Rectangle(rect));
@@ -111,7 +109,7 @@ async fn demo_booleans() -> Scene {
 
         // Create shapes
         let mut circle1 = nf.create_ellipse_node();
-        circle1.base.name = "Circle 1".to_string();
+        circle1.name = Some("Circle 1".to_string());
         circle1.transform = AffineTransform::new(start_x, y_offset, 0.0);
         circle1.size = Size {
             width: base_size,
@@ -123,7 +121,7 @@ async fn demo_booleans() -> Scene {
         })];
 
         let mut circle2 = nf.create_ellipse_node();
-        circle2.base.name = "Circle 2".to_string();
+        circle2.name = Some("Circle 2".to_string());
         circle2.transform = AffineTransform::new(start_x + 100.0, y_offset, 0.0);
         circle2.size = Size {
             width: base_size,
@@ -136,7 +134,7 @@ async fn demo_booleans() -> Scene {
 
         // Add description text
         let mut text = nf.create_text_span_node();
-        text.base.name = "Description".to_string();
+        text.name = Some("Description".to_string());
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.size = Size {
             width: 500.0,
@@ -151,14 +149,12 @@ async fn demo_booleans() -> Scene {
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNode {
-            base: BaseNode {
-                id: "bool_intersection_1".to_string(),
-                name: "Intersection Operation".to_string(),
-                active: true,
-            },
+            id: "bool_intersection_1".to_string(),
+            name: Some("Intersection Operation".to_string()),
+            active: true,
             transform: AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0),
             op: BooleanPathOperation::Intersection,
-            children: vec![circle1.base.id.clone(), circle2.base.id.clone()],
+            children: vec![circle1.id.clone(), circle2.id.clone()],
             fill: Paint::Solid(SolidPaint {
                 color: Color(100, 100, 200, 255),
                 opacity: 1.0,
@@ -176,10 +172,10 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(circle1.base.id.clone());
-        all_shape_ids.push(circle2.base.id.clone());
-        all_shape_ids.push(text.base.id.clone());
-        all_shape_ids.push(bool_node.base.id.clone());
+        all_shape_ids.push(circle1.id.clone());
+        all_shape_ids.push(circle2.id.clone());
+        all_shape_ids.push(text.id.clone());
+        all_shape_ids.push(bool_node.id.clone());
 
         // Insert all nodes
         repository.insert(Node::Ellipse(circle1));
@@ -194,7 +190,7 @@ async fn demo_booleans() -> Scene {
 
         // Create shapes
         let mut star = nf.create_regular_star_polygon_node();
-        star.base.name = "Star".to_string();
+        star.name = Some("Star".to_string());
         star.transform = AffineTransform::new(start_x, y_offset, 0.0);
         star.size = Size {
             width: base_size,
@@ -206,7 +202,7 @@ async fn demo_booleans() -> Scene {
         })];
 
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = "Rectangle".to_string();
+        rect.name = Some("Rectangle".to_string());
         rect.transform = AffineTransform::new(start_x + spacing * 0.5, y_offset, 0.0);
         rect.size = Size {
             width: base_size * 0.8,
@@ -219,7 +215,7 @@ async fn demo_booleans() -> Scene {
 
         // Add description text
         let mut text = nf.create_text_span_node();
-        text.base.name = "Description".to_string();
+        text.name = Some("Description".to_string());
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.size = Size {
             width: 500.0,
@@ -234,14 +230,12 @@ async fn demo_booleans() -> Scene {
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNode {
-            base: BaseNode {
-                id: "bool_difference_1".to_string(),
-                name: "Difference Operation".to_string(),
-                active: true,
-            },
+            id: "bool_difference_1".to_string(),
+            name: Some("Difference Operation".to_string()),
+            active: true,
             transform: AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0),
             op: BooleanPathOperation::Difference,
-            children: vec![star.base.id.clone(), rect.base.id.clone()],
+            children: vec![star.id.clone(), rect.id.clone()],
             fill: Paint::Solid(SolidPaint {
                 color: Color(100, 100, 200, 255),
                 opacity: 1.0,
@@ -259,10 +253,10 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(star.base.id.clone());
-        all_shape_ids.push(rect.base.id.clone());
-        all_shape_ids.push(text.base.id.clone());
-        all_shape_ids.push(bool_node.base.id.clone());
+        all_shape_ids.push(star.id.clone());
+        all_shape_ids.push(rect.id.clone());
+        all_shape_ids.push(text.id.clone());
+        all_shape_ids.push(bool_node.id.clone());
 
         // Insert all nodes
         repository.insert(Node::RegularStarPolygon(star));
@@ -277,7 +271,7 @@ async fn demo_booleans() -> Scene {
 
         // Create shapes
         let mut square1 = nf.create_rectangle_node();
-        square1.base.name = "Square 1".to_string();
+        square1.name = Some("Square 1".to_string());
         square1.transform = AffineTransform::new(start_x, y_offset, 0.0);
         square1.size = Size {
             width: base_size,
@@ -289,7 +283,7 @@ async fn demo_booleans() -> Scene {
         }));
 
         let mut square2 = nf.create_rectangle_node();
-        square2.base.name = "Square 2".to_string();
+        square2.name = Some("Square 2".to_string());
         square2.transform = AffineTransform::new(start_x + spacing * 0.5, y_offset, 0.0);
         square2.size = Size {
             width: base_size,
@@ -302,7 +296,7 @@ async fn demo_booleans() -> Scene {
 
         // Add description text
         let mut text = nf.create_text_span_node();
-        text.base.name = "Description".to_string();
+        text.name = Some("Description".to_string());
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.size = Size {
             width: 500.0,
@@ -317,14 +311,12 @@ async fn demo_booleans() -> Scene {
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNode {
-            base: BaseNode {
-                id: "bool_xor_1".to_string(),
-                name: "XOR Operation".to_string(),
-                active: true,
-            },
+            id: "bool_xor_1".to_string(),
+            name: Some("XOR Operation".to_string()),
+            active: true,
             transform: AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0),
             op: BooleanPathOperation::Xor,
-            children: vec![square1.base.id.clone(), square2.base.id.clone()],
+            children: vec![square1.id.clone(), square2.id.clone()],
             fill: Paint::Solid(SolidPaint {
                 color: Color(100, 100, 200, 255),
                 opacity: 1.0,
@@ -342,10 +334,10 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(square1.base.id.clone());
-        all_shape_ids.push(square2.base.id.clone());
-        all_shape_ids.push(text.base.id.clone());
-        all_shape_ids.push(bool_node.base.id.clone());
+        all_shape_ids.push(square1.id.clone());
+        all_shape_ids.push(square2.id.clone());
+        all_shape_ids.push(text.id.clone());
+        all_shape_ids.push(bool_node.id.clone());
 
         // Insert all nodes
         repository.insert(Node::Rectangle(square1));
@@ -356,7 +348,7 @@ async fn demo_booleans() -> Scene {
 
     // Set up the root container
     root_container_node.children.extend(all_shape_ids);
-    let root_container_id = root_container_node.base.id.clone();
+    let root_container_id = root_container_node.id.clone();
     repository.insert(Node::Container(root_container_node));
 
     Scene {

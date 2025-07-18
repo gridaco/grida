@@ -32,8 +32,8 @@ fn create_static_scene() -> Scene {
     for i in 0..10 {
         for j in 0..10 {
             let mut rect = nf.create_rectangle_node();
-            let id = rect.base.id.clone();
-            rect.base.name = format!("Rectangle {}-{}", i, j);
+            let id = rect.id.clone();
+            rect.name = Some(format!("Rectangle {}-{}", i, j));
             rect.transform = AffineTransform::new(i as f32 * 100.0, j as f32 * 100.0, 0.0);
             rect.size = Size {
                 width: 50.0,
@@ -46,11 +46,9 @@ fn create_static_scene() -> Scene {
 
     // Create a root group containing all rectangles
     let root_group = GroupNode {
-        base: BaseNode {
-            id: "root".to_string(),
-            name: "Root Group".to_string(),
-            active: true,
-        },
+        id: "root".to_string(),
+        name: Some("Root Group".to_string()),
+        active: true,
         transform: AffineTransform::identity(),
         children: ids,
         opacity: 1.0,

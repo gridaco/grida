@@ -17,7 +17,7 @@ async fn demo_webfonts() -> Scene {
 
     // Create a heading with Playfair Display
     let mut heading_node = nf.create_text_span_node();
-    heading_node.base.name = "Heading".to_string();
+    heading_node.name = Some("Heading".to_string());
     heading_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
     heading_node.size = Size {
         width: 800.0,
@@ -39,7 +39,7 @@ async fn demo_webfonts() -> Scene {
 
     // Create a description paragraph with Playfair Display
     let mut description_node = nf.create_text_span_node();
-    description_node.base.name = "Description".to_string();
+    description_node.name = Some("Description".to_string());
     description_node.transform = AffineTransform::new(50.0, 120.0, 0.0);
     description_node.size = Size {
         width: 800.0,
@@ -83,7 +83,7 @@ async fn demo_webfonts() -> Scene {
 
     for (i, (variant, weight, is_italic)) in variants.iter().enumerate() {
         let mut text_node = nf.create_text_span_node();
-        text_node.base.name = format!("Albert Sans {}", variant);
+        text_node.name = Some(format!("Albert Sans {}", variant));
         text_node.transform = AffineTransform::new(50.0, 280.0 + (i as f32 * 40.0), 0.0);
         text_node.size = Size {
             width: 800.0,
@@ -107,7 +107,7 @@ async fn demo_webfonts() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.base.name = "Root Container".to_string();
+    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1080.0,
         height: 1080.0,
@@ -117,12 +117,9 @@ async fn demo_webfonts() -> Scene {
     let mut repository = NodeRepository::new();
 
     // Collect all the IDs
-    let heading_id = heading_node.base.id.clone();
-    let description_id = description_node.base.id.clone();
-    let albert_text_ids: Vec<_> = albert_text_nodes
-        .iter()
-        .map(|n| n.base.id.clone())
-        .collect();
+    let heading_id = heading_node.id.clone();
+    let description_id = description_node.id.clone();
+    let albert_text_ids: Vec<_> = albert_text_nodes.iter().map(|n| n.id.clone()).collect();
 
     // Add all nodes to the repository
     repository.insert(Node::TextSpan(heading_node));
@@ -135,7 +132,7 @@ async fn demo_webfonts() -> Scene {
     let mut children = vec![heading_id, description_id];
     children.extend(albert_text_ids);
     root_container_node.children = children;
-    let root_container_id = root_container_node.base.id.clone();
+    let root_container_id = root_container_node.id.clone();
     repository.insert(Node::Container(root_container_node));
 
     Scene {

@@ -375,7 +375,7 @@ pub fn boolean_operation_path(
     cache: &GeometryCache,
 ) -> Option<Path> {
     let world = cache
-        .get_world_transform(&node.base.id)
+        .get_world_transform(&node.id)
         .unwrap_or_else(AffineTransform::identity);
     let inv = world.inverse().unwrap_or_else(AffineTransform::identity);
 

@@ -137,47 +137,47 @@ pub enum Node {
 // node trait
 pub trait NodeTrait {
     fn id(&self) -> NodeId;
-    fn name(&self) -> String;
+    fn name(&self) -> Option<String>;
 }
 
 impl NodeTrait for Node {
     fn id(&self) -> NodeId {
         match self {
-            Node::Error(n) => n.base.id.clone(),
-            Node::Group(n) => n.base.id.clone(),
-            Node::Container(n) => n.base.id.clone(),
-            Node::Rectangle(n) => n.base.id.clone(),
-            Node::Ellipse(n) => n.base.id.clone(),
-            Node::Arc(n) => n.base.id.clone(),
-            Node::Polygon(n) => n.base.id.clone(),
-            Node::RegularPolygon(n) => n.base.id.clone(),
-            Node::RegularStarPolygon(n) => n.base.id.clone(),
-            Node::Line(n) => n.base.id.clone(),
-            Node::TextSpan(n) => n.base.id.clone(),
-            Node::SVGPath(n) => n.base.id.clone(),
-            Node::Vector(n) => n.base.id.clone(),
-            Node::BooleanOperation(n) => n.base.id.clone(),
-            Node::Image(n) => n.base.id.clone(),
+            Node::Error(n) => n.id.clone(),
+            Node::Group(n) => n.id.clone(),
+            Node::Container(n) => n.id.clone(),
+            Node::Rectangle(n) => n.id.clone(),
+            Node::Ellipse(n) => n.id.clone(),
+            Node::Arc(n) => n.id.clone(),
+            Node::Polygon(n) => n.id.clone(),
+            Node::RegularPolygon(n) => n.id.clone(),
+            Node::RegularStarPolygon(n) => n.id.clone(),
+            Node::Line(n) => n.id.clone(),
+            Node::TextSpan(n) => n.id.clone(),
+            Node::SVGPath(n) => n.id.clone(),
+            Node::Vector(n) => n.id.clone(),
+            Node::BooleanOperation(n) => n.id.clone(),
+            Node::Image(n) => n.id.clone(),
         }
     }
 
-    fn name(&self) -> String {
+    fn name(&self) -> Option<String> {
         match self {
-            Node::Error(n) => n.base.name.clone(),
-            Node::Group(n) => n.base.name.clone(),
-            Node::Container(n) => n.base.name.clone(),
-            Node::Rectangle(n) => n.base.name.clone(),
-            Node::Ellipse(n) => n.base.name.clone(),
-            Node::Arc(n) => n.base.name.clone(),
-            Node::Polygon(n) => n.base.name.clone(),
-            Node::RegularPolygon(n) => n.base.name.clone(),
-            Node::RegularStarPolygon(n) => n.base.name.clone(),
-            Node::Line(n) => n.base.name.clone(),
-            Node::TextSpan(n) => n.base.name.clone(),
-            Node::SVGPath(n) => n.base.name.clone(),
-            Node::Vector(n) => n.base.name.clone(),
-            Node::BooleanOperation(n) => n.base.name.clone(),
-            Node::Image(n) => n.base.name.clone(),
+            Node::Error(n) => n.name.clone(),
+            Node::Group(n) => n.name.clone(),
+            Node::Container(n) => n.name.clone(),
+            Node::Rectangle(n) => n.name.clone(),
+            Node::Ellipse(n) => n.name.clone(),
+            Node::Arc(n) => n.name.clone(),
+            Node::Polygon(n) => n.name.clone(),
+            Node::RegularPolygon(n) => n.name.clone(),
+            Node::RegularStarPolygon(n) => n.name.clone(),
+            Node::Line(n) => n.name.clone(),
+            Node::TextSpan(n) => n.name.clone(),
+            Node::SVGPath(n) => n.name.clone(),
+            Node::Vector(n) => n.name.clone(),
+            Node::BooleanOperation(n) => n.name.clone(),
+            Node::Image(n) => n.name.clone(),
         }
     }
 }
@@ -236,15 +236,10 @@ pub enum LeafNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct BaseNode {
-    pub id: NodeId,
-    pub name: String,
-    pub active: bool,
-}
-
-#[derive(Debug, Clone)]
 pub struct ErrorNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub error: String,
@@ -264,7 +259,9 @@ impl ErrorNode {
 
 #[derive(Debug, Clone)]
 pub struct GroupNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub children: Vec<NodeId>,
     pub opacity: f32,
@@ -273,7 +270,9 @@ pub struct GroupNode {
 
 #[derive(Debug, Clone)]
 pub struct ContainerNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
@@ -324,7 +323,9 @@ impl NodeGeometryMixin for ContainerNode {
 
 #[derive(Debug, Clone)]
 pub struct RectangleNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
@@ -373,7 +374,9 @@ impl NodeGeometryMixin for RectangleNode {
 
 #[derive(Debug, Clone)]
 pub struct LineNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size, // height is always 0 (ignored)
     pub strokes: Vec<Paint>,
@@ -394,7 +397,9 @@ impl LineNode {
 
 #[derive(Debug, Clone)]
 pub struct ImageNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
@@ -438,7 +443,9 @@ impl NodeGeometryMixin for ImageNode {
 /// The ellipse is drawn within the bounding box defined by these coordinates.
 #[derive(Debug, Clone)]
 pub struct EllipseNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub fills: Vec<Paint>,
@@ -494,7 +501,9 @@ impl NodeGeometryMixin for EllipseNode {
 /// For details on arc mathematics, see: <https://mathworld.wolfram.com/Arc.html> (implementation varies)
 #[derive(Debug, Clone)]
 pub struct ArcNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     /// inner radius - 0 ~ 1
@@ -548,7 +557,9 @@ impl NodeGeometryMixin for ArcNode {
 
 #[derive(Debug, Clone)]
 pub struct BooleanPathOperationNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub op: BooleanPathOperation,
     pub children: Vec<NodeId>,
@@ -567,7 +578,9 @@ pub struct BooleanPathOperationNode {
 ///
 #[derive(Debug, Clone)]
 pub struct VectorNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub fill: Option<Paint>,
     pub network: VectorNetwork,
@@ -591,7 +604,9 @@ impl ToSkPath for VectorNode {
 ///
 #[derive(Debug, Clone)]
 pub struct SVGPathNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub fill: Paint,
     pub data: String,
@@ -615,8 +630,9 @@ pub struct SVGPathNode {
 /// https://developer.mozilla.org/en-US/docs/Web/SVG/Element/polygon
 #[derive(Debug, Clone)]
 pub struct PolygonNode {
-    /// Common base metadata and identity.
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
 
     /// 2D affine transform matrix applied to the shape.
     pub transform: AffineTransform,
@@ -684,8 +700,9 @@ impl ToSkPath for PolygonNode {
 /// For details on regular polygon mathematics, see: <https://mathworld.wolfram.com/RegularPolygon.html> (implementation varies)
 #[derive(Debug, Clone)]
 pub struct RegularPolygonNode {
-    /// Core identity + metadata
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
 
     /// Affine transform applied to this node
     pub transform: AffineTransform,
@@ -772,7 +789,9 @@ impl RegularPolygonNode {
             .collect();
 
         PolygonNode {
-            base: self.base.clone(),
+            id: self.id.clone(),
+            name: self.name.clone(),
+            active: self.active,
             transform: self.transform,
             points,
             corner_radius: self.corner_radius,
@@ -797,8 +816,9 @@ impl RegularPolygonNode {
 /// For details on star polygon mathematics, see: <https://mathworld.wolfram.com/StarPolygon.html>
 #[derive(Debug, Clone)]
 pub struct RegularStarPolygonNode {
-    /// Core identity + metadata
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
 
     /// Affine transform applied to this node
     pub transform: AffineTransform,
@@ -893,7 +913,9 @@ impl RegularStarPolygonNode {
         }
 
         PolygonNode {
-            base: self.base.clone(),
+            id: self.id.clone(),
+            name: self.name.clone(),
+            active: self.active,
             transform: self.transform,
             points,
             corner_radius: self.corner_radius,
@@ -913,8 +935,9 @@ impl RegularStarPolygonNode {
 /// For multi-style content, see `RichTextNode` (not implemented yet).
 #[derive(Debug, Clone)]
 pub struct TextSpanNode {
-    /// Metadata and identity.
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
 
     /// Transform applied to the text container.
     pub transform: AffineTransform,
@@ -952,7 +975,9 @@ pub struct TextSpanNode {
 #[derive(Debug, Clone)]
 #[deprecated(note = "Not implemented yet")]
 pub struct TextNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub text: String,

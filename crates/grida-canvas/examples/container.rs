@@ -11,7 +11,7 @@ async fn demo_clip() -> Scene {
 
     // Create a single container with solid fill
     let mut container = nf.create_container_node();
-    container.base.name = "Simple Container".to_string();
+    container.name = Some("Simple Container".to_string());
     container.transform = AffineTransform::new(100.0, 100.0, 0.0);
     container.size = Size {
         width: 300.0,
@@ -38,7 +38,7 @@ async fn demo_clip() -> Scene {
 
     // Create an ellipse
     let mut ellipse = nf.create_ellipse_node();
-    ellipse.base.name = "Simple Ellipse".to_string();
+    ellipse.name = Some("Simple Ellipse".to_string());
     ellipse.transform = AffineTransform::new(100.0, 150.0, 0.0); // Position below container
     ellipse.size = Size {
         width: 300.0,
@@ -55,13 +55,13 @@ async fn demo_clip() -> Scene {
     ellipse.stroke_width = 2.0;
 
     // Add nodes to repository and collect their IDs
-    let ellipse_id = ellipse.base.id.clone();
+    let ellipse_id = ellipse.id.clone();
     repository.insert(Node::Ellipse(ellipse));
 
     // Add ellipse as child of container
     container.children = vec![ellipse_id];
 
-    let container_id = container.base.id.clone();
+    let container_id = container.id.clone();
     repository.insert(Node::Container(container));
 
     Scene {

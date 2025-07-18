@@ -598,7 +598,7 @@ mod tests {
             width: 50.0,
             height: 40.0,
         };
-        let rect_id = rect.base.id.clone();
+        let rect_id = rect.id.clone();
         repo.insert(Node::Rectangle(rect));
 
         let scene = Scene {

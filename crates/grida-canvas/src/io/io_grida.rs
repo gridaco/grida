@@ -166,7 +166,8 @@ pub struct JSONScene {
 #[derive(Debug, Deserialize)]
 pub struct JSONUnknownNodeProperties {
     pub id: String,
-    pub name: String,
+    #[serde(default)]
+    pub name: Option<String>,
     #[serde(default = "default_active")]
     pub active: bool,
     #[serde(default = "default_locked")]
@@ -462,11 +463,9 @@ pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
 impl From<JSONContainerNode> for ContainerNode {
     fn from(node: JSONContainerNode) -> Self {
         ContainerNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
             size: Size {
                 width: node.base.width,
@@ -502,11 +501,9 @@ impl From<JSONTextNode> for TextSpanNode {
         let width = node.base.width;
         let height = node.base.height;
         TextSpanNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
             size: Size { width, height },
             text: node.text,
@@ -542,11 +539,9 @@ impl From<JSONEllipseNode> for Node {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         Node::Ellipse(EllipseNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             size: Size {
                 width: node.base.width,
@@ -573,11 +568,9 @@ impl From<JSONRectangleNode> for Node {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         Node::Rectangle(RectangleNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             size: Size {
                 width: node.base.width,
@@ -611,11 +604,9 @@ impl From<JSONRegularPolygonNode> for Node {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         Node::RegularPolygon(RegularPolygonNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             size: Size {
                 width: node.base.width,
@@ -644,11 +635,9 @@ impl From<JSONRegularStarPolygonNode> for Node {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         Node::RegularStarPolygon(RegularStarPolygonNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             size: Size {
                 width: node.base.width,
@@ -679,11 +668,9 @@ impl From<JSONLegacyVectorNode> for Node {
 
         // For vector nodes, we'll create a path node with the path data
         Node::SVGPath(SVGPathNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             fill: node.base.fill.into(),
             data: node.paths.map_or("".to_string(), |paths| {
@@ -713,11 +700,9 @@ impl From<JSONLineNode> for Node {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         Node::Line(LineNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             size: Size {
                 width: node.base.width,
@@ -743,11 +728,9 @@ impl From<JSONPathNode> for Node {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         Node::Vector(VectorNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             fill: Some(node.base.fill.into()),
             network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
@@ -779,11 +762,9 @@ impl From<JSONNode> for Node {
             JSONNode::RegularStarPolygon(rsp) => rsp.into(),
             JSONNode::Line(line) => line.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNode {
-                base: BaseNode {
-                    id: unknown.id,
-                    name: unknown.name,
-                    active: unknown.active,
-                },
+                id: unknown.id,
+                name: unknown.name,
+                active: unknown.active,
                 transform: AffineTransform::identity(),
                 size: Size {
                     width: unknown.width,

@@ -29,14 +29,6 @@ impl NodeFactory {
     const DEFAULT_STROKE_ALIGN: StrokeAlign = StrokeAlign::Inside;
     const DEFAULT_OPACITY: f32 = 1.0;
 
-    fn default_base_node(&self) -> BaseNode {
-        BaseNode {
-            id: self.id(),
-            name: String::new(),
-            active: true,
-        }
-    }
-
     fn default_solid_paint(color: Color) -> Paint {
         Paint::Solid(SolidPaint {
             color,
@@ -57,7 +49,9 @@ impl NodeFactory {
     /// Creates a new rectangle node with default values
     pub fn create_rectangle_node(&self) -> RectangleNode {
         RectangleNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
@@ -75,7 +69,9 @@ impl NodeFactory {
     /// Creates a new ellipse node with default values
     pub fn create_ellipse_node(&self) -> EllipseNode {
         EllipseNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             fills: vec![Self::default_solid_paint(Self::DEFAULT_COLOR)],
@@ -92,7 +88,9 @@ impl NodeFactory {
     /// Creates a new line node with default values
     pub fn create_line_node(&self) -> LineNode {
         LineNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Size {
                 width: Self::DEFAULT_SIZE.width,
@@ -111,7 +109,9 @@ impl NodeFactory {
     /// Creates a new text span node with default values
     pub fn create_text_span_node(&self) -> TextSpanNode {
         TextSpanNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Size {
                 width: Self::DEFAULT_SIZE.width,
@@ -143,7 +143,9 @@ impl NodeFactory {
     /// Creates a new group node with default values
     pub fn create_group_node(&self) -> GroupNode {
         GroupNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             children: Vec::new(),
             opacity: Self::DEFAULT_OPACITY,
@@ -154,7 +156,9 @@ impl NodeFactory {
     /// Creates a new container node with default values
     pub fn create_container_node(&self) -> ContainerNode {
         ContainerNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
@@ -174,7 +178,9 @@ impl NodeFactory {
     /// Creates a new path node with default values
     pub fn create_path_node(&self) -> SVGPathNode {
         SVGPathNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             data: String::new(),
@@ -191,7 +197,9 @@ impl NodeFactory {
     /// Creates a new regular polygon node with default values
     pub fn create_regular_polygon_node(&self) -> RegularPolygonNode {
         RegularPolygonNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             point_count: 3, // Triangle by default
@@ -209,7 +217,9 @@ impl NodeFactory {
 
     pub fn create_regular_star_polygon_node(&self) -> RegularStarPolygonNode {
         RegularStarPolygonNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             point_count: 5,    // 5-pointed star by default
@@ -228,7 +238,9 @@ impl NodeFactory {
 
     pub fn create_polygon_node(&self) -> PolygonNode {
         PolygonNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             points: Vec::new(),
             corner_radius: 0.0,
@@ -246,7 +258,9 @@ impl NodeFactory {
     /// Creates a new image node with default values
     pub fn create_image_node(&self) -> ImageNode {
         ImageNode {
-            base: self.default_base_node(),
+            id: self.id(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),

@@ -7,7 +7,7 @@ pub(crate) fn create_dummy_scene() -> Scene {
     let mut nodes = NodeRepository::new();
 
     let mut rect1 = nf.create_rectangle_node();
-    rect1.base.name = "Red Rectangle".to_string();
+    rect1.name = Some("Red Rectangle".to_string());
     rect1.transform = math2::transform::AffineTransform::new(100.0, 100.0, 0.0);
     rect1.size = Size {
         width: 150.0,
@@ -17,11 +17,11 @@ pub(crate) fn create_dummy_scene() -> Scene {
         color: Color(255, 0, 0, 255),
         opacity: 1.0,
     }));
-    let rect1_id = rect1.base.id.clone();
+    let rect1_id = rect1.id.clone();
     nodes.insert(Node::Rectangle(rect1));
 
     let mut rect2 = nf.create_rectangle_node();
-    rect2.base.name = "Blue Rectangle".to_string();
+    rect2.name = Some("Blue Rectangle".to_string());
     rect2.transform = math2::transform::AffineTransform::new(300.0, 100.0, 0.0);
     rect2.size = Size {
         width: 120.0,
@@ -31,11 +31,11 @@ pub(crate) fn create_dummy_scene() -> Scene {
         color: Color(0, 0, 255, 255),
         opacity: 1.0,
     }));
-    let rect2_id = rect2.base.id.clone();
+    let rect2_id = rect2.id.clone();
     nodes.insert(Node::Rectangle(rect2));
 
     let mut rect3 = nf.create_rectangle_node();
-    rect3.base.name = "Green Rectangle".to_string();
+    rect3.name = Some("Green Rectangle".to_string());
     rect3.transform = math2::transform::AffineTransform::new(500.0, 100.0, 0.0);
     rect3.size = Size {
         width: 100.0,
@@ -45,7 +45,7 @@ pub(crate) fn create_dummy_scene() -> Scene {
         color: Color(0, 255, 0, 255),
         opacity: 1.0,
     }));
-    let rect3_id = rect3.base.id.clone();
+    let rect3_id = rect3.id.clone();
     nodes.insert(Node::Rectangle(rect3));
 
     Scene {
@@ -68,7 +68,7 @@ pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
     for y in 0..rows {
         for x in 0..cols {
             let mut rect = nf.create_rectangle_node();
-            rect.base.name = format!("rect-{}-{}", x, y);
+            rect.name = Some(format!("rect-{}-{}", x, y));
             rect.transform = math2::transform::AffineTransform::new(
                 x as f32 * (size + spacing),
                 y as f32 * (size + spacing),
@@ -82,7 +82,7 @@ pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
                 color: Color(((x * 5) % 255) as u8, ((y * 3) % 255) as u8, 128, 255),
                 opacity: 1.0,
             }));
-            let id = rect.base.id.clone();
+            let id = rect.id.clone();
             nodes.insert(Node::Rectangle(rect));
             children.push(id);
         }

@@ -11,7 +11,7 @@ async fn demo_fills() -> Scene {
 
     // Root container
     let mut root = nf.create_container_node();
-    root.base.name = "Root".to_string();
+    root.name = Some("Root".to_string());
     root.size = Size {
         width: 1200.0,
         height: 800.0,
@@ -24,7 +24,7 @@ async fn demo_fills() -> Scene {
 
     // 1. Rectangle with multiple solid fills (layered colors)
     let mut multi_solid_rect = nf.create_rectangle_node();
-    multi_solid_rect.base.name = "Multi Solid Fills".to_string();
+    multi_solid_rect.name = Some("Multi Solid Fills".to_string());
     multi_solid_rect.transform = AffineTransform::new(start_x, base_y, 0.0);
     multi_solid_rect.size = Size {
         width: 150.0,
@@ -46,12 +46,12 @@ async fn demo_fills() -> Scene {
         }),
     ];
     multi_solid_rect.stroke_width = 3.0;
-    ids.push(multi_solid_rect.base.id.clone());
+    ids.push(multi_solid_rect.id.clone());
     repository.insert(Node::Rectangle(multi_solid_rect));
 
     // 2. Rectangle with solid + linear gradient fills
     let mut solid_gradient_rect = nf.create_rectangle_node();
-    solid_gradient_rect.base.name = "Solid + Linear Gradient".to_string();
+    solid_gradient_rect.name = Some("Solid + Linear Gradient".to_string());
     solid_gradient_rect.transform = AffineTransform::new(start_x + spacing, base_y, 0.0);
     solid_gradient_rect.size = Size {
         width: 150.0,
@@ -79,12 +79,12 @@ async fn demo_fills() -> Scene {
         }),
     ];
     solid_gradient_rect.stroke_width = 3.0;
-    ids.push(solid_gradient_rect.base.id.clone());
+    ids.push(solid_gradient_rect.id.clone());
     repository.insert(Node::Rectangle(solid_gradient_rect));
 
     // 3. Rectangle with solid + radial gradient fills
     let mut solid_radial_rect = nf.create_rectangle_node();
-    solid_radial_rect.base.name = "Solid + Radial Gradient".to_string();
+    solid_radial_rect.name = Some("Solid + Radial Gradient".to_string());
     solid_radial_rect.transform = AffineTransform::new(start_x + spacing * 2.0, base_y, 0.0);
     solid_radial_rect.size = Size {
         width: 150.0,
@@ -116,12 +116,12 @@ async fn demo_fills() -> Scene {
         }),
     ];
     solid_radial_rect.stroke_width = 3.0;
-    ids.push(solid_radial_rect.base.id.clone());
+    ids.push(solid_radial_rect.id.clone());
     repository.insert(Node::Rectangle(solid_radial_rect));
 
     // 4. Rectangle with linear + radial gradient fills
     let mut gradient_gradient_rect = nf.create_rectangle_node();
-    gradient_gradient_rect.base.name = "Linear + Radial Gradient".to_string();
+    gradient_gradient_rect.name = Some("Linear + Radial Gradient".to_string());
     gradient_gradient_rect.transform = AffineTransform::new(start_x + spacing * 3.0, base_y, 0.0);
     gradient_gradient_rect.size = Size {
         width: 150.0,
@@ -161,12 +161,12 @@ async fn demo_fills() -> Scene {
         }),
     ];
     gradient_gradient_rect.stroke_width = 3.0;
-    ids.push(gradient_gradient_rect.base.id.clone());
+    ids.push(gradient_gradient_rect.id.clone());
     repository.insert(Node::Rectangle(gradient_gradient_rect));
 
     // 5. Ellipse with multiple radial gradients (concentric circles effect)
     let mut multi_radial_ellipse = nf.create_ellipse_node();
-    multi_radial_ellipse.base.name = "Multi Radial Gradients".to_string();
+    multi_radial_ellipse.name = Some("Multi Radial Gradients".to_string());
     multi_radial_ellipse.transform = AffineTransform::new(start_x, base_y + spacing, 0.0);
     multi_radial_ellipse.size = Size {
         width: 150.0,
@@ -217,7 +217,7 @@ async fn demo_fills() -> Scene {
         }),
     ];
     multi_radial_ellipse.stroke_width = 3.0;
-    ids.push(multi_radial_ellipse.base.id.clone());
+    ids.push(multi_radial_ellipse.id.clone());
     repository.insert(Node::Ellipse(multi_radial_ellipse));
 
     // 6. Polygon with solid + linear gradient + radial gradient
@@ -232,7 +232,7 @@ async fn demo_fills() -> Scene {
         .collect::<Vec<_>>();
 
     let mut complex_fill_polygon = nf.create_polygon_node();
-    complex_fill_polygon.base.name = "Complex Multi-Fill Polygon".to_string();
+    complex_fill_polygon.name = Some("Complex Multi-Fill Polygon".to_string());
     complex_fill_polygon.transform = AffineTransform::new(start_x + spacing, base_y + spacing, 0.0);
     complex_fill_polygon.points = pentagon_points;
     complex_fill_polygon.fills = vec![
@@ -272,12 +272,12 @@ async fn demo_fills() -> Scene {
         }),
     ];
     complex_fill_polygon.stroke_width = 4.0;
-    ids.push(complex_fill_polygon.base.id.clone());
+    ids.push(complex_fill_polygon.id.clone());
     repository.insert(Node::Polygon(complex_fill_polygon));
 
     // 7. Regular polygon with multiple linear gradients at different angles
     let mut multi_linear_polygon = nf.create_regular_polygon_node();
-    multi_linear_polygon.base.name = "Multi Linear Gradients".to_string();
+    multi_linear_polygon.name = Some("Multi Linear Gradients".to_string());
     multi_linear_polygon.transform =
         AffineTransform::new(start_x + spacing * 2.0, base_y + spacing, 0.0);
     multi_linear_polygon.size = Size {
@@ -330,12 +330,12 @@ async fn demo_fills() -> Scene {
         }),
     ];
     multi_linear_polygon.stroke_width = 3.0;
-    ids.push(multi_linear_polygon.base.id.clone());
+    ids.push(multi_linear_polygon.id.clone());
     repository.insert(Node::RegularPolygon(multi_linear_polygon));
 
     // 8. Container with multiple fills (demonstrating container fill capability)
     let mut multi_fill_container = nf.create_container_node();
-    multi_fill_container.base.name = "Multi-Fill Container".to_string();
+    multi_fill_container.name = Some("Multi-Fill Container".to_string());
     multi_fill_container.transform =
         AffineTransform::new(start_x + spacing * 3.0, base_y + spacing, 0.0);
     multi_fill_container.size = Size {
@@ -367,12 +367,12 @@ async fn demo_fills() -> Scene {
         }),
     ];
     multi_fill_container.stroke_width = 3.0;
-    ids.push(multi_fill_container.base.id.clone());
+    ids.push(multi_fill_container.id.clone());
     repository.insert(Node::Container(multi_fill_container));
 
     // Add all nodes to root
     root.children = ids.clone();
-    let root_id = root.base.id.clone();
+    let root_id = root.id.clone();
     repository.insert(Node::Container(root));
 
     Scene {

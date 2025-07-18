@@ -507,7 +507,7 @@ impl<'a> Painter<'a> {
     /// Draw a PathNode (SVG path data)
     fn draw_path_node(&self, node: &SVGPathNode) {
         self.with_transform(&node.transform.matrix, || {
-            let path = self.cached_path(&node.base.id, &node.data);
+            let path = self.cached_path(&node.id, &node.data);
             let shape = PainterShape::from_path((*path).clone());
             self.draw_shape_with_effects(&node.effects, &shape, || {
                 self.with_opacity(node.opacity, || {
@@ -590,7 +590,7 @@ impl<'a> Painter<'a> {
             self.with_opacity(node.opacity, || {
                 self.with_blendmode(node.blend_mode, || {
                     self.draw_text_span(
-                        &node.base.id,
+                        &node.id,
                         &node.text,
                         &node.size,
                         &node.fill,
@@ -930,7 +930,7 @@ mod tests {
         let nf = NodeFactory::new();
         let mut text = nf.create_text_span_node();
         text.text = "Hello".into();
-        let text_id = text.base.id.clone();
+        let text_id = text.id.clone();
 
         painter.draw_text_span_node(&text);
         let p_first = {
@@ -954,7 +954,7 @@ mod tests {
 
         let mut path_node = nf.create_path_node();
         path_node.data = "M0 0L10 10Z".to_string();
-        let path_id = path_node.base.id.clone();
+        let path_id = path_node.id.clone();
 
         painter.draw_path_node(&path_node);
         let path_first = {

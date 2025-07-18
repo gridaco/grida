@@ -11,7 +11,7 @@ async fn demo_paints() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.base.name = "Root Container".to_string();
+    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1080.0,
         height: 1080.0,
@@ -26,7 +26,7 @@ async fn demo_paints() -> Scene {
     // Solid Colors Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Solid Color {}", i + 1);
+        rect.name = Some(format!("Solid Color {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 100.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -42,14 +42,14 @@ async fn demo_paints() -> Scene {
             ),
             opacity: 1.0,
         }));
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
     // Linear Gradient Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Linear Gradient {}", i + 1);
+        rect.name = Some(format!("Linear Gradient {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 200.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -75,14 +75,14 @@ async fn demo_paints() -> Scene {
             ],
             opacity: 1.0,
         }));
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
     // Radial Gradient Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Radial Gradient {}", i + 1);
+        rect.name = Some(format!("Radial Gradient {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -109,14 +109,14 @@ async fn demo_paints() -> Scene {
             ],
             opacity: 1.0,
         }));
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
     // Stroke Solid Colors Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Stroke Solid Color {}", i + 1);
+        rect.name = Some(format!("Stroke Solid Color {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 400.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -142,14 +142,14 @@ async fn demo_paints() -> Scene {
         })];
         rect.stroke_width = 4.0; // Consistent stroke width
 
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
     // Stroke Linear Gradient Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Stroke Linear Gradient {}", i + 1);
+        rect.name = Some(format!("Stroke Linear Gradient {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -183,14 +183,14 @@ async fn demo_paints() -> Scene {
         })];
         rect.stroke_width = 4.0; // Consistent stroke width
 
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
     // Stroke Radial Gradient Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Stroke Radial Gradient {}", i + 1);
+        rect.name = Some(format!("Stroke Radial Gradient {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 600.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -225,13 +225,13 @@ async fn demo_paints() -> Scene {
         })];
         rect.stroke_width = 4.0; // Consistent stroke width
 
-        all_shape_ids.push(rect.base.id.clone());
+        all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
 
     // Set up the root container
     root_container_node.children.extend(all_shape_ids);
-    let root_container_id = root_container_node.base.id.clone();
+    let root_container_id = root_container_node.id.clone();
     repository.insert(Node::Container(root_container_node));
 
     Scene {

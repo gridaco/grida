@@ -21,7 +21,7 @@ async fn demo_texts() -> Scene {
 
     // Create a single word text span
     let mut word_text_node = nf.create_text_span_node();
-    word_text_node.base.name = "Word Text".to_string();
+    word_text_node.name = Some("Word Text".to_string());
     word_text_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
     word_text_node.size = Size {
         width: 400.0,
@@ -48,7 +48,7 @@ async fn demo_texts() -> Scene {
 
     // Create a sentence text span
     let mut sentence_text_node = nf.create_text_span_node();
-    sentence_text_node.base.name = "Sentence Text".to_string();
+    sentence_text_node.name = Some("Sentence Text".to_string());
     sentence_text_node.transform = AffineTransform::new(50.0, 150.0, 0.0);
     sentence_text_node.size = Size {
         width: 500.0,
@@ -72,7 +72,7 @@ async fn demo_texts() -> Scene {
 
     // Create a paragraph text span
     let mut paragraph_text_node = nf.create_text_span_node();
-    paragraph_text_node.base.name = "Paragraph Text".to_string();
+    paragraph_text_node.name = Some("Paragraph Text".to_string());
     paragraph_text_node.transform = AffineTransform::new(50.0, 250.0, 0.0);
     paragraph_text_node.size = Size {
         width: 800.0,
@@ -94,7 +94,7 @@ async fn demo_texts() -> Scene {
 
     // Create a second paragraph text span with different color
     let mut second_paragraph_text_node = nf.create_text_span_node();
-    second_paragraph_text_node.base.name = "Second Paragraph Text".to_string();
+    second_paragraph_text_node.name = Some("Second Paragraph Text".to_string());
     second_paragraph_text_node.transform = AffineTransform::new(50.0, 800.0, 0.0);
     second_paragraph_text_node.size = Size {
         width: 800.0,
@@ -120,7 +120,7 @@ async fn demo_texts() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.base.name = "Root Container".to_string();
+    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1080.0,
         height: 1080.0,
@@ -130,10 +130,10 @@ async fn demo_texts() -> Scene {
     let mut repository = NodeRepository::new();
 
     // Collect all the IDs
-    let word_text_id = word_text_node.base.id.clone();
-    let sentence_text_id = sentence_text_node.base.id.clone();
-    let paragraph_text_id = paragraph_text_node.base.id.clone();
-    let second_paragraph_text_id = second_paragraph_text_node.base.id.clone();
+    let word_text_id = word_text_node.id.clone();
+    let sentence_text_id = sentence_text_node.id.clone();
+    let paragraph_text_id = paragraph_text_node.id.clone();
+    let second_paragraph_text_id = second_paragraph_text_node.id.clone();
 
     // Add all nodes to the repository
     repository.insert(Node::TextSpan(word_text_node));
@@ -148,7 +148,7 @@ async fn demo_texts() -> Scene {
         paragraph_text_id,
         second_paragraph_text_id,
     ];
-    let root_container_id = root_container_node.base.id.clone();
+    let root_container_id = root_container_node.id.clone();
     repository.insert(Node::Container(root_container_node));
 
     Scene {
