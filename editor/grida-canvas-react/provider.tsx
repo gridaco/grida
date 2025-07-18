@@ -18,7 +18,7 @@ import type { Action } from "@/grida-canvas/action";
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
 import equal from "fast-deep-equal";
 import { toast } from "sonner";
-import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
+import { is_direct_component_consumer } from "@/grida-canvas/utils/supports";
 import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
@@ -154,9 +154,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeNodePositioningMode(node_id, value),
 
       //
-      cornerRadius: (
-        value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
-      ) => instance.changeNodeCornerRadius(node_id, value),
+      cornerRadius: (value: cg.CornerRadius) =>
+        instance.changeNodeCornerRadius(node_id, value),
       pointCount: (value: number) =>
         instance.changeNodePointCount(node_id, value),
       innerRadius: (value: number) =>
@@ -527,7 +526,7 @@ export function useCurrentSelection() {
   );
 
   const cornerRadius = useCallback(
-    (value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]) => {
+    (value: cg.CornerRadius) => {
       mixedProperties.cornerRadius?.ids.forEach((id) => {
         instance.changeNodeCornerRadius(id, value);
       });

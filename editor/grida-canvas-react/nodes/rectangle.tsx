@@ -9,10 +9,17 @@ export function RectangleWidget({
   fill,
   stroke,
   strokeWidth,
-  cornerRadius,
+  cornerRadiusTopLeft,
+  cornerRadiusTopRight,
+  cornerRadiusBottomLeft,
+  cornerRadiusBottomRight,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RectangleNode>) {
-  const isUniformRadius = typeof cornerRadius === "number";
+  const isZero =
+    cornerRadiusTopLeft === 0 &&
+    cornerRadiusTopRight === 0 &&
+    cornerRadiusBottomLeft === 0 &&
+    cornerRadiusBottomRight === 0;
 
   const { defs: fillDefs, ref: fillDef } = fill
     ? svg.paint.defs(fill)
@@ -43,19 +50,22 @@ export function RectangleWidget({
       {fillDefs && <g dangerouslySetInnerHTML={{ __html: fillDefs }} />}
       {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}
 
-      {isUniformRadius ? (
+      {isZero ? (
         <rect
           width={width}
           height={height}
-          rx={cornerRadius}
-          ry={cornerRadius}
           fill={fillDef}
           strokeWidth={strokeWidth}
           stroke={strokeDef}
         />
       ) : (
         <path
-          d={svg.d.generateRoundedRectPath(width, height, cornerRadius)}
+          d={svg.d.generateRoundedRectPath(width, height, [
+            cornerRadiusTopLeft ?? 0,
+            cornerRadiusTopRight ?? 0,
+            cornerRadiusBottomRight ?? 0,
+            cornerRadiusBottomLeft ?? 0,
+          ])}
           fill={fillDef}
           strokeWidth={strokeWidth}
           stroke={strokeDef}

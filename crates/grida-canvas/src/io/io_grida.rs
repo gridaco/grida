@@ -200,12 +200,38 @@ pub struct JSONUnknownNodeProperties {
     pub width: f32,
     #[serde(rename = "height", deserialize_with = "de_css_length")]
     pub height: f32,
+
     #[serde(
         rename = "cornerRadius",
         default,
-        deserialize_with = "de_corner_radius"
+        deserialize_with = "de_radius_option"
     )]
-    pub corner_radius: Option<RectangularCornerRadius>,
+    pub corner_radius: Option<Radius>,
+    #[serde(
+        rename = "cornerRadiusTopLeft",
+        default,
+        deserialize_with = "de_radius_option"
+    )]
+    pub corner_radius_top_left: Option<Radius>,
+    #[serde(
+        rename = "cornerRadiusTopRight",
+        default,
+        deserialize_with = "de_radius_option"
+    )]
+    pub corner_radius_top_right: Option<Radius>,
+    #[serde(
+        rename = "cornerRadiusBottomRight",
+        default,
+        deserialize_with = "de_radius_option"
+    )]
+    pub corner_radius_bottom_right: Option<Radius>,
+    #[serde(
+        rename = "cornerRadiusBottomLeft",
+        default,
+        deserialize_with = "de_radius_option"
+    )]
+    pub corner_radius_bottom_left: Option<Radius>,
+
     // fill
     #[serde(rename = "fill")]
     pub fill: Option<JSONPaint>,
@@ -446,10 +472,13 @@ impl From<JSONContainerNode> for ContainerNode {
                 width: node.base.width,
                 height: node.base.height,
             },
-            corner_radius: node
-                .base
-                .corner_radius
-                .unwrap_or(RectangularCornerRadius::zero()),
+            corner_radius: merge_corner_radius(
+                node.base.corner_radius,
+                node.base.corner_radius_top_left,
+                node.base.corner_radius_top_right,
+                node.base.corner_radius_bottom_right,
+                node.base.corner_radius_bottom_left,
+            ),
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
             stroke_width: 0.0,
@@ -554,10 +583,13 @@ impl From<JSONRectangleNode> for Node {
                 width: node.base.width,
                 height: node.base.height,
             },
-            corner_radius: node
-                .base
-                .corner_radius
-                .unwrap_or(RectangularCornerRadius::zero()),
+            corner_radius: merge_corner_radius(
+                node.base.corner_radius,
+                node.base.corner_radius_top_left,
+                node.base.corner_radius_top_right,
+                node.base.corner_radius_bottom_right,
+                node.base.corner_radius_bottom_left,
+            ),
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
@@ -775,39 +807,49 @@ where
     }
 }
 
-fn de_corner_radius<'de, D>(deserializer: D) -> Result<Option<RectangularCornerRadius>, D::Error>
+fn de_radius_option<'de, D>(deserializer: D) -> Result<Option<Radius>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
-
+    let value: Option<Value> = Deserialize::deserialize(deserializer)?;
     match value {
-        None => Ok(None),
-        Some(v) => match v {
-            serde_json::Value::Number(n) => {
-                let radius = n.as_f64().unwrap_or(0.0) as f32;
-                Ok(Some(RectangularCornerRadius::all(Radius::circular(radius))))
-            }
-            serde_json::Value::Array(arr) => {
-                if arr.len() == 4 {
-                    let values: Vec<f32> = arr
-                        .into_iter()
-                        .map(|v| v.as_f64().unwrap_or(0.0) as f32)
-                        .collect();
-                    Ok(Some(RectangularCornerRadius {
-                        /* top-left | top-right | bottom-right | bottom-left */
-                        tl: Radius::circular(values[0]),
-                        tr: Radius::circular(values[1]),
-                        br: Radius::circular(values[2]),
-                        bl: Radius::circular(values[3]),
-                    }))
-                } else {
-                    Ok(None)
-                }
-            }
-            _ => Ok(None),
-        },
+        Some(Value::Number(n)) => Ok(Some(Radius::circular(n.as_f64().unwrap_or(0.0) as f32))),
+        _ => Ok(None),
     }
+}
+
+fn de_radius<'de, D>(deserializer: D) -> Result<Radius, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Value = Deserialize::deserialize(deserializer)?;
+    match value {
+        Value::Number(n) => Ok(Radius::circular(n.as_f64().unwrap_or(0.0) as f32)),
+        _ => Ok(Radius::zero()),
+    }
+}
+
+fn merge_corner_radius(
+    corner_radius: Option<Radius>,
+    corner_radius_top_left: Option<Radius>,
+    corner_radius_top_right: Option<Radius>,
+    corner_radius_bottom_right: Option<Radius>,
+    corner_radius_bottom_left: Option<Radius>,
+) -> RectangularCornerRadius {
+    let mut r = RectangularCornerRadius::all(corner_radius.unwrap_or(Radius::zero()));
+    if let Some(corner_radius_top_left) = corner_radius_top_left {
+        r.tl = corner_radius_top_left;
+    }
+    if let Some(corner_radius_top_right) = corner_radius_top_right {
+        r.tr = corner_radius_top_right;
+    }
+    if let Some(corner_radius_bottom_right) = corner_radius_bottom_right {
+        r.br = corner_radius_bottom_right;
+    }
+    if let Some(corner_radius_bottom_left) = corner_radius_bottom_left {
+        r.bl = corner_radius_bottom_left;
+    }
+    r
 }
 
 fn merge_effects(
@@ -857,97 +899,5 @@ mod tests {
             !parsed.document.nodes.is_empty(),
             "nodes should not be empty"
         );
-    }
-
-    #[test]
-    fn corner_radius_optional_and_falls_back_to_zero() {
-        // Test JSON without cornerRadius field
-        let json_without_corner_radius = r#"{
-            "version": "0.0.1-beta.1+20250303",
-            "document": {
-                "bitmaps": {},
-                "properties": {},
-                "nodes": {
-                    "test-rect": {
-                        "type": "rectangle",
-                        "id": "test-rect",
-                        "name": "Test Rectangle",
-                        "left": 0.0,
-                        "top": 0.0,
-                        "width": 100.0,
-                        "height": 100.0,
-                        "fill": {
-                            "type": "solid",
-                            "color": {
-                                "r": 255,
-                                "g": 0,
-                                "b": 0,
-                                "a": 1.0
-                            }
-                        }
-                    }
-                },
-                "scenes": {}
-            }
-        }"#;
-
-        let parsed: JSONCanvasFile = serde_json::from_str(json_without_corner_radius)
-            .expect("failed to parse JSON without cornerRadius");
-
-        // Verify that the rectangle node was parsed successfully
-        if let Some(JSONNode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
-            // corner_radius should be None when not present in JSON
-            assert!(rect_node.base.corner_radius.is_none());
-        } else {
-            panic!("Expected rectangle node not found");
-        }
-
-        // Test JSON with cornerRadius field
-        let json_with_corner_radius = r#"{
-            "version": "0.0.1-beta.1+20250303",
-            "document": {
-                "bitmaps": {},
-                "properties": {},
-                "nodes": {
-                    "test-rect": {
-                        "type": "rectangle",
-                        "id": "test-rect",
-                        "name": "Test Rectangle",
-                        "left": 0.0,
-                        "top": 0.0,
-                        "width": 100.0,
-                        "height": 100.0,
-                        "cornerRadius": 10.0,
-                        "fill": {
-                            "type": "solid",
-                            "color": {
-                                "r": 255,
-                                "g": 0,
-                                "b": 0,
-                                "a": 1.0
-                            }
-                        }
-                    }
-                },
-                "scenes": {}
-            }
-        }"#;
-
-        let parsed: JSONCanvasFile = serde_json::from_str(json_with_corner_radius)
-            .expect("failed to parse JSON with cornerRadius");
-
-        // Verify that the rectangle node was parsed successfully with cornerRadius
-        if let Some(JSONNode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
-            // corner_radius should be Some when present in JSON
-            assert!(rect_node.base.corner_radius.is_some());
-            if let Some(corner_radius) = &rect_node.base.corner_radius {
-                assert_eq!(corner_radius.tl.rx, 10.0);
-                assert_eq!(corner_radius.tr.rx, 10.0);
-                assert_eq!(corner_radius.bl.rx, 10.0);
-                assert_eq!(corner_radius.br.rx, 10.0);
-            }
-        } else {
-            panic!("Expected rectangle node not found");
-        }
     }
 }

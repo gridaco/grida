@@ -1078,10 +1078,20 @@ export namespace grida.program.nodes {
     export interface IExportable {}
 
     /**
+     * Corner radius
+     */
+    export interface ICornerRadius {
+      cornerRadius?: number;
+    }
+
+    /**
      * Rectangle Corner
      */
-    export interface IRectangleCorner {
-      cornerRadius: number | cg.CornerRadius4;
+    export interface IRectangularCornerRadius {
+      cornerRadiusTopLeft?: number;
+      cornerRadiusTopRight?: number;
+      cornerRadiusBottomLeft?: number;
+      cornerRadiusBottomRight?: number;
     }
 
     /**
@@ -1440,7 +1450,8 @@ export namespace grida.program.nodes {
       i.IBoxFit,
       i.IHrefable,
       i.IMouseCursor,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.ISourceValue {
     readonly type: "image";
     alt?: string;
@@ -1486,7 +1497,8 @@ export namespace grida.program.nodes {
       i.IBoxFit,
       i.IHrefable,
       i.IMouseCursor,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.ISourceValue {
     readonly type: "video";
 
@@ -1513,7 +1525,8 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IExpandable,
       i.IChildrenReference,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.IPadding,
       i.IFlexContainer {
     readonly type: "container";
@@ -1535,7 +1548,8 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.ISourceValue {
     readonly type: "iframe";
   }
@@ -1736,7 +1750,8 @@ export namespace grida.program.nodes {
       i.IFill<cg.Paint>,
       i.IStroke,
       i.IEffects,
-      i.IRectangleCorner {
+      i.ICornerRadius,
+      i.IRectangularCornerRadius {
     readonly type: "rectangle";
   }
 
@@ -1793,7 +1808,8 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IExpandable,
       i.IChildrenReference,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.IPadding,
       i.IFlexContainer,
       i.IProperties {
@@ -1912,6 +1928,10 @@ export namespace grida.program.nodes {
             top: 0,
             left: 0,
             cornerRadius: 0,
+            cornerRadiusTopLeft: 0,
+            cornerRadiusTopRight: 0,
+            cornerRadiusBottomLeft: 0,
+            cornerRadiusBottomRight: 0,
             strokeWidth: 0,
             strokeCap: "butt",
             ...prototype,
@@ -2095,6 +2115,10 @@ export namespace grida.program.nodes {
         width: 100,
         height: 100,
         cornerRadius: 0,
+        cornerRadiusTopLeft: 0,
+        cornerRadiusTopRight: 0,
+        cornerRadiusBottomLeft: 0,
+        cornerRadiusBottomRight: 0,
         style: {},
         children: [],
         ...partial,

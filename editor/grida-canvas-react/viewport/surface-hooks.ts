@@ -3,7 +3,7 @@ import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
 import cmath from "@grida/cmath";
 import { NodeWithMeta, useTransformState } from "../provider";
-import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
+import { is_direct_component_consumer } from "@/grida-canvas/utils/supports";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";

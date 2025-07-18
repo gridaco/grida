@@ -45,7 +45,8 @@ export namespace css {
       Partial<grida.program.nodes.i.IFill<cg.Paint>> &
       Partial<grida.program.nodes.i.ICSSBorder> &
       Partial<grida.program.nodes.i.IMouseCursor> &
-      Partial<grida.program.nodes.i.IRectangleCorner> &
+      Partial<grida.program.nodes.i.ICornerRadius> &
+      Partial<grida.program.nodes.i.IRectangularCornerRadius> &
       Partial<grida.program.nodes.i.IBoxFit> &
       Partial<grida.program.nodes.i.IComputedTextNodeStyle> &
       Partial<grida.program.nodes.i.IPadding> &
@@ -70,6 +71,10 @@ export namespace css {
       fill,
       fit,
       cornerRadius,
+      cornerRadiusTopLeft,
+      cornerRadiusTopRight,
+      cornerRadiusBottomLeft,
+      cornerRadiusBottomRight,
       //
       border,
       //
@@ -112,9 +117,13 @@ export namespace css {
       objectFit: fit,
       rotate: rotation ? `${rotation}deg` : undefined,
       //
-      borderRadius: cornerRadius
-        ? cornerRadiusToBorderRadiusCSS(cornerRadius)
-        : undefined,
+      borderRadius: cornerRadiusToBorderRadiusCSS({
+        cornerRadius,
+        cornerRadiusTopLeft,
+        cornerRadiusTopRight,
+        cornerRadiusBottomLeft,
+        cornerRadiusBottomRight,
+      }),
       //
       padding: padding ? paddingToPaddingCSS(padding) : undefined,
       //
@@ -283,14 +292,13 @@ export namespace css {
   }
 
   export function cornerRadiusToBorderRadiusCSS(
-    cr: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
-  ): string {
-    if (!cr) return "0";
-    if (typeof cr === "number") {
-      return `${cr}px`;
-    } else {
-      return `${cr[0]}px ${cr[1]}px ${cr[2]}px ${cr[3]}px`;
-    }
+    cr: Partial<
+      grida.program.nodes.i.IRectangularCornerRadius &
+        grida.program.nodes.i.ICornerRadius
+    >
+  ): string | undefined {
+    if (!cr) return undefined;
+    return `${cr.cornerRadiusTopLeft ?? cr.cornerRadius ?? 0}px ${cr.cornerRadiusTopRight ?? cr.cornerRadius ?? 0}px ${cr.cornerRadiusBottomRight ?? cr.cornerRadius ?? 0}px ${cr.cornerRadiusBottomLeft ?? cr.cornerRadius ?? 0}px`;
   }
 
   export function paddingToPaddingCSS(

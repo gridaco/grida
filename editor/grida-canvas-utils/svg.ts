@@ -56,7 +56,7 @@ export namespace svg {
     export function generateRoundedRectPath(
       width: number,
       height: number,
-      cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
+      cornerRadius: cg.CornerRadius
     ): string {
       const {
         topLeftRadius = 0,

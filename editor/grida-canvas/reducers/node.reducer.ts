@@ -172,12 +172,6 @@ const safe_properties: Partial<
     },
   }),
   cornerRadius: defineNodeProperty<"cornerRadius">({
-    assert: (node) =>
-      node.type === "rectangle" ||
-      node.type === "image" ||
-      node.type === "video" ||
-      node.type === "container" ||
-      node.type === "component",
     apply: (draft, value, prev) => {
       // TODO: make [cornerRadius < (Math.min(width, height) / 2)]
 
@@ -195,11 +189,35 @@ const safe_properties: Partial<
               br: Math.max(value[2], 0),
               bl: Math.max(value[3], 0),
             };
+
       if (each.tl === each.tr && each.tl === each.br && each.tl === each.bl) {
         draft.cornerRadius = each.tl;
-      } else {
-        draft.cornerRadius = [each.tl, each.tr, each.br, each.bl];
       }
+
+      draft.cornerRadiusTopLeft = each.tl;
+      draft.cornerRadiusTopRight = each.tr;
+      draft.cornerRadiusBottomRight = each.br;
+      draft.cornerRadiusBottomLeft = each.bl;
+    },
+  }),
+  cornerRadiusTopLeft: defineNodeProperty<"cornerRadiusTopLeft">({
+    apply: (draft, value, prev) => {
+      draft.cornerRadiusTopLeft = value;
+    },
+  }),
+  cornerRadiusTopRight: defineNodeProperty<"cornerRadiusTopRight">({
+    apply: (draft, value, prev) => {
+      draft.cornerRadiusTopRight = value;
+    },
+  }),
+  cornerRadiusBottomRight: defineNodeProperty<"cornerRadiusBottomRight">({
+    apply: (draft, value, prev) => {
+      draft.cornerRadiusBottomRight = value;
+    },
+  }),
+  cornerRadiusBottomLeft: defineNodeProperty<"cornerRadiusBottomLeft">({
+    apply: (draft, value, prev) => {
+      draft.cornerRadiusBottomLeft = value;
     },
   }),
   pointCount: defineNodeProperty<"pointCount">({

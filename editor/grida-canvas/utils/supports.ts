@@ -8,8 +8,9 @@ type Renderer =
   | "grida-canvas-dom"
   | "grida-canvas-dom-svg";
 
-type Property =
+type Feature =
   | "cornerRadius"
+  | "cornerRadius4"
   | "border"
   | "children"
   | "stroke"
@@ -46,8 +47,16 @@ const GRIDA_TCANVAS_RECTANGLE_NODE: INodePropertiesConfig = {
   },
 };
 
-const dom_supports: Record<Property, ReadonlyArray<NodeType>> = {
+const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
   cornerRadius: [
+    "rectangle",
+    "image",
+    "video",
+    "container",
+    "component",
+    "instance",
+  ],
+  cornerRadius4: [
     "rectangle",
     "image",
     "video",
@@ -65,8 +74,18 @@ const dom_supports: Record<Property, ReadonlyArray<NodeType>> = {
   strokeCap: ["path", "line"],
 } as const;
 
-const canvas_supports: Record<Property, ReadonlyArray<NodeType>> = {
+const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
   cornerRadius: [
+    "rectangle",
+    "polygon",
+    "star",
+    "image",
+    "video",
+    "container",
+    "component",
+    "instance",
+  ],
+  cornerRadius4: [
     "rectangle",
     "image",
     "video",
@@ -82,25 +101,29 @@ const canvas_supports: Record<Property, ReadonlyArray<NodeType>> = {
     "image",
     "video",
     "container",
-    "component",
-    "instance",
     "path",
     "line",
     "rectangle",
     "ellipse",
+    "polygon",
+    "star",
+    "component",
+    "instance",
   ],
   feDropShadow: [
     "container",
     "rectangle",
     "image",
     "video",
-    "container",
-    "component",
     "instance",
     "path",
     "line",
     "rectangle",
     "ellipse",
+    "polygon",
+    "star",
+    "container",
+    "component",
   ],
   strokeCap: ["path", "line"],
 } as const;

@@ -1269,17 +1269,23 @@ export class Editor
       fit,
     });
   }
-  changeNodeCornerRadius(
-    node_id: string,
-    cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
-  ) {
-    requestAnimationFrame(() => {
+  changeNodeCornerRadius(node_id: string, cornerRadius: cg.CornerRadius) {
+    if (typeof cornerRadius === "number") {
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
         cornerRadius,
       });
-    });
+    } else {
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        cornerRadiusTopLeft: cornerRadius[0],
+        cornerRadiusTopRight: cornerRadius[1],
+        cornerRadiusBottomRight: cornerRadius[2],
+        cornerRadiusBottomLeft: cornerRadius[3],
+      });
+    }
   }
   changeNodePointCount(node_id: editor.NodeID, pointCount: number): void {
     this.dispatch({

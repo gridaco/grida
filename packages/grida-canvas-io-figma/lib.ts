@@ -165,6 +165,17 @@ export namespace iofigma {
         return arr.filter((f) => f.visible !== false)[0];
       }
 
+      function rectangleCornerRadius(
+        rectangleCornerRadii?: number[] | [number, number, number, number]
+      ): grida.program.nodes.i.IRectangularCornerRadius {
+        return {
+          cornerRadiusTopLeft: rectangleCornerRadii?.[0] ?? 0,
+          cornerRadiusTopRight: rectangleCornerRadii?.[1] ?? 0,
+          cornerRadiusBottomLeft: rectangleCornerRadii?.[2] ?? 0,
+          cornerRadiusBottomRight: rectangleCornerRadii?.[3] ?? 0,
+        };
+      }
+
       type FigmaParentNode =
         | BooleanOperationNode
         | InstanceNode
@@ -308,6 +319,10 @@ export namespace iofigma {
               //
               style: {},
               cornerRadius: 0,
+              cornerRadiusTopLeft: 0,
+              cornerRadiusTopRight: 0,
+              cornerRadiusBottomLeft: 0,
+              cornerRadiusBottomRight: 0,
               padding: 0,
               // TODO:
               layout: "flow",
@@ -388,16 +403,8 @@ export namespace iofigma {
               style: {
                 overflow: clipsContent ? "clip" : undefined,
               },
-              cornerRadius: node.cornerRadius
-                ? node.cornerRadius
-                : node.rectangleCornerRadii
-                  ? (node.rectangleCornerRadii as [
-                      number,
-                      number,
-                      number,
-                      number,
-                    ])
-                  : 0,
+              cornerRadius: node.cornerRadius ?? 0,
+              ...rectangleCornerRadius(node.rectangleCornerRadii),
               padding:
                 paddingTop === paddingRight &&
                 paddingTop === paddingBottom &&
@@ -445,6 +452,7 @@ export namespace iofigma {
               //
               style: {},
               cornerRadius: 0,
+              ...rectangleCornerRadius([0, 0, 0, 0]),
               padding: 0,
               layout: "flow",
               direction: "horizontal",
@@ -570,17 +578,6 @@ export namespace iofigma {
               ? first_visible(strokes)
               : undefined;
 
-            const cornerRadius = node.cornerRadius
-              ? node.cornerRadius
-              : node.rectangleCornerRadii
-                ? (node.rectangleCornerRadii as [
-                    number,
-                    number,
-                    number,
-                    number,
-                  ])
-                : 0;
-
             if (first_visible_fill?.type === "IMAGE") {
               return {
                 id: node.id,
@@ -597,7 +594,8 @@ export namespace iofigma {
                 top: node.relativeTransform![1][2],
                 width: node.size!.x,
                 height: node.size!.y,
-                cornerRadius,
+                cornerRadius: node.cornerRadius ?? 0,
+                ...rectangleCornerRadius(node.rectangleCornerRadii),
                 fit: "cover",
                 //
                 border:
@@ -641,7 +639,8 @@ export namespace iofigma {
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-              cornerRadius: cornerRadius,
+              cornerRadius: node.cornerRadius ?? 0,
+              ...rectangleCornerRadius(node.rectangleCornerRadii),
             } satisfies grida.program.nodes.RectangleNode;
           }
           case "ELLIPSE": {

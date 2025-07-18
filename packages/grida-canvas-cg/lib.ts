@@ -526,7 +526,13 @@ export namespace cg {
    */
   export type CornerRadius4 = [number, number, number, number];
 
+  /**
+   * all | <[top-left | top-right | bottom-right | bottom-left]>
+   */
+  export type CornerRadius = number | CornerRadius4;
+
   export function cornerRadius4Identical(value: CornerRadius4): boolean {
+    if (typeof value === "number") return true;
     return (
       value[0] === value[1] && value[1] === value[2] && value[2] === value[3]
     );

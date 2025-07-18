@@ -59,7 +59,7 @@ import {
   LockOpen1Icon,
   PlusIcon,
 } from "@radix-ui/react-icons";
-import { supports } from "@/grida-canvas-utils/utils/supports";
+import { supports } from "@/grida-canvas/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
@@ -553,7 +553,7 @@ function SelectionMixedProperties({
                   <CornerRadiusControl onValueCommit={change.cornerRadius} />
                 ) : (
                   <CornerRadiusControl
-                    value={cornerRadius?.value}
+                    value={{ cornerRadius: cornerRadius?.value }}
                     onValueCommit={change.cornerRadius}
                   />
                 )}
@@ -718,6 +718,10 @@ function SelectedNodeProperties({
     opacity: node.opacity,
     blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
+    cornerRadiusTopLeft: node.cornerRadiusTopLeft,
+    cornerRadiusTopRight: node.cornerRadiusTopRight,
+    cornerRadiusBottomRight: node.cornerRadiusBottomRight,
+    cornerRadiusBottomLeft: node.cornerRadiusBottomLeft,
     pointCount: node.pointCount,
     innerRadius: node.innerRadius,
     fill: node.fill,
@@ -764,6 +768,10 @@ function SelectedNodeProperties({
     opacity,
     blendMode,
     cornerRadius,
+    cornerRadiusTopLeft,
+    cornerRadiusTopRight,
+    cornerRadiusBottomRight,
+    cornerRadiusBottomLeft,
     pointCount,
     innerRadius,
     fill,
@@ -1086,7 +1094,13 @@ function SelectedNodeProperties({
               <PropertyLine>
                 <PropertyLineLabel>Radius</PropertyLineLabel>
                 <CornerRadiusControl
-                  value={cornerRadius}
+                  value={{
+                    cornerRadius,
+                    cornerRadiusTopLeft,
+                    cornerRadiusTopRight,
+                    cornerRadiusBottomRight,
+                    cornerRadiusBottomLeft,
+                  }}
                   onValueCommit={actions.cornerRadius}
                 />
               </PropertyLine>
