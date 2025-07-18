@@ -249,7 +249,14 @@ export namespace editor.state {
       }
     | {
         type: "insert";
-        node: "text" | "image" | "container" | "rectangle" | "ellipse";
+        node:
+          | "text"
+          | "image"
+          | "container"
+          | "rectangle"
+          | "ellipse"
+          | "polygon"
+          | "star";
       }
     | {
         type: "draw";

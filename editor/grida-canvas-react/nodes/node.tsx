@@ -212,6 +212,8 @@ const fillings = {
   video: "background",
   rectangle: "none",
   ellipse: "none",
+  polygon: "none",
+  star: "none",
   template_instance: "none",
   instance: "none",
   vector: "none",

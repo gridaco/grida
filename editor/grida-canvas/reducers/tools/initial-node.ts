@@ -181,6 +181,39 @@ export default function initialNode(
         ...seed,
       } satisfies grida.program.nodes.RectangleNode;
     }
+    case "polygon": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "polygon",
+        pointCount: 3,
+        cornerRadius: 0,
+        width: 100,
+        height: 100,
+        strokeWidth: 0,
+        strokeCap: "butt",
+        fill: gray,
+        ...seed,
+      } satisfies grida.program.nodes.RegularPolygonNode;
+    }
+    case "star": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "star",
+        pointCount: 5,
+        innerRadius: 0,
+        cornerRadius: 0,
+        width: 100,
+        height: 100,
+        strokeWidth: 0,
+        strokeCap: "butt",
+        fill: gray,
+        ...seed,
+      } satisfies grida.program.nodes.RegularStarPolygonNode;
+    }
     case "line": {
       return {
         ...base,

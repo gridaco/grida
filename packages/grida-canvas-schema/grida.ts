@@ -771,8 +771,8 @@ export namespace grida.program.nodes {
     | LineNode
     | RectangleNode
     | EllipseNode
-    // | RegularPolygonNode
-    // | RegularStarPolygonNode
+    | RegularPolygonNode
+    | RegularStarPolygonNode
     | ComponentNode
     | InstanceNode
     | TemplateInstanceNode;
@@ -1619,7 +1619,7 @@ export namespace grida.program.nodes {
       i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke {
-    readonly type: "regular-polygon";
+    readonly type: "polygon";
     pointCount: number;
   }
 
@@ -1636,7 +1636,7 @@ export namespace grida.program.nodes {
       i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke {
-    readonly type: "regular-star-polygon";
+    readonly type: "star";
     pointCount: number;
     innerRadius: number;
   }

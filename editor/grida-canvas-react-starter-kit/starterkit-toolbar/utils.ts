@@ -54,6 +54,8 @@ export function toolbar_value_to_cursormode(
     case "image":
     case "rectangle":
     case "text":
+    case "polygon":
+    case "star":
       return { type: "insert", node: tt };
     case "line":
     case "pencil":

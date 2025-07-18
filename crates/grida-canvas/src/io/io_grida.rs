@@ -243,6 +243,10 @@ pub enum JSONNode {
     Ellipse(JSONEllipseNode),
     #[serde(rename = "rectangle")]
     Rectangle(JSONRectangleNode),
+    #[serde(rename = "polygon")]
+    RegularPolygon(JSONRegularPolygonNode),
+    #[serde(rename = "star")]
+    RegularStarPolygon(JSONRegularStarPolygonNode),
     #[serde(rename = "line")]
     Line(JSONLineNode),
     #[serde(rename = "text")]
@@ -370,6 +374,27 @@ pub struct JSONEllipseNode {
 pub struct JSONRectangleNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONRegularPolygonNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "pointCount")]
+    pub point_count: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONRegularStarPolygonNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "pointCount")]
+    pub point_count: usize,
+
+    #[serde(rename = "innerRadius")]
+    pub inner_radius: f32,
 }
 
 // Default value functions
@@ -549,6 +574,73 @@ impl From<JSONRectangleNode> for Node {
     }
 }
 
+impl From<JSONRegularPolygonNode> for Node {
+    fn from(node: JSONRegularPolygonNode) -> Self {
+        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+
+        Node::RegularPolygon(RegularPolygonNode {
+            base: BaseNode {
+                id: node.base.id,
+                name: node.base.name,
+                active: node.base.active,
+            },
+            transform,
+            size: Size {
+                width: node.base.width,
+                height: node.base.height,
+            },
+            corner_radius: 0.0,
+            fills: vec![node.base.fill.into()],
+            strokes: vec![node.base.stroke.into()],
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
+            blend_mode: node.base.blend_mode,
+            opacity: node.base.opacity,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+            point_count: node.point_count,
+        })
+    }
+}
+
+impl From<JSONRegularStarPolygonNode> for Node {
+    fn from(node: JSONRegularStarPolygonNode) -> Self {
+        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+
+        Node::RegularStarPolygon(RegularStarPolygonNode {
+            base: BaseNode {
+                id: node.base.id,
+                name: node.base.name,
+                active: node.base.active,
+            },
+            transform,
+            size: Size {
+                width: node.base.width,
+                height: node.base.height,
+            },
+            corner_radius: 0.0,
+            inner_radius: node.inner_radius,
+            fills: vec![node.base.fill.into()],
+            strokes: vec![node.base.stroke.into()],
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
+            blend_mode: node.base.blend_mode,
+            opacity: node.base.opacity,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+            point_count: node.point_count,
+        })
+    }
+}
+
 impl From<JSONLegacyVectorNode> for Node {
     fn from(node: JSONLegacyVectorNode) -> Self {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
@@ -651,6 +743,8 @@ impl From<JSONNode> for Node {
             JSONNode::Path(path) => path.into(),
             JSONNode::Ellipse(ellipse) => ellipse.into(),
             JSONNode::Rectangle(rectangle) => rectangle.into(),
+            JSONNode::RegularPolygon(rpolygon) => rpolygon.into(),
+            JSONNode::RegularStarPolygon(rsp) => rsp.into(),
             JSONNode::Line(line) => line.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNode {
                 base: BaseNode {
