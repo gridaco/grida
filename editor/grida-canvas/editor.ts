@@ -1281,6 +1281,20 @@ export class Editor
       });
     });
   }
+  changeNodePointCount(node_id: editor.NodeID, pointCount: number): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      pointCount,
+    });
+  }
+  changeNodeInnerRadius(node_id: editor.NodeID, innerRadius: number): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      innerRadius,
+    });
+  }
   // text style
   changeTextNodeFontFamily(node_id: string, fontFamily: string | undefined) {
     this.dispatch({

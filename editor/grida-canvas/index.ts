@@ -1353,6 +1353,8 @@ export namespace editor.api {
       node_id: NodeID,
       cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
     ): void;
+    changeNodePointCount(node_id: NodeID, pointCount: number): void;
+    changeNodeInnerRadius(node_id: NodeID, innerRadius: number): void;
     changeNodeFill(
       node_id: NodeID,
       fill:

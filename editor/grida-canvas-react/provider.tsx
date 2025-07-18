@@ -157,6 +157,10 @@ export function useNodeActions(node_id: string | undefined) {
       cornerRadius: (
         value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
       ) => instance.changeNodeCornerRadius(node_id, value),
+      pointCount: (value: number) =>
+        instance.changeNodePointCount(node_id, value),
+      innerRadius: (value: number) =>
+        instance.changeNodeInnerRadius(node_id, value),
       fill: (
         value:
           | grida.program.nodes.i.props.SolidPaintToken

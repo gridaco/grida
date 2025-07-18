@@ -103,6 +103,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import InputPropertyNumber from "./ui/number";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -717,6 +718,8 @@ function SelectedNodeProperties({
     opacity: node.opacity,
     blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
+    pointCount: node.pointCount,
+    innerRadius: node.innerRadius,
     fill: node.fill,
 
     fit: node.fit,
@@ -761,6 +764,8 @@ function SelectedNodeProperties({
     opacity,
     blendMode,
     cornerRadius,
+    pointCount,
+    innerRadius,
     fill,
 
     fit,
@@ -1086,6 +1091,36 @@ function SelectedNodeProperties({
                 />
               </PropertyLine>
             )}
+            {(pointCount != null || innerRadius != null) && (
+              <>
+                {pointCount != null && (
+                  <PropertyLine>
+                    <PropertyLineLabel>Count</PropertyLineLabel>
+                    <InputPropertyNumber
+                      mode="fixed"
+                      min={3}
+                      max={60}
+                      value={pointCount}
+                      onValueCommit={actions.pointCount}
+                    />
+                  </PropertyLine>
+                )}
+                {innerRadius != null && (
+                  <PropertyLine>
+                    <PropertyLineLabel>Ratio</PropertyLineLabel>
+                    <InputPropertyNumber
+                      mode="fixed"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={innerRadius}
+                      onValueCommit={actions.innerRadius}
+                    />
+                  </PropertyLine>
+                )}
+              </>
+            )}
+
             {supports.border(node.type, { backend }) && (
               <PropertyLine>
                 <PropertyLineLabel>Border</PropertyLineLabel>

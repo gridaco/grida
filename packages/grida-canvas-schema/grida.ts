@@ -835,6 +835,8 @@ export namespace grida.program.nodes {
       Partial<LineNode> &
       Partial<RectangleNode> &
       Partial<EllipseNode> &
+      Partial<RegularPolygonNode> &
+      Partial<RegularStarPolygonNode> &
       Partial<ComponentNode> &
       Partial<InstanceNode> &
       Partial<TemplateInstanceNode>,

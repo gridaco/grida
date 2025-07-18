@@ -4,6 +4,7 @@ import type { NodeChangeAction } from "../action";
 import type cg from "@grida/cg";
 import { v4 } from "uuid";
 import assert from "assert";
+import cmath from "@grida/cmath";
 
 function defineNodeProperty<
   K extends keyof grida.program.nodes.UnknwonNode,
@@ -199,6 +200,18 @@ const safe_properties: Partial<
       } else {
         draft.cornerRadius = [each.tl, each.tr, each.br, each.bl];
       }
+    },
+  }),
+  pointCount: defineNodeProperty<"pointCount">({
+    assert: (node) => typeof node.pointCount === "number",
+    apply: (draft, value, prev) => {
+      draft.pointCount = cmath.clamp(value, 3, 60);
+    },
+  }),
+  innerRadius: defineNodeProperty<"innerRadius">({
+    assert: (node) => typeof node.innerRadius === "number",
+    apply: (draft, value, prev) => {
+      draft.innerRadius = cmath.clamp(value, 0, 1);
     },
   }),
   border: defineNodeProperty<"border">({

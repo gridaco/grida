@@ -204,7 +204,7 @@ export default function initialNode(
         ...styles,
         type: "star",
         pointCount: 5,
-        innerRadius: 0,
+        innerRadius: 0.5,
         cornerRadius: 0,
         width: 100,
         height: 100,
