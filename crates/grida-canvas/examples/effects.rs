@@ -33,7 +33,7 @@ async fn demo_effects() -> Scene {
                 width: base_size,
                 height: base_size,
             };
-            rect.corner_radius = RectangularCornerRadius::all(20.0);
+            rect.corner_radius = RectangularCornerRadius::circular(20.0);
             rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(255, 255, 255, 255), // White
                 opacity: 1.0,
@@ -84,7 +84,7 @@ async fn demo_effects() -> Scene {
                 width: base_size,
                 height: base_size,
             };
-            rect.corner_radius = RectangularCornerRadius::all(20.0);
+            rect.corner_radius = RectangularCornerRadius::circular(20.0);
             rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(200, 200, 200, 255), // White
                 opacity: 1.0,
@@ -158,7 +158,7 @@ async fn demo_effects() -> Scene {
                 width: base_size,
                 height: base_size,
             };
-            blur_rect.corner_radius = RectangularCornerRadius::all(20.0);
+            blur_rect.corner_radius = RectangularCornerRadius::circular(20.0);
             blur_rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(255, 255, 255, 128), // Semi-transparent white
                 opacity: 1.0,
@@ -203,7 +203,7 @@ async fn demo_effects() -> Scene {
                 width: base_size,
                 height: base_size,
             };
-            rect.corner_radius = RectangularCornerRadius::all(20.0);
+            rect.corner_radius = RectangularCornerRadius::circular(20.0);
             rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(240, 240, 240, 255), // Light gray
                 opacity: 1.0,
@@ -254,7 +254,7 @@ async fn demo_effects() -> Scene {
                 width: base_size,
                 height: base_size,
             };
-            rect.corner_radius = RectangularCornerRadius::all(20.0);
+            rect.corner_radius = RectangularCornerRadius::circular(20.0);
             rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(255, 255, 255, 255), // White
                 opacity: 1.0,

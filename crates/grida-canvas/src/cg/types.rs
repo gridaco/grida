@@ -105,33 +105,75 @@ pub enum StrokeAlign {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct Radius {
+    pub rx: f32,
+    pub ry: f32,
+}
+
+impl Radius {
+    pub fn circular(radius: f32) -> Self {
+        Self {
+            rx: radius,
+            ry: radius,
+        }
+    }
+
+    pub fn elliptical(rx: f32, ry: f32) -> Self {
+        Self { rx, ry }
+    }
+
+    pub fn zero() -> Self {
+        Self { rx: 0.0, ry: 0.0 }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.rx == 0.0 && self.ry == 0.0
+    }
+
+    pub fn is_uniform(&self) -> bool {
+        self.rx == self.ry
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct RectangularCornerRadius {
-    pub tl: f32,
-    pub tr: f32,
-    pub bl: f32,
-    pub br: f32,
+    pub tl: Radius,
+    pub tr: Radius,
+    pub bl: Radius,
+    pub br: Radius,
 }
 
 impl RectangularCornerRadius {
     pub fn zero() -> Self {
-        Self::all(0.0)
+        Self::all(Radius::zero())
     }
 
-    pub fn all(value: f32) -> Self {
+    pub fn all(radius: Radius) -> Self {
         Self {
-            tl: value,
-            tr: value,
-            bl: value,
-            br: value,
+            tl: radius,
+            tr: radius,
+            bl: radius,
+            br: radius,
         }
     }
 
+    pub fn circular(radius: f32) -> Self {
+        Self::all(Radius::circular(radius))
+    }
+
     pub fn is_zero(&self) -> bool {
-        self.tl == 0.0 && self.tr == 0.0 && self.bl == 0.0 && self.br == 0.0
+        self.tl.is_zero() && self.tr.is_zero() && self.bl.is_zero() && self.br.is_zero()
     }
 
     pub fn is_uniform(&self) -> bool {
-        self.tl == self.tr && self.tl == self.bl && self.tl == self.br
+        // all uniform and the values are the same
+        self.tl.is_uniform()
+            && self.tr.is_uniform()
+            && self.bl.is_uniform()
+            && self.br.is_uniform()
+            && self.tl.rx == self.tr.rx
+            && self.tl.rx == self.bl.rx
+            && self.tl.rx == self.br.rx
     }
 }
 

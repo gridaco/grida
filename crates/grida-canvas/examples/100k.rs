@@ -39,7 +39,7 @@ async fn demo_n_shapes(n: usize) -> Scene {
             width: shape_size,
             height: shape_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(10.0);
+        rect.corner_radius = RectangularCornerRadius::circular(10.0);
 
         // Create rainbow effect from top-left to bottom-right
         // Calculate diagonal position (0.0 to 1.0 across the diagonal)

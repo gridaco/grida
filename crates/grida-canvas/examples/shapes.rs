@@ -33,7 +33,7 @@ async fn demo_shapes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(0.0 + (i as f32 * 8.0)); // 0 to 72
+        rect.corner_radius = RectangularCornerRadius::circular(0.0 + (i as f32 * 8.0)); // 0 to 72
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(
                 200 - (i * 20) as u8,

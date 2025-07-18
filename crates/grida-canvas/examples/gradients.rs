@@ -31,7 +31,7 @@ async fn demo_gradients() -> Scene {
             width: base,
             height: base,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         let angle = (i as f32) * 45.0;
         rect.set_fill(Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(angle),
@@ -60,7 +60,7 @@ async fn demo_gradients() -> Scene {
             width: base,
             height: base,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         let offset = -0.25 + 0.125 * i as f32;
         rect.set_fill(Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform {
@@ -91,7 +91,7 @@ async fn demo_gradients() -> Scene {
             width: base,
             height: base,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
@@ -125,7 +125,7 @@ async fn demo_gradients() -> Scene {
             width: base,
             height: base,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,

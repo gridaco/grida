@@ -87,7 +87,7 @@ async fn demo_scene() -> Scene {
         width: 200.0,
         height: 150.0,
     };
-    rect_gradient.corner_radius = RectangularCornerRadius::all(20.0);
+    rect_gradient.corner_radius = RectangularCornerRadius::circular(20.0);
     rect_gradient.set_fill(Paint::LinearGradient(LinearGradientPaint {
         transform: AffineTransform::from_rotatation(45.0),
         stops: vec![

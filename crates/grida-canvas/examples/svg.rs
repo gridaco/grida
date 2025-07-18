@@ -88,7 +88,7 @@ async fn demo_scene() -> Scene {
         width: 200.0,
         height: 150.0,
     };
-    rect_gradient.corner_radius = RectangularCornerRadius::all(20.0);
+    rect_gradient.corner_radius = RectangularCornerRadius::circular(20.0);
     rect_gradient.set_fill(Paint::LinearGradient(LinearGradientPaint {
         transform: AffineTransform::from_rotatation(45.0),
         stops: vec![
@@ -112,14 +112,13 @@ async fn demo_scene() -> Scene {
         color: Color(0, 0, 0, 255),
         opacity: 1.0,
     })];
-    rect_gradient.effects =
-        LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
-            dx: 5.0,
-            dy: 5.0,
-            blur: 10.0,
-            spread: 0.0,
-            color: Color(0, 0, 0, 100),
-        })]);
+    rect_gradient.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
+        dx: 5.0,
+        dy: 5.0,
+        blur: 10.0,
+        spread: 0.0,
+        color: Color(0, 0, 0, 100),
+    })]);
     all_node_ids.push(rect_gradient.base.id.clone());
     repo.insert(Node::Rectangle(rect_gradient));
 

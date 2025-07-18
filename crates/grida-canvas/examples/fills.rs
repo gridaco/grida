@@ -30,7 +30,7 @@ async fn demo_fills() -> Scene {
         width: 150.0,
         height: 150.0,
     };
-    multi_solid_rect.corner_radius = RectangularCornerRadius::all(20.0);
+    multi_solid_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     multi_solid_rect.fills = vec![
         Paint::Solid(SolidPaint {
             color: Color(255, 0, 0, 255), // Red base
@@ -57,7 +57,7 @@ async fn demo_fills() -> Scene {
         width: 150.0,
         height: 150.0,
     };
-    solid_gradient_rect.corner_radius = RectangularCornerRadius::all(20.0);
+    solid_gradient_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     solid_gradient_rect.fills = vec![
         Paint::Solid(SolidPaint {
             color: Color(255, 255, 0, 255), // Yellow base
@@ -90,7 +90,7 @@ async fn demo_fills() -> Scene {
         width: 150.0,
         height: 150.0,
     };
-    solid_radial_rect.corner_radius = RectangularCornerRadius::all(20.0);
+    solid_radial_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     solid_radial_rect.fills = vec![
         Paint::Solid(SolidPaint {
             color: Color(128, 128, 128, 255), // Gray base
@@ -127,7 +127,7 @@ async fn demo_fills() -> Scene {
         width: 150.0,
         height: 150.0,
     };
-    gradient_gradient_rect.corner_radius = RectangularCornerRadius::all(20.0);
+    gradient_gradient_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     gradient_gradient_rect.fills = vec![
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(90.0),

@@ -202,10 +202,10 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
                 let rrect = RRect::new_rect_radii(
                     rect,
                     &[
-                        Point::new(r.tl, r.tl),
-                        Point::new(r.tr, r.tr),
-                        Point::new(r.br, r.br),
-                        Point::new(r.bl, r.bl),
+                        Point::new(r.tl.rx, r.tl.ry),
+                        Point::new(r.tr.rx, r.tr.ry),
+                        Point::new(r.br.rx, r.br.ry),
+                        Point::new(r.bl.rx, r.bl.ry),
                     ],
                 );
                 PainterShape::from_rrect(rrect)
@@ -263,14 +263,14 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
         IntrinsicSizeNode::Container(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             let r = n.corner_radius;
-            if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
+            if !r.is_zero() {
                 let rrect = RRect::new_rect_radii(
                     rect,
                     &[
-                        Point::new(r.tl, r.tl),
-                        Point::new(r.tr, r.tr),
-                        Point::new(r.br, r.br),
-                        Point::new(r.bl, r.bl),
+                        Point::new(r.tl.rx, r.tl.ry),
+                        Point::new(r.tr.rx, r.tr.ry),
+                        Point::new(r.br.rx, r.br.ry),
+                        Point::new(r.bl.rx, r.bl.ry),
                     ],
                 );
                 PainterShape::from_rrect(rrect)
@@ -281,14 +281,14 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
         IntrinsicSizeNode::Image(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             let r = n.corner_radius;
-            if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
+            if !r.is_zero() {
                 let rrect = RRect::new_rect_radii(
                     rect,
                     &[
-                        Point::new(r.tl, r.tl),
-                        Point::new(r.tr, r.tr),
-                        Point::new(r.br, r.br),
-                        Point::new(r.bl, r.bl),
+                        Point::new(r.tl.rx, r.tl.ry),
+                        Point::new(r.tr.rx, r.tr.ry),
+                        Point::new(r.br.rx, r.br.ry),
+                        Point::new(r.bl.rx, r.bl.ry),
                     ],
                 );
                 PainterShape::from_rrect(rrect)

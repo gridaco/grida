@@ -56,7 +56,7 @@ async fn demo_blendmode() -> Scene {
             width: base_size,
             height: base_size,
         };
-        background.corner_radius = RectangularCornerRadius::all(20.0);
+        background.corner_radius = RectangularCornerRadius::circular(20.0);
 
         // Create a complex background with radial gradient (similar to C++ example)
         background.set_fill(Paint::RadialGradient(RadialGradientPaint {
@@ -89,7 +89,7 @@ async fn demo_blendmode() -> Scene {
             width: base_size,
             height: base_size,
         };
-        sweep_overlay.corner_radius = RectangularCornerRadius::all(20.0);
+        sweep_overlay.corner_radius = RectangularCornerRadius::circular(20.0);
         sweep_overlay.blend_mode = BlendMode::Multiply; // Modulate equivalent
 
         // Create a sweep-like effect using a radial gradient with multiple color stops

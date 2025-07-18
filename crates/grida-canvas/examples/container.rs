@@ -17,7 +17,7 @@ async fn demo_clip() -> Scene {
         width: 300.0,
         height: 300.0,
     };
-    container.corner_radius = RectangularCornerRadius::all(20.0);
+    container.corner_radius = RectangularCornerRadius::circular(20.0);
     container.set_fill(Paint::Solid(SolidPaint {
         color: Color(240, 100, 100, 255), // Light red
         opacity: 1.0,

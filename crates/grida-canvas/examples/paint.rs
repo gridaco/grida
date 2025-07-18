@@ -32,7 +32,7 @@ async fn demo_paints() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(
                 255 - (i * 25) as u8,
@@ -55,7 +55,7 @@ async fn demo_paints() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // Create a linear gradient that changes angle based on index
         let angle = (i as f32 * 36.0) * std::f32::consts::PI / 180.0; // 0 to 360 degrees
@@ -88,7 +88,7 @@ async fn demo_paints() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // Create a radial gradient with varying center positions
         let center_x = 0.2 + (i as f32 * 0.06); // 0.2 to 0.8
@@ -122,7 +122,7 @@ async fn demo_paints() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {
@@ -155,7 +155,7 @@ async fn demo_paints() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {
@@ -196,7 +196,7 @@ async fn demo_paints() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {

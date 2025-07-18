@@ -33,7 +33,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {
@@ -69,7 +69,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {
@@ -99,7 +99,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
@@ -185,7 +185,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {
@@ -231,7 +231,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {
@@ -269,7 +269,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
@@ -300,7 +300,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
@@ -331,7 +331,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
@@ -366,7 +366,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
@@ -391,7 +391,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
@@ -422,7 +422,7 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,

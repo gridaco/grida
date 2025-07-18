@@ -786,7 +786,7 @@ where
         Some(v) => match v {
             serde_json::Value::Number(n) => {
                 let radius = n.as_f64().unwrap_or(0.0) as f32;
-                Ok(Some(RectangularCornerRadius::all(radius)))
+                Ok(Some(RectangularCornerRadius::all(Radius::circular(radius))))
             }
             serde_json::Value::Array(arr) => {
                 if arr.len() == 4 {
@@ -796,10 +796,10 @@ where
                         .collect();
                     Ok(Some(RectangularCornerRadius {
                         /* top-left | top-right | bottom-right | bottom-left */
-                        tl: values[0],
-                        tr: values[1],
-                        br: values[2],
-                        bl: values[3],
+                        tl: Radius::circular(values[0]),
+                        tr: Radius::circular(values[1]),
+                        br: Radius::circular(values[2]),
+                        bl: Radius::circular(values[3]),
                     }))
                 } else {
                     Ok(None)
@@ -941,10 +941,10 @@ mod tests {
             // corner_radius should be Some when present in JSON
             assert!(rect_node.base.corner_radius.is_some());
             if let Some(corner_radius) = &rect_node.base.corner_radius {
-                assert_eq!(corner_radius.tl, 10.0);
-                assert_eq!(corner_radius.tr, 10.0);
-                assert_eq!(corner_radius.bl, 10.0);
-                assert_eq!(corner_radius.br, 10.0);
+                assert_eq!(corner_radius.tl.rx, 10.0);
+                assert_eq!(corner_radius.tr.rx, 10.0);
+                assert_eq!(corner_radius.bl.rx, 10.0);
+                assert_eq!(corner_radius.br.rx, 10.0);
             }
         } else {
             panic!("Expected rectangle node not found");

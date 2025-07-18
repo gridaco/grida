@@ -21,7 +21,7 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 200.0,
     };
-    image_node.corner_radius = RectangularCornerRadius::all(20.0);
+    image_node.corner_radius = RectangularCornerRadius::circular(20.0);
     image_node.stroke_width = 2.0;
     image_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 4.0,
@@ -40,7 +40,7 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 100.0,
     };
-    rect_node.corner_radius = RectangularCornerRadius::all(10.0);
+    rect_node.corner_radius = RectangularCornerRadius::circular(10.0);
     rect_node.set_fill(Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255), // Red fill
         opacity: 1.0,
