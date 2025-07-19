@@ -3,7 +3,7 @@ use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::painter::cvt;
 use crate::sk::mappings::ToSkPath;
-use crate::{cache::geometry::GeometryCache, path::*};
+use crate::{cache::geometry::GeometryCache, shape::*};
 use math2::transform::AffineTransform;
 use skia_safe::{
     path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, Point, RRect, Rect, StrokeRec,
@@ -220,7 +220,7 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
         IntrinsicSizeNode::Arc(n) => PainterShape::from_path(build_arc_path(&EllipticalArcShape {
             width: n.size.width,
             height: n.size.height,
-            inner_radius: n.inner_radius,
+            inner_radius_ratio: n.inner_radius,
             start_angle: n.start_angle,
             angle: n.angle,
         })),

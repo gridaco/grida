@@ -1,12 +1,13 @@
 use skia_safe::{Path, Rect};
 
+/// A Circular Arc shape (that can have irregular / elliptical dimensions)
 pub struct EllipticalArcShape {
     /// width of the box
     pub width: f32,
     /// height of the box
     pub height: f32,
     /// inner radius in 0..1
-    pub inner_radius: f32,
+    pub inner_radius_ratio: f32,
     /// start angle in degrees
     pub start_angle: f32,
     /// angle in degrees
@@ -21,8 +22,8 @@ pub fn build_arc_path(shape: &EllipticalArcShape) -> Path {
     let cy = shape.height / 2.0;
     let rx = shape.width / 2.0;
     let ry = shape.height / 2.0;
-    let inner_rx = rx * shape.inner_radius;
-    let inner_ry = ry * shape.inner_radius;
+    let inner_rx = rx * shape.inner_radius_ratio;
+    let inner_ry = ry * shape.inner_radius_ratio;
 
     let start_deg = shape.start_angle;
     let sweep_deg = shape.angle;
@@ -37,7 +38,7 @@ pub fn build_arc_path(shape: &EllipticalArcShape) -> Path {
     let outer_rect = Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0);
     path.arc_to(outer_rect, start_deg, sweep_deg, false);
 
-    if shape.inner_radius > 0.0 {
+    if shape.inner_radius_ratio > 0.0 {
         let end_inner = (cx + inner_rx * end_rad.cos(), cy + inner_ry * end_rad.sin());
         path.line_to(end_inner);
 

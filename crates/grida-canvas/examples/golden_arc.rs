@@ -1,11 +1,11 @@
-use cg::path::*;
+use cg::shape::*;
 use skia_safe::{surfaces, Color, Paint};
 
 fn main() {
     let shape = EllipticalArcShape {
         width: 400.0,
         height: 400.0,
-        inner_radius: 0.5,
+        inner_radius_ratio: 0.5,
         start_angle: 45.0,
         angle: 180.0,
     };

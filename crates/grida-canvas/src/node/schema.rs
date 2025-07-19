@@ -1,7 +1,7 @@
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::painter::cvt;
-use crate::path::*;
+use crate::shape::*;
 use crate::sk::mappings::ToSkPath;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;

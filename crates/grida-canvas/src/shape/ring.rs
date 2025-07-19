@@ -4,7 +4,7 @@ pub struct EllipticalRingShape {
     /// size of the box
     pub size: skia_safe::Size,
     /// inner radius in 0..1
-    pub inner_radius: f32,
+    pub inner_radius_ratio: f32,
 }
 
 pub fn build_ring_path(shape: EllipticalRingShape) -> skia_safe::Path {
@@ -16,8 +16,8 @@ pub fn build_ring_path(shape: EllipticalRingShape) -> skia_safe::Path {
     let cy = h / 2.0;
     let rx = w / 2.0;
     let ry = h / 2.0;
-    let inner_rx = rx * shape.inner_radius;
-    let inner_ry = ry * shape.inner_radius;
+    let inner_rx = rx * shape.inner_radius_ratio;
+    let inner_ry = ry * shape.inner_radius_ratio;
 
     // Create outer ellipse (clockwise)
     let outer_rect = skia_safe::Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0);

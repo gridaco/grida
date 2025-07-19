@@ -1,10 +1,10 @@
-use cg::path::*;
+use cg::shape::*;
 use skia_safe::{surfaces, Color, Paint};
 
 fn main() {
     let shape = EllipticalRingShape {
         size: skia_safe::Size::new(400.0, 400.0),
-        inner_radius: 0.5,
+        inner_radius_ratio: 0.5,
     };
 
     let mut surface =
