@@ -13,7 +13,7 @@ async fn demo_shapes() -> Scene {
     root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1080.0,
-        height: 1080.0,
+        height: 1200.0,
     };
 
     let mut repository = NodeRepository::new();
@@ -177,6 +177,31 @@ async fn demo_shapes() -> Scene {
         })];
         all_shape_ids.push(star.id.clone());
         repository.insert(Node::RegularStarPolygon(star));
+    }
+
+    // Arc Row - demonstrating different angle variations
+    for i in 0..items_per_row {
+        let mut arc = nf.create_arc_node();
+        arc.name = Some(format!("Arc {}", i + 1));
+        arc.transform = AffineTransform::new(start_x + spacing * i as f32, 700.0, 0.0);
+        arc.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        arc.start_angle = 0.0;
+        arc.angle = 45.0 + (i as f32 * 31.5); // 45 to 360 degrees
+        arc.inner_radius = 0.3; // Fixed inner radius for visibility
+        arc.fills = vec![Paint::Solid(SolidPaint {
+            color: Color(
+                200 - (i * 20) as u8,
+                200 - (i * 20) as u8,
+                200 - (i * 20) as u8,
+                255,
+            ), // Fading gray
+            opacity: 1.0,
+        })];
+        all_shape_ids.push(arc.id.clone());
+        repository.insert(Node::Arc(arc));
     }
 
     // Set up the root container
