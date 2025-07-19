@@ -5,7 +5,7 @@ use skia_safe::{self as sk, color_filters, image_filters, BlendMode, ColorMatrix
 /// Draw a drop shadow behind the given shape on the provided canvas.
 pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
     let sk::Color4f { r, g, b, a } = {
-        let crate::cg::types::Color(r, g, b, a) = shadow.color;
+        let crate::cg::types::CGColor(r, g, b, a) = shadow.color;
         sk::Color4f::new(
             r as f32 / 255.0,
             g as f32 / 255.0,
@@ -64,7 +64,7 @@ pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeSh
 
 /// Draw an inner shadow clipped to the given shape.
 pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
-    let crate::cg::types::Color(r, g, b, a) = shadow.color;
+    let crate::cg::types::CGColor(r, g, b, a) = shadow.color;
     let spread = shadow.spread;
 
     let path = shape.to_path();

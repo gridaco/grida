@@ -2,7 +2,7 @@ use crate::cg::types::*;
 use skia_safe;
 
 pub trait ToSkPath {
-    fn to_sk_path(&self) -> skia_safe::Path;
+    fn to_path(&self) -> skia_safe::Path;
 }
 
 impl From<BooleanPathOperation> for skia_safe::PathOp {

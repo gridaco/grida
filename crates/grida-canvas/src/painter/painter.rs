@@ -8,7 +8,6 @@ use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::runtime::repository::{FontRepository, ImageRepository};
-use crate::sk::mappings::ToSkPath;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
 use std::cell::RefCell;
@@ -547,7 +546,7 @@ impl<'a> Painter<'a> {
     /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
     fn draw_polygon_node(&self, node: &PolygonNode) {
         self.with_transform(&node.transform.matrix, || {
-            let path = node.to_sk_path();
+            let path = node.to_path();
             let shape = PainterShape::from_path(path.clone());
             self.draw_shape_with_effects(&node.effects, &shape, || {
                 self.with_opacity(node.opacity, || {
@@ -568,13 +567,49 @@ impl<'a> Painter<'a> {
 
     /// Draw a RegularPolygonNode by converting to a PolygonNode
     fn draw_regular_polygon_node(&self, node: &RegularPolygonNode) {
-        let polygon = node.to_polygon();
+        let points = node.to_points();
+
+        let polygon = PolygonNode {
+            id: node.id.clone(),
+            name: node.name.clone(),
+            active: node.active,
+            transform: node.transform,
+            points,
+            corner_radius: node.corner_radius,
+            fills: node.fills.clone(),
+            strokes: node.strokes.clone(),
+            stroke_width: node.stroke_width,
+            stroke_align: node.stroke_align,
+            opacity: node.opacity,
+            blend_mode: node.blend_mode,
+            effects: node.effects.clone(),
+            stroke_dash_array: node.stroke_dash_array.clone(),
+        };
+
         self.draw_polygon_node(&polygon);
     }
 
     /// Draw a RegularStarPolygonNode by converting to a PolygonNode
     fn draw_regular_star_polygon_node(&self, node: &RegularStarPolygonNode) {
-        let polygon = node.to_polygon();
+        let points = node.to_points();
+
+        let polygon = PolygonNode {
+            id: node.id.clone(),
+            name: node.name.clone(),
+            active: node.active,
+            transform: node.transform,
+            points,
+            corner_radius: node.corner_radius,
+            fills: node.fills.clone(),
+            strokes: node.strokes.clone(),
+            stroke_width: node.stroke_width,
+            stroke_align: node.stroke_align,
+            opacity: node.opacity,
+            blend_mode: node.blend_mode,
+            effects: node.effects.clone(),
+            stroke_dash_array: node.stroke_dash_array.clone(),
+        };
+
         self.draw_polygon_node(&polygon);
     }
 
@@ -704,11 +739,11 @@ impl<'a> Painter<'a> {
 
             // Create a red fill paint
             let fill = Paint::Solid(SolidPaint {
-                color: Color(255, 0, 0, 51), // Semi-transparent red
+                color: CGColor(255, 0, 0, 51), // Semi-transparent red
                 opacity: 1.0,
             });
             let stroke = Paint::Solid(SolidPaint {
-                color: Color(255, 0, 0, 255), // Solid red
+                color: CGColor(255, 0, 0, 255), // Solid red
                 opacity: 1.0,
             });
 

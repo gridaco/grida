@@ -140,7 +140,7 @@ async fn demo_webfonts() -> Scene {
         name: "Webfonts Demo".to_string(),
         children: vec![root_container_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

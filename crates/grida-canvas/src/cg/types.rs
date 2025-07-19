@@ -2,8 +2,40 @@ use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::Deserialize;
 
+/// A 2D point with x and y coordinates.
 #[derive(Debug, Clone, Copy)]
-pub struct Color(pub u8, pub u8, pub u8, pub u8);
+pub struct CGPoint {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl CGPoint {
+    /// Subtracts a scaled vector from this point.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The point to subtract
+    /// * `scale` - The scale factor to apply to the other point
+    ///
+    /// # Returns
+    ///
+    /// A new point representing the result of the vector operation
+    pub fn subtract_scaled(&self, other: CGPoint, scale: f32) -> CGPoint {
+        CGPoint {
+            x: self.x - other.x * scale,
+            y: self.y - other.y * scale,
+        }
+    }
+}
+
+impl Into<skia_safe::Point> for CGPoint {
+    fn into(self) -> skia_safe::Point {
+        skia_safe::Point::new(self.x, self.y)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
 /// Boolean path operation.
 #[derive(Debug, Clone, Copy)]
@@ -340,49 +372,49 @@ impl Paint {
 
 #[derive(Debug, Clone)]
 pub struct SolidPaint {
-    pub color: Color,
+    pub color: CGColor,
     pub opacity: f32,
 }
 
 impl SolidPaint {
     pub fn transparent() -> Self {
         Self {
-            color: Color(0, 0, 0, 0),
+            color: CGColor(0, 0, 0, 0),
             opacity: 0.0,
         }
     }
 
     pub fn black() -> Self {
         Self {
-            color: Color(0, 0, 0, 255),
+            color: CGColor(0, 0, 0, 255),
             opacity: 1.0,
         }
     }
 
     pub fn white() -> Self {
         Self {
-            color: Color(255, 255, 255, 255),
+            color: CGColor(255, 255, 255, 255),
             opacity: 1.0,
         }
     }
 
     pub fn red() -> Self {
         Self {
-            color: Color(255, 0, 0, 255),
+            color: CGColor(255, 0, 0, 255),
             opacity: 1.0,
         }
     }
 
     pub fn blue() -> Self {
         Self {
-            color: Color(0, 0, 255, 255),
+            color: CGColor(0, 0, 255, 255),
             opacity: 1.0,
         }
     }
 
     pub fn green() -> Self {
         Self {
-            color: Color(0, 255, 0, 255),
+            color: CGColor(0, 255, 0, 255),
             opacity: 1.0,
         }
     }
@@ -392,7 +424,7 @@ impl SolidPaint {
 pub struct GradientStop {
     /// 0.0 = start, 1.0 = end
     pub offset: f32,
-    pub color: Color,
+    pub color: CGColor,
 }
 
 #[derive(Debug, Clone)]
@@ -487,7 +519,7 @@ pub struct FeShadow {
     pub spread: f32,
 
     /// Shadow color (includes alpha)
-    pub color: Color,
+    pub color: CGColor,
 }
 
 #[derive(Debug, Clone)]

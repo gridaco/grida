@@ -28,7 +28,7 @@ async fn demo_basic() -> Scene {
         dy: 4.0,
         blur: 8.0,
         spread: 0.0,
-        color: Color(0, 0, 0, 77),
+        color: CGColor(0, 0, 0, 77),
     })]);
     image_node.hash = demo_image_id.to_string();
 
@@ -42,7 +42,7 @@ async fn demo_basic() -> Scene {
     };
     rect_node.corner_radius = RectangularCornerRadius::circular(10.0);
     rect_node.set_fill(Paint::Solid(SolidPaint {
-        color: Color(255, 0, 0, 255), // Red fill
+        color: CGColor(255, 0, 0, 255), // Red fill
         opacity: 1.0,
     }));
     rect_node.stroke_width = 2.0;
@@ -51,7 +51,7 @@ async fn demo_basic() -> Scene {
         dy: 4.0,
         blur: 8.0,
         spread: 0.0,
-        color: Color(0, 0, 0, 77),
+        color: CGColor(0, 0, 0, 77),
     })]);
 
     // Create a test ellipse node with radial gradient and a visible stroke
@@ -68,15 +68,15 @@ async fn demo_basic() -> Scene {
         stops: vec![
             GradientStop {
                 offset: 0.0,
-                color: Color(0, 255, 0, 255), // Green
+                color: CGColor(0, 255, 0, 255), // Green
             },
             GradientStop {
                 offset: 0.5,
-                color: Color(255, 255, 0, 255), // Yellow
+                color: CGColor(255, 255, 0, 255), // Yellow
             },
             GradientStop {
                 offset: 1.0,
-                color: Color(255, 0, 255, 255), // Magenta
+                color: CGColor(255, 0, 255, 255), // Magenta
             },
         ],
         opacity: 1.0,
@@ -90,7 +90,7 @@ async fn demo_basic() -> Scene {
             let radius = 100.0;
             let x = radius * angle.cos();
             let y = radius * angle.sin();
-            Point { x, y }
+            CGPoint { x, y }
         })
         .collect::<Vec<_>>();
 
@@ -100,11 +100,11 @@ async fn demo_basic() -> Scene {
     polygon_node.transform = AffineTransform::new(600.0, 50.0, 0.0);
     polygon_node.points = pentagon_points;
     polygon_node.fills = vec![Paint::Solid(SolidPaint {
-        color: Color(255, 200, 0, 255), // Orange fill
+        color: CGColor(255, 200, 0, 255), // Orange fill
         opacity: 1.0,
     })];
     polygon_node.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(0, 0, 0, 255), // Black stroke
+        color: CGColor(0, 0, 0, 255), // Black stroke
         opacity: 1.0,
     })];
     polygon_node.stroke_width = 5.0;
@@ -120,7 +120,7 @@ async fn demo_basic() -> Scene {
     };
     regular_polygon_node.point_count = 6; // hexagon
     regular_polygon_node.fills = vec![Paint::Solid(SolidPaint {
-        color: Color(0, 200, 255, 255), // Cyan fill
+        color: CGColor(0, 200, 255, 255), // Cyan fill
         opacity: 1.0,
     })];
     regular_polygon_node.stroke_width = 4.0;
@@ -148,7 +148,7 @@ async fn demo_basic() -> Scene {
     text_span_node.text_align = TextAlign::Center;
     text_span_node.text_align_vertical = TextAlignVertical::Center;
     text_span_node.stroke = Some(Paint::Solid(SolidPaint {
-        color: Color(0, 0, 0, 255), // Black stroke
+        color: CGColor(0, 0, 0, 255), // Black stroke
         opacity: 1.0,
     }));
     text_span_node.stroke_width = Some(4.0);
@@ -159,7 +159,7 @@ async fn demo_basic() -> Scene {
     path_node.transform = AffineTransform::new(550.0, 300.0, 0.0);
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
     path_node.stroke = Some(Paint::Solid(SolidPaint {
-        color: Color(255, 0, 0, 255), // Red stroke
+        color: CGColor(255, 0, 0, 255), // Red stroke
         opacity: 1.0,
     }));
     path_node.stroke_width = 4.0;
@@ -174,7 +174,7 @@ async fn demo_basic() -> Scene {
         height: 0.0, // ignored
     };
     line_node.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(0, 255, 0, 255), // Green color
+        color: CGColor(0, 255, 0, 255), // Green color
         opacity: 1.0,
     })];
     line_node.stroke_width = 4.0;
@@ -230,7 +230,7 @@ async fn demo_basic() -> Scene {
         name: "Demo".to_string(),
         children: vec![root_container_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

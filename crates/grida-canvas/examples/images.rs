@@ -32,7 +32,7 @@ async fn demo_images() -> Scene {
         fit: BoxFit::Cover,
     }));
     rect1.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(255, 0, 0, 255),
+        color: CGColor(255, 0, 0, 255),
         opacity: 1.0,
     })];
     rect1.stroke_width = 2.0;
@@ -69,7 +69,7 @@ async fn demo_images() -> Scene {
     };
     rect3.corner_radius = RectangularCornerRadius::circular(40.0);
     rect3.set_fill(Paint::Solid(SolidPaint {
-        color: Color(240, 240, 240, 255),
+        color: CGColor(240, 240, 240, 255),
         opacity: 1.0,
     }));
     rect3.strokes = vec![Paint::Image(ImagePaint {
@@ -119,7 +119,7 @@ async fn demo_images() -> Scene {
         name: "Images Demo".to_string(),
         children: vec![root_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

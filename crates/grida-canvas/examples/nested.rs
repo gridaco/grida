@@ -18,7 +18,7 @@ async fn demo_nested() -> Scene {
         height: 100.0,
     };
     rect.set_fill(Paint::Solid(SolidPaint {
-        color: Color(255, 0, 0, 255),
+        color: CGColor(255, 0, 0, 255),
         opacity: 1.0,
     }));
     let mut current_id = rect.id.clone();
@@ -44,7 +44,7 @@ async fn demo_nested() -> Scene {
                 height: 100.0,
             };
             group_rect.set_fill(Paint::Solid(SolidPaint {
-                color: Color(0, 255, 0, 255), // Green
+                color: CGColor(0, 255, 0, 255), // Green
                 opacity: 1.0,
             }));
             let group_rect_id = group_rect.id.clone();
@@ -71,7 +71,7 @@ async fn demo_nested() -> Scene {
                 height: 100.0,
             };
             container_rect.set_fill(Paint::Solid(SolidPaint {
-                color: Color(0, 0, 255, 255), // Blue
+                color: CGColor(0, 0, 255, 255), // Blue
                 opacity: 1.0,
             }));
             let container_rect_id = container_rect.id.clone();
@@ -88,7 +88,7 @@ async fn demo_nested() -> Scene {
         name: "Nested Demo".to_string(),
         children: vec![current_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

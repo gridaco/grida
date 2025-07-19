@@ -1,38 +1,11 @@
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
-use crate::painter::cvt;
 use crate::shape::*;
 use crate::sk::mappings::ToSkPath;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
 
 pub type NodeId = String;
-
-/// A 2D point with x and y coordinates.
-#[derive(Debug, Clone, Copy)]
-pub struct Point {
-    pub x: f32,
-    pub y: f32,
-}
-
-impl Point {
-    /// Subtracts a scaled vector from this point.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - The point to subtract
-    /// * `scale` - The scale factor to apply to the other point
-    ///
-    /// # Returns
-    ///
-    /// A new point representing the result of the vector operation
-    pub fn subtract_scaled(&self, other: Point, scale: f32) -> Point {
-        Point {
-            x: self.x - other.x * scale,
-            y: self.y - other.y * scale,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct LayerEffects {
@@ -108,7 +81,7 @@ pub struct Scene {
     pub name: String,
     pub children: Vec<NodeId>,
     pub nodes: NodeRepository,
-    pub background_color: Option<Color>,
+    pub background_color: Option<CGColor>,
 }
 
 // endregion
@@ -199,6 +172,11 @@ pub trait NodeGeometryMixin {
     fn has_stroke_geometry(&self) -> bool;
 
     fn render_bounds_stroke_width(&self) -> f32;
+}
+
+pub trait NodeShapeMixin {
+    fn to_shape(&self) -> Shape;
+    fn to_path(&self) -> skia_safe::Path;
 }
 
 /// Intrinsic size node is a node that has a fixed size, and can be rendered soley on its own.
@@ -595,7 +573,7 @@ pub struct VectorNode {
 }
 
 impl ToSkPath for VectorNode {
-    fn to_sk_path(&self) -> skia_safe::Path {
+    fn to_path(&self) -> skia_safe::Path {
         self.network.clone().into()
     }
 }
@@ -639,7 +617,7 @@ pub struct PolygonNode {
     pub transform: AffineTransform,
 
     /// The list of points defining the polygon vertices.
-    pub points: Vec<Point>,
+    pub points: Vec<CGPoint>,
 
     /// The corner radius of the polygon.
     pub corner_radius: f32,
@@ -681,9 +659,23 @@ impl NodeStrokesMixin for PolygonNode {
     }
 }
 
-impl ToSkPath for PolygonNode {
-    fn to_sk_path(&self) -> skia_safe::Path {
-        cvt::sk_polygon_path(&self.points, self.corner_radius)
+impl PolygonNode {
+    pub fn to_own_shape(&self) -> SimplePolygonShape {
+        SimplePolygonShape {
+            points: self.points.clone(),
+            corner_radius: self.corner_radius,
+        }
+    }
+}
+
+impl NodeShapeMixin for PolygonNode {
+    fn to_shape(&self) -> Shape {
+        Shape::SimplePolygon(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        let shape = self.to_own_shape();
+        build_simple_polygon_path(&shape)
     }
 }
 
@@ -767,44 +759,29 @@ impl NodeGeometryMixin for RegularPolygonNode {
 }
 
 impl RegularPolygonNode {
-    pub fn to_polygon(&self) -> PolygonNode {
-        let w = self.size.width;
-        let h = self.size.height;
-        let cx = w / 2.0;
-        let cy = h / 2.0;
-        let r = w.min(h) / 2.0;
-        let angle_offset = if self.point_count % 2 == 0 {
-            std::f32::consts::PI / self.point_count as f32
-        } else {
-            -std::f32::consts::PI / 2.0
-        };
-
-        let points: Vec<Point> = (0..self.point_count)
-            .map(|i| {
-                let theta = (i as f32 / self.point_count as f32) * 2.0 * std::f32::consts::PI
-                    + angle_offset;
-                let x = cx + r * theta.cos();
-                let y = cy + r * theta.sin();
-                Point { x, y }
-            })
-            .collect();
-
-        PolygonNode {
-            id: self.id.clone(),
-            name: self.name.clone(),
-            active: self.active,
-            transform: self.transform,
-            points,
-            corner_radius: self.corner_radius,
-            fills: self.fills.clone(),
-            strokes: self.strokes.clone(),
-            stroke_width: self.stroke_width,
-            stroke_align: self.stroke_align,
-            opacity: self.opacity,
-            blend_mode: self.blend_mode,
-            effects: self.effects.clone(),
-            stroke_dash_array: self.stroke_dash_array.clone(),
+    pub fn to_own_shape(&self) -> EllipticalRegularPolygonShape {
+        EllipticalRegularPolygonShape {
+            width: self.size.width,
+            height: self.size.height,
+            point_count: self.point_count,
         }
+    }
+
+    pub fn to_points(&self) -> Vec<CGPoint> {
+        build_regular_polygon_points(&self.to_own_shape())
+    }
+}
+
+impl NodeShapeMixin for RegularPolygonNode {
+    fn to_shape(&self) -> Shape {
+        Shape::EllipticalRegularPolygon(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        build_simple_polygon_path(&SimplePolygonShape {
+            points: self.to_points(),
+            corner_radius: self.corner_radius,
+        })
     }
 }
 
@@ -893,41 +870,27 @@ impl NodeGeometryMixin for RegularStarPolygonNode {
     }
 }
 
+impl NodeShapeMixin for RegularStarPolygonNode {
+    fn to_shape(&self) -> Shape {
+        Shape::EllipticalRegularStar(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        build_star_path(&self.to_own_shape())
+    }
+}
+
 impl RegularStarPolygonNode {
-    pub fn to_polygon(&self) -> PolygonNode {
-        let w = self.size.width;
-        let h = self.size.height;
-        let cx = w / 2.0;
-        let cy = h / 2.0;
-        let outer_r = cx.min(cy);
-        let inner_r = outer_r * self.inner_radius;
-        let step = std::f32::consts::PI / self.point_count as f32;
-        let start_angle = -std::f32::consts::PI / 2.0;
+    pub fn to_points(&self) -> Vec<CGPoint> {
+        build_star_points(&self.to_own_shape())
+    }
 
-        let mut points = Vec::with_capacity(self.point_count * 2);
-        for i in 0..(self.point_count * 2) {
-            let angle = start_angle + i as f32 * step;
-            let r = if i % 2 == 0 { outer_r } else { inner_r };
-            let x = cx + r * angle.cos();
-            let y = cy + r * angle.sin();
-            points.push(Point { x, y });
-        }
-
-        PolygonNode {
-            id: self.id.clone(),
-            name: self.name.clone(),
-            active: self.active,
-            transform: self.transform,
-            points,
-            corner_radius: self.corner_radius,
-            fills: self.fills.clone(),
-            strokes: self.strokes.clone(),
-            stroke_width: self.stroke_width,
-            stroke_align: self.stroke_align,
-            opacity: self.opacity,
-            blend_mode: self.blend_mode,
-            effects: self.effects.clone(),
-            stroke_dash_array: self.stroke_dash_array.clone(),
+    pub fn to_own_shape(&self) -> EllipticalRegularStarShape {
+        EllipticalRegularStarShape {
+            width: self.size.width,
+            height: self.size.height,
+            inner_radius_ratio: self.inner_radius,
+            point_count: self.point_count,
         }
     }
 }

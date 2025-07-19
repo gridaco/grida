@@ -26,7 +26,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             },
             corner_radius: RectangularCornerRadius::zero(),
             fills: vec![Paint::Solid(SolidPaint {
-                color: Color(255, 0, 0, 255),
+                color: CGColor(255, 0, 0, 255),
                 opacity: 1.0,
             })],
             strokes: vec![],
@@ -41,7 +41,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                     dy: 2.0,
                     blur: 4.0,
                     spread: 0.0,
-                    color: Color(0, 0, 0, 128),
+                    color: CGColor(0, 0, 0, 128),
                 })])
             } else {
                 LayerEffects::new_empty()

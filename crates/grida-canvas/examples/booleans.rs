@@ -35,7 +35,7 @@ async fn demo_booleans() -> Scene {
             height: base_size,
         };
         rect.set_fill(Paint::Solid(SolidPaint {
-            color: Color(200, 200, 200, 255),
+            color: CGColor(200, 200, 200, 255),
             opacity: 1.0,
         }));
 
@@ -47,7 +47,7 @@ async fn demo_booleans() -> Scene {
             height: base_size,
         };
         circle.fills = vec![Paint::Solid(SolidPaint {
-            color: Color(200, 200, 200, 255),
+            color: CGColor(200, 200, 200, 255),
             opacity: 1.0,
         })];
 
@@ -62,7 +62,7 @@ async fn demo_booleans() -> Scene {
         text.text = "Union (A ∪ B): Combines two shapes into one".to_string();
         text.text_style.font_size = 16.0;
         text.fill = Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255),
+            color: CGColor(0, 0, 0, 255),
             opacity: 1.0,
         });
 
@@ -75,11 +75,11 @@ async fn demo_booleans() -> Scene {
             op: BooleanPathOperation::Union,
             children: vec![rect.id.clone(), circle.id.clone()],
             fill: Paint::Solid(SolidPaint {
-                color: Color(100, 100, 200, 255),
+                color: CGColor(100, 100, 200, 255),
                 opacity: 1.0,
             }),
             stroke: Some(Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
+                color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
             })),
             stroke_width: 2.0,
@@ -116,7 +116,7 @@ async fn demo_booleans() -> Scene {
             height: base_size,
         };
         circle1.fills = vec![Paint::Solid(SolidPaint {
-            color: Color(200, 200, 200, 255),
+            color: CGColor(200, 200, 200, 255),
             opacity: 1.0,
         })];
 
@@ -128,7 +128,7 @@ async fn demo_booleans() -> Scene {
             height: base_size,
         };
         circle2.fills = vec![Paint::Solid(SolidPaint {
-            color: Color(200, 200, 200, 255),
+            color: CGColor(200, 200, 200, 255),
             opacity: 1.0,
         })];
 
@@ -143,7 +143,7 @@ async fn demo_booleans() -> Scene {
         text.text = "Intersection (A ∩ B): Shows only the overlapping area".to_string();
         text.text_style.font_size = 16.0;
         text.fill = Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255),
+            color: CGColor(0, 0, 0, 255),
             opacity: 1.0,
         });
 
@@ -156,11 +156,11 @@ async fn demo_booleans() -> Scene {
             op: BooleanPathOperation::Intersection,
             children: vec![circle1.id.clone(), circle2.id.clone()],
             fill: Paint::Solid(SolidPaint {
-                color: Color(100, 100, 200, 255),
+                color: CGColor(100, 100, 200, 255),
                 opacity: 1.0,
             }),
             stroke: Some(Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
+                color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
             })),
             stroke_width: 2.0,
@@ -197,7 +197,7 @@ async fn demo_booleans() -> Scene {
             height: base_size,
         };
         star.fills = vec![Paint::Solid(SolidPaint {
-            color: Color(200, 200, 200, 255),
+            color: CGColor(200, 200, 200, 255),
             opacity: 1.0,
         })];
 
@@ -209,7 +209,7 @@ async fn demo_booleans() -> Scene {
             height: base_size * 0.8,
         };
         rect.set_fill(Paint::Solid(SolidPaint {
-            color: Color(200, 200, 200, 255),
+            color: CGColor(200, 200, 200, 255),
             opacity: 1.0,
         }));
 
@@ -224,7 +224,7 @@ async fn demo_booleans() -> Scene {
         text.text = "Difference (A - B): Removes the second shape from the first".to_string();
         text.text_style.font_size = 16.0;
         text.fill = Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255),
+            color: CGColor(0, 0, 0, 255),
             opacity: 1.0,
         });
 
@@ -237,11 +237,11 @@ async fn demo_booleans() -> Scene {
             op: BooleanPathOperation::Difference,
             children: vec![star.id.clone(), rect.id.clone()],
             fill: Paint::Solid(SolidPaint {
-                color: Color(100, 100, 200, 255),
+                color: CGColor(100, 100, 200, 255),
                 opacity: 1.0,
             }),
             stroke: Some(Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
+                color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
             })),
             stroke_width: 2.0,
@@ -278,7 +278,7 @@ async fn demo_booleans() -> Scene {
             height: base_size,
         };
         square1.set_fill(Paint::Solid(SolidPaint {
-            color: Color(200, 200, 200, 255),
+            color: CGColor(200, 200, 200, 255),
             opacity: 1.0,
         }));
 
@@ -290,7 +290,7 @@ async fn demo_booleans() -> Scene {
             height: base_size,
         };
         square2.set_fill(Paint::Solid(SolidPaint {
-            color: Color(200, 200, 200, 255),
+            color: CGColor(200, 200, 200, 255),
             opacity: 1.0,
         }));
 
@@ -305,7 +305,7 @@ async fn demo_booleans() -> Scene {
         text.text = "XOR (A ⊕ B): Shows areas that don't overlap".to_string();
         text.text_style.font_size = 16.0;
         text.fill = Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255),
+            color: CGColor(0, 0, 0, 255),
             opacity: 1.0,
         });
 
@@ -318,11 +318,11 @@ async fn demo_booleans() -> Scene {
             op: BooleanPathOperation::Xor,
             children: vec![square1.id.clone(), square2.id.clone()],
             fill: Paint::Solid(SolidPaint {
-                color: Color(100, 100, 200, 255),
+                color: CGColor(100, 100, 200, 255),
                 opacity: 1.0,
             }),
             stroke: Some(Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
+                color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
             })),
             stroke_width: 2.0,
@@ -356,7 +356,7 @@ async fn demo_booleans() -> Scene {
         name: "Boolean Operations Demo".to_string(),
         children: vec![root_container_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

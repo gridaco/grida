@@ -32,7 +32,7 @@ async fn demo_lines() -> Scene {
         height: 0.0,
     };
     line_basic.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(0, 0, 0, 255),
+        color: CGColor(0, 0, 0, 255),
         opacity: 1.0,
     })];
     line_basic.stroke_width = 2.0;
@@ -48,7 +48,7 @@ async fn demo_lines() -> Scene {
         height: 0.0,
     };
     line_outside.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(255, 0, 0, 255),
+        color: CGColor(255, 0, 0, 255),
         opacity: 1.0,
     })];
     line_outside.stroke_width = 8.0;
@@ -65,7 +65,7 @@ async fn demo_lines() -> Scene {
         height: 0.0,
     };
     line_dashed.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(0, 0, 255, 255),
+        color: CGColor(0, 0, 255, 255),
         opacity: 1.0,
     })];
     line_dashed.stroke_width = 4.0;
@@ -86,11 +86,11 @@ async fn demo_lines() -> Scene {
         stops: vec![
             GradientStop {
                 offset: 0.0,
-                color: Color(0, 255, 0, 255),
+                color: CGColor(0, 255, 0, 255),
             },
             GradientStop {
                 offset: 1.0,
-                color: Color(255, 0, 255, 255),
+                color: CGColor(255, 0, 255, 255),
             },
         ],
         opacity: 1.0,
@@ -109,7 +109,7 @@ async fn demo_lines() -> Scene {
         height: 0.0,
     };
     line_rotated.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(0, 128, 128, 255),
+        color: CGColor(0, 128, 128, 255),
         opacity: 1.0,
     })];
     line_rotated.stroke_width = 4.0;
@@ -126,7 +126,7 @@ async fn demo_lines() -> Scene {
         name: "LineNode Demo".to_string(),
         children: vec![root_id],
         nodes: repo,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

@@ -94,9 +94,9 @@ pub struct JSONFeShadow {
     pub inset: bool,
 }
 
-impl From<JSONRGBA> for Color {
+impl From<JSONRGBA> for CGColor {
     fn from(color: JSONRGBA) -> Self {
-        Color(color.r, color.g, color.b, (color.a * 255.0).round() as u8)
+        CGColor(color.r, color.g, color.b, (color.a * 255.0).round() as u8)
     }
 }
 
@@ -116,7 +116,7 @@ impl From<Option<JSONPaint>> for Paint {
     fn from(fill: Option<JSONPaint>) -> Self {
         match fill {
             Some(JSONPaint::Solid { color }) => Paint::Solid(SolidPaint {
-                color: color.map_or(Color(0, 0, 0, 0), |c| c.into()),
+                color: color.map_or(CGColor(0, 0, 0, 0), |c| c.into()),
                 opacity: 1.0,
             }),
             Some(JSONPaint::LinearGradient {
@@ -144,7 +144,7 @@ impl From<Option<JSONPaint>> for Paint {
                 })
             }
             None => Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 0),
+                color: CGColor(0, 0, 0, 0),
                 opacity: 1.0,
             }),
         }

@@ -35,7 +35,7 @@ async fn demo_effects() -> Scene {
             };
             rect.corner_radius = RectangularCornerRadius::circular(20.0);
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: Color(255, 255, 255, 255), // White
+                color: CGColor(255, 255, 255, 255), // White
                 opacity: 1.0,
             }));
             rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
@@ -43,7 +43,7 @@ async fn demo_effects() -> Scene {
                 dy: 4.0,
                 blur: 4.0 * (i + 1) as f32,
                 spread: 0.0,
-                color: Color(0, 0, 0, 128),
+                color: CGColor(0, 0, 0, 128),
             })]);
             all_effect_ids.push(rect.id.clone());
             repository.insert(Node::Rectangle(rect));
@@ -58,7 +58,7 @@ async fn demo_effects() -> Scene {
             };
             polygon.point_count = i + 3;
             polygon.fills = vec![Paint::Solid(SolidPaint {
-                color: Color(255, 255, 255, 255), // White
+                color: CGColor(255, 255, 255, 255), // White
                 opacity: 1.0,
             })];
             polygon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
@@ -66,7 +66,7 @@ async fn demo_effects() -> Scene {
                 dy: 4.0,
                 blur: 4.0 * (i + 1) as f32,
                 spread: 2.0 * (i + 1) as f32,
-                color: Color(0, 0, 0, 128),
+                color: CGColor(0, 0, 0, 128),
             })]);
             all_effect_ids.push(polygon.id.clone());
             repository.insert(Node::RegularPolygon(polygon));
@@ -86,7 +86,7 @@ async fn demo_effects() -> Scene {
             };
             rect.corner_radius = RectangularCornerRadius::circular(20.0);
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: Color(200, 200, 200, 255), // White
+                color: CGColor(200, 200, 200, 255), // White
                 opacity: 1.0,
             }));
             rect.effects =
@@ -106,7 +106,7 @@ async fn demo_effects() -> Scene {
             };
             polygon.point_count = i + 3;
             polygon.fills = vec![Paint::Solid(SolidPaint {
-                color: Color(200, 200, 200, 255), // White
+                color: CGColor(200, 200, 200, 255), // White
                 opacity: 1.0,
             })];
             polygon.effects =
@@ -132,15 +132,15 @@ async fn demo_effects() -> Scene {
         stops: vec![
             GradientStop {
                 offset: 0.0,
-                color: Color(255, 0, 128, 255),
+                color: CGColor(255, 0, 128, 255),
             }, // Pink
             GradientStop {
                 offset: 0.5,
-                color: Color(0, 255, 255, 255),
+                color: CGColor(0, 255, 255, 255),
             }, // Cyan
             GradientStop {
                 offset: 1.0,
-                color: Color(255, 255, 0, 255),
+                color: CGColor(255, 255, 0, 255),
             }, // Yellow
         ],
         opacity: 1.0,
@@ -160,7 +160,7 @@ async fn demo_effects() -> Scene {
             };
             blur_rect.corner_radius = RectangularCornerRadius::circular(20.0);
             blur_rect.set_fill(Paint::Solid(SolidPaint {
-                color: Color(255, 255, 255, 128), // Semi-transparent white
+                color: CGColor(255, 255, 255, 128), // Semi-transparent white
                 opacity: 1.0,
             }));
             blur_rect.effects =
@@ -180,7 +180,7 @@ async fn demo_effects() -> Scene {
             };
             blur_polygon.point_count = i + 3;
             blur_polygon.fills = vec![Paint::Solid(SolidPaint {
-                color: Color(255, 255, 255, 128), // Semi-transparent white
+                color: CGColor(255, 255, 255, 128), // Semi-transparent white
                 opacity: 1.0,
             })];
             blur_polygon.effects =
@@ -205,7 +205,7 @@ async fn demo_effects() -> Scene {
             };
             rect.corner_radius = RectangularCornerRadius::circular(20.0);
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: Color(240, 240, 240, 255), // Light gray
+                color: CGColor(240, 240, 240, 255), // Light gray
                 opacity: 1.0,
             }));
             rect.effects = LayerEffects::from_array(vec![FilterEffect::InnerShadow(FeShadow {
@@ -213,7 +213,7 @@ async fn demo_effects() -> Scene {
                 dy: 2.0,
                 blur: 3.0 * (i + 1) as f32,
                 spread: 0.0,
-                color: Color(0, 0, 0, 100),
+                color: CGColor(0, 0, 0, 100),
             })]);
             all_effect_ids.push(rect.id.clone());
             repository.insert(Node::Rectangle(rect));
@@ -228,7 +228,7 @@ async fn demo_effects() -> Scene {
             };
             polygon.point_count = i + 3;
             polygon.fills = vec![Paint::Solid(SolidPaint {
-                color: Color(240, 240, 240, 255), // Light gray
+                color: CGColor(240, 240, 240, 255), // Light gray
                 opacity: 1.0,
             })];
             polygon.effects = LayerEffects::from_array(vec![FilterEffect::InnerShadow(FeShadow {
@@ -236,7 +236,7 @@ async fn demo_effects() -> Scene {
                 dy: 2.0,
                 blur: 3.0 * (i + 1) as f32,
                 spread: 2.0 * (i + 1) as f32,
-                color: Color(0, 0, 0, 100),
+                color: CGColor(0, 0, 0, 100),
             })]);
             all_effect_ids.push(polygon.id.clone());
             repository.insert(Node::RegularPolygon(polygon));
@@ -256,7 +256,7 @@ async fn demo_effects() -> Scene {
             };
             rect.corner_radius = RectangularCornerRadius::circular(20.0);
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: Color(255, 255, 255, 255), // White
+                color: CGColor(255, 255, 255, 255), // White
                 opacity: 1.0,
             }));
 
@@ -268,14 +268,14 @@ async fn demo_effects() -> Scene {
                         dy: 6.0,
                         blur: 8.0,
                         spread: 0.0,
-                        color: Color(0, 0, 0, 100),
+                        color: CGColor(0, 0, 0, 100),
                     }),
                     FilterEffect::InnerShadow(FeShadow {
                         dx: -2.0,
                         dy: -2.0,
                         blur: 4.0,
                         spread: 0.0,
-                        color: Color(0, 0, 0, 80),
+                        color: CGColor(0, 0, 0, 80),
                     }),
                 ],
                 1 => vec![
@@ -284,7 +284,7 @@ async fn demo_effects() -> Scene {
                         dy: 4.0,
                         blur: 6.0,
                         spread: 0.0,
-                        color: Color(0, 0, 0, 120),
+                        color: CGColor(0, 0, 0, 120),
                     }),
                     FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 }),
                 ],
@@ -294,14 +294,14 @@ async fn demo_effects() -> Scene {
                         dy: 8.0,
                         blur: 12.0,
                         spread: 2.0,
-                        color: Color(0, 0, 0, 150),
+                        color: CGColor(0, 0, 0, 150),
                     }),
                     FilterEffect::InnerShadow(FeShadow {
                         dx: -1.0,
                         dy: -1.0,
                         blur: 3.0,
                         spread: 0.0,
-                        color: Color(255, 255, 255, 100),
+                        color: CGColor(255, 255, 255, 100),
                     }),
                     FilterEffect::LayerBlur(FeGaussianBlur { radius: 1.0 }),
                 ],
@@ -322,7 +322,7 @@ async fn demo_effects() -> Scene {
             };
             polygon.point_count = i + 3;
             polygon.fills = vec![Paint::Solid(SolidPaint {
-                color: Color(255, 255, 255, 255), // White
+                color: CGColor(255, 255, 255, 255), // White
                 opacity: 1.0,
             })];
 
@@ -334,7 +334,7 @@ async fn demo_effects() -> Scene {
                         dy: 5.0,
                         blur: 10.0,
                         spread: 0.0,
-                        color: Color(0, 0, 0, 110),
+                        color: CGColor(0, 0, 0, 110),
                     }),
                     FilterEffect::BackdropBlur(FeGaussianBlur { radius: 4.0 }),
                 ],
@@ -344,7 +344,7 @@ async fn demo_effects() -> Scene {
                         dy: 3.0,
                         blur: 6.0,
                         spread: 0.0,
-                        color: Color(0, 0, 0, 90),
+                        color: CGColor(0, 0, 0, 90),
                     }),
                     FilterEffect::LayerBlur(FeGaussianBlur { radius: 3.0 }),
                 ],
@@ -354,14 +354,14 @@ async fn demo_effects() -> Scene {
                         dy: 10.0,
                         blur: 15.0,
                         spread: 3.0,
-                        color: Color(0, 0, 0, 180),
+                        color: CGColor(0, 0, 0, 180),
                     }),
                     FilterEffect::InnerShadow(FeShadow {
                         dx: -2.0,
                         dy: -2.0,
                         blur: 5.0,
                         spread: 0.0,
-                        color: Color(255, 255, 255, 120),
+                        color: CGColor(255, 255, 255, 120),
                     }),
                     FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 }),
                 ],
@@ -385,7 +385,7 @@ async fn demo_effects() -> Scene {
         name: "Effects Demo".to_string(),
         children: vec![root_container_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

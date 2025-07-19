@@ -32,7 +32,7 @@ async fn load_scene_from_file(file_path: &str) -> Scene {
         id: scene_id,
         name: scene.name.clone(),
         children: scene.children.clone(),
-        background_color: Some(Color(230, 230, 230, 255)),
+        background_color: Some(CGColor(230, 230, 230, 255)),
     }
 }
 

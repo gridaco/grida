@@ -14,7 +14,7 @@ pub(crate) fn create_dummy_scene() -> Scene {
         height: 100.0,
     };
     rect1.set_fill(Paint::Solid(SolidPaint {
-        color: Color(255, 0, 0, 255),
+        color: CGColor(255, 0, 0, 255),
         opacity: 1.0,
     }));
     let rect1_id = rect1.id.clone();
@@ -28,7 +28,7 @@ pub(crate) fn create_dummy_scene() -> Scene {
         height: 80.0,
     };
     rect2.set_fill(Paint::Solid(SolidPaint {
-        color: Color(0, 0, 255, 255),
+        color: CGColor(0, 0, 255, 255),
         opacity: 1.0,
     }));
     let rect2_id = rect2.id.clone();
@@ -42,7 +42,7 @@ pub(crate) fn create_dummy_scene() -> Scene {
         height: 120.0,
     };
     rect3.set_fill(Paint::Solid(SolidPaint {
-        color: Color(0, 255, 0, 255),
+        color: CGColor(0, 255, 0, 255),
         opacity: 1.0,
     }));
     let rect3_id = rect3.id.clone();
@@ -53,7 +53,7 @@ pub(crate) fn create_dummy_scene() -> Scene {
         name: "Dummy Scene".to_string(),
         children: vec![rect1_id, rect2_id, rect3_id],
         nodes,
-        background_color: Some(Color(240, 240, 240, 255)),
+        background_color: Some(CGColor(240, 240, 240, 255)),
     }
 }
 
@@ -79,7 +79,7 @@ pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
                 height: size,
             };
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: Color(((x * 5) % 255) as u8, ((y * 3) % 255) as u8, 128, 255),
+                color: CGColor(((x * 5) % 255) as u8, ((y * 3) % 255) as u8, 128, 255),
                 opacity: 1.0,
             }));
             let id = rect.id.clone();
@@ -93,6 +93,6 @@ pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
         name: "Benchmark Scene".to_string(),
         children,
         nodes,
-        background_color: Some(Color(255, 255, 255, 255)),
+        background_color: Some(CGColor(255, 255, 255, 255)),
     }
 }

@@ -17,7 +17,7 @@ fn test_pdf_export() {
     };
     rect.transform = AffineTransform::new(10.0, 10.0, 0.0);
     rect.fills = vec![Paint::Solid(SolidPaint {
-        color: Color(255, 0, 0, 255), // Red
+        color: CGColor(255, 0, 0, 255), // Red
         opacity: 1.0,
     })];
 
@@ -29,7 +29,7 @@ fn test_pdf_export() {
         name: "Test Scene".into(),
         children: vec![rect_id.clone()],
         nodes: repo,
-        background_color: Some(Color(255, 255, 255, 255)), // White background
+        background_color: Some(CGColor(255, 255, 255, 255)), // White background
     };
 
     // Create a geometry cache to get the render bounds

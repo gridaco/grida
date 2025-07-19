@@ -136,7 +136,7 @@ async fn demo_vectors() -> Scene {
                     ],
                 },
                 strokes: vec![Paint::Solid(SolidPaint {
-                    color: Color(255, 0, 0, 255),
+                    color: CGColor(255, 0, 0, 255),
                     opacity: 1.0,
                 })],
                 stroke_width: 3.0,
@@ -270,7 +270,7 @@ async fn demo_vectors() -> Scene {
                     }],
                 },
                 strokes: vec![Paint::Solid(SolidPaint {
-                    color: Color(0, 100, 255, 255),
+                    color: CGColor(0, 100, 255, 255),
                     opacity: 1.0,
                 })],
                 stroke_width: 3.0,
@@ -296,7 +296,7 @@ async fn demo_vectors() -> Scene {
         name: "Fills Demo".to_string(),
         children: vec![root_id],
         nodes: repository,
-        background_color: Some(Color(240, 240, 240, 255)),
+        background_color: Some(CGColor(240, 240, 240, 255)),
     }
 }
 

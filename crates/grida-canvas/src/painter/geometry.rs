@@ -2,7 +2,6 @@ use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::painter::cvt;
-use crate::sk::mappings::ToSkPath;
 use crate::{cache::geometry::GeometryCache, shape::*};
 use math2::transform::AffineTransform;
 use skia_safe::{
@@ -193,6 +192,13 @@ impl PainterShape {
     }
 }
 
+pub fn build_shape_from_points(points: &[CGPoint]) -> PainterShape {
+    let mut path = Path::new();
+    let skia_points: Vec<skia_safe::Point> = points.iter().map(|&p| p.into()).collect();
+    path.add_poly(&skia_points, true);
+    PainterShape::from_path(path)
+}
+
 pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
     match node {
         IntrinsicSizeNode::Rectangle(n) => {
@@ -224,31 +230,9 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             start_angle: n.start_angle,
             angle: n.angle,
         })),
-        IntrinsicSizeNode::Polygon(n) => {
-            let path = if n.corner_radius > 0.0 {
-                n.to_sk_path()
-            } else {
-                let mut p = Path::new();
-                let mut iter = n.points.iter();
-                if let Some(&pt) = iter.next() {
-                    p.move_to((pt.x, pt.y));
-                    for &pt in iter {
-                        p.line_to((pt.x, pt.y));
-                    }
-                    p.close();
-                }
-                p
-            };
-            PainterShape::from_path(path)
-        }
-        IntrinsicSizeNode::RegularPolygon(n) => {
-            let poly = n.to_polygon();
-            build_shape(&IntrinsicSizeNode::Polygon(poly))
-        }
-        IntrinsicSizeNode::RegularStarPolygon(n) => {
-            let poly = n.to_polygon();
-            build_shape(&IntrinsicSizeNode::Polygon(poly))
-        }
+        IntrinsicSizeNode::Polygon(n) => build_shape_from_points(&n.points),
+        IntrinsicSizeNode::RegularPolygon(n) => build_shape_from_points(&n.to_points()),
+        IntrinsicSizeNode::RegularStarPolygon(n) => build_shape_from_points(&n.to_points()),
         IntrinsicSizeNode::Line(n) => {
             let mut path = Path::new();
             path.move_to((0.0, 0.0));

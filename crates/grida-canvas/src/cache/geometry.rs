@@ -344,7 +344,7 @@ fn transform_rect(rect: &Rectangle, t: &AffineTransform) -> Rectangle {
     rect::transform(*rect, t)
 }
 
-fn polygon_bounds(points: &[crate::node::schema::Point]) -> Rectangle {
+fn polygon_bounds(points: &[CGPoint]) -> Rectangle {
     let mut min_x = f32::INFINITY;
     let mut min_y = f32::INFINITY;
     let mut max_x = f32::NEG_INFINITY;

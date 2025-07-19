@@ -34,7 +34,7 @@ async fn demo_paints() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::Solid(SolidPaint {
-            color: Color(
+            color: CGColor(
                 255 - (i * 25) as u8,
                 100 + (i * 15) as u8,
                 50 + (i * 20) as u8,
@@ -66,11 +66,11 @@ async fn demo_paints() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: Color(255, 100, 100, 255),
+                    color: CGColor(255, 100, 100, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: Color(100, 100, 255, 255),
+                    color: CGColor(100, 100, 255, 255),
                 },
             ],
             opacity: 1.0,
@@ -100,11 +100,11 @@ async fn demo_paints() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: Color(255, 255, 100, 255),
+                    color: CGColor(255, 255, 100, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: Color(100, 255, 100, 255),
+                    color: CGColor(100, 255, 100, 255),
                 },
             ],
             opacity: 1.0,
@@ -126,13 +126,13 @@ async fn demo_paints() -> Scene {
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 0), // Transparent
+            color: CGColor(0, 0, 0, 0), // Transparent
             opacity: 1.0,
         }));
 
         // Solid color stroke with varying colors
         rect.strokes = vec![Paint::Solid(SolidPaint {
-            color: Color(
+            color: CGColor(
                 255 - (i * 25) as u8,
                 100 + (i * 15) as u8,
                 50 + (i * 20) as u8,
@@ -159,7 +159,7 @@ async fn demo_paints() -> Scene {
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 0), // Transparent
+            color: CGColor(0, 0, 0, 0), // Transparent
             opacity: 1.0,
         }));
 
@@ -172,11 +172,11 @@ async fn demo_paints() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: Color(255, 100, 100, 255),
+                    color: CGColor(255, 100, 100, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: Color(100, 100, 255, 255),
+                    color: CGColor(100, 100, 255, 255),
                 },
             ],
             opacity: 1.0,
@@ -200,7 +200,7 @@ async fn demo_paints() -> Scene {
 
         // No fill
         rect.set_fill(Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 0), // Transparent
+            color: CGColor(0, 0, 0, 0), // Transparent
             opacity: 1.0,
         }));
 
@@ -214,11 +214,11 @@ async fn demo_paints() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: Color(255, 255, 100, 255),
+                    color: CGColor(255, 255, 100, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: Color(100, 255, 100, 255),
+                    color: CGColor(100, 255, 100, 255),
                 },
             ],
             opacity: 1.0,
@@ -239,7 +239,7 @@ async fn demo_paints() -> Scene {
         name: "Paints Demo".to_string(),
         children: vec![root_container_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

@@ -68,7 +68,7 @@ fn drop_shadow_expands_render_bounds() {
         dy: 5.0,
         blur: 10.0,
         spread: 0.0,
-        color: Color(0, 0, 0, 255),
+        color: CGColor(0, 0, 0, 255),
     })]);
     let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
@@ -100,7 +100,7 @@ fn drop_shadow_spread_expands_render_bounds() {
         dy: 0.0,
         blur: 0.0,
         spread: 10.0,
-        color: Color(0, 0, 0, 255),
+        color: CGColor(0, 0, 0, 255),
     })]);
     let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));

@@ -35,7 +35,7 @@ async fn demo_shapes() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(0.0 + (i as f32 * 8.0)); // 0 to 72
         rect.set_fill(Paint::Solid(SolidPaint {
-            color: Color(
+            color: CGColor(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -57,7 +57,7 @@ async fn demo_shapes() -> Scene {
             height: base_size,
         };
         ellipse.fills = vec![Paint::Solid(SolidPaint {
-            color: Color(
+            color: CGColor(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -79,7 +79,7 @@ async fn demo_shapes() -> Scene {
                 let radius = base_size / 2.0;
                 let x = radius * angle.cos();
                 let y = radius * angle.sin();
-                Point { x, y }
+                CGPoint { x, y }
             })
             .collect::<Vec<_>>();
 
@@ -89,7 +89,7 @@ async fn demo_shapes() -> Scene {
         polygon.points = points;
         polygon.corner_radius = 16.0;
         polygon.fills = vec![Paint::Solid(SolidPaint {
-            color: Color(
+            color: CGColor(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -112,7 +112,7 @@ async fn demo_shapes() -> Scene {
         };
         regular_polygon.point_count = 3 + i; // 3 to 12 points
         regular_polygon.fills = vec![Paint::Solid(SolidPaint {
-            color: Color(
+            color: CGColor(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -143,7 +143,7 @@ async fn demo_shapes() -> Scene {
         path.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         path.data = data.to_string();
         path.fill = Paint::Solid(SolidPaint {
-            color: Color(
+            color: CGColor(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -167,7 +167,7 @@ async fn demo_shapes() -> Scene {
         star.point_count = 3 + i; // 3 to 12 points
         star.inner_radius = 0.7 - (i as f32 * 0.05); // 0.3 to 0.75 inner radius
         star.fills = vec![Paint::Solid(SolidPaint {
-            color: Color(
+            color: CGColor(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -192,7 +192,7 @@ async fn demo_shapes() -> Scene {
         arc.angle = 45.0 + (i as f32 * 31.5); // 45 to 360 degrees
         arc.inner_radius = 0.3; // Fixed inner radius for visibility
         arc.fills = vec![Paint::Solid(SolidPaint {
-            color: Color(
+            color: CGColor(
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
                 200 - (i * 20) as u8,
@@ -214,7 +214,7 @@ async fn demo_shapes() -> Scene {
         name: "Shapes Demo".to_string(),
         children: vec![root_container_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

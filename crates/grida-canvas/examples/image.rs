@@ -35,7 +35,7 @@ async fn demo_image() -> Scene {
         fit: BoxFit::Cover,
     }));
     rect1.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(255, 0, 0, 255),
+        color: CGColor(255, 0, 0, 255),
         opacity: 1.0,
     })];
     rect1.stroke_width = 2.0;
@@ -55,7 +55,7 @@ async fn demo_image() -> Scene {
         name: "Images Demo".to_string(),
         children: vec![root_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

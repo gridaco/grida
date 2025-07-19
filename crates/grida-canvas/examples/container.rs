@@ -19,11 +19,11 @@ async fn demo_clip() -> Scene {
     };
     container.corner_radius = RectangularCornerRadius::circular(20.0);
     container.set_fill(Paint::Solid(SolidPaint {
-        color: Color(240, 100, 100, 255), // Light red
+        color: CGColor(240, 100, 100, 255), // Light red
         opacity: 1.0,
     }));
     container.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(200, 50, 50, 255), // Darker red
+        color: CGColor(200, 50, 50, 255), // Darker red
         opacity: 1.0,
     })];
     container.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
@@ -31,7 +31,7 @@ async fn demo_clip() -> Scene {
         dy: 0.0,
         blur: 10.0,
         spread: 0.0,
-        color: Color(0, 0, 0, 255),
+        color: CGColor(0, 0, 0, 255),
     })]);
     container.clip = true;
     container.stroke_width = 2.0;
@@ -45,11 +45,11 @@ async fn demo_clip() -> Scene {
         height: 200.0,
     };
     ellipse.fills = vec![Paint::Solid(SolidPaint {
-        color: Color(100, 200, 100, 255), // Light green
+        color: CGColor(100, 200, 100, 255), // Light green
         opacity: 1.0,
     })];
     ellipse.strokes = vec![Paint::Solid(SolidPaint {
-        color: Color(50, 150, 50, 255), // Darker green
+        color: CGColor(50, 150, 50, 255), // Darker green
         opacity: 1.0,
     })];
     ellipse.stroke_width = 2.0;

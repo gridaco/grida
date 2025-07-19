@@ -51,7 +51,7 @@ async fn demo_n_shapes(n: usize) -> Scene {
         let (r, g, b) = hsv_to_rgb(hue, 1.0, 1.0);
 
         rect.set_fill(Paint::Solid(SolidPaint {
-            color: Color(r, g, b, 255),
+            color: CGColor(r, g, b, 255),
             opacity: 1.0,
         }));
 

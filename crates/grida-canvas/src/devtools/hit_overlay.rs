@@ -160,7 +160,7 @@ impl HitOverlay {
             .cloned()
             .unwrap_or(crate::cg::types::Paint::Solid(
                 crate::cg::types::SolidPaint {
-                    color: crate::cg::Color(0, 0, 0, 255),
+                    color: crate::cg::CGColor(0, 0, 0, 255),
                     opacity: 1.0,
                 },
             ));

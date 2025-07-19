@@ -39,7 +39,7 @@ async fn demo_texts() -> Scene {
         text_transform: TextTransform::Uppercase,
     };
     word_text_node.stroke = Some(Paint::Solid(SolidPaint {
-        color: Color(255, 255, 255, 255),
+        color: CGColor(255, 255, 255, 255),
         opacity: 1.0,
     }));
     word_text_node.stroke_width = Some(1.0);
@@ -114,7 +114,7 @@ async fn demo_texts() -> Scene {
     second_paragraph_text_node.text_align = TextAlign::Left;
     second_paragraph_text_node.text_align_vertical = TextAlignVertical::Top;
     second_paragraph_text_node.fill = Paint::Solid(SolidPaint {
-        color: Color(70, 130, 180, 255), // Steel blue color
+        color: CGColor(70, 130, 180, 255), // Steel blue color
         opacity: 1.0,
     });
 
@@ -156,7 +156,7 @@ async fn demo_texts() -> Scene {
         name: "Text Demo".to_string(),
         children: vec![root_container_id],
         nodes: repository,
-        background_color: Some(Color(250, 250, 250, 255)),
+        background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }
 

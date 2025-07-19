@@ -402,7 +402,7 @@ impl Renderer {
         &mut self,
         canvas: &Canvas,
         plan: &FramePlan,
-        background_color: Option<Color>,
+        background_color: Option<CGColor>,
         width: f32,
         height: f32,
     ) -> DrawResult {
@@ -413,7 +413,7 @@ impl Renderer {
 
         // Paint background color first if present
         if let Some(bg_color) = background_color {
-            let Color(r, g, b, a) = bg_color;
+            let CGColor(r, g, b, a) = bg_color;
             let color = skia_safe::Color::from_argb(a, r, g, b);
             let mut paint = SkPaint::default();
             paint.set_color(color);
@@ -509,7 +509,7 @@ impl Renderer {
         &self,
         canvas: &Canvas,
         plan: &FramePlan,
-        background_color: Option<Color>,
+        background_color: Option<CGColor>,
         width: f32,
         height: f32,
     ) -> DrawResult {
@@ -519,7 +519,7 @@ impl Renderer {
 
         // Paint background color first if present
         if let Some(bg_color) = background_color {
-            let Color(r, g, b, a) = bg_color;
+            let CGColor(r, g, b, a) = bg_color;
             let color = skia_safe::Color::from_argb(a, r, g, b);
             let mut paint = SkPaint::default();
             paint.set_color(color);

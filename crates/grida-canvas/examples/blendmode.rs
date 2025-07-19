@@ -64,15 +64,15 @@ async fn demo_blendmode() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: Color(255, 255, 255, 255), // White center
+                    color: CGColor(255, 255, 255, 255), // White center
                 },
                 GradientStop {
                     offset: 0.5,
-                    color: Color(255, 255, 255, 255), // White middle
+                    color: CGColor(255, 255, 255, 255), // White middle
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: Color(255, 255, 255, 0), // Transparent edge
+                    color: CGColor(255, 255, 255, 0), // Transparent edge
                 },
             ],
             opacity: 1.0,
@@ -98,35 +98,35 @@ async fn demo_blendmode() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: Color(255, 0, 255, 255), // Magenta
+                    color: CGColor(255, 0, 255, 255), // Magenta
                 },
                 GradientStop {
                     offset: 0.14,
-                    color: Color(255, 0, 0, 255), // Red
+                    color: CGColor(255, 0, 0, 255), // Red
                 },
                 GradientStop {
                     offset: 0.28,
-                    color: Color(255, 255, 0, 255), // Yellow
+                    color: CGColor(255, 255, 0, 255), // Yellow
                 },
                 GradientStop {
                     offset: 0.42,
-                    color: Color(0, 255, 0, 255), // Green
+                    color: CGColor(0, 255, 0, 255), // Green
                 },
                 GradientStop {
                     offset: 0.57,
-                    color: Color(0, 255, 255, 255), // Cyan
+                    color: CGColor(0, 255, 255, 255), // Cyan
                 },
                 GradientStop {
                     offset: 0.71,
-                    color: Color(0, 0, 255, 255), // Blue
+                    color: CGColor(0, 0, 255, 255), // Blue
                 },
                 GradientStop {
                     offset: 0.85,
-                    color: Color(255, 0, 255, 255), // Magenta
+                    color: CGColor(255, 0, 255, 255), // Magenta
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: Color(255, 0, 255, 255), // Magenta
+                    color: CGColor(255, 0, 255, 255), // Magenta
                 },
             ],
             opacity: 0.3, // Make it subtle
@@ -155,7 +155,7 @@ async fn demo_blendmode() -> Scene {
             height: circle_radius * 2.0,
         };
         green_circle.set_fill(Paint::Solid(SolidPaint {
-            color: Color(0, 255, 0, 255), // Green
+            color: CGColor(0, 255, 0, 255), // Green
             opacity: 1.0,
         }));
         green_circle.blend_mode = BlendMode::Normal; // Plus equivalent
@@ -172,7 +172,7 @@ async fn demo_blendmode() -> Scene {
             height: circle_radius * 2.0,
         };
         red_circle.set_fill(Paint::Solid(SolidPaint {
-            color: Color(255, 0, 0, 255), // Red
+            color: CGColor(255, 0, 0, 255), // Red
             opacity: 1.0,
         }));
         red_circle.blend_mode = BlendMode::Normal; // Plus equivalent
@@ -190,7 +190,7 @@ async fn demo_blendmode() -> Scene {
             height: circle_radius * 2.0,
         };
         blue_circle.set_fill(Paint::Solid(SolidPaint {
-            color: Color(0, 0, 255, 255), // Blue
+            color: CGColor(0, 0, 255, 255), // Blue
             opacity: 1.0,
         }));
         blue_circle.blend_mode = BlendMode::Normal; // Plus equivalent
@@ -225,7 +225,7 @@ async fn demo_blendmode() -> Scene {
         label.text_align = TextAlign::Left;
         label.text_align_vertical = TextAlignVertical::Top;
         label.fill = Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255), // Black text
+            color: CGColor(0, 0, 0, 255), // Black text
             opacity: 1.0,
         });
         let label_id = label.id.clone();
@@ -248,7 +248,7 @@ async fn demo_blendmode() -> Scene {
         name: "Blend Mode Demo".to_string(),
         children: vec![root_container_id],
         nodes: repository,
-        background_color: Some(Color(240, 240, 240, 255)),
+        background_color: Some(CGColor(240, 240, 240, 255)),
     }
 }
 

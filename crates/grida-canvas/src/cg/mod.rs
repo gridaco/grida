@@ -1,2 +1,3 @@
 pub mod types;
-pub use types::Color;
+pub use types::CGColor;
+pub use types::CGPoint;

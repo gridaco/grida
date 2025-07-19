@@ -62,7 +62,7 @@ fn create_static_scene() -> Scene {
         name: "Test Scene".to_string(),
         children: vec!["root".to_string()],
         nodes: repository,
-        background_color: Some(Color(255, 255, 255, 255)),
+        background_color: Some(CGColor(255, 255, 255, 255)),
     }
 }
 
