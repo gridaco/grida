@@ -1,11 +1,7 @@
 use crate::cg::types::*;
 use crate::helpers::webfont_helper;
 use crate::node::repository::NodeRepository;
-use crate::node::schema::{
-    BaseNode, BooleanPathOperationNode, ContainerNode, EllipseNode, ErrorNode, LineNode, Node,
-    NodeId, RectangleNode, RegularPolygonNode, RegularStarPolygonNode, SVGPathNode, Scene, Size,
-    TextSpanNode,
-};
+use crate::node::schema::*;
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
     TextAlignHorizontal as FigmaTextAlignHorizontal, TextAlignVertical as FigmaTextAlignVertical,
@@ -23,19 +19,19 @@ use math2::box_fit::BoxFit;
 use math2::transform::AffineTransform;
 
 const TRANSPARENT: Paint = Paint::Solid(SolidPaint {
-    color: Color(0, 0, 0, 0),
+    color: CGColor(0, 0, 0, 0),
     opacity: 0.0,
 });
 
 const BLACK: Paint = Paint::Solid(SolidPaint {
-    color: Color(0, 0, 0, 255),
+    color: CGColor(0, 0, 0, 255),
     opacity: 1.0,
 });
 
 // Map implementations
-impl From<&Rgba> for Color {
+impl From<&Rgba> for CGColor {
     fn from(color: &Rgba) -> Self {
-        Color(
+        CGColor(
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,
             (color.b * 255.0) as u8,
@@ -44,9 +40,9 @@ impl From<&Rgba> for Color {
     }
 }
 
-impl From<&Box<Rgba>> for Color {
+impl From<&Box<Rgba>> for CGColor {
     fn from(color: &Box<Rgba>) -> Self {
-        Color(
+        CGColor(
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,
             (color.b * 255.0) as u8,
@@ -59,7 +55,7 @@ impl From<&FigmaPaint> for Paint {
     fn from(paint: &FigmaPaint) -> Self {
         match paint {
             FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
-                color: Color::from(&solid.color),
+                color: CGColor::from(&solid.color),
                 opacity: solid.opacity.unwrap_or(1.0) as f32,
             }),
             FigmaPaint::ImagePaint(image) => {
@@ -98,7 +94,7 @@ impl From<&FigmaPaint> for Paint {
                     .iter()
                     .map(|stop| GradientStop {
                         offset: stop.position as f32,
-                        color: Color::from(&stop.color),
+                        color: CGColor::from(&stop.color),
                     })
                     .collect();
 
@@ -122,13 +118,13 @@ impl From<&FigmaPaint> for Paint {
                         })
                     }
                     _ => Paint::Solid(SolidPaint {
-                        color: Color(0, 0, 0, 255),
+                        color: CGColor(0, 0, 0, 255),
                         opacity: 1.0,
                     }),
                 }
             }
             _ => Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
+                color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
             }),
         }
@@ -273,7 +269,7 @@ impl FigmaConverter {
     }
 
     /// Convert Figma's RGBA color to our Color
-    fn convert_color(color: &Rgba) -> Color {
+    fn convert_color(color: &Rgba) -> CGColor {
         color.into()
     }
 
@@ -281,7 +277,7 @@ impl FigmaConverter {
     fn convert_paint(&self, paint: &FigmaPaint) -> Paint {
         match paint {
             FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
-                color: Color::from(&solid.color),
+                color: CGColor::from(&solid.color),
                 opacity: solid.opacity.unwrap_or(1.0) as f32,
             }),
             FigmaPaint::ImagePaint(image) => {
@@ -325,7 +321,7 @@ impl FigmaConverter {
                     .iter()
                     .map(|stop| GradientStop {
                         offset: stop.position as f32,
-                        color: Color::from(&stop.color),
+                        color: CGColor::from(&stop.color),
                     })
                     .collect();
 
@@ -349,13 +345,13 @@ impl FigmaConverter {
                         })
                     }
                     _ => Paint::Solid(SolidPaint {
-                        color: Color(0, 0, 0, 255),
+                        color: CGColor(0, 0, 0, 255),
                         opacity: 1.0,
                     }),
                 }
             }
             _ => Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
+                color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
             }),
         }
@@ -442,49 +438,72 @@ impl FigmaConverter {
     }
 
     /// Convert Figma's effects to our FilterEffect vector
-    fn convert_effects(effects: Option<&Vec<Effect>>) -> Vec<FilterEffect> {
-        // If no effects, return empty vector
-        let effects = match effects {
-            Some(effects) if !effects.is_empty() => effects,
-            _ => return Vec::new(),
-        };
+    fn convert_effects(effects: &Vec<Effect>) -> LayerEffects {
+        let mut layer_effects = LayerEffects::new_empty();
 
-        // Filter visible effects and convert them
-        effects
+        // If no effects, return empty vector
+        if effects.is_empty() {
+            return layer_effects;
+        }
+
+        // shadows
+        let shadows: Vec<FilterShadowEffect> = effects
             .iter()
-            .filter(|effect| match effect {
-                Effect::DropShadow(drop_shadow) => drop_shadow.visible,
-                Effect::LayerBlur(blur) => blur.visible,
-                Effect::BackgroundBlur(blur) => blur.visible,
-                Effect::InnerShadow(inner_shadow) => inner_shadow.visible,
-                _ => true,
-            })
             .filter_map(|effect| match effect {
-                Effect::DropShadow(drop_shadow) => Some(FilterEffect::DropShadow(FeDropShadow {
-                    dx: drop_shadow.offset.x as f32,
-                    dy: drop_shadow.offset.y as f32,
-                    blur: drop_shadow.radius as f32,
-                    color: Self::convert_color(&drop_shadow.color),
-                })),
-                Effect::LayerBlur(blur) => Some(FilterEffect::GaussianBlur(FeGaussianBlur {
-                    radius: blur.radius as f32,
-                })),
-                Effect::BackgroundBlur(blur) => Some(FilterEffect::BackdropBlur(FeBackdropBlur {
-                    radius: blur.radius as f32,
-                })),
-                _ => None, // Skip unsupported effects
+                Effect::DropShadow(drop_shadow) => {
+                    drop_shadow
+                        .visible
+                        .then_some(FilterShadowEffect::DropShadow(FeShadow {
+                            dx: drop_shadow.offset.x as f32,
+                            dy: drop_shadow.offset.y as f32,
+                            blur: drop_shadow.radius as f32,
+                            color: Self::convert_color(&drop_shadow.color),
+                            spread: drop_shadow.spread.unwrap_or(0.0) as f32,
+                        }))
+                }
+                Effect::InnerShadow(inner_shadow) => {
+                    inner_shadow
+                        .visible
+                        .then_some(FilterShadowEffect::InnerShadow(FeShadow {
+                            dx: inner_shadow.offset.x as f32,
+                            dy: inner_shadow.offset.y as f32,
+                            blur: inner_shadow.radius as f32,
+                            color: Self::convert_color(&inner_shadow.color),
+                            spread: inner_shadow.spread.unwrap_or(0.0) as f32,
+                        }))
+                }
+                _ => None,
             })
-            .collect()
+            .collect();
+
+        let layer_blur: Option<FeGaussianBlur> = effects.iter().find_map(|effect| match effect {
+            Effect::LayerBlur(blur) => blur.visible.then_some(FeGaussianBlur {
+                radius: blur.radius as f32,
+            }),
+            _ => None,
+        });
+
+        let backdrop_blur: Option<FeGaussianBlur> =
+            effects.iter().find_map(|effect| match effect {
+                Effect::BackgroundBlur(blur) => blur.visible.then_some(FeGaussianBlur {
+                    radius: blur.radius as f32,
+                }),
+                _ => None,
+            });
+
+        layer_effects.shadows = shadows;
+        layer_effects.blur = layer_blur;
+        layer_effects.backdrop_blur = backdrop_blur;
+
+        layer_effects
     }
 
     /// Convert Figma's slice to our SliceNode
     fn convert_slice(&mut self, slice: &Box<SliceNode>) -> Result<Node, String> {
         Ok(Node::Error(ErrorNode {
-            base: BaseNode {
-                id: slice.id.clone(),
-                name: format!("[Slice] {}", slice.name),
-                active: slice.visible.unwrap_or(true),
-            },
+            id: slice.id.clone(),
+            name: Some(format!("[Slice] {}", slice.name)),
+            active: slice.visible.unwrap_or(true),
             transform: AffineTransform::identity(),
             size: Size {
                 width: 100.0,
@@ -510,11 +529,9 @@ impl FigmaConverter {
         let transform = Self::convert_transform(component.relative_transform.as_ref());
 
         Ok(Node::Container(ContainerNode {
-            base: BaseNode {
-                id: component.id.clone(),
-                name: component.name.clone(),
-                active: component.visible.unwrap_or(true),
-            },
+            id: component.id.clone(),
+            name: Some(component.name.clone()),
+            active: component.visible.unwrap_or(true),
             blend_mode: Self::convert_blend_mode(component.blend_mode),
             transform,
             size,
@@ -536,7 +553,7 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effects: Self::convert_effects(Some(&component.effects)),
+            effects: Self::convert_effects(&component.effects),
             children,
             opacity: Self::convert_opacity(component.visible),
             clip: component.clips_content,
@@ -549,11 +566,9 @@ impl FigmaConverter {
         component_set: &Box<ComponentSetNode>,
     ) -> Result<Node, String> {
         Ok(Node::Error(ErrorNode {
-            base: BaseNode {
-                id: component_set.id.clone(),
-                name: format!("[ComponentSet] {}", component_set.name),
-                active: component_set.visible.unwrap_or(true),
-            },
+            id: component_set.id.clone(),
+            name: Some(format!("[ComponentSet] {}", component_set.name)),
+            active: component_set.visible.unwrap_or(true),
             transform: Self::convert_transform(component_set.relative_transform.as_ref()),
             size: Self::convert_size(component_set.size.as_ref()),
             opacity: Self::convert_opacity(component_set.visible),
@@ -568,20 +583,15 @@ impl FigmaConverter {
     ) -> RectangularCornerRadius {
         if let Some(radius) = corner_radius {
             // If corner_radius is present, use it for all corners
-            RectangularCornerRadius {
-                tl: radius as f32,
-                tr: radius as f32,
-                br: radius as f32,
-                bl: radius as f32,
-            }
+            RectangularCornerRadius::circular(radius as f32)
         } else if let Some(radii) = rectangle_corner_radii {
             // If rectangle_corner_radii is present, use individual values
             if radii.len() == 4 {
                 RectangularCornerRadius {
-                    tl: radii[0] as f32,
-                    tr: radii[1] as f32,
-                    br: radii[2] as f32,
-                    bl: radii[3] as f32,
+                    tl: Radius::circular(radii[0] as f32),
+                    tr: Radius::circular(radii[1] as f32),
+                    br: Radius::circular(radii[2] as f32),
+                    bl: Radius::circular(radii[3] as f32),
                 }
             } else {
                 RectangularCornerRadius::zero()
@@ -607,11 +617,9 @@ impl FigmaConverter {
         let transform = Self::convert_transform(instance.relative_transform.as_ref());
 
         Ok(Node::Container(ContainerNode {
-            base: BaseNode {
-                id: instance.id.clone(),
-                name: instance.name.clone(),
-                active: instance.visible.unwrap_or(true),
-            },
+            id: instance.id.clone(),
+            name: Some(instance.name.clone()),
+            active: instance.visible.unwrap_or(true),
             blend_mode: Self::convert_blend_mode(instance.blend_mode),
             transform,
             size,
@@ -633,7 +641,7 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effects: Self::convert_effects(Some(&instance.effects)),
+            effects: Self::convert_effects(&instance.effects),
             children,
             opacity: Self::convert_opacity(instance.visible),
             clip: instance.clips_content,
@@ -649,11 +657,9 @@ impl FigmaConverter {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Node::Container(ContainerNode {
-            base: BaseNode {
-                id: section.id.clone(),
-                name: format!("[Section] {}", section.name),
-                active: section.visible.unwrap_or(true),
-            },
+            id: section.id.clone(),
+            name: Some(format!("[Section] {}", section.name)),
+            active: section.visible.unwrap_or(true),
             blend_mode: BlendMode::Normal,
             transform: Self::convert_transform(section.relative_transform.as_ref()),
             size: Self::convert_size(section.size.as_ref()),
@@ -665,7 +671,7 @@ impl FigmaConverter {
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: Self::convert_opacity(section.visible),
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
             clip: false,
         }))
     }
@@ -673,11 +679,9 @@ impl FigmaConverter {
     /// Convert Figma's link to our LinkUnfurlNode
     fn convert_link(&mut self, link: &Box<LinkUnfurlNode>) -> Result<Node, String> {
         Ok(Node::Error(ErrorNode {
-            base: BaseNode {
-                id: link.id.clone(),
-                name: format!("[Link] {}", link.name),
-                active: link.visible.unwrap_or(true),
-            },
+            id: link.id.clone(),
+            name: Some(format!("[Link] {}", link.name)),
+            active: link.visible.unwrap_or(true),
             transform: AffineTransform::identity(),
             size: Size {
                 width: 100.0,
@@ -748,10 +752,9 @@ impl FigmaConverter {
         Ok(Scene {
             id: canvas.id.clone(),
             name: canvas.name.clone(),
-            transform: AffineTransform::identity(),
             children,
             nodes: self.repository.clone(),
-            background_color: Some(Color::from(&canvas.background_color)),
+            background_color: Some(CGColor::from(&canvas.background_color)),
         })
     }
 
@@ -766,11 +769,9 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Container(ContainerNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
             transform,
             size,
@@ -792,7 +793,7 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effects: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(&origin.effects),
             children,
             opacity: Self::convert_opacity(origin.visible),
             clip: origin.clips_content,
@@ -837,11 +838,9 @@ impl FigmaConverter {
         }
 
         Ok(Node::TextSpan(TextSpanNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             transform: Self::convert_transform(origin.relative_transform.as_ref()),
             size: Size {
                 width: origin.size.as_ref().map_or(0.0, |size| size.x as f32),
@@ -890,6 +889,7 @@ impl FigmaConverter {
             stroke_align: StrokeAlign::Inside,
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            effects: Self::convert_effects(&origin.effects),
         }))
     }
 
@@ -901,11 +901,9 @@ impl FigmaConverter {
         if let Some(fill_geometries) = &origin.fill_geometry {
             for geometry in fill_geometries {
                 let path_node = Node::SVGPath(SVGPathNode {
-                    base: BaseNode {
-                        id: format!("{}-path-{}", origin.id, path_index),
-                        name: format!("{}-path-{}", origin.name, path_index),
-                        active: origin.visible.unwrap_or(true),
-                    },
+                    id: format!("{}-path-{}", origin.id, path_index),
+                    name: Some(format!("{}-path-{}", origin.name, path_index)),
+                    active: origin.visible.unwrap_or(true),
                     transform: AffineTransform::identity(),
                     fill: self
                         .convert_fills(Some(&origin.fills))
@@ -919,7 +917,7 @@ impl FigmaConverter {
                     stroke_dash_array: None,
                     opacity: Self::convert_opacity(origin.visible),
                     blend_mode: Self::convert_blend_mode(origin.blend_mode),
-                    effects: Self::convert_effects(Some(&origin.effects)),
+                    effects: Self::convert_effects(&origin.effects),
                 });
                 children.push(self.repository.insert(path_node));
                 path_index += 1;
@@ -931,11 +929,9 @@ impl FigmaConverter {
         if let Some(stroke_geometries) = &origin.stroke_geometry {
             for geometry in stroke_geometries {
                 let path_node = Node::SVGPath(SVGPathNode {
-                    base: BaseNode {
-                        id: format!("{}-path-{}", origin.id, path_index),
-                        name: format!("{}-path-{}", origin.name, path_index),
-                        active: origin.visible.unwrap_or(true),
-                    },
+                    id: format!("{}-path-{}", origin.id, path_index),
+                    name: Some(format!("{}-path-{}", origin.name, path_index)),
+                    active: origin.visible.unwrap_or(true),
                     transform: AffineTransform::identity(),
                     fill: self
                         .convert_strokes(Some(&origin.strokes))
@@ -949,7 +945,7 @@ impl FigmaConverter {
                     stroke_dash_array: None,
                     opacity: Self::convert_opacity(origin.visible),
                     blend_mode: Self::convert_blend_mode(origin.blend_mode),
-                    effects: Self::convert_effects(Some(&origin.effects)),
+                    effects: Self::convert_effects(&origin.effects),
                 });
                 children.push(self.repository.insert(path_node));
                 path_index += 1;
@@ -958,11 +954,9 @@ impl FigmaConverter {
 
         // Create a group node containing all the path nodes
         Ok(Node::Container(ContainerNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
             transform: Self::convert_transform(origin.relative_transform.as_ref()),
             size: Self::convert_size(origin.size.as_ref()),
@@ -972,7 +966,7 @@ impl FigmaConverter {
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
             children,
             opacity: Self::convert_opacity(origin.visible),
             clip: false,
@@ -1007,11 +1001,9 @@ impl FigmaConverter {
         };
 
         Ok(Node::BooleanOperation(BooleanPathOperationNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             transform,
             op: op,
             children,
@@ -1034,7 +1026,7 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effects: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(&origin.effects),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
         }))
@@ -1045,11 +1037,9 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::RegularStarPolygon(RegularStarPolygonNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             transform,
             size,
             // not available in api?
@@ -1072,7 +1062,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(&origin.effects),
         }))
     }
 
@@ -1082,11 +1072,9 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Line(LineNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             transform,
             size,
             strokes: self
@@ -1107,7 +1095,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(&origin.effects),
         }))
     }
 
@@ -1120,11 +1108,9 @@ impl FigmaConverter {
             Self::convert_transform(origin.relative_transform.as_ref().map(|v| v.as_ref()));
 
         Ok(Node::Ellipse(EllipseNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             transform,
             size,
             fills: self.convert_fills(Some(&origin.fills)),
@@ -1143,7 +1129,14 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(&origin.effects),
+
+            // arc data
+            inner_radius: Some(origin.arc_data.inner_radius as f32),
+            angle: Some(
+                (origin.arc_data.ending_angle - origin.arc_data.starting_angle).to_degrees() as f32,
+            ),
+            start_angle: origin.arc_data.starting_angle.to_degrees() as f32,
         }))
     }
 
@@ -1154,11 +1147,9 @@ impl FigmaConverter {
         let size = Self::convert_size(origin.size.as_ref());
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
         Ok(Node::RegularPolygon(RegularPolygonNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             transform,
             size,
             // No count in api ?
@@ -1180,7 +1171,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(&origin.effects),
         }))
     }
 
@@ -1189,11 +1180,9 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Rectangle(RectangleNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             transform,
             size,
             corner_radius: Self::convert_corner_radius(
@@ -1216,7 +1205,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(Some(&origin.effects)),
+            effects: Self::convert_effects(&origin.effects),
         }))
     }
 
@@ -1231,11 +1220,9 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Container(ContainerNode {
-            base: BaseNode {
-                id: origin.id.clone(),
-                name: origin.name.clone(),
-                active: origin.visible.unwrap_or(true),
-            },
+            id: origin.id.clone(),
+            name: Some(origin.name.clone()),
+            active: origin.visible.unwrap_or(true),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
             transform,
             size,
@@ -1248,7 +1235,7 @@ impl FigmaConverter {
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effects: vec![],
+            effects: LayerEffects::new_empty(),
             children,
             opacity: 1.0,
             clip: origin.clips_content,
