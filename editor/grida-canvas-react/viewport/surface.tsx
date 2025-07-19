@@ -23,7 +23,7 @@ import { useIsWindowResizing } from "./hooks/window-resizing";
 import {
   is_direct_component_consumer,
   supports,
-} from "@/grida-canvas-utils/utils/supports";
+} from "@/grida-canvas/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext, useViewport } from "./context";

@@ -1,38 +1,10 @@
-pub use super::geometry::*;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
-use crate::painter::cvt;
-use crate::sk::mappings::ToSkPath;
+use crate::shape::*;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
 
 pub type NodeId = String;
-
-/// A 2D point with x and y coordinates.
-#[derive(Debug, Clone, Copy)]
-pub struct Point {
-    pub x: f32,
-    pub y: f32,
-}
-
-impl Point {
-    /// Subtracts a scaled vector from this point.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - The point to subtract
-    /// * `scale` - The scale factor to apply to the other point
-    ///
-    /// # Returns
-    ///
-    /// A new point representing the result of the vector operation
-    pub fn subtract_scaled(&self, other: Point, scale: f32) -> Point {
-        Point {
-            x: self.x - other.x * scale,
-            y: self.y - other.y * scale,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct LayerEffects {
@@ -89,6 +61,13 @@ impl LayerEffects {
 }
 
 #[derive(Debug, Clone)]
+pub struct StrokeStyle {
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Size {
     pub width: f32,
     pub height: f32,
@@ -101,7 +80,7 @@ pub struct Scene {
     pub name: String,
     pub children: Vec<NodeId>,
     pub nodes: NodeRepository,
-    pub background_color: Option<Color>,
+    pub background_color: Option<CGColor>,
 }
 
 // endregion
@@ -129,45 +108,45 @@ pub enum Node {
 // node trait
 pub trait NodeTrait {
     fn id(&self) -> NodeId;
-    fn name(&self) -> String;
+    fn name(&self) -> Option<String>;
 }
 
 impl NodeTrait for Node {
     fn id(&self) -> NodeId {
         match self {
-            Node::Error(n) => n.base.id.clone(),
-            Node::Group(n) => n.base.id.clone(),
-            Node::Container(n) => n.base.id.clone(),
-            Node::Rectangle(n) => n.base.id.clone(),
-            Node::Ellipse(n) => n.base.id.clone(),
-            Node::Polygon(n) => n.base.id.clone(),
-            Node::RegularPolygon(n) => n.base.id.clone(),
-            Node::RegularStarPolygon(n) => n.base.id.clone(),
-            Node::Line(n) => n.base.id.clone(),
-            Node::TextSpan(n) => n.base.id.clone(),
-            Node::SVGPath(n) => n.base.id.clone(),
-            Node::Vector(n) => n.base.id.clone(),
-            Node::BooleanOperation(n) => n.base.id.clone(),
-            Node::Image(n) => n.base.id.clone(),
+            Node::Error(n) => n.id.clone(),
+            Node::Group(n) => n.id.clone(),
+            Node::Container(n) => n.id.clone(),
+            Node::Rectangle(n) => n.id.clone(),
+            Node::Ellipse(n) => n.id.clone(),
+            Node::Polygon(n) => n.id.clone(),
+            Node::RegularPolygon(n) => n.id.clone(),
+            Node::RegularStarPolygon(n) => n.id.clone(),
+            Node::Line(n) => n.id.clone(),
+            Node::TextSpan(n) => n.id.clone(),
+            Node::SVGPath(n) => n.id.clone(),
+            Node::Vector(n) => n.id.clone(),
+            Node::BooleanOperation(n) => n.id.clone(),
+            Node::Image(n) => n.id.clone(),
         }
     }
 
-    fn name(&self) -> String {
+    fn name(&self) -> Option<String> {
         match self {
-            Node::Error(n) => n.base.name.clone(),
-            Node::Group(n) => n.base.name.clone(),
-            Node::Container(n) => n.base.name.clone(),
-            Node::Rectangle(n) => n.base.name.clone(),
-            Node::Ellipse(n) => n.base.name.clone(),
-            Node::Polygon(n) => n.base.name.clone(),
-            Node::RegularPolygon(n) => n.base.name.clone(),
-            Node::RegularStarPolygon(n) => n.base.name.clone(),
-            Node::Line(n) => n.base.name.clone(),
-            Node::TextSpan(n) => n.base.name.clone(),
-            Node::SVGPath(n) => n.base.name.clone(),
-            Node::Vector(n) => n.base.name.clone(),
-            Node::BooleanOperation(n) => n.base.name.clone(),
-            Node::Image(n) => n.base.name.clone(),
+            Node::Error(n) => n.name.clone(),
+            Node::Group(n) => n.name.clone(),
+            Node::Container(n) => n.name.clone(),
+            Node::Rectangle(n) => n.name.clone(),
+            Node::Ellipse(n) => n.name.clone(),
+            Node::Polygon(n) => n.name.clone(),
+            Node::RegularPolygon(n) => n.name.clone(),
+            Node::RegularStarPolygon(n) => n.name.clone(),
+            Node::Line(n) => n.name.clone(),
+            Node::TextSpan(n) => n.name.clone(),
+            Node::SVGPath(n) => n.name.clone(),
+            Node::Vector(n) => n.name.clone(),
+            Node::BooleanOperation(n) => n.name.clone(),
+            Node::Image(n) => n.name.clone(),
         }
     }
 }
@@ -189,6 +168,11 @@ pub trait NodeGeometryMixin {
     fn has_stroke_geometry(&self) -> bool;
 
     fn render_bounds_stroke_width(&self) -> f32;
+}
+
+pub trait NodeShapeMixin {
+    fn to_shape(&self) -> Shape;
+    fn to_path(&self) -> skia_safe::Path;
 }
 
 /// Intrinsic size node is a node that has a fixed size, and can be rendered soley on its own.
@@ -224,15 +208,10 @@ pub enum LeafNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct BaseNode {
-    pub id: NodeId,
-    pub name: String,
-    pub active: bool,
-}
-
-#[derive(Debug, Clone)]
 pub struct ErrorNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub error: String,
@@ -252,7 +231,9 @@ impl ErrorNode {
 
 #[derive(Debug, Clone)]
 pub struct GroupNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub children: Vec<NodeId>,
     pub opacity: f32,
@@ -261,7 +242,9 @@ pub struct GroupNode {
 
 #[derive(Debug, Clone)]
 pub struct ContainerNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
@@ -312,7 +295,9 @@ impl NodeGeometryMixin for ContainerNode {
 
 #[derive(Debug, Clone)]
 pub struct RectangleNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
@@ -361,7 +346,9 @@ impl NodeGeometryMixin for RectangleNode {
 
 #[derive(Debug, Clone)]
 pub struct LineNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size, // height is always 0 (ignored)
     pub strokes: Vec<Paint>,
@@ -382,7 +369,9 @@ impl LineNode {
 
 #[derive(Debug, Clone)]
 pub struct ImageNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
@@ -424,9 +413,19 @@ impl NodeGeometryMixin for ImageNode {
 ///
 /// Like RectangleNode, uses a top-left based coordinate system (x,y,width,height).
 /// The ellipse is drawn within the bounding box defined by these coordinates.
+///
+/// ## Arc & Ring support
+///
+/// **3RD PARTY IMPLEMENTATIONS:**
+/// - https://konvajs.org/api/Konva.Arc.html
+/// - https://www.figma.com/plugin-docs/api/ArcData/
+///
+/// For details on arc mathematics, see: <https://mathworld.wolfram.com/Arc.html> (implementation varies)
 #[derive(Debug, Clone)]
 pub struct EllipseNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub fills: Vec<Paint>,
@@ -437,6 +436,16 @@ pub struct EllipseNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+
+    /// inner radius - 0 ~ 1
+    pub inner_radius: Option<f32>,
+
+    /// start angle in degrees
+    /// default is 0.0
+    pub start_angle: f32,
+
+    /// sweep angle in degrees (end_angle = start_angle + angle)
+    pub angle: Option<f32>,
 }
 
 impl NodeFillsMixin for EllipseNode {
@@ -446,6 +455,45 @@ impl NodeFillsMixin for EllipseNode {
 
     fn set_fills(&mut self, fills: Vec<Paint>) {
         self.fills = fills;
+    }
+}
+
+impl NodeShapeMixin for EllipseNode {
+    fn to_shape(&self) -> Shape {
+        let w = self.size.width;
+        let h = self.size.height;
+        let angle = self.angle.unwrap_or(360.0);
+
+        // check if art/ring data needs to be handled.
+        // if either angle or inner radius is present.
+        // if only inner radius is present (or angle is 360) => ring
+        // if both are present => arc
+        if self.inner_radius.is_some() || angle != 360.0 {
+            if self.inner_radius.is_some() && angle == 360.0 {
+                return Shape::EllipticalRing(EllipticalRingShape {
+                    width: w,
+                    height: h,
+                    inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
+                });
+            } else {
+                return Shape::EllipticalArc(EllipticalArcShape {
+                    width: w,
+                    height: h,
+                    inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
+                    start_angle: self.start_angle,
+                    angle: angle,
+                });
+            }
+        }
+
+        return Shape::Ellipse(EllipseShape {
+            width: w,
+            height: h,
+        });
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        (&self.to_shape()).into()
     }
 }
 
@@ -474,7 +522,9 @@ impl NodeGeometryMixin for EllipseNode {
 
 #[derive(Debug, Clone)]
 pub struct BooleanPathOperationNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub op: BooleanPathOperation,
     pub children: Vec<NodeId>,
@@ -493,7 +543,9 @@ pub struct BooleanPathOperationNode {
 ///
 #[derive(Debug, Clone)]
 pub struct VectorNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub fill: Option<Paint>,
     pub network: VectorNetwork,
@@ -506,18 +558,14 @@ pub struct VectorNode {
     pub effects: LayerEffects,
 }
 
-impl ToSkPath for VectorNode {
-    fn to_sk_path(&self) -> skia_safe::Path {
-        self.network.clone().into()
-    }
-}
-
 ///
 /// SVG Path compatible path node.
 ///
 #[derive(Debug, Clone)]
 pub struct SVGPathNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub fill: Paint,
     pub data: String,
@@ -541,14 +589,15 @@ pub struct SVGPathNode {
 /// https://developer.mozilla.org/en-US/docs/Web/SVG/Element/polygon
 #[derive(Debug, Clone)]
 pub struct PolygonNode {
-    /// Common base metadata and identity.
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
 
     /// 2D affine transform matrix applied to the shape.
     pub transform: AffineTransform,
 
     /// The list of points defining the polygon vertices.
-    pub points: Vec<Point>,
+    pub points: Vec<CGPoint>,
 
     /// The corner radius of the polygon.
     pub corner_radius: f32,
@@ -590,9 +639,23 @@ impl NodeStrokesMixin for PolygonNode {
     }
 }
 
-impl ToSkPath for PolygonNode {
-    fn to_sk_path(&self) -> skia_safe::Path {
-        cvt::sk_polygon_path(&self.points, self.corner_radius)
+impl PolygonNode {
+    pub fn to_own_shape(&self) -> SimplePolygonShape {
+        SimplePolygonShape {
+            points: self.points.clone(),
+            corner_radius: self.corner_radius,
+        }
+    }
+}
+
+impl NodeShapeMixin for PolygonNode {
+    fn to_shape(&self) -> Shape {
+        Shape::SimplePolygon(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        let shape = self.to_own_shape();
+        build_simple_polygon_path(&shape)
     }
 }
 
@@ -610,8 +673,9 @@ impl ToSkPath for PolygonNode {
 /// For details on regular polygon mathematics, see: <https://mathworld.wolfram.com/RegularPolygon.html> (implementation varies)
 #[derive(Debug, Clone)]
 pub struct RegularPolygonNode {
-    /// Core identity + metadata
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
 
     /// Affine transform applied to this node
     pub transform: AffineTransform,
@@ -675,42 +739,29 @@ impl NodeGeometryMixin for RegularPolygonNode {
 }
 
 impl RegularPolygonNode {
-    pub fn to_polygon(&self) -> PolygonNode {
-        let w = self.size.width;
-        let h = self.size.height;
-        let cx = w / 2.0;
-        let cy = h / 2.0;
-        let r = w.min(h) / 2.0;
-        let angle_offset = if self.point_count % 2 == 0 {
-            std::f32::consts::PI / self.point_count as f32
-        } else {
-            -std::f32::consts::PI / 2.0
-        };
-
-        let points: Vec<Point> = (0..self.point_count)
-            .map(|i| {
-                let theta = (i as f32 / self.point_count as f32) * 2.0 * std::f32::consts::PI
-                    + angle_offset;
-                let x = cx + r * theta.cos();
-                let y = cy + r * theta.sin();
-                Point { x, y }
-            })
-            .collect();
-
-        PolygonNode {
-            base: self.base.clone(),
-            transform: self.transform,
-            points,
-            corner_radius: self.corner_radius,
-            fills: self.fills.clone(),
-            strokes: self.strokes.clone(),
-            stroke_width: self.stroke_width,
-            stroke_align: self.stroke_align,
-            opacity: self.opacity,
-            blend_mode: self.blend_mode,
-            effects: self.effects.clone(),
-            stroke_dash_array: self.stroke_dash_array.clone(),
+    pub fn to_own_shape(&self) -> EllipticalRegularPolygonShape {
+        EllipticalRegularPolygonShape {
+            width: self.size.width,
+            height: self.size.height,
+            point_count: self.point_count,
         }
+    }
+
+    pub fn to_points(&self) -> Vec<CGPoint> {
+        build_regular_polygon_points(&self.to_own_shape())
+    }
+}
+
+impl NodeShapeMixin for RegularPolygonNode {
+    fn to_shape(&self) -> Shape {
+        Shape::EllipticalRegularPolygon(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        build_simple_polygon_path(&SimplePolygonShape {
+            points: self.to_points(),
+            corner_radius: self.corner_radius,
+        })
     }
 }
 
@@ -723,8 +774,9 @@ impl RegularPolygonNode {
 /// For details on star polygon mathematics, see: <https://mathworld.wolfram.com/StarPolygon.html>
 #[derive(Debug, Clone)]
 pub struct RegularStarPolygonNode {
-    /// Core identity + metadata
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
 
     /// Affine transform applied to this node
     pub transform: AffineTransform,
@@ -798,39 +850,27 @@ impl NodeGeometryMixin for RegularStarPolygonNode {
     }
 }
 
+impl NodeShapeMixin for RegularStarPolygonNode {
+    fn to_shape(&self) -> Shape {
+        Shape::EllipticalRegularStar(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        build_star_path(&self.to_own_shape())
+    }
+}
+
 impl RegularStarPolygonNode {
-    pub fn to_polygon(&self) -> PolygonNode {
-        let w = self.size.width;
-        let h = self.size.height;
-        let cx = w / 2.0;
-        let cy = h / 2.0;
-        let outer_r = cx.min(cy);
-        let inner_r = outer_r * self.inner_radius;
-        let step = std::f32::consts::PI / self.point_count as f32;
-        let start_angle = -std::f32::consts::PI / 2.0;
+    pub fn to_points(&self) -> Vec<CGPoint> {
+        build_star_points(&self.to_own_shape())
+    }
 
-        let mut points = Vec::with_capacity(self.point_count * 2);
-        for i in 0..(self.point_count * 2) {
-            let angle = start_angle + i as f32 * step;
-            let r = if i % 2 == 0 { outer_r } else { inner_r };
-            let x = cx + r * angle.cos();
-            let y = cy + r * angle.sin();
-            points.push(Point { x, y });
-        }
-
-        PolygonNode {
-            base: self.base.clone(),
-            transform: self.transform,
-            points,
-            corner_radius: self.corner_radius,
-            fills: self.fills.clone(),
-            strokes: self.strokes.clone(),
-            stroke_width: self.stroke_width,
-            stroke_align: self.stroke_align,
-            opacity: self.opacity,
-            blend_mode: self.blend_mode,
-            effects: self.effects.clone(),
-            stroke_dash_array: self.stroke_dash_array.clone(),
+    pub fn to_own_shape(&self) -> EllipticalRegularStarShape {
+        EllipticalRegularStarShape {
+            width: self.size.width,
+            height: self.size.height,
+            inner_radius_ratio: self.inner_radius,
+            point_count: self.point_count,
         }
     }
 }
@@ -839,8 +879,9 @@ impl RegularStarPolygonNode {
 /// For multi-style content, see `RichTextNode` (not implemented yet).
 #[derive(Debug, Clone)]
 pub struct TextSpanNode {
-    /// Metadata and identity.
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
 
     /// Transform applied to the text container.
     pub transform: AffineTransform,
@@ -878,7 +919,9 @@ pub struct TextSpanNode {
 #[derive(Debug, Clone)]
 #[deprecated(note = "Not implemented yet")]
 pub struct TextNode {
-    pub base: BaseNode,
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
     pub text: String,

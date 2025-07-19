@@ -2,8 +2,40 @@ use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::Deserialize;
 
+/// A 2D point with x and y coordinates.
 #[derive(Debug, Clone, Copy)]
-pub struct Color(pub u8, pub u8, pub u8, pub u8);
+pub struct CGPoint {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl CGPoint {
+    /// Subtracts a scaled vector from this point.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The point to subtract
+    /// * `scale` - The scale factor to apply to the other point
+    ///
+    /// # Returns
+    ///
+    /// A new point representing the result of the vector operation
+    pub fn subtract_scaled(&self, other: CGPoint, scale: f32) -> CGPoint {
+        CGPoint {
+            x: self.x - other.x * scale,
+            y: self.y - other.y * scale,
+        }
+    }
+}
+
+impl Into<skia_safe::Point> for CGPoint {
+    fn into(self) -> skia_safe::Point {
+        skia_safe::Point::new(self.x, self.y)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
 /// Boolean path operation.
 #[derive(Debug, Clone, Copy)]
@@ -105,33 +137,75 @@ pub enum StrokeAlign {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct Radius {
+    pub rx: f32,
+    pub ry: f32,
+}
+
+impl Radius {
+    pub fn circular(radius: f32) -> Self {
+        Self {
+            rx: radius,
+            ry: radius,
+        }
+    }
+
+    pub fn elliptical(rx: f32, ry: f32) -> Self {
+        Self { rx, ry }
+    }
+
+    pub fn zero() -> Self {
+        Self { rx: 0.0, ry: 0.0 }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.rx == 0.0 && self.ry == 0.0
+    }
+
+    pub fn is_uniform(&self) -> bool {
+        self.rx == self.ry
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct RectangularCornerRadius {
-    pub tl: f32,
-    pub tr: f32,
-    pub bl: f32,
-    pub br: f32,
+    pub tl: Radius,
+    pub tr: Radius,
+    pub bl: Radius,
+    pub br: Radius,
 }
 
 impl RectangularCornerRadius {
     pub fn zero() -> Self {
-        Self::all(0.0)
+        Self::all(Radius::zero())
     }
 
-    pub fn all(value: f32) -> Self {
+    pub fn all(radius: Radius) -> Self {
         Self {
-            tl: value,
-            tr: value,
-            bl: value,
-            br: value,
+            tl: radius,
+            tr: radius,
+            bl: radius,
+            br: radius,
         }
     }
 
+    pub fn circular(radius: f32) -> Self {
+        Self::all(Radius::circular(radius))
+    }
+
     pub fn is_zero(&self) -> bool {
-        self.tl == 0.0 && self.tr == 0.0 && self.bl == 0.0 && self.br == 0.0
+        self.tl.is_zero() && self.tr.is_zero() && self.bl.is_zero() && self.br.is_zero()
     }
 
     pub fn is_uniform(&self) -> bool {
-        self.tl == self.tr && self.tl == self.bl && self.tl == self.br
+        // all uniform and the values are the same
+        self.tl.is_uniform()
+            && self.tr.is_uniform()
+            && self.bl.is_uniform()
+            && self.br.is_uniform()
+            && self.tl.rx == self.tr.rx
+            && self.tl.rx == self.bl.rx
+            && self.tl.rx == self.br.rx
     }
 }
 
@@ -298,49 +372,49 @@ impl Paint {
 
 #[derive(Debug, Clone)]
 pub struct SolidPaint {
-    pub color: Color,
+    pub color: CGColor,
     pub opacity: f32,
 }
 
 impl SolidPaint {
     pub fn transparent() -> Self {
         Self {
-            color: Color(0, 0, 0, 0),
+            color: CGColor(0, 0, 0, 0),
             opacity: 0.0,
         }
     }
 
     pub fn black() -> Self {
         Self {
-            color: Color(0, 0, 0, 255),
+            color: CGColor(0, 0, 0, 255),
             opacity: 1.0,
         }
     }
 
     pub fn white() -> Self {
         Self {
-            color: Color(255, 255, 255, 255),
+            color: CGColor(255, 255, 255, 255),
             opacity: 1.0,
         }
     }
 
     pub fn red() -> Self {
         Self {
-            color: Color(255, 0, 0, 255),
+            color: CGColor(255, 0, 0, 255),
             opacity: 1.0,
         }
     }
 
     pub fn blue() -> Self {
         Self {
-            color: Color(0, 0, 255, 255),
+            color: CGColor(0, 0, 255, 255),
             opacity: 1.0,
         }
     }
 
     pub fn green() -> Self {
         Self {
-            color: Color(0, 255, 0, 255),
+            color: CGColor(0, 255, 0, 255),
             opacity: 1.0,
         }
     }
@@ -350,7 +424,7 @@ impl SolidPaint {
 pub struct GradientStop {
     /// 0.0 = start, 1.0 = end
     pub offset: f32,
-    pub color: Color,
+    pub color: CGColor,
 }
 
 #[derive(Debug, Clone)]
@@ -445,7 +519,7 @@ pub struct FeShadow {
     pub spread: f32,
 
     /// Shadow color (includes alpha)
-    pub color: Color,
+    pub color: CGColor,
 }
 
 #[derive(Debug, Clone)]

@@ -138,8 +138,11 @@ export default function InputPropertyNumber({
   autoSelect = true,
   min,
   max,
+  appearance,
   ...props
-}: NumericPropertyControlProps) {
+}: NumericPropertyControlProps & {
+  appearance?: "none";
+}) {
   const mixed = value === grida.mixed;
   const [internalValue, setInternalValue] = useState<string | number>(
     mixed ? "mixed" : (value ?? "")
@@ -190,7 +193,13 @@ export default function InputPropertyNumber({
       {...props}
       type={mixed ? "text" : "number"}
       placeholder={placeholder}
-      className={cn(WorkbenchUI.inputVariants({ size: "xs" }), className)}
+      className={cn(
+        WorkbenchUI.inputVariants({ size: "xs" }),
+        appearance === "none"
+          ? "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          : "",
+        className
+      )}
       value={internalValue}
       onFocus={handleFocus}
       onBlur={handleBlur}

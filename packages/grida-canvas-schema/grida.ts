@@ -771,8 +771,8 @@ export namespace grida.program.nodes {
     | LineNode
     | RectangleNode
     | EllipseNode
-    // | RegularPolygonNode
-    // | RegularStarPolygonNode
+    | RegularPolygonNode
+    | RegularStarPolygonNode
     | ComponentNode
     | InstanceNode
     | TemplateInstanceNode;
@@ -835,6 +835,8 @@ export namespace grida.program.nodes {
       Partial<LineNode> &
       Partial<RectangleNode> &
       Partial<EllipseNode> &
+      Partial<RegularPolygonNode> &
+      Partial<RegularStarPolygonNode> &
       Partial<ComponentNode> &
       Partial<InstanceNode> &
       Partial<TemplateInstanceNode>,
@@ -1076,10 +1078,20 @@ export namespace grida.program.nodes {
     export interface IExportable {}
 
     /**
+     * Corner radius
+     */
+    export interface ICornerRadius {
+      cornerRadius?: number;
+    }
+
+    /**
      * Rectangle Corner
      */
-    export interface IRectangleCorner {
-      cornerRadius: number | cg.CornerRadius4;
+    export interface IRectangularCornerRadius {
+      cornerRadiusTopLeft?: number;
+      cornerRadiusTopRight?: number;
+      cornerRadiusBottomLeft?: number;
+      cornerRadiusBottomRight?: number;
     }
 
     /**
@@ -1176,6 +1188,31 @@ export namespace grida.program.nodes {
       feBlur?: cg.FeBlur;
       feBackdropBlur?: cg.FeBlur;
       feShadows?: cg.FeShadow[];
+    }
+
+    export interface IEllipseArcData {
+      /**
+       * angle of the sweep in degree
+       * @default 360
+       *
+       * @example
+       * - 0 - no circle
+       * - 180 - half circle
+       * - 360 - full circle
+       */
+      angle: number;
+
+      /**
+       * start angle in degree
+       * @default 0
+       */
+      angleOffset: number;
+
+      /**
+       * inner radius in 0~1
+       * @default 0
+       */
+      innerRadius: number;
     }
 
     /**
@@ -1438,7 +1475,8 @@ export namespace grida.program.nodes {
       i.IBoxFit,
       i.IHrefable,
       i.IMouseCursor,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.ISourceValue {
     readonly type: "image";
     alt?: string;
@@ -1484,7 +1522,8 @@ export namespace grida.program.nodes {
       i.IBoxFit,
       i.IHrefable,
       i.IMouseCursor,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.ISourceValue {
     readonly type: "video";
 
@@ -1511,7 +1550,8 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IExpandable,
       i.IChildrenReference,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.IPadding,
       i.IFlexContainer {
     readonly type: "container";
@@ -1533,7 +1573,8 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.ISourceValue {
     readonly type: "iframe";
   }
@@ -1619,7 +1660,7 @@ export namespace grida.program.nodes {
       i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke {
-    readonly type: "regular-polygon";
+    readonly type: "polygon";
     pointCount: number;
   }
 
@@ -1636,7 +1677,7 @@ export namespace grida.program.nodes {
       i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke {
-    readonly type: "regular-star-polygon";
+    readonly type: "star";
     pointCount: number;
     innerRadius: number;
   }
@@ -1734,7 +1775,8 @@ export namespace grida.program.nodes {
       i.IFill<cg.Paint>,
       i.IStroke,
       i.IEffects,
-      i.IRectangleCorner {
+      i.ICornerRadius,
+      i.IRectangularCornerRadius {
     readonly type: "rectangle";
   }
 
@@ -1764,6 +1806,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       // i.ICSSDimension,
       i.IFixedDimension,
+      i.IEllipseArcData,
       i.IOpacity,
       i.IBlendMode,
       i.IZIndex,
@@ -1791,7 +1834,8 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IExpandable,
       i.IChildrenReference,
-      i.IRectangleCorner,
+      i.ICornerRadius,
+      i.IRectangularCornerRadius,
       i.IPadding,
       i.IFlexContainer,
       i.IProperties {
@@ -1910,6 +1954,10 @@ export namespace grida.program.nodes {
             top: 0,
             left: 0,
             cornerRadius: 0,
+            cornerRadiusTopLeft: 0,
+            cornerRadiusTopRight: 0,
+            cornerRadiusBottomLeft: 0,
+            cornerRadiusBottomRight: 0,
             strokeWidth: 0,
             strokeCap: "butt",
             ...prototype,
@@ -2093,6 +2141,10 @@ export namespace grida.program.nodes {
         width: 100,
         height: 100,
         cornerRadius: 0,
+        cornerRadiusTopLeft: 0,
+        cornerRadiusTopRight: 0,
+        cornerRadiusBottomLeft: 0,
+        cornerRadiusBottomRight: 0,
         style: {},
         children: [],
         ...partial,

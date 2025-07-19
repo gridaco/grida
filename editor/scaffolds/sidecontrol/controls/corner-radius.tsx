@@ -6,7 +6,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkbenchUI } from "@/components/workbench";
-import type grida from "@grida/schema";
 import cg from "@grida/cg";
 import {
   CornerTopLeftIcon,
@@ -16,6 +15,12 @@ import {
   CornersIcon,
 } from "@radix-ui/react-icons";
 import { PropertyInputContainer } from "../ui";
+import grida from "@grida/schema";
+
+type CornerRadius = Partial<
+  grida.program.nodes.i.ICornerRadius &
+    grida.program.nodes.i.IRectangularCornerRadius
+>;
 
 export function CornerRadiusControl({
   disabled,
@@ -23,10 +28,8 @@ export function CornerRadiusControl({
   onValueCommit,
 }: {
   disabled?: boolean;
-  value?: grida.program.nodes.i.IRectangleCorner["cornerRadius"];
-  onValueCommit?: (
-    value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
-  ) => void;
+  value?: CornerRadius;
+  onValueCommit?: (value: cg.CornerRadius) => void;
 }) {
   const mode = Array.isArray(value) ? "each" : "all";
 
@@ -63,13 +66,12 @@ export function CornerRadiusControl({
       </div>
       <PopoverContent>
         <CornerRadius4Control
-          value={
-            Array.isArray(value)
-              ? (value as cg.CornerRadius4)
-              : value
-                ? [value, value, value, value]
-                : [0, 0, 0, 0]
-          }
+          value={[
+            value?.cornerRadiusTopLeft ?? value?.cornerRadius ?? 0,
+            value?.cornerRadiusTopRight ?? value?.cornerRadius ?? 0,
+            value?.cornerRadiusBottomRight ?? value?.cornerRadius ?? 0,
+            value?.cornerRadiusBottomLeft ?? value?.cornerRadius ?? 0,
+          ]}
           onValueCommit={(v) => {
             if (cg.cornerRadius4Identical(v)) {
               onValueCommit?.(v[0]);

@@ -12,6 +12,7 @@ pub mod os;
 pub mod painter;
 pub mod resource;
 pub mod runtime;
+pub mod shape;
 pub mod sk;
 pub mod sys;
 pub mod text;

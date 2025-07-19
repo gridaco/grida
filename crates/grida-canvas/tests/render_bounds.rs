@@ -10,7 +10,7 @@ fn stroke_affects_render_bounds() {
     let mut rect = nf.create_rectangle_node();
     rect.stroke_width = 10.0;
     rect.stroke_align = StrokeAlign::Outside;
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     let scene = Scene {
@@ -38,7 +38,7 @@ fn gaussian_blur_expands_render_bounds() {
     rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
         radius: 5.0,
     })]);
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     let scene = Scene {
@@ -68,9 +68,9 @@ fn drop_shadow_expands_render_bounds() {
         dy: 5.0,
         blur: 10.0,
         spread: 0.0,
-        color: Color(0, 0, 0, 255),
+        color: CGColor(0, 0, 0, 255),
     })]);
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     let scene = Scene {
@@ -100,9 +100,9 @@ fn drop_shadow_spread_expands_render_bounds() {
         dy: 0.0,
         blur: 0.0,
         spread: 10.0,
-        color: Color(0, 0, 0, 255),
+        color: CGColor(0, 0, 0, 255),
     })]);
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     let scene = Scene {

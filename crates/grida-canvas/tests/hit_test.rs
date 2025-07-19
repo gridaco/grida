@@ -14,7 +14,7 @@ fn hit_first_returns_topmost() {
         width: 20.0,
         height: 20.0,
     };
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     let mut container = nf.create_container_node();
@@ -22,7 +22,7 @@ fn hit_first_returns_topmost() {
         width: 40.0,
         height: 40.0,
     };
-    let container_id = container.base.id.clone();
+    let container_id = container.id.clone();
     container.children.push(rect_id.clone());
     repo.insert(Node::Container(container));
 
@@ -58,7 +58,7 @@ fn path_hit_testing_uses_contains() {
 
     let mut path_node = nf.create_path_node();
     path_node.data = "M0 0 L10 0 L10 10 Z".into();
-    let path_id = path_node.base.id.clone();
+    let path_id = path_node.id.clone();
     repo.insert(Node::SVGPath(path_node.clone()));
 
     let scene = Scene {
@@ -97,7 +97,7 @@ fn intersects_returns_all_nodes_in_rect() {
         width: 100.0,
         height: 100.0,
     };
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     let mut container = nf.create_container_node();
@@ -105,7 +105,7 @@ fn intersects_returns_all_nodes_in_rect() {
         width: 100.0,
         height: 100.0,
     };
-    let container_id = container.base.id.clone();
+    let container_id = container.id.clone();
     container.children.push(rect_id.clone());
     repo.insert(Node::Container(container));
 

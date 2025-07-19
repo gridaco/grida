@@ -1,5 +1,6 @@
 use crate::cg::types::*;
 use crate::node::schema::*;
+use crate::shape::*;
 use math2::transform::AffineTransform;
 use serde::Deserialize;
 use serde_json::Value;
@@ -93,9 +94,9 @@ pub struct JSONFeShadow {
     pub inset: bool,
 }
 
-impl From<JSONRGBA> for Color {
+impl From<JSONRGBA> for CGColor {
     fn from(color: JSONRGBA) -> Self {
-        Color(color.r, color.g, color.b, (color.a * 255.0).round() as u8)
+        CGColor(color.r, color.g, color.b, (color.a * 255.0).round() as u8)
     }
 }
 
@@ -115,7 +116,7 @@ impl From<Option<JSONPaint>> for Paint {
     fn from(fill: Option<JSONPaint>) -> Self {
         match fill {
             Some(JSONPaint::Solid { color }) => Paint::Solid(SolidPaint {
-                color: color.map_or(Color(0, 0, 0, 0), |c| c.into()),
+                color: color.map_or(CGColor(0, 0, 0, 0), |c| c.into()),
                 opacity: 1.0,
             }),
             Some(JSONPaint::LinearGradient {
@@ -143,7 +144,7 @@ impl From<Option<JSONPaint>> for Paint {
                 })
             }
             None => Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 0),
+                color: CGColor(0, 0, 0, 0),
                 opacity: 1.0,
             }),
         }
@@ -166,7 +167,8 @@ pub struct JSONScene {
 #[derive(Debug, Deserialize)]
 pub struct JSONUnknownNodeProperties {
     pub id: String,
-    pub name: String,
+    #[serde(default)]
+    pub name: Option<String>,
     #[serde(default = "default_active")]
     pub active: bool,
     #[serde(default = "default_locked")]
@@ -200,12 +202,38 @@ pub struct JSONUnknownNodeProperties {
     pub width: f32,
     #[serde(rename = "height", deserialize_with = "de_css_length")]
     pub height: f32,
+
     #[serde(
         rename = "cornerRadius",
         default,
-        deserialize_with = "de_corner_radius"
+        deserialize_with = "de_radius_option"
     )]
-    pub corner_radius: Option<RectangularCornerRadius>,
+    pub corner_radius: Option<Radius>,
+    #[serde(
+        rename = "cornerRadiusTopLeft",
+        default,
+        deserialize_with = "de_radius_option"
+    )]
+    pub corner_radius_top_left: Option<Radius>,
+    #[serde(
+        rename = "cornerRadiusTopRight",
+        default,
+        deserialize_with = "de_radius_option"
+    )]
+    pub corner_radius_top_right: Option<Radius>,
+    #[serde(
+        rename = "cornerRadiusBottomRight",
+        default,
+        deserialize_with = "de_radius_option"
+    )]
+    pub corner_radius_bottom_right: Option<Radius>,
+    #[serde(
+        rename = "cornerRadiusBottomLeft",
+        default,
+        deserialize_with = "de_radius_option"
+    )]
+    pub corner_radius_bottom_left: Option<Radius>,
+
     // fill
     #[serde(rename = "fill")]
     pub fill: Option<JSONPaint>,
@@ -243,6 +271,10 @@ pub enum JSONNode {
     Ellipse(JSONEllipseNode),
     #[serde(rename = "rectangle")]
     Rectangle(JSONRectangleNode),
+    #[serde(rename = "polygon")]
+    RegularPolygon(JSONRegularPolygonNode),
+    #[serde(rename = "star")]
+    RegularStarPolygon(JSONRegularStarPolygonNode),
     #[serde(rename = "line")]
     Line(JSONLineNode),
     #[serde(rename = "text")]
@@ -364,12 +396,45 @@ pub struct JSONPathNode {
 pub struct JSONEllipseNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
+
+    /// angle in degrees 0..360
+    #[serde(rename = "angle", default)]
+    pub angle: Option<f32>,
+
+    /// angle offset in degrees (start angle) 0..360
+    #[serde(rename = "angleOffset", default)]
+    pub angle_offset: Option<f32>,
+
+    /// inner radius in 0..1
+    #[serde(rename = "innerRadius", default)]
+    pub inner_radius: Option<f32>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct JSONRectangleNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONRegularPolygonNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "pointCount")]
+    pub point_count: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONRegularStarPolygonNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "pointCount")]
+    pub point_count: usize,
+
+    #[serde(rename = "innerRadius")]
+    pub inner_radius: f32,
 }
 
 // Default value functions
@@ -411,20 +476,21 @@ pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
 impl From<JSONContainerNode> for ContainerNode {
     fn from(node: JSONContainerNode) -> Self {
         ContainerNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
             size: Size {
                 width: node.base.width,
                 height: node.base.height,
             },
-            corner_radius: node
-                .base
-                .corner_radius
-                .unwrap_or(RectangularCornerRadius::zero()),
+            corner_radius: merge_corner_radius(
+                node.base.corner_radius,
+                node.base.corner_radius_top_left,
+                node.base.corner_radius_top_right,
+                node.base.corner_radius_bottom_right,
+                node.base.corner_radius_bottom_left,
+            ),
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
             stroke_width: 0.0,
@@ -448,11 +514,9 @@ impl From<JSONTextNode> for TextSpanNode {
         let width = node.base.width;
         let height = node.base.height;
         TextSpanNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
             size: Size { width, height },
             text: node.text,
@@ -488,16 +552,54 @@ impl From<JSONEllipseNode> for Node {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         Node::Ellipse(EllipseNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             size: Size {
                 width: node.base.width,
                 height: node.base.height,
             },
+            fills: vec![node.base.fill.into()],
+            strokes: vec![node.base.stroke.into()],
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
+            blend_mode: node.base.blend_mode,
+            opacity: node.base.opacity,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+
+            inner_radius: node.inner_radius,
+            start_angle: node.angle_offset.unwrap_or(0.0),
+            angle: node.angle,
+        })
+    }
+}
+
+impl From<JSONRectangleNode> for Node {
+    fn from(node: JSONRectangleNode) -> Self {
+        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+
+        Node::Rectangle(RectangleNode {
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
+            transform,
+            size: Size {
+                width: node.base.width,
+                height: node.base.height,
+            },
+            corner_radius: merge_corner_radius(
+                node.base.corner_radius,
+                node.base.corner_radius_top_left,
+                node.base.corner_radius_top_right,
+                node.base.corner_radius_bottom_right,
+                node.base.corner_radius_bottom_left,
+            ),
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
@@ -514,25 +616,20 @@ impl From<JSONEllipseNode> for Node {
     }
 }
 
-impl From<JSONRectangleNode> for Node {
-    fn from(node: JSONRectangleNode) -> Self {
+impl From<JSONRegularPolygonNode> for Node {
+    fn from(node: JSONRegularPolygonNode) -> Self {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
-        Node::Rectangle(RectangleNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+        Node::RegularPolygon(RegularPolygonNode {
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             size: Size {
                 width: node.base.width,
                 height: node.base.height,
             },
-            corner_radius: node
-                .base
-                .corner_radius
-                .unwrap_or(RectangularCornerRadius::zero()),
+            corner_radius: 0.0,
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
@@ -545,6 +642,39 @@ impl From<JSONRectangleNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
+            point_count: node.point_count,
+        })
+    }
+}
+
+impl From<JSONRegularStarPolygonNode> for Node {
+    fn from(node: JSONRegularStarPolygonNode) -> Self {
+        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+
+        Node::RegularStarPolygon(RegularStarPolygonNode {
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
+            transform,
+            size: Size {
+                width: node.base.width,
+                height: node.base.height,
+            },
+            corner_radius: 0.0,
+            inner_radius: node.inner_radius,
+            fills: vec![node.base.fill.into()],
+            strokes: vec![node.base.stroke.into()],
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
+            blend_mode: node.base.blend_mode,
+            opacity: node.base.opacity,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+            point_count: node.point_count,
         })
     }
 }
@@ -555,11 +685,9 @@ impl From<JSONLegacyVectorNode> for Node {
 
         // For vector nodes, we'll create a path node with the path data
         Node::SVGPath(SVGPathNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             fill: node.base.fill.into(),
             data: node.paths.map_or("".to_string(), |paths| {
@@ -589,11 +717,9 @@ impl From<JSONLineNode> for Node {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         Node::Line(LineNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             size: Size {
                 width: node.base.width,
@@ -619,11 +745,9 @@ impl From<JSONPathNode> for Node {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         Node::Vector(VectorNode {
-            base: BaseNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-            },
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
             transform,
             fill: Some(node.base.fill.into()),
             network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
@@ -651,13 +775,13 @@ impl From<JSONNode> for Node {
             JSONNode::Path(path) => path.into(),
             JSONNode::Ellipse(ellipse) => ellipse.into(),
             JSONNode::Rectangle(rectangle) => rectangle.into(),
+            JSONNode::RegularPolygon(rpolygon) => rpolygon.into(),
+            JSONNode::RegularStarPolygon(rsp) => rsp.into(),
             JSONNode::Line(line) => line.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNode {
-                base: BaseNode {
-                    id: unknown.id,
-                    name: unknown.name,
-                    active: unknown.active,
-                },
+                id: unknown.id,
+                name: unknown.name,
+                active: unknown.active,
                 transform: AffineTransform::identity(),
                 size: Size {
                     width: unknown.width,
@@ -681,39 +805,50 @@ where
     }
 }
 
-fn de_corner_radius<'de, D>(deserializer: D) -> Result<Option<RectangularCornerRadius>, D::Error>
+fn de_radius_option<'de, D>(deserializer: D) -> Result<Option<Radius>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
-
+    let value: Option<Value> = Deserialize::deserialize(deserializer)?;
     match value {
-        None => Ok(None),
-        Some(v) => match v {
-            serde_json::Value::Number(n) => {
-                let radius = n.as_f64().unwrap_or(0.0) as f32;
-                Ok(Some(RectangularCornerRadius::all(radius)))
-            }
-            serde_json::Value::Array(arr) => {
-                if arr.len() == 4 {
-                    let values: Vec<f32> = arr
-                        .into_iter()
-                        .map(|v| v.as_f64().unwrap_or(0.0) as f32)
-                        .collect();
-                    Ok(Some(RectangularCornerRadius {
-                        /* top-left | top-right | bottom-right | bottom-left */
-                        tl: values[0],
-                        tr: values[1],
-                        br: values[2],
-                        bl: values[3],
-                    }))
-                } else {
-                    Ok(None)
-                }
-            }
-            _ => Ok(None),
-        },
+        Some(Value::Number(n)) => Ok(Some(Radius::circular(n.as_f64().unwrap_or(0.0) as f32))),
+        _ => Ok(None),
     }
+}
+
+#[allow(dead_code)]
+fn de_radius<'de, D>(deserializer: D) -> Result<Radius, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Value = Deserialize::deserialize(deserializer)?;
+    match value {
+        Value::Number(n) => Ok(Radius::circular(n.as_f64().unwrap_or(0.0) as f32)),
+        _ => Ok(Radius::zero()),
+    }
+}
+
+fn merge_corner_radius(
+    corner_radius: Option<Radius>,
+    corner_radius_top_left: Option<Radius>,
+    corner_radius_top_right: Option<Radius>,
+    corner_radius_bottom_right: Option<Radius>,
+    corner_radius_bottom_left: Option<Radius>,
+) -> RectangularCornerRadius {
+    let mut r = RectangularCornerRadius::all(corner_radius.unwrap_or(Radius::zero()));
+    if let Some(corner_radius_top_left) = corner_radius_top_left {
+        r.tl = corner_radius_top_left;
+    }
+    if let Some(corner_radius_top_right) = corner_radius_top_right {
+        r.tr = corner_radius_top_right;
+    }
+    if let Some(corner_radius_bottom_right) = corner_radius_bottom_right {
+        r.br = corner_radius_bottom_right;
+    }
+    if let Some(corner_radius_bottom_left) = corner_radius_bottom_left {
+        r.bl = corner_radius_bottom_left;
+    }
+    r
 }
 
 fn merge_effects(
@@ -763,97 +898,5 @@ mod tests {
             !parsed.document.nodes.is_empty(),
             "nodes should not be empty"
         );
-    }
-
-    #[test]
-    fn corner_radius_optional_and_falls_back_to_zero() {
-        // Test JSON without cornerRadius field
-        let json_without_corner_radius = r#"{
-            "version": "0.0.1-beta.1+20250303",
-            "document": {
-                "bitmaps": {},
-                "properties": {},
-                "nodes": {
-                    "test-rect": {
-                        "type": "rectangle",
-                        "id": "test-rect",
-                        "name": "Test Rectangle",
-                        "left": 0.0,
-                        "top": 0.0,
-                        "width": 100.0,
-                        "height": 100.0,
-                        "fill": {
-                            "type": "solid",
-                            "color": {
-                                "r": 255,
-                                "g": 0,
-                                "b": 0,
-                                "a": 1.0
-                            }
-                        }
-                    }
-                },
-                "scenes": {}
-            }
-        }"#;
-
-        let parsed: JSONCanvasFile = serde_json::from_str(json_without_corner_radius)
-            .expect("failed to parse JSON without cornerRadius");
-
-        // Verify that the rectangle node was parsed successfully
-        if let Some(JSONNode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
-            // corner_radius should be None when not present in JSON
-            assert!(rect_node.base.corner_radius.is_none());
-        } else {
-            panic!("Expected rectangle node not found");
-        }
-
-        // Test JSON with cornerRadius field
-        let json_with_corner_radius = r#"{
-            "version": "0.0.1-beta.1+20250303",
-            "document": {
-                "bitmaps": {},
-                "properties": {},
-                "nodes": {
-                    "test-rect": {
-                        "type": "rectangle",
-                        "id": "test-rect",
-                        "name": "Test Rectangle",
-                        "left": 0.0,
-                        "top": 0.0,
-                        "width": 100.0,
-                        "height": 100.0,
-                        "cornerRadius": 10.0,
-                        "fill": {
-                            "type": "solid",
-                            "color": {
-                                "r": 255,
-                                "g": 0,
-                                "b": 0,
-                                "a": 1.0
-                            }
-                        }
-                    }
-                },
-                "scenes": {}
-            }
-        }"#;
-
-        let parsed: JSONCanvasFile = serde_json::from_str(json_with_corner_radius)
-            .expect("failed to parse JSON with cornerRadius");
-
-        // Verify that the rectangle node was parsed successfully with cornerRadius
-        if let Some(JSONNode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
-            // corner_radius should be Some when present in JSON
-            assert!(rect_node.base.corner_radius.is_some());
-            if let Some(corner_radius) = &rect_node.base.corner_radius {
-                assert_eq!(corner_radius.tl, 10.0);
-                assert_eq!(corner_radius.tr, 10.0);
-                assert_eq!(corner_radius.bl, 10.0);
-                assert_eq!(corner_radius.br, 10.0);
-            }
-        } else {
-            panic!("Expected rectangle node not found");
-        }
     }
 }

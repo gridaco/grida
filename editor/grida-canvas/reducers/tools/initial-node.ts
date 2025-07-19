@@ -163,6 +163,9 @@ export default function initialNode(
         strokeWidth: 0,
         strokeCap: "butt",
         fill: gray,
+        angle: 360,
+        angleOffset: 0,
+        innerRadius: 0,
         ...seed,
       } satisfies grida.program.nodes.EllipseNode;
     }
@@ -180,6 +183,39 @@ export default function initialNode(
         fill: gray,
         ...seed,
       } satisfies grida.program.nodes.RectangleNode;
+    }
+    case "polygon": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "polygon",
+        pointCount: 3,
+        cornerRadius: 0,
+        width: 100,
+        height: 100,
+        strokeWidth: 0,
+        strokeCap: "butt",
+        fill: gray,
+        ...seed,
+      } satisfies grida.program.nodes.RegularPolygonNode;
+    }
+    case "star": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "star",
+        pointCount: 5,
+        innerRadius: 0.5,
+        cornerRadius: 0,
+        width: 100,
+        height: 100,
+        strokeWidth: 0,
+        strokeCap: "butt",
+        fill: gray,
+        ...seed,
+      } satisfies grida.program.nodes.RegularStarPolygonNode;
     }
     case "line": {
       return {

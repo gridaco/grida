@@ -45,21 +45,19 @@ import { LengthPercentageControl } from "./controls/length-percentage";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
-import { BlendModeDropdown, BlendModeSelect } from "./controls/blend-mode";
+import { BlendModeDropdown } from "./controls/blend-mode";
 import {
   useComputedNode,
   useCurrentEditor,
-  useDocumentState,
   useEditorState,
 } from "@/grida-canvas-react";
 import {
-  BlendingModeIcon,
   Crosshair2Icon,
   LockClosedIcon,
   LockOpen1Icon,
   PlusIcon,
 } from "@radix-ui/react-icons";
-import { supports } from "@/grida-canvas-utils/utils/supports";
+import { supports } from "@/grida-canvas/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
@@ -98,11 +96,8 @@ import { StrokeAlignControl } from "./controls/stroke-align";
 import cg from "@grida/cg";
 import { editor } from "@/grida-canvas";
 import { FeControl } from "./controls/fe";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import InputPropertyNumber from "./ui/number";
+import { ArcPropertiesControl } from "./controls/arc-properties";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -534,7 +529,7 @@ function SelectionMixedProperties({
         )}
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
+            <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
@@ -552,7 +547,7 @@ function SelectionMixedProperties({
                   <CornerRadiusControl onValueCommit={change.cornerRadius} />
                 ) : (
                   <CornerRadiusControl
-                    value={cornerRadius?.value}
+                    value={{ cornerRadius: cornerRadius?.value }}
                     onValueCommit={change.cornerRadius}
                   />
                 )}
@@ -564,6 +559,22 @@ function SelectionMixedProperties({
                 <BorderControl value={border} onValueChange={actions.border} />
               </PropertyLine>
             )} */}
+
+            {/* <PropertyLine>
+              <PropertyLineLabel>Shadow</PropertyLineLabel>
+              <BoxShadowControl
+                value={{ boxShadow }}
+                onValueChange={actions.boxShadow}
+              />
+            </PropertyLine> */}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Fill</PropertyLineLabel>
               {fill?.mixed || fill?.partial ? (
@@ -580,26 +591,12 @@ function SelectionMixedProperties({
                 />
               )}
             </PropertyLine>
-            {/* <PropertyLine>
-              <PropertyLineLabel>Shadow</PropertyLineLabel>
-              <BoxShadowControl
-                value={{ boxShadow }}
-                onValueChange={actions.boxShadow}
-              />
-            </PropertyLine> */}
-            <PropertyLine>
-              <PropertyLineLabel>Cursor</PropertyLineLabel>
-              <CursorControl
-                value={cursor?.value}
-                onValueChange={change.cursor}
-              />
-            </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
         {supports_stroke && (
           <SidebarSection className="border-b pb-4">
             <SidebarSectionHeaderItem>
-              <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
+              <SidebarSectionHeaderLabel>Strokes</SidebarSectionHeaderLabel>
             </SidebarSectionHeaderItem>
             <SidebarMenuSectionContent className="space-y-2">
               <PropertyLine>
@@ -635,26 +632,35 @@ function SelectionMixedProperties({
             </SidebarMenuSectionContent>
           </SidebarSection>
         )}
-        {/* <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Link To</PropertyLineLabel>
-              <HrefControl value={node.href} onValueChange={actions.href} />
-            </PropertyLine>
-            {node.href && (
+        {backend === "dom" && (
+          <SidebarSection className="border-b pb-4">
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>Actions</SidebarSectionHeaderLabel>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuSectionContent className="space-y-2">
+              {/* <PropertyLine>
+                <PropertyLineLabel>Link To</PropertyLineLabel>
+                <HrefControl value={node.href} onValueChange={actions.href} />
+              </PropertyLine>
+              {node.href && (
+                <PropertyLine>
+                  <PropertyLineLabel>New Tab</PropertyLineLabel>
+                  <TargetBlankControl
+                    value={node.target}
+                    onValueChange={actions.target}
+                  />
+                </PropertyLine>
+              )} */}
               <PropertyLine>
-                <PropertyLineLabel>New Tab</PropertyLineLabel>
-                <TargetBlankControl
-                  value={node.target}
-                  onValueChange={actions.target}
+                <PropertyLineLabel>Cursor</PropertyLineLabel>
+                <CursorControl
+                  value={cursor?.value}
+                  onValueChange={change.cursor}
                 />
               </PropertyLine>
-            )}
-          </SidebarMenuSectionContent>
-        </SidebarSection> */}
+            </SidebarMenuSectionContent>
+          </SidebarSection>
+        )}
         {/* #region selection colors */}
         <SelectionColors />
         {/* #endregion selection colors */}
@@ -717,6 +723,14 @@ function SelectedNodeProperties({
     opacity: node.opacity,
     blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
+    cornerRadiusTopLeft: node.cornerRadiusTopLeft,
+    cornerRadiusTopRight: node.cornerRadiusTopRight,
+    cornerRadiusBottomRight: node.cornerRadiusBottomRight,
+    cornerRadiusBottomLeft: node.cornerRadiusBottomLeft,
+    pointCount: node.pointCount,
+    innerRadius: node.innerRadius,
+    angle: node.angle,
+    angleOffset: node.angleOffset,
     fill: node.fill,
 
     fit: node.fit,
@@ -761,6 +775,14 @@ function SelectedNodeProperties({
     opacity,
     blendMode,
     cornerRadius,
+    cornerRadiusTopLeft,
+    cornerRadiusTopRight,
+    cornerRadiusBottomRight,
+    cornerRadiusBottomLeft,
+    pointCount,
+    innerRadius,
+    angle,
+    angleOffset,
     fill,
 
     fit,
@@ -1061,7 +1083,7 @@ function SelectedNodeProperties({
         )}
         <SidebarSection hidden={!is_stylable} className="border-b pb-4">
           <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
+            <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
             <SidebarSectionHeaderActions>
               <BlendModeDropdown
                 value={blendMode}
@@ -1077,21 +1099,78 @@ function SelectedNodeProperties({
                 onValueCommit={actions.opacity}
               />
             </PropertyLine>
-            {supports.cornerRadius(node.type, { backend }) && (
-              <PropertyLine>
-                <PropertyLineLabel>Radius</PropertyLineLabel>
-                <CornerRadiusControl
-                  value={cornerRadius}
-                  onValueCommit={actions.cornerRadius}
-                />
-              </PropertyLine>
-            )}
             {supports.border(node.type, { backend }) && (
               <PropertyLine>
                 <PropertyLineLabel>Border</PropertyLineLabel>
                 <BorderControl value={border} onValueChange={actions.border} />
               </PropertyLine>
             )}
+            {supports.cornerRadius(node.type, { backend }) && (
+              <PropertyLine>
+                <PropertyLineLabel>Radius</PropertyLineLabel>
+                <CornerRadiusControl
+                  value={{
+                    cornerRadius,
+                    cornerRadiusTopLeft,
+                    cornerRadiusTopRight,
+                    cornerRadiusBottomRight,
+                    cornerRadiusBottomLeft,
+                  }}
+                  onValueCommit={actions.cornerRadius}
+                />
+              </PropertyLine>
+            )}
+            {(pointCount != null || innerRadius != null) && (
+              <>
+                {pointCount != null && (
+                  <PropertyLine>
+                    <PropertyLineLabel>Count</PropertyLineLabel>
+                    <InputPropertyNumber
+                      mode="fixed"
+                      min={3}
+                      max={60}
+                      value={pointCount}
+                      onValueCommit={actions.pointCount}
+                    />
+                  </PropertyLine>
+                )}
+                {innerRadius != null && type !== "ellipse" && (
+                  <PropertyLine>
+                    <PropertyLineLabel>Ratio</PropertyLineLabel>
+                    <InputPropertyNumber
+                      mode="fixed"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={innerRadius}
+                      onValueCommit={actions.innerRadius}
+                    />
+                  </PropertyLine>
+                )}
+              </>
+            )}
+            {supports.arcData(node.type, { backend }) && (
+              <PropertyLine>
+                <PropertyLineLabel>Arc</PropertyLineLabel>
+                <ArcPropertiesControl
+                  value={{
+                    angle: angle ?? 360,
+                    angleOffset: angleOffset ?? 0,
+                    innerRadius: innerRadius ?? 0,
+                  }}
+                  onValueChange={(v) => {
+                    actions.arcData(v);
+                  }}
+                />
+              </PropertyLine>
+            )}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Fill</PropertyLineLabel>
               <FillControl
@@ -1099,10 +1178,6 @@ function SelectedNodeProperties({
                 onValueChange={actions.fill}
                 removable
               />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Cursor</PropertyLineLabel>
-              <CursorControl value={cursor} onValueChange={actions.cursor} />
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
@@ -1123,7 +1198,7 @@ function SelectedNodeProperties({
             className="border-b pb-4"
           >
             <SidebarSectionHeaderItem>
-              <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
+              <SidebarSectionHeaderLabel>Actions</SidebarSectionHeaderLabel>
             </SidebarSectionHeaderItem>
             <SidebarMenuSectionContent className="space-y-2">
               <PropertyLine>
@@ -1139,6 +1214,10 @@ function SelectedNodeProperties({
                   />
                 </PropertyLine>
               )}
+              <PropertyLine>
+                <PropertyLineLabel>Cursor</PropertyLineLabel>
+                <CursorControl value={cursor} onValueChange={actions.cursor} />
+              </PropertyLine>
             </SidebarMenuSectionContent>
           </SidebarSection>
         )}

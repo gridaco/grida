@@ -14,6 +14,7 @@ cargo fmt
 
 # run check
 cargo check
+cargo check --all-targets --all-features
 
 # run build
 cargo build

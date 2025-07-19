@@ -15,7 +15,7 @@ fn layers_in_rect_include_partially_visible_nested() {
         width: 100.0,
         height: 100.0,
     };
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     let mut container = nf.create_container_node();
@@ -23,7 +23,7 @@ fn layers_in_rect_include_partially_visible_nested() {
         width: 100.0,
         height: 100.0,
     };
-    let container_id = container.base.id.clone();
+    let container_id = container.id.clone();
     container.children.push(rect_id.clone());
     repo.insert(Node::Container(container));
 

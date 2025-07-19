@@ -249,7 +249,14 @@ export namespace editor.state {
       }
     | {
         type: "insert";
-        node: "text" | "image" | "container" | "rectangle" | "ellipse";
+        node:
+          | "text"
+          | "image"
+          | "container"
+          | "rectangle"
+          | "ellipse"
+          | "polygon"
+          | "star";
       }
     | {
         type: "draw";
@@ -1344,7 +1351,13 @@ export namespace editor.api {
     ): void;
     changeNodeCornerRadius(
       node_id: NodeID,
-      cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
+      cornerRadius: cg.CornerRadius
+    ): void;
+    changeNodePointCount(node_id: NodeID, pointCount: number): void;
+    changeNodeInnerRadius(node_id: NodeID, innerRadius: number): void;
+    changeNodeArcData(
+      node_id: NodeID,
+      arcData: grida.program.nodes.i.IEllipseArcData
     ): void;
     changeNodeFill(
       node_id: NodeID,

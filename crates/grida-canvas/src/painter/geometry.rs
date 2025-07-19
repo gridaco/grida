@@ -3,7 +3,7 @@ use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::painter::cvt;
-use crate::sk::mappings::ToSkPath;
+use crate::shape::*;
 use math2::transform::AffineTransform;
 use skia_safe::{
     path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, Point, RRect, Rect, StrokeRec,
@@ -165,6 +165,15 @@ impl PainterShape {
         }
     }
 
+    pub fn from_shape(shape: &Shape) -> Self {
+        match shape {
+            Shape::Ellipse(shape) => {
+                PainterShape::from_oval(Rect::from_xywh(0.0, 0.0, shape.width, shape.height))
+            }
+            _ => PainterShape::from_path(shape.into()),
+        }
+    }
+
     pub fn to_path(&self) -> Path {
         let mut path = Path::new();
 
@@ -193,6 +202,13 @@ impl PainterShape {
     }
 }
 
+pub fn build_shape_from_points(points: &[CGPoint]) -> PainterShape {
+    let mut path = Path::new();
+    let skia_points: Vec<skia_safe::Point> = points.iter().map(|&p| p.into()).collect();
+    path.add_poly(&skia_points, true);
+    PainterShape::from_path(path)
+}
+
 pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
     match node {
         IntrinsicSizeNode::Rectangle(n) => {
@@ -202,10 +218,10 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
                 let rrect = RRect::new_rect_radii(
                     rect,
                     &[
-                        Point::new(r.tl, r.tl),
-                        Point::new(r.tr, r.tr),
-                        Point::new(r.br, r.br),
-                        Point::new(r.bl, r.bl),
+                        Point::new(r.tl.rx, r.tl.ry),
+                        Point::new(r.tr.rx, r.tr.ry),
+                        Point::new(r.br.rx, r.br.ry),
+                        Point::new(r.bl.rx, r.bl.ry),
                     ],
                 );
                 PainterShape::from_rrect(rrect)
@@ -214,34 +230,12 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             }
         }
         IntrinsicSizeNode::Ellipse(n) => {
-            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-            PainterShape::from_oval(rect)
+            let shape = n.to_shape();
+            PainterShape::from_shape(&shape)
         }
-        IntrinsicSizeNode::Polygon(n) => {
-            let path = if n.corner_radius > 0.0 {
-                n.to_sk_path()
-            } else {
-                let mut p = Path::new();
-                let mut iter = n.points.iter();
-                if let Some(&pt) = iter.next() {
-                    p.move_to((pt.x, pt.y));
-                    for &pt in iter {
-                        p.line_to((pt.x, pt.y));
-                    }
-                    p.close();
-                }
-                p
-            };
-            PainterShape::from_path(path)
-        }
-        IntrinsicSizeNode::RegularPolygon(n) => {
-            let poly = n.to_polygon();
-            build_shape(&IntrinsicSizeNode::Polygon(poly))
-        }
-        IntrinsicSizeNode::RegularStarPolygon(n) => {
-            let poly = n.to_polygon();
-            build_shape(&IntrinsicSizeNode::Polygon(poly))
-        }
+        IntrinsicSizeNode::Polygon(n) => build_shape_from_points(&n.points),
+        IntrinsicSizeNode::RegularPolygon(n) => build_shape_from_points(&n.to_points()),
+        IntrinsicSizeNode::RegularStarPolygon(n) => build_shape_from_points(&n.to_points()),
         IntrinsicSizeNode::Line(n) => {
             let mut path = Path::new();
             path.move_to((0.0, 0.0));
@@ -260,14 +254,14 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
         IntrinsicSizeNode::Container(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             let r = n.corner_radius;
-            if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
+            if !r.is_zero() {
                 let rrect = RRect::new_rect_radii(
                     rect,
                     &[
-                        Point::new(r.tl, r.tl),
-                        Point::new(r.tr, r.tr),
-                        Point::new(r.br, r.br),
-                        Point::new(r.bl, r.bl),
+                        Point::new(r.tl.rx, r.tl.ry),
+                        Point::new(r.tr.rx, r.tr.ry),
+                        Point::new(r.br.rx, r.br.ry),
+                        Point::new(r.bl.rx, r.bl.ry),
                     ],
                 );
                 PainterShape::from_rrect(rrect)
@@ -278,14 +272,14 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
         IntrinsicSizeNode::Image(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             let r = n.corner_radius;
-            if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
+            if !r.is_zero() {
                 let rrect = RRect::new_rect_radii(
                     rect,
                     &[
-                        Point::new(r.tl, r.tl),
-                        Point::new(r.tr, r.tr),
-                        Point::new(r.br, r.br),
-                        Point::new(r.bl, r.bl),
+                        Point::new(r.tl.rx, r.tl.ry),
+                        Point::new(r.tr.rx, r.tr.ry),
+                        Point::new(r.br.rx, r.br.ry),
+                        Point::new(r.bl.rx, r.bl.ry),
                     ],
                 );
                 PainterShape::from_rrect(rrect)
@@ -372,7 +366,7 @@ pub fn boolean_operation_path(
     cache: &GeometryCache,
 ) -> Option<Path> {
     let world = cache
-        .get_world_transform(&node.base.id)
+        .get_world_transform(&node.id)
         .unwrap_or_else(AffineTransform::identity);
     let inv = world.inverse().unwrap_or_else(AffineTransform::identity);
 

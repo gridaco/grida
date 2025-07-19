@@ -10,18 +10,18 @@ fn test_pdf_export() {
     let mut repo = NodeRepository::new();
 
     let mut rect = nf.create_rectangle_node();
-    rect.base.name = "Test Rectangle".to_string();
+    rect.name = Some("Test Rectangle".to_string());
     rect.size = Size {
         width: 100.0,
         height: 50.0,
     };
     rect.transform = AffineTransform::new(10.0, 10.0, 0.0);
     rect.fills = vec![Paint::Solid(SolidPaint {
-        color: Color(255, 0, 0, 255), // Red
+        color: CGColor(255, 0, 0, 255), // Red
         opacity: 1.0,
     })];
 
-    let rect_id = rect.base.id.clone();
+    let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
     let scene = Scene {
@@ -29,7 +29,7 @@ fn test_pdf_export() {
         name: "Test Scene".into(),
         children: vec![rect_id.clone()],
         nodes: repo,
-        background_color: Some(Color(255, 255, 255, 255)), // White background
+        background_color: Some(CGColor(255, 255, 255, 255)), // White background
     };
 
     // Create a geometry cache to get the render bounds

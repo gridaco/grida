@@ -225,6 +225,19 @@ namespace cmath {
   }
 
   /**
+   * Converts an angle from radians to degrees.
+   *
+   * @param rad - The angle in radians.
+   * @returns The angle in degrees.
+   *
+   * @example
+   * const angleInDegrees = rad2deg(Math.PI / 2); // Returns 90
+   */
+  export function rad2deg(rad: number): number {
+    return (rad * 180) / Math.PI;
+  }
+
+  /**
    * Converts an angle to its principal angle within the range [-180, 180).
    *
    * A principal angle is the equivalent angle that falls within a standard range.

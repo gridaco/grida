@@ -16,11 +16,9 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         ids.push(id.clone());
 
         let rect = RectangleNode {
-            base: BaseNode {
-                id: id.clone(),
-                name: format!("Rectangle {}", i),
-                active: true,
-            },
+            id: id.clone(),
+            name: None,
+            active: true,
             transform: AffineTransform::identity(),
             size: Size {
                 width: 100.0,
@@ -28,7 +26,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             },
             corner_radius: RectangularCornerRadius::zero(),
             fills: vec![Paint::Solid(SolidPaint {
-                color: Color(255, 0, 0, 255),
+                color: CGColor(255, 0, 0, 255),
                 opacity: 1.0,
             })],
             strokes: vec![],
@@ -43,7 +41,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                     dy: 2.0,
                     blur: 4.0,
                     spread: 0.0,
-                    color: Color(0, 0, 0, 128),
+                    color: CGColor(0, 0, 0, 128),
                 })])
             } else {
                 LayerEffects::new_empty()
@@ -55,11 +53,9 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
 
     // Create root group
     let root_group = GroupNode {
-        base: BaseNode {
-            id: "root".to_string(),
-            name: "Root Group".to_string(),
-            active: true,
-        },
+        id: "root".to_string(),
+        name: Some("Root Group".to_string()),
+        active: true,
         transform: AffineTransform::identity(),
         children: ids.clone(),
         opacity: 1.0,
