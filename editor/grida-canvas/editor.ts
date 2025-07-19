@@ -1301,6 +1301,18 @@ export class Editor
       innerRadius,
     });
   }
+  changeNodeArcData(
+    node_id: editor.NodeID,
+    arcData: grida.program.nodes.i.IEllipseArcData
+  ): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      innerRadius: arcData.innerRadius,
+      angle: arcData.angle,
+      angleOffset: arcData.angleOffset,
+    });
+  }
   // text style
   changeTextNodeFontFamily(node_id: string, fontFamily: string | undefined) {
     this.dispatch({

@@ -160,6 +160,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeNodePointCount(node_id, value),
       innerRadius: (value: number) =>
         instance.changeNodeInnerRadius(node_id, value),
+      arcData: (value: grida.program.nodes.i.IEllipseArcData) =>
+        instance.changeNodeArcData(node_id, value),
       fill: (
         value:
           | grida.program.nodes.i.props.SolidPaintToken

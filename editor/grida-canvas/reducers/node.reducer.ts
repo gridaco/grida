@@ -232,6 +232,18 @@ const safe_properties: Partial<
       draft.innerRadius = cmath.clamp(value, 0, 1);
     },
   }),
+  angle: defineNodeProperty<"angle">({
+    assert: (node) => typeof node.angle === "number",
+    apply: (draft, value, prev) => {
+      draft.angle = cmath.clamp(value, 0, 360);
+    },
+  }),
+  angleOffset: defineNodeProperty<"angleOffset">({
+    assert: (node) => typeof node.angleOffset === "number",
+    apply: (draft, value, prev) => {
+      draft.angleOffset = cmath.clamp(value, 0, 360);
+    },
+  }),
   border: defineNodeProperty<"border">({
     assert: (node) =>
       // node.type === "text" ||

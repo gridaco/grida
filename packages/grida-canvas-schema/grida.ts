@@ -1190,6 +1190,31 @@ export namespace grida.program.nodes {
       feShadows?: cg.FeShadow[];
     }
 
+    export interface IEllipseArcData {
+      /**
+       * angle of the sweep in degree
+       * @default 360
+       *
+       * @example
+       * - 0 - no circle
+       * - 180 - half circle
+       * - 360 - full circle
+       */
+      angle: number;
+
+      /**
+       * start angle in degree
+       * @default 0
+       */
+      angleOffset: number;
+
+      /**
+       * inner radius in 0~1
+       * @default 0
+       */
+      innerRadius: number;
+    }
+
     /**
      * Node that supports stroke with color - such as rectangle, ellipse, etc.
      *
@@ -1781,6 +1806,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       // i.ICSSDimension,
       i.IFixedDimension,
+      i.IEllipseArcData,
       i.IOpacity,
       i.IBlendMode,
       i.IZIndex,

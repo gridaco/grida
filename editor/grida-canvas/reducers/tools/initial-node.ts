@@ -163,6 +163,9 @@ export default function initialNode(
         strokeWidth: 0,
         strokeCap: "butt",
         fill: gray,
+        angle: 360,
+        angleOffset: 0,
+        innerRadius: 0,
         ...seed,
       } satisfies grida.program.nodes.EllipseNode;
     }

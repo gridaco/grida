@@ -45,15 +45,13 @@ import { LengthPercentageControl } from "./controls/length-percentage";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
-import { BlendModeDropdown, BlendModeSelect } from "./controls/blend-mode";
+import { BlendModeDropdown } from "./controls/blend-mode";
 import {
   useComputedNode,
   useCurrentEditor,
-  useDocumentState,
   useEditorState,
 } from "@/grida-canvas-react";
 import {
-  BlendingModeIcon,
   Crosshair2Icon,
   LockClosedIcon,
   LockOpen1Icon,
@@ -98,12 +96,8 @@ import { StrokeAlignControl } from "./controls/stroke-align";
 import cg from "@grida/cg";
 import { editor } from "@/grida-canvas";
 import { FeControl } from "./controls/fe";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import InputPropertyNumber from "./ui/number";
+import { ArcPropertiesControl } from "./controls/arc-properties";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -535,7 +529,7 @@ function SelectionMixedProperties({
         )}
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
+            <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
@@ -565,6 +559,22 @@ function SelectionMixedProperties({
                 <BorderControl value={border} onValueChange={actions.border} />
               </PropertyLine>
             )} */}
+
+            {/* <PropertyLine>
+              <PropertyLineLabel>Shadow</PropertyLineLabel>
+              <BoxShadowControl
+                value={{ boxShadow }}
+                onValueChange={actions.boxShadow}
+              />
+            </PropertyLine> */}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Fill</PropertyLineLabel>
               {fill?.mixed || fill?.partial ? (
@@ -581,26 +591,12 @@ function SelectionMixedProperties({
                 />
               )}
             </PropertyLine>
-            {/* <PropertyLine>
-              <PropertyLineLabel>Shadow</PropertyLineLabel>
-              <BoxShadowControl
-                value={{ boxShadow }}
-                onValueChange={actions.boxShadow}
-              />
-            </PropertyLine> */}
-            <PropertyLine>
-              <PropertyLineLabel>Cursor</PropertyLineLabel>
-              <CursorControl
-                value={cursor?.value}
-                onValueChange={change.cursor}
-              />
-            </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
         {supports_stroke && (
           <SidebarSection className="border-b pb-4">
             <SidebarSectionHeaderItem>
-              <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
+              <SidebarSectionHeaderLabel>Strokes</SidebarSectionHeaderLabel>
             </SidebarSectionHeaderItem>
             <SidebarMenuSectionContent className="space-y-2">
               <PropertyLine>
@@ -636,26 +632,35 @@ function SelectionMixedProperties({
             </SidebarMenuSectionContent>
           </SidebarSection>
         )}
-        {/* <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Link To</PropertyLineLabel>
-              <HrefControl value={node.href} onValueChange={actions.href} />
-            </PropertyLine>
-            {node.href && (
+        {backend === "dom" && (
+          <SidebarSection className="border-b pb-4">
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>Actions</SidebarSectionHeaderLabel>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuSectionContent className="space-y-2">
+              {/* <PropertyLine>
+                <PropertyLineLabel>Link To</PropertyLineLabel>
+                <HrefControl value={node.href} onValueChange={actions.href} />
+              </PropertyLine>
+              {node.href && (
+                <PropertyLine>
+                  <PropertyLineLabel>New Tab</PropertyLineLabel>
+                  <TargetBlankControl
+                    value={node.target}
+                    onValueChange={actions.target}
+                  />
+                </PropertyLine>
+              )} */}
               <PropertyLine>
-                <PropertyLineLabel>New Tab</PropertyLineLabel>
-                <TargetBlankControl
-                  value={node.target}
-                  onValueChange={actions.target}
+                <PropertyLineLabel>Cursor</PropertyLineLabel>
+                <CursorControl
+                  value={cursor?.value}
+                  onValueChange={change.cursor}
                 />
               </PropertyLine>
-            )}
-          </SidebarMenuSectionContent>
-        </SidebarSection> */}
+            </SidebarMenuSectionContent>
+          </SidebarSection>
+        )}
         {/* #region selection colors */}
         <SelectionColors />
         {/* #endregion selection colors */}
@@ -724,6 +729,8 @@ function SelectedNodeProperties({
     cornerRadiusBottomLeft: node.cornerRadiusBottomLeft,
     pointCount: node.pointCount,
     innerRadius: node.innerRadius,
+    angle: node.angle,
+    angleOffset: node.angleOffset,
     fill: node.fill,
 
     fit: node.fit,
@@ -774,6 +781,8 @@ function SelectedNodeProperties({
     cornerRadiusBottomLeft,
     pointCount,
     innerRadius,
+    angle,
+    angleOffset,
     fill,
 
     fit,
@@ -1074,7 +1083,7 @@ function SelectedNodeProperties({
         )}
         <SidebarSection hidden={!is_stylable} className="border-b pb-4">
           <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
+            <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
             <SidebarSectionHeaderActions>
               <BlendModeDropdown
                 value={blendMode}
@@ -1090,6 +1099,12 @@ function SelectedNodeProperties({
                 onValueCommit={actions.opacity}
               />
             </PropertyLine>
+            {supports.border(node.type, { backend }) && (
+              <PropertyLine>
+                <PropertyLineLabel>Border</PropertyLineLabel>
+                <BorderControl value={border} onValueChange={actions.border} />
+              </PropertyLine>
+            )}
             {supports.cornerRadius(node.type, { backend }) && (
               <PropertyLine>
                 <PropertyLineLabel>Radius</PropertyLineLabel>
@@ -1134,13 +1149,28 @@ function SelectedNodeProperties({
                 )}
               </>
             )}
-
-            {supports.border(node.type, { backend }) && (
+            {supports.arcData(node.type, { backend }) && (
               <PropertyLine>
-                <PropertyLineLabel>Border</PropertyLineLabel>
-                <BorderControl value={border} onValueChange={actions.border} />
+                <PropertyLineLabel>Arc</PropertyLineLabel>
+                <ArcPropertiesControl
+                  value={{
+                    angle: angle ?? 360,
+                    angleOffset: angleOffset ?? 0,
+                    innerRadius: innerRadius ?? 0,
+                  }}
+                  onValueChange={(v) => {
+                    actions.arcData(v);
+                  }}
+                />
               </PropertyLine>
             )}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Fill</PropertyLineLabel>
               <FillControl
@@ -1148,10 +1178,6 @@ function SelectedNodeProperties({
                 onValueChange={actions.fill}
                 removable
               />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Cursor</PropertyLineLabel>
-              <CursorControl value={cursor} onValueChange={actions.cursor} />
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
@@ -1172,7 +1198,7 @@ function SelectedNodeProperties({
             className="border-b pb-4"
           >
             <SidebarSectionHeaderItem>
-              <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
+              <SidebarSectionHeaderLabel>Actions</SidebarSectionHeaderLabel>
             </SidebarSectionHeaderItem>
             <SidebarMenuSectionContent className="space-y-2">
               <PropertyLine>
@@ -1188,6 +1214,10 @@ function SelectedNodeProperties({
                   />
                 </PropertyLine>
               )}
+              <PropertyLine>
+                <PropertyLineLabel>Cursor</PropertyLineLabel>
+                <CursorControl value={cursor} onValueChange={actions.cursor} />
+              </PropertyLine>
             </SidebarMenuSectionContent>
           </SidebarSection>
         )}

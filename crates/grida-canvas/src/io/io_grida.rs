@@ -395,6 +395,18 @@ pub struct JSONPathNode {
 pub struct JSONEllipseNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
+
+    /// angle in degrees 0..360
+    #[serde(rename = "angle", default)]
+    pub angle: Option<f32>,
+
+    /// angle offset in degrees (start angle) 0..360
+    #[serde(rename = "angleOffset", default)]
+    pub angle_offset: Option<f32>,
+
+    /// inner radius in 0..1
+    #[serde(rename = "innerRadius", default)]
+    pub inner_radius: Option<f32>,
 }
 
 #[derive(Debug, Deserialize)]

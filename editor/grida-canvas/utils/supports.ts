@@ -9,6 +9,7 @@ type Renderer =
   | "grida-canvas-dom-svg";
 
 type Feature =
+  | "arcData"
   | "cornerRadius"
   | "cornerRadius4"
   | "border"
@@ -48,6 +49,7 @@ const GRIDA_TCANVAS_RECTANGLE_NODE: INodePropertiesConfig = {
 };
 
 const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
+  arcData: ["ellipse"],
   cornerRadius: [
     "rectangle",
     "image",
@@ -75,6 +77,7 @@ const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
 } as const;
 
 const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
+  arcData: ["ellipse"],
   cornerRadius: [
     "rectangle",
     "polygon",
@@ -133,6 +136,14 @@ type Context = {
 };
 
 export namespace supports {
+  export const arcData = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.arcData.includes(type);
+      case "canvas":
+        return canvas_supports.arcData.includes(type);
+    }
+  };
   export const cornerRadius = (type: NodeType, context: Context) => {
     switch (context.backend) {
       case "dom":

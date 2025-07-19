@@ -1355,6 +1355,10 @@ export namespace editor.api {
     ): void;
     changeNodePointCount(node_id: NodeID, pointCount: number): void;
     changeNodeInnerRadius(node_id: NodeID, innerRadius: number): void;
+    changeNodeArcData(
+      node_id: NodeID,
+      arcData: grida.program.nodes.EllipseNode["arcData"]
+    ): void;
     changeNodeFill(
       node_id: NodeID,
       fill:
