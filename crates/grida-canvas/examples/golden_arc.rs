@@ -11,37 +11,29 @@ fn build_arc_path(node: &ArcNode) -> Path {
     let cy = h / 2.0;
     let rx = w / 2.0;
     let ry = h / 2.0;
-    let inner_rx = rx * node.radius_a;
-    let inner_ry = ry * node.radius_a;
+    let inner_rx = rx * node.inner_radius;
+    let inner_ry = ry * node.inner_radius;
 
-    let start_angle = node.angle_a;
-    let end_angle = node.angle_b;
-    let sweep = end_angle - start_angle;
+    let start_deg = node.start_angle;
+    let sweep_deg = node.angle;
+    let end_deg = start_deg + sweep_deg;
 
-    let start_point = (cx + rx * start_angle.cos(), cy + ry * start_angle.sin());
+    let start_rad = start_deg.to_radians();
+    let end_rad = end_deg.to_radians();
+
+    let start_point = (cx + rx * start_rad.cos(), cy + ry * start_rad.sin());
     path.move_to(start_point);
-    let outer_rect = Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0);
-    path.arc_to(
-        outer_rect,
-        start_angle.to_degrees(),
-        sweep.to_degrees(),
-        false,
-    );
 
-    if node.radius_a > 0.0 {
-        let end_inner = (
-            cx + inner_rx * end_angle.cos(),
-            cy + inner_ry * end_angle.sin(),
-        );
+    let outer_rect = Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0);
+    path.arc_to(outer_rect, start_deg, sweep_deg, false);
+
+    if node.inner_radius > 0.0 {
+        let end_inner = (cx + inner_rx * end_rad.cos(), cy + inner_ry * end_rad.sin());
         path.line_to(end_inner);
+
         let inner_rect =
             Rect::from_xywh(cx - inner_rx, cy - inner_ry, inner_rx * 2.0, inner_ry * 2.0);
-        path.arc_to(
-            inner_rect,
-            end_angle.to_degrees(),
-            (start_angle - end_angle).to_degrees(),
-            false,
-        );
+        path.arc_to(inner_rect, end_deg, -sweep_deg, false);
     } else {
         path.line_to((cx, cy));
     }
@@ -60,9 +52,9 @@ fn main() {
             width: 200.0,
             height: 200.0,
         },
-        radius_a: 0.5,
-        angle_a: 50.0,
-        angle_b: 40.0,
+        inner_radius: 0.5,
+        start_angle: 0.0,
+        angle: 90.0,
         fills: vec![Paint::Solid(SolidPaint {
             color: Color(0, 128, 255, 255),
             opacity: 1.0,

@@ -507,11 +507,12 @@ pub struct ArcNode {
     pub transform: AffineTransform,
     pub size: Size,
     /// inner radius - 0 ~ 1
-    pub radius_a: f32,
-    /// start angle
-    pub angle_a: f32,
-    /// end angle
-    pub angle_b: f32,
+    pub inner_radius: f32,
+    /// start angle in degrees
+    pub start_angle: f32,
+    /// sweep angle in degrees (end_angle = start_angle + angle)
+    pub angle: f32,
+
     pub fills: Vec<Paint>,
     pub strokes: Vec<Paint>,
     pub stroke_width: f32,
