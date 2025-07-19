@@ -2,6 +2,7 @@ use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
+use cg::path::*;
 use cg::window;
 use math2::transform::AffineTransform;
 

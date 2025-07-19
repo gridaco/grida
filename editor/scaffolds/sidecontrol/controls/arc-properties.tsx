@@ -22,8 +22,6 @@ export function ArcPropertiesControl({
           mode="fixed"
           type="number"
           value={value.angleOffset}
-          min={0}
-          max={360}
           step={1}
           appearance="none"
           onValueChange={(v) => {
@@ -37,8 +35,6 @@ export function ArcPropertiesControl({
           mode="fixed"
           type="number"
           value={value.angle}
-          min={0}
-          max={360}
           step={1}
           appearance="none"
           onValueChange={(v) => {

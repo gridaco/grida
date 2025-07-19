@@ -296,7 +296,32 @@ impl LayerList {
                     }))
                 }
                 Node::Arc(n) => {
-                    todo!()
+                    let shape = build_shape(&IntrinsicSizeNode::Arc(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        base: PainterPictureLayerBase {
+                            id: n.id.clone(),
+                            z_index: out.len(),
+                            opacity: parent_opacity * n.opacity,
+                            blend_mode: n.blend_mode,
+                            transform,
+                            shape,
+                            effects: n.effects.clone(),
+                            strokes: n.strokes.clone(),
+                            fills: n.fills.clone(),
+                            stroke_path,
+                            clip_path: Self::compute_clip_path(&n.id, repo, cache),
+                        },
+                    }))
                 }
                 Node::Polygon(n) => {
                     let shape = build_shape(&IntrinsicSizeNode::Polygon(n.clone()));

@@ -10,6 +10,7 @@ pub mod io;
 pub mod node;
 pub mod os;
 pub mod painter;
+pub mod path;
 pub mod resource;
 pub mod runtime;
 pub mod sk;

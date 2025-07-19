@@ -1,9 +1,9 @@
-use crate::cache::geometry::GeometryCache;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::painter::cvt;
 use crate::sk::mappings::ToSkPath;
+use crate::{cache::geometry::GeometryCache, path::*};
 use math2::transform::AffineTransform;
 use skia_safe::{
     path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, Point, RRect, Rect, StrokeRec,
@@ -217,9 +217,7 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             PainterShape::from_oval(rect)
         }
-        IntrinsicSizeNode::Arc(n) => {
-            todo!()
-        }
+        IntrinsicSizeNode::Arc(n) => PainterShape::from_path(build_arc_path(n)),
         IntrinsicSizeNode::Polygon(n) => {
             let path = if n.corner_radius > 0.0 {
                 n.to_sk_path()
@@ -355,6 +353,7 @@ pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
     match node {
         Node::Rectangle(n) => Some(build_shape(&IntrinsicSizeNode::Rectangle(n.clone()))),
         Node::Ellipse(n) => Some(build_shape(&IntrinsicSizeNode::Ellipse(n.clone()))),
+        Node::Arc(n) => Some(build_shape(&IntrinsicSizeNode::Arc(n.clone()))),
         Node::Polygon(n) => Some(build_shape(&IntrinsicSizeNode::Polygon(n.clone()))),
         Node::RegularPolygon(n) => Some(build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone()))),
         Node::RegularStarPolygon(n) => Some(build_shape(&IntrinsicSizeNode::RegularStarPolygon(

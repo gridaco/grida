@@ -1134,7 +1134,7 @@ function SelectedNodeProperties({
                     />
                   </PropertyLine>
                 )}
-                {innerRadius != null && (
+                {innerRadius != null && type !== "ellipse" && (
                   <PropertyLine>
                     <PropertyLineLabel>Ratio</PropertyLineLabel>
                     <InputPropertyNumber

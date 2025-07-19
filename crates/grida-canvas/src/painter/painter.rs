@@ -457,7 +457,23 @@ impl<'a> Painter<'a> {
     }
 
     fn draw_arc_node(&self, node: &ArcNode) {
-        todo!()
+        self.with_transform(&node.transform.matrix, || {
+            let shape = build_shape(&IntrinsicSizeNode::Arc(node.clone()));
+            self.draw_shape_with_effects(&node.effects, &shape, || {
+                self.with_opacity(node.opacity, || {
+                    self.with_blendmode(node.blend_mode, || {
+                        self.draw_fills(&shape, &node.fills);
+                        self.draw_strokes(
+                            &shape,
+                            &node.strokes,
+                            node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
+                        );
+                    });
+                });
+            });
+        });
     }
 
     /// Draw a LineNode
