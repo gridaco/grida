@@ -1,7 +1,9 @@
 use crate::cg::*;
 
 pub struct EllipticalRegularPolygonShape {
+    /// width of the box
     pub width: f32,
+    /// height of the box
     pub height: f32,
     pub point_count: usize,
 }

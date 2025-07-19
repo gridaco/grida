@@ -551,42 +551,6 @@ impl From<JSONEllipseNode> for Node {
     fn from(node: JSONEllipseNode) -> Self {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
-        // check if the ellipse node contains valid arc data.
-        // 1. properties are present
-        // 2. angle is not 360
-        let is_arc = (node.angle.is_some() || node.angle_offset.is_some())
-            && node.angle.unwrap_or(360.0) != 360.0;
-
-        if is_arc {
-            return Node::Arc(ArcNode {
-                id: node.base.id,
-                name: node.base.name,
-                active: node.base.active,
-                transform,
-                size: Size {
-                    width: node.base.width,
-                    height: node.base.height,
-                },
-                fills: vec![node.base.fill.into()],
-                strokes: vec![node.base.stroke.into()],
-                stroke_width: node.base.stroke_width,
-                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-                stroke_dash_array: None,
-                blend_mode: node.base.blend_mode,
-                opacity: node.base.opacity,
-                effects: merge_effects(
-                    node.base.fe_shadows,
-                    node.base.fe_blur,
-                    node.base.fe_backdrop_blur,
-                ),
-
-                //
-                inner_radius: node.inner_radius.unwrap_or(0.0),
-                start_angle: node.angle_offset.unwrap_or(0.0),
-                angle: node.angle.unwrap_or(360.0),
-            });
-        }
-
         Node::Ellipse(EllipseNode {
             id: node.base.id,
             name: node.base.name,
@@ -608,6 +572,10 @@ impl From<JSONEllipseNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
+
+            inner_radius: node.inner_radius,
+            start_angle: node.angle_offset.unwrap_or(0.0),
+            angle: node.angle,
         })
     }
 }

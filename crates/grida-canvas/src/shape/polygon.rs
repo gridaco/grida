@@ -7,6 +7,13 @@ pub struct SimplePolygonShape {
     /// If <= 0, corner radius is not applied.
     pub corner_radius: f32,
 }
+pub fn build_path_from_points(points: &[CGPoint]) -> skia_safe::Path {
+    let mut path = skia_safe::Path::new();
+    let skia_points: Vec<skia_safe::Point> = points.iter().map(|&p| p.into()).collect();
+    path.add_poly(&skia_points, true);
+
+    path
+}
 
 /// Given:
 ///   - `pts`: Vec<Point> with your polygon's vertices in order

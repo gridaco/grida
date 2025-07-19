@@ -1,7 +1,6 @@
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::shape::*;
-use crate::sk::mappings::ToSkPath;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
 
@@ -95,7 +94,6 @@ pub enum Node {
     Container(ContainerNode),
     Rectangle(RectangleNode),
     Ellipse(EllipseNode),
-    Arc(ArcNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
     RegularStarPolygon(RegularStarPolygonNode),
@@ -121,7 +119,6 @@ impl NodeTrait for Node {
             Node::Container(n) => n.id.clone(),
             Node::Rectangle(n) => n.id.clone(),
             Node::Ellipse(n) => n.id.clone(),
-            Node::Arc(n) => n.id.clone(),
             Node::Polygon(n) => n.id.clone(),
             Node::RegularPolygon(n) => n.id.clone(),
             Node::RegularStarPolygon(n) => n.id.clone(),
@@ -141,7 +138,6 @@ impl NodeTrait for Node {
             Node::Container(n) => n.name.clone(),
             Node::Rectangle(n) => n.name.clone(),
             Node::Ellipse(n) => n.name.clone(),
-            Node::Arc(n) => n.name.clone(),
             Node::Polygon(n) => n.name.clone(),
             Node::RegularPolygon(n) => n.name.clone(),
             Node::RegularStarPolygon(n) => n.name.clone(),
@@ -186,7 +182,6 @@ pub enum IntrinsicSizeNode {
     Container(ContainerNode),
     Rectangle(RectangleNode),
     Ellipse(EllipseNode),
-    Arc(ArcNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
     RegularStarPolygon(RegularStarPolygonNode),
@@ -202,7 +197,6 @@ pub enum LeafNode {
     Error(ErrorNode),
     Rectangle(RectangleNode),
     Ellipse(EllipseNode),
-    Arc(ArcNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
     RegularStarPolygon(RegularStarPolygonNode),
@@ -419,6 +413,14 @@ impl NodeGeometryMixin for ImageNode {
 ///
 /// Like RectangleNode, uses a top-left based coordinate system (x,y,width,height).
 /// The ellipse is drawn within the bounding box defined by these coordinates.
+///
+/// ## Arc & Ring support
+///
+/// **3RD PARTY IMPLEMENTATIONS:**
+/// - https://konvajs.org/api/Konva.Arc.html
+/// - https://www.figma.com/plugin-docs/api/ArcData/
+///
+/// For details on arc mathematics, see: <https://mathworld.wolfram.com/Arc.html> (implementation varies)
 #[derive(Debug, Clone)]
 pub struct EllipseNode {
     pub id: NodeId,
@@ -434,6 +436,16 @@ pub struct EllipseNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+
+    /// inner radius - 0 ~ 1
+    pub inner_radius: Option<f32>,
+
+    /// start angle in degrees
+    /// default is 0.0
+    pub start_angle: f32,
+
+    /// sweep angle in degrees (end_angle = start_angle + angle)
+    pub angle: Option<f32>,
 }
 
 impl NodeFillsMixin for EllipseNode {
@@ -446,72 +458,46 @@ impl NodeFillsMixin for EllipseNode {
     }
 }
 
+impl NodeShapeMixin for EllipseNode {
+    fn to_shape(&self) -> Shape {
+        let w = self.size.width;
+        let h = self.size.height;
+        let angle = self.angle.unwrap_or(360.0);
+
+        // check if art/ring data needs to be handled.
+        // if either angle or inner radius is present.
+        // if only inner radius is present (or angle is 360) => ring
+        // if both are present => arc
+        if self.inner_radius.is_some() || angle != 360.0 {
+            if self.inner_radius.is_some() && angle == 360.0 {
+                return Shape::EllipticalRing(EllipticalRingShape {
+                    width: w,
+                    height: h,
+                    inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
+                });
+            } else {
+                return Shape::EllipticalArc(EllipticalArcShape {
+                    width: w,
+                    height: h,
+                    inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
+                    start_angle: self.start_angle,
+                    angle: angle,
+                });
+            }
+        }
+
+        return Shape::Ellipse(EllipseShape {
+            width: w,
+            height: h,
+        });
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        (&self.to_shape()).into()
+    }
+}
+
 impl NodeGeometryMixin for EllipseNode {
-    fn rect(&self) -> Rectangle {
-        Rectangle {
-            x: 0.0,
-            y: 0.0,
-            width: self.size.width,
-            height: self.size.height,
-        }
-    }
-
-    fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
-    }
-
-    fn render_bounds_stroke_width(&self) -> f32 {
-        if self.has_stroke_geometry() {
-            self.stroke_width
-        } else {
-            0.0
-        }
-    }
-}
-
-/// Arc Node.
-///
-///
-/// **3RD PARTY IMPLEMENTATIONS:**
-/// - https://konvajs.org/api/Konva.Arc.html
-/// - https://www.figma.com/plugin-docs/api/ArcData/
-///
-/// For details on arc mathematics, see: <https://mathworld.wolfram.com/Arc.html> (implementation varies)
-#[derive(Debug, Clone)]
-pub struct ArcNode {
-    pub id: NodeId,
-    pub name: Option<String>,
-    pub active: bool,
-    pub transform: AffineTransform,
-    pub size: Size,
-    /// inner radius - 0 ~ 1
-    pub inner_radius: f32,
-    /// start angle in degrees
-    pub start_angle: f32,
-    /// sweep angle in degrees (end_angle = start_angle + angle)
-    pub angle: f32,
-
-    pub fills: Vec<Paint>,
-    pub strokes: Vec<Paint>,
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
-}
-
-impl NodeFillsMixin for ArcNode {
-    fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
-    }
-
-    fn set_fills(&mut self, fills: Vec<Paint>) {
-        self.fills = fills;
-    }
-}
-
-impl NodeGeometryMixin for ArcNode {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -570,12 +556,6 @@ pub struct VectorNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
-}
-
-impl ToSkPath for VectorNode {
-    fn to_path(&self) -> skia_safe::Path {
-        self.network.clone().into()
-    }
 }
 
 ///

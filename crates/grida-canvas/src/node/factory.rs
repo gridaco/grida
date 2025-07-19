@@ -76,28 +76,9 @@ impl NodeFactory {
             active: true,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
-            fills: vec![Self::default_solid_paint(Self::DEFAULT_COLOR)],
-            strokes: vec![],
-            stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
-        }
-    }
-
-    /// Creates a new arc node with default values
-    pub fn create_arc_node(&self) -> ArcNode {
-        ArcNode {
-            id: self.id(),
-            name: None,
-            active: true,
-            transform: AffineTransform::identity(),
-            size: Self::DEFAULT_SIZE,
-            inner_radius: 0.0,
+            inner_radius: None,
             start_angle: 0.0,
-            angle: 30.0,
+            angle: None,
             fills: vec![Self::default_solid_paint(Self::DEFAULT_COLOR)],
             strokes: vec![],
             stroke_width: Self::DEFAULT_STROKE_WIDTH,

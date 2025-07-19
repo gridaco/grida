@@ -1,17 +1,19 @@
 use skia_safe;
 
 pub struct EllipticalRingShape {
-    /// size of the box
-    pub size: skia_safe::Size,
+    /// width of the box
+    pub width: f32,
+    /// height of the box
+    pub height: f32,
     /// inner radius in 0..1
     pub inner_radius_ratio: f32,
 }
 
-pub fn build_ring_path(shape: EllipticalRingShape) -> skia_safe::Path {
+pub fn build_ring_path(shape: &EllipticalRingShape) -> skia_safe::Path {
     let mut path = skia_safe::Path::new();
 
-    let w = shape.size.width;
-    let h = shape.size.height;
+    let w = shape.width;
+    let h = shape.height;
     let cx = w / 2.0;
     let cy = h / 2.0;
     let rx = w / 2.0;

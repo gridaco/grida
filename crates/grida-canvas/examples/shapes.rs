@@ -181,7 +181,7 @@ async fn demo_shapes() -> Scene {
 
     // Arc Row - demonstrating different angle variations
     for i in 0..items_per_row {
-        let mut arc = nf.create_arc_node();
+        let mut arc = nf.create_ellipse_node();
         arc.name = Some(format!("Arc {}", i + 1));
         arc.transform = AffineTransform::new(start_x + spacing * i as f32, 700.0, 0.0);
         arc.size = Size {
@@ -189,8 +189,8 @@ async fn demo_shapes() -> Scene {
             height: base_size,
         };
         arc.start_angle = 0.0;
-        arc.angle = 45.0 + (i as f32 * 31.5); // 45 to 360 degrees
-        arc.inner_radius = 0.3; // Fixed inner radius for visibility
+        arc.angle = Some(45.0 + (i as f32 * 31.5)); // 45 to 360 degrees
+        arc.inner_radius = Some(0.3); // Fixed inner radius for visibility
         arc.fills = vec![Paint::Solid(SolidPaint {
             color: CGColor(
                 200 - (i * 20) as u8,
@@ -201,7 +201,7 @@ async fn demo_shapes() -> Scene {
             opacity: 1.0,
         })];
         all_shape_ids.push(arc.id.clone());
-        repository.insert(Node::Arc(arc));
+        repository.insert(Node::Ellipse(arc));
     }
 
     // Set up the root container

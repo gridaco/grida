@@ -1,8 +1,9 @@
+use crate::cache::geometry::GeometryCache;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::painter::cvt;
-use crate::{cache::geometry::GeometryCache, shape::*};
+use crate::shape::*;
 use math2::transform::AffineTransform;
 use skia_safe::{
     path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, Point, RRect, Rect, StrokeRec,
@@ -164,6 +165,15 @@ impl PainterShape {
         }
     }
 
+    pub fn from_shape(shape: &Shape) -> Self {
+        match shape {
+            Shape::Ellipse(shape) => {
+                PainterShape::from_oval(Rect::from_xywh(0.0, 0.0, shape.width, shape.height))
+            }
+            _ => PainterShape::from_path(shape.into()),
+        }
+    }
+
     pub fn to_path(&self) -> Path {
         let mut path = Path::new();
 
@@ -220,16 +230,9 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             }
         }
         IntrinsicSizeNode::Ellipse(n) => {
-            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-            PainterShape::from_oval(rect)
+            let shape = n.to_shape();
+            PainterShape::from_shape(&shape)
         }
-        IntrinsicSizeNode::Arc(n) => PainterShape::from_path(build_arc_path(&EllipticalArcShape {
-            width: n.size.width,
-            height: n.size.height,
-            inner_radius_ratio: n.inner_radius,
-            start_angle: n.start_angle,
-            angle: n.angle,
-        })),
         IntrinsicSizeNode::Polygon(n) => build_shape_from_points(&n.points),
         IntrinsicSizeNode::RegularPolygon(n) => build_shape_from_points(&n.to_points()),
         IntrinsicSizeNode::RegularStarPolygon(n) => build_shape_from_points(&n.to_points()),
@@ -343,7 +346,6 @@ pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
     match node {
         Node::Rectangle(n) => Some(build_shape(&IntrinsicSizeNode::Rectangle(n.clone()))),
         Node::Ellipse(n) => Some(build_shape(&IntrinsicSizeNode::Ellipse(n.clone()))),
-        Node::Arc(n) => Some(build_shape(&IntrinsicSizeNode::Arc(n.clone()))),
         Node::Polygon(n) => Some(build_shape(&IntrinsicSizeNode::Polygon(n.clone()))),
         Node::RegularPolygon(n) => Some(build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone()))),
         Node::RegularStarPolygon(n) => Some(build_shape(&IntrinsicSizeNode::RegularStarPolygon(
