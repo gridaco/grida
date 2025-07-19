@@ -3,9 +3,12 @@
 import React, { ReactNode, useMemo } from "react";
 import type { TemplateComponent } from "../template-builder/with-template";
 import { ReactNodeRenderers } from ".";
-import { useComputedNode, useNode } from "../provider";
-import { useEditorState, useCurrentEditor } from "../use-editor";
-import { useUserCustomTemplates } from "../renderer";
+import { useComputedNode, useNode } from "../../grida-canvas-react/provider";
+import {
+  useEditorState,
+  useCurrentEditor,
+} from "../../grida-canvas-react/use-editor";
+import { useUserCustomTemplates } from "../../grida-canvas-react/renderer";
 import { css } from "@/grida-canvas-utils/css";
 import grida from "@grida/schema";
 import type cg from "@grida/cg";

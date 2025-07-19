@@ -3,8 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { HalfHeightGradient } from "./gradient-overlay";
 import { SlashIcon } from "@radix-ui/react-icons";
-import { withTemplateDefinition } from "@/grida-canvas-react/template-builder/with-template";
-import { NodeElement } from "@/grida-canvas-react/nodes/node";
+import { withTemplateDefinition } from "@/grida-canvas-react-renderer-dom/template-builder/with-template";
+import { NodeElement } from "@/grida-canvas-react-renderer-dom/nodes/node";
 import { Media } from "./media";
 import grida from "@grida/schema";
 

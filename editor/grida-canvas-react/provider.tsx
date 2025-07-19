@@ -7,7 +7,7 @@ import { io } from "@grida/io";
 import type { tokens } from "@grida/tokens";
 import type cg from "@grida/cg";
 import { dq } from "@/grida-canvas/query";
-import { useComputed } from "./nodes/use-computed";
+import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 import {
   DataProvider,
   ProgramDataContextHost,

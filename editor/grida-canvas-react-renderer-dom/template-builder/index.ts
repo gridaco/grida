@@ -1,4 +1,4 @@
-import type { TemplateComponent } from "@/grida-canvas-react/template-builder/with-template";
+import type { TemplateComponent } from "@/grida-canvas-react-renderer-dom/template-builder/with-template";
 
 export namespace TemplateComponents {
   export const components: { [key: string]: TemplateComponent } = {};

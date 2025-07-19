@@ -23,7 +23,7 @@ import cmath from "@grida/cmath";
 import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
-import { useComputed } from "@/grida-canvas-react/nodes/use-computed";
+import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 
 export function PaintControl({
   value,

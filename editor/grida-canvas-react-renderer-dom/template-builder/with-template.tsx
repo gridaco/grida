@@ -1,5 +1,5 @@
 import React from "react";
-import { TemplateComponents } from "@/grida-canvas-react/template-builder";
+import { TemplateComponents } from "@/grida-canvas-react-renderer-dom/template-builder";
 import grida from "@grida/schema";
 
 const TEMPLATE_TYPE_KEY = "type";

@@ -3,13 +3,13 @@
 import React, { useContext, useEffect, useMemo } from "react";
 import { useCurrentSceneState, useTransformState } from "./provider";
 import { useCurrentEditor, useEditorState } from "./use-editor";
-import { NodeElement } from "./nodes/node";
+import { NodeElement } from "@/grida-canvas-react-renderer-dom/nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
 import { SizeProvider } from "./viewport/size";
 import cmath from "@grida/cmath";
-import Canvas from "@/grida-canvas-wasm-react";
+import Canvas from "@/grida-canvas-react-renderer-canvas-wasm";
 import type { Editor } from "@/grida-canvas/editor";
 
 type CustomComponent = React.ComponentType<any>;

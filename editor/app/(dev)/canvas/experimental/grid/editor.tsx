@@ -5,12 +5,12 @@ import {
   GridContext,
   GridEditor,
   useGrid,
-} from "@/grida-canvas-react/experiments/grid-builder";
+} from "@/grida-canvas-experimental-legacy/experimental-grid-builder";
 import {
   GridaBlock,
   GridaBlockRenderer,
   ObjectFit,
-} from "@/app/(dev)/dev/grid/blocks";
+} from "@/app/(dev)/canvas/experimental/grid/blocks";
 import { InsertPanel } from "./panel";
 import React, { useEffect, useState } from "react";
 import {
