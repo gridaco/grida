@@ -2,20 +2,18 @@ use cg::path::*;
 use skia_safe::{surfaces, Color, Paint};
 
 fn main() {
-    let shape = EllipticalArcShape {
-        width: 400.0,
-        height: 400.0,
+    let shape = EllipticalRingShape {
+        size: skia_safe::Size::new(400.0, 400.0),
         inner_radius: 0.5,
-        start_angle: 45.0,
-        angle: 180.0,
     };
 
     let mut surface =
-        surfaces::raster_n32_premul((shape.width as i32, shape.height as i32)).expect("surface");
+        surfaces::raster_n32_premul((shape.size.width as i32, shape.size.height as i32))
+            .expect("surface");
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    let path = build_arc_path(&shape);
+    let path = build_ring_path(shape);
 
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
@@ -26,5 +24,5 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/arc.png", data.as_bytes()).unwrap();
+    std::fs::write("goldens/ring.png", data.as_bytes()).unwrap();
 }

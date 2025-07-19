@@ -1,21 +1,31 @@
-use crate::node::schema::ArcNode;
 use skia_safe::{Path, Rect};
 
-/// Build a closed arc path for [`ArcNode`].
-pub fn build_arc_path(node: &ArcNode) -> Path {
+pub struct EllipticalArcShape {
+    /// width of the box
+    pub width: f32,
+    /// height of the box
+    pub height: f32,
+    /// inner radius in 0..1
+    pub inner_radius: f32,
+    /// start angle in degrees
+    pub start_angle: f32,
+    /// angle in degrees
+    pub angle: f32,
+}
+
+/// Build a closed arc path for [`EllipticalArcShape`].
+pub fn build_arc_path(shape: &EllipticalArcShape) -> Path {
     let mut path = Path::new();
 
-    let w = node.size.width;
-    let h = node.size.height;
-    let cx = w / 2.0;
-    let cy = h / 2.0;
-    let rx = w / 2.0;
-    let ry = h / 2.0;
-    let inner_rx = rx * node.inner_radius;
-    let inner_ry = ry * node.inner_radius;
+    let cx = shape.width / 2.0;
+    let cy = shape.height / 2.0;
+    let rx = shape.width / 2.0;
+    let ry = shape.height / 2.0;
+    let inner_rx = rx * shape.inner_radius;
+    let inner_ry = ry * shape.inner_radius;
 
-    let start_deg = node.start_angle;
-    let sweep_deg = node.angle;
+    let start_deg = shape.start_angle;
+    let sweep_deg = shape.angle;
     let end_deg = start_deg + sweep_deg;
 
     let start_rad = start_deg.to_radians();
@@ -27,7 +37,7 @@ pub fn build_arc_path(node: &ArcNode) -> Path {
     let outer_rect = Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0);
     path.arc_to(outer_rect, start_deg, sweep_deg, false);
 
-    if node.inner_radius > 0.0 {
+    if shape.inner_radius > 0.0 {
         let end_inner = (cx + inner_rx * end_rad.cos(), cy + inner_ry * end_rad.sin());
         path.line_to(end_inner);
 
