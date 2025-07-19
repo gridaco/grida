@@ -11,6 +11,8 @@ import { IFrameWidget } from "./iframe";
 import { RichTextWidget } from "./richtext";
 import { PathWidget } from "./path";
 import { BitmapWidget } from "./bitmap";
+import { RegularPolygonWidget } from "./polygon";
+import { RegularStarPolygonWidget } from "./star";
 
 export namespace ReactNodeRenderers {
   export const container = ContainerWidget;
@@ -22,6 +24,8 @@ export namespace ReactNodeRenderers {
   export const polyline = SVGPolyLineWidget;
   export const rectangle = RectangleWidget;
   export const ellipse = EllipseWidget;
+  export const polygon = RegularPolygonWidget;
+  export const star = RegularStarPolygonWidget;
   export const text = TextWidget;
   export const image = ImageWidget;
   export const video = VideoWidget;

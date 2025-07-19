@@ -92,6 +92,8 @@ export function NodeElement<P extends Record<string, any>>({
       case "rectangle":
       case "component":
       case "ellipse":
+      case "polygon":
+      case "star":
       case "iframe":
       case "richtext": {
         return ReactNodeRenderers[node.type];
