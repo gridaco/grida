@@ -1357,7 +1357,7 @@ export namespace editor.api {
     changeNodeInnerRadius(node_id: NodeID, innerRadius: number): void;
     changeNodeArcData(
       node_id: NodeID,
-      arcData: grida.program.nodes.EllipseNode["arcData"]
+      arcData: grida.program.nodes.i.IEllipseArcData
     ): void;
     changeNodeFill(
       node_id: NodeID,

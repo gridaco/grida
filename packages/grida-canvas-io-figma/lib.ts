@@ -671,6 +671,13 @@ export namespace iofigma {
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
+
+              // arc data
+              innerRadius: node.arcData.innerRadius,
+              angleOffset: cmath.rad2deg(node.arcData.startingAngle),
+              angle: cmath.rad2deg(
+                node.arcData.endingAngle - node.arcData.startingAngle
+              ),
             } satisfies grida.program.nodes.EllipseNode;
           }
           case "BOOLEAN_OPERATION": {

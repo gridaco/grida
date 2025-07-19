@@ -816,6 +816,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 fn de_radius<'de, D>(deserializer: D) -> Result<Radius, D::Error>
 where
     D: serde::Deserializer<'de>,
