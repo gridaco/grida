@@ -5,6 +5,7 @@ pub struct EllipticalRegularPolygonShape {
     pub width: f32,
     /// height of the box
     pub height: f32,
+    /// Number of points
     pub point_count: usize,
 }
 

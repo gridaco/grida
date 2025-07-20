@@ -1,4 +1,5 @@
 pub mod arc;
+pub mod corner;
 pub mod ellipse;
 pub mod polygon;
 pub mod ring;
@@ -7,6 +8,7 @@ pub mod star;
 pub mod vn;
 
 pub use arc::*;
+pub use corner::*;
 pub use ellipse::*;
 pub use polygon::*;
 pub use ring::*;

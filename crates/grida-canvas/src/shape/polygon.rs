@@ -1,9 +1,10 @@
+use super::*;
 use crate::cg::CGPoint;
 use skia_safe;
 /// A simple (non-self-intersecting) closed polygon shape with optional corner radius.
 pub struct SimplePolygonShape {
     pub points: Vec<CGPoint>,
-    /// Corner radius in logical pixels.
+    /// Corner radius effect to be applied to the path.
     /// If <= 0, corner radius is not applied.
     pub corner_radius: f32,
 }
@@ -35,10 +36,5 @@ pub fn build_simple_polygon_path(shape: &SimplePolygonShape) -> skia_safe::Path 
         return path;
     }
 
-    let mut paint = skia_safe::Paint::default();
-    paint.set_path_effect(skia_safe::PathEffect::corner_path(r));
-    let mut dst = skia_safe::Path::new();
-    skia_safe::path_utils::fill_path_with_paint(&path, &paint, &mut dst, None, None);
-
-    dst
+    build_corner_radius_path(&path, r)
 }
