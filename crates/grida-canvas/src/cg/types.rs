@@ -140,10 +140,22 @@ pub enum StrokeAlign {
     Outside,
 }
 
+impl Default for StrokeAlign {
+    fn default() -> Self {
+        StrokeAlign::Inside
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Radius {
     pub rx: f32,
     pub ry: f32,
+}
+
+impl Default for Radius {
+    fn default() -> Self {
+        Self::zero()
+    }
 }
 
 impl Radius {
@@ -235,6 +247,12 @@ pub enum TextTransform {
     Capitalize,
 }
 
+impl Default for TextTransform {
+    fn default() -> Self {
+        TextTransform::None
+    }
+}
+
 /// Supported text decoration modes.
 ///
 /// Only `Underline` and `None` are supported in the current version.
@@ -271,6 +289,12 @@ pub enum TextAlign {
     Justify,
 }
 
+impl Default for TextAlign {
+    fn default() -> Self {
+        TextAlign::Left
+    }
+}
+
 /// Supported vertical alignment values for text.
 ///
 /// In CSS, this maps to `align-content`.
@@ -285,6 +309,12 @@ pub enum TextAlignVertical {
     Center,
     #[serde(rename = "bottom")]
     Bottom,
+}
+
+impl Default for TextAlignVertical {
+    fn default() -> Self {
+        TextAlignVertical::Top
+    }
 }
 
 /// Font weight value (1-1000).

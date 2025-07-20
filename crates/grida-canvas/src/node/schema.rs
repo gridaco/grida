@@ -87,6 +87,64 @@ pub struct Scene {
 
 // region: Node Definitions
 
+/// flat unknown node properties
+/// this is a standard spec for each exposed property names and types.
+pub struct UnknownNodeProperties {
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
+    pub transform: AffineTransform,
+    pub children: Option<Vec<NodeId>>,
+    pub opacity: f32,
+    pub blend_mode: BlendMode,
+
+    pub size: Option<Size>,
+    pub point_count: Option<usize>,
+    pub inner_radius: f32,
+
+    /// start angle in degrees
+    /// default is 0.0
+    pub start_angle: f32,
+    /// sweep angle in degrees (end_angle = start_angle + angle)
+    pub angle: Option<f32>,
+
+    /// The scalar corner radius of the shape.
+    pub corner_radius: f32,
+
+    /// The top-left corner [Radius] of the rectangular shape.
+    pub corner_radius_top_left: Option<Radius>,
+    /// The top-right corner [Radius] of the rectangular shape.
+    pub corner_radius_top_right: Option<Radius>,
+    /// The bottom-right corner [Radius] of the rectangular shape.
+    pub corner_radius_bottom_right: Option<Radius>,
+    /// The bottom-left corner [Radius] of the rectangular shape.
+    pub corner_radius_bottom_left: Option<Radius>,
+    // #endregion
+    /// The paint used to fill the interior of the shape.
+    pub fills: Vec<Paint>,
+
+    /// The stroke paint used to outline the shape.
+    pub strokes: Vec<Paint>,
+    /// The stroke width used to outline the shape.
+    pub stroke_width: f32,
+    /// The stroke align used to outline the shape.
+    pub stroke_align: StrokeAlign,
+    /// The stroke dash array used to outline the shape.
+    pub stroke_dash_array: Option<Vec<f32>>,
+
+    /// The effects applied to the shape.
+    pub effects: LayerEffects,
+
+    /// Text content (plain UTF-8).
+    pub text: Option<String>,
+    /// Font & fill appearance.
+    pub text_style: Option<TextStyle>,
+    /// Horizontal alignment.
+    pub text_align: Option<TextAlign>,
+    /// Vertical alignment.
+    pub text_align_vertical: Option<TextAlignVertical>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Node {
     Error(ErrorNode),
@@ -611,12 +669,12 @@ pub struct PolygonNode {
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
 
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
-    pub stroke_dash_array: Option<Vec<f32>>,
 }
 
 impl NodeFillsMixin for PolygonNode {
@@ -698,11 +756,11 @@ pub struct RegularPolygonNode {
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
-    pub stroke_dash_array: Option<Vec<f32>>,
 }
 
 impl NodeFillsMixin for RegularPolygonNode {
