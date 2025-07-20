@@ -10,6 +10,10 @@ pub struct CGPoint {
 }
 
 impl CGPoint {
+    pub fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
+    }
+
     /// Subtracts a scaled vector from this point.
     ///
     /// # Arguments
