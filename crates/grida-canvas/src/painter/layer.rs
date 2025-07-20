@@ -1,11 +1,11 @@
 use super::geometry::{
-    boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes, stroke_geometry,
-    PainterShape,
+    boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes, PainterShape,
 };
 use crate::cache::geometry::GeometryCache;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
+use crate::shape::*;
 use math2::transform::AffineTransform;
 use skia_safe::Path;
 

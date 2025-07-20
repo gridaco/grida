@@ -8,6 +8,7 @@ use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::runtime::repository::{FontRepository, ImageRepository};
+use crate::shape::*;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
 use std::cell::RefCell;
