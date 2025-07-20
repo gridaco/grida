@@ -1137,6 +1137,7 @@ impl FigmaConverter {
                 (origin.arc_data.ending_angle - origin.arc_data.starting_angle).to_degrees() as f32,
             ),
             start_angle: origin.arc_data.starting_angle.to_degrees() as f32,
+            corner_radius: None,
         }))
     }
 

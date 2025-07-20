@@ -5,7 +5,7 @@ use crate::node::schema::*;
 use crate::painter::cvt;
 use crate::shape::*;
 use math2::transform::AffineTransform;
-use skia_safe::{Path, Point, RRect, Rect};
+use skia_safe::{Path, RRect, Rect};
 
 /// Internal universal Painter's shape abstraction for optimized drawing
 /// Virtual nodes like Group, BooleanOperation are not Painter's shapes, they use different methods.
@@ -97,18 +97,20 @@ impl PainterShape {
     }
 }
 
-fn build_shape_from_points(points: &[CGPoint]) -> PainterShape {
-    let mut path = Path::new();
-    let skia_points: Vec<skia_safe::Point> = points.iter().map(|&p| p.into()).collect();
-    path.add_poly(&skia_points, true);
-    PainterShape::from_path(path)
-}
-
 pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
     match node {
-        IntrinsicSizeNode::Polygon(n) => build_shape_from_points(&n.points),
-        IntrinsicSizeNode::RegularPolygon(n) => build_shape_from_points(&n.to_points()),
-        IntrinsicSizeNode::RegularStarPolygon(n) => build_shape_from_points(&n.to_points()),
+        IntrinsicSizeNode::Polygon(n) => {
+            let shape = n.to_shape();
+            PainterShape::from_shape(&shape)
+        }
+        IntrinsicSizeNode::RegularPolygon(n) => {
+            let shape = n.to_shape();
+            PainterShape::from_shape(&shape)
+        }
+        IntrinsicSizeNode::RegularStarPolygon(n) => {
+            let shape = n.to_shape();
+            PainterShape::from_shape(&shape)
+        }
         IntrinsicSizeNode::Line(n) => {
             let mut path = Path::new();
             path.move_to((0.0, 0.0));

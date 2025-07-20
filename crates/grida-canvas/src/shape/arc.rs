@@ -1,3 +1,4 @@
+use super::*;
 use skia_safe::{Path, Rect};
 
 /// A Circular Arc shape (that can have irregular / elliptical dimensions)
@@ -12,6 +13,9 @@ pub struct EllipticalArcShape {
     pub start_angle: f32,
     /// angle in degrees
     pub angle: f32,
+    /// Corner radius effect to be applied to the path.
+    /// If <= 0, corner radius is not applied.
+    pub corner_radius: f32,
 }
 
 /// Build a closed arc path for [`EllipticalArcShape`].
@@ -50,5 +54,11 @@ pub fn build_arc_path(shape: &EllipticalArcShape) -> Path {
     }
 
     path.close();
-    path
+
+    if shape.corner_radius <= 0.0 {
+        return path;
+    }
+
+    // FIXME: the corner on arc is not working as expected. - we need to update the path building to align
+    build_corner_radius_path(&path, shape.corner_radius)
 }

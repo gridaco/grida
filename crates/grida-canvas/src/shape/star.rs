@@ -1,3 +1,4 @@
+use super::*;
 use crate::cg::*;
 use skia_safe;
 
@@ -11,6 +12,9 @@ pub struct EllipticalRegularStarShape {
     pub inner_radius_ratio: f32,
     /// number of points >= 3
     pub point_count: usize,
+    /// Corner radius effect to be applied to the path.
+    /// If <= 0, corner radius is not applied.
+    pub corner_radius: f32,
 }
 
 pub fn build_star_points(shape: &EllipticalRegularStarShape) -> Vec<CGPoint> {
@@ -48,11 +52,8 @@ pub fn build_star_path(shape: &EllipticalRegularStarShape) -> skia_safe::Path {
         return skia_safe::Path::new();
     }
 
-    let mut path = skia_safe::Path::new();
-    path.move_to(points[0]);
-    for i in 1..points.len() {
-        path.line_to(points[i]);
-    }
-    path.close();
-    path
+    build_simple_polygon_path(&SimplePolygonShape {
+        points,
+        corner_radius: shape.corner_radius,
+    })
 }

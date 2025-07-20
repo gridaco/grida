@@ -1,4 +1,5 @@
-use crate::cg::*;
+use super::*;
+use crate::{cg::*, shape::build_simple_polygon_path};
 
 pub struct EllipticalRegularPolygonShape {
     /// width of the box
@@ -7,6 +8,9 @@ pub struct EllipticalRegularPolygonShape {
     pub height: f32,
     /// Number of points
     pub point_count: usize,
+    /// Corner radius effect to be applied to the path.
+    /// If <= 0, corner radius is not applied.
+    pub corner_radius: f32,
 }
 
 pub fn build_regular_polygon_points(shape: &EllipticalRegularPolygonShape) -> Vec<CGPoint> {
@@ -27,4 +31,11 @@ pub fn build_regular_polygon_points(shape: &EllipticalRegularPolygonShape) -> Ve
     }
 
     points
+}
+
+pub fn build_regular_polygon_path(shape: &EllipticalRegularPolygonShape) -> skia_safe::Path {
+    build_simple_polygon_path(&SimplePolygonShape {
+        points: build_regular_polygon_points(shape),
+        corner_radius: shape.corner_radius,
+    })
 }

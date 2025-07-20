@@ -8,6 +8,7 @@ fn main() {
         inner_radius_ratio: 0.5,
         start_angle: 45.0,
         angle: 180.0,
+        corner_radius: 0.0,
     };
 
     let mut surface =

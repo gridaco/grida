@@ -576,6 +576,7 @@ impl From<JSONEllipseNode> for Node {
             inner_radius: node.inner_radius,
             start_angle: node.angle_offset.unwrap_or(0.0),
             angle: node.angle,
+            corner_radius: node.base.corner_radius.map(|r| r.rx),
         })
     }
 }

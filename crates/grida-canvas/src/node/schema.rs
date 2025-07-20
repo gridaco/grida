@@ -544,6 +544,8 @@ pub struct EllipseNode {
 
     /// sweep angle in degrees (end_angle = start_angle + angle)
     pub angle: Option<f32>,
+
+    pub corner_radius: Option<f32>,
 }
 
 impl NodeFillsMixin for EllipseNode {
@@ -580,6 +582,7 @@ impl NodeShapeMixin for EllipseNode {
                     inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
                     start_angle: self.start_angle,
                     angle: angle,
+                    corner_radius: self.corner_radius.unwrap_or(0.0),
                 });
             }
         }
@@ -842,6 +845,7 @@ impl RegularPolygonNode {
             width: self.size.width,
             height: self.size.height,
             point_count: self.point_count,
+            corner_radius: self.corner_radius,
         }
     }
 
@@ -969,6 +973,7 @@ impl RegularStarPolygonNode {
             height: self.size.height,
             inner_radius_ratio: self.inner_radius,
             point_count: self.point_count,
+            corner_radius: self.corner_radius,
         }
     }
 }

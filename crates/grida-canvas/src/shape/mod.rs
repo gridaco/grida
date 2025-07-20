@@ -39,9 +39,7 @@ impl Into<skia_safe::Path> for &Shape {
             Shape::EllipticalArc(shape) => build_arc_path(&shape),
             Shape::EllipticalRing(shape) => build_ring_path(&shape),
             Shape::EllipticalRegularStar(shape) => build_star_path(&shape),
-            Shape::EllipticalRegularPolygon(shape) => {
-                build_path_from_points(&build_regular_polygon_points(&shape))
-            }
+            Shape::EllipticalRegularPolygon(shape) => build_regular_polygon_path(shape),
         }
     }
 }
