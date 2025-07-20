@@ -2,6 +2,17 @@ use cg::cg::types::*;
 use cg::shape::*;
 use skia_safe::{self as sk, surfaces};
 
+// **Light**
+// Adjust the angle and intensity of the light illuminating your glass frames to change where the highlight appears on the frame’s edge.
+// **Refraction**
+// Control the way light bends along the edge of your glass frame. The higher the refraction value, the more your glass frames will distort the elements around them.
+// **Depth**
+// Change how thick your glass material appears to provide a more pronounced 3D feel to the edge of the frame.
+// **Dispersion**
+// Increase dispersion to add a hint of chromatic aberration at the edge of your glass frames. This works best in combination with refraction.
+// **Frost**
+// Adjust the amount of background blur present on your glass frames to help glass elements stand out on busy backgrounds to provide better contrast.
+
 struct LiquidGlassEffect {
     /// The intensity of specular highlights. Must be between 0 and 1. Higher values create brighter highlights.
     light_intensity: f32,
