@@ -3890,6 +3890,10 @@ interface NoiseEffectBase {
    */
   readonly color: RGBA;
   /**
+   * Whether the noise effect is visible.
+   */
+  readonly visible: boolean;
+  /**
    * The blend mode of the noise.
    */
   readonly blendMode: BlendMode;
@@ -3901,6 +3905,10 @@ interface NoiseEffectBase {
    * The density of the noise effect.
    */
   readonly density: number;
+  /**
+   * Noise effects currently do not support binding variables.
+   */
+  readonly boundVariables?: {};
 }
 /**
  * @see https://www.figma.com/plugin-docs/api/Effect
@@ -3956,6 +3964,10 @@ interface TextureEffect {
    */
   readonly type: "TEXTURE";
   /**
+   * Whether the texture effect is visible.
+   */
+  readonly visible: boolean;
+  /**
    * The size of the texture effect.
    */
   readonly noiseSize: number;
@@ -3967,6 +3979,51 @@ interface TextureEffect {
    * Whether the texture is clipped to the shape.
    */
   readonly clipToShape: boolean;
+  /**
+   * Texture effects currently do not support binding variables.
+   */
+  readonly boundVariables?: {};
+}
+/**
+ * @see https://www.figma.com/plugin-docs/api/Effect
+ */
+interface GlassEffect {
+  /**
+   * The string literal representing the type of effect this is. Always check the `type` before reading other properties.
+   */
+  readonly type: "GLASS";
+  /**
+   * Whether this glass effect is visible.
+   */
+  readonly visible: boolean;
+  /**
+   * The intensity of specular highlights. Must be between 0 and 1. Higher values create brighter highlights.
+   */
+  readonly lightIntensity: number;
+  /**
+   * The angle of the specular light in degrees. Controls the direction of highlights on the glass surface.
+   */
+  readonly lightAngle: number;
+  /**
+   * The intensity of the refraction distortion. Must be between 0 and 1. Higher values create more distortion.
+   */
+  readonly refraction: number;
+  /**
+   * The depth of the refraction effect. Must be >= 1. Higher values create deeper glass appearance.
+   */
+  readonly depth: number;
+  /**
+   * The amount of chromatic aberration (color separation). Must be between 0 and 1. Higher values create more rainbow-like distortion at edges.
+   */
+  readonly dispersion: number;
+  /**
+   * The radius of frost on the glass effect.
+   */
+  readonly radius: number;
+  /**
+   * Glass effects currently do not support binding variables.
+   */
+  readonly boundVariables?: {};
 }
 /**
  * @see https://www.figma.com/plugin-docs/api/Effect
@@ -3976,7 +4033,8 @@ declare type Effect =
   | InnerShadowEffect
   | BlurEffect
   | NoiseEffect
-  | TextureEffect;
+  | TextureEffect
+  | GlassEffect;
 /**
  * @see https://www.figma.com/plugin-docs/api/Constraints
  */
@@ -6669,9 +6727,10 @@ interface AutoLayoutMixin {
 interface GridTrackSize {
   /**
    * Applicable only on FIXED grid tracks. The size of the track in pixels.
+   * Optional for `FLEX` tracks.
    * If the setter for this value is called on a `FLEX` track, the track will be converted to a `FIXED` track.
    */
-  value: number;
+  value?: number;
   /**
    * The type of the grid track. `FLEX` indicates that the track will grow to fill the available space in the container (evenly divided among all flex tracks in the grid), while `FIXED` indicates that the track will have a fixed size.
    **/
@@ -6702,6 +6761,7 @@ interface GridLayoutMixin {
    * // + --- + --- + --- +
    * // |     |     |     |
    * // + --- + --- + --- +
+   * ```
    */
   gridRowCount: number;
   /**
