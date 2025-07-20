@@ -152,6 +152,14 @@ export namespace supports {
         return canvas_supports.cornerRadius.includes(type);
     }
   };
+  export const cornerRadius4 = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.cornerRadius4.includes(type);
+      case "canvas":
+        return canvas_supports.cornerRadius4.includes(type);
+    }
+  };
   export const border = (type: NodeType, context: Context) => {
     switch (context.backend) {
       case "dom":

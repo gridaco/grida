@@ -174,30 +174,7 @@ const safe_properties: Partial<
   cornerRadius: defineNodeProperty<"cornerRadius">({
     apply: (draft, value, prev) => {
       // TODO: make [cornerRadius < (Math.min(width, height) / 2)]
-
-      const each =
-        typeof value == "number"
-          ? {
-              tl: Math.max(value, 0),
-              tr: Math.max(value, 0),
-              br: Math.max(value, 0),
-              bl: Math.max(value, 0),
-            }
-          : {
-              tl: Math.max(value[0], 0),
-              tr: Math.max(value[1], 0),
-              br: Math.max(value[2], 0),
-              bl: Math.max(value[3], 0),
-            };
-
-      if (each.tl === each.tr && each.tl === each.br && each.tl === each.bl) {
-        draft.cornerRadius = each.tl;
-      }
-
-      draft.cornerRadiusTopLeft = each.tl;
-      draft.cornerRadiusTopRight = each.tr;
-      draft.cornerRadiusBottomRight = each.br;
-      draft.cornerRadiusBottomLeft = each.bl;
+      draft.cornerRadius = value;
     },
   }),
   cornerRadiusTopLeft: defineNodeProperty<"cornerRadiusTopLeft">({
