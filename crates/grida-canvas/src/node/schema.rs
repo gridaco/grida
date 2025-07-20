@@ -318,6 +318,16 @@ pub struct ContainerNode {
     pub clip: bool,
 }
 
+impl ContainerNode {
+    pub fn to_own_shape(&self) -> RRectShape {
+        RRectShape {
+            width: self.size.width,
+            height: self.size.height,
+            corner_radius: self.corner_radius,
+        }
+    }
+}
+
 impl NodeFillsMixin for ContainerNode {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = vec![fill];
@@ -351,6 +361,16 @@ impl NodeGeometryMixin for ContainerNode {
     }
 }
 
+impl NodeShapeMixin for ContainerNode {
+    fn to_shape(&self) -> Shape {
+        Shape::RRect(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        build_rrect_path(&self.to_own_shape())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RectangleNode {
     pub id: NodeId,
@@ -367,6 +387,16 @@ pub struct RectangleNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+}
+
+impl RectangleNode {
+    pub fn to_own_shape(&self) -> RRectShape {
+        RRectShape {
+            width: self.size.width,
+            height: self.size.height,
+            corner_radius: self.corner_radius,
+        }
+    }
 }
 
 impl NodeFillsMixin for RectangleNode {
@@ -442,6 +472,16 @@ pub struct ImageNode {
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
     pub hash: String,
+}
+
+impl ImageNode {
+    pub fn to_own_shape(&self) -> RRectShape {
+        RRectShape {
+            width: self.size.width,
+            height: self.size.height,
+            corner_radius: self.corner_radius,
+        }
+    }
 }
 
 impl NodeGeometryMixin for ImageNode {

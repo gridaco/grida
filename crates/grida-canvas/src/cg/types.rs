@@ -181,6 +181,25 @@ impl Radius {
     pub fn is_uniform(&self) -> bool {
         self.rx == self.ry
     }
+
+    pub fn tuple(&self) -> (f32, f32) {
+        (self.rx, self.ry)
+    }
+}
+
+impl Into<CGPoint> for Radius {
+    fn into(self) -> CGPoint {
+        CGPoint {
+            x: self.rx,
+            y: self.ry,
+        }
+    }
+}
+
+impl Into<(f32, f32)> for Radius {
+    fn into(self) -> (f32, f32) {
+        (self.rx, self.ry)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
