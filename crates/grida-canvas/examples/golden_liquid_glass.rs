@@ -1,0 +1,44 @@
+use cg::cg::types::*;
+use cg::shape::*;
+use skia_safe::{self as sk, surfaces};
+
+struct LiquidGlassEffect {
+    /// The intensity of specular highlights. Must be between 0 and 1. Higher values create brighter highlights.
+    light_intensity: f32,
+    /// The angle of the specular light in degrees. Controls the direction of highlights on the glass surface.
+    light_angle: f32,
+    /// The intensity of the refraction distortion. Must be between 0 and 1. Higher values create more distortion.
+    refraction: f32,
+    /// The depth of the refraction effect. Must be >= 1. Higher values create deeper glass appearance.
+    depth: f32,
+    /// The amount of chromatic aberration (color separation). Must be between 0 and 1. Higher values create more rainbow-like distortion at edges.
+    dispersion: f32,
+    /// The radius of frost on the glass effect.
+    radius: f32,
+}
+
+static BACKGROUND: &[u8] = include_bytes!("../../fixtures/images/stripes.png");
+
+// 1. background image
+// 2. forground glass shape 300x100 rounded rect
+// 3. glass effect on glass shape
+fn main() {
+    let effect = LiquidGlassEffect {
+        light_intensity: 0.5,
+        light_angle: 45.0,
+        refraction: 0.5,
+        depth: 1.0,
+        dispersion: 0.5,
+        radius: 10.0,
+    };
+
+    let shape: RRectShape = RRectShape {
+        width: 300.0,
+        height: 100.0,
+        corner_radius: RectangularCornerRadius::circular(10.0),
+    };
+
+    let (width, height) = (400, 400);
+    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let canvas = surface.canvas();
+}
