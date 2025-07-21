@@ -32,6 +32,13 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
                 size,
             );
         }
+        Paint::Angular(gradient) => {
+            return gradient::gradient_paint(
+                &GradientPaint::Angular(gradient.clone()),
+                opacity,
+                size,
+            );
+        }
         Paint::Image(image_paint) => {
             // For image paints, we just set the opacity since the actual drawing
             // is handled by draw_image_rect in the draw_fill_and_stroke method
