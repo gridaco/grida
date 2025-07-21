@@ -1,4 +1,5 @@
 use super::*;
+use math2::bezier_a2c;
 use skia_safe::{Path, Rect};
 
 /// A Elliptical Arc shape (that can have irregular / elliptical dimensions)
@@ -104,9 +105,89 @@ fn __build_ring_sector_path_no_corner_with_arc_to(shape: &EllipticalRingSectorSh
 ///     => "MCCCCCCCCLCCCCCCCCLZ"
 /// if the sweep < 180, it uses 4 points (8 in total)
 ///
+/// FIXME: this needs to be revised, the path building does not aligns with the corner radius handling.
 fn __build_ring_sector_path_no_corner_with_cubic_to(shape: &EllipticalRingSectorShape) -> Path {
-    // TODO:
     let mut path = Path::new();
+
+    let cx = shape._cx();
+    let cy = shape._cy();
+    let rx = shape._rx();
+    let ry = shape._ry();
+    let inner_rx = shape._inner_rx();
+    let inner_ry = shape._inner_ry();
+
+    let start_deg = shape.start_angle;
+    let sweep_deg = shape.angle;
+    let end_deg = start_deg + sweep_deg;
+
+    let start_rad = start_deg.to_radians();
+    let end_rad = end_deg.to_radians();
+
+    // Calculate start and end points for outer arc
+    let start_x = cx + rx * start_rad.cos();
+    let start_y = cy + ry * start_rad.sin();
+    let end_x = cx + rx * end_rad.cos();
+    let end_y = cy + ry * end_rad.sin();
+
+    // Move to start point
+    path.move_to((start_x, start_y));
+
+    // Draw outer arc using cubic bezier curves
+    let outer_bezier_points = bezier_a2c(
+        start_x,
+        start_y,
+        rx,
+        ry,
+        0.0,                     // angle (no rotation)
+        sweep_deg.abs() > 180.0, // large_arc_flag
+        sweep_deg > 0.0,         // sweep_flag
+        end_x,
+        end_y,
+        None,
+    );
+
+    // Add cubic bezier curves for outer arc
+    for chunk in outer_bezier_points.chunks(6) {
+        if let [c1x, c1y, c2x, c2y, x, y] = chunk {
+            path.cubic_to((*c1x, *c1y), (*c2x, *c2y), (*x, *y));
+        }
+    }
+
+    // Draw line to inner arc end point (if inner radius exists)
+    if shape.inner_radius_ratio > 0.0 {
+        let end_inner_x = cx + inner_rx * end_rad.cos();
+        let end_inner_y = cy + inner_ry * end_rad.sin();
+        path.line_to((end_inner_x, end_inner_y));
+
+        // Calculate start point for inner arc
+        let start_inner_x = cx + inner_rx * start_rad.cos();
+        let start_inner_y = cy + inner_ry * start_rad.sin();
+
+        // Draw inner arc using cubic bezier curves (in reverse direction)
+        let inner_bezier_points = bezier_a2c(
+            end_inner_x,
+            end_inner_y,
+            inner_rx,
+            inner_ry,
+            0.0,                     // angle (no rotation)
+            sweep_deg.abs() > 180.0, // large_arc_flag
+            false,                   // sweep_flag (reverse direction)
+            start_inner_x,
+            start_inner_y,
+            None,
+        );
+
+        // Add cubic bezier curves for inner arc
+        for chunk in inner_bezier_points.chunks(6) {
+            if let [c1x, c1y, c2x, c2y, x, y] = chunk {
+                path.cubic_to((*c1x, *c1y), (*c2x, *c2y), (*x, *y));
+            }
+        }
+    } else {
+        // If no inner radius, draw line to center
+        path.line_to((cx, cy));
+    }
+
     path.close();
     path
 }
