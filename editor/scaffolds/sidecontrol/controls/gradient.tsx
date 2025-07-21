@@ -9,14 +9,17 @@ import InputPropertyNumber from "../ui/number";
 import cmath from "@grida/cmath";
 import { css } from "@/grida-canvas-utils/css";
 
+type GradientPaint =
+  | cg.LinearGradientPaint
+  | cg.RadialGradientPaint
+  | cg.SweepGradientPaint;
+
 export function GradientControl({
   value,
   onValueChange,
 }: {
-  value: cg.LinearGradientPaint | cg.RadialGradientPaint;
-  onValueChange?: (
-    value: cg.LinearGradientPaint | cg.RadialGradientPaint
-  ) => void;
+  value: GradientPaint;
+  onValueChange?: (value: GradientPaint) => void;
 }) {
   const { stops } = value;
   return (

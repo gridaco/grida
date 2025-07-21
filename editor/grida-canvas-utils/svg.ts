@@ -172,6 +172,14 @@ ${gradientStops}
             ref: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
           };
         }
+        case "sweep_gradient":
+        default: {
+          // not supported
+          return {
+            defs: undefined,
+            ref: "",
+          };
+        }
       }
     }
   }

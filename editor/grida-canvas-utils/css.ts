@@ -288,6 +288,8 @@ export namespace css {
         return toLinearGradientString(paint);
       case "radial_gradient":
         return toRadialGradientString(paint);
+      case "sweep_gradient":
+        return toConicGradientString(paint);
     }
   }
 
@@ -368,5 +370,19 @@ export namespace css {
       .join(", ");
 
     return `radial-gradient(${gradientStops})`;
+  }
+
+  export function toConicGradientString(
+    paint: Omit<cg.SweepGradientPaint, "id">
+  ): string {
+    const { stops } = paint;
+
+    const gradientStops = stops
+      .map((stop) => {
+        return `${toRGBAString(stop.color)} ${stop.offset * 100}%`;
+      })
+      .join(", ");
+
+    return `conic-gradient(${gradientStops})`;
   }
 }

@@ -12,6 +12,7 @@ import { cn } from "@/components/lib/utils";
 import {
   LinearGradientPaintIcon,
   RadialGradientPaintIcon,
+  SweepGradientPaintIcon,
   SolidPaintIcon,
 } from "./icons/paint-icon";
 import { PaintChip } from "./utils/paint-chip";
@@ -74,7 +75,8 @@ function ComputedPaintControl({
         case "solid": {
           switch (to) {
             case "linear_gradient":
-            case "radial_gradient": {
+            case "radial_gradient":
+            case "sweep_gradient": {
               onValueChange?.({
                 type: to,
                 transform: cmath.transform.identity,
@@ -97,7 +99,8 @@ function ComputedPaintControl({
           break;
         }
         case "linear_gradient":
-        case "radial_gradient": {
+        case "radial_gradient":
+        case "sweep_gradient": {
           switch (to) {
             case "solid": {
               onValueChange?.({
@@ -107,7 +110,8 @@ function ComputedPaintControl({
               break;
             }
             case "linear_gradient":
-            case "radial_gradient": {
+            case "radial_gradient":
+            case "sweep_gradient": {
               onValueChange?.({
                 type: to,
                 stops: value.stops,
@@ -201,6 +205,22 @@ function ComputedPaintControl({
               </PaintInputContainer>
             </PopoverTrigger>
           )}
+          {value.type === "sweep_gradient" && (
+            <PopoverTrigger className="w-full">
+              <PaintInputContainer>
+                <PaintChip paint={value} />
+                <span className="ms-2 text-start text-xs flex-1">Sweep</span>
+                {removable && (
+                  <button
+                    onClick={onRemovePaint}
+                    className="px-1 py-1 me-0.5 text-muted-foreground"
+                  >
+                    <Cross2Icon className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </PaintInputContainer>
+            </PopoverTrigger>
+          )}
         </>
       ) : (
         <PopoverTrigger className="w-full">
@@ -235,6 +255,11 @@ function ComputedPaintControl({
                 active={value?.type === "radial_gradient"}
               />
             </TabsTrigger>
+            <TabsTrigger value="sweep_gradient">
+              <SweepGradientPaintIcon
+                active={value?.type === "sweep_gradient"}
+              />
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="solid" className="p-0 m-0">
             {value?.type === "solid" && (
@@ -267,6 +292,11 @@ function ComputedPaintControl({
           </TabsContent>
           <TabsContent value="radial_gradient" className="p-2">
             {value?.type === "radial_gradient" && (
+              <GradientControl value={value} onValueChange={onValueChange} />
+            )}
+          </TabsContent>
+          <TabsContent value="sweep_gradient" className="p-2">
+            {value?.type === "sweep_gradient" && (
               <GradientControl value={value} onValueChange={onValueChange} />
             )}
           </TabsContent>

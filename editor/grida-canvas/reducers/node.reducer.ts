@@ -158,8 +158,12 @@ const safe_properties: Partial<
       switch (value.type) {
         case "linear_gradient":
         case "radial_gradient":
+        case "sweep_gradient":
           draft.fill = {
-            ...(value as cg.LinearGradientPaint | cg.RadialGradientPaint),
+            ...(value as
+              | cg.LinearGradientPaint
+              | cg.RadialGradientPaint
+              | cg.SweepGradientPaint),
             id: `gradient-${v4()}`,
           };
           break;
