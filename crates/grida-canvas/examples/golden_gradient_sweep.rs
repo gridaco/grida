@@ -12,15 +12,11 @@ fn main() {
         stops: vec![
             GradientStop {
                 offset: 0.0,
-                color: CGColor(255, 0, 0, 255),
+                color: CGColor(255, 97, 97, 255),
             },
             GradientStop {
-                offset: 0.33,
-                color: CGColor(0, 255, 0, 255),
-            },
-            GradientStop {
-                offset: 0.66,
-                color: CGColor(0, 0, 255, 255),
+                offset: 0.5,
+                color: CGColor(133, 0, 0, 255),
             },
             GradientStop {
                 offset: 1.0,

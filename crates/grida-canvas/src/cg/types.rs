@@ -410,7 +410,6 @@ pub enum Paint {
     LinearGradient(LinearGradientPaint),
     RadialGradient(RadialGradientPaint),
     SweepGradient(SweepGradientPaint),
-    Angular(AngularGradientPaint),
     Image(ImagePaint),
 }
 
@@ -421,7 +420,6 @@ impl Paint {
             Paint::LinearGradient(gradient) => gradient.opacity,
             Paint::RadialGradient(gradient) => gradient.opacity,
             Paint::SweepGradient(gradient) => gradient.opacity,
-            Paint::Angular(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
         }
     }
@@ -432,7 +430,6 @@ pub enum GradientPaint {
     Linear(LinearGradientPaint),
     Radial(RadialGradientPaint),
     Sweep(SweepGradientPaint),
-    Angular(AngularGradientPaint),
 }
 
 impl GradientPaint {
@@ -441,7 +438,6 @@ impl GradientPaint {
             GradientPaint::Linear(gradient) => gradient.opacity,
             GradientPaint::Radial(gradient) => gradient.opacity,
             GradientPaint::Sweep(gradient) => gradient.opacity,
-            GradientPaint::Angular(gradient) => gradient.opacity,
         }
     }
 }
@@ -519,13 +515,6 @@ pub struct RadialGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct SweepGradientPaint {
-    pub transform: AffineTransform,
-    pub stops: Vec<GradientStop>,
-    pub opacity: f32,
-}
-
-#[derive(Debug, Clone)]
-pub struct AngularGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
