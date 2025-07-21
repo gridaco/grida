@@ -91,7 +91,7 @@ pub fn sweep_gradient_paint(
         skia_safe::TileMode::Clamp,
         Some((0.0, 360.0)),
         None,
-        None,
+        Some(&sk_matrix(gradient.transform.matrix)),
     ) {
         paint.set_shader(shader);
     }

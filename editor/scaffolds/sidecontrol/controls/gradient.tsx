@@ -7,6 +7,11 @@ import { Cross2Icon } from "@radix-ui/react-icons";
 import InputPropertyNumber from "../ui/number";
 import cmath from "@grida/cmath";
 import { GradientStopsSlider } from "./gradient-stops";
+import { ArrowRightLeftIcon, RotateCwIcon } from "lucide-react";
+import { Button } from "@/components/ui-editor/button";
+import { Label } from "@/components/ui/label";
+import DegreeControl from "./degree";
+import { useMemo } from "react";
 
 type GradientPaint =
   | cg.LinearGradientPaint
@@ -21,8 +26,61 @@ export function GradientControl({
   onValueChange?: (value: GradientPaint) => void;
 }) {
   const { stops } = value;
+
+  const onFlipStopsClick = () => {
+    const flippedStops = stops
+      .map((stop, index) => ({
+        ...stop,
+        offset: 1 - stop.offset,
+      }))
+      .reverse();
+    onValueChange?.({ ...value, stops: flippedStops });
+  };
+
+  const onRotateClick = () => {
+    const currentAngle = value.transform
+      ? cmath.transform.angle(value.transform)
+      : 0;
+    const newAngle = currentAngle + 45;
+    const t = cmath.transform.computeRelativeLinearGradientTransform(newAngle);
+    onValueChange?.({
+      ...value,
+      transform: t,
+    });
+  };
+
+  const onRotationChange = (angle: number) => {
+    const t = cmath.transform.computeRelativeLinearGradientTransform(angle);
+    onValueChange?.({
+      ...value,
+      transform: t,
+    });
+  };
+
+  const deg = useMemo(() => {
+    return value.transform ? cmath.transform.angle(value.transform) : undefined;
+  }, [value.transform]);
+
   return (
     <div className="w-full">
+      <div className="flex items-center justify-end gap-2 mb-2">
+        <Button
+          onClick={onFlipStopsClick}
+          title="Flip"
+          variant="ghost"
+          size="icon"
+        >
+          <ArrowRightLeftIcon className="size-3.5" />
+        </Button>
+        <Button
+          onClick={onRotateClick}
+          title="Rotate"
+          variant="ghost"
+          size="icon"
+        >
+          <RotateCwIcon className="size-3.5" />
+        </Button>
+      </div>
       <GradientStopsSlider
         stops={stops}
         onValueChange={(stops) => {
@@ -30,26 +88,19 @@ export function GradientControl({
         }}
       />
       <hr className="my-4 w-full" />
-      <div>
+      <div className="flex items-center gap-2">
+        <DegreeControl size="icon" value={deg} onChange={onRotationChange} />
         <InputPropertyNumber
           mode="fixed"
           type="number"
           placeholder="angle"
           step={1}
-          value={
-            value.transform ? cmath.transform.angle(value.transform) : undefined
-          }
-          onValueCommit={(v) => {
-            // change on commit
-            const t = cmath.transform.computeRelativeLinearGradientTransform(v);
-            onValueChange?.({
-              ...value,
-              transform: t,
-            });
-          }}
+          value={deg}
+          onValueCommit={onRotationChange}
         />
       </div>
       <hr className="my-4 w-full" />
+      <Label className="text-xs mb-2">Stops</Label>
       <div className="flex flex-col gap-2">
         {stops.map((stop, index) => (
           <GradientStop
