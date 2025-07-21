@@ -117,6 +117,15 @@ impl From<&FigmaPaint> for Paint {
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                         })
                     }
+                    figma_api::models::gradient_paint::Type::GradientAngular => {
+                        Paint::SweepGradient(SweepGradientPaint {
+                            transform: convert_gradient_transform(
+                                &gradient.gradient_handle_positions,
+                            ),
+                            stops,
+                            opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                        })
+                    }
                     _ => Paint::Solid(SolidPaint {
                         color: CGColor(0, 0, 0, 255),
                         opacity: 1.0,
