@@ -16,13 +16,63 @@ import {
 } from "@radix-ui/react-icons";
 import { PropertyInputContainer } from "../ui";
 import grida from "@grida/schema";
+import { useMemo } from "react";
 
 type CornerRadius = Partial<
   grida.program.nodes.i.ICornerRadius &
     grida.program.nodes.i.IRectangularCornerRadius
 >;
 
+function isUniform(value: CornerRadius) {
+  const _a = value.cornerRadius;
+  const is_all_uniform =
+    _a === value.cornerRadiusTopLeft &&
+    _a === value.cornerRadiusTopRight &&
+    _a === value.cornerRadiusBottomRight &&
+    _a === value.cornerRadiusBottomLeft;
+
+  if (is_all_uniform) return true;
+
+  const _tl = value.cornerRadiusTopLeft;
+  const is_all_4_uniform =
+    _tl === value.cornerRadiusTopRight &&
+    _tl === value.cornerRadiusBottomRight &&
+    _tl === value.cornerRadiusBottomLeft;
+
+  return is_all_4_uniform;
+}
+
 export function CornerRadiusControl({
+  value = 0,
+  disabled,
+  onValueCommit,
+}: {
+  value?: number;
+  disabled?: boolean;
+  onValueCommit?: (value: cg.CornerRadius) => void;
+}) {
+  return (
+    <div
+      className={WorkbenchUI.inputVariants({
+        variant: "container",
+        size: "xs",
+      })}
+    >
+      <InputPropertyNumber
+        mode="fixed"
+        disabled={disabled}
+        type="number"
+        value={value}
+        placeholder={"0"}
+        min={0}
+        step={1}
+        onValueCommit={onValueCommit}
+      />
+    </div>
+  );
+}
+
+export function CornerRadius4Control({
   disabled,
   value,
   onValueCommit,
@@ -31,7 +81,10 @@ export function CornerRadiusControl({
   value?: CornerRadius;
   onValueCommit?: (value: cg.CornerRadius) => void;
 }) {
-  const mode = Array.isArray(value) ? "each" : "all";
+  const mode = useMemo(() => {
+    if (!value) return "all";
+    return isUniform(value) ? "all" : "each";
+  }, [value]);
 
   return (
     <Popover>
@@ -65,7 +118,7 @@ export function CornerRadiusControl({
         </div>
       </div>
       <PopoverContent>
-        <CornerRadius4Control
+        <Radius4Control
           value={[
             value?.cornerRadiusTopLeft ?? value?.cornerRadius ?? 0,
             value?.cornerRadiusTopRight ?? value?.cornerRadius ?? 0,
@@ -85,7 +138,7 @@ export function CornerRadiusControl({
   );
 }
 
-function CornerRadius4Control({
+function Radius4Control({
   value,
   onValueCommit,
 }: {

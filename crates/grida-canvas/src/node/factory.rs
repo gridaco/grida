@@ -87,6 +87,7 @@ impl NodeFactory {
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effects: LayerEffects::new_empty(),
+            corner_radius: None,
         }
     }
 

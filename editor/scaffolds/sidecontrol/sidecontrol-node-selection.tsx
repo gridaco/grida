@@ -14,7 +14,10 @@ import { FontSizeControl } from "./controls/font-size";
 import { FontWeightControl } from "./controls/font-weight";
 import { OpacityControl } from "./controls/opacity";
 import { HrefControl } from "./controls/href";
-import { CornerRadiusControl } from "./controls/corner-radius";
+import {
+  CornerRadius4Control,
+  CornerRadiusControl,
+} from "./controls/corner-radius";
 import { BorderControl } from "./controls/border";
 import { FillControl } from "./controls/fill";
 import { StringValueControl } from "./controls/string-value";
@@ -544,9 +547,9 @@ function SelectionMixedProperties({
               <PropertyLine>
                 <PropertyLineLabel>Radius</PropertyLineLabel>
                 {cornerRadius?.mixed ? (
-                  <CornerRadiusControl onValueCommit={change.cornerRadius} />
+                  <CornerRadius4Control onValueCommit={change.cornerRadius} />
                 ) : (
-                  <CornerRadiusControl
+                  <CornerRadius4Control
                     value={{ cornerRadius: cornerRadius?.value }}
                     onValueCommit={change.cornerRadius}
                   />
@@ -1106,19 +1109,31 @@ function SelectedNodeProperties({
               </PropertyLine>
             )}
             {supports.cornerRadius(node.type, { backend }) && (
-              <PropertyLine>
-                <PropertyLineLabel>Radius</PropertyLineLabel>
-                <CornerRadiusControl
-                  value={{
-                    cornerRadius,
-                    cornerRadiusTopLeft,
-                    cornerRadiusTopRight,
-                    cornerRadiusBottomRight,
-                    cornerRadiusBottomLeft,
-                  }}
-                  onValueCommit={actions.cornerRadius}
-                />
-              </PropertyLine>
+              <>
+                {supports.cornerRadius4(node.type, { backend }) ? (
+                  <PropertyLine>
+                    <PropertyLineLabel>Radius</PropertyLineLabel>
+                    <CornerRadius4Control
+                      value={{
+                        cornerRadius,
+                        cornerRadiusTopLeft,
+                        cornerRadiusTopRight,
+                        cornerRadiusBottomRight,
+                        cornerRadiusBottomLeft,
+                      }}
+                      onValueCommit={actions.cornerRadius}
+                    />
+                  </PropertyLine>
+                ) : (
+                  <PropertyLine>
+                    <PropertyLineLabel>Radius</PropertyLineLabel>
+                    <CornerRadiusControl
+                      value={cornerRadius}
+                      onValueCommit={actions.cornerRadius}
+                    />
+                  </PropertyLine>
+                )}
+              </>
             )}
             {(pointCount != null || innerRadius != null) && (
               <>

@@ -1,6 +1,7 @@
 use crate::cache::scene::SceneCache;
 use crate::node::schema::NodeId;
-use crate::painter::{cvt, layer::Layer};
+use crate::painter::layer::Layer;
+use crate::sk;
 use math2::{rect, rect::Rectangle, vector2::Vector2};
 
 /// Hit testing utilities for [`SceneCache`].
@@ -89,7 +90,7 @@ impl<'a> HitTester<'a> {
                     } else {
                         base.shape.to_path()
                     };
-                    path.transform(&cvt::sk_matrix(base.transform.matrix));
+                    path.transform(&sk::sk_matrix(base.transform.matrix));
                     if path.contains((point[0], point[1])) {
                         return Some(layer.id().clone());
                     }
@@ -120,7 +121,7 @@ impl<'a> HitTester<'a> {
                     } else {
                         base.shape.to_path()
                     };
-                    path.transform(&cvt::sk_matrix(base.transform.matrix));
+                    path.transform(&sk::sk_matrix(base.transform.matrix));
                     if path.contains((point[0], point[1])) {
                         out.push(layer.id().clone());
                     }
@@ -143,7 +144,7 @@ impl<'a> HitTester<'a> {
             } else {
                 base.shape.to_path()
             };
-            path.transform(&cvt::sk_matrix(base.transform.matrix));
+            path.transform(&sk::sk_matrix(base.transform.matrix));
             path.contains((point[0], point[1]))
         } else {
             false

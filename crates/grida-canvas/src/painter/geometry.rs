@@ -1,116 +1,10 @@
-use crate::cache::geometry::GeometryCache;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
-use crate::painter::cvt;
 use crate::shape::*;
+use crate::{cache::geometry::GeometryCache, sk};
 use math2::transform::AffineTransform;
-use skia_safe::{
-    path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, Point, RRect, Rect, StrokeRec,
-};
-
-/// Computes the stroke geometry path for a given input `Path`, enabling rich stroke
-/// rendering features such as image fills, gradients, and complex stroke alignment.
-///
-/// This function generates a *filled path* that visually represents the stroke outline,
-/// based on stroke width, alignment, and optional dash pattern. The result can be used
-/// with any fill-based rendering pipeline, e.g. image shaders, gradients, or masking.
-///
-/// # Parameters
-///
-/// - `source_path`: The original vector path to be stroked.
-/// - `stroke_width`: The stroke width (measured in logical pixels).
-/// - `stroke_align`: Controls how the stroke is aligned relative to the path.
-///   - `StrokeAlign::Center`: Stroke is centered on the path (default Skia behavior).
-///   - `StrokeAlign::Inside`: Stroke lies entirely inside the path boundary.
-///   - `StrokeAlign::Outside`: Stroke lies entirely outside the path boundary.
-/// - `stroke_dash_array`: Optional dash pattern (e.g., `[10.0, 4.0]` for 10 on, 4 off).
-///
-/// # Returns
-///
-/// A `Path` representing the stroke outline as a filled geometry. This path can be used
-/// with image or gradient fills, or for clipping, hit-testing, or boolean operations.
-///
-/// # Behavior
-///
-/// - If `stroke_align` is not `Center`, the result uses boolean path operations to clip or subtract
-///   the stroke geometry relative to the original path.
-/// - If a dash array is provided, it is applied before stroking.
-/// - If the path is empty or invalid, an empty `Path` is returned.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let stroke_path = stroke_geometry(
-///     &original_path,
-///     4.0,
-///     StrokeAlign::Inside,
-///     Some(&vec![8.0, 4.0])
-/// );
-/// canvas.draw_path(&stroke_path, &image_paint);
-/// ```
-///
-/// # See Also
-///
-/// - [`SkStrokeRec`](https://github.com/google/skia/blob/main/include/core/SkStrokeRec.h)
-/// - [`SkPath::op`](https://github.com/google/skia/blob/main/include/core/SkPath.h)
-/// - [`SkDashPathEffect`](https://github.com/google/skia/blob/main/include/effects/SkDashPathEffect.h)
-pub fn stroke_geometry(
-    source_path: &Path,
-    stroke_width: f32,
-    stroke_align: StrokeAlign,
-    stroke_dash_array: Option<&Vec<f32>>,
-) -> Path {
-    use StrokeAlign::*;
-
-    let adjusted_width = match stroke_align {
-        Center => stroke_width,
-        Inside => stroke_width * 2.0,  // we'll clip it later
-        Outside => stroke_width * 2.0, // we'll subtract later
-    };
-
-    // Create a stroke record with the adjusted width
-    let mut stroke_rec = StrokeRec::new(InitStyle::Hairline);
-    stroke_rec.set_stroke_style(adjusted_width, false);
-
-    // Apply dash effect if provided
-    let mut path_to_stroke = source_path.clone();
-    if let Some(dashes) = stroke_dash_array {
-        if let Some(pe) = PathEffect::dash(dashes, 0.0) {
-            if let Some((dashed, _)) =
-                pe.filter_path(source_path, &stroke_rec, source_path.bounds())
-            {
-                path_to_stroke = dashed;
-            }
-        }
-    }
-
-    // Apply the stroke to create the outline
-    let mut stroked_path = Path::new();
-    if stroke_rec.apply_to_path(&mut stroked_path, &path_to_stroke) {
-        match stroke_align {
-            Center => stroked_path,
-            Inside => {
-                // Clip to original path: intersection
-                if let Some(result) = Path::op(&stroked_path, source_path, PathOp::Intersect) {
-                    result
-                } else {
-                    stroked_path
-                }
-            }
-            Outside => {
-                // Subtract original path from stroke outline
-                if let Some(result) = Path::op(&stroked_path, source_path, PathOp::Difference) {
-                    result
-                } else {
-                    stroked_path
-                }
-            }
-        }
-    } else {
-        Path::new()
-    }
-}
+use skia_safe::{Path, RRect, Rect};
 
 /// Internal universal Painter's shape abstraction for optimized drawing
 /// Virtual nodes like Group, BooleanOperation are not Painter's shapes, they use different methods.
@@ -202,40 +96,20 @@ impl PainterShape {
     }
 }
 
-pub fn build_shape_from_points(points: &[CGPoint]) -> PainterShape {
-    let mut path = Path::new();
-    let skia_points: Vec<skia_safe::Point> = points.iter().map(|&p| p.into()).collect();
-    path.add_poly(&skia_points, true);
-    PainterShape::from_path(path)
-}
-
 pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
     match node {
-        IntrinsicSizeNode::Rectangle(n) => {
-            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-            let r = n.corner_radius;
-            if !r.is_zero() {
-                let rrect = RRect::new_rect_radii(
-                    rect,
-                    &[
-                        Point::new(r.tl.rx, r.tl.ry),
-                        Point::new(r.tr.rx, r.tr.ry),
-                        Point::new(r.br.rx, r.br.ry),
-                        Point::new(r.bl.rx, r.bl.ry),
-                    ],
-                );
-                PainterShape::from_rrect(rrect)
-            } else {
-                PainterShape::from_rect(rect)
-            }
-        }
-        IntrinsicSizeNode::Ellipse(n) => {
+        IntrinsicSizeNode::Polygon(n) => {
             let shape = n.to_shape();
             PainterShape::from_shape(&shape)
         }
-        IntrinsicSizeNode::Polygon(n) => build_shape_from_points(&n.points),
-        IntrinsicSizeNode::RegularPolygon(n) => build_shape_from_points(&n.to_points()),
-        IntrinsicSizeNode::RegularStarPolygon(n) => build_shape_from_points(&n.to_points()),
+        IntrinsicSizeNode::RegularPolygon(n) => {
+            let shape = n.to_shape();
+            PainterShape::from_shape(&shape)
+        }
+        IntrinsicSizeNode::RegularStarPolygon(n) => {
+            let shape = n.to_shape();
+            PainterShape::from_shape(&shape)
+        }
         IntrinsicSizeNode::Line(n) => {
             let mut path = Path::new();
             path.move_to((0.0, 0.0));
@@ -251,39 +125,37 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             }
         }
         IntrinsicSizeNode::Vector(n) => PainterShape::from_path(n.network.clone().into()),
-        IntrinsicSizeNode::Container(n) => {
+        IntrinsicSizeNode::Ellipse(n) => {
+            let shape = n.to_shape();
+            PainterShape::from_shape(&shape)
+        }
+        IntrinsicSizeNode::Rectangle(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             let r = n.corner_radius;
             if !r.is_zero() {
-                let rrect = RRect::new_rect_radii(
-                    rect,
-                    &[
-                        Point::new(r.tl.rx, r.tl.ry),
-                        Point::new(r.tr.rx, r.tr.ry),
-                        Point::new(r.br.rx, r.br.ry),
-                        Point::new(r.bl.rx, r.bl.ry),
-                    ],
-                );
+                let rrect = build_rrect(&n.to_own_shape());
                 PainterShape::from_rrect(rrect)
             } else {
                 PainterShape::from_rect(rect)
             }
         }
-        IntrinsicSizeNode::Image(n) => {
-            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+        IntrinsicSizeNode::Container(n) => {
             let r = n.corner_radius;
             if !r.is_zero() {
-                let rrect = RRect::new_rect_radii(
-                    rect,
-                    &[
-                        Point::new(r.tl.rx, r.tl.ry),
-                        Point::new(r.tr.rx, r.tr.ry),
-                        Point::new(r.br.rx, r.br.ry),
-                        Point::new(r.bl.rx, r.bl.ry),
-                    ],
-                );
+                let rrect = build_rrect(&n.to_own_shape());
                 PainterShape::from_rrect(rrect)
             } else {
+                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+                PainterShape::from_rect(rect)
+            }
+        }
+        IntrinsicSizeNode::Image(n) => {
+            let r = n.corner_radius;
+            if !r.is_zero() {
+                let rrect = build_rrect(&n.to_own_shape());
+                PainterShape::from_rrect(rrect)
+            } else {
+                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
                 PainterShape::from_rect(rect)
             }
         }
@@ -385,7 +257,7 @@ pub fn boolean_operation_path(
                 .get_world_transform(child_id)
                 .unwrap_or_else(AffineTransform::identity);
             let relative = inv.compose(&child_world);
-            path.transform(&cvt::sk_matrix(relative.matrix));
+            path.transform(&sk::sk_matrix(relative.matrix));
 
             let op = if i == 0 {
                 BooleanPathOperation::Union

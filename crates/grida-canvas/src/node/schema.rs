@@ -87,6 +87,64 @@ pub struct Scene {
 
 // region: Node Definitions
 
+/// flat unknown node properties
+/// this is a standard spec for each exposed property names and types.
+pub struct UnknownNodeProperties {
+    pub id: NodeId,
+    pub name: Option<String>,
+    pub active: bool,
+    pub transform: AffineTransform,
+    pub children: Option<Vec<NodeId>>,
+    pub opacity: f32,
+    pub blend_mode: BlendMode,
+
+    pub size: Option<Size>,
+    pub point_count: Option<usize>,
+    pub inner_radius: f32,
+
+    /// start angle in degrees
+    /// default is 0.0
+    pub start_angle: f32,
+    /// sweep angle in degrees (end_angle = start_angle + angle)
+    pub angle: Option<f32>,
+
+    /// The scalar corner radius of the shape.
+    pub corner_radius: f32,
+
+    /// The top-left corner [Radius] of the rectangular shape.
+    pub corner_radius_top_left: Option<Radius>,
+    /// The top-right corner [Radius] of the rectangular shape.
+    pub corner_radius_top_right: Option<Radius>,
+    /// The bottom-right corner [Radius] of the rectangular shape.
+    pub corner_radius_bottom_right: Option<Radius>,
+    /// The bottom-left corner [Radius] of the rectangular shape.
+    pub corner_radius_bottom_left: Option<Radius>,
+    // #endregion
+    /// The paint used to fill the interior of the shape.
+    pub fills: Vec<Paint>,
+
+    /// The stroke paint used to outline the shape.
+    pub strokes: Vec<Paint>,
+    /// The stroke width used to outline the shape.
+    pub stroke_width: f32,
+    /// The stroke align used to outline the shape.
+    pub stroke_align: StrokeAlign,
+    /// The stroke dash array used to outline the shape.
+    pub stroke_dash_array: Option<Vec<f32>>,
+
+    /// The effects applied to the shape.
+    pub effects: LayerEffects,
+
+    /// Text content (plain UTF-8).
+    pub text: Option<String>,
+    /// Font & fill appearance.
+    pub text_style: Option<TextStyle>,
+    /// Horizontal alignment.
+    pub text_align: Option<TextAlign>,
+    /// Vertical alignment.
+    pub text_align_vertical: Option<TextAlignVertical>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Node {
     Error(ErrorNode),
@@ -260,6 +318,16 @@ pub struct ContainerNode {
     pub clip: bool,
 }
 
+impl ContainerNode {
+    pub fn to_own_shape(&self) -> RRectShape {
+        RRectShape {
+            width: self.size.width,
+            height: self.size.height,
+            corner_radius: self.corner_radius,
+        }
+    }
+}
+
 impl NodeFillsMixin for ContainerNode {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = vec![fill];
@@ -293,6 +361,16 @@ impl NodeGeometryMixin for ContainerNode {
     }
 }
 
+impl NodeShapeMixin for ContainerNode {
+    fn to_shape(&self) -> Shape {
+        Shape::RRect(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        build_rrect_path(&self.to_own_shape())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RectangleNode {
     pub id: NodeId,
@@ -309,6 +387,16 @@ pub struct RectangleNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+}
+
+impl RectangleNode {
+    pub fn to_own_shape(&self) -> RRectShape {
+        RRectShape {
+            width: self.size.width,
+            height: self.size.height,
+            corner_radius: self.corner_radius,
+        }
+    }
 }
 
 impl NodeFillsMixin for RectangleNode {
@@ -386,6 +474,16 @@ pub struct ImageNode {
     pub hash: String,
 }
 
+impl ImageNode {
+    pub fn to_own_shape(&self) -> RRectShape {
+        RRectShape {
+            width: self.size.width,
+            height: self.size.height,
+            corner_radius: self.corner_radius,
+        }
+    }
+}
+
 impl NodeGeometryMixin for ImageNode {
     fn rect(&self) -> Rectangle {
         Rectangle {
@@ -446,6 +544,8 @@ pub struct EllipseNode {
 
     /// sweep angle in degrees (end_angle = start_angle + angle)
     pub angle: Option<f32>,
+
+    pub corner_radius: Option<f32>,
 }
 
 impl NodeFillsMixin for EllipseNode {
@@ -476,12 +576,13 @@ impl NodeShapeMixin for EllipseNode {
                     inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
                 });
             } else {
-                return Shape::EllipticalArc(EllipticalArcShape {
+                return Shape::EllipticalRingSector(EllipticalRingSectorShape {
                     width: w,
                     height: h,
                     inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
                     start_angle: self.start_angle,
                     angle: angle,
+                    corner_radius: self.corner_radius.unwrap_or(0.0),
                 });
             }
         }
@@ -611,12 +712,12 @@ pub struct PolygonNode {
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
 
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
-    pub stroke_dash_array: Option<Vec<f32>>,
 }
 
 impl NodeFillsMixin for PolygonNode {
@@ -698,11 +799,11 @@ pub struct RegularPolygonNode {
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
-    pub stroke_dash_array: Option<Vec<f32>>,
 }
 
 impl NodeFillsMixin for RegularPolygonNode {
@@ -739,11 +840,12 @@ impl NodeGeometryMixin for RegularPolygonNode {
 }
 
 impl RegularPolygonNode {
-    pub fn to_own_shape(&self) -> EllipticalRegularPolygonShape {
-        EllipticalRegularPolygonShape {
+    pub fn to_own_shape(&self) -> RegularPolygonShape {
+        RegularPolygonShape {
             width: self.size.width,
             height: self.size.height,
             point_count: self.point_count,
+            corner_radius: self.corner_radius,
         }
     }
 
@@ -754,7 +856,7 @@ impl RegularPolygonNode {
 
 impl NodeShapeMixin for RegularPolygonNode {
     fn to_shape(&self) -> Shape {
-        Shape::EllipticalRegularPolygon(self.to_own_shape())
+        Shape::RegularPolygon(self.to_own_shape())
     }
 
     fn to_path(&self) -> skia_safe::Path {
@@ -852,7 +954,7 @@ impl NodeGeometryMixin for RegularStarPolygonNode {
 
 impl NodeShapeMixin for RegularStarPolygonNode {
     fn to_shape(&self) -> Shape {
-        Shape::EllipticalRegularStar(self.to_own_shape())
+        Shape::RegularStarPolygon(self.to_own_shape())
     }
 
     fn to_path(&self) -> skia_safe::Path {
@@ -865,12 +967,13 @@ impl RegularStarPolygonNode {
         build_star_points(&self.to_own_shape())
     }
 
-    pub fn to_own_shape(&self) -> EllipticalRegularStarShape {
-        EllipticalRegularStarShape {
+    pub fn to_own_shape(&self) -> RegularStarShape {
+        RegularStarShape {
             width: self.size.width,
             height: self.size.height,
             inner_radius_ratio: self.inner_radius,
             point_count: self.point_count,
+            corner_radius: self.corner_radius,
         }
     }
 }

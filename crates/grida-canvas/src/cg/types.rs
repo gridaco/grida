@@ -10,6 +10,10 @@ pub struct CGPoint {
 }
 
 impl CGPoint {
+    pub fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
+    }
+
     /// Subtracts a scaled vector from this point.
     ///
     /// # Arguments
@@ -136,10 +140,22 @@ pub enum StrokeAlign {
     Outside,
 }
 
+impl Default for StrokeAlign {
+    fn default() -> Self {
+        StrokeAlign::Inside
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Radius {
     pub rx: f32,
     pub ry: f32,
+}
+
+impl Default for Radius {
+    fn default() -> Self {
+        Self::zero()
+    }
 }
 
 impl Radius {
@@ -164,6 +180,25 @@ impl Radius {
 
     pub fn is_uniform(&self) -> bool {
         self.rx == self.ry
+    }
+
+    pub fn tuple(&self) -> (f32, f32) {
+        (self.rx, self.ry)
+    }
+}
+
+impl Into<CGPoint> for Radius {
+    fn into(self) -> CGPoint {
+        CGPoint {
+            x: self.rx,
+            y: self.ry,
+        }
+    }
+}
+
+impl Into<(f32, f32)> for Radius {
+    fn into(self) -> (f32, f32) {
+        (self.rx, self.ry)
     }
 }
 
@@ -231,6 +266,12 @@ pub enum TextTransform {
     Capitalize,
 }
 
+impl Default for TextTransform {
+    fn default() -> Self {
+        TextTransform::None
+    }
+}
+
 /// Supported text decoration modes.
 ///
 /// Only `Underline` and `None` are supported in the current version.
@@ -267,6 +308,12 @@ pub enum TextAlign {
     Justify,
 }
 
+impl Default for TextAlign {
+    fn default() -> Self {
+        TextAlign::Left
+    }
+}
+
 /// Supported vertical alignment values for text.
 ///
 /// In CSS, this maps to `align-content`.
@@ -281,6 +328,12 @@ pub enum TextAlignVertical {
     Center,
     #[serde(rename = "bottom")]
     Bottom,
+}
+
+impl Default for TextAlignVertical {
+    fn default() -> Self {
+        TextAlignVertical::Top
+    }
 }
 
 /// Font weight value (1-1000).
@@ -356,6 +409,7 @@ pub enum Paint {
     Solid(SolidPaint),
     LinearGradient(LinearGradientPaint),
     RadialGradient(RadialGradientPaint),
+    SweepGradient(SweepGradientPaint),
     Image(ImagePaint),
 }
 
@@ -365,7 +419,25 @@ impl Paint {
             Paint::Solid(solid) => solid.opacity,
             Paint::LinearGradient(gradient) => gradient.opacity,
             Paint::RadialGradient(gradient) => gradient.opacity,
+            Paint::SweepGradient(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum GradientPaint {
+    Linear(LinearGradientPaint),
+    Radial(RadialGradientPaint),
+    Sweep(SweepGradientPaint),
+}
+
+impl GradientPaint {
+    pub fn opacity(&self) -> f32 {
+        match self {
+            GradientPaint::Linear(gradient) => gradient.opacity,
+            GradientPaint::Radial(gradient) => gradient.opacity,
+            GradientPaint::Sweep(gradient) => gradient.opacity,
         }
     }
 }
@@ -436,6 +508,13 @@ pub struct LinearGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct RadialGradientPaint {
+    pub transform: AffineTransform,
+    pub stops: Vec<GradientStop>,
+    pub opacity: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct SweepGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,

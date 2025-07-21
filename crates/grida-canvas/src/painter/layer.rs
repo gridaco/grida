@@ -1,11 +1,12 @@
 use super::geometry::{
-    boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes, stroke_geometry,
-    PainterShape,
+    boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes, PainterShape,
 };
 use crate::cache::geometry::GeometryCache;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
+use crate::shape::*;
+use crate::sk;
 use math2::transform::AffineTransform;
 use skia_safe::Path;
 
@@ -585,9 +586,7 @@ impl LayerList {
                             let shape = build_shape(&IntrinsicSizeNode::Container(n.clone()));
                             let mut path = shape.to_path();
                             let relative_transform = current_inv.compose(&world_transform);
-                            path.transform(&crate::painter::cvt::sk_matrix(
-                                relative_transform.matrix,
-                            ));
+                            path.transform(&sk::sk_matrix(relative_transform.matrix));
 
                             clip_shapes.push((
                                 PainterShape::from_path(path),
@@ -601,9 +600,7 @@ impl LayerList {
                                 .get_world_transform(&id)
                                 .unwrap_or_else(AffineTransform::identity);
                             let relative_transform = current_inv.compose(&world_transform);
-                            path.transform(&crate::painter::cvt::sk_matrix(
-                                relative_transform.matrix,
-                            ));
+                            path.transform(&sk::sk_matrix(relative_transform.matrix));
 
                             clip_shapes.push((
                                 PainterShape::from_path(path),

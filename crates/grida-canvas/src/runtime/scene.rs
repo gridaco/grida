@@ -2,8 +2,9 @@ use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
 use crate::cg::types::*;
 use crate::node::schema::*;
 use crate::painter::layer::Layer;
-use crate::painter::{cvt, Painter};
+use crate::painter::Painter;
 use crate::runtime::counter::FrameCounter;
+use crate::sk;
 use crate::{
     cache,
     runtime::camera::Camera2D,
@@ -424,7 +425,7 @@ impl Renderer {
         canvas.save();
 
         // Apply camera transform
-        canvas.concat(&cvt::sk_matrix(self.camera.view_matrix().matrix));
+        canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
         // draw image cache tiles
         for tk in plan.tiles.iter() {
@@ -530,7 +531,7 @@ impl Renderer {
         canvas.save();
 
         // Apply camera transform
-        canvas.concat(&cvt::sk_matrix(self.camera.view_matrix().matrix));
+        canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
         // draw picture regions
         let painter = Painter::new(canvas, self.fonts.clone(), self.images.clone());

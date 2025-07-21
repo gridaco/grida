@@ -53,6 +53,12 @@ pub enum JSONPaint {
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
     },
+    #[serde(rename = "sweep_gradient")]
+    SweepGradient {
+        id: Option<String>,
+        transform: Option<[[f32; 3]; 2]>,
+        stops: Vec<JSONGradientStop>,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,6 +149,18 @@ impl From<Option<JSONPaint>> for Paint {
                     opacity: 1.0,
                 })
             }
+            Some(JSONPaint::SweepGradient {
+                transform, stops, ..
+            }) => {
+                let stops = stops.into_iter().map(|s| s.into()).collect();
+                Paint::SweepGradient(SweepGradientPaint {
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    stops,
+                    opacity: 1.0,
+                })
+            }
             None => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 0),
                 opacity: 1.0,
@@ -203,12 +221,8 @@ pub struct JSONUnknownNodeProperties {
     #[serde(rename = "height", deserialize_with = "de_css_length")]
     pub height: f32,
 
-    #[serde(
-        rename = "cornerRadius",
-        default,
-        deserialize_with = "de_radius_option"
-    )]
-    pub corner_radius: Option<Radius>,
+    #[serde(rename = "cornerRadius", default)]
+    pub corner_radius: Option<f32>,
     #[serde(
         rename = "cornerRadiusTopLeft",
         default,
@@ -576,6 +590,7 @@ impl From<JSONEllipseNode> for Node {
             inner_radius: node.inner_radius,
             start_angle: node.angle_offset.unwrap_or(0.0),
             angle: node.angle,
+            corner_radius: node.base.corner_radius,
         })
     }
 }
@@ -629,7 +644,7 @@ impl From<JSONRegularPolygonNode> for Node {
                 width: node.base.width,
                 height: node.base.height,
             },
-            corner_radius: 0.0,
+            corner_radius: node.base.corner_radius.unwrap_or(0.0),
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
@@ -660,7 +675,7 @@ impl From<JSONRegularStarPolygonNode> for Node {
                 width: node.base.width,
                 height: node.base.height,
             },
-            corner_radius: 0.0,
+            corner_radius: node.base.corner_radius.unwrap_or(0.0),
             inner_radius: node.inner_radius,
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
@@ -829,13 +844,13 @@ where
 }
 
 fn merge_corner_radius(
-    corner_radius: Option<Radius>,
+    corner_radius: Option<f32>,
     corner_radius_top_left: Option<Radius>,
     corner_radius_top_right: Option<Radius>,
     corner_radius_bottom_right: Option<Radius>,
     corner_radius_bottom_left: Option<Radius>,
 ) -> RectangularCornerRadius {
-    let mut r = RectangularCornerRadius::all(corner_radius.unwrap_or(Radius::zero()));
+    let mut r = RectangularCornerRadius::circular(corner_radius.unwrap_or(0.0));
     if let Some(corner_radius_top_left) = corner_radius_top_left {
         r.tl = corner_radius_top_left;
     }

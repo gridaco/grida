@@ -1,5 +1,5 @@
 use cg::cg::types::*;
-use cg::painter::geometry::stroke_geometry;
+use cg::shape::*;
 use skia_safe::Path;
 
 #[test]

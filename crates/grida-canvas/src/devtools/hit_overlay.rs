@@ -7,6 +7,7 @@ use crate::painter::{
 };
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::FontRepository;
+use crate::sk;
 use skia_safe::{textlayout, Color, Font, Paint, PaintStyle, Path, Point, Rect, Surface};
 
 thread_local! {
@@ -93,8 +94,8 @@ impl HitOverlay {
                             _ => base.shape.to_path(),
                         }
                     };
-                    path.transform(&cvt::sk_matrix(base.transform.matrix));
-                    path.transform(&cvt::sk_matrix(camera.view_matrix().matrix));
+                    path.transform(&sk::sk_matrix(base.transform.matrix));
+                    path.transform(&sk::sk_matrix(camera.view_matrix().matrix));
 
                     // background for hit text
                     let hit_text_rect = Rect::from_xywh(10.0, 80.0, 300.0, 40.0);

@@ -87,7 +87,7 @@ async fn demo_shapes() -> Scene {
         polygon.name = Some(format!("Polygon {}", i + 1));
         polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
         polygon.points = points;
-        polygon.corner_radius = 16.0;
+        polygon.corner_radius = 8.0;
         polygon.fills = vec![Paint::Solid(SolidPaint {
             color: CGColor(
                 200 - (i * 20) as u8,
@@ -120,6 +120,7 @@ async fn demo_shapes() -> Scene {
             ), // Fading gray
             opacity: 1.0,
         })];
+        regular_polygon.corner_radius = 8.0;
         all_shape_ids.push(regular_polygon.id.clone());
         repository.insert(Node::RegularPolygon(regular_polygon));
     }
@@ -175,6 +176,7 @@ async fn demo_shapes() -> Scene {
             ), // Fading gray
             opacity: 1.0,
         })];
+        star.corner_radius = 8.0;
         all_shape_ids.push(star.id.clone());
         repository.insert(Node::RegularStarPolygon(star));
     }
@@ -200,6 +202,7 @@ async fn demo_shapes() -> Scene {
             ), // Fading gray
             opacity: 1.0,
         })];
+        arc.corner_radius = Some(8.0);
         all_shape_ids.push(arc.id.clone());
         repository.insert(Node::Ellipse(arc));
     }

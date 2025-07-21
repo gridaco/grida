@@ -8,6 +8,8 @@ use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::runtime::repository::{FontRepository, ImageRepository};
+use crate::shape::*;
+use crate::sk;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
 use std::cell::RefCell;
@@ -57,7 +59,7 @@ impl<'a> Painter<'a> {
     fn with_transform<F: FnOnce()>(&self, transform: &[[f32; 3]; 2], f: F) {
         let canvas = self.canvas;
         canvas.save();
-        canvas.concat(&cvt::sk_matrix(*transform));
+        canvas.concat(&sk::sk_matrix(*transform));
         f();
         canvas.restore();
     }
@@ -241,7 +243,7 @@ impl<'a> Painter<'a> {
                 (image.width() as f32, image.height() as f32),
                 (shape.rect.width(), shape.rect.height()),
             );
-            canvas.concat(&cvt::sk_matrix(m));
+            canvas.concat(&sk::sk_matrix(m));
 
             canvas.draw_image_rect(
                 &image,
@@ -321,7 +323,7 @@ impl<'a> Painter<'a> {
                         (image.width() as f32, image.height() as f32),
                         (shape.rect.width(), shape.rect.height()),
                     );
-                    canvas.concat(&cvt::sk_matrix(m));
+                    canvas.concat(&sk::sk_matrix(m));
 
                     canvas.draw_image_rect(
                         &image,
