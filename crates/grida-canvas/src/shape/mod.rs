@@ -1,22 +1,24 @@
-pub mod arc;
 pub mod corner;
 pub mod ellipse;
+pub mod ellipse_ring;
+pub mod ellipse_ring_sector;
+pub mod ellipse_sector;
 pub mod polygon;
-pub mod ring;
-pub mod rpolygon;
+pub mod regular_polygon;
+pub mod regular_star;
 pub mod rrect;
-pub mod star;
 pub mod stroke;
 pub mod vn;
 
-pub use arc::*;
 pub use corner::*;
 pub use ellipse::*;
+pub use ellipse_ring::*;
+pub use ellipse_ring_sector::*;
+pub use ellipse_sector::*;
 pub use polygon::*;
-pub use ring::*;
-pub use rpolygon::*;
+pub use regular_polygon::*;
+pub use regular_star::*;
 pub use rrect::*;
-pub use star::*;
 pub use stroke::*;
 pub use vn::*;
 
@@ -24,10 +26,11 @@ pub enum Shape {
     RRect(RRectShape),
     SimplePolygon(SimplePolygonShape),
     Ellipse(EllipseShape),
-    EllipticalArc(EllipticalArcShape),
+    EllipticalRingSector(EllipticalRingSectorShape),
+    EllipticalSector(EllipticalSectorShape),
     EllipticalRing(EllipticalRingShape),
-    EllipticalRegularStar(EllipticalRegularStarShape),
-    EllipticalRegularPolygon(EllipticalRegularPolygonShape),
+    RegularStarPolygon(RegularStarShape),
+    RegularPolygon(RegularPolygonShape),
 }
 
 impl Into<skia_safe::Path> for &Shape {
@@ -36,10 +39,11 @@ impl Into<skia_safe::Path> for &Shape {
             Shape::RRect(shape) => build_rrect_path(&shape),
             Shape::SimplePolygon(shape) => build_simple_polygon_path(&shape),
             Shape::Ellipse(shape) => build_ellipse_path(&shape),
-            Shape::EllipticalArc(shape) => build_arc_path(&shape),
+            Shape::EllipticalRingSector(shape) => build_ring_sector_path(&shape),
+            Shape::EllipticalSector(shape) => build_sector_path(&shape),
             Shape::EllipticalRing(shape) => build_ring_path(&shape),
-            Shape::EllipticalRegularStar(shape) => build_star_path(&shape),
-            Shape::EllipticalRegularPolygon(shape) => build_regular_polygon_path(shape),
+            Shape::RegularStarPolygon(shape) => build_star_path(&shape),
+            Shape::RegularPolygon(shape) => build_regular_polygon_path(shape),
         }
     }
 }

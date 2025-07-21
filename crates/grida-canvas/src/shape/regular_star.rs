@@ -3,7 +3,7 @@ use crate::cg::*;
 use skia_safe;
 
 /// A Regular Star Polygon shape (that can have irregular / elliptical dimensions)
-pub struct EllipticalRegularStarShape {
+pub struct RegularStarShape {
     /// width of the box
     pub width: f32,
     /// height of the box
@@ -17,7 +17,7 @@ pub struct EllipticalRegularStarShape {
     pub corner_radius: f32,
 }
 
-pub fn build_star_points(shape: &EllipticalRegularStarShape) -> Vec<CGPoint> {
+pub fn build_star_points(shape: &RegularStarShape) -> Vec<CGPoint> {
     let center_x = shape.width / 2.0;
     let center_y = shape.height / 2.0;
 
@@ -45,7 +45,7 @@ pub fn build_star_points(shape: &EllipticalRegularStarShape) -> Vec<CGPoint> {
     points
 }
 
-pub fn build_star_path(shape: &EllipticalRegularStarShape) -> skia_safe::Path {
+pub fn build_star_path(shape: &RegularStarShape) -> skia_safe::Path {
     let points = build_star_points(shape);
 
     if points.is_empty() {

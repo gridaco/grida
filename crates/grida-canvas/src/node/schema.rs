@@ -576,7 +576,7 @@ impl NodeShapeMixin for EllipseNode {
                     inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
                 });
             } else {
-                return Shape::EllipticalArc(EllipticalArcShape {
+                return Shape::EllipticalRingSector(EllipticalRingSectorShape {
                     width: w,
                     height: h,
                     inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
@@ -840,8 +840,8 @@ impl NodeGeometryMixin for RegularPolygonNode {
 }
 
 impl RegularPolygonNode {
-    pub fn to_own_shape(&self) -> EllipticalRegularPolygonShape {
-        EllipticalRegularPolygonShape {
+    pub fn to_own_shape(&self) -> RegularPolygonShape {
+        RegularPolygonShape {
             width: self.size.width,
             height: self.size.height,
             point_count: self.point_count,
@@ -856,7 +856,7 @@ impl RegularPolygonNode {
 
 impl NodeShapeMixin for RegularPolygonNode {
     fn to_shape(&self) -> Shape {
-        Shape::EllipticalRegularPolygon(self.to_own_shape())
+        Shape::RegularPolygon(self.to_own_shape())
     }
 
     fn to_path(&self) -> skia_safe::Path {
@@ -954,7 +954,7 @@ impl NodeGeometryMixin for RegularStarPolygonNode {
 
 impl NodeShapeMixin for RegularStarPolygonNode {
     fn to_shape(&self) -> Shape {
-        Shape::EllipticalRegularStar(self.to_own_shape())
+        Shape::RegularStarPolygon(self.to_own_shape())
     }
 
     fn to_path(&self) -> skia_safe::Path {
@@ -967,8 +967,8 @@ impl RegularStarPolygonNode {
         build_star_points(&self.to_own_shape())
     }
 
-    pub fn to_own_shape(&self) -> EllipticalRegularStarShape {
-        EllipticalRegularStarShape {
+    pub fn to_own_shape(&self) -> RegularStarShape {
+        RegularStarShape {
             width: self.size.width,
             height: self.size.height,
             inner_radius_ratio: self.inner_radius,

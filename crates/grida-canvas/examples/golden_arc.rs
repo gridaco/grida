@@ -2,7 +2,7 @@ use cg::shape::*;
 use skia_safe::{surfaces, Color, Paint};
 
 fn main() {
-    let shape = EllipticalArcShape {
+    let shape = EllipticalRingSectorShape {
         width: 400.0,
         height: 400.0,
         inner_radius_ratio: 0.5,
@@ -16,7 +16,7 @@ fn main() {
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    let path = build_arc_path(&shape);
+    let path = build_ring_sector_path(&shape);
 
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
