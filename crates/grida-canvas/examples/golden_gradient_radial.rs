@@ -8,7 +8,7 @@ fn main() {
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    let gradient = SweepGradientPaint {
+    let gradient = RadialGradientPaint {
         stops: vec![
             GradientStop {
                 offset: 0.0,
@@ -31,7 +31,7 @@ fn main() {
         transform: AffineTransform::identity(),
     };
 
-    let paint = sweep_gradient_paint(&gradient, 1.0, (width as f32, height as f32));
+    let paint = radial_gradient_paint(&gradient, 1.0, (width as f32, height as f32));
 
     canvas.draw_rect(
         Rect::from_xywh(0.0, 0.0, width as f32, height as f32),
@@ -42,5 +42,5 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write("goldens/gradient_sweep.png", data.as_bytes()).unwrap();
+    std::fs::write("goldens/gradient_radial.png", data.as_bytes()).unwrap();
 }

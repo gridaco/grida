@@ -1,9 +1,8 @@
-use crate::cache::geometry::GeometryCache;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
-use crate::painter::cvt;
 use crate::shape::*;
+use crate::{cache::geometry::GeometryCache, sk};
 use math2::transform::AffineTransform;
 use skia_safe::{Path, RRect, Rect};
 
@@ -258,7 +257,7 @@ pub fn boolean_operation_path(
                 .get_world_transform(child_id)
                 .unwrap_or_else(AffineTransform::identity);
             let relative = inv.compose(&child_world);
-            path.transform(&cvt::sk_matrix(relative.matrix));
+            path.transform(&sk::sk_matrix(relative.matrix));
 
             let op = if i == 0 {
                 BooleanPathOperation::Union

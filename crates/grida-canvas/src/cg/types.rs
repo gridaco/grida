@@ -409,6 +409,7 @@ pub enum Paint {
     Solid(SolidPaint),
     LinearGradient(LinearGradientPaint),
     RadialGradient(RadialGradientPaint),
+    SweepGradient(SweepGradientPaint),
     Image(ImagePaint),
 }
 
@@ -418,7 +419,25 @@ impl Paint {
             Paint::Solid(solid) => solid.opacity,
             Paint::LinearGradient(gradient) => gradient.opacity,
             Paint::RadialGradient(gradient) => gradient.opacity,
+            Paint::SweepGradient(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum GradientPaint {
+    Linear(LinearGradientPaint),
+    Radial(RadialGradientPaint),
+    Sweep(SweepGradientPaint),
+}
+
+impl GradientPaint {
+    pub fn opacity(&self) -> f32 {
+        match self {
+            GradientPaint::Linear(gradient) => gradient.opacity,
+            GradientPaint::Radial(gradient) => gradient.opacity,
+            GradientPaint::Sweep(gradient) => gradient.opacity,
         }
     }
 }
@@ -489,6 +508,13 @@ pub struct LinearGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct RadialGradientPaint {
+    pub transform: AffineTransform,
+    pub stops: Vec<GradientStop>,
+    pub opacity: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct SweepGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
