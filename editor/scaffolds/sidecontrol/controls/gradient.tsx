@@ -4,10 +4,9 @@ import { RGBAColorControl } from "./color";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import * as SliderPrimitive from "@radix-ui/react-slider";
 import InputPropertyNumber from "../ui/number";
 import cmath from "@grida/cmath";
-import { css } from "@/grida-canvas-utils/css";
+import { GradientStopsSlider } from "./gradient-stops";
 
 type GradientPaint =
   | cg.LinearGradientPaint
@@ -71,81 +70,6 @@ export function GradientControl({
         ))}
       </div>
     </div>
-  );
-}
-
-function GradientStopsSlider({
-  stops,
-  onValueChange,
-}: {
-  stops: cg.GradientStop[];
-  onValueChange?: (value: cg.GradientStop[]) => void;
-}) {
-  const step = 0.01;
-  const threshold = step * 20;
-
-  const offsets = stops.map((stop) => stop.offset);
-
-  const handleValueChange = (changes: number[]) => {
-    const updatedValues = [...offsets];
-
-    changes.forEach((newVal) => {
-      const isNewPoint = !offsets.some(
-        (existingVal) => Math.abs(existingVal - newVal) < threshold
-      );
-      if (isNewPoint) {
-        updatedValues.push(newVal); // Add the new value if it’s not close to any existing value
-      } else {
-        // If not new, update the closest value
-        const closestIndex = offsets.findIndex(
-          (existingVal) => Math.abs(existingVal - newVal) < threshold
-        );
-        updatedValues[closestIndex] = newVal;
-      }
-    });
-
-    const newstops = updatedValues
-      .sort((a, b) => a - b)
-      .map((offset, index) => {
-        // get existing stop
-        const prev = stops[index];
-        if (prev) {
-          return { ...prev, offset };
-        } else {
-          return { offset, color: { r: 0, g: 0, b: 0, a: 1 } };
-        }
-      });
-
-    // console.log(updatedValues, newstops);
-
-    onValueChange?.(newstops);
-  };
-
-  return (
-    <SliderPrimitive.Root
-      className="relative flex w-full touch-none select-none items-center"
-      min={0}
-      max={1}
-      step={step}
-      value={offsets}
-      onValueChange={handleValueChange}
-    >
-      <SliderPrimitive.Track
-        className="relative h-2 w-full grow overflow-hidden rounded-full"
-        style={{
-          background: `linear-gradient(to right, ${stops.map((stop) => `${css.toRGBAString(stop.color)} ${stop.offset * 100}%`).join(", ")})`,
-        }}
-      ></SliderPrimitive.Track>
-      {stops.map((stop, index) => (
-        <SliderPrimitive.Thumb
-          key={index}
-          className="block size-4 rounded-full border-2 border-background outline-1 outline-workbench-accent-sky shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-          style={{
-            background: css.toRGBAString(stop.color),
-          }}
-        />
-      ))}
-    </SliderPrimitive.Root>
   );
 }
 
