@@ -48,11 +48,12 @@ impl EllipticalRingSectorShape {
 /// Build a closed arc path for [`EllipticalArcShape`].
 pub fn build_ring_sector_path(shape: &EllipticalRingSectorShape) -> Path {
     if shape.corner_radius <= 0.0 {
-        return __build_ring_sector_path_no_corner_with_arc_to(&shape);
+        __build_ring_sector_path_no_corner_with_arc_to(&shape)
     } else {
-        // FIXME: the corner on arc is not working as expected. - we need to update the path building to align
-        let path = __build_ring_sector_path_no_corner_with_cubic_to(&shape);
-        return build_corner_radius_path(&path, shape.corner_radius);
+        // TODO: this is a trick for implementing the corner to a ring sector.
+        // do it the right way later.
+        #[allow(deprecated)]
+        __build_ring_sector_path_with_corner_6subpath(&shape)
     }
 }
 
@@ -91,6 +92,78 @@ fn __build_ring_sector_path_no_corner_with_arc_to(shape: &EllipticalRingSectorSh
     } else {
         path.line_to((cx, cy));
     }
+
+    path.close();
+
+    path
+}
+
+/// Build a closed arc path for [`EllipticalRingSectorShape`] with corner radius.
+/// This draws arcs for the corners instead of relying on the `corner_path` effect.
+///
+/// **Limitations**
+/// The path will overlap
+///
+/// See:
+/// - https://stackoverflow.com/a/57921952
+#[deprecated]
+fn __build_ring_sector_path_with_corner_6subpath(shape: &EllipticalRingSectorShape) -> Path {
+    let mut path = Path::new();
+
+    let cx = shape._cx();
+    let cy = shape._cy();
+    let rx = shape._rx();
+    let ry = shape._ry();
+    let inner_rx = shape._inner_rx();
+    let inner_ry = shape._inner_ry();
+    let r = shape.corner_radius;
+
+    let start_deg = shape.start_angle;
+    let sweep_deg = shape.angle;
+    let end_deg = start_deg + sweep_deg;
+
+    let start_rad = start_deg.to_radians();
+    let end_rad = end_deg.to_radians();
+
+    // Start point on outer arc
+    let start_x = cx + rx * start_rad.cos();
+    let start_y = cy + ry * start_rad.sin();
+    path.move_to((start_x, start_y));
+
+    // Outer arc
+    let outer_rect = Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0);
+    path.arc_to(outer_rect, start_deg, sweep_deg, false);
+
+    // Determine sweep direction sign
+    let dir = if sweep_deg >= 0.0 { 1.0 } else { -1.0 };
+
+    // Outer finish corner
+    let ofc_x = cx + (rx - r) * end_rad.cos();
+    let ofc_y = cy + (ry - r) * end_rad.sin();
+    let ofc_rect = Rect::from_xywh(ofc_x - r, ofc_y - r, r * 2.0, r * 2.0);
+    path.arc_to(ofc_rect, end_deg, 90.0 * dir, false);
+
+    // Inner finish corner
+    let ifc_x = cx + (inner_rx + r) * end_rad.cos();
+    let ifc_y = cy + (inner_ry + r) * end_rad.sin();
+    let ifc_rect = Rect::from_xywh(ifc_x - r, ifc_y - r, r * 2.0, r * 2.0);
+    path.arc_to(ifc_rect, end_deg + 90.0 * dir, 90.0 * dir, false);
+
+    // Inner arc
+    let inner_rect = Rect::from_xywh(cx - inner_rx, cy - inner_ry, inner_rx * 2.0, inner_ry * 2.0);
+    path.arc_to(inner_rect, end_deg, -sweep_deg, false);
+
+    // Inner start corner
+    let isc_x = cx + (inner_rx + r) * start_rad.cos();
+    let isc_y = cy + (inner_ry + r) * start_rad.sin();
+    let isc_rect = Rect::from_xywh(isc_x - r, isc_y - r, r * 2.0, r * 2.0);
+    path.arc_to(isc_rect, start_deg + 180.0 * dir, 90.0 * dir, false);
+
+    // Outer start corner
+    let osc_x = cx + (rx - r) * start_rad.cos();
+    let osc_y = cy + (ry - r) * start_rad.sin();
+    let osc_rect = Rect::from_xywh(osc_x - r, osc_y - r, r * 2.0, r * 2.0);
+    path.arc_to(osc_rect, start_deg + 270.0 * dir, 90.0 * dir, false);
 
     path.close();
 
@@ -183,6 +256,10 @@ fn __build_ring_sector_path_no_corner_with_cubic_to(shape: &EllipticalRingSector
                 path.cubic_to((*c1x, *c1y), (*c2x, *c2y), (*x, *y));
             }
         }
+
+        // explicit closing line back to the outer start point helps
+        // [`build_corner_radius_path`] apply the corner effect correctly.
+        path.line_to((start_x, start_y));
     } else {
         // If no inner radius, draw line to center
         path.line_to((cx, cy));
