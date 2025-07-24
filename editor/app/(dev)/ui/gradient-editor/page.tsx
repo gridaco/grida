@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { Card } from "@/components/ui/card";
+import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +18,7 @@ import {
 } from "@/grida-canvas-react-gradient";
 import type cg from "@grida/cg";
 import { css } from "@/grida-canvas-utils/css";
+import { useWindowSize } from "@uidotdev/usehooks";
 
 // Helper function to convert RGBA8888 to hex string
 const rgbaToHex = (color: cg.RGBA8888): string => {
@@ -36,11 +36,52 @@ const hexToRgba = (hex: string): cg.RGBA8888 => {
   return { r, g, b, a: 1 };
 };
 
-export default function GradientEditorDemoPage() {
-  const [gradientType, setGradientType] = useState<GradientType>("linear");
-  const [readonly, setReadonly] = useState(false);
+// Canvas component for the gradient editor
+function Canvas({
+  gradientType,
+  editor,
+  generateGradientCSS,
+  width,
+  height,
+}: {
+  gradientType: GradientType;
+  editor: ReturnType<typeof useGradient>;
+  generateGradientCSS: () => string;
+  width: number;
+  height: number;
+}) {
+  return (
+    <div className="relative w-full h-full p-6">
+      <div className="relative w-full h-full rounded-xl shadow-2xl overflow-hidden">
+        <GradientEditor
+          width={width}
+          height={height}
+          gradientType={gradientType}
+          editor={editor}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: generateGradientCSS(),
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
-  // Create the gradient editor instance
+// Main gradient editor component that only renders when size is ready
+function GradientEditorContent() {
+  const [gradientType, setGradientType] = useState<GradientType>("linear");
+  const windowSize = useWindowSize();
+
+  // Calculate dimensions with padding
+  const dimensions = {
+    width: (windowSize.width || 800) - 48, // 24px padding on each side
+    height: (windowSize.height || 600) - 48,
+  };
+
+  // Create the gradient editor instance only when we have dimensions
   const editor = useGradient({
     gradientType,
     initialValue: {
@@ -53,9 +94,8 @@ export default function GradientEditorDemoPage() {
         [0, 1, 0.5],
       ],
     },
-    width: 400,
-    height: 300,
-    readonly,
+    width: dimensions.width,
+    height: dimensions.height,
   });
 
   // Update state when gradient type changes
@@ -80,186 +120,150 @@ export default function GradientEditorDemoPage() {
   }, [gradientType, editor.stops, editor.transform]);
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Advanced Gradient Editor</h1>
-          <p>
-            Professional gradient editor supporting linear, radial, and sweep
-            gradients with 2D affine transforms. Now fully controlled via
-            useGradient hook.
+    <div className="fixed inset-0 overflow-hidden">
+      {/* Floating Title */}
+      <div className="absolute top-12 left-12 z-50">
+        <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 border shadow-lg">
+          <h1 className="text-lg font-bold mb-0.5 font-mono">
+            @grida/react-gradient-editor
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            Interactive gradient creation tool
           </p>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Editor */}
-          <div className="lg:col-span-2">
-            <Card className="p-4">
-              <div className="space-y-4">
-                {/* Gradient Type Selector */}
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-medium">Gradient Type:</label>
-                  <Select
-                    value={gradientType}
-                    onValueChange={handleGradientTypeChange}
-                    disabled={readonly}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="linear">Linear</SelectItem>
-                      <SelectItem value="radial">Radial</SelectItem>
-                      <SelectItem value="sweep">Sweep</SelectItem>
-                    </SelectContent>
-                  </Select>
+      {/* Full Screen Gradient Canvas */}
+      <Canvas
+        gradientType={gradientType}
+        editor={editor}
+        generateGradientCSS={generateGradientCSS}
+        width={dimensions.width}
+        height={dimensions.height}
+      />
 
-                  <Button
-                    variant={readonly ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setReadonly(!readonly)}
-                  >
-                    {readonly ? "Enable Edit" : "Readonly"}
-                  </Button>
-                </div>
-
-                {/* Gradient Canvas */}
-                <div
-                  className="relative"
-                  style={{
-                    width: 400,
-                    height: 300,
-                  }}
-                >
-                  <GradientEditor
-                    width={400}
-                    height={300}
-                    gradientType={gradientType}
-                    editor={editor}
-                  />
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background: generateGradientCSS(),
-                    }}
-                  />
-                </div>
-
-                {/* Instructions */}
-                <div className="text-xs p-2 rounded border">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div>
-                      <strong>Controls:</strong> Blue=Center/Start,
-                      Green=End/Radius, Purple=Scale
-                    </div>
-                    <div>
-                      <strong>Tracks:</strong>{" "}
-                      {gradientType === "sweep"
-                        ? "Ellipse track for stops"
-                        : "Line track for stops"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
+      {/* Floating Control Bar at Bottom Center */}
+      <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="bg-background/80 backdrop-blur-sm rounded-lg p-4 border shadow-lg min-w-[400px]">
+          <div className="flex items-center gap-4 mb-4">
+            {/* Gradient Type Selector */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Type:</label>
+              <Select
+                value={gradientType}
+                onValueChange={handleGradientTypeChange}
+              >
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="linear">Linear</SelectItem>
+                  <SelectItem value="radial">Radial</SelectItem>
+                  <SelectItem value="sweep">Sweep</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Control Panel */}
-          <div className="space-y-4">
-            {/* Color stop controls */}
-            {editor.focusedStop !== null &&
-              (() => {
-                const focusedStopData = editor.stops[editor.focusedStop];
-                if (!focusedStopData) return null;
+          {/* Color Stop Controls */}
+          {editor.focusedStop !== null &&
+            (() => {
+              const focusedStopData = editor.stops[editor.focusedStop];
+              if (!focusedStopData) return null;
 
-                return (
-                  <Card className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">
-                        Color Stop {editor.focusedStop + 1}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => {
-                          if (readonly) return;
-                          if (editor.stops.length > 2) {
-                            editor.removeStop(editor.focusedStop!);
-                          }
-                        }}
-                        disabled={editor.stops.length <= 2 || readonly}
-                        aria-label="Delete selected color stop"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+              return (
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">
+                      Stop {editor.focusedStop + 1}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        if (editor.stops.length > 2) {
+                          editor.removeStop(editor.focusedStop!);
+                        }
+                      }}
+                      disabled={editor.stops.length <= 2}
+                      aria-label="Delete selected color stop"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs">Position</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="1"
-                          step="0.01"
-                          value={focusedStopData.offset.toFixed(2)}
-                          onChange={(e) => {
-                            if (readonly) return;
-                            const pos = Math.max(
-                              0,
-                              Math.min(
-                                1,
-                                Number.parseFloat(e.target.value) || 0
-                              )
-                            );
-                            editor.updateStopOffset(editor.focusedStop!, pos);
-                          }}
-                          className="h-8"
-                          disabled={readonly}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs">Color</label>
-                        <Input
-                          type="color"
-                          value={rgbaToHex(focusedStopData.color)}
-                          onChange={(e) => {
-                            if (readonly) return;
-                            const hex = e.target.value;
-                            const newColor = hexToRgba(hex);
-                            editor.updateStopColor(
-                              editor.focusedStop!,
-                              newColor
-                            );
-                          }}
-                          className="h-8"
-                          disabled={readonly}
-                        />
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })()}
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs">Position</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={focusedStopData.offset.toFixed(2)}
+                      onChange={(e) => {
+                        const pos = Math.max(
+                          0,
+                          Math.min(1, Number.parseFloat(e.target.value) || 0)
+                        );
+                        editor.updateStopOffset(editor.focusedStop!, pos);
+                      }}
+                      className="w-16"
+                    />
+                  </div>
 
-            {/* Info */}
-            <Card className="p-4">
-              <div className="text-xs space-y-1">
-                <div>Type: {gradientType}</div>
-                <div>Stops: {editor.stops.length}</div>
-                <div>
-                  Focused:{" "}
-                  {editor.focusedStop !== null
-                    ? "Color Stop"
-                    : editor.focusedControl
-                      ? `Point ${editor.focusedControl}`
-                      : "None"}
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs">Color</label>
+                    <Input
+                      type="color"
+                      value={rgbaToHex(focusedStopData.color)}
+                      onChange={(e) => {
+                        const hex = e.target.value;
+                        const newColor = hexToRgba(hex);
+                        editor.updateStopColor(editor.focusedStop!, newColor);
+                      }}
+                      className="w-12"
+                    />
+                  </div>
                 </div>
-                <div>Mode: {readonly ? "Readonly" : "Editable"}</div>
-              </div>
-            </Card>
+              );
+            })()}
+
+          {/* Info Display */}
+          <div className="text-xs text-muted-foreground mt-2">
+            <span>Stops: {editor.stops.length}</span>
+            <span className="mx-2">•</span>
+            <span>
+              Focus:{" "}
+              {editor.focusedStop !== null
+                ? "Color Stop"
+                : editor.focusedControl
+                  ? `Point ${editor.focusedControl}`
+                  : "None"}
+            </span>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+// Root component that measures window size and conditionally renders the editor
+export default function GradientEditorDemoPage() {
+  const windowSize = useWindowSize();
+
+  // Only render the real component when we have window dimensions
+  if (!windowSize.width || !windowSize.height) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">
+            Initializing gradient editor...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return <GradientEditorContent />;
 }
