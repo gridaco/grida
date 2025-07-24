@@ -2,6 +2,12 @@ import { produce } from "immer";
 import type cg from "@grida/cg";
 
 export type GradientType = "linear" | "radial" | "sweep";
+
+export type GradientValue = {
+  transform: cg.AffineTransform;
+  stops: cg.GradientStop[];
+};
+
 export interface GradientTransform {
   // 2D affine transform matrix [[a, b, tx], [d, e, ty]]
   a: number;

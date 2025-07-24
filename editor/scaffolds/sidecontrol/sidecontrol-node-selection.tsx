@@ -1192,6 +1192,14 @@ function SelectedNodeProperties({
                 value={fill}
                 onValueChange={actions.fill}
                 removable
+                onOpenChange={(open) => {
+                  if (open) {
+                    instance.tryEnterContentEditMode(node_id, "fill/gradient");
+                  } else {
+                    instance.tryExitContentEditMode();
+                  }
+                  //
+                }}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>

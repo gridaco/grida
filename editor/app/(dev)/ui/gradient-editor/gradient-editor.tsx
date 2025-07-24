@@ -7,9 +7,11 @@ import {
   createInitialState,
   type GradientState,
   type GradientType,
+  type GradientValue,
   getControlPoints,
   getStopMarkerTransform,
 } from "./gradient-reducer";
+import cg from "@grida/cg";
 
 // Helper function to convert RGBA8888 to CSS rgba string
 const rgbaToString = (color: {
@@ -26,24 +28,23 @@ export interface GradientEditorProps {
   height?: number;
   gradientType: GradientType;
   initialState?: Partial<GradientState>;
-  onChange?: (state: GradientState) => void;
+  onStateChange?: (state: GradientState) => void;
+  onValueChange?: (value: GradientValue) => void;
   readonly?: boolean;
   background?: string;
   preventDefault?: boolean;
   stopPropagation?: boolean;
 }
 
-// Constants
-const STOP_OFFSET = 25;
 const STOP_SIZE = 18;
-const CONTROL_SIZE = 8;
 
 export default function GradientEditor({
   width = 400,
   height = 300,
   gradientType,
   initialState = {},
-  onChange,
+  onStateChange,
+  onValueChange,
   readonly = false,
   background,
   preventDefault = true,
@@ -57,16 +58,20 @@ export default function GradientEditor({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Call onChange when state changes
-  const handleStateChange = useCallback(
-    (action: any) => {
-      dispatch(action);
-      // Call onChange with the new state after dispatch
-      const newState = gradientReducer(state, action);
-      onChange?.(newState);
-    },
-    [state, onChange]
-  );
+  useEffect(() => {
+    onStateChange?.(state);
+  }, [state, onStateChange]);
+
+  useEffect(() => {
+    const _t = state.transform;
+    onValueChange?.({
+      stops: state.stops,
+      transform: [
+        [_t.a, _t.b, _t.tx],
+        [_t.d, _t.e, _t.ty],
+      ],
+    });
+  }, [state.stops, state.transform, onValueChange]);
 
   // Handle mouse events only if not readonly
   const handlePointerDown = useCallback(
@@ -79,19 +84,12 @@ export default function GradientEditor({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      handleStateChange({
+      dispatch({
         type: "HANDLE_POINTER_DOWN",
         payload: { x, y, width, height },
       });
     },
-    [
-      readonly,
-      preventDefault,
-      stopPropagation,
-      handleStateChange,
-      width,
-      height,
-    ]
+    [readonly, preventDefault, stopPropagation, dispatch, width, height]
   );
 
   const handlePointerMove = useCallback(
@@ -104,19 +102,12 @@ export default function GradientEditor({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      handleStateChange({
+      dispatch({
         type: "HANDLE_POINTER_MOVE",
         payload: { x, y, width, height },
       });
     },
-    [
-      readonly,
-      preventDefault,
-      stopPropagation,
-      handleStateChange,
-      width,
-      height,
-    ]
+    [readonly, preventDefault, stopPropagation, dispatch, width, height]
   );
 
   const handlePointerUp = useCallback(
@@ -124,9 +115,9 @@ export default function GradientEditor({
       if (preventDefault) e?.preventDefault();
       if (stopPropagation) e?.stopPropagation();
       if (readonly) return;
-      handleStateChange({ type: "HANDLE_POINTER_UP" });
+      dispatch({ type: "HANDLE_POINTER_UP" });
     },
-    [readonly, handleStateChange, preventDefault, stopPropagation]
+    [readonly, dispatch, preventDefault, stopPropagation]
   );
 
   const handlePointerLeave = useCallback(
@@ -134,9 +125,9 @@ export default function GradientEditor({
       if (preventDefault) e?.preventDefault();
       if (stopPropagation) e?.stopPropagation();
       if (readonly) return;
-      handleStateChange({ type: "HANDLE_POINTER_LEAVE" });
+      dispatch({ type: "HANDLE_POINTER_LEAVE" });
     },
-    [readonly, handleStateChange, preventDefault, stopPropagation]
+    [readonly, dispatch, preventDefault, stopPropagation]
   );
 
   // Register global pointer events for dragging outside bounds
@@ -268,7 +259,7 @@ export default function GradientEditor({
           if (preventDefault) e.preventDefault();
           if (stopPropagation) e.stopPropagation();
           if (!readonly)
-            handleStateChange({ type: "SET_FOCUSED_CONTROL", payload: "A" });
+            dispatch({ type: "SET_FOCUSED_CONTROL", payload: "A" });
         }}
       />
 
@@ -283,7 +274,7 @@ export default function GradientEditor({
           if (preventDefault) e.preventDefault();
           if (stopPropagation) e.stopPropagation();
           if (!readonly)
-            handleStateChange({ type: "SET_FOCUSED_CONTROL", payload: "B" });
+            dispatch({ type: "SET_FOCUSED_CONTROL", payload: "B" });
         }}
       />
 
@@ -298,7 +289,7 @@ export default function GradientEditor({
           if (preventDefault) e.preventDefault();
           if (stopPropagation) e.stopPropagation();
           if (!readonly)
-            handleStateChange({ type: "SET_FOCUSED_CONTROL", payload: "C" });
+            dispatch({ type: "SET_FOCUSED_CONTROL", payload: "C" });
         }}
       />
 
@@ -325,7 +316,7 @@ export default function GradientEditor({
               if (preventDefault) e.preventDefault();
               if (stopPropagation) e.stopPropagation();
               if (!readonly)
-                handleStateChange({
+                dispatch({
                   type: "SET_FOCUSED_STOP",
                   payload: index,
                 });

@@ -25,16 +25,30 @@ import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
+import { PopoverContentProps } from "@radix-ui/react-popover";
+
+const popover_content_on_pointer_down_outside: PopoverContentProps["onPointerDownOutside"] =
+  (e) => {
+    // if the target contains 'data-popover-no-close', ignore the event
+    if (
+      e.target instanceof HTMLElement &&
+      e.target.closest("[data-popover-no-close]")
+    ) {
+      e.preventDefault();
+    }
+  };
 
 export function PaintControl({
   value,
   onValueChange,
   removable,
+  onOpenChange,
 }: {
   value?: grida.program.nodes.i.props.PropsPaintValue;
   onValueChange?: (
     value: ComputedPaintWithoutID | TokenizedPaint | null
   ) => void;
+  onOpenChange?: (open: boolean) => void;
   removable?: boolean;
 }) {
   if (tokens.is.tokenized(value)) {
@@ -49,6 +63,7 @@ export function PaintControl({
       <ComputedPaintControl
         value={value as ComputedPaint}
         onValueChange={onValueChange}
+        onOpenChange={onOpenChange}
       />
     );
   }
@@ -62,10 +77,12 @@ function ComputedPaintControl({
   value,
   onValueChange,
   removable,
+  onOpenChange,
 }: {
   value?: ComputedPaint;
   onValueChange?: (value: ComputedPaintWithoutID | null) => void;
   removable?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const onTypeChange = useCallback(
     (type: cg.Paint["type"]) => {
@@ -140,7 +157,7 @@ function ComputedPaintControl({
   };
 
   return (
-    <Popover>
+    <Popover onOpenChange={onOpenChange}>
       {value ? (
         <>
           {value.type === "solid" && (
@@ -239,7 +256,13 @@ function ComputedPaintControl({
           </div>
         </PopoverTrigger>
       )}
-      <PopoverContent align="start" side="right" sideOffset={8} className="p-0">
+      <PopoverContent
+        onPointerDownOutside={popover_content_on_pointer_down_outside}
+        align="start"
+        side="right"
+        sideOffset={8}
+        className="p-0"
+      >
         <Tabs value={value?.type} onValueChange={onTypeChange as any}>
           <TabsList className="m-2">
             <TabsTrigger value="solid">
@@ -310,10 +333,12 @@ function TokenizedPaintControl({
   value,
   removable,
   onValueChange,
+  onOpenChange,
 }: {
   value: TokenizedPaint;
   removable?: boolean;
   onValueChange?: (value: TokenizedPaint | null) => void;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const computed = useComputed(
     {
@@ -325,7 +350,7 @@ function TokenizedPaintControl({
   const identifier = value.color;
 
   return (
-    <Popover>
+    <Popover onOpenChange={onOpenChange}>
       <PopoverTrigger>
         <PaintInputContainer>
           <PaintChip paint={computed.value as any as ComputedPaint} />
@@ -344,7 +369,9 @@ function TokenizedPaintControl({
         )} */}
         </PaintInputContainer>
       </PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent
+        onPointerDownOutside={popover_content_on_pointer_down_outside}
+      >
         <ContextVariableColors
           onSelect={(token) => {
             onValueChange?.({

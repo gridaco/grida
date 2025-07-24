@@ -186,7 +186,7 @@ export default function Page() {
                     dragState: state.dragState,
                     hoverPreview: state.hoverPreview,
                   }}
-                  onChange={handleChange}
+                  onStateChange={handleChange}
                   readonly={readonly}
                   background={generateGradientCSS()}
                 />
