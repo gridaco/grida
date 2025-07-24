@@ -402,6 +402,16 @@ const identity: GradientTransform = {
   ty: 0.5,
 };
 
+export function getValue(state: GradientState): GradientValue {
+  return {
+    stops: state.stops,
+    transform: [
+      [state.transform.a, state.transform.b, state.transform.tx],
+      [state.transform.d, state.transform.e, state.transform.ty],
+    ],
+  };
+}
+
 // Initial state
 export function createInitialState(
   type?: GradientType,

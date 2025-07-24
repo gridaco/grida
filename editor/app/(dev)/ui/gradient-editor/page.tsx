@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,13 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
-import GradientEditor from "@/grida-canvas-react-gradient";
+import GradientEditor, { useGradient } from "@/grida-canvas-react-gradient";
 import {
   createInitialState,
-  type GradientState,
   type GradientType,
 } from "@/grida-canvas-react-gradient";
 import type cg from "@grida/cg";
+import { css } from "@/grida-canvas-utils/css";
 
 // Helper function to convert RGBA8888 to hex string
 const rgbaToHex = (color: cg.RGBA8888): string => {
@@ -36,103 +36,48 @@ const hexToRgba = (hex: string): cg.RGBA8888 => {
   return { r, g, b, a: 1 };
 };
 
-export default function Page() {
+export default function GradientEditorDemoPage() {
   const [gradientType, setGradientType] = useState<GradientType>("linear");
-  const [state, setState] = useState<GradientState>(() =>
-    createInitialState(gradientType)
-  );
   const [readonly, setReadonly] = useState(false);
 
-  const handleChange = useCallback((newState: GradientState) => {
-    setState(newState);
-  }, []);
+  // Create the gradient editor instance
+  const editor = useGradient({
+    gradientType,
+    initialValue: {
+      stops: [
+        { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } },
+        { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } },
+      ],
+      transform: [
+        [1, 0, 0.5],
+        [0, 1, 0.5],
+      ],
+    },
+    width: 400,
+    height: 300,
+    readonly,
+  });
 
   // Update state when gradient type changes
-  const handleGradientTypeChange = useCallback((newType: GradientType) => {
-    setGradientType(newType);
-    // Recreate state with new gradient type
-    setState(createInitialState(newType));
-  }, []);
+  const handleGradientTypeChange = useCallback(
+    (newType: GradientType) => {
+      setGradientType(newType);
+      // Recreate editor with new gradient type
+      const newInitialState = createInitialState(newType);
+      editor.setStops(newInitialState.stops);
+      editor.setTransform(newInitialState.transform);
+    },
+    [editor]
+  );
 
-  // Calculate control points from transform for display
-  const getControlPoints = useCallback(() => {
-    const A = { x: state.transform.tx, y: state.transform.ty };
-
-    // B point: A + (a, d) * scale - controls rotation and main radius
-    const scale = 100; // Base scale for visualization
-    const B = {
-      x: A.x + state.transform.a * scale,
-      y: A.y + state.transform.d * scale,
-    };
-
-    // C point: Always perpendicular to A-B line, distance controlled by (b, e)
-    // Calculate perpendicular direction to A-B
-    const abLength = Math.sqrt(
-      state.transform.a * state.transform.a +
-        state.transform.d * state.transform.d
-    );
-    if (abLength === 0) {
-      // Fallback if A and B are at same position
-      return { A, B, C: { x: A.x, y: A.y - scale } };
-    }
-
-    // Perpendicular unit vector (90° rotation of A-B direction)
-    const perpX = -state.transform.d / abLength;
-    const perpY = state.transform.a / abLength;
-
-    // C distance from transform.b and transform.e (should represent the same distance)
-    const cDistance =
-      Math.sqrt(
-        state.transform.b * state.transform.b +
-          state.transform.e * state.transform.e
-      ) * scale;
-
-    const C = {
-      x: A.x + perpX * cDistance,
-      y: A.y + perpY * cDistance,
-    };
-
-    return { A, B, C };
-  }, [state.transform]);
-
-  // Generate CSS gradient string
   const generateGradientCSS = useCallback(() => {
-    const sortedStops = [...state.stops].sort(
-      (a, b) => a.offset - b.offset // Changed from position to offset
-    );
-    const stopStrings = sortedStops.map(
-      (stop) =>
-        `rgba(${stop.color.r}, ${stop.color.g}, ${stop.color.b}, ${stop.color.a}) ${(stop.offset * 100).toFixed(1)}%` // Changed to use RGBA8888 format
-    );
-
-    const { A, B, C } = getControlPoints();
-
-    switch (gradientType) {
-      case "linear": {
-        const angle = Math.atan2(B.y - A.y, B.x - A.x) * (180 / Math.PI) + 90;
-        return `linear-gradient(${angle}deg, ${stopStrings.join(", ")})`;
-      }
-      case "radial": {
-        // Main radius from A-B distance
-        const radiusX = Math.sqrt(
-          Math.pow(B.x - A.x, 2) + Math.pow(B.y - A.y, 2)
-        );
-        // Scale radius from A-C distance
-        const radiusY = Math.sqrt(
-          Math.pow(C.x - A.x, 2) + Math.pow(C.y - A.y, 2)
-        );
-        return `radial-gradient(ellipse ${radiusX}px ${radiusY}px at ${A.x}px ${A.y}px, ${stopStrings.join(", ")})`;
-      }
-      case "sweep": {
-        const angle = Math.atan2(B.y - A.y, B.x - A.x) * (180 / Math.PI);
-        return `conic-gradient(from ${angle}deg at ${A.x}px ${A.y}px, ${stopStrings.join(", ")})`;
-      }
-      default:
-        return `linear-gradient(0deg, ${stopStrings.join(", ")})`;
-    }
-  }, [gradientType, state.stops, getControlPoints]);
-
-  const { A, B, C } = getControlPoints();
+    const g = editor.getValue();
+    return css.toGradientString({
+      type: `${gradientType}_gradient`,
+      stops: g.stops,
+      transform: g.transform,
+    });
+  }, [gradientType, editor.stops, editor.transform]);
 
   return (
     <div className="min-h-screen p-8">
@@ -141,7 +86,8 @@ export default function Page() {
           <h1 className="text-3xl font-bold mb-2">Advanced Gradient Editor</h1>
           <p>
             Professional gradient editor supporting linear, radial, and sweep
-            gradients with 2D affine transforms.
+            gradients with 2D affine transforms. Now fully controlled via
+            useGradient hook.
           </p>
         </div>
 
@@ -189,8 +135,7 @@ export default function Page() {
                     width={400}
                     height={300}
                     gradientType={gradientType}
-                    onStateChange={handleChange}
-                    readonly={readonly}
+                    editor={editor}
                   />
                   <div
                     className="absolute inset-0"
@@ -221,178 +166,28 @@ export default function Page() {
 
           {/* Control Panel */}
           <div className="space-y-4">
-            {/* Transform controls */}
-            {state.focusedControl && (
-              <Card className="p-4">
-                <div className="mb-2">
-                  <span className="text-sm font-medium">
-                    Control Point {state.focusedControl} -{" "}
-                    {state.focusedControl === "A"
-                      ? "Center/Start"
-                      : state.focusedControl === "B"
-                        ? "End/Radius"
-                        : "Scale"}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs">X Position</label>
-                    <Input
-                      type="number"
-                      value={
-                        state.focusedControl === "A"
-                          ? Math.round(A.x)
-                          : state.focusedControl === "B"
-                            ? Math.round(B.x)
-                            : Math.round(C.x)
-                      }
-                      onChange={(e) => {
-                        if (readonly) return;
-                        const newX = Number.parseInt(e.target.value) || 0;
-                        const currentX =
-                          state.focusedControl === "A"
-                            ? A.x
-                            : state.focusedControl === "B"
-                              ? B.x
-                              : C.x;
-
-                        // Calculate the delta and update transform
-                        const deltaX = newX - currentX;
-                        if (state.focusedControl === "A") {
-                          setState((prev) => ({
-                            ...prev,
-                            transform: {
-                              ...prev.transform,
-                              tx: prev.transform.tx + deltaX,
-                            },
-                          }));
-                        } else if (state.focusedControl === "B") {
-                          const scale = 100;
-                          setState((prev) => ({
-                            ...prev,
-                            transform: {
-                              ...prev.transform,
-                              a: prev.transform.a + deltaX / scale,
-                            },
-                          }));
-                        } else if (state.focusedControl === "C") {
-                          const scale = 100;
-                          // Calculate perpendicular direction for C point
-                          const abLength = Math.sqrt(
-                            state.transform.a * state.transform.a +
-                              state.transform.d * state.transform.d
-                          );
-                          if (abLength > 0) {
-                            const perpX = -state.transform.d / abLength;
-                            setState((prev) => ({
-                              ...prev,
-                              transform: {
-                                ...prev.transform,
-                                b: prev.transform.b + (perpX * deltaX) / scale,
-                              },
-                            }));
-                          }
-                        }
-                      }}
-                      className="h-8"
-                      disabled={readonly}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs">Y Position</label>
-                    <Input
-                      type="number"
-                      value={
-                        state.focusedControl === "A"
-                          ? Math.round(A.y)
-                          : state.focusedControl === "B"
-                            ? Math.round(B.y)
-                            : Math.round(C.y)
-                      }
-                      onChange={(e) => {
-                        if (readonly) return;
-                        const newY = Number.parseInt(e.target.value) || 0;
-                        const currentY =
-                          state.focusedControl === "A"
-                            ? A.y
-                            : state.focusedControl === "B"
-                              ? B.y
-                              : C.y;
-
-                        // Calculate the delta and update transform
-                        const deltaY = newY - currentY;
-                        if (state.focusedControl === "A") {
-                          setState((prev) => ({
-                            ...prev,
-                            transform: {
-                              ...prev.transform,
-                              ty: prev.transform.ty + deltaY,
-                            },
-                          }));
-                        } else if (state.focusedControl === "B") {
-                          const scale = 100;
-                          setState((prev) => ({
-                            ...prev,
-                            transform: {
-                              ...prev.transform,
-                              d: prev.transform.d + deltaY / scale,
-                            },
-                          }));
-                        } else if (state.focusedControl === "C") {
-                          const scale = 100;
-                          // Calculate perpendicular direction for C point
-                          const abLength = Math.sqrt(
-                            state.transform.a * state.transform.a +
-                              state.transform.d * state.transform.d
-                          );
-                          if (abLength > 0) {
-                            const perpY = state.transform.a / abLength;
-                            setState((prev) => ({
-                              ...prev,
-                              transform: {
-                                ...prev.transform,
-                                e: prev.transform.e + (perpY * deltaY) / scale,
-                              },
-                            }));
-                          }
-                        }
-                      }}
-                      className="h-8"
-                      disabled={readonly}
-                    />
-                  </div>
-                </div>
-              </Card>
-            )}
-
             {/* Color stop controls */}
-            {state.focusedStop !== null &&
+            {editor.focusedStop !== null &&
               (() => {
-                const focusedStopData = state.stops[state.focusedStop];
+                const focusedStopData = editor.stops[editor.focusedStop];
                 if (!focusedStopData) return null;
 
                 return (
                   <Card className="p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium">
-                        Color Stop {state.focusedStop + 1}
+                        Color Stop {editor.focusedStop + 1}
                       </span>
                       <Button
                         size="sm"
                         variant="destructive"
                         onClick={() => {
                           if (readonly) return;
-                          if (state.stops.length > 2) {
-                            setState((prev) => ({
-                              ...prev,
-                              stops: prev.stops.filter(
-                                (_, index) => index !== state.focusedStop
-                              ),
-                              focusedStop: null,
-                            }));
+                          if (editor.stops.length > 2) {
+                            editor.removeStop(editor.focusedStop!);
                           }
                         }}
-                        disabled={state.stops.length <= 2 || readonly}
+                        disabled={editor.stops.length <= 2 || readonly}
                         aria-label="Delete selected color stop"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -407,7 +202,7 @@ export default function Page() {
                           min="0"
                           max="1"
                           step="0.01"
-                          value={focusedStopData.offset.toFixed(2)} // Changed from position to offset
+                          value={focusedStopData.offset.toFixed(2)}
                           onChange={(e) => {
                             if (readonly) return;
                             const pos = Math.max(
@@ -417,14 +212,7 @@ export default function Page() {
                                 Number.parseFloat(e.target.value) || 0
                               )
                             );
-                            setState((prev) => ({
-                              ...prev,
-                              stops: prev.stops.map((s, index) =>
-                                index === state.focusedStop
-                                  ? { ...s, offset: pos } // Changed from position to offset
-                                  : s
-                              ),
-                            }));
+                            editor.updateStopOffset(editor.focusedStop!, pos);
                           }}
                           className="h-8"
                           disabled={readonly}
@@ -434,19 +222,15 @@ export default function Page() {
                         <label className="text-xs">Color</label>
                         <Input
                           type="color"
-                          value={rgbaToHex(focusedStopData.color)} // Convert RGBA8888 to hex
+                          value={rgbaToHex(focusedStopData.color)}
                           onChange={(e) => {
                             if (readonly) return;
                             const hex = e.target.value;
-                            const newColor = hexToRgba(hex); // Convert hex to RGBA8888
-                            setState((prev) => ({
-                              ...prev,
-                              stops: prev.stops.map((s, index) =>
-                                index === state.focusedStop
-                                  ? { ...s, color: newColor } // Use RGBA8888 format
-                                  : s
-                              ),
-                            }));
+                            const newColor = hexToRgba(hex);
+                            editor.updateStopColor(
+                              editor.focusedStop!,
+                              newColor
+                            );
                           }}
                           className="h-8"
                           disabled={readonly}
@@ -461,13 +245,13 @@ export default function Page() {
             <Card className="p-4">
               <div className="text-xs space-y-1">
                 <div>Type: {gradientType}</div>
-                <div>Stops: {state.stops.length}</div>
+                <div>Stops: {editor.stops.length}</div>
                 <div>
                   Focused:{" "}
-                  {state.focusedStop
+                  {editor.focusedStop !== null
                     ? "Color Stop"
-                    : state.focusedControl
-                      ? `Point ${state.focusedControl}`
+                    : editor.focusedControl
+                      ? `Point ${editor.focusedControl}`
                       : "None"}
                 </div>
                 <div>Mode: {readonly ? "Readonly" : "Editable"}</div>

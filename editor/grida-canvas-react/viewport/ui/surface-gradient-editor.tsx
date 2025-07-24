@@ -1,7 +1,7 @@
 import React from "react";
 import { useTransformState, useCurrentEditor } from "@/grida-canvas-react";
 import { useSingleSelection } from "../surface-hooks";
-import GradientEditor from "@/grida-canvas-react-gradient";
+import GradientEditor, { useGradient } from "@/grida-canvas-react-gradient";
 import cg from "@grida/cg";
 import { useNodeState } from "@/grida-canvas-react/provider";
 
@@ -57,6 +57,16 @@ function Editor({
   }));
 
   const gradientType = fill?.type ? gradientTypeMap[fill.type] : undefined;
+
+  const g = useGradient({
+    gradientType: gradientType ?? "linear",
+    width,
+    height,
+    // initialValue: fill as cg.GradientPaint,
+    preventDefault: true,
+    stopPropagation: true,
+  });
+
   if (!gradientType) return null;
 
   return (
@@ -64,17 +74,7 @@ function Editor({
       width={width}
       height={height}
       gradientType={gradientType}
-      // value={fill as cg.GradientPaint}
-      initialValue={fill as cg.GradientPaint}
-      onValueChange={(g) => {
-        editor.changeNodeFill(node_id, {
-          type: "linear_gradient",
-          stops: g.stops,
-          transform: g.transform,
-        });
-      }}
-      preventDefault
-      stopPropagation
+      editor={g}
     />
   );
 }

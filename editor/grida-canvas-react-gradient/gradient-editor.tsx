@@ -1,17 +1,10 @@
 "use client";
 
-import type React from "react";
-import { useRef, useCallback, useReducer, useEffect } from "react";
-import {
-  gradientReducer,
-  createInitialState,
-  type GradientState,
-  type GradientType,
-  type GradientValue,
-  getControlPoints,
-  getStopMarkerTransform,
-} from "./gradient-reducer";
+import React from "react";
+import { type GradientType, type GradientValue } from "./gradient-reducer";
+import { type UseGradientReturn } from "./use-gradient";
 import { cn } from "@/components/lib/utils";
+import StopMarker from "./gradient-color-stop-marker";
 
 // Helper function to convert RGBA8888 to CSS rgba string
 const rgbaToString = (color: {
@@ -29,177 +22,42 @@ export interface GradientEditorProps {
   width?: number;
   height?: number;
   gradientType: GradientType;
-  initialValue?: GradientValue;
-  onStateChange?: (state: GradientState) => void;
-  onValueChange?: (value: GradientValue) => void;
-  readonly?: boolean;
-  preventDefault?: boolean;
-  stopPropagation?: boolean;
+  editor: UseGradientReturn;
 }
 
 export default function GradientEditor({
   width = 400,
   height = 300,
   gradientType,
-  initialValue,
-  onStateChange,
-  onValueChange,
-  readonly = false,
-  preventDefault = true,
-  stopPropagation = true,
+  editor,
 }: GradientEditorProps) {
-  const [state, dispatch] = useReducer(gradientReducer, {
-    ...createInitialState(gradientType, initialValue),
-  });
-
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    onStateChange?.(state);
-  }, [state, onStateChange]);
-
-  useEffect(() => {
-    const _t = state.transform;
-    onValueChange?.({
-      stops: state.stops,
-      transform: [
-        [_t.a, _t.b, _t.tx],
-        [_t.d, _t.e, _t.ty],
-      ],
-    });
-  }, [state.stops, state.transform, onValueChange]);
-
-  // Handle mouse events only if not readonly
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (preventDefault) e.preventDefault();
-      if (stopPropagation) e.stopPropagation();
-      if (readonly || !containerRef.current) return;
-
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      dispatch({
-        type: "HANDLE_POINTER_DOWN",
-        payload: { x, y, width, height, gradientType },
-      });
-    },
-    [
-      readonly,
-      preventDefault,
-      stopPropagation,
-      dispatch,
-      width,
-      height,
-      gradientType,
-    ]
-  );
-
-  const handlePointerMove = useCallback(
-    (e: React.MouseEvent | PointerEvent) => {
-      if (preventDefault) e.preventDefault();
-      if (stopPropagation) e.stopPropagation();
-      if (readonly || !containerRef.current) return;
-
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      dispatch({
-        type: "HANDLE_POINTER_MOVE",
-        payload: { x, y, width, height, gradientType },
-      });
-    },
-    [
-      readonly,
-      preventDefault,
-      stopPropagation,
-      dispatch,
-      width,
-      height,
-      gradientType,
-    ]
-  );
-
-  const handlePointerUp = useCallback(
-    (e?: React.MouseEvent | PointerEvent) => {
-      if (preventDefault) e?.preventDefault();
-      if (stopPropagation) e?.stopPropagation();
-      if (readonly) return;
-      dispatch({ type: "HANDLE_POINTER_UP" });
-    },
-    [readonly, dispatch, preventDefault, stopPropagation]
-  );
-
-  const handlePointerLeave = useCallback(
-    (e?: React.MouseEvent) => {
-      if (preventDefault) e?.preventDefault();
-      if (stopPropagation) e?.stopPropagation();
-      if (readonly) return;
-      dispatch({ type: "HANDLE_POINTER_LEAVE" });
-    },
-    [readonly, dispatch, preventDefault, stopPropagation]
-  );
-
-  // Register global pointer events for dragging outside bounds
-  useEffect(() => {
-    if (readonly) return;
-
-    const handleGlobalPointerMove = (e: PointerEvent) => {
-      if (state.dragState.type) {
-        handlePointerMove(e);
-      }
-    };
-
-    const handleGlobalPointerUp = (e: PointerEvent) => {
-      if (state.dragState.type) {
-        handlePointerUp(e);
-      }
-    };
-
-    if (state.dragState.type) {
-      window.addEventListener("pointermove", handleGlobalPointerMove, {
-        passive: false,
-      });
-      window.addEventListener("pointerup", handleGlobalPointerUp, {
-        passive: false,
-      });
-    }
-
-    return () => {
-      window.removeEventListener("pointermove", handleGlobalPointerMove);
-      window.removeEventListener("pointerup", handleGlobalPointerUp);
-    };
-  }, [state.dragState.type, readonly, handlePointerMove, handlePointerUp]);
-
-  const { A, B, C } = getControlPoints(state.transform, width, height);
+  const { A, B, C } = editor.controlPoints;
 
   return (
     <div
-      ref={containerRef}
+      ref={editor.containerRef}
       className={`relative select-none z-10 ${
-        readonly ? "cursor-default" : "cursor-crosshair"
+        editor.readonly ? "cursor-default" : "cursor-crosshair"
       }`}
       style={{
         width,
         height,
         overflow: "visible",
       }}
-      onPointerDown={handlePointerDown}
+      onPointerDown={editor.handlePointerDown}
       onPointerMove={(e) => {
         // Only handle local pointer move if not dragging
-        if (!state.dragState.type) {
-          handlePointerMove(e);
+        if (!editor.state.dragState.type) {
+          editor.handlePointerMove(e);
         }
       }}
       onPointerUp={(e) => {
         // Only handle local pointer up if not dragging
-        if (!state.dragState.type) {
-          handlePointerUp(e);
+        if (!editor.state.dragState.type) {
+          editor.handlePointerUp(e);
         }
       }}
-      onPointerLeave={handlePointerLeave}
+      onPointerLeave={editor.handlePointerLeave}
       data-popover-no-close
       role="application"
       aria-label="Gradient editor canvas"
@@ -268,14 +126,13 @@ export default function GradientEditor({
       <ControlPoint
         x={A.x}
         y={A.y}
-        selected={state.focusedControl === "A"}
-        readonly={readonly}
+        selected={editor.focusedControl === "A"}
+        readonly={editor.readonly}
         tabIndex={0}
         onFocus={(e) => {
-          if (preventDefault) e.preventDefault();
-          if (stopPropagation) e.stopPropagation();
-          if (!readonly)
-            dispatch({ type: "SET_FOCUSED_CONTROL", payload: "A" });
+          e.preventDefault();
+          e.stopPropagation();
+          if (!editor.readonly) editor.setFocusedControl("A");
         }}
       />
 
@@ -283,14 +140,13 @@ export default function GradientEditor({
       <ControlPoint
         x={B.x}
         y={B.y}
-        selected={state.focusedControl === "B"}
-        readonly={readonly}
+        selected={editor.focusedControl === "B"}
+        readonly={editor.readonly}
         tabIndex={0}
         onFocus={(e) => {
-          if (preventDefault) e.preventDefault();
-          if (stopPropagation) e.stopPropagation();
-          if (!readonly)
-            dispatch({ type: "SET_FOCUSED_CONTROL", payload: "B" });
+          e.preventDefault();
+          e.stopPropagation();
+          if (!editor.readonly) editor.setFocusedControl("B");
         }}
       />
 
@@ -298,61 +154,46 @@ export default function GradientEditor({
       <ControlPoint
         x={C.x}
         y={C.y}
-        selected={state.focusedControl === "C"}
-        readonly={readonly}
+        selected={editor.focusedControl === "C"}
+        readonly={editor.readonly}
         tabIndex={0}
         onFocus={(e) => {
-          if (preventDefault) e.preventDefault();
-          if (stopPropagation) e.stopPropagation();
-          if (!readonly)
-            dispatch({ type: "SET_FOCUSED_CONTROL", payload: "C" });
+          e.preventDefault();
+          e.stopPropagation();
+          if (!editor.readonly) editor.setFocusedControl("C");
         }}
       />
 
       {/* Color Stop Markers */}
-      {state.stops.map((stop, index) => {
-        const selected = state.focusedStop === index;
-        const { x, y, rotation } = getStopMarkerTransform(
-          stop.offset, // Changed from position to offset
-          gradientType,
-          state.transform,
-          width,
-          height
-        );
+      {editor.stops.map((stop, index) => {
+        const selected = editor.focusedStop === index;
+        const { x, y, rotation } = editor.getStopMarkerTransform(stop.offset);
         return (
           <StopMarker
             key={index}
             x={x}
             y={y}
             transform={`translate(-50%, -50%) rotate(${rotation}deg)`}
-            color={rgbaToString(stop.color)} // Convert RGBA8888 to CSS string
+            color={rgbaToString(stop.color)}
             selected={selected}
-            readonly={readonly}
+            readonly={editor.readonly}
             tabIndex={0}
             arrow={true}
             stopSize={STOP_SIZE}
             onFocus={(e) => {
-              if (preventDefault) e.preventDefault();
-              if (stopPropagation) e.stopPropagation();
-              if (!readonly)
-                dispatch({
-                  type: "SET_FOCUSED_STOP",
-                  payload: index,
-                });
+              e.preventDefault();
+              e.stopPropagation();
+              if (!editor.readonly) editor.setFocusedStop(index);
             }}
           />
         );
       })}
 
       {/* Hover Preview */}
-      {state.hoverPreview &&
+      {editor.state.hoverPreview &&
         (() => {
-          const previewTransform = getStopMarkerTransform(
-            state.hoverPreview.position,
-            gradientType,
-            state.transform,
-            width,
-            height
+          const previewTransform = editor.getStopMarkerTransform(
+            editor.state.hoverPreview.position
           );
           return (
             <StopMarker
@@ -367,91 +208,6 @@ export default function GradientEditor({
             />
           );
         })()}
-    </div>
-  );
-}
-
-function StopMarker({
-  x,
-  y,
-  transform,
-  color,
-  selected,
-  readonly,
-  tabIndex,
-  onFocus,
-  arrow = true,
-  stopSize,
-  className,
-}: {
-  x: number;
-  y: number;
-  transform: string;
-  color: string;
-  selected: boolean;
-  readonly: boolean;
-  tabIndex?: number;
-  onFocus?: React.FocusEventHandler<HTMLDivElement>;
-  arrow?: boolean;
-  stopSize: number;
-  className?: string;
-}) {
-  return (
-    <div
-      data-selected={selected}
-      data-readonly={readonly}
-      className={cn(
-        `
-        group/stop
-        absolute focus:outline-none focus:ring-2 focus:ring-blue-500 
-        data-[selected=true]:z-10
-        data-[selected=false]:z-0
-        data-[readonly=true]:cursor-default
-        data-[readonly=false]:cursor-move
-        `,
-        className
-      )}
-      style={{
-        left: x,
-        top: y,
-        width: stopSize,
-        height: stopSize,
-        transform,
-      }}
-      role="button"
-      aria-label={`Color stop`}
-      tabIndex={tabIndex}
-      data-popover-no-close
-      onFocus={onFocus}
-    >
-      {/* arrow */}
-      {arrow && (
-        <div
-          className={`
-            absolute left-1/2 transform -translate-x-1/2
-            border-l-[5px] border-l-transparent
-            border-r-[5px] border-r-transparent
-            border-t-white border-t-[6px]
-            group-data-[selected=true]/stop:border-t-yellow-400
-            `}
-          style={{
-            top: stopSize - 2,
-            width: 0,
-            height: 0,
-          }}
-        />
-      )}
-
-      {/* fill */}
-      <div
-        className={`
-          w-full h-full border-2 shadow-lg
-          group-data-[selected=true]/stop:border-yellow-400 group-data-[selected=false]/stop:border-white
-          `}
-        style={{ backgroundColor: color }}
-      >
-        <div className="w-full h-full bg-gradient-to-br from-white/30 to-transparent" />
-      </div>
     </div>
   );
 }

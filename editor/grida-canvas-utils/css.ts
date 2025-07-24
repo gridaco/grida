@@ -323,6 +323,19 @@ export namespace css {
     }
   }
 
+  export function toGradientString(paint: cg.GradientPaint): string {
+    switch (paint.type) {
+      case "linear_gradient":
+        return toLinearGradientString(paint);
+      case "radial_gradient":
+        return toRadialGradientString(paint);
+      case "sweep_gradient":
+        return toConicGradientString(paint);
+      default:
+        return "";
+    }
+  }
+
   /**
    *
    * @example
@@ -333,7 +346,7 @@ export namespace css {
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/linear-gradient
    */
   export function toLinearGradientString(
-    paint: Omit<cg.LinearGradientPaint, "id">
+    paint: cg.LinearGradientPaint
   ): string {
     const { stops, transform } = paint;
 
@@ -359,7 +372,7 @@ export namespace css {
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/radial-gradient
    */
   export function toRadialGradientString(
-    paint: Omit<cg.RadialGradientPaint, "id">
+    paint: cg.RadialGradientPaint
   ): string {
     const { stops } = paint;
 
@@ -372,9 +385,7 @@ export namespace css {
     return `radial-gradient(${gradientStops})`;
   }
 
-  export function toConicGradientString(
-    paint: Omit<cg.SweepGradientPaint, "id">
-  ): string {
+  export function toConicGradientString(paint: cg.SweepGradientPaint): string {
     const { stops } = paint;
 
     const gradientStops = stops
