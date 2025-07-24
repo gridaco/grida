@@ -603,7 +603,7 @@ export namespace editor.state {
    * @deprecated - WIP
    */
   type GradientContentEditMode = {
-    type: "gradient";
+    type: "fill/gradient";
     node_id: string;
   };
 
@@ -1641,6 +1641,10 @@ export namespace editor.api {
     tryExitContentEditMode(): void;
     tryToggleContentEditMode(): void;
     tryEnterContentEditMode(): void;
+    tryEnterContentEditMode(
+      node_id?: string,
+      mode?: "auto" | "fill/gradient"
+    ): void;
     //
 
     /**

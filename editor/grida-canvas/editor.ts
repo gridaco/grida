@@ -520,10 +520,26 @@ export class Editor
    *
    * when triggered on such invalid context, it should be a no-op
    */
-  tryEnterContentEditMode() {
-    this.dispatch({
-      type: "surface/content-edit-mode/try-enter",
-    });
+  tryEnterContentEditMode(
+    node_id?: string,
+    mode: "auto" | "fill/gradient" = "auto"
+  ) {
+    node_id = node_id ?? this.state.selection[0];
+    switch (mode) {
+      case "auto":
+        return this.dispatch({
+          type: "surface/content-edit-mode/try-enter",
+        });
+      case "fill/gradient":
+        if (node_id) {
+          return this.dispatch({
+            type: "surface/content-edit-mode/fill/gradient",
+            node_id: node_id ?? this.state.selection[0],
+          });
+        } else {
+          // no-op
+        }
+    }
   }
 
   tryExitContentEditMode() {

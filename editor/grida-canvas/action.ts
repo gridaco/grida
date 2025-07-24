@@ -481,6 +481,7 @@ export type SurfaceAction =
   | EditorSurface_ChangeBrushSizeAction
   | EditorSurface_ChangeBrushOpacityAction
   | EditorSurface_EnterContentEditMode
+  | EditorSurface_EnterFillGradientContentEditMode
   | EditorSurface_ExitContentEditMode
   //
   | EditorSurface_CursorMode
@@ -522,6 +523,11 @@ export interface EditorSurface_DeleteGuideAction {
 
 export type EditorSurface_EnterContentEditMode = {
   type: "surface/content-edit-mode/try-enter";
+};
+
+export type EditorSurface_EnterFillGradientContentEditMode = {
+  node_id: string;
+  type: "surface/content-edit-mode/fill/gradient";
 };
 
 export type EditorSurface_ExitContentEditMode = {
