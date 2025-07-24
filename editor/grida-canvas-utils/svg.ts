@@ -1,7 +1,7 @@
 import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
-import type grida from "@grida/schema";
 import type cg from "@grida/cg";
 import cmath from "@grida/cmath";
+import { v4 } from "uuid";
 
 export namespace svg {
   export namespace d {
@@ -96,8 +96,11 @@ export namespace svg {
       return `<stop offset="${stop.offset * 100}%" stop-color="rgba(${stop.color.r}, ${stop.color.g}, ${stop.color.b}, ${stop.color.a})" />`;
     }
 
-    export function stringifyLinearGradient(paint: cg.LinearGradientPaint) {
-      const { id, stops, transform } = paint;
+    export function stringifyLinearGradient(
+      id: string,
+      paint: cg.LinearGradientPaint
+    ) {
+      const { stops, transform } = paint;
 
       // De-structure the 2x3 transform matrix:
       // [
@@ -118,8 +121,11 @@ ${gradientStops}
   </linearGradient>`;
     }
 
-    export function stringifyRadialGradient(paint: cg.RadialGradientPaint) {
-      const { id, stops } = paint;
+    export function stringifyRadialGradient(
+      id: string,
+      paint: cg.RadialGradientPaint
+    ) {
+      const { stops } = paint;
 
       // Creating gradient stops
       const gradientStops = stops.map(stringifyGradientStop).join("\n");
@@ -148,21 +154,22 @@ ${gradientStops}
       defs: string | undefined;
       ref: string;
     } {
+      const id = v4();
       switch (paint.type) {
         case "linear_gradient": {
-          const defs = `<defs>${gradient.stringifyLinearGradient(paint)}</defs>`;
+          const defs = `<defs>${gradient.stringifyLinearGradient(id, paint)}</defs>`;
 
           return {
             defs,
-            ref: `url(#${paint.id})`,
+            ref: `url(#${id})`,
           };
         }
         case "radial_gradient": {
-          const defs = `<defs>${gradient.stringifyRadialGradient(paint)}</defs>`;
+          const defs = `<defs>${gradient.stringifyRadialGradient(id, paint)}</defs>`;
 
           return {
             defs,
-            ref: `url(#${paint.id})`,
+            ref: `url(#${id})`,
           };
         }
         case "solid": {

@@ -1219,7 +1219,7 @@ export class Editor
   }
   changeNodeFill(
     node_id: string,
-    fill: grida.program.nodes.i.props.SolidPaintToken | cg.PaintWithoutID | null
+    fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
@@ -1231,10 +1231,7 @@ export class Editor
   }
   changeNodeStroke(
     node_id: string,
-    stroke:
-      | grida.program.nodes.i.props.SolidPaintToken
-      | cg.PaintWithoutID
-      | null
+    stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
     requestAnimationFrame(() => {
       this.dispatch({

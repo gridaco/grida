@@ -1361,17 +1361,11 @@ export namespace editor.api {
     ): void;
     changeNodeFill(
       node_id: NodeID,
-      fill:
-        | grida.program.nodes.i.props.SolidPaintToken
-        | cg.PaintWithoutID
-        | null
+      fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
     ): void;
     changeNodeStroke(
       node_id: NodeID,
-      stroke:
-        | grida.program.nodes.i.props.SolidPaintToken
-        | cg.PaintWithoutID
-        | null
+      stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
     ): void;
     changeNodeStrokeWidth(
       node_id: NodeID,

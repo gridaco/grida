@@ -45,9 +45,7 @@ export function PaintControl({
   onOpenChange,
 }: {
   value?: grida.program.nodes.i.props.PropsPaintValue;
-  onValueChange?: (
-    value: ComputedPaintWithoutID | TokenizedPaint | null
-  ) => void;
+  onValueChange?: (value: ComputedPaint | TokenizedPaint | null) => void;
   onOpenChange?: (open: boolean) => void;
   removable?: boolean;
 }) {
@@ -70,7 +68,6 @@ export function PaintControl({
 }
 
 type ComputedPaint = cg.Paint;
-type ComputedPaintWithoutID = cg.PaintWithoutID;
 type TokenizedPaint = grida.program.nodes.i.props.SolidPaintToken;
 
 function ComputedPaintControl({
@@ -80,7 +77,7 @@ function ComputedPaintControl({
   onOpenChange,
 }: {
   value?: ComputedPaint;
-  onValueChange?: (value: ComputedPaintWithoutID | null) => void;
+  onValueChange?: (value: ComputedPaint | null) => void;
   removable?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {

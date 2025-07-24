@@ -336,34 +336,30 @@ export namespace cg {
     "type"
   > & { type: Paint["type"] };
 
-  export type PaintWithoutID =
-    | SolidPaint
-    | Omit<LinearGradientPaint, "id">
-    | Omit<RadialGradientPaint, "id">
-    | Omit<SweepGradientPaint, "id">;
-
   export type SolidPaint = {
     type: "solid";
     color: cg.RGBA8888;
   };
 
+  export type GradientPaint =
+    | LinearGradientPaint
+    | RadialGradientPaint
+    | SweepGradientPaint;
+
   export type LinearGradientPaint = {
     type: "linear_gradient";
-    id: string;
     transform: AffineTransform;
     stops: Array<GradientStop>;
   };
 
   export type RadialGradientPaint = {
     type: "radial_gradient";
-    id: string;
     transform: AffineTransform;
     stops: Array<GradientStop>;
   };
 
   export type SweepGradientPaint = {
     type: "sweep_gradient";
-    id: string;
     transform: AffineTransform;
     stops: Array<GradientStop>;
   };
