@@ -28,18 +28,21 @@ pub fn linear_gradient_paint(
     size: (f32, f32),
 ) -> skia_safe::Paint {
     let mut paint = skia_safe::Paint::default();
-    let (width, _height) = size;
+    let (width, height) = size;
+    let x0 = 0.0;
+    let x1 = width;
+    let cy = height / 2.0;
+
+    let gmatrix = sk_matrix(gradient.transform.matrix);
+
     let (colors, positions) = build_gradient_stops(&gradient.stops, opacity * gradient.opacity);
     if let Some(shader) = skia_safe::Shader::linear_gradient(
-        (
-            skia_safe::Point::new(0.0, 0.0),
-            skia_safe::Point::new(width, 0.0),
-        ),
+        (skia_safe::Point::new(x0, cy), skia_safe::Point::new(x1, cy)),
         &colors[..],
         Some(&positions[..]),
         skia_safe::TileMode::Clamp,
         None,
-        Some(&sk_matrix(gradient.transform.matrix)),
+        Some(&gmatrix),
     ) {
         paint.set_shader(shader);
     }
