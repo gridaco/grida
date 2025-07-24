@@ -217,6 +217,56 @@ export const getDistance = (x1: number, y1: number, x2: number, y2: number) => {
   return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 };
 
+// Helper function to insert a stop in sorted position by offset
+export const insertStopInSortedPosition = (
+  stops: cg.GradientStop[],
+  newStop: cg.GradientStop
+): { stops: cg.GradientStop[]; insertedIndex: number } => {
+  const newStops = [...stops];
+
+  // Find the correct position to insert the new stop
+  let insertIndex = 0;
+  for (let i = 0; i < newStops.length; i++) {
+    if (newStop.offset > newStops[i].offset) {
+      insertIndex = i + 1;
+    } else {
+      break;
+    }
+  }
+
+  // Insert the stop at the correct position
+  newStops.splice(insertIndex, 0, newStop);
+
+  return { stops: newStops, insertedIndex: insertIndex };
+};
+
+// Helper function to sort stops by offset and return the new index of a specific stop
+export const sortStopsByOffset = (
+  stops: cg.GradientStop[],
+  originalIndex: number
+): { stops: cg.GradientStop[]; newIndex: number } => {
+  const newStops = [...stops];
+  const movedStop = newStops[originalIndex];
+
+  // Remove the stop from its current position
+  newStops.splice(originalIndex, 1);
+
+  // Find the correct position to re-insert it
+  let newIndex = 0;
+  for (let i = 0; i < newStops.length; i++) {
+    if (movedStop.offset > newStops[i].offset) {
+      newIndex = i + 1;
+    } else {
+      break;
+    }
+  }
+
+  // Insert the stop at the correct position
+  newStops.splice(newIndex, 0, movedStop);
+
+  return { stops: newStops, newIndex };
+};
+
 export const detectHitTarget = (
   x: number,
   y: number,
@@ -449,9 +499,16 @@ export const gradientReducer = (
         draft.stops = action.payload;
         break;
 
-      case "ADD_STOP":
-        draft.stops.push(action.payload);
+      case "ADD_STOP": {
+        const { stops: newStops, insertedIndex } = insertStopInSortedPosition(
+          draft.stops,
+          action.payload
+        );
+        draft.stops = newStops;
+        // Update focused stop to the newly inserted stop
+        draft.focusedStop = insertedIndex;
         break;
+      }
 
       case "UPDATE_STOP": {
         const stopIndex = action.payload.index;
@@ -549,8 +606,12 @@ export const gradientReducer = (
             offset: hitTarget.position, // Changed from position to offset
             color: { r: 128, g: 128, b: 128, a: 1 }, // Changed to RGBA8888 format
           };
-          draft.stops.push(newStop);
-          draft.focusedStop = draft.stops.length - 1;
+          const { stops: newStops, insertedIndex } = insertStopInSortedPosition(
+            draft.stops,
+            newStop
+          );
+          draft.stops = newStops;
+          draft.focusedStop = insertedIndex;
           draft.focusedControl = null;
         } else {
           draft.focusedStop = null;
@@ -727,9 +788,24 @@ export const gradientReducer = (
         break;
       }
 
-      case "HANDLE_POINTER_UP":
+      case "HANDLE_POINTER_UP": {
+        // If we were dragging a stop, sort the stops to maintain order
+        if (
+          draft.dragState.type === "stop" &&
+          draft.dragState.index !== undefined
+        ) {
+          const originalIndex = draft.dragState.index;
+          const { stops: sortedStops, newIndex } = sortStopsByOffset(
+            draft.stops,
+            originalIndex
+          );
+          draft.stops = sortedStops;
+          // Update focused stop to the new position
+          draft.focusedStop = newIndex;
+        }
         draft.dragState = { type: null };
         break;
+      }
 
       case "HANDLE_POINTER_LEAVE":
         draft.hoverPreview = null;

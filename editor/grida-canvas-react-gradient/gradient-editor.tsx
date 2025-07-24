@@ -166,10 +166,15 @@ export default function GradientEditor({
   return (
     <div
       ref={containerRef}
-      className={`relative select-none ${
+      className={`relative select-none z-10 ${
         readonly ? "cursor-default" : "cursor-crosshair"
       }`}
-      style={{ width, height, background: background || "transparent" }}
+      style={{
+        width,
+        height,
+        background: background || "transparent",
+        overflow: "visible",
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={(e) => {
         // Only handle local pointer move if not dragging
