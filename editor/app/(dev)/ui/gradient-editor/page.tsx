@@ -37,11 +37,21 @@ const hexToRgba = (hex: string): cg.RGBA8888 => {
 };
 
 export default function Page() {
-  const [state, setState] = useState<GradientState>(() => createInitialState());
+  const [gradientType, setGradientType] = useState<GradientType>("linear");
+  const [state, setState] = useState<GradientState>(() =>
+    createInitialState(gradientType)
+  );
   const [readonly, setReadonly] = useState(false);
 
   const handleChange = useCallback((newState: GradientState) => {
     setState(newState);
+  }, []);
+
+  // Update state when gradient type changes
+  const handleGradientTypeChange = useCallback((newType: GradientType) => {
+    setGradientType(newType);
+    // Recreate state with new gradient type
+    setState(createInitialState(newType));
   }, []);
 
   // Calculate control points from transform for display
@@ -97,7 +107,7 @@ export default function Page() {
 
     const { A, B, C } = getControlPoints();
 
-    switch (state.gradientType) {
+    switch (gradientType) {
       case "linear": {
         const angle = Math.atan2(B.y - A.y, B.x - A.x) * (180 / Math.PI) + 90;
         return `linear-gradient(${angle}deg, ${stopStrings.join(", ")})`;
@@ -120,18 +130,16 @@ export default function Page() {
       default:
         return `linear-gradient(0deg, ${stopStrings.join(", ")})`;
     }
-  }, [state.gradientType, state.stops, getControlPoints]);
+  }, [gradientType, state.stops, getControlPoints]);
 
   const { A, B, C } = getControlPoints();
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="min-h-screen p-8">
       <div className="max-w-6xl mx-auto space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Advanced Gradient Editor
-          </h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold mb-2">Advanced Gradient Editor</h1>
+          <p>
             Professional gradient editor supporting linear, radial, and sweep
             gradients with 2D affine transforms.
           </p>
@@ -140,22 +148,20 @@ export default function Page() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Editor */}
           <div className="lg:col-span-2">
-            <Card className="p-4 bg-gray-900 text-white border-gray-700">
+            <Card className="p-4">
               <div className="space-y-4">
                 {/* Gradient Type Selector */}
                 <div className="flex items-center gap-4">
                   <label className="text-sm font-medium">Gradient Type:</label>
                   <Select
-                    value={state.gradientType}
-                    onValueChange={(value: GradientType) =>
-                      setState((prev) => ({ ...prev, gradientType: value }))
-                    }
+                    value={gradientType}
+                    onValueChange={handleGradientTypeChange}
                     disabled={readonly}
                   >
-                    <SelectTrigger className="w-32 bg-gray-800 border-gray-600">
+                    <SelectTrigger className="w-32">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-600">
+                    <SelectContent>
                       <SelectItem value="linear">Linear</SelectItem>
                       <SelectItem value="radial">Radial</SelectItem>
                       <SelectItem value="sweep">Sweep</SelectItem>
@@ -175,22 +181,14 @@ export default function Page() {
                 <GradientEditor
                   width={400}
                   height={300}
-                  gradientType={state.gradientType}
-                  initialState={{
-                    transform: state.transform,
-                    stops: state.stops,
-                    focusedStop: state.focusedStop,
-                    focusedControl: state.focusedControl,
-                    dragState: state.dragState,
-                    hoverPreview: state.hoverPreview,
-                  }}
+                  gradientType={gradientType}
                   onStateChange={handleChange}
                   readonly={readonly}
                   background={generateGradientCSS()}
                 />
 
                 {/* Instructions */}
-                <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
+                <div className="text-xs p-2 rounded border">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
                       <strong>Controls:</strong> Blue=Center/Start,
@@ -198,7 +196,7 @@ export default function Page() {
                     </div>
                     <div>
                       <strong>Tracks:</strong>{" "}
-                      {state.gradientType === "sweep"
+                      {gradientType === "sweep"
                         ? "Ellipse track for stops"
                         : "Line track for stops"}
                     </div>
@@ -212,9 +210,9 @@ export default function Page() {
           <div className="space-y-4">
             {/* Transform controls */}
             {state.focusedControl && (
-              <Card className="p-4 bg-gray-800 border-gray-600">
+              <Card className="p-4">
                 <div className="mb-2">
-                  <span className="text-sm font-medium text-white">
+                  <span className="text-sm font-medium">
                     Control Point {state.focusedControl} -{" "}
                     {state.focusedControl === "A"
                       ? "Center/Start"
@@ -225,7 +223,7 @@ export default function Page() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-gray-400">X Position</label>
+                    <label className="text-xs">X Position</label>
                     <Input
                       type="number"
                       value={
@@ -283,12 +281,12 @@ export default function Page() {
                           }
                         }
                       }}
-                      className="h-8 bg-gray-700 border-gray-600 text-white"
+                      className="h-8"
                       disabled={readonly}
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400">Y Position</label>
+                    <label className="text-xs">Y Position</label>
                     <Input
                       type="number"
                       value={
@@ -346,7 +344,7 @@ export default function Page() {
                           }
                         }
                       }}
-                      className="h-8 bg-gray-700 border-gray-600 text-white"
+                      className="h-8"
                       disabled={readonly}
                     />
                   </div>
@@ -361,9 +359,9 @@ export default function Page() {
                 if (!focusedStopData) return null;
 
                 return (
-                  <Card className="p-4 bg-gray-800 border-gray-600">
+                  <Card className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium">
                         Color Stop {state.focusedStop + 1}
                       </span>
                       <Button
@@ -390,9 +388,7 @@ export default function Page() {
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs text-gray-400">
-                          Position
-                        </label>
+                        <label className="text-xs">Position</label>
                         <Input
                           type="number"
                           min="0"
@@ -417,12 +413,12 @@ export default function Page() {
                               ),
                             }));
                           }}
-                          className="h-8 bg-gray-700 border-gray-600 text-white"
+                          className="h-8"
                           disabled={readonly}
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400">Color</label>
+                        <label className="text-xs">Color</label>
                         <Input
                           type="color"
                           value={rgbaToHex(focusedStopData.color)} // Convert RGBA8888 to hex
@@ -439,7 +435,7 @@ export default function Page() {
                               ),
                             }));
                           }}
-                          className="h-8 bg-gray-700 border-gray-600"
+                          className="h-8"
                           disabled={readonly}
                         />
                       </div>
@@ -449,9 +445,9 @@ export default function Page() {
               })()}
 
             {/* Info */}
-            <Card className="p-4 bg-gray-800 border-gray-600">
-              <div className="text-xs text-gray-400 space-y-1">
-                <div>Type: {state.gradientType}</div>
+            <Card className="p-4">
+              <div className="text-xs space-y-1">
+                <div>Type: {gradientType}</div>
                 <div>Stops: {state.stops.length}</div>
                 <div>
                   Focused:{" "}

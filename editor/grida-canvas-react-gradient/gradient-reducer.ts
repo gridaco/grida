@@ -25,7 +25,6 @@ export interface GradientTransform {
 }
 
 export interface GradientState {
-  gradientType: GradientType;
   transform: GradientTransform;
   stops: cg.GradientStop[];
   focusedStop: number | null;
@@ -52,7 +51,8 @@ export const getControlPoints = (
   const A = { x: transform.tx * width, y: transform.ty * height };
 
   // B point: A + (a, d) * scale - controls rotation and main radius
-  const scale = 100; // Base scale for visualization
+  // Scale should be relative to container size for proper scaling
+  const scale = Math.min(width, height) * 0.2; // 20% of smaller dimension
   const B = {
     x: A.x + transform.a * scale,
     y: A.y + transform.d * scale,
@@ -165,8 +165,10 @@ export const getStopMarkerTransform = (
   transform: GradientTransform,
   width: number,
   height: number,
-  stopOffset: number = 25
+  stopOffset?: number
 ) => {
+  // Fixed stop offset for consistent physical appearance
+  const relativeStopOffset = stopOffset ?? 25;
   const trackPos = gradientPositionToScreen(
     position,
     gradientType,
@@ -194,8 +196,8 @@ export const getStopMarkerTransform = (
     const angle = Math.atan2(-perpY, -perpX) * (180 / Math.PI) + 270;
 
     return {
-      x: trackPos.x + perpX * stopOffset,
-      y: trackPos.y + perpY * stopOffset,
+      x: trackPos.x + perpX * relativeStopOffset,
+      y: trackPos.y + perpY * relativeStopOffset,
       rotation: angle,
     };
   } else {
@@ -205,8 +207,8 @@ export const getStopMarkerTransform = (
     const perpY = Math.sin(angle);
 
     return {
-      x: trackPos.x + perpX * stopOffset,
-      y: trackPos.y + perpY * stopOffset,
+      x: trackPos.x + perpX * relativeStopOffset,
+      y: trackPos.y + perpY * relativeStopOffset,
       rotation: angle * (180 / Math.PI) + 90,
     };
   }
@@ -273,9 +275,13 @@ export const detectHitTarget = (
   state: GradientState,
   width: number,
   height: number,
-  controlSize: number = 8,
-  stopSize: number = 18
+  gradientType: GradientType,
+  controlSize?: number,
+  stopSize?: number
 ) => {
+  // Calculate relative sizes based on container dimensions
+  const relativeControlSize = controlSize ?? Math.min(width, height) * 0.02; // 2% of smaller dimension
+  const relativeStopSize = stopSize ?? 18; // Fixed stop size for consistent hit detection
   const { A, B, C } = getControlPoints(state.transform, width, height);
 
   // Check control points
@@ -283,11 +289,11 @@ export const detectHitTarget = (
   const distB = getDistance(x, y, B.x, B.y);
   const distC = getDistance(x, y, C.x, C.y);
 
-  if (distA < controlSize)
+  if (distA < relativeControlSize)
     return { type: "control", target: "A", distance: distA };
-  if (distB < controlSize)
+  if (distB < relativeControlSize)
     return { type: "control", target: "B", distance: distB };
-  if (distC < controlSize)
+  if (distC < relativeControlSize)
     return { type: "control", target: "C", distance: distC };
 
   // Check stop markers
@@ -295,13 +301,13 @@ export const detectHitTarget = (
     const stop = state.stops[i];
     const markerTransform = getStopMarkerTransform(
       stop.offset, // Changed from position to offset
-      state.gradientType,
+      gradientType,
       state.transform,
       width,
       height
     );
     const dist = getDistance(x, y, markerTransform.x, markerTransform.y);
-    if (dist < stopSize / 2 + 5) {
+    if (dist < relativeStopSize / 2 + Math.min(width, height) * 0.012) {
       return { type: "stop", target: i, distance: dist };
     }
   }
@@ -310,22 +316,29 @@ export const detectHitTarget = (
   const gradientPos = screenToGradientPosition(
     x,
     y,
-    state.gradientType,
+    gradientType,
     state.transform,
     width,
     height
   );
   const trackPos = gradientPositionToScreen(
     gradientPos,
-    state.gradientType,
+    gradientType,
     state.transform,
     width,
     height
   );
   const trackDist = getDistance(x, y, trackPos.x, trackPos.y);
 
-  const hitThreshold = state.gradientType === "sweep" ? 20 : 15;
-  if (trackDist < hitThreshold && gradientPos >= 0 && gradientPos <= 1) {
+  const relativeHitThreshold =
+    gradientType === "sweep"
+      ? Math.min(width, height) * 0.05 // 5% for sweep
+      : Math.min(width, height) * 0.0375; // 3.75% for linear/radial
+  if (
+    trackDist < relativeHitThreshold &&
+    gradientPos >= 0 &&
+    gradientPos <= 1
+  ) {
     return { type: "track", position: gradientPos, distance: trackDist };
   }
 
@@ -334,7 +347,6 @@ export const detectHitTarget = (
 
 // Action types
 export type GradientAction =
-  | { type: "SET_GRADIENT_TYPE"; payload: GradientType }
   | { type: "SET_TRANSFORM"; payload: GradientTransform }
   | {
       type: "UPDATE_CONTROL_POINT";
@@ -365,6 +377,7 @@ export type GradientAction =
         y: number;
         width: number;
         height: number;
+        gradientType: GradientType;
       };
     }
   | {
@@ -374,6 +387,7 @@ export type GradientAction =
         y: number;
         width: number;
         height: number;
+        gradientType: GradientType;
       };
     }
   | { type: "HANDLE_POINTER_UP" }
@@ -389,18 +403,39 @@ const identity: GradientTransform = {
 };
 
 // Initial state
-export const createInitialState = (): GradientState => ({
-  gradientType: "linear",
-  transform: identity,
-  stops: [
-    { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } }, // Changed to cg.GradientStop format
-    { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } }, // Changed to cg.GradientStop format
-  ],
-  focusedStop: null,
-  focusedControl: null,
-  dragState: { type: null },
-  hoverPreview: null,
-});
+export function createInitialState(
+  type?: GradientType,
+  gradient?: GradientValue
+): GradientState {
+  if (type && gradient) {
+    return {
+      transform: {
+        a: gradient.transform[0][0],
+        b: gradient.transform[0][1],
+        tx: gradient.transform[0][2],
+        d: gradient.transform[1][0],
+        e: gradient.transform[1][1],
+        ty: gradient.transform[1][2],
+      },
+      stops: gradient.stops,
+      focusedStop: null,
+      focusedControl: null,
+      dragState: { type: null },
+      hoverPreview: null,
+    };
+  }
+  return {
+    transform: identity,
+    stops: [
+      { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } }, // Changed to cg.GradientStop format
+      { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } }, // Changed to cg.GradientStop format
+    ],
+    focusedStop: null,
+    focusedControl: null,
+    dragState: { type: null },
+    hoverPreview: null,
+  };
+}
 
 // Reducer
 export const gradientReducer = (
@@ -409,17 +444,14 @@ export const gradientReducer = (
 ): GradientState => {
   return produce(state, (draft) => {
     switch (action.type) {
-      case "SET_GRADIENT_TYPE":
-        draft.gradientType = action.payload;
-        break;
-
       case "SET_TRANSFORM":
         draft.transform = action.payload;
         break;
 
       case "UPDATE_CONTROL_POINT": {
         const { point, deltaX, deltaY, width, height } = action.payload;
-        const scale = 100;
+        // Use relative scale for proper scaling with container size
+        const scale = Math.min(width, height) * 0.2; // 20% of smaller dimension
 
         switch (point) {
           case "A":
@@ -565,8 +597,15 @@ export const gradientReducer = (
         break;
 
       case "HANDLE_POINTER_DOWN": {
-        const { x, y, width, height } = action.payload;
-        const hitTarget = detectHitTarget(x, y, state, width, height);
+        const { x, y, width, height, gradientType } = action.payload;
+        const hitTarget = detectHitTarget(
+          x,
+          y,
+          state,
+          width,
+          height,
+          gradientType
+        );
 
         if (hitTarget?.type === "control") {
           const { A, B, C } = getControlPoints(draft.transform, width, height);
@@ -585,7 +624,7 @@ export const gradientReducer = (
           if (stop) {
             const markerTransform = getStopMarkerTransform(
               stop.offset, // Changed from position to offset
-              draft.gradientType,
+              gradientType,
               draft.transform,
               width, // Pass actual width
               height // Pass actual height
@@ -621,7 +660,7 @@ export const gradientReducer = (
       }
 
       case "HANDLE_POINTER_MOVE": {
-        const { x, y, width, height } = action.payload;
+        const { x, y, width, height, gradientType } = action.payload;
 
         if (draft.dragState.type) {
           const adjustedX = x - (draft.dragState.offset?.x || 0);
@@ -642,7 +681,8 @@ export const gradientReducer = (
             );
           } else if (draft.dragState.type === "B") {
             const { A } = getControlPoints(draft.transform, width, height);
-            const scale = 100;
+            // Use relative scale for proper scaling with container size
+            const scale = Math.min(width, height) * 0.2; // 20% of smaller dimension
 
             // Calculate current distances
             const currentDistanceB = Math.sqrt(
@@ -686,7 +726,8 @@ export const gradientReducer = (
               const finalDistance =
                 projectedDistance >= 0 ? clampedDistance : -clampedDistance;
 
-              const scale = 100;
+              // Use relative scale for proper scaling with container size
+              const scale = Math.min(width, height) * 0.2; // 20% of smaller dimension
               draft.transform.b = (perpX * finalDistance) / scale;
               draft.transform.e = (perpY * finalDistance) / scale;
             }
@@ -697,7 +738,7 @@ export const gradientReducer = (
             const newPosition = screenToGradientPosition(
               adjustedX,
               adjustedY,
-              draft.gradientType,
+              gradientType,
               draft.transform,
               width, // Pass actual width
               height // Pass actual height
@@ -719,7 +760,12 @@ export const gradientReducer = (
           const distB = getDistance(x, y, B.x, B.y);
           const distC = getDistance(x, y, C.x, C.y);
 
-          if (distA < 15 || distB < 15 || distC < 15) {
+          const relativeControlHoverSize = Math.min(width, height) * 0.0375; // 3.75% of smaller dimension
+          if (
+            distA < relativeControlHoverSize ||
+            distB < relativeControlHoverSize ||
+            distC < relativeControlHoverSize
+          ) {
             hoveringOverControl = true;
           }
 
@@ -729,7 +775,7 @@ export const gradientReducer = (
               const stop = draft.stops[i];
               const markerTransform = getStopMarkerTransform(
                 stop.offset, // Changed from position to offset
-                draft.gradientType,
+                gradientType,
                 draft.transform,
                 width, // Pass actual width
                 height // Pass actual height
@@ -740,7 +786,8 @@ export const gradientReducer = (
                 markerTransform.x,
                 markerTransform.y
               );
-              if (dist < 18 / 2 + 10) {
+              const relativeStopHoverSize = 18 / 2 + 10; // Fixed stop hover size
+              if (dist < relativeStopHoverSize) {
                 hoveringOverControl = true;
                 break;
               }
@@ -751,14 +798,14 @@ export const gradientReducer = (
             const gradientPos = screenToGradientPosition(
               x,
               y,
-              draft.gradientType,
+              gradientType,
               draft.transform,
               width, // Pass actual width
               height // Pass actual height
             );
             const trackPos = gradientPositionToScreen(
               gradientPos,
-              draft.gradientType,
+              gradientType,
               draft.transform,
               width, // Pass actual width
               height // Pass actual height
@@ -766,10 +813,13 @@ export const gradientReducer = (
             const trackDist = getDistance(x, y, trackPos.x, trackPos.y);
 
             // Use a larger hit area for elliptical tracks (sweep only)
-            const hitThreshold = draft.gradientType === "sweep" ? 20 : 15;
+            const relativeTrackHitThreshold =
+              gradientType === "sweep"
+                ? Math.min(width, height) * 0.05 // 5% for sweep
+                : Math.min(width, height) * 0.0375; // 3.75% for linear/radial
 
             if (
-              trackDist < hitThreshold &&
+              trackDist < relativeTrackHitThreshold &&
               gradientPos >= 0 &&
               gradientPos <= 1
             ) {

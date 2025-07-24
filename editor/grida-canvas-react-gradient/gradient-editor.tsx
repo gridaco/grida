@@ -11,7 +11,7 @@ import {
   getControlPoints,
   getStopMarkerTransform,
 } from "./gradient-reducer";
-import cg from "@grida/cg";
+import { cn } from "@/components/lib/utils";
 
 // Helper function to convert RGBA8888 to CSS rgba string
 const rgbaToString = (color: {
@@ -27,7 +27,7 @@ export interface GradientEditorProps {
   width?: number;
   height?: number;
   gradientType: GradientType;
-  initialState?: Partial<GradientState>;
+  initialValue?: GradientValue;
   onStateChange?: (state: GradientState) => void;
   onValueChange?: (value: GradientValue) => void;
   readonly?: boolean;
@@ -36,13 +36,11 @@ export interface GradientEditorProps {
   stopPropagation?: boolean;
 }
 
-const STOP_SIZE = 18;
-
 export default function GradientEditor({
   width = 400,
   height = 300,
   gradientType,
-  initialState = {},
+  initialValue,
   onStateChange,
   onValueChange,
   readonly = false,
@@ -50,10 +48,10 @@ export default function GradientEditor({
   preventDefault = true,
   stopPropagation = true,
 }: GradientEditorProps) {
+  // Fixed stop size for consistent physical appearance
+  const STOP_SIZE = 18;
   const [state, dispatch] = useReducer(gradientReducer, {
-    ...createInitialState(),
-    ...initialState,
-    gradientType, // Override with prop
+    ...createInitialState(gradientType, initialValue),
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -86,10 +84,18 @@ export default function GradientEditor({
 
       dispatch({
         type: "HANDLE_POINTER_DOWN",
-        payload: { x, y, width, height },
+        payload: { x, y, width, height, gradientType },
       });
     },
-    [readonly, preventDefault, stopPropagation, dispatch, width, height]
+    [
+      readonly,
+      preventDefault,
+      stopPropagation,
+      dispatch,
+      width,
+      height,
+      gradientType,
+    ]
   );
 
   const handlePointerMove = useCallback(
@@ -104,10 +110,18 @@ export default function GradientEditor({
 
       dispatch({
         type: "HANDLE_POINTER_MOVE",
-        payload: { x, y, width, height },
+        payload: { x, y, width, height, gradientType },
       });
     },
-    [readonly, preventDefault, stopPropagation, dispatch, width, height]
+    [
+      readonly,
+      preventDefault,
+      stopPropagation,
+      dispatch,
+      width,
+      height,
+      gradientType,
+    ]
   );
 
   const handlePointerUp = useCallback(
@@ -224,7 +238,7 @@ export default function GradientEditor({
         />
 
         {/* Elliptical Track for radial and sweep */}
-        {(state.gradientType === "radial" || state.gradientType === "sweep") &&
+        {(gradientType === "radial" || gradientType === "sweep") &&
           (() => {
             const radiusX = Math.sqrt(
               Math.pow(B.x - A.x, 2) + Math.pow(B.y - A.y, 2)
@@ -303,7 +317,7 @@ export default function GradientEditor({
         const selected = state.focusedStop === index;
         const { x, y, rotation } = getStopMarkerTransform(
           stop.offset, // Changed from position to offset
-          state.gradientType,
+          gradientType,
           state.transform,
           width,
           height
@@ -319,6 +333,7 @@ export default function GradientEditor({
             readonly={readonly}
             tabIndex={0}
             arrow={true}
+            stopSize={STOP_SIZE}
             onFocus={(e) => {
               if (preventDefault) e.preventDefault();
               if (stopPropagation) e.stopPropagation();
@@ -337,38 +352,22 @@ export default function GradientEditor({
         (() => {
           const previewTransform = getStopMarkerTransform(
             state.hoverPreview.position,
-            state.gradientType,
+            gradientType,
             state.transform,
             width,
             height
           );
           return (
-            <div
-              className="absolute pointer-events-none opacity-60 animate-pulse z-20"
-              style={{
-                left: previewTransform.x,
-                top: previewTransform.y,
-                width: STOP_SIZE,
-                height: STOP_SIZE,
-                transform: `translate(-50%, -50%) rotate(${previewTransform.rotation}deg)`,
-              }}
-            >
-              <div className="w-full h-full border-2 border-white bg-gray-500 shadow-lg">
-                <div className="w-full h-full bg-gradient-to-br from-white/30 to-transparent" />
-              </div>
-              <div
-                className="absolute left-1/2 transform -translate-x-1/2 border-t-white"
-                style={{
-                  top: STOP_SIZE - 2,
-                  width: 0,
-                  height: 0,
-                  borderLeft: "5px solid transparent",
-                  borderRight: "5px solid transparent",
-                  borderTop: "6px solid",
-                  opacity: 0.7,
-                }}
-              />
-            </div>
+            <StopMarker
+              x={previewTransform.x}
+              y={previewTransform.y}
+              transform={`translate(-50%, -50%) rotate(${previewTransform.rotation}deg)`}
+              color={"gray"}
+              selected={false}
+              readonly
+              stopSize={STOP_SIZE}
+              className="opacity-60 pointer-events-none"
+            />
           );
         })()}
     </div>
@@ -385,6 +384,8 @@ function StopMarker({
   tabIndex,
   onFocus,
   arrow = true,
+  stopSize,
+  className,
 }: {
   x: number;
   y: number;
@@ -393,19 +394,31 @@ function StopMarker({
   selected: boolean;
   readonly: boolean;
   tabIndex?: number;
-  onFocus: React.FocusEventHandler<HTMLDivElement>;
+  onFocus?: React.FocusEventHandler<HTMLDivElement>;
   arrow?: boolean;
+  stopSize: number;
+  className?: string;
 }) {
   return (
     <div
-      className={`absolute focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-        selected ? "scale-110 z-10" : "z-0"
-      } ${readonly ? "cursor-default" : "cursor-move"}`}
+      data-selected={selected}
+      data-readonly={readonly}
+      className={cn(
+        `
+        group/stop
+        absolute focus:outline-none focus:ring-2 focus:ring-blue-500 
+        data-[selected=true]:z-10
+        data-[selected=false]:z-0
+        data-[readonly=true]:cursor-default
+        data-[readonly=false]:cursor-move
+        `,
+        className
+      )}
       style={{
         left: x,
         top: y,
-        width: STOP_SIZE,
-        height: STOP_SIZE,
+        width: stopSize,
+        height: stopSize,
         transform,
       }}
       role="button"
@@ -414,32 +427,34 @@ function StopMarker({
       data-popover-no-close
       onFocus={onFocus}
     >
+      {/* arrow */}
+      {arrow && (
+        <div
+          className={`
+            absolute left-1/2 transform -translate-x-1/2
+            border-l-[5px] border-l-transparent
+            border-r-[5px] border-r-transparent
+            border-t-white border-t-[6px]
+            group-data-[selected=true]/stop:border-t-yellow-400
+            `}
+          style={{
+            top: stopSize - 2,
+            width: 0,
+            height: 0,
+          }}
+        />
+      )}
+
+      {/* fill */}
       <div
-        className={`w-full h-full border-2 shadow-lg ${
-          selected ? "border-yellow-400 ring-2 ring-yellow-400" : "border-white"
-        }`}
+        className={`
+          w-full h-full border-2 shadow-lg
+          group-data-[selected=true]/stop:border-yellow-400 group-data-[selected=false]/stop:border-white
+          `}
         style={{ backgroundColor: color }}
       >
         <div className="w-full h-full bg-gradient-to-br from-white/30 to-transparent" />
       </div>
-
-      {/* arrow */}
-      {arrow && (
-        <div
-          className={`absolute left-1/2 transform -translate-x-1/2 ${
-            selected ? "border-t-yellow-400" : "border-t-white"
-          }`}
-          style={{
-            top: STOP_SIZE - 2,
-            width: 0,
-            height: 0,
-            borderLeft: "5px solid transparent",
-            borderRight: "5px solid transparent",
-            borderTop: "6px solid",
-            filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))",
-          }}
-        />
-      )}
     </div>
   );
 }

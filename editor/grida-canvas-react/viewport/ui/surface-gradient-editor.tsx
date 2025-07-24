@@ -64,6 +64,7 @@ function Editor({
       width={width}
       height={height}
       gradientType={gradientType}
+      initialValue={fill as cg.GradientPaint}
       onValueChange={(g) => {
         editor.changeNodeFill(node_id, {
           type: "linear_gradient",
