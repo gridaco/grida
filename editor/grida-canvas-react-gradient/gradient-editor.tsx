@@ -23,6 +23,8 @@ const rgbaToString = (color: {
   return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
 };
 
+const STOP_SIZE = 18;
+
 export interface GradientEditorProps {
   width?: number;
   height?: number;
@@ -31,7 +33,6 @@ export interface GradientEditorProps {
   onStateChange?: (state: GradientState) => void;
   onValueChange?: (value: GradientValue) => void;
   readonly?: boolean;
-  background?: string;
   preventDefault?: boolean;
   stopPropagation?: boolean;
 }
@@ -44,12 +45,9 @@ export default function GradientEditor({
   onStateChange,
   onValueChange,
   readonly = false,
-  background,
   preventDefault = true,
   stopPropagation = true,
 }: GradientEditorProps) {
-  // Fixed stop size for consistent physical appearance
-  const STOP_SIZE = 18;
   const [state, dispatch] = useReducer(gradientReducer, {
     ...createInitialState(gradientType, initialValue),
   });
@@ -186,7 +184,6 @@ export default function GradientEditor({
       style={{
         width,
         height,
-        background: background || "transparent",
         overflow: "visible",
       }}
       onPointerDown={handlePointerDown}

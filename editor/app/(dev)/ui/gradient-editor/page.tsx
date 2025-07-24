@@ -178,14 +178,27 @@ export default function Page() {
                 </div>
 
                 {/* Gradient Canvas */}
-                <GradientEditor
-                  width={400}
-                  height={300}
-                  gradientType={gradientType}
-                  onStateChange={handleChange}
-                  readonly={readonly}
-                  background={generateGradientCSS()}
-                />
+                <div
+                  className="relative"
+                  style={{
+                    width: 400,
+                    height: 300,
+                  }}
+                >
+                  <GradientEditor
+                    width={400}
+                    height={300}
+                    gradientType={gradientType}
+                    onStateChange={handleChange}
+                    readonly={readonly}
+                  />
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: generateGradientCSS(),
+                    }}
+                  />
+                </div>
 
                 {/* Instructions */}
                 <div className="text-xs p-2 rounded border">
