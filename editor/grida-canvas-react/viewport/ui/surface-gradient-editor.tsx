@@ -1,7 +1,7 @@
 import React from "react";
 import { useTransformState, useCurrentEditor } from "@/grida-canvas-react";
 import { useSingleSelection } from "../surface-hooks";
-import GradientEditor from "@/app/(dev)/ui/gradient-editor/gradient-editor";
+import GradientEditor from "@/grida-canvas-react-gradient";
 import cg from "@grida/cg";
 import { useNodeState } from "@/grida-canvas-react/provider";
 
@@ -31,48 +31,46 @@ export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
           zIndex: 1,
         }}
       >
-        <Editor node_id={node_id} />
+        <Editor
+          node_id={node_id}
+          width={data.boundingSurfaceRect.width}
+          height={data.boundingSurfaceRect.height}
+        />
       </div>
     </div>
   );
 }
 
-function Editor({ node_id }: { node_id: string }) {
+function Editor({
+  node_id,
+  width,
+  height,
+}: {
+  node_id: string;
+  width: number;
+  height: number;
+}) {
   const editor = useCurrentEditor();
 
-  const { fill, width, height } = useNodeState(node_id, (node) => ({
+  const { fill } = useNodeState(node_id, (node) => ({
     fill: node.fill,
-    width: node.width,
-    height: node.height,
   }));
 
   const gradientType = fill?.type ? gradientTypeMap[fill.type] : undefined;
   if (!gradientType) return null;
-
-  console.log("fill", fill);
 
   return (
     <GradientEditor
       width={width}
       height={height}
       gradientType={gradientType}
-      // onValueChange={(s) => {
-      //   editor.changeNodeFill(node_id, {
-      //     ...fill,
-      //     type: "linear_gradient",
-      //     stops: s.stops,
-      //     // transform: g.transform,
-      //   });
-      //   //
-      // }}
-      // onValueChange={(g) => {
-      //   console.log("g", g);
-      //   editor.changeNodeFill(node_id, {
-      //     type: "linear_gradient",
-      //     stops: g.stops,
-      //     transform: g.transform,
-      //   });
-      // }}
+      onValueChange={(g) => {
+        editor.changeNodeFill(node_id, {
+          type: "linear_gradient",
+          stops: g.stops,
+          transform: g.transform,
+        });
+      }}
       preventDefault
       stopPropagation
     />

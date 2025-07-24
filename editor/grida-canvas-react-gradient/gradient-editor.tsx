@@ -51,7 +51,7 @@ export default function GradientEditor({
   stopPropagation = true,
 }: GradientEditorProps) {
   const [state, dispatch] = useReducer(gradientReducer, {
-    ...createInitialState(width, height),
+    ...createInitialState(),
     ...initialState,
     gradientType, // Override with prop
   });
@@ -161,12 +161,12 @@ export default function GradientEditor({
     };
   }, [state.dragState.type, readonly, handlePointerMove, handlePointerUp]);
 
-  const { A, B, C } = getControlPoints(state.transform);
+  const { A, B, C } = getControlPoints(state.transform, width, height);
 
   return (
     <div
       ref={containerRef}
-      className={`relative border border-gray-600 select-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+      className={`relative select-none ${
         readonly ? "cursor-default" : "cursor-crosshair"
       }`}
       style={{ width, height, background: background || "transparent" }}
@@ -299,7 +299,9 @@ export default function GradientEditor({
         const { x, y, rotation } = getStopMarkerTransform(
           stop.offset, // Changed from position to offset
           state.gradientType,
-          state.transform
+          state.transform,
+          width,
+          height
         );
         return (
           <StopMarker
@@ -331,7 +333,9 @@ export default function GradientEditor({
           const previewTransform = getStopMarkerTransform(
             state.hoverPreview.position,
             state.gradientType,
-            state.transform
+            state.transform,
+            width,
+            height
           );
           return (
             <div

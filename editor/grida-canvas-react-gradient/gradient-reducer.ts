@@ -12,10 +12,16 @@ export interface GradientTransform {
   // 2D affine transform matrix [[a, b, tx], [d, e, ty]]
   a: number;
   b: number;
-  tx: number; // A point x
+  /**
+   * A point x (relative coordinate 0-1, can be negative)
+   */
+  tx: number; //
   d: number;
   e: number;
-  ty: number; // A point y
+  /**
+   * A point y (relative coordinate 0-1, can be negative)
+   */
+  ty: number;
 }
 
 export interface GradientState {
@@ -37,8 +43,13 @@ export interface GradientState {
 }
 
 // Utility functions for calculations
-export const getControlPoints = (transform: GradientTransform) => {
-  const A = { x: transform.tx, y: transform.ty };
+export const getControlPoints = (
+  transform: GradientTransform,
+  width: number,
+  height: number
+) => {
+  // Convert relative coordinates (0-1) to absolute pixel coordinates
+  const A = { x: transform.tx * width, y: transform.ty * height };
 
   // B point: A + (a, d) * scale - controls rotation and main radius
   const scale = 100; // Base scale for visualization
@@ -77,9 +88,11 @@ export const screenToGradientPosition = (
   x: number,
   y: number,
   gradientType: GradientType,
-  transform: GradientTransform
+  transform: GradientTransform,
+  width: number,
+  height: number
 ) => {
-  const { A, B, C } = getControlPoints(transform);
+  const { A, B, C } = getControlPoints(transform, width, height);
 
   if (gradientType === "linear" || gradientType === "radial") {
     // Project onto A-B line for both linear and radial
@@ -109,9 +122,11 @@ export const screenToGradientPosition = (
 export const gradientPositionToScreen = (
   position: number,
   gradientType: GradientType,
-  transform: GradientTransform
+  transform: GradientTransform,
+  width: number,
+  height: number
 ) => {
-  const { A, B, C } = getControlPoints(transform);
+  const { A, B, C } = getControlPoints(transform, width, height);
 
   if (gradientType === "linear" || gradientType === "radial") {
     // Linear interpolation along A-B line for both linear and radial
@@ -148,14 +163,22 @@ export const getStopMarkerTransform = (
   position: number,
   gradientType: GradientType,
   transform: GradientTransform,
+  width: number,
+  height: number,
   stopOffset: number = 25
 ) => {
-  const trackPos = gradientPositionToScreen(position, gradientType, transform);
-  const { A } = getControlPoints(transform);
+  const trackPos = gradientPositionToScreen(
+    position,
+    gradientType,
+    transform,
+    width,
+    height
+  );
+  const { A } = getControlPoints(transform, width, height);
 
   if (gradientType === "linear" || gradientType === "radial") {
     // Same logic for both linear and radial - position along A-B line
-    const { B } = getControlPoints(transform);
+    const { B } = getControlPoints(transform, width, height);
     const dx = B.x - A.x;
     const dy = B.y - A.y;
     const length = Math.sqrt(dx * dx + dy * dy);
@@ -198,10 +221,12 @@ export const detectHitTarget = (
   x: number,
   y: number,
   state: GradientState,
+  width: number,
+  height: number,
   controlSize: number = 8,
   stopSize: number = 18
 ) => {
-  const { A, B, C } = getControlPoints(state.transform);
+  const { A, B, C } = getControlPoints(state.transform, width, height);
 
   // Check control points
   const distA = getDistance(x, y, A.x, A.y);
@@ -221,7 +246,9 @@ export const detectHitTarget = (
     const markerTransform = getStopMarkerTransform(
       stop.offset, // Changed from position to offset
       state.gradientType,
-      state.transform
+      state.transform,
+      width,
+      height
     );
     const dist = getDistance(x, y, markerTransform.x, markerTransform.y);
     if (dist < stopSize / 2 + 5) {
@@ -234,12 +261,16 @@ export const detectHitTarget = (
     x,
     y,
     state.gradientType,
-    state.transform
+    state.transform,
+    width,
+    height
   );
   const trackPos = gradientPositionToScreen(
     gradientPos,
     state.gradientType,
-    state.transform
+    state.transform,
+    width,
+    height
   );
   const trackDist = getDistance(x, y, trackPos.x, trackPos.y);
 
@@ -298,20 +329,19 @@ export type GradientAction =
   | { type: "HANDLE_POINTER_UP" }
   | { type: "HANDLE_POINTER_LEAVE" };
 
+const identity: GradientTransform = {
+  a: 1,
+  b: 0,
+  tx: 0.5,
+  d: 0,
+  e: 1,
+  ty: 0.5,
+};
+
 // Initial state
-export const createInitialState = (
-  width: number,
-  height: number
-): GradientState => ({
+export const createInitialState = (): GradientState => ({
   gradientType: "linear",
-  transform: {
-    a: 1,
-    b: 0,
-    tx: width / 2,
-    d: 0,
-    e: 1,
-    ty: height / 2,
-  },
+  transform: identity,
   stops: [
     { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } }, // Changed to cg.GradientStop format
     { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } }, // Changed to cg.GradientStop format
@@ -343,13 +373,17 @@ export const gradientReducer = (
 
         switch (point) {
           case "A":
+            // Convert pixel deltas to relative deltas
+            const relativeDeltaX = deltaX / width;
+            const relativeDeltaY = deltaY / height;
+
             draft.transform.tx = Math.max(
-              0,
-              Math.min(width, draft.transform.tx + deltaX)
+              -0.5, // Allow negative values as requested
+              Math.min(1.5, draft.transform.tx + relativeDeltaX) // Allow values beyond 1
             );
             draft.transform.ty = Math.max(
-              0,
-              Math.min(height, draft.transform.ty + deltaY)
+              -0.5, // Allow negative values as requested
+              Math.min(1.5, draft.transform.ty + relativeDeltaY) // Allow values beyond 1
             );
             break;
 
@@ -475,10 +509,10 @@ export const gradientReducer = (
 
       case "HANDLE_POINTER_DOWN": {
         const { x, y, width, height } = action.payload;
-        const hitTarget = detectHitTarget(x, y, state);
+        const hitTarget = detectHitTarget(x, y, state, width, height);
 
         if (hitTarget?.type === "control") {
-          const { A, B, C } = getControlPoints(draft.transform);
+          const { A, B, C } = getControlPoints(draft.transform, width, height);
           const controlPoint = hitTarget.target as "A" | "B" | "C";
           const point = controlPoint === "A" ? A : controlPoint === "B" ? B : C;
 
@@ -495,7 +529,9 @@ export const gradientReducer = (
             const markerTransform = getStopMarkerTransform(
               stop.offset, // Changed from position to offset
               draft.gradientType,
-              draft.transform
+              draft.transform,
+              width, // Pass actual width
+              height // Pass actual height
             );
             draft.dragState = {
               type: "stop",
@@ -531,19 +567,20 @@ export const gradientReducer = (
           const adjustedY = y - (draft.dragState.offset?.y || 0);
 
           if (draft.dragState.type === "A") {
-            const deltaX = adjustedX - draft.transform.tx;
-            const deltaY = adjustedY - draft.transform.ty;
+            // Convert absolute pixel coordinates to relative coordinates
+            const relativeX = adjustedX / width;
+            const relativeY = adjustedY / height;
 
             draft.transform.tx = Math.max(
-              0,
-              Math.min(width, draft.transform.tx + deltaX)
+              -0.5, // Allow negative values as requested
+              Math.min(1.5, relativeX) // Allow values beyond 1
             );
             draft.transform.ty = Math.max(
-              0,
-              Math.min(height, draft.transform.ty + deltaY)
+              -0.5, // Allow negative values as requested
+              Math.min(1.5, relativeY) // Allow values beyond 1
             );
           } else if (draft.dragState.type === "B") {
-            const { A } = getControlPoints(draft.transform);
+            const { A } = getControlPoints(draft.transform, width, height);
             const scale = 100;
 
             // Calculate current distances
@@ -564,7 +601,7 @@ export const gradientReducer = (
             draft.transform.b = (draft.transform.b || 0) * scaleFactor;
             draft.transform.e = (draft.transform.e || 0) * scaleFactor;
           } else if (draft.dragState.type === "C") {
-            const { A } = getControlPoints(draft.transform);
+            const { A } = getControlPoints(draft.transform, width, height);
 
             // Calculate A-B direction for perpendicular constraint
             const abLength = Math.sqrt(
@@ -600,7 +637,9 @@ export const gradientReducer = (
               adjustedX,
               adjustedY,
               draft.gradientType,
-              draft.transform
+              draft.transform,
+              width, // Pass actual width
+              height // Pass actual height
             );
             const stopIndex = draft.dragState.index;
             if (stopIndex >= 0 && stopIndex < draft.stops.length) {
@@ -611,7 +650,7 @@ export const gradientReducer = (
           draft.hoverPreview = null;
         } else {
           // Show hover preview
-          const { A, B, C } = getControlPoints(draft.transform);
+          const { A, B, C } = getControlPoints(draft.transform, width, height);
           let hoveringOverControl = false;
 
           // Check if hovering over controls
@@ -630,7 +669,9 @@ export const gradientReducer = (
               const markerTransform = getStopMarkerTransform(
                 stop.offset, // Changed from position to offset
                 draft.gradientType,
-                draft.transform
+                draft.transform,
+                width, // Pass actual width
+                height // Pass actual height
               );
               const dist = getDistance(
                 x,
@@ -650,12 +691,16 @@ export const gradientReducer = (
               x,
               y,
               draft.gradientType,
-              draft.transform
+              draft.transform,
+              width, // Pass actual width
+              height // Pass actual height
             );
             const trackPos = gradientPositionToScreen(
               gradientPos,
               draft.gradientType,
-              draft.transform
+              draft.transform,
+              width, // Pass actual width
+              height // Pass actual height
             );
             const trackDist = getDistance(x, y, trackPos.x, trackPos.y);
 

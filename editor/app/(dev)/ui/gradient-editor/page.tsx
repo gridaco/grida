@@ -12,12 +12,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
-import GradientEditor from "./gradient-editor";
+import GradientEditor from "@/grida-canvas-react-gradient";
 import {
   createInitialState,
   type GradientState,
   type GradientType,
-} from "./gradient-reducer";
+} from "@/grida-canvas-react-gradient";
 import type cg from "@grida/cg";
 
 // Helper function to convert RGBA8888 to hex string
@@ -37,9 +37,7 @@ const hexToRgba = (hex: string): cg.RGBA8888 => {
 };
 
 export default function Page() {
-  const [state, setState] = useState<GradientState>(() =>
-    createInitialState(400, 300)
-  );
+  const [state, setState] = useState<GradientState>(() => createInitialState());
   const [readonly, setReadonly] = useState(false);
 
   const handleChange = useCallback((newState: GradientState) => {
