@@ -123,12 +123,12 @@ function GradientEditorContent() {
     <div className="fixed inset-0 overflow-hidden">
       {/* Floating Title */}
       <div className="absolute top-12 left-12 z-50">
-        <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 border shadow-lg">
+        <div className="bg-background/80 backdrop-blur-sm rounded-lg px-4 py-3 border shadow-lg">
           <h1 className="text-lg font-bold mb-0.5 font-mono">
             @grida/react-gradient-editor
           </h1>
           <p className="text-xs text-muted-foreground">
-            Interactive gradient creation tool
+            Gradient stops & transforms
           </p>
         </div>
       </div>

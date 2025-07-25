@@ -1,9 +1,8 @@
 "use client";
 
 import React from "react";
-import { type GradientType, type GradientValue } from "./gradient-reducer";
+import { type GradientType } from "./gradient-reducer";
 import { type UseGradientReturn } from "./use-gradient";
-import { cn } from "@/components/lib/utils";
 import StopMarker from "./gradient-color-stop-marker";
 
 // Helper function to convert RGBA8888 to CSS rgba string

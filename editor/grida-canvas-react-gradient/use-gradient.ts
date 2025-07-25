@@ -91,21 +91,24 @@ export function useGradient({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Calculate control points
-  const controlPoints = getControlPoints(state.transform, width, height);
+  const controlPoints = getControlPoints(state.controlPoints, width, height);
 
   // Transform actions
   const setTransform = useCallback((transform: GradientTransform) => {
-    dispatch({ type: "SET_TRANSFORM", payload: transform });
+    dispatch({
+      type: "SET_TRANSFORM",
+      payload: { transform, gradientType },
+    });
   }, []);
 
   const updateControlPoint = useCallback(
     (point: "A" | "B" | "C", deltaX: number, deltaY: number) => {
       dispatch({
         type: "UPDATE_CONTROL_POINT",
-        payload: { point, deltaX, deltaY, width, height },
+        payload: { point, deltaX, deltaY, width, height, gradientType },
       });
     },
-    [width, height]
+    [width, height, gradientType]
   );
 
   // Stop actions
@@ -218,12 +221,12 @@ export function useGradient({
       return getStopMarkerTransform(
         position,
         gradientType,
-        state.transform,
+        state.controlPoints,
         width,
         height
       );
     },
-    [gradientType, state.transform, width, height]
+    [gradientType, state.controlPoints, width, height]
   );
 
   const getValue = useCallback((): GradientValue => {
