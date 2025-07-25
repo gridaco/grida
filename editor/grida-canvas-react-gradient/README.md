@@ -223,7 +223,11 @@ interface GradientState {
 
 - **A Point**: Center/Start point of the gradient
 - **B Point**: End/Radius point - controls rotation and main radius
-- **C Point**: Scale point - controls perpendicular scaling (for radial/sweep)
+- **C Point**: Scale point - controls perpendicular scaling
+
+For linear gradients only **A** and **B** are visible. In radial and sweep
+gradients the **C** control remains locked perpendicular to the A–B axis and
+adjusts the minor radius of the ellipse.
 
 ## Migration from Previous Version
 

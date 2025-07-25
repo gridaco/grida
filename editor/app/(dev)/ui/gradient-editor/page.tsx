@@ -90,8 +90,8 @@ function GradientEditorContent() {
         { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } },
       ],
       transform: [
-        [1, 0, 0.5],
-        [0, 1, 0.5],
+        [1, 0, 0],
+        [0, 1, 0],
       ],
     },
     width: dimensions.width,

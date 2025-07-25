@@ -89,11 +89,23 @@ export const getPointsFromTransform = (
   gradientType: GradientType
 ): ControlPoints => {
   const base = getBaseControlPoints(gradientType);
-  return {
-    A: applyTransform(t, base.A),
-    B: applyTransform(t, base.B),
-    C: applyTransform(t, base.C),
-  };
+  const A = applyTransform(t, base.A);
+  const B = applyTransform(t, base.B);
+  let C = applyTransform(t, base.C);
+
+  if (gradientType === "linear") {
+    const dx = B.x - A.x;
+    const dy = B.y - A.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
+    const px = -dy / len;
+    const py = dx / len;
+    C = {
+      x: A.x + px * (len * 0.5),
+      y: A.y + py * (len * 0.5),
+    };
+  }
+
+  return { A, B, C };
 };
 
 // Compute transform from control points
@@ -103,15 +115,33 @@ export const getTransformFromPoints = (
 ): GradientTransform => {
   const base = getBaseControlPoints(gradientType);
 
+  let pts = points;
+
+  if (gradientType === "linear") {
+    const dx = points.B.x - points.A.x;
+    const dy = points.B.y - points.A.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
+    const px = -dy / len;
+    const py = dx / len;
+    pts = {
+      A: points.A,
+      B: points.B,
+      C: {
+        x: points.A.x + px * (len * 0.5),
+        y: points.A.y + py * (len * 0.5),
+      },
+    };
+  }
+
   const u1 = base.B.x - base.A.x;
   const u2 = base.B.y - base.A.y;
   const v1 = base.C.x - base.A.x;
   const v2 = base.C.y - base.A.y;
 
-  const p1 = points.B.x - points.A.x;
-  const p2 = points.B.y - points.A.y;
-  const q1 = points.C.x - points.A.x;
-  const q2 = points.C.y - points.A.y;
+  const p1 = pts.B.x - pts.A.x;
+  const p2 = pts.B.y - pts.A.y;
+  const q1 = pts.C.x - pts.A.x;
+  const q2 = pts.C.y - pts.A.y;
 
   const det = u1 * v2 - u2 * v1 || 1e-6;
 
@@ -348,7 +378,7 @@ export const detectHitTarget = (
     return { type: "control", target: "A", distance: distA };
   if (distB < relativeControlSize)
     return { type: "control", target: "B", distance: distB };
-  if (distC < relativeControlSize)
+  if (gradientType !== "linear" && distC < relativeControlSize)
     return { type: "control", target: "C", distance: distC };
 
   // Check stop markers
@@ -536,6 +566,39 @@ export const gradientReducer = (
           x: Math.max(-0.5, Math.min(1.5, next.x)),
           y: Math.max(-0.5, Math.min(1.5, next.y)),
         };
+
+        if (gradientType !== "linear") {
+          if (point === "B") {
+            const A = draft.controlPoints.A;
+            const B = draft.controlPoints.B;
+            const dx = B.x - A.x;
+            const dy = B.y - A.y;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
+            const px = -dy / len;
+            const py = dx / len;
+            const AC = {
+              x: draft.controlPoints.C.x - A.x,
+              y: draft.controlPoints.C.y - A.y,
+            };
+            const distAC = Math.sqrt(AC.x * AC.x + AC.y * AC.y);
+            draft.controlPoints.C.x = A.x + px * distAC;
+            draft.controlPoints.C.y = A.y + py * distAC;
+          } else if (point === "C") {
+            const A = draft.controlPoints.A;
+            const B = draft.controlPoints.B;
+            const dx = B.x - A.x;
+            const dy = B.y - A.y;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
+            const px = -dy / len;
+            const py = dx / len;
+            const dist = Math.sqrt(
+              Math.pow(draft.controlPoints.C.x - A.x, 2) +
+                Math.pow(draft.controlPoints.C.y - A.y, 2)
+            );
+            draft.controlPoints.C.x = A.x + px * dist;
+            draft.controlPoints.C.y = A.y + py * dist;
+          }
+        }
         draft.transform = getTransformFromPoints(
           draft.controlPoints,
           gradientType
@@ -702,36 +765,58 @@ export const gradientReducer = (
               draft.controlPoints,
               gradientType
             );
-          } else if (draft.dragState.type === "B") {
-            const relativeX = adjustedX / width;
-            const relativeY = adjustedY / height;
-            draft.controlPoints.B.x = Math.max(
-              -0.5,
-              Math.min(1.5, relativeX)
-            );
-            draft.controlPoints.B.y = Math.max(
-              -0.5,
-              Math.min(1.5, relativeY)
-            );
-            draft.transform = getTransformFromPoints(
-              draft.controlPoints,
-              gradientType
-            );
-          } else if (draft.dragState.type === "C") {
-            const relativeX = adjustedX / width;
-            const relativeY = adjustedY / height;
-            draft.controlPoints.C.x = Math.max(
-              -0.5,
-              Math.min(1.5, relativeX)
-            );
-            draft.controlPoints.C.y = Math.max(
-              -0.5,
-              Math.min(1.5, relativeY)
-            );
-            draft.transform = getTransformFromPoints(
-              draft.controlPoints,
-              gradientType
-            );
+      } else if (draft.dragState.type === "B") {
+        const relativeX = adjustedX / width;
+        const relativeY = adjustedY / height;
+        draft.controlPoints.B.x = Math.max(-0.5, Math.min(1.5, relativeX));
+        draft.controlPoints.B.y = Math.max(-0.5, Math.min(1.5, relativeY));
+
+        if (gradientType !== "linear") {
+          const A = draft.controlPoints.A;
+          const B = draft.controlPoints.B;
+          const dx = B.x - A.x;
+          const dy = B.y - A.y;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
+          const px = -dy / len;
+          const py = dx / len;
+          const AC = {
+            x: draft.controlPoints.C.x - A.x,
+            y: draft.controlPoints.C.y - A.y,
+          };
+          const distAC = Math.sqrt(AC.x * AC.x + AC.y * AC.y);
+          draft.controlPoints.C.x = A.x + px * distAC;
+          draft.controlPoints.C.y = A.y + py * distAC;
+        }
+
+        draft.transform = getTransformFromPoints(
+          draft.controlPoints,
+          gradientType
+        );
+      } else if (draft.dragState.type === "C") {
+        const relativeX = adjustedX / width;
+        const relativeY = adjustedY / height;
+        if (gradientType === "linear") {
+          draft.controlPoints.C.x = Math.max(-0.5, Math.min(1.5, relativeX));
+          draft.controlPoints.C.y = Math.max(-0.5, Math.min(1.5, relativeY));
+        } else {
+          const A = draft.controlPoints.A;
+          const B = draft.controlPoints.B;
+          const dx = B.x - A.x;
+          const dy = B.y - A.y;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
+          const px = -dy / len;
+          const py = dx / len;
+          const dist = Math.sqrt(
+            Math.pow(relativeX - A.x, 2) + Math.pow(relativeY - A.y, 2)
+          );
+          draft.controlPoints.C.x = A.x + px * dist;
+          draft.controlPoints.C.y = A.y + py * dist;
+        }
+
+        draft.transform = getTransformFromPoints(
+          draft.controlPoints,
+          gradientType
+        );
           } else if (
             draft.dragState.type === "stop" &&
             draft.dragState.index !== undefined
@@ -769,7 +854,7 @@ export const gradientReducer = (
           if (
             distA < relativeControlHoverSize ||
             distB < relativeControlHoverSize ||
-            distC < relativeControlHoverSize
+            (gradientType !== "linear" && distC < relativeControlHoverSize)
           ) {
             hoveringOverControl = true;
           }

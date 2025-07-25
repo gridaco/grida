@@ -148,19 +148,21 @@ export default function GradientEditor({
         }}
       />
 
-      {/* C Point */}
-      <ControlPoint
-        x={C.x}
-        y={C.y}
-        selected={editor.focusedControl === "C"}
-        readonly={editor.readonly}
-        tabIndex={0}
-        onFocus={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (!editor.readonly) editor.setFocusedControl("C");
-        }}
-      />
+      {/* C Point (radial/sweep only) */}
+      {(gradientType === "radial" || gradientType === "sweep") && (
+        <ControlPoint
+          x={C.x}
+          y={C.y}
+          selected={editor.focusedControl === "C"}
+          readonly={editor.readonly}
+          tabIndex={0}
+          onFocus={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!editor.readonly) editor.setFocusedControl("C");
+          }}
+        />
+      )}
 
       {/* Color Stop Markers */}
       {editor.stops.map((stop, index) => {
