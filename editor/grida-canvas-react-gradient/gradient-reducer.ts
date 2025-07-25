@@ -1,5 +1,6 @@
 import { produce } from "immer";
 import type cg from "@grida/cg";
+import { ellipseMarkerRotation, degToRad } from "./ellipse-utils";
 
 export type GradientType = "linear" | "radial" | "sweep";
 
@@ -258,41 +259,59 @@ export const getStopMarkerTransform = (
     width,
     height
   );
-  const { A } = getControlPoints(points, width, height);
+  const { A, B, C } = getControlPoints(points, width, height);
 
-  if (gradientType === "linear" || gradientType === "radial") {
-    // Same logic for both linear and radial - position along A-B line
-    const { B } = getControlPoints(points, width, height);
-    const dx = B.x - A.x;
-    const dy = B.y - A.y;
-    const length = Math.sqrt(dx * dx + dy * dy);
+  switch (gradientType) {
+    case "linear":
+    case "radial": {
+      // Position along A-B line with perpendicular offset
+      const dx = B.x - A.x;
+      const dy = B.y - A.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
 
-    let perpX = -dy / length;
-    let perpY = dx / length;
+      let perpX = -dy / length;
+      let perpY = dx / length;
 
-    if (perpY > 0) {
-      perpX = -perpX;
-      perpY = -perpY;
+      if (perpY > 0) {
+        perpX = -perpX;
+        perpY = -perpY;
+      }
+
+      const angle = Math.atan2(-perpY, -perpX) * (180 / Math.PI) + 270;
+
+      return {
+        x: trackPos.x + perpX * relativeStopOffset,
+        y: trackPos.y + perpY * relativeStopOffset,
+        rotation: angle,
+      };
     }
+    case "sweep": {
+      const radiusX = Math.sqrt(
+        Math.pow(B.x - A.x, 2) + Math.pow(B.y - A.y, 2)
+      );
+      const radiusY = Math.sqrt(
+        Math.pow(C.x - A.x, 2) + Math.pow(C.y - A.y, 2)
+      );
+      const baseAngle = Math.atan2(B.y - A.y, B.x - A.x) * (180 / Math.PI);
+      const currentAngle = baseAngle + position * 360;
+      const rotation = ellipseMarkerRotation(
+        A.x,
+        A.y,
+        radiusX,
+        radiusY,
+        currentAngle,
+        baseAngle
+      );
+      const rad = degToRad(rotation - 90);
+      const perpX = Math.cos(rad);
+      const perpY = Math.sin(rad);
 
-    const angle = Math.atan2(-perpY, -perpX) * (180 / Math.PI) + 270;
-
-    return {
-      x: trackPos.x + perpX * relativeStopOffset,
-      y: trackPos.y + perpY * relativeStopOffset,
-      rotation: angle,
-    };
-  } else {
-    // For sweep, position radially outward from center
-    const angle = Math.atan2(trackPos.y - A.y, trackPos.x - A.x);
-    const perpX = Math.cos(angle);
-    const perpY = Math.sin(angle);
-
-    return {
-      x: trackPos.x + perpX * relativeStopOffset,
-      y: trackPos.y + perpY * relativeStopOffset,
-      rotation: angle * (180 / Math.PI) + 90,
-    };
+      return {
+        x: trackPos.x + perpX * relativeStopOffset,
+        y: trackPos.y + perpY * relativeStopOffset,
+        rotation,
+      };
+    }
   }
 };
 
