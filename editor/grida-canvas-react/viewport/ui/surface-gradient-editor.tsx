@@ -1,15 +1,10 @@
 import React from "react";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { useSingleSelection } from "../surface-hooks";
-import GradientEditor, { useGradient } from "@/grida-canvas-react-gradient";
+import GradientControlPointsEditor from "@/grida-canvas-react-gradient/gradient-control-points-editor";
+import { useGradientEditorIntegration } from "@/grida-canvas-react-gradient/use-gradient-editor-integration";
 import cg from "@grida/cg";
 import { useNodeState } from "@/grida-canvas-react/provider";
-
-const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
-  ["linear_gradient" satisfies cg.Paint["type"]]: "linear",
-  ["radial_gradient" satisfies cg.Paint["type"]]: "radial",
-  ["sweep_gradient" satisfies cg.Paint["type"]]: "sweep",
-};
 
 function isGradientPaint(fill: cg.Paint): fill is cg.GradientPaint {
   return (
@@ -72,36 +67,26 @@ function Editor({
   gradient: cg.GradientPaint;
   onValueChange: (fill: cg.GradientPaint) => void;
 }) {
-  const gradientType = gradientTypeMap[gradient.type];
-  const g = useGradient({
-    gradientType,
+  const integration = useGradientEditorIntegration({
+    gradient,
     width,
     height,
-    initialValue: {
-      colors: gradient.stops.map((stop) => stop.color),
-      positions: gradient.stops.map((stop) => stop.offset),
-      transform: gradient.transform,
-    },
-    preventDefault: true,
-    stopPropagation: true,
-    onValueChange: (g) => {
-      onValueChange?.({
-        type: `${gradientType}_gradient` as cg.GradientPaint["type"],
-        stops: g.positions.map((position, index) => ({
-          offset: position,
-          color: g.colors[index],
-        })),
-        transform: g.transform,
-      });
-    },
+    onGradientChange: onValueChange,
   });
 
   return (
-    <GradientEditor
+    <GradientControlPointsEditor
       width={width}
       height={height}
-      gradientType={gradientType}
-      editor={g}
+      gradientType={integration.gradientType}
+      stops={integration.stops}
+      focusedStop={integration.focusedStop}
+      points={integration.points}
+      onPointsChange={integration.onPointsChange}
+      onPositionChange={integration.onPositionChange}
+      onInsertStop={integration.onInsertStop}
+      onDeleteStop={integration.onDeleteStop}
+      onFocusedStopChange={integration.onFocusedStopChange}
     />
   );
 }

@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
-import GradientEditor, { useGradient } from "@/grida-canvas-react-gradient";
+import GradientEditor, { useGradientControlPoints } from "@/grida-canvas-react-gradient";
 import {
   createInitialState,
   type GradientType,
@@ -82,7 +82,7 @@ function GradientEditorContent() {
   };
 
   // Create the gradient editor instance only when we have dimensions
-  const controller = useGradient({
+  const controller = useGradientControlPoints({
     gradientType,
     initialValue: {
       positions: [0, 1],
