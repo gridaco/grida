@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect } from "react";
 import { useTransformState, useCurrentEditor } from "@/grida-canvas-react";
 import { useSingleSelection } from "../surface-hooks";
 import GradientEditor, { useGradient } from "@/grida-canvas-react-gradient";
@@ -58,6 +58,13 @@ function Editor({
 
   const gradientType = fill?.type ? gradientTypeMap[fill.type] : undefined;
 
+  const onGradientChange = useCallback(
+    (gradient: cg.GradientPaint) => {
+      editor.changeNodeFill(node_id, gradient);
+    },
+    [node_id, editor]
+  );
+
   const g = useGradient({
     gradientType: gradientType ?? "linear",
     width,
@@ -66,6 +73,21 @@ function Editor({
     preventDefault: true,
     stopPropagation: true,
   });
+
+  // Sync gradient changes to editor
+  // FIXME: dirty hook
+  useEffect(() => {
+    if (!gradientType) return;
+
+    const gradientValue = g.getValue();
+    const gradientPaint: cg.GradientPaint = {
+      type: `${gradientType}_gradient` as cg.GradientPaint["type"],
+      stops: gradientValue.stops,
+      transform: gradientValue.transform,
+    };
+
+    onGradientChange(gradientPaint);
+  }, [g.stops, g.transform, gradientType, onGradientChange]);
 
   if (!gradientType) return null;
 
