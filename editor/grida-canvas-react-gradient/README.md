@@ -228,6 +228,8 @@ interface GradientState {
 For linear gradients only **A** and **B** are visible. In radial and sweep
 gradients the **C** control remains locked perpendicular to the A–B axis and
 adjusts the minor radius of the ellipse.
+Moving **A** or **B** translates or scales the ellipse while keeping **C**
+perpendicular. Dragging **C** only changes the minor radius.
 
 ## Migration from Previous Version
 

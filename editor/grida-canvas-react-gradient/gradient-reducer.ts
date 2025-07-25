@@ -82,6 +82,11 @@ export const applyTransform = (t: GradientTransform, p: Point): Point => {
 };
 
 // Convert transform to relative control points
+/**
+ * Converts an affine transform back into relative control points.
+ * The returned points are always normalized so that for radial and
+ * sweep gradients the C control remains perpendicular to the A–B axis.
+ */
 export const getPointsFromTransform = (
   t: GradientTransform,
   gradientType: GradientType
@@ -91,45 +96,59 @@ export const getPointsFromTransform = (
   const B = applyTransform(t, base.B);
   let C = applyTransform(t, base.C);
 
+  const dx = B.x - A.x;
+  const dy = B.y - A.y;
+  const len = Math.hypot(dx, dy) || 1e-6;
   if (gradientType === "linear") {
-    const dx = B.x - A.x;
-    const dy = B.y - A.y;
-    const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
     const px = -dy / len;
     const py = dx / len;
     C = {
       x: A.x + px * (len * 0.5),
       y: A.y + py * (len * 0.5),
     };
+  } else {
+    const dist = Math.hypot(C.x - A.x, C.y - A.y);
+    const nx = -dy / len;
+    const ny = dx / len;
+    C = { x: A.x + nx * dist, y: A.y + ny * dist };
   }
 
   return { A, B, C };
 };
 
 // Compute transform from control points
+/**
+ * Calculates the affine transform that maps the default gradient
+ * anchors to the given control points.
+ *
+ * For linear gradients the matrix is derived using only the A and B
+ * points, producing translation, rotation and scale along the gradient
+ * axis. Radial and sweep gradients use all three points.
+ */
 export const getTransformFromPoints = (
   points: ControlPoints,
   gradientType: GradientType
 ): GradientTransform => {
   const base = getBaseControlPoints(gradientType);
 
-  let pts = points;
-
   if (gradientType === "linear") {
     const dx = points.B.x - points.A.x;
     const dy = points.B.y - points.A.y;
-    const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
-    const px = -dy / len;
-    const py = dx / len;
-    pts = {
-      A: points.A,
-      B: points.B,
-      C: {
-        x: points.A.x + px * (len * 0.5),
-        y: points.A.y + py * (len * 0.5),
-      },
-    };
+    const len = Math.hypot(dx, dy) || 1e-6;
+    const cos = dx / len;
+    const sin = dy / len;
+
+    const a = cos * len;
+    const d = sin * len;
+    const b = -sin;
+    const e = cos;
+    const tx = points.A.x - b * 0.5;
+    const ty = points.A.y - e * 0.5;
+
+    return { a, b, tx, d, e, ty };
   }
+
+  let pts = points;
 
   const u1 = base.B.x - base.A.x;
   const u2 = base.B.y - base.A.y;
@@ -573,45 +592,59 @@ export const gradientReducer = (
       case "UPDATE_CONTROL_POINT": {
         const { point, deltaX, deltaY, width, height, gradientType } =
           action.payload;
-        const cp = draft.controlPoints[point];
-        const next = {
-          x: cp.x + deltaX / width,
-          y: cp.y + deltaY / height,
-        };
-        draft.controlPoints[point] = next;
+        const rel = { x: deltaX / width, y: deltaY / height };
 
-        if (gradientType !== "linear") {
-          if (point === "B") {
-            const A = draft.controlPoints.A;
-            const B = draft.controlPoints.B;
-            const dx = B.x - A.x;
-            const dy = B.y - A.y;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
-            const px = -dy / len;
-            const py = dx / len;
-            const AC = {
-              x: draft.controlPoints.C.x - A.x,
-              y: draft.controlPoints.C.y - A.y,
+        if (gradientType === "linear") {
+          draft.controlPoints[point] = {
+            x: draft.controlPoints[point].x + rel.x,
+            y: draft.controlPoints[point].y + rel.y,
+          };
+        } else {
+          const A = draft.controlPoints.A;
+          const B = draft.controlPoints.B;
+          const C = draft.controlPoints.C;
+
+          if (point === "A") {
+            const newA = { x: A.x + rel.x, y: A.y + rel.y };
+            const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
+            const newLen = Math.hypot(B.x - newA.x, B.y - newA.y) || 1e-6;
+            const ratio = newLen / oldLen;
+            const nx = -(B.y - newA.y) / newLen;
+            const ny = (B.x - newA.x) / newLen;
+            const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
+            draft.controlPoints.A = newA;
+            draft.controlPoints.C = {
+              x: newA.x + nx * distAC,
+              y: newA.y + ny * distAC,
             };
-            const distAC = Math.sqrt(AC.x * AC.x + AC.y * AC.y);
-            draft.controlPoints.C.x = A.x + px * distAC;
-            draft.controlPoints.C.y = A.y + py * distAC;
+          } else if (point === "B") {
+            const newB = { x: B.x + rel.x, y: B.y + rel.y };
+            const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
+            const newLen = Math.hypot(newB.x - A.x, newB.y - A.y) || 1e-6;
+            const ratio = newLen / oldLen;
+            const nx = -(newB.y - A.y) / newLen;
+            const ny = (newB.x - A.x) / newLen;
+            const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
+            draft.controlPoints.B = newB;
+            draft.controlPoints.C = {
+              x: A.x + nx * distAC,
+              y: A.y + ny * distAC,
+            };
           } else if (point === "C") {
-            const A = draft.controlPoints.A;
-            const B = draft.controlPoints.B;
+            const newC = { x: C.x + rel.x, y: C.y + rel.y };
             const dx = B.x - A.x;
             const dy = B.y - A.y;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
-            const px = -dy / len;
-            const py = dx / len;
-            const dist = Math.sqrt(
-              Math.pow(draft.controlPoints.C.x - A.x, 2) +
-                Math.pow(draft.controlPoints.C.y - A.y, 2)
-            );
-            draft.controlPoints.C.x = A.x + px * dist;
-            draft.controlPoints.C.y = A.y + py * dist;
+            const len = Math.hypot(dx, dy) || 1e-6;
+            const dist = Math.hypot(newC.x - A.x, newC.y - A.y);
+            const nx = -dy / len;
+            const ny = dx / len;
+            draft.controlPoints.C = {
+              x: A.x + nx * dist,
+              y: A.y + ny * dist,
+            };
           }
         }
+
         draft.transform = getTransformFromPoints(
           draft.controlPoints,
           gradientType
@@ -763,11 +796,30 @@ export const gradientReducer = (
           const adjustedY = y - (draft.dragState.offset?.y || 0);
 
           if (draft.dragState.type === "A") {
-            // Convert absolute pixel coordinates to relative coordinates
             const relativeX = adjustedX / width;
             const relativeY = adjustedY / height;
-            draft.controlPoints.A.x = relativeX;
-            draft.controlPoints.A.y = relativeY;
+
+            if (gradientType === "linear") {
+              draft.controlPoints.A.x = relativeX;
+              draft.controlPoints.A.y = relativeY;
+            } else {
+              const A = draft.controlPoints.A;
+              const B = draft.controlPoints.B;
+              const C = draft.controlPoints.C;
+              const newA = { x: relativeX, y: relativeY };
+              const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
+              const newLen = Math.hypot(B.x - newA.x, B.y - newA.y) || 1e-6;
+              const ratio = newLen / oldLen;
+              const nx = -(B.y - newA.y) / newLen;
+              const ny = (B.x - newA.x) / newLen;
+              const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
+              draft.controlPoints.A = newA;
+              draft.controlPoints.C = {
+                x: newA.x + nx * distAC,
+                y: newA.y + ny * distAC,
+              };
+            }
+
             draft.transform = getTransformFromPoints(
               draft.controlPoints,
               gradientType
@@ -775,24 +827,26 @@ export const gradientReducer = (
           } else if (draft.dragState.type === "B") {
             const relativeX = adjustedX / width;
             const relativeY = adjustedY / height;
-            draft.controlPoints.B.x = relativeX;
-            draft.controlPoints.B.y = relativeY;
 
-            if (gradientType !== "linear") {
+            if (gradientType === "linear") {
+              draft.controlPoints.B.x = relativeX;
+              draft.controlPoints.B.y = relativeY;
+            } else {
               const A = draft.controlPoints.A;
               const B = draft.controlPoints.B;
-              const dx = B.x - A.x;
-              const dy = B.y - A.y;
-              const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
-              const px = -dy / len;
-              const py = dx / len;
-              const AC = {
-                x: draft.controlPoints.C.x - A.x,
-                y: draft.controlPoints.C.y - A.y,
+              const C = draft.controlPoints.C;
+              const newB = { x: relativeX, y: relativeY };
+              const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
+              const newLen = Math.hypot(newB.x - A.x, newB.y - A.y) || 1e-6;
+              const ratio = newLen / oldLen;
+              const nx = -(newB.y - A.y) / newLen;
+              const ny = (newB.x - A.x) / newLen;
+              const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
+              draft.controlPoints.B = newB;
+              draft.controlPoints.C = {
+                x: A.x + nx * distAC,
+                y: A.y + ny * distAC,
               };
-              const distAC = Math.sqrt(AC.x * AC.x + AC.y * AC.y);
-              draft.controlPoints.C.x = A.x + px * distAC;
-              draft.controlPoints.C.y = A.y + py * distAC;
             }
 
             draft.transform = getTransformFromPoints(
@@ -802,6 +856,7 @@ export const gradientReducer = (
           } else if (draft.dragState.type === "C") {
             const relativeX = adjustedX / width;
             const relativeY = adjustedY / height;
+
             if (gradientType === "linear") {
               draft.controlPoints.C.x = relativeX;
               draft.controlPoints.C.y = relativeY;
@@ -810,14 +865,14 @@ export const gradientReducer = (
               const B = draft.controlPoints.B;
               const dx = B.x - A.x;
               const dy = B.y - A.y;
-              const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
-              const px = -dy / len;
-              const py = dx / len;
-              const dist = Math.sqrt(
-                Math.pow(relativeX - A.x, 2) + Math.pow(relativeY - A.y, 2)
-              );
-              draft.controlPoints.C.x = A.x + px * dist;
-              draft.controlPoints.C.y = A.y + py * dist;
+              const len = Math.hypot(dx, dy) || 1e-6;
+              const dist = Math.hypot(relativeX - A.x, relativeY - A.y);
+              const nx = -dy / len;
+              const ny = dx / len;
+              draft.controlPoints.C = {
+                x: A.x + nx * dist,
+                y: A.y + ny * dist,
+              };
             }
 
             draft.transform = getTransformFromPoints(
