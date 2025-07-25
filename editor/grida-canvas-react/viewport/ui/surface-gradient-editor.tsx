@@ -80,14 +80,19 @@ function Editor({
     if (!gradientType) return;
 
     const gradientValue = g.getValue();
+    // Convert flattened structure back to the format expected by cg.GradientPaint
+    const stops = gradientValue.positions.map((position, index) => ({
+      offset: position,
+      color: gradientValue.colors[index],
+    }));
     const gradientPaint: cg.GradientPaint = {
       type: `${gradientType}_gradient` as cg.GradientPaint["type"],
-      stops: gradientValue.stops,
+      stops,
       transform: gradientValue.transform,
     };
 
     onGradientChange(gradientPaint);
-  }, [g.stops, g.transform, gradientType, onGradientChange]);
+  }, [g.positions, g.colors, g.transform, gradientType, onGradientChange]);
 
   if (!gradientType) return null;
 

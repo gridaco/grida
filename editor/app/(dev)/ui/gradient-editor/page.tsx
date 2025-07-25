@@ -85,9 +85,10 @@ function GradientEditorContent() {
   const editor = useGradient({
     gradientType,
     initialValue: {
-      stops: [
-        { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } },
-        { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } },
+      positions: [0, 1],
+      colors: [
+        { r: 255, g: 0, b: 0, a: 1 },
+        { r: 0, g: 0, b: 255, a: 1 },
       ],
       transform: [
         [1, 0, 0],
@@ -104,7 +105,8 @@ function GradientEditorContent() {
       setGradientType(newType);
       // Recreate editor with new gradient type
       const newInitialState = createInitialState(newType);
-      editor.setStops(newInitialState.stops);
+      editor.setPositions(newInitialState.positions);
+      editor.setColors(newInitialState.colors);
       editor.setTransform(newInitialState.transform);
     },
     [editor]
@@ -112,12 +114,17 @@ function GradientEditorContent() {
 
   const generateGradientCSS = useCallback(() => {
     const g = editor.getValue();
+    // Convert flattened structure back to the format expected by css.toGradientString
+    const stops = g.positions.map((position, index) => ({
+      offset: position,
+      color: g.colors[index],
+    }));
     return css.toGradientString({
       type: `${gradientType}_gradient`,
-      stops: g.stops,
+      stops,
       transform: g.transform,
     });
-  }, [gradientType, editor.stops, editor.transform]);
+  }, [gradientType, editor.positions, editor.colors, editor.transform]);
 
   return (
     <div className="fixed inset-0 overflow-hidden">
@@ -168,8 +175,9 @@ function GradientEditorContent() {
           {/* Color Stop Controls */}
           {editor.focusedStop !== null &&
             (() => {
-              const focusedStopData = editor.stops[editor.focusedStop];
-              if (!focusedStopData) return null;
+              const position = editor.positions[editor.focusedStop];
+              const color = editor.colors[editor.focusedStop];
+              if (position === undefined || color === undefined) return null;
 
               return (
                 <div className="flex items-center gap-4">
@@ -181,11 +189,11 @@ function GradientEditorContent() {
                       size="sm"
                       variant="destructive"
                       onClick={() => {
-                        if (editor.stops.length > 2) {
+                        if (editor.positions.length > 2) {
                           editor.removeStop(editor.focusedStop!);
                         }
                       }}
-                      disabled={editor.stops.length <= 2}
+                      disabled={editor.positions.length <= 2}
                       aria-label="Delete selected color stop"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -199,13 +207,13 @@ function GradientEditorContent() {
                       min="0"
                       max="1"
                       step="0.01"
-                      value={focusedStopData.offset.toFixed(2)}
+                      value={position.toFixed(2)}
                       onChange={(e) => {
                         const pos = Math.max(
                           0,
                           Math.min(1, Number.parseFloat(e.target.value) || 0)
                         );
-                        editor.updateStopOffset(editor.focusedStop!, pos);
+                        editor.updateStopPosition(editor.focusedStop!, pos);
                       }}
                       className="w-16"
                     />
@@ -215,7 +223,7 @@ function GradientEditorContent() {
                     <label className="text-xs">Color</label>
                     <Input
                       type="color"
-                      value={rgbaToHex(focusedStopData.color)}
+                      value={rgbaToHex(color)}
                       onChange={(e) => {
                         const hex = e.target.value;
                         const newColor = hexToRgba(hex);
@@ -230,7 +238,7 @@ function GradientEditorContent() {
 
           {/* Info Display */}
           <div className="text-xs text-muted-foreground mt-2">
-            <span>Stops: {editor.stops.length}</span>
+            <span>Stops: {editor.positions.length}</span>
             <span className="mx-2">•</span>
             <span>
               Focus:{" "}

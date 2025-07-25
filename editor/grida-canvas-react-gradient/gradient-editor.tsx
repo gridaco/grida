@@ -165,16 +165,16 @@ export default function GradientEditor({
       )}
 
       {/* Color Stop Markers */}
-      {editor.stops.map((stop, index) => {
+      {editor.positions.map((position, index) => {
         const selected = editor.focusedStop === index;
-        const { x, y, rotation } = editor.getStopMarkerTransform(stop.offset);
+        const { x, y, rotation } = editor.getStopMarkerTransform(position);
         return (
           <StopMarker
             key={index}
             x={x}
             y={y}
             transform={`translate(-50%, -50%) rotate(${rotation}deg)`}
-            color={rgbaToString(stop.color)}
+            color={rgbaToString(editor.colors[index])}
             selected={selected}
             readonly={editor.readonly}
             tabIndex={0}

@@ -31,7 +31,8 @@ export interface UseGradientReturn {
   controlPoints: ReturnType<typeof getControlPoints>;
 
   // Stops management
-  stops: cg.GradientStop[];
+  positions: number[];
+  colors: cg.RGBA8888[];
   focusedStop: number | null;
   focusedControl: "A" | "B" | "C" | null;
 
@@ -47,12 +48,12 @@ export interface UseGradientReturn {
   ) => void;
 
   // Stop actions
-  setStops: (stops: cg.GradientStop[]) => void;
-  addStop: (stop: cg.GradientStop) => void;
-  updateStop: (index: number, updates: Partial<cg.GradientStop>) => void;
-  removeStop: (index: number) => void;
+  setPositions: (positions: number[]) => void;
+  setColors: (colors: cg.RGBA8888[]) => void;
+  addStop: (position: number, color: cg.RGBA8888) => void;
+  updateStopPosition: (index: number, position: number) => void;
   updateStopColor: (index: number, color: cg.RGBA8888) => void;
-  updateStopOffset: (index: number, offset: number) => void;
+  removeStop: (index: number) => void;
 
   // Focus actions
   setFocusedStop: (index: number | null) => void;
@@ -112,38 +113,29 @@ export function useGradient({
   );
 
   // Stop actions
-  const setStops = useCallback((stops: cg.GradientStop[]) => {
-    dispatch({ type: "SET_STOPS", payload: stops });
+  const setPositions = useCallback((positions: number[]) => {
+    dispatch({ type: "SET_POSITIONS", payload: positions });
   }, []);
 
-  const addStop = useCallback((stop: cg.GradientStop) => {
-    dispatch({ type: "ADD_STOP", payload: stop });
+  const setColors = useCallback((colors: cg.RGBA8888[]) => {
+    dispatch({ type: "SET_COLORS", payload: colors });
   }, []);
 
-  const updateStop = useCallback(
-    (index: number, updates: Partial<cg.GradientStop>) => {
-      dispatch({ type: "UPDATE_STOP", payload: { index, updates } });
-    },
-    []
-  );
+  const addStop = useCallback((position: number, color: cg.RGBA8888) => {
+    dispatch({ type: "ADD_STOP", payload: { position, color } });
+  }, []);
+
+  const updateStopPosition = useCallback((index: number, position: number) => {
+    dispatch({ type: "UPDATE_STOP_POSITION", payload: { index, position } });
+  }, []);
+
+  const updateStopColor = useCallback((index: number, color: cg.RGBA8888) => {
+    dispatch({ type: "UPDATE_STOP_COLOR", payload: { index, color } });
+  }, []);
 
   const removeStop = useCallback((index: number) => {
     dispatch({ type: "REMOVE_STOP", payload: index });
   }, []);
-
-  const updateStopColor = useCallback(
-    (index: number, color: cg.RGBA8888) => {
-      updateStop(index, { color });
-    },
-    [updateStop]
-  );
-
-  const updateStopOffset = useCallback(
-    (index: number, offset: number) => {
-      updateStop(index, { offset });
-    },
-    [updateStop]
-  );
 
   // Focus actions
   const setFocusedStop = useCallback((index: number | null) => {
@@ -232,13 +224,14 @@ export function useGradient({
   const getValue = useCallback((): GradientValue => {
     const _t = state.transform;
     return {
-      stops: state.stops,
+      positions: state.positions,
+      colors: state.colors,
       transform: [
         [_t.a, _t.b, _t.tx],
         [_t.d, _t.e, _t.ty],
       ],
     };
-  }, [state.stops, state.transform]);
+  }, [state.positions, state.colors, state.transform]);
 
   // Register global pointer events for dragging outside bounds
   useEffect(() => {
@@ -281,7 +274,8 @@ export function useGradient({
     controlPoints,
 
     // Stops management
-    stops: state.stops,
+    positions: state.positions,
+    colors: state.colors,
     focusedStop: state.focusedStop,
     focusedControl: state.focusedControl,
 
@@ -293,12 +287,12 @@ export function useGradient({
     updateControlPoint,
 
     // Stop actions
-    setStops,
+    setPositions,
+    setColors,
     addStop,
-    updateStop,
-    removeStop,
+    updateStopPosition,
     updateStopColor,
-    updateStopOffset,
+    removeStop,
 
     // Focus actions
     setFocusedStop,

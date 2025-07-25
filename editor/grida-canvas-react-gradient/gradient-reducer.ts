@@ -6,7 +6,8 @@ export type GradientType = "linear" | "radial" | "sweep";
 
 export type GradientValue = {
   transform: cg.AffineTransform;
-  stops: cg.GradientStop[];
+  positions: number[];
+  colors: cg.RGBA8888[];
 };
 
 export interface GradientTransform {
@@ -39,7 +40,8 @@ export interface ControlPoints {
 export interface GradientState {
   controlPoints: ControlPoints;
   transform: GradientTransform;
-  stops: cg.GradientStop[];
+  positions: number[];
+  colors: cg.RGBA8888[];
   focusedStop: number | null;
   focusedControl: "A" | "B" | "C" | null;
   dragState: {
@@ -341,15 +343,18 @@ export const getDistance = (x1: number, y1: number, x2: number, y2: number) => {
 
 // Helper function to insert a stop in sorted position by offset
 export const insertStopInSortedPosition = (
-  stops: cg.GradientStop[],
-  newStop: cg.GradientStop
-): { stops: cg.GradientStop[]; insertedIndex: number } => {
-  const newStops = [...stops];
+  positions: number[],
+  colors: cg.RGBA8888[],
+  newPosition: number,
+  newColor: cg.RGBA8888
+): { positions: number[]; colors: cg.RGBA8888[]; insertedIndex: number } => {
+  const newPositions = [...positions];
+  const newColors = [...colors];
 
   // Find the correct position to insert the new stop
   let insertIndex = 0;
-  for (let i = 0; i < newStops.length; i++) {
-    if (newStop.offset > newStops[i].offset) {
+  for (let i = 0; i < newPositions.length; i++) {
+    if (newPosition > newPositions[i]) {
       insertIndex = i + 1;
     } else {
       break;
@@ -357,26 +362,35 @@ export const insertStopInSortedPosition = (
   }
 
   // Insert the stop at the correct position
-  newStops.splice(insertIndex, 0, newStop);
+  newPositions.splice(insertIndex, 0, newPosition);
+  newColors.splice(insertIndex, 0, newColor);
 
-  return { stops: newStops, insertedIndex: insertIndex };
+  return {
+    positions: newPositions,
+    colors: newColors,
+    insertedIndex: insertIndex,
+  };
 };
 
 // Helper function to sort stops by offset and return the new index of a specific stop
 export const sortStopsByOffset = (
-  stops: cg.GradientStop[],
+  positions: number[],
+  colors: cg.RGBA8888[],
   originalIndex: number
-): { stops: cg.GradientStop[]; newIndex: number } => {
-  const newStops = [...stops];
-  const movedStop = newStops[originalIndex];
+): { positions: number[]; colors: cg.RGBA8888[]; newIndex: number } => {
+  const newPositions = [...positions];
+  const newColors = [...colors];
+  const movedPosition = newPositions[originalIndex];
+  const movedColor = newColors[originalIndex];
 
   // Remove the stop from its current position
-  newStops.splice(originalIndex, 1);
+  newPositions.splice(originalIndex, 1);
+  newColors.splice(originalIndex, 1);
 
   // Find the correct position to re-insert it
   let newIndex = 0;
-  for (let i = 0; i < newStops.length; i++) {
-    if (movedStop.offset > newStops[i].offset) {
+  for (let i = 0; i < newPositions.length; i++) {
+    if (movedPosition > newPositions[i]) {
       newIndex = i + 1;
     } else {
       break;
@@ -384,9 +398,10 @@ export const sortStopsByOffset = (
   }
 
   // Insert the stop at the correct position
-  newStops.splice(newIndex, 0, movedStop);
+  newPositions.splice(newIndex, 0, movedPosition);
+  newColors.splice(newIndex, 0, movedColor);
 
-  return { stops: newStops, newIndex };
+  return { positions: newPositions, colors: newColors, newIndex };
 };
 
 export const detectHitTarget = (
@@ -417,10 +432,10 @@ export const detectHitTarget = (
     return { type: "control", target: "C", distance: distC };
 
   // Check stop markers
-  for (let i = 0; i < state.stops.length; i++) {
-    const stop = state.stops[i];
+  for (let i = 0; i < state.positions.length; i++) {
+    const position = state.positions[i];
     const markerTransform = getStopMarkerTransform(
-      stop.offset,
+      position,
       gradientType,
       state.controlPoints,
       width,
@@ -482,11 +497,16 @@ export type GradientAction =
         gradientType: GradientType;
       };
     }
-  | { type: "SET_STOPS"; payload: cg.GradientStop[] }
-  | { type: "ADD_STOP"; payload: cg.GradientStop }
+  | { type: "SET_POSITIONS"; payload: number[] }
+  | { type: "SET_COLORS"; payload: cg.RGBA8888[] }
+  | { type: "ADD_STOP"; payload: { position: number; color: cg.RGBA8888 } }
   | {
-      type: "UPDATE_STOP";
-      payload: { index: number; updates: Partial<cg.GradientStop> };
+      type: "UPDATE_STOP_POSITION";
+      payload: { index: number; position: number };
+    }
+  | {
+      type: "UPDATE_STOP_COLOR";
+      payload: { index: number; color: cg.RGBA8888 };
     }
   | { type: "REMOVE_STOP"; payload: number }
   | { type: "SET_FOCUSED_STOP"; payload: number | null }
@@ -528,7 +548,8 @@ const identity: GradientTransform = {
 
 export function getValue(state: GradientState): GradientValue {
   return {
-    stops: state.stops,
+    positions: state.positions,
+    colors: state.colors,
     transform: [
       [state.transform.a, state.transform.b, state.transform.tx],
       [state.transform.d, state.transform.e, state.transform.ty],
@@ -553,7 +574,8 @@ export function createInitialState(
     return {
       transform,
       controlPoints: getPointsFromTransform(transform, type),
-      stops: gradient.stops,
+      positions: gradient.positions,
+      colors: gradient.colors,
       focusedStop: null,
       focusedControl: null,
       dragState: { type: null },
@@ -563,9 +585,10 @@ export function createInitialState(
   return {
     transform: identity,
     controlPoints: getPointsFromTransform(identity, type ?? "linear"),
-    stops: [
-      { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } }, // Changed to cg.GradientStop format
-      { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } }, // Changed to cg.GradientStop format
+    positions: [0, 1],
+    colors: [
+      { r: 255, g: 0, b: 0, a: 1 },
+      { r: 0, g: 0, b: 255, a: 1 },
     ],
     focusedStop: null,
     focusedControl: null,
@@ -652,36 +675,53 @@ export const gradientReducer = (
         break;
       }
 
-      case "SET_STOPS":
-        draft.stops = action.payload;
+      case "SET_POSITIONS":
+        draft.positions = action.payload;
+        break;
+
+      case "SET_COLORS":
+        draft.colors = action.payload;
         break;
 
       case "ADD_STOP": {
-        const { stops: newStops, insertedIndex } = insertStopInSortedPosition(
-          draft.stops,
-          action.payload
+        const {
+          positions: newPositions,
+          colors: newColors,
+          insertedIndex,
+        } = insertStopInSortedPosition(
+          draft.positions,
+          draft.colors,
+          action.payload.position,
+          action.payload.color
         );
-        draft.stops = newStops;
+        draft.positions = newPositions;
+        draft.colors = newColors;
         // Update focused stop to the newly inserted stop
         draft.focusedStop = insertedIndex;
         break;
       }
 
-      case "UPDATE_STOP": {
+      case "UPDATE_STOP_POSITION": {
         const stopIndex = action.payload.index;
-        if (stopIndex >= 0 && stopIndex < draft.stops.length) {
-          draft.stops[stopIndex] = {
-            ...draft.stops[stopIndex],
-            ...action.payload.updates,
-          };
+        if (stopIndex >= 0 && stopIndex < draft.positions.length) {
+          draft.positions[stopIndex] = action.payload.position;
+        }
+        break;
+      }
+
+      case "UPDATE_STOP_COLOR": {
+        const stopIndex = action.payload.index;
+        if (stopIndex >= 0 && stopIndex < draft.colors.length) {
+          draft.colors[stopIndex] = action.payload.color;
         }
         break;
       }
 
       case "REMOVE_STOP":
-        if (draft.stops.length > 2) {
+        if (draft.positions.length > 2) {
           const indexToRemove = action.payload;
-          draft.stops.splice(indexToRemove, 1);
+          draft.positions.splice(indexToRemove, 1);
+          draft.colors.splice(indexToRemove, 1);
           if (draft.focusedStop === indexToRemove) {
             draft.focusedStop = null;
           } else if (
@@ -749,10 +789,10 @@ export const gradientReducer = (
           draft.focusedStop = null;
         } else if (hitTarget?.type === "stop") {
           const stopIndex = hitTarget.target as number;
-          const stop = draft.stops[stopIndex];
-          if (stop) {
+          const position = draft.positions[stopIndex];
+          if (position !== undefined) {
             const markerTransform = getStopMarkerTransform(
-              stop.offset,
+              position,
               gradientType,
               draft.controlPoints,
               width,
@@ -770,15 +810,20 @@ export const gradientReducer = (
           hitTarget?.type === "track" &&
           hitTarget.position !== undefined
         ) {
-          const newStop: cg.GradientStop = {
-            offset: hitTarget.position, // Changed from position to offset
-            color: { r: 128, g: 128, b: 128, a: 1 }, // Changed to RGBA8888 format
-          };
-          const { stops: newStops, insertedIndex } = insertStopInSortedPosition(
-            draft.stops,
-            newStop
+          const newPosition = hitTarget.position;
+          const newColor: cg.RGBA8888 = { r: 128, g: 128, b: 128, a: 1 };
+          const {
+            positions: newPositions,
+            colors: newColors,
+            insertedIndex,
+          } = insertStopInSortedPosition(
+            draft.positions,
+            draft.colors,
+            newPosition,
+            newColor
           );
-          draft.stops = newStops;
+          draft.positions = newPositions;
+          draft.colors = newColors;
           draft.focusedStop = insertedIndex;
           draft.focusedControl = null;
         } else {
@@ -892,8 +937,8 @@ export const gradientReducer = (
               height // Pass actual height
             );
             const stopIndex = draft.dragState.index;
-            if (stopIndex >= 0 && stopIndex < draft.stops.length) {
-              draft.stops[stopIndex].offset = newPosition; // Changed from position to offset
+            if (stopIndex >= 0 && stopIndex < draft.positions.length) {
+              draft.positions[stopIndex] = newPosition;
             }
           }
 
@@ -923,10 +968,10 @@ export const gradientReducer = (
 
           // Check existing stops
           if (!hoveringOverControl) {
-            for (let i = 0; i < draft.stops.length; i++) {
-              const stop = draft.stops[i];
+            for (let i = 0; i < draft.positions.length; i++) {
+              const position = draft.positions[i];
               const markerTransform = getStopMarkerTransform(
-                stop.offset,
+                position,
                 gradientType,
                 draft.controlPoints,
                 width,
@@ -997,11 +1042,13 @@ export const gradientReducer = (
           draft.dragState.index !== undefined
         ) {
           const originalIndex = draft.dragState.index;
-          const { stops: sortedStops, newIndex } = sortStopsByOffset(
-            draft.stops,
-            originalIndex
-          );
-          draft.stops = sortedStops;
+          const {
+            positions: sortedPositions,
+            colors: sortedColors,
+            newIndex,
+          } = sortStopsByOffset(draft.positions, draft.colors, originalIndex);
+          draft.positions = sortedPositions;
+          draft.colors = sortedColors;
           // Update focused stop to the new position
           draft.focusedStop = newIndex;
         }
