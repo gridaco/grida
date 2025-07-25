@@ -39,7 +39,6 @@ export interface ControlPoints {
 
 export interface GradientState {
   controlPoints: ControlPoints;
-  transform: GradientTransform;
   positions: number[];
   colors: cg.RGBA8888[];
   focusedStop: number | null;
@@ -483,10 +482,6 @@ export const detectHitTarget = (
 // Action types
 export type GradientAction =
   | {
-      type: "SET_TRANSFORM";
-      payload: { transform: GradientTransform; gradientType: GradientType };
-    }
-  | {
       type: "UPDATE_CONTROL_POINT";
       payload: {
         point: "A" | "B" | "C";
@@ -546,17 +541,6 @@ const identity: GradientTransform = {
   ty: 0,
 };
 
-export function getValue(state: GradientState): GradientValue {
-  return {
-    positions: state.positions,
-    colors: state.colors,
-    transform: [
-      [state.transform.a, state.transform.b, state.transform.tx],
-      [state.transform.d, state.transform.e, state.transform.ty],
-    ],
-  };
-}
-
 // Initial state
 export function createInitialState(
   type?: GradientType,
@@ -572,7 +556,6 @@ export function createInitialState(
       ty: gradient.transform[1][2],
     };
     return {
-      transform,
       controlPoints: getPointsFromTransform(transform, type),
       positions: gradient.positions,
       colors: gradient.colors,
@@ -583,7 +566,6 @@ export function createInitialState(
     };
   }
   return {
-    transform: identity,
     controlPoints: getPointsFromTransform(identity, type ?? "linear"),
     positions: [0, 1],
     colors: [
@@ -604,14 +586,6 @@ export const gradientReducer = (
 ): GradientState => {
   return produce(state, (draft) => {
     switch (action.type) {
-      case "SET_TRANSFORM":
-        draft.transform = action.payload.transform;
-        draft.controlPoints = getPointsFromTransform(
-          action.payload.transform,
-          action.payload.gradientType
-        );
-        break;
-
       case "UPDATE_CONTROL_POINT": {
         const { point, deltaX, deltaY, width, height, gradientType } =
           action.payload;
@@ -668,10 +642,6 @@ export const gradientReducer = (
           }
         }
 
-        draft.transform = getTransformFromPoints(
-          draft.controlPoints,
-          gradientType
-        );
         break;
       }
 
@@ -864,11 +834,6 @@ export const gradientReducer = (
                 y: newA.y + ny * distAC,
               };
             }
-
-            draft.transform = getTransformFromPoints(
-              draft.controlPoints,
-              gradientType
-            );
           } else if (draft.dragState.type === "B") {
             const relativeX = adjustedX / width;
             const relativeY = adjustedY / height;
@@ -893,11 +858,6 @@ export const gradientReducer = (
                 y: A.y + ny * distAC,
               };
             }
-
-            draft.transform = getTransformFromPoints(
-              draft.controlPoints,
-              gradientType
-            );
           } else if (draft.dragState.type === "C") {
             const relativeX = adjustedX / width;
             const relativeY = adjustedY / height;
@@ -919,11 +879,6 @@ export const gradientReducer = (
                 y: A.y + ny * dist,
               };
             }
-
-            draft.transform = getTransformFromPoints(
-              draft.controlPoints,
-              gradientType
-            );
           } else if (
             draft.dragState.type === "stop" &&
             draft.dragState.index !== undefined

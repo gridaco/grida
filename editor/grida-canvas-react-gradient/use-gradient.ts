@@ -1,19 +1,29 @@
-import { useReducer, useCallback, useRef, useEffect } from "react";
+import { useReducer, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   gradientReducer,
   createInitialState,
   type GradientState,
   type GradientType,
   type GradientValue,
-  type GradientTransform,
   getControlPoints,
   getStopMarkerTransform,
+  getTransformFromPoints,
 } from "./gradient-reducer";
 import type cg from "@grida/cg";
 
 export interface UseGradientOptions {
   gradientType: GradientType;
   initialValue?: GradientValue;
+
+  /**
+   * the controlled value, the transform is not accepted as it requires special flow.
+   */
+  value?: {
+    positions: number[];
+    colors: cg.RGBA8888[];
+  };
+
+  onValueChange?: (value: GradientValue) => void;
   width?: number;
   height?: number;
   readonly?: boolean;
@@ -27,7 +37,6 @@ export interface UseGradientReturn {
   readonly: boolean;
 
   // Transform and positioning
-  transform: GradientTransform;
   controlPoints: ReturnType<typeof getControlPoints>;
 
   // Stops management
@@ -39,8 +48,6 @@ export interface UseGradientReturn {
   // Actions
   dispatch: React.Dispatch<any>;
 
-  // Transform actions
-  setTransform: (transform: GradientTransform) => void;
   updateControlPoint: (
     point: "A" | "B" | "C",
     deltaX: number,
@@ -76,31 +83,48 @@ export interface UseGradientReturn {
   containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
+function getValueFromState(
+  type: GradientType,
+  state: GradientState
+): GradientValue {
+  const t = getTransformFromPoints(state.controlPoints, type);
+  return {
+    positions: state.positions,
+    colors: state.colors,
+    transform: [
+      [t.a, t.b, t.tx],
+      [t.d, t.e, t.ty],
+    ],
+  };
+}
+
 export function useGradient({
   gradientType,
   initialValue,
+  value: _value,
   width = 400,
   height = 300,
   readonly = false,
   preventDefault = true,
   stopPropagation = true,
+  onValueChange,
 }: UseGradientOptions): UseGradientReturn {
-  const [state, dispatch] = useReducer(gradientReducer, {
+  const [_state, dispatch] = useReducer(gradientReducer, {
     ...createInitialState(gradientType, initialValue),
   });
+
+  const state: GradientState = _value
+    ? {
+        ..._state,
+        positions: _value.positions ?? _state.positions,
+        colors: _value.colors ?? _state.colors,
+      }
+    : _state;
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Calculate control points
   const controlPoints = getControlPoints(state.controlPoints, width, height);
-
-  // Transform actions
-  const setTransform = useCallback((transform: GradientTransform) => {
-    dispatch({
-      type: "SET_TRANSFORM",
-      payload: { transform, gradientType },
-    });
-  }, []);
 
   const updateControlPoint = useCallback(
     (point: "A" | "B" | "C", deltaX: number, deltaY: number) => {
@@ -222,16 +246,8 @@ export function useGradient({
   );
 
   const getValue = useCallback((): GradientValue => {
-    const _t = state.transform;
-    return {
-      positions: state.positions,
-      colors: state.colors,
-      transform: [
-        [_t.a, _t.b, _t.tx],
-        [_t.d, _t.e, _t.ty],
-      ],
-    };
-  }, [state.positions, state.colors, state.transform]);
+    return getValueFromState(gradientType, state);
+  }, [state.positions, state.colors, state.controlPoints, gradientType]);
 
   // Register global pointer events for dragging outside bounds
   useEffect(() => {
@@ -264,13 +280,16 @@ export function useGradient({
     };
   }, [state.dragState.type, readonly, handlePointerMove, handlePointerUp]);
 
+  useEffect(() => {
+    onValueChange?.(getValue());
+  }, [getValue, onValueChange]);
+
   return {
     // State
     state,
     readonly,
 
     // Transform and positioning
-    transform: state.transform,
     controlPoints,
 
     // Stops management
@@ -283,7 +302,6 @@ export function useGradient({
     dispatch,
 
     // Transform actions
-    setTransform,
     updateControlPoint,
 
     // Stop actions
