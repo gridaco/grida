@@ -508,6 +508,42 @@ pub struct LinearGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct RadialGradientPaint {
+    /// # Radial Gradient Transform Model
+    ///
+    /// ## Coordinate Space
+    /// The radial gradient is defined in **unit gradient space**:
+    /// - Center: `(0.5, 0.5)`
+    /// - Radius: `0.5`
+    ///
+    /// This forms a normalized circle inside a `[0.0, 1.0] x [0.0, 1.0]` box.
+    /// All geometry is defined relative to this unit space.
+    ///
+    /// ## Scaling to Object Space
+    /// The gradient is mapped to the target rectangle by applying a scale matrix derived from its size:
+    ///
+    /// ```text
+    /// local_matrix = scale(width, height) × user_transform
+    /// ```
+    ///
+    /// - `scale(width, height)` transforms the unit circle to match the target rectangle,
+    ///   allowing the gradient to become elliptical if `width ≠ height`.
+    /// - `user_transform` is an additional affine matrix defined in gradient space (centered at 0.5, 0.5).
+    ///
+    /// ## Rendering Behavior
+    /// When passed to Skia, the shader uses:
+    /// - `center = (0.5, 0.5)`
+    /// - `radius = 0.5`
+    ///
+    /// These are interpreted in **local gradient space**, and the `local_matrix` maps device coordinates
+    /// back into that space.
+    ///
+    /// ## Summary
+    /// - The gradient definition is resolution-independent.
+    /// - `width` and `height` determine how unit space is scaled — they do **not** directly affect center or radius.
+    /// - All transforms (e.g. rotation, skew) should be encoded in the `user_transform`, not baked into radius or center.
+    ///
+    /// This model mirrors the behavior of tools like Figma and Flutter, and ensures consistent and flexible rendering
+    /// across any shape size.
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
