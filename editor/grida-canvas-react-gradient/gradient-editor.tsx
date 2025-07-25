@@ -36,13 +36,12 @@ export default function GradientEditor({
   return (
     <div
       ref={editor.containerRef}
-      className={`relative select-none z-10 ${
+      className={`relative select-none overflow-visible z-10 ${
         editor.readonly ? "cursor-default" : "cursor-crosshair"
       }`}
       style={{
         width,
         height,
-        overflow: "visible",
       }}
       onPointerDown={editor.handlePointerDown}
       onPointerMove={(e) => {
@@ -65,7 +64,7 @@ export default function GradientEditor({
     >
       {/* SVG Tracks */}
       <svg
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none overflow-visible"
         width={width}
         height={height}
       >
