@@ -91,10 +91,7 @@ function getValueFromState(
   return {
     positions: state.positions,
     colors: state.colors,
-    transform: [
-      [t.a, t.b, t.tx],
-      [t.d, t.e, t.ty],
-    ],
+    transform: t,
   };
 }
 

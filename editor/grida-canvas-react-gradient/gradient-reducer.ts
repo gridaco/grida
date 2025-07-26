@@ -1,5 +1,6 @@
 import { produce } from "immer";
 import type cg from "@grida/cg";
+import cmath from "@grida/cmath";
 import { ellipseMarkerRotation, degToRad } from "./ellipse-utils";
 
 export type GradientType = "linear" | "radial" | "sweep";
@@ -10,27 +11,10 @@ export type GradientValue = {
   colors: cg.RGBA8888[];
 };
 
-export interface GradientTransform {
-  // 2D affine transform matrix [[a, b, tx], [d, e, ty]]
-  a: number;
-  b: number;
-  /**
-   * A point x (relative coordinate 0-1, can be negative)
-   */
-  tx: number; //
-  d: number;
-  e: number;
-  /**
-   * A point y (relative coordinate 0-1, can be negative)
-   */
-  ty: number;
-}
-
 export interface Point {
   x: number;
   y: number;
 }
-
 export interface ControlPoints {
   A: Point;
   B: Point;
@@ -74,14 +58,6 @@ export const getBaseControlPoints = (
   };
 };
 
-// Apply affine transform to a relative point
-export const applyTransform = (t: GradientTransform, p: Point): Point => {
-  return {
-    x: t.a * p.x + t.b * p.y + t.tx,
-    y: t.d * p.x + t.e * p.y + t.ty,
-  };
-};
-
 // Convert transform to relative control points
 /**
  * Converts an affine transform back into relative control points.
@@ -89,13 +65,16 @@ export const applyTransform = (t: GradientTransform, p: Point): Point => {
  * sweep gradients the C control remains perpendicular to the A–B axis.
  */
 export const getPointsFromTransform = (
-  t: GradientTransform,
+  t: cg.AffineTransform,
   gradientType: GradientType
 ): ControlPoints => {
   const base = getBaseControlPoints(gradientType);
-  const A = applyTransform(t, base.A);
-  const B = applyTransform(t, base.B);
-  let C = applyTransform(t, base.C);
+  const _A = cmath.vector2.transform([base.A.x, base.A.y], t);
+  const _B = cmath.vector2.transform([base.B.x, base.B.y], t);
+  const _C = cmath.vector2.transform([base.C.x, base.C.y], t);
+  const A = { x: _A[0], y: _A[1] };
+  const B = { x: _B[0], y: _B[1] };
+  let C = { x: _C[0], y: _C[1] };
 
   const dx = B.x - A.x;
   const dy = B.y - A.y;
@@ -129,7 +108,7 @@ export const getPointsFromTransform = (
 export const getTransformFromPoints = (
   points: ControlPoints,
   gradientType: GradientType
-): GradientTransform => {
+): cg.AffineTransform => {
   const base = getBaseControlPoints(gradientType);
 
   if (gradientType === "linear") {
@@ -146,7 +125,10 @@ export const getTransformFromPoints = (
     const tx = points.A.x - b * 0.5;
     const ty = points.A.y - e * 0.5;
 
-    return { a, b, tx, d, e, ty };
+    return [
+      [a, b, tx],
+      [d, e, ty],
+    ];
   }
 
   let pts = points;
@@ -171,7 +153,10 @@ export const getTransformFromPoints = (
   const tx = points.A.x - a * base.A.x - b * base.A.y;
   const ty = points.A.y - d * base.A.x - e * base.A.y;
 
-  return { a, b, tx, d, e, ty };
+  return [
+    [a, b, tx],
+    [d, e, ty],
+  ];
 };
 
 // Get screen coordinates from relative control points
@@ -506,6 +491,7 @@ export type GradientAction =
   | { type: "REMOVE_STOP"; payload: number }
   | { type: "SET_FOCUSED_STOP"; payload: number | null }
   | { type: "SET_FOCUSED_CONTROL"; payload: "A" | "B" | "C" | null }
+  | { type: "SET_CONTROL_POINTS"; payload: ControlPoints }
   | { type: "SET_DRAG_STATE"; payload: GradientState["dragState"] }
   | { type: "SET_HOVER_PREVIEW"; payload: GradientState["hoverPreview"] }
   | { type: "RESET_FOCUS" }
@@ -532,14 +518,10 @@ export type GradientAction =
   | { type: "HANDLE_POINTER_UP" }
   | { type: "HANDLE_POINTER_LEAVE" };
 
-const identity: GradientTransform = {
-  a: 1,
-  b: 0,
-  tx: 0,
-  d: 0,
-  e: 1,
-  ty: 0,
-};
+const identity: cg.AffineTransform = [
+  [1, 0, 0],
+  [0, 1, 0],
+];
 
 // Initial state
 export function createInitialState(
@@ -547,16 +529,8 @@ export function createInitialState(
   gradient?: GradientValue
 ): GradientState {
   if (type && gradient) {
-    const transform: GradientTransform = {
-      a: gradient.transform[0][0],
-      b: gradient.transform[0][1],
-      tx: gradient.transform[0][2],
-      d: gradient.transform[1][0],
-      e: gradient.transform[1][1],
-      ty: gradient.transform[1][2],
-    };
     return {
-      controlPoints: getPointsFromTransform(transform, type),
+      controlPoints: getPointsFromTransform(gradient.transform, type),
       positions: gradient.positions,
       colors: gradient.colors,
       focusedStop: null,
@@ -579,6 +553,110 @@ export function createInitialState(
   };
 }
 
+// --- Control Points Modularization ---
+
+// ControlPoints State (already defined as ControlPoints)
+// export interface ControlPoints { ... }
+
+// ControlPoints Actions
+export type ControlPointsAction =
+  | {
+      type: "UPDATE_CONTROL_POINT";
+      payload: {
+        point: "A" | "B" | "C";
+        deltaX: number;
+        deltaY: number;
+        width: number;
+        height: number;
+        gradientType: GradientType;
+      };
+    }
+  | { type: "SET_CONTROL_POINTS"; payload: ControlPoints };
+
+// ControlPoints Reducer
+export function controlPointsReducer(
+  state: ControlPoints,
+  action: ControlPointsAction
+): ControlPoints {
+  switch (action.type) {
+    case "UPDATE_CONTROL_POINT": {
+      const { point, deltaX, deltaY, width, height, gradientType } =
+        action.payload;
+      const rel = { x: deltaX / width, y: deltaY / height };
+      if (gradientType === "linear") {
+        return {
+          ...state,
+          [point]: {
+            x: state[point].x + rel.x,
+            y: state[point].y + rel.y,
+          },
+        };
+      } else {
+        // Copy logic from main reducer for radial/sweep
+        const A = state.A;
+        const B = state.B;
+        const C = state.C;
+        if (point === "A") {
+          const newA = { x: A.x + rel.x, y: A.y + rel.y };
+          const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
+          const newLen = Math.hypot(B.x - newA.x, B.y - newA.y) || 1e-6;
+          const ratio = newLen / oldLen;
+          const nx = -(B.y - newA.y) / newLen;
+          const ny = (B.x - newA.x) / newLen;
+          const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
+          return {
+            ...state,
+            A: newA,
+            C: {
+              x: newA.x + nx * distAC,
+              y: newA.y + ny * distAC,
+            },
+          };
+        } else if (point === "B") {
+          const newB = { x: B.x + rel.x, y: B.y + rel.y };
+          const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
+          const newLen = Math.hypot(newB.x - A.x, newB.y - A.y) || 1e-6;
+          const ratio = newLen / oldLen;
+          const nx = -(newB.y - A.y) / newLen;
+          const ny = (newB.x - A.x) / newLen;
+          const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
+          return {
+            ...state,
+            B: newB,
+            C: {
+              x: A.x + nx * distAC,
+              y: A.y + ny * distAC,
+            },
+          };
+        } else if (point === "C") {
+          const newC = { x: C.x + rel.x, y: C.y + rel.y };
+          const dx = B.x - A.x;
+          const dy = B.y - A.y;
+          const len = Math.hypot(dx, dy) || 1e-6;
+          const dist = Math.hypot(newC.x - A.x, newC.y - A.y);
+          const nx = -dy / len;
+          const ny = dx / len;
+          return {
+            ...state,
+            C: {
+              x: A.x + nx * dist,
+              y: A.y + ny * dist,
+            },
+          };
+        }
+      }
+      return state;
+    }
+    case "SET_CONTROL_POINTS": {
+      return { ...action.payload };
+    }
+    default:
+      return state;
+  }
+}
+
+// --- End Control Points Modularization ---
+
 // Reducer
 export const gradientReducer = (
   state: GradientState,
@@ -586,62 +664,13 @@ export const gradientReducer = (
 ): GradientState => {
   return produce(state, (draft) => {
     switch (action.type) {
-      case "UPDATE_CONTROL_POINT": {
-        const { point, deltaX, deltaY, width, height, gradientType } =
-          action.payload;
-        const rel = { x: deltaX / width, y: deltaY / height };
-
-        if (gradientType === "linear") {
-          draft.controlPoints[point] = {
-            x: draft.controlPoints[point].x + rel.x,
-            y: draft.controlPoints[point].y + rel.y,
-          };
-        } else {
-          const A = draft.controlPoints.A;
-          const B = draft.controlPoints.B;
-          const C = draft.controlPoints.C;
-
-          if (point === "A") {
-            const newA = { x: A.x + rel.x, y: A.y + rel.y };
-            const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
-            const newLen = Math.hypot(B.x - newA.x, B.y - newA.y) || 1e-6;
-            const ratio = newLen / oldLen;
-            const nx = -(B.y - newA.y) / newLen;
-            const ny = (B.x - newA.x) / newLen;
-            const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
-            draft.controlPoints.A = newA;
-            draft.controlPoints.C = {
-              x: newA.x + nx * distAC,
-              y: newA.y + ny * distAC,
-            };
-          } else if (point === "B") {
-            const newB = { x: B.x + rel.x, y: B.y + rel.y };
-            const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
-            const newLen = Math.hypot(newB.x - A.x, newB.y - A.y) || 1e-6;
-            const ratio = newLen / oldLen;
-            const nx = -(newB.y - A.y) / newLen;
-            const ny = (newB.x - A.x) / newLen;
-            const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
-            draft.controlPoints.B = newB;
-            draft.controlPoints.C = {
-              x: A.x + nx * distAC,
-              y: A.y + ny * distAC,
-            };
-          } else if (point === "C") {
-            const newC = { x: C.x + rel.x, y: C.y + rel.y };
-            const dx = B.x - A.x;
-            const dy = B.y - A.y;
-            const len = Math.hypot(dx, dy) || 1e-6;
-            const dist = Math.hypot(newC.x - A.x, newC.y - A.y);
-            const nx = -dy / len;
-            const ny = dx / len;
-            draft.controlPoints.C = {
-              x: A.x + nx * dist,
-              y: A.y + ny * dist,
-            };
-          }
-        }
-
+      // Control Points Actions
+      case "UPDATE_CONTROL_POINT":
+      case "SET_CONTROL_POINTS": {
+        draft.controlPoints = controlPointsReducer(
+          draft.controlPoints,
+          action as ControlPointsAction
+        );
         break;
       }
 

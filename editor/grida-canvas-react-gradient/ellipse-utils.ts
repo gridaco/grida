@@ -18,7 +18,7 @@ export function ellipseMarkerRotation(
   rx: number,
   ry: number,
   angle: number,
-  ellipseRotation: number = 0,
+  ellipseRotation: number = 0
 ): number {
   const t = degToRad(angle - ellipseRotation);
   const base = degToRad(ellipseRotation);

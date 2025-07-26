@@ -10,6 +10,7 @@ export default function StopMarker({
   readonly,
   tabIndex,
   onFocus,
+  onPointerDown,
   arrow = true,
   stopSize,
   className,
@@ -22,6 +23,7 @@ export default function StopMarker({
   readonly: boolean;
   tabIndex?: number;
   onFocus?: React.FocusEventHandler<HTMLDivElement>;
+  onPointerDown?: React.PointerEventHandler<HTMLDivElement>;
   arrow?: boolean;
   stopSize: number;
   className?: string;
@@ -53,6 +55,7 @@ export default function StopMarker({
       tabIndex={tabIndex}
       data-popover-no-close
       onFocus={onFocus}
+      onPointerDown={onPointerDown}
     >
       {/* arrow */}
       {arrow && (

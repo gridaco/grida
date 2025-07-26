@@ -3,7 +3,8 @@
 import React from "react";
 import { type GradientType } from "./gradient-reducer";
 import { type UseGradientReturn } from "./use-gradient";
-import StopMarker from "./gradient-color-stop-marker";
+import StopMarker from "./components/gradient-color-stop-marker";
+import ControlPoint from "./components/control-point";
 
 // Helper function to convert RGBA8888 to CSS rgba string
 const rgbaToString = (color: {
@@ -209,35 +210,5 @@ export default function GradientEditor({
           );
         })()}
     </div>
-  );
-}
-
-function ControlPoint({
-  x,
-  y,
-  selected,
-  readonly,
-  tabIndex,
-  onFocus,
-}: {
-  x: number;
-  y: number;
-  readonly?: boolean;
-  selected?: boolean;
-  tabIndex?: number;
-  onFocus?: React.FocusEventHandler<HTMLDivElement>;
-}) {
-  return (
-    <div
-      className={`absolute w-2 h-2 bg-white border rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-lg ${
-        selected ? "scale-105 ring-2 ring-white" : ""
-      } ${readonly ? "cursor-default" : "cursor-move"}`}
-      style={{ left: x, top: y }}
-      role="button"
-      aria-label="Control point"
-      tabIndex={tabIndex}
-      data-popover-no-close
-      onFocus={onFocus}
-    />
   );
 }
