@@ -163,16 +163,10 @@ export function useNodeActions(node_id: string | undefined) {
       arcData: (value: grida.program.nodes.i.IEllipseArcData) =>
         instance.changeNodeArcData(node_id, value),
       fill: (
-        value:
-          | grida.program.nodes.i.props.SolidPaintToken
-          | cg.PaintWithoutID
-          | null
+        value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
       ) => instance.changeNodeFill(node_id, value),
       stroke: (
-        value:
-          | grida.program.nodes.i.props.SolidPaintToken
-          | cg.PaintWithoutID
-          | null
+        value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
       ) => instance.changeNodeStroke(node_id, value),
       strokeWidth: (change: editor.api.NumberChange) =>
         instance.changeNodeStrokeWidth(node_id, change),
@@ -258,8 +252,8 @@ const compareNodeProperty: PropertyCompareFn<
     case "fill":
     case "stroke":
       // support gradient (as the id should be ignored)
-      const { id: __, ..._a } = (a ?? {}) as cg.AnyPaint;
-      const { id: _, ..._b } = (b ?? {}) as cg.AnyPaint;
+      const _a = (a ?? {}) as cg.Paint;
+      const _b = (b ?? {}) as cg.Paint;
       return equal(_a, _b);
   }
   return equal(a, b);
@@ -440,12 +434,7 @@ export function useCurrentSelection() {
   );
 
   const fill = useCallback(
-    (
-      value:
-        | grida.program.nodes.i.props.SolidPaintToken
-        | cg.PaintWithoutID
-        | null
-    ) => {
+    (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
       mixedProperties.fill?.ids.forEach((id) => {
         instance.changeNodeFill(id, value);
       });
@@ -454,12 +443,7 @@ export function useCurrentSelection() {
   );
 
   const stroke = useCallback(
-    (
-      value:
-        | grida.program.nodes.i.props.SolidPaintToken
-        | cg.PaintWithoutID
-        | null
-    ) => {
+    (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
       mixedProperties.stroke?.ids.forEach((id) => {
         instance.changeNodeStroke(id, value);
       });
@@ -671,7 +655,7 @@ export function useSelectionPaints() {
       index: number,
       value:
         | grida.program.nodes.i.props.SolidPaintToken
-        | cg.PaintWithoutID
+        | cg.Paint
         | null
         | null
     ) => {

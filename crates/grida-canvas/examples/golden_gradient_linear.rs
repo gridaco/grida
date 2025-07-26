@@ -8,26 +8,26 @@ fn main() {
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    let gradient = SweepGradientPaint {
+    let gradient = LinearGradientPaint {
         stops: vec![
             GradientStop {
                 offset: 0.0,
-                color: CGColor(255, 97, 97, 255),
+                color: CGColor(255, 0, 0, 255),
             },
             GradientStop {
                 offset: 0.5,
-                color: CGColor(133, 0, 0, 255),
+                color: CGColor(0, 255, 0, 255),
             },
             GradientStop {
                 offset: 1.0,
-                color: CGColor(255, 0, 0, 255),
+                color: CGColor(0, 0, 255, 255),
             },
         ],
         opacity: 1.0,
         transform: AffineTransform::identity(),
     };
 
-    let paint = sweep_gradient_paint(&gradient, 1.0, (width as f32, height as f32));
+    let paint = linear_gradient_paint(&gradient, 1.0, (width as f32, height as f32));
 
     canvas.draw_rect(
         Rect::from_xywh(0.0, 0.0, width as f32, height as f32),
@@ -38,5 +38,5 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write("goldens/gradient_sweep.png", data.as_bytes()).unwrap();
+    std::fs::write("goldens/gradient_linear.png", data.as_bytes()).unwrap();
 }

@@ -12,6 +12,7 @@ import { cn } from "@/components/lib/utils";
 import {
   LinearGradientPaintIcon,
   RadialGradientPaintIcon,
+  SweepGradientPaintIcon,
   SolidPaintIcon,
 } from "./icons/paint-icon";
 import { PaintChip } from "./utils/paint-chip";
@@ -24,17 +25,33 @@ import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
+import { PopoverContentProps } from "@radix-ui/react-popover";
+
+const popover_content_on_pointer_down_outside: PopoverContentProps["onPointerDownOutside"] =
+  (e) => {
+    // if the target contains 'data-popover-no-close', ignore the event
+    if (
+      e.target instanceof HTMLElement &&
+      e.target.closest("[data-popover-no-close]")
+    ) {
+      e.preventDefault();
+    }
+  };
 
 export function PaintControl({
   value,
   onValueChange,
   removable,
+  selectedGradientStop,
+  onOpenChange,
+  onSelectedGradientStopChange,
 }: {
   value?: grida.program.nodes.i.props.PropsPaintValue;
-  onValueChange?: (
-    value: ComputedPaintWithoutID | TokenizedPaint | null
-  ) => void;
+  onValueChange?: (value: ComputedPaint | TokenizedPaint | null) => void;
+  onOpenChange?: (open: boolean) => void;
+  selectedGradientStop?: number;
   removable?: boolean;
+  onSelectedGradientStopChange?: (stop: number) => void;
 }) {
   if (tokens.is.tokenized(value)) {
     return (
@@ -48,23 +65,32 @@ export function PaintControl({
       <ComputedPaintControl
         value={value as ComputedPaint}
         onValueChange={onValueChange}
+        onOpenChange={onOpenChange}
+        selectedGradientStop={selectedGradientStop}
+        removable={removable}
+        onSelectedGradientStopChange={onSelectedGradientStopChange}
       />
     );
   }
 }
 
 type ComputedPaint = cg.Paint;
-type ComputedPaintWithoutID = cg.PaintWithoutID;
 type TokenizedPaint = grida.program.nodes.i.props.SolidPaintToken;
 
 function ComputedPaintControl({
   value,
   onValueChange,
   removable,
+  onOpenChange,
+  selectedGradientStop,
+  onSelectedGradientStopChange,
 }: {
   value?: ComputedPaint;
-  onValueChange?: (value: ComputedPaintWithoutID | null) => void;
+  onValueChange?: (value: ComputedPaint | null) => void;
   removable?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  selectedGradientStop?: number;
+  onSelectedGradientStopChange?: (stop: number) => void;
 }) {
   const onTypeChange = useCallback(
     (type: cg.Paint["type"]) => {
@@ -74,7 +100,8 @@ function ComputedPaintControl({
         case "solid": {
           switch (to) {
             case "linear_gradient":
-            case "radial_gradient": {
+            case "radial_gradient":
+            case "sweep_gradient": {
               onValueChange?.({
                 type: to,
                 transform: cmath.transform.identity,
@@ -97,7 +124,8 @@ function ComputedPaintControl({
           break;
         }
         case "linear_gradient":
-        case "radial_gradient": {
+        case "radial_gradient":
+        case "sweep_gradient": {
           switch (to) {
             case "solid": {
               onValueChange?.({
@@ -107,7 +135,8 @@ function ComputedPaintControl({
               break;
             }
             case "linear_gradient":
-            case "radial_gradient": {
+            case "radial_gradient":
+            case "sweep_gradient": {
               onValueChange?.({
                 type: to,
                 stops: value.stops,
@@ -136,7 +165,7 @@ function ComputedPaintControl({
   };
 
   return (
-    <Popover>
+    <Popover onOpenChange={onOpenChange}>
       {value ? (
         <>
           {value.type === "solid" && (
@@ -201,6 +230,22 @@ function ComputedPaintControl({
               </PaintInputContainer>
             </PopoverTrigger>
           )}
+          {value.type === "sweep_gradient" && (
+            <PopoverTrigger className="w-full">
+              <PaintInputContainer>
+                <PaintChip paint={value} />
+                <span className="ms-2 text-start text-xs flex-1">Sweep</span>
+                {removable && (
+                  <button
+                    onClick={onRemovePaint}
+                    className="px-1 py-1 me-0.5 text-muted-foreground"
+                  >
+                    <Cross2Icon className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </PaintInputContainer>
+            </PopoverTrigger>
+          )}
         </>
       ) : (
         <PopoverTrigger className="w-full">
@@ -219,7 +264,13 @@ function ComputedPaintControl({
           </div>
         </PopoverTrigger>
       )}
-      <PopoverContent align="start" side="right" sideOffset={8} className="p-0">
+      <PopoverContent
+        onPointerDownOutside={popover_content_on_pointer_down_outside}
+        align="start"
+        side="right"
+        sideOffset={8}
+        className="p-0"
+      >
         <Tabs value={value?.type} onValueChange={onTypeChange as any}>
           <TabsList className="m-2">
             <TabsTrigger value="solid">
@@ -233,6 +284,11 @@ function ComputedPaintControl({
             <TabsTrigger value="radial_gradient">
               <RadialGradientPaintIcon
                 active={value?.type === "radial_gradient"}
+              />
+            </TabsTrigger>
+            <TabsTrigger value="sweep_gradient">
+              <SweepGradientPaintIcon
+                active={value?.type === "sweep_gradient"}
               />
             </TabsTrigger>
           </TabsList>
@@ -262,12 +318,32 @@ function ComputedPaintControl({
           </TabsContent>
           <TabsContent value="linear_gradient" className="p-2">
             {value?.type === "linear_gradient" && (
-              <GradientControl value={value} onValueChange={onValueChange} />
+              <GradientControl
+                value={value}
+                onValueChange={onValueChange}
+                selectedStop={selectedGradientStop}
+                onSelectedStopChange={onSelectedGradientStopChange}
+              />
             )}
           </TabsContent>
           <TabsContent value="radial_gradient" className="p-2">
             {value?.type === "radial_gradient" && (
-              <GradientControl value={value} onValueChange={onValueChange} />
+              <GradientControl
+                value={value}
+                onValueChange={onValueChange}
+                selectedStop={selectedGradientStop}
+                onSelectedStopChange={onSelectedGradientStopChange}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="sweep_gradient" className="p-2">
+            {value?.type === "sweep_gradient" && (
+              <GradientControl
+                value={value}
+                onValueChange={onValueChange}
+                selectedStop={selectedGradientStop}
+                onSelectedStopChange={onSelectedGradientStopChange}
+              />
             )}
           </TabsContent>
         </Tabs>
@@ -280,10 +356,12 @@ function TokenizedPaintControl({
   value,
   removable,
   onValueChange,
+  onOpenChange,
 }: {
   value: TokenizedPaint;
   removable?: boolean;
   onValueChange?: (value: TokenizedPaint | null) => void;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const computed = useComputed(
     {
@@ -295,7 +373,7 @@ function TokenizedPaintControl({
   const identifier = value.color;
 
   return (
-    <Popover>
+    <Popover onOpenChange={onOpenChange}>
       <PopoverTrigger>
         <PaintInputContainer>
           <PaintChip paint={computed.value as any as ComputedPaint} />
@@ -314,7 +392,9 @@ function TokenizedPaintControl({
         )} */}
         </PaintInputContainer>
       </PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent
+        onPointerDownOutside={popover_content_on_pointer_down_outside}
+      >
         <ContextVariableColors
           onSelect={(token) => {
             onValueChange?.({

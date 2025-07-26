@@ -520,10 +520,26 @@ export class Editor
    *
    * when triggered on such invalid context, it should be a no-op
    */
-  tryEnterContentEditMode() {
-    this.dispatch({
-      type: "surface/content-edit-mode/try-enter",
-    });
+  tryEnterContentEditMode(
+    node_id?: string,
+    mode: "auto" | "fill/gradient" = "auto"
+  ) {
+    node_id = node_id ?? this.state.selection[0];
+    switch (mode) {
+      case "auto":
+        return this.dispatch({
+          type: "surface/content-edit-mode/try-enter",
+        });
+      case "fill/gradient":
+        if (node_id) {
+          return this.dispatch({
+            type: "surface/content-edit-mode/fill/gradient",
+            node_id: node_id ?? this.state.selection[0],
+          });
+        } else {
+          // no-op
+        }
+    }
   }
 
   tryExitContentEditMode() {
@@ -632,6 +648,16 @@ export class Editor
       target: {
         node_id,
         vertex,
+      },
+    });
+  }
+
+  public selectGradientStop(node_id: editor.NodeID, stop: number): void {
+    this.dispatch({
+      type: "select-gradient-stop",
+      target: {
+        node_id,
+        stop,
       },
     });
   }
@@ -1203,7 +1229,7 @@ export class Editor
   }
   changeNodeFill(
     node_id: string,
-    fill: grida.program.nodes.i.props.SolidPaintToken | cg.PaintWithoutID | null
+    fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
@@ -1215,10 +1241,7 @@ export class Editor
   }
   changeNodeStroke(
     node_id: string,
-    stroke:
-      | grida.program.nodes.i.props.SolidPaintToken
-      | cg.PaintWithoutID
-      | null
+    stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
     requestAnimationFrame(() => {
       this.dispatch({

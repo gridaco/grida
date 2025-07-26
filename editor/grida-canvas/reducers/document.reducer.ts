@@ -7,6 +7,7 @@ import type {
   TemplateEditorSetTemplatePropsAction,
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
+  EditorSelectGradientStopAction,
 } from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
@@ -746,10 +747,24 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     //
+    case "select-gradient-stop": {
+      return produce(state, (draft) => {
+        const { target } = <EditorSelectGradientStopAction>action;
+        const { node_id, stop } = target;
+        const node = dq.__getNodeById(draft, node_id);
+        assert(node);
+        if (draft.content_edit_mode?.type === "fill/gradient") {
+          draft.content_edit_mode.node_id = node_id;
+          draft.content_edit_mode.selected_stop = stop;
+        }
+      });
+    }
+    //
     case "surface/ruler":
     case "surface/guide/delete":
     case "surface/pixel-grid":
     case "surface/content-edit-mode/try-enter":
+    case "surface/content-edit-mode/fill/gradient":
     case "surface/content-edit-mode/try-exit":
     case "surface/tool":
     case "surface/brush":

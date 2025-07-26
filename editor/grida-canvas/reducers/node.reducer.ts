@@ -158,9 +158,12 @@ const safe_properties: Partial<
       switch (value.type) {
         case "linear_gradient":
         case "radial_gradient":
+        case "sweep_gradient":
           draft.fill = {
-            ...(value as cg.LinearGradientPaint | cg.RadialGradientPaint),
-            id: `gradient-${v4()}`,
+            ...(value as
+              | cg.LinearGradientPaint
+              | cg.RadialGradientPaint
+              | cg.SweepGradientPaint),
           };
           break;
         case "solid":
@@ -249,7 +252,6 @@ const safe_properties: Partial<
         case "radial_gradient":
           draft.stroke = {
             ...(value as cg.LinearGradientPaint | cg.RadialGradientPaint),
-            id: `gradient-${v4()}`,
           };
           break;
         case "solid":

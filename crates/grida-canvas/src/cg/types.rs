@@ -508,6 +508,39 @@ pub struct LinearGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct RadialGradientPaint {
+    /// # Radial Gradient Transform Model
+    ///
+    /// ## Coordinate Space
+    /// The radial gradient is defined in **unit gradient space**:
+    /// - Center: `(0.5, 0.5)`
+    /// - Radius: `0.5`
+    ///
+    /// This forms a normalized circle inside a `[0.0, 1.0] x [0.0, 1.0]` box.
+    /// All geometry is defined relative to this unit space.
+    ///
+    /// ## Scaling to Object Space
+    /// The gradient is mapped to the target rectangle by applying a scale matrix derived from its size:
+    ///
+    /// ```text
+    /// local_matrix = scale(width, height) × user_transform
+    /// ```
+    ///
+    /// - `scale(width, height)` transforms the unit circle to match the target rectangle,
+    ///   allowing the gradient to become elliptical if `width ≠ height`.
+    /// - `user_transform` is an additional affine matrix defined in gradient space (centered at 0.5, 0.5).
+    ///
+    /// ## Rendering Behavior
+    /// When passed to Skia, the shader uses:
+    /// - `center = (0.5, 0.5)`
+    /// - `radius = 0.5`
+    ///
+    /// These are interpreted in **local gradient space**, and the `local_matrix` maps device coordinates
+    /// back into that space.
+    ///
+    /// ## Summary
+    /// - The gradient definition is resolution-independent.
+    /// - `width` and `height` determine how unit space is scaled — they do **not** directly affect center or radius.
+    /// - All transforms (e.g. rotation, skew) should be encoded in the `user_transform`, not baked into radius or center.
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
@@ -515,6 +548,39 @@ pub struct RadialGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct SweepGradientPaint {
+    /// # Sweep Gradient Transform Model
+    ///
+    /// ## Coordinate Space
+    /// The sweep gradient is defined in **unit gradient space**:
+    /// - Center: `(0.5, 0.5)`
+    /// - Angular domain: `0° → 360°` sweeping **clockwise**
+    ///
+    /// This defines a full circular sweep originating from the center of a `[0.0, 1.0] x [0.0, 1.0]` box.
+    /// All angular evaluations happen around that center.
+    ///
+    /// ## Scaling to Object Space
+    /// The gradient is mapped to the target rectangle by applying a scale matrix derived from its size:
+    ///
+    /// ```text
+    /// local_matrix = scale(width, height) × user_transform
+    /// ```
+    ///
+    /// - `scale(width, height)` adapts the normalized sweep space to the visual size of the shape.
+    /// - `user_transform` is an additional affine matrix applied **after** scaling,
+    ///   allowing rotation, skewing, and movement of the angular center.
+    ///
+    /// ## Rendering Behavior
+    /// When passed to Skia, the shader uses:
+    /// - `center = (0.5, 0.5)`
+    /// - Angle range = `0.0° to 360.0°`
+    ///
+    /// These are interpreted in **gradient-local space**, and the `local_matrix` maps device-space coordinates
+    /// into that space.
+    ///
+    /// ## Summary
+    /// - The gradient is resolution-independent and relative to a center anchor.
+    /// - Use scaling to map the unit system to the bounding box.
+    /// - Use the `transform` to rotate, offset, or skew the sweep gradient.
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,

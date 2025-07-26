@@ -44,7 +44,7 @@ import { PointerCursor } from "@/components/multiplayer/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
-import { SurfaceGradientEditor } from "./ui/gradient-editor";
+import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler/react";
@@ -363,10 +363,10 @@ export function EditorSurface() {
                 node_id={content_edit_mode.node_id}
               />
             )}
-            {content_edit_mode?.type === "gradient" && (
+            {content_edit_mode?.type === "fill/gradient" && (
               <SurfaceGradientEditor
                 key="gradient-editor"
-                node_id={content_edit_mode.node_id}
+                {...content_edit_mode}
               />
             )}
           </SurfaceGroup>
