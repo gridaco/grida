@@ -550,7 +550,7 @@ export namespace editor.state {
     | TextContentEditMode
     | PathContentEditMode
     | BitmapContentEditMode
-    | GradientContentEditMode;
+    | FillGradientContentEditMode;
 
   type TextContentEditMode = {
     type: "text";
@@ -600,11 +600,17 @@ export namespace editor.state {
   };
 
   /**
-   * @deprecated - WIP
+   * surface gradient edit mode
    */
-  type GradientContentEditMode = {
+  export type FillGradientContentEditMode = {
     type: "fill/gradient";
     node_id: string;
+    /**
+     * index of the focused stop, if any
+     *
+     * @default 0
+     */
+    selected_stop: number;
   };
 
   /**
@@ -1661,6 +1667,18 @@ export namespace editor.api {
     //
     selectVertex(node_id: NodeID, vertex: number): void;
     deleteVertex(node_id: NodeID, vertex: number): void;
+    //
+
+    //
+    /**
+     * select the gradient stop by the given index
+     *
+     * only effective when content edit mode is {@link editor.state.FillGradientContentEditMode}
+     *
+     * @param node_id node id
+     * @param stop index of the stop
+     */
+    selectGradientStop(node_id: NodeID, stop: number): void;
     //
 
     //

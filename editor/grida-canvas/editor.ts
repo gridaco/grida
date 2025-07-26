@@ -652,6 +652,16 @@ export class Editor
     });
   }
 
+  public selectGradientStop(node_id: editor.NodeID, stop: number): void {
+    this.dispatch({
+      type: "select-gradient-stop",
+      target: {
+        node_id,
+        stop,
+      },
+    });
+  }
+
   public getNodeSnapshotById(
     node_id: editor.NodeID
   ): Readonly<grida.program.nodes.Node> {

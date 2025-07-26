@@ -82,6 +82,7 @@ function __self_try_content_edit_mode_fill_gradient(
   draft.content_edit_mode = {
     node_id: node_id,
     type: "fill/gradient",
+    selected_stop: 0,
   };
 }
 

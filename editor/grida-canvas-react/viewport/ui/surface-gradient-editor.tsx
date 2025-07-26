@@ -1,14 +1,14 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { useCurrentEditor } from "@/grida-canvas-react";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import { useSingleSelection } from "../surface-hooks";
 import {
   GradientControlPointsEditor,
   getPointsFromTransform,
   getTransformFromPoints,
-  type GradientType,
 } from "@/grida-canvas-react-gradient";
 import cg from "@grida/cg";
 import { useNodeState } from "@/grida-canvas-react/provider";
+import { editor } from "@/grida-canvas";
 
 const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
   ["linear_gradient" satisfies cg.Paint["type"]]: "linear",
@@ -24,8 +24,10 @@ function isGradientPaint(fill: cg.Paint): fill is cg.GradientPaint {
   );
 }
 
-export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
-  const editor = useCurrentEditor();
+export function SurfaceGradientEditor({
+  node_id,
+  selected_stop,
+}: editor.state.FillGradientContentEditMode) {
   const data = useSingleSelection(node_id);
   const { fill } = useNodeState(node_id, (node) => ({
     fill: node.fill,
@@ -50,33 +52,33 @@ export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
           zIndex: 1,
         }}
       >
-        <Editor
+        <EditorUser
           node_id={node_id}
           width={data.boundingSurfaceRect.width}
           height={data.boundingSurfaceRect.height}
           gradient={fill}
-          onValueChange={(g) => {
-            editor.changeNodeFill(node_id, g);
-          }}
+          selected_stop={selected_stop}
         />
       </div>
     </div>
   );
 }
 
-function Editor({
+function EditorUser({
   node_id,
   width,
   height,
   gradient,
-  onValueChange,
+  selected_stop,
 }: {
   node_id: string;
   width: number;
   height: number;
   gradient: cg.GradientPaint;
-  onValueChange: (fill: cg.GradientPaint) => void;
+  selected_stop: number;
 }) {
+  const editor = useCurrentEditor();
+
   const gradientType = gradientTypeMap[gradient.type];
 
   // Convert transform to control points for initial state
@@ -93,7 +95,13 @@ function Editor({
   });
 
   const [stops, setStops] = useState(gradient.stops);
-  const [focusedStop, setFocusedStop] = useState<number | null>(null);
+
+  const setFocusedStop = useCallback(
+    (stop: number | null) => {
+      editor.selectGradientStop(node_id, stop ?? 0);
+    },
+    [editor, node_id]
+  );
 
   // Update state when gradient prop changes
   useEffect(() => {
@@ -104,6 +112,13 @@ function Editor({
     setPoints([controlPoints.A, controlPoints.B, controlPoints.C]);
     setStops(gradient.stops);
   }, [gradient, gradientType]);
+
+  const onValueChange = useCallback(
+    (g: cg.GradientPaint) => {
+      editor?.changeNodeFill(node_id, g);
+    },
+    [editor, node_id]
+  );
 
   const handlePointsChange = useCallback(
     (
@@ -185,10 +200,10 @@ function Editor({
       setStops(newStops);
 
       // Adjust focused stop
-      if (focusedStop === index) {
+      if (selected_stop === index) {
         setFocusedStop(null);
-      } else if (focusedStop !== null && focusedStop > index) {
-        setFocusedStop(focusedStop - 1);
+      } else if (selected_stop !== null && selected_stop > index) {
+        setFocusedStop(selected_stop - 1);
       }
 
       // Convert points to transform
@@ -203,13 +218,13 @@ function Editor({
         transform,
       });
     },
-    [stops, focusedStop, points, gradientType, onValueChange]
+    [stops, selected_stop, points, gradientType, onValueChange]
   );
 
   return (
     <GradientControlPointsEditor
       stops={stops}
-      focusedStop={focusedStop}
+      focusedStop={selected_stop}
       points={points}
       width={width}
       height={height}
