@@ -506,6 +506,7 @@ export type GradientAction =
   | { type: "REMOVE_STOP"; payload: number }
   | { type: "SET_FOCUSED_STOP"; payload: number | null }
   | { type: "SET_FOCUSED_CONTROL"; payload: "A" | "B" | "C" | null }
+  | { type: "SET_CONTROL_POINTS"; payload: ControlPoints }
   | { type: "SET_DRAG_STATE"; payload: GradientState["dragState"] }
   | { type: "SET_HOVER_PREVIEW"; payload: GradientState["hoverPreview"] }
   | { type: "RESET_FOCUS" }
@@ -716,6 +717,10 @@ export const gradientReducer = (
         if (action.payload) {
           draft.focusedStop = null;
         }
+        break;
+
+      case "SET_CONTROL_POINTS":
+        draft.controlPoints = action.payload;
         break;
 
       case "SET_DRAG_STATE":
