@@ -734,7 +734,6 @@ function SelectedNodeProperties({
     innerRadius: node.innerRadius,
     angle: node.angle,
     angleOffset: node.angleOffset,
-    fill: node.fill,
 
     fit: node.fit,
     fontFamily: node.fontFamily,
@@ -786,7 +785,6 @@ function SelectedNodeProperties({
     innerRadius,
     angle,
     angleOffset,
-    fill,
 
     fit,
     fontFamily,
@@ -1181,29 +1179,7 @@ function SelectedNodeProperties({
             )}
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Fill</PropertyLineLabel>
-              <FillControl
-                value={fill}
-                onValueChange={actions.fill}
-                removable
-                onOpenChange={(open) => {
-                  if (open) {
-                    instance.tryEnterContentEditMode(node_id, "fill/gradient");
-                  } else {
-                    instance.tryExitContentEditMode();
-                  }
-                  //
-                }}
-              />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+        <SectionFills node_id={node_id} />
         {supports.stroke(node.type, { backend }) && (
           <SectionStrokes
             node_id={node_id}
@@ -1362,6 +1338,54 @@ function SectionDimension({ node_id }: { node_id: string }) {
           <LengthPercentageControl
             value={height}
             onValueCommit={actions.height}
+          />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function SectionFills({ node_id }: { node_id: string }) {
+  const instance = useCurrentEditor();
+  const { content_edit_mode } = useEditorState(instance, (state) => ({
+    content_edit_mode: state.content_edit_mode,
+  }));
+
+  const { fill } = useNodeState(node_id, (node) => ({
+    fill: node.fill,
+  }));
+
+  const selectedGradientStop =
+    content_edit_mode?.type === "fill/gradient"
+      ? content_edit_mode.selected_stop
+      : undefined;
+
+  const actions = useNodeActions(node_id)!;
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Fill</PropertyLineLabel>
+          <FillControl
+            value={fill}
+            onValueChange={actions.fill}
+            removable
+            selectedGradientStop={selectedGradientStop}
+            onSelectedGradientStopChange={(stop) => {
+              instance.selectGradientStop(node_id, stop);
+            }}
+            onOpenChange={(open) => {
+              if (open) {
+                instance.tryEnterContentEditMode(node_id, "fill/gradient");
+              } else {
+                instance.tryExitContentEditMode();
+              }
+              //
+            }}
           />
         </PropertyLine>
       </SidebarMenuSectionContent>

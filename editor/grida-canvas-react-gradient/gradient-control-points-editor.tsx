@@ -478,7 +478,14 @@ export default function GradientControlPointsEditor({
         height={height}
       >
         <defs>
-          <filter id="trackShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <filter
+            id="trackShadow"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+            filterUnits="userSpaceOnUse"
+          >
             <feDropShadow
               dx="0"
               dy="2"
@@ -496,6 +503,7 @@ export default function GradientControlPointsEditor({
           stroke="white"
           strokeWidth="3"
           opacity="0.8"
+          filter="url(#trackShadow)"
         />
         {/* Elliptical Track for radial and sweep */}
         {(gradientType === "radial" || gradientType === "sweep") &&

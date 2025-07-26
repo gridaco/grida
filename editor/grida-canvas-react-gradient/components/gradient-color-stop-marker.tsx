@@ -64,7 +64,7 @@ export default function StopMarker({
             absolute left-1/2 transform -translate-x-1/2
             border-l-[5px] border-l-transparent
             border-r-[5px] border-r-transparent
-            border-t-white border-t-[6px]
+            border-t-gray-300 border-t-[6px]
             group-data-[selected=true]/stop:border-t-yellow-400
             `}
           style={{
@@ -79,7 +79,7 @@ export default function StopMarker({
       <div
         className={`
           w-full h-full border-2 shadow-lg
-          group-data-[selected=true]/stop:border-yellow-400 group-data-[selected=false]/stop:border-white
+          group-data-[selected=true]/stop:border-yellow-400 group-data-[selected=false]/stop:border-gray-300
           `}
         style={{ backgroundColor: color }}
       >

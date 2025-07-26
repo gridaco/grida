@@ -4,14 +4,11 @@ import { RGBAColorControl } from "./color";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import InputPropertyNumber from "../ui/number";
 import cmath from "@grida/cmath";
 import { GradientStopsSlider } from "@/grida-canvas-react-gradient/gradient-stops-slider";
 import { ArrowRightLeftIcon, RotateCwIcon } from "lucide-react";
 import { Button } from "@/components/ui-editor/button";
 import { Label } from "@/components/ui/label";
-import DegreeControl from "./degree";
-import { useMemo } from "react";
 
 type GradientPaint =
   | cg.LinearGradientPaint
@@ -20,9 +17,13 @@ type GradientPaint =
 
 export function GradientControl({
   value,
+  selectedStop,
+  onSelectedStopChange,
   onValueChange,
 }: {
   value: GradientPaint;
+  selectedStop?: number;
+  onSelectedStopChange?: (stop: number) => void;
   onValueChange?: (value: GradientPaint) => void;
 }) {
   const { stops } = value;
@@ -71,6 +72,8 @@ export function GradientControl({
       </div>
       <GradientStopsSlider
         stops={stops}
+        selectedStop={selectedStop}
+        onSelectedStopChange={onSelectedStopChange}
         onValueChange={(stops) => {
           onValueChange?.({ ...value, stops });
         }}

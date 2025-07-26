@@ -21,8 +21,8 @@ export default function ControlPoint({
 }: ControlPointProps) {
   return (
     <div
-      className={`absolute w-2 h-2 bg-white border rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-lg ${
-        selected ? "scale-105 ring-2 ring-white" : ""
+      className={`absolute size-3 bg-white border rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-sm ${
+        selected ? "scale-105 ring-2" : ""
       } ${readonly ? "cursor-default" : "cursor-move"}`}
       style={{ left: x, top: y }}
       role="button"

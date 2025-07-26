@@ -42,12 +42,16 @@ export function PaintControl({
   value,
   onValueChange,
   removable,
+  selectedGradientStop,
   onOpenChange,
+  onSelectedGradientStopChange,
 }: {
   value?: grida.program.nodes.i.props.PropsPaintValue;
   onValueChange?: (value: ComputedPaint | TokenizedPaint | null) => void;
   onOpenChange?: (open: boolean) => void;
+  selectedGradientStop?: number;
   removable?: boolean;
+  onSelectedGradientStopChange?: (stop: number) => void;
 }) {
   if (tokens.is.tokenized(value)) {
     return (
@@ -62,6 +66,9 @@ export function PaintControl({
         value={value as ComputedPaint}
         onValueChange={onValueChange}
         onOpenChange={onOpenChange}
+        selectedGradientStop={selectedGradientStop}
+        removable={removable}
+        onSelectedGradientStopChange={onSelectedGradientStopChange}
       />
     );
   }
@@ -75,11 +82,15 @@ function ComputedPaintControl({
   onValueChange,
   removable,
   onOpenChange,
+  selectedGradientStop,
+  onSelectedGradientStopChange,
 }: {
   value?: ComputedPaint;
   onValueChange?: (value: ComputedPaint | null) => void;
   removable?: boolean;
   onOpenChange?: (open: boolean) => void;
+  selectedGradientStop?: number;
+  onSelectedGradientStopChange?: (stop: number) => void;
 }) {
   const onTypeChange = useCallback(
     (type: cg.Paint["type"]) => {
@@ -307,17 +318,32 @@ function ComputedPaintControl({
           </TabsContent>
           <TabsContent value="linear_gradient" className="p-2">
             {value?.type === "linear_gradient" && (
-              <GradientControl value={value} onValueChange={onValueChange} />
+              <GradientControl
+                value={value}
+                onValueChange={onValueChange}
+                selectedStop={selectedGradientStop}
+                onSelectedStopChange={onSelectedGradientStopChange}
+              />
             )}
           </TabsContent>
           <TabsContent value="radial_gradient" className="p-2">
             {value?.type === "radial_gradient" && (
-              <GradientControl value={value} onValueChange={onValueChange} />
+              <GradientControl
+                value={value}
+                onValueChange={onValueChange}
+                selectedStop={selectedGradientStop}
+                onSelectedStopChange={onSelectedGradientStopChange}
+              />
             )}
           </TabsContent>
           <TabsContent value="sweep_gradient" className="p-2">
             {value?.type === "sweep_gradient" && (
-              <GradientControl value={value} onValueChange={onValueChange} />
+              <GradientControl
+                value={value}
+                onValueChange={onValueChange}
+                selectedStop={selectedGradientStop}
+                onSelectedStopChange={onSelectedGradientStopChange}
+              />
             )}
           </TabsContent>
         </Tabs>

@@ -4,9 +4,13 @@ import { css } from "@/grida-canvas-utils/css";
 
 export function GradientStopsSlider({
   stops,
+  selectedStop,
   onValueChange,
+  onSelectedStopChange,
 }: {
   stops: cg.GradientStop[];
+  selectedStop?: number;
+  onSelectedStopChange?: (stop: number) => void;
   onValueChange?: (value: cg.GradientStop[]) => void;
 }) {
   const step = 0.01;
@@ -63,9 +67,19 @@ export function GradientStopsSlider({
         }}
       />
       {stops.map((stop, index) => (
-        <SliderPrimitive.Thumb key={index}>
+        <SliderPrimitive.Thumb
+          key={index}
+          data-selected={selectedStop === index}
+          className="group/stop-thumb"
+          onPointerDown={() => {
+            onSelectedStopChange?.(index);
+          }}
+        >
           <div
-            className="block size-7 rounded border-4 border-background outline-1 outline-workbench-accent-sky shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+            className="
+              block size-7 rounded border-4 border-background outline-1 outline-workbench-accent-sky shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50
+              group-data-[selected=true]/stop-thumb:border-yellow-400
+            "
             style={{
               background: css.toRGBAString(stop.color),
             }}
