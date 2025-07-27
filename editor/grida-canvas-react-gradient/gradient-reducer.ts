@@ -498,7 +498,9 @@ export function controlPointsReducer(
     case "UPDATE_CONTROL_POINT": {
       const { point, deltaX, deltaY, width, height, gradientType } =
         action.payload;
-      const rel = { x: deltaX / width, y: deltaY / height };
+      // deltaX and deltaY are already relative to the container so no
+      // additional normalization is required here
+      const rel = { x: deltaX, y: deltaY };
       if (gradientType === "linear") {
         return {
           ...state,
@@ -514,56 +516,98 @@ export function controlPointsReducer(
         const C = state.C;
         if (point === "A") {
           const newA = { x: A.x + rel.x, y: A.y + rel.y };
-          const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
-          const newLen = Math.hypot(B.x - newA.x, B.y - newA.y) || 1e-6;
-          const ratio = newLen / oldLen;
-          const nx = -(B.y - newA.y) / newLen;
-          const ny = (B.x - newA.x) / newLen;
-          const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
+
+          const oldDxPx = (B.x - A.x) * width;
+          const oldDyPx = (B.y - A.y) * height;
+          const newDxPx = (B.x - newA.x) * width;
+          const newDyPx = (B.y - newA.y) * height;
+
+          const oldLenPx = Math.hypot(oldDxPx, oldDyPx) || 1e-6;
+          const newLenPx = Math.hypot(newDxPx, newDyPx) || 1e-6;
+          const ratio = newLenPx / oldLenPx;
+
+          const sign =
+            Math.sign(
+              oldDxPx * ((C.y - A.y) * height) -
+                oldDyPx * ((C.x - A.x) * width)
+            ) || 1;
+
+          const perpXpx = (-newDyPx / newLenPx) * sign;
+          const perpYpx = (newDxPx / newLenPx) * sign;
+
+          const distACPx =
+            Math.hypot((C.x - A.x) * width, (C.y - A.y) * height) * ratio;
+
+          const newCxPx = newA.x * width + perpXpx * distACPx;
+          const newCyPx = newA.y * height + perpYpx * distACPx;
+
           return {
             ...state,
             A: newA,
             C: {
-              x: newA.x + nx * distAC,
-              y: newA.y + ny * distAC,
+              x: newCxPx / width,
+              y: newCyPx / height,
             },
           };
         } else if (point === "B") {
           const newB = { x: B.x + rel.x, y: B.y + rel.y };
-          const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
-          const newLen = Math.hypot(newB.x - A.x, newB.y - A.y) || 1e-6;
-          const ratio = newLen / oldLen;
-          const nx = -(newB.y - A.y) / newLen;
-          const ny = (newB.x - A.x) / newLen;
-          const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
+
+          const oldDxPx = (B.x - A.x) * width;
+          const oldDyPx = (B.y - A.y) * height;
+          const newDxPx = (newB.x - A.x) * width;
+          const newDyPx = (newB.y - A.y) * height;
+
+          const oldLenPx = Math.hypot(oldDxPx, oldDyPx) || 1e-6;
+          const newLenPx = Math.hypot(newDxPx, newDyPx) || 1e-6;
+          const ratio = newLenPx / oldLenPx;
+
+          const sign =
+            Math.sign(
+              oldDxPx * ((C.y - A.y) * height) -
+                oldDyPx * ((C.x - A.x) * width)
+            ) || 1;
+
+          const perpXpx = (-newDyPx / newLenPx) * sign;
+          const perpYpx = (newDxPx / newLenPx) * sign;
+
+          const distACPx =
+            Math.hypot((C.x - A.x) * width, (C.y - A.y) * height) * ratio;
+
+          const newCxPx = A.x * width + perpXpx * distACPx;
+          const newCyPx = A.y * height + perpYpx * distACPx;
+
           return {
             ...state,
             B: newB,
             C: {
-              x: A.x + nx * distAC,
-              y: A.y + ny * distAC,
+              x: newCxPx / width,
+              y: newCyPx / height,
             },
           };
         } else if (point === "C") {
           // C point should only move perpendicular to A-B axis (scaleY constraint)
-          const dx = B.x - A.x;
-          const dy = B.y - A.y;
-          const len = Math.hypot(dx, dy) || 1e-6;
-          const perpX = -dy / len;
-          const perpY = dx / len;
+          const dxPx = (B.x - A.x) * width;
+          const dyPx = (B.y - A.y) * height;
+          const lenPx = Math.hypot(dxPx, dyPx) || 1e-6;
+          const perpXpx = -dyPx / lenPx;
+          const perpYpx = dxPx / lenPx;
 
-          // Project the drag delta onto the perpendicular direction
-          const dragDotPerp = rel.x * perpX + rel.y * perpY;
+          const dragPxX = rel.x * width;
+          const dragPxY = rel.y * height;
+          const dragDotPerp = dragPxX * perpXpx + dragPxY * perpYpx;
 
-          // Get current distance of C from A along perpendicular direction
-          const currentDist = (C.x - A.x) * perpX + (C.y - A.y) * perpY;
-          const newDist = currentDist + dragDotPerp;
+          const currentDistPx =
+            (C.x - A.x) * width * perpXpx + (C.y - A.y) * height * perpYpx;
+          const newDistPx = currentDistPx + dragDotPerp;
+
+          const newCxPx = A.x * width + perpXpx * newDistPx;
+          const newCyPx = A.y * height + perpYpx * newDistPx;
 
           return {
             ...state,
             C: {
-              x: A.x + perpX * newDist,
-              y: A.y + perpY * newDist,
+              x: newCxPx / width,
+              y: newCyPx / height,
             },
           };
         }
