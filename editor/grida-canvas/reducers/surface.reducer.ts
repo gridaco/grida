@@ -115,6 +115,70 @@ function __self_try_enter_content_edit_mode_auto(
       };
       break;
     }
+    // primitive shapes
+    case "rectangle":
+    case "star":
+    case "polygon":
+    case "ellipse":
+    case "line": {
+      // 1. convert the primitive to path
+
+      const node = dq.__getNodeById(draft, node_id);
+      // TODO: convert the shape to vector network
+      // @ts-ignore
+      draft.document.nodes[node_id] = {
+        ...node,
+        type: "path",
+        fillRule: "nonzero",
+        vectorNetwork: {
+          // dummy - make a rectangle
+          vertices: [
+            { p: [0, 0] },
+            { p: [100, 0] },
+            { p: [100, 100] },
+            { p: [0, 100] },
+          ],
+          segments: [
+            {
+              a: 0,
+              b: 1,
+              ta: [0, 0],
+              tb: [0, 0],
+            },
+            {
+              a: 1,
+              b: 2,
+              ta: [0, 0],
+              tb: [0, 0],
+            },
+            {
+              a: 2,
+              b: 3,
+              ta: [0, 0],
+              tb: [0, 0],
+            },
+            {
+              a: 3,
+              b: 0,
+              ta: [0, 0],
+              tb: [0, 0],
+            },
+          ],
+        },
+      };
+
+      // 2. enter path edit mode
+      draft.content_edit_mode = {
+        type: "path",
+        node_id: node_id,
+        selected_vertices: [],
+        a_point: null,
+        next_ta: null,
+        path_cursor_position: draft.pointer.position,
+      };
+
+      break;
+    }
     case "bitmap": {
       const node = dq.__getNodeById(
         draft,
