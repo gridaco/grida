@@ -712,7 +712,7 @@ function SelectedNodeProperties({
 
   const actions = useNodeActions(node_id)!;
 
-  // const node = useNode(node_id);
+  // TODO: chunk by usage, so the controls won't re-render when not needed
   const node = useNodeState(node_id, (node) => ({
     id: node.id,
     name: node.name,
@@ -723,7 +723,6 @@ function SelectedNodeProperties({
     src: node.src,
     text: node.text,
     type: node.type,
-    opacity: node.opacity,
     blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
     cornerRadiusTopLeft: node.cornerRadiusTopLeft,
@@ -766,6 +765,7 @@ function SelectedNodeProperties({
     // x
     userdata: node.userdata,
   }));
+
   const computed = useComputedNode(node_id);
   const {
     id,
@@ -774,7 +774,6 @@ function SelectedNodeProperties({
     locked,
     component_id,
     type,
-    opacity,
     blendMode,
     cornerRadius,
     cornerRadiusTopLeft,
@@ -818,7 +817,6 @@ function SelectedNodeProperties({
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
-  const is_instance = type === "instance";
   const is_templateinstance = type === "template_instance";
   const is_text = type === "text";
   const is_image = type === "image";
@@ -1093,13 +1091,7 @@ function SelectedNodeProperties({
             </SidebarSectionHeaderActions>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Opacity</PropertyLineLabel>
-              <OpacityControl
-                value={opacity as any}
-                onValueCommit={actions.opacity}
-              />
-            </PropertyLine>
+            <PropertyLineOpacity node_id={node_id} />
             {supports.border(node.type, { backend }) && (
               <PropertyLine>
                 <PropertyLineLabel>Border</PropertyLineLabel>
@@ -1252,6 +1244,18 @@ function SelectedNodeProperties({
         </SidebarSection>
       </div>
     </SchemaProvider>
+  );
+}
+
+function PropertyLineOpacity({ node_id }: { node_id: string }) {
+  const actions = useNodeActions(node_id)!;
+  const opacity = useNodeState(node_id, (node) => node.opacity);
+
+  return (
+    <PropertyLine>
+      <PropertyLineLabel>Opacity</PropertyLineLabel>
+      <OpacityControl value={opacity as any} onValueCommit={actions.opacity} />
+    </PropertyLine>
   );
 }
 
