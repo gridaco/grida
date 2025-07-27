@@ -1,13 +1,13 @@
 import { WorkbenchUI } from "@/components/workbench";
 import grida from "@grida/schema";
 import cg from "@grida/cg";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GradientControl } from "./gradient";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@/components/ui-editor/popover";
 import { cn } from "@/components/lib/utils";
 import {
   LinearGradientPaintIcon,
@@ -25,18 +25,6 @@ import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
-import { PopoverContentProps } from "@radix-ui/react-popover";
-
-const popover_content_on_pointer_down_outside: PopoverContentProps["onPointerDownOutside"] =
-  (e) => {
-    // if the target contains 'data-popover-no-close', ignore the event
-    if (
-      e.target instanceof HTMLElement &&
-      e.target.closest("[data-popover-no-close]")
-    ) {
-      e.preventDefault();
-    }
-  };
 
 export function PaintControl({
   value,
@@ -204,12 +192,13 @@ function ComputedPaintControl({
                 <PaintChip paint={value} />
                 <span className="ms-2 text-start text-xs flex-1">Linear</span>
                 {removable && (
-                  <button
+                  <span
+                    role="button"
                     onClick={onRemovePaint}
                     className="px-1 py-1 me-0.5 text-muted-foreground"
                   >
                     <Cross2Icon className="w-3.5 h-3.5" />
-                  </button>
+                  </span>
                 )}
               </PaintInputContainer>
             </PopoverTrigger>
@@ -220,12 +209,13 @@ function ComputedPaintControl({
                 <PaintChip paint={value} />
                 <span className="ms-2 text-start text-xs flex-1">Radial</span>
                 {removable && (
-                  <button
+                  <span
+                    role="button"
                     onClick={onRemovePaint}
                     className="px-1 py-1 me-0.5 text-muted-foreground"
                   >
                     <Cross2Icon className="w-3.5 h-3.5" />
-                  </button>
+                  </span>
                 )}
               </PaintInputContainer>
             </PopoverTrigger>
@@ -236,12 +226,13 @@ function ComputedPaintControl({
                 <PaintChip paint={value} />
                 <span className="ms-2 text-start text-xs flex-1">Sweep</span>
                 {removable && (
-                  <button
+                  <span
+                    role="button"
                     onClick={onRemovePaint}
                     className="px-1 py-1 me-0.5 text-muted-foreground"
                   >
                     <Cross2Icon className="w-3.5 h-3.5" />
-                  </button>
+                  </span>
                 )}
               </PaintInputContainer>
             </PopoverTrigger>
@@ -264,13 +255,7 @@ function ComputedPaintControl({
           </div>
         </PopoverTrigger>
       )}
-      <PopoverContent
-        onPointerDownOutside={popover_content_on_pointer_down_outside}
-        align="start"
-        side="right"
-        sideOffset={8}
-        className="p-0"
-      >
+      <PopoverContent align="start" side="right" sideOffset={8} className="p-0">
         <Tabs value={value?.type} onValueChange={onTypeChange as any}>
           <TabsList className="m-2">
             <TabsTrigger value="solid">
@@ -292,9 +277,9 @@ function ComputedPaintControl({
               />
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="solid" className="p-0 m-0">
+          <>
             {value?.type === "solid" && (
-              <>
+              <div>
                 <ColorPicker
                   color={value.color}
                   onColorChange={(color) => {
@@ -313,39 +298,23 @@ function ComputedPaintControl({
                     });
                   }}
                 />
-              </>
+              </div>
             )}
-          </TabsContent>
-          <TabsContent value="linear_gradient" className="p-2">
-            {value?.type === "linear_gradient" && (
-              <GradientControl
-                value={value}
-                onValueChange={onValueChange}
-                selectedStop={selectedGradientStop}
-                onSelectedStopChange={onSelectedGradientStopChange}
-              />
+          </>
+          <>
+            {(value?.type === "linear_gradient" ||
+              value?.type === "radial_gradient" ||
+              value?.type === "sweep_gradient") && (
+              <div className="p-2">
+                <GradientControl
+                  value={value}
+                  onValueChange={onValueChange}
+                  selectedStop={selectedGradientStop}
+                  onSelectedStopChange={onSelectedGradientStopChange}
+                />
+              </div>
             )}
-          </TabsContent>
-          <TabsContent value="radial_gradient" className="p-2">
-            {value?.type === "radial_gradient" && (
-              <GradientControl
-                value={value}
-                onValueChange={onValueChange}
-                selectedStop={selectedGradientStop}
-                onSelectedStopChange={onSelectedGradientStopChange}
-              />
-            )}
-          </TabsContent>
-          <TabsContent value="sweep_gradient" className="p-2">
-            {value?.type === "sweep_gradient" && (
-              <GradientControl
-                value={value}
-                onValueChange={onValueChange}
-                selectedStop={selectedGradientStop}
-                onSelectedStopChange={onSelectedGradientStopChange}
-              />
-            )}
-          </TabsContent>
+          </>
         </Tabs>
       </PopoverContent>
     </Popover>
@@ -392,9 +361,7 @@ function TokenizedPaintControl({
         )} */}
         </PaintInputContainer>
       </PopoverTrigger>
-      <PopoverContent
-        onPointerDownOutside={popover_content_on_pointer_down_outside}
-      >
+      <PopoverContent>
         <ContextVariableColors
           onSelect={(token) => {
             onValueChange?.({
