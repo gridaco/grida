@@ -25,21 +25,21 @@ pub fn gradient_paint(paint: &GradientPaint, opacity: f32, size: (f32, f32)) -> 
 pub fn linear_gradient_paint(
     gradient: &LinearGradientPaint,
     opacity: f32,
-    size: (f32, f32),
+    (x, y): (f32, f32),
 ) -> skia_safe::Paint {
     let mut paint = skia_safe::Paint::default();
-    let (width, _height) = size;
     let (colors, positions) = build_gradient_stops(&gradient.stops, opacity * gradient.opacity);
+
+    let mut matrix = skia_safe::Matrix::scale((x, y));
+    matrix.pre_concat(&sk_matrix(gradient.transform.matrix));
+
     if let Some(shader) = skia_safe::Shader::linear_gradient(
-        (
-            skia_safe::Point::new(0.0, 0.0),
-            skia_safe::Point::new(width, 0.0),
-        ),
+        ((0.0, 0.5), (1.0, 0.5)),
         &colors[..],
         Some(&positions[..]),
         skia_safe::TileMode::Clamp,
         None,
-        Some(&sk_matrix(gradient.transform.matrix)),
+        Some(&matrix),
     ) {
         paint.set_shader(shader);
     }
@@ -51,21 +51,22 @@ pub fn linear_gradient_paint(
 pub fn radial_gradient_paint(
     gradient: &RadialGradientPaint,
     opacity: f32,
-    size: (f32, f32),
+    (x, y): (f32, f32),
 ) -> skia_safe::Paint {
     let mut paint = skia_safe::Paint::default();
-    let (width, height) = size;
     let (colors, positions) = build_gradient_stops(&gradient.stops, opacity * gradient.opacity);
-    let center = skia_safe::Point::new(width / 2.0, height / 2.0);
-    let radius = width.min(height) / 2.0;
+
+    let mut matrix = skia_safe::Matrix::scale((x, y));
+    matrix.pre_concat(&sk_matrix(gradient.transform.matrix));
+
     if let Some(shader) = skia_safe::Shader::radial_gradient(
-        center,
-        radius,
+        (0.5, 0.5),
+        0.5,
         &colors[..],
         Some(&positions[..]),
         skia_safe::TileMode::Clamp,
         None,
-        Some(&sk_matrix(gradient.transform.matrix)),
+        Some(&matrix),
     ) {
         paint.set_shader(shader);
     }
@@ -77,21 +78,23 @@ pub fn radial_gradient_paint(
 pub fn sweep_gradient_paint(
     gradient: &SweepGradientPaint,
     opacity: f32,
-    size: (f32, f32),
+    (x, y): (f32, f32),
 ) -> skia_safe::Paint {
     let mut paint = skia_safe::Paint::default();
 
-    let (width, height) = size;
     let (colors, positions) = build_gradient_stops(&gradient.stops, opacity * gradient.opacity);
-    let center = skia_safe::Point::new(width as f32 / 2.0, height as f32 / 2.0);
+
+    let mut matrix = skia_safe::Matrix::scale((x, y));
+    matrix.pre_concat(&sk_matrix(gradient.transform.matrix));
+
     if let Some(shader) = skia_safe::Shader::sweep_gradient(
-        center,
+        (0.5, 0.5),
         skia_safe::gradient_shader::GradientShaderColors::Colors(&colors),
         Some(&positions[..]),
         skia_safe::TileMode::Clamp,
         Some((0.0, 360.0)),
         None,
-        None,
+        Some(&matrix),
     ) {
         paint.set_shader(shader);
     }

@@ -1,53 +1,83 @@
-import { Input } from "@/components/ui/input";
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./color";
-import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import * as SliderPrimitive from "@radix-ui/react-slider";
-import InputPropertyNumber from "../ui/number";
 import cmath from "@grida/cmath";
-import { css } from "@/grida-canvas-utils/css";
+import { GradientStopsSlider } from "@/grida-canvas-react-gradient/gradient-stops-slider";
+import { ArrowRightLeftIcon, RotateCwIcon } from "lucide-react";
+import { Button } from "@/components/ui-editor/button";
+import { Label } from "@/components/ui/label";
+import InputPropertyPercentage from "../ui/percentage";
+
+type GradientPaint =
+  | cg.LinearGradientPaint
+  | cg.RadialGradientPaint
+  | cg.SweepGradientPaint;
 
 export function GradientControl({
   value,
+  selectedStop,
+  onSelectedStopChange,
   onValueChange,
 }: {
-  value: cg.LinearGradientPaint | cg.RadialGradientPaint;
-  onValueChange?: (
-    value: cg.LinearGradientPaint | cg.RadialGradientPaint
-  ) => void;
+  value: GradientPaint;
+  selectedStop?: number;
+  onSelectedStopChange?: (stop: number) => void;
+  onValueChange?: (value: GradientPaint) => void;
 }) {
   const { stops } = value;
+
+  const onFlipStopsClick = () => {
+    const flippedStops = stops
+      .map((stop, index) => ({
+        ...stop,
+        offset: 1 - stop.offset,
+      }))
+      .reverse();
+    onValueChange?.({ ...value, stops: flippedStops });
+  };
+
+  const onRotateClick = () => {
+    const currentAngle = value.transform
+      ? cmath.transform.angle(value.transform)
+      : 0;
+    const newAngle = currentAngle + 45;
+    const t = cmath.transform.computeRelativeLinearGradientTransform(newAngle);
+    onValueChange?.({
+      ...value,
+      transform: t,
+    });
+  };
+
   return (
     <div className="w-full">
+      <div className="flex items-center justify-end gap-2 mb-2">
+        <Button
+          onClick={onFlipStopsClick}
+          title="Flip"
+          variant="ghost"
+          size="icon"
+        >
+          <ArrowRightLeftIcon className="size-3.5" />
+        </Button>
+        <Button
+          onClick={onRotateClick}
+          title="Rotate"
+          variant="ghost"
+          size="icon"
+        >
+          <RotateCwIcon className="size-3.5" />
+        </Button>
+      </div>
       <GradientStopsSlider
         stops={stops}
+        selectedStop={selectedStop}
+        onSelectedStopChange={onSelectedStopChange}
         onValueChange={(stops) => {
           onValueChange?.({ ...value, stops });
         }}
       />
       <hr className="my-4 w-full" />
-      <div>
-        <InputPropertyNumber
-          mode="fixed"
-          type="number"
-          placeholder="angle"
-          step={1}
-          value={
-            value.transform ? cmath.transform.angle(value.transform) : undefined
-          }
-          onValueCommit={(v) => {
-            // change on commit
-            const t = cmath.transform.computeRelativeLinearGradientTransform(v);
-            onValueChange?.({
-              ...value,
-              transform: t,
-            });
-          }}
-        />
-      </div>
-      <hr className="my-4 w-full" />
+      <Label className="text-xs mb-2">Stops</Label>
       <div className="flex flex-col gap-2">
         {stops.map((stop, index) => (
           <GradientStop
@@ -71,81 +101,6 @@ export function GradientControl({
   );
 }
 
-function GradientStopsSlider({
-  stops,
-  onValueChange,
-}: {
-  stops: cg.GradientStop[];
-  onValueChange?: (value: cg.GradientStop[]) => void;
-}) {
-  const step = 0.01;
-  const threshold = step * 20;
-
-  const offsets = stops.map((stop) => stop.offset);
-
-  const handleValueChange = (changes: number[]) => {
-    const updatedValues = [...offsets];
-
-    changes.forEach((newVal) => {
-      const isNewPoint = !offsets.some(
-        (existingVal) => Math.abs(existingVal - newVal) < threshold
-      );
-      if (isNewPoint) {
-        updatedValues.push(newVal); // Add the new value if it’s not close to any existing value
-      } else {
-        // If not new, update the closest value
-        const closestIndex = offsets.findIndex(
-          (existingVal) => Math.abs(existingVal - newVal) < threshold
-        );
-        updatedValues[closestIndex] = newVal;
-      }
-    });
-
-    const newstops = updatedValues
-      .sort((a, b) => a - b)
-      .map((offset, index) => {
-        // get existing stop
-        const prev = stops[index];
-        if (prev) {
-          return { ...prev, offset };
-        } else {
-          return { offset, color: { r: 0, g: 0, b: 0, a: 1 } };
-        }
-      });
-
-    // console.log(updatedValues, newstops);
-
-    onValueChange?.(newstops);
-  };
-
-  return (
-    <SliderPrimitive.Root
-      className="relative flex w-full touch-none select-none items-center"
-      min={0}
-      max={1}
-      step={step}
-      value={offsets}
-      onValueChange={handleValueChange}
-    >
-      <SliderPrimitive.Track
-        className="relative h-2 w-full grow overflow-hidden rounded-full"
-        style={{
-          background: `linear-gradient(to right, ${stops.map((stop) => `${css.toRGBAString(stop.color)} ${stop.offset * 100}%`).join(", ")})`,
-        }}
-      ></SliderPrimitive.Track>
-      {stops.map((stop, index) => (
-        <SliderPrimitive.Thumb
-          key={index}
-          className="block size-4 rounded-full border-2 border-background outline-1 outline-workbench-accent-sky shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-          style={{
-            background: css.toRGBAString(stop.color),
-          }}
-        />
-      ))}
-    </SliderPrimitive.Root>
-  );
-}
-
 function GradientStop({
   value: stop,
   onValueChange,
@@ -159,17 +114,15 @@ function GradientStop({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <Input
-        type="number"
-        value={stop.offset * 100}
-        onChange={(e) => {
-          const v100 = parseFloat(e.target.value);
-          const v = v100 / 100;
-          if (isNaN(v)) return;
-
+      <InputPropertyPercentage
+        mode="fixed"
+        value={stop.offset}
+        min={0}
+        max={1}
+        onValueCommit={(v) => {
           onValueChange?.({ ...stop, offset: v });
         }}
-        className={cn("flex-1", WorkbenchUI.inputVariants({ size: "xs" }))}
+        className="flex-1"
       />
       <div className="flex-[2]">
         <RGBAColorControl

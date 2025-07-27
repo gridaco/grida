@@ -75,7 +75,18 @@ function __self_guide_delete(draft: editor.state.IEditorState, idx: number) {
   scene.guides.splice(idx, 1);
 }
 
-function __self_try_enter_content_edit_mode(
+function __self_try_content_edit_mode_fill_gradient(
+  draft: editor.state.IEditorState,
+  node_id: string
+) {
+  draft.content_edit_mode = {
+    node_id: node_id,
+    type: "fill/gradient",
+    selected_stop: 0,
+  };
+}
+
+function __self_try_enter_content_edit_mode_auto(
   draft: editor.state.IEditorState,
   node_id: string
 ) {
@@ -104,17 +115,6 @@ function __self_try_enter_content_edit_mode(
       };
       break;
     }
-    // TODO: experimental - remove me
-    // case "rectangle":
-    // case "ellipse": {
-    //   if (node.fill?.type === "linear_gradient") {
-    //     draft.content_edit_mode = {
-    //       type: "gradient",
-    //       node_id: node_id,
-    //     };
-    //   }
-    //   //
-    // }
     case "bitmap": {
       const node = dq.__getNodeById(
         draft,
@@ -628,7 +628,12 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       case "surface/content-edit-mode/try-enter": {
         if (state.selection.length !== 1) break;
         const node_id = state.selection[0];
-        __self_try_enter_content_edit_mode(draft, node_id);
+        __self_try_enter_content_edit_mode_auto(draft, node_id);
+        break;
+      }
+      case "surface/content-edit-mode/fill/gradient": {
+        const { node_id } = action;
+        __self_try_content_edit_mode_fill_gradient(draft, node_id);
         break;
       }
       case "surface/content-edit-mode/try-exit": {

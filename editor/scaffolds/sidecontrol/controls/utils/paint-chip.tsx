@@ -17,6 +17,8 @@ export function PaintChip({
       return <LinearGradientPaintChip paint={paint} className={className} />;
     case "radial_gradient":
       return <RadialGradientPaintChip paint={paint} className={className} />;
+    case "sweep_gradient":
+      return <SweepGradientPaintChip paint={paint} className={className} />;
   }
 }
 
@@ -88,6 +90,31 @@ export function RadialGradientPaintChip({
         className="absolute w-full h-full"
         style={{
           background: css.toRadialGradientString(paint),
+        }}
+      />
+      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
+    </div>
+  );
+}
+
+export function SweepGradientPaintChip({
+  paint,
+  className,
+}: {
+  paint: cg.SweepGradientPaint;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
+        className
+      )}
+    >
+      <div
+        className="absolute w-full h-full"
+        style={{
+          background: css.toConicGradientString(paint),
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />

@@ -288,6 +288,8 @@ export namespace css {
         return toLinearGradientString(paint);
       case "radial_gradient":
         return toRadialGradientString(paint);
+      case "sweep_gradient":
+        return toConicGradientString(paint);
     }
   }
 
@@ -321,6 +323,19 @@ export namespace css {
     }
   }
 
+  export function toGradientString(paint: cg.GradientPaint): string {
+    switch (paint.type) {
+      case "linear_gradient":
+        return toLinearGradientString(paint);
+      case "radial_gradient":
+        return toRadialGradientString(paint);
+      case "sweep_gradient":
+        return toConicGradientString(paint);
+      default:
+        return "";
+    }
+  }
+
   /**
    *
    * @example
@@ -331,12 +346,15 @@ export namespace css {
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/linear-gradient
    */
   export function toLinearGradientString(
-    paint: Omit<cg.LinearGradientPaint, "id">
+    paint: cg.LinearGradientPaint
   ): string {
     const { stops, transform } = paint;
 
     // the css linear-gradient does not support custom matrix transformation
-    const deg = cmath.transform.angle(transform ?? cmath.transform.identity);
+    // in css, the default is top-center-to-bottom-center (which cg default is center-left-to-center-right)
+    // so we need to add 90 degrees to the angle to make it match the css default
+    const deg =
+      cmath.transform.angle(transform ?? cmath.transform.identity) + 90;
 
     const gradientStops = stops
       .map((stop) => {
@@ -357,9 +375,12 @@ export namespace css {
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/radial-gradient
    */
   export function toRadialGradientString(
-    paint: Omit<cg.RadialGradientPaint, "id">
+    paint: cg.RadialGradientPaint
   ): string {
     const { stops } = paint;
+
+    const tx = paint.transform?.[0][2] ?? 0.5;
+    const ty = paint.transform?.[1][2] ?? 0.5;
 
     const gradientStops = stops
       .map((stop) => {
@@ -367,6 +388,54 @@ export namespace css {
       })
       .join(", ");
 
-    return `radial-gradient(${gradientStops})`;
+    return `radial-gradient(at ${tx * 100}% ${ty * 100}%, ${gradientStops})`;
+  }
+
+  /**
+   *
+   * @example
+   * `conic-gradient(from 0deg at 50% 50%, red, blue)`
+   *
+   * @param paint
+   * @returns
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/conic-gradient
+   */
+  export function toConicGradientString(paint: cg.SweepGradientPaint): string {
+    const { stops, transform } = paint;
+
+    // Extract origin offset from transform matrix (similar to radial gradient)
+    const tx = paint.transform?.[0][2] ?? 0.5;
+    const ty = paint.transform?.[1][2] ?? 0.5;
+
+    // Calculate starting angle from transform matrix
+    // For conic gradients, we need to extract the rotation angle from the transform
+    // The angle represents where the gradient starts (0deg = top, 90deg = right, etc.)
+    let startAngle = 0;
+    if (transform) {
+      // Extract the rotation angle from the transform matrix
+      // This is similar to how linear gradients handle angle calculation
+      startAngle = cmath.transform.angle(transform);
+
+      // CSS conic gradients start from the top (0deg) by default
+      // We need to adjust the angle to match the expected behavior
+      // Add 90 degrees to align with CSS conic gradient default orientation
+      startAngle += 90;
+
+      // Normalize angle to 0-360 range
+      startAngle = ((startAngle % 360) + 360) % 360;
+    }
+
+    const gradientStops = stops
+      .map((stop) => {
+        return `${toRGBAString(stop.color)} ${stop.offset * 100}%`;
+      })
+      .join(", ");
+
+    // If origin is at center (0.5, 0.5), we can omit the "at" clause for better compatibility
+    if (Math.abs(tx - 0.5) < 0.01 && Math.abs(ty - 0.5) < 0.01) {
+      return `conic-gradient(from ${startAngle}deg, ${gradientStops})`;
+    }
+
+    return `conic-gradient(from ${startAngle}deg at ${tx * 100}% ${ty * 100}%, ${gradientStops})`;
   }
 }

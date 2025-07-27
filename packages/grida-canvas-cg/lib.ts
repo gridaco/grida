@@ -305,7 +305,11 @@ export namespace cg {
     | "zoom-in"
     | "zoom-out";
 
-  export type Paint = SolidPaint | LinearGradientPaint | RadialGradientPaint;
+  export type Paint =
+    | SolidPaint
+    | LinearGradientPaint
+    | RadialGradientPaint
+    | SweepGradientPaint;
 
   export namespace paints {
     export const transparent: Paint = {
@@ -327,30 +331,35 @@ export namespace cg {
   export type AnyPaint = Omit<
     Partial<SolidPaint> &
       Partial<LinearGradientPaint> &
-      Partial<RadialGradientPaint>,
+      Partial<RadialGradientPaint> &
+      Partial<SweepGradientPaint>,
     "type"
   > & { type: Paint["type"] };
-
-  export type PaintWithoutID =
-    | SolidPaint
-    | Omit<LinearGradientPaint, "id">
-    | Omit<RadialGradientPaint, "id">;
 
   export type SolidPaint = {
     type: "solid";
     color: cg.RGBA8888;
   };
 
+  export type GradientPaint =
+    | LinearGradientPaint
+    | RadialGradientPaint
+    | SweepGradientPaint;
+
   export type LinearGradientPaint = {
     type: "linear_gradient";
-    id: string;
     transform: AffineTransform;
     stops: Array<GradientStop>;
   };
 
   export type RadialGradientPaint = {
     type: "radial_gradient";
-    id: string;
+    transform: AffineTransform;
+    stops: Array<GradientStop>;
+  };
+
+  export type SweepGradientPaint = {
+    type: "sweep_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
   };

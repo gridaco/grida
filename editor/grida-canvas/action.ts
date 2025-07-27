@@ -30,6 +30,7 @@ export type DocumentAction =
   | EditorDeleteAction
   | EditorHierarchyAction
   | EditorVectorPathAction
+  | EditorGradientAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
   | EditorA11yArrowAction
@@ -65,6 +66,20 @@ interface IVertexIdx {
 interface VertexQuery extends IVertexIdx {
   /**
    * node id (must be a path node)
+   */
+  node_id: NodeID;
+}
+
+interface IGradientStopIdx {
+  /**
+   * index of the gradient stop
+   */
+  stop: number;
+}
+
+interface GradientStopQuery extends IGradientStopIdx {
+  /**
+   * node id (must be a gradient node)
    */
   node_id: NodeID;
 }
@@ -244,6 +259,16 @@ export interface EditorHoverVertexAction {
   target: VertexQuery;
 }
 // #endregion
+
+// #region [gradient]
+export type EditorGradientAction = EditorSelectGradientStopAction;
+
+export interface EditorSelectGradientStopAction {
+  type: "select-gradient-stop";
+  target: GradientStopQuery;
+}
+
+// #endregion [gradient]
 
 /**
  * [Nudge]
@@ -481,6 +506,7 @@ export type SurfaceAction =
   | EditorSurface_ChangeBrushSizeAction
   | EditorSurface_ChangeBrushOpacityAction
   | EditorSurface_EnterContentEditMode
+  | EditorSurface_EnterFillGradientContentEditMode
   | EditorSurface_ExitContentEditMode
   //
   | EditorSurface_CursorMode
@@ -522,6 +548,11 @@ export interface EditorSurface_DeleteGuideAction {
 
 export type EditorSurface_EnterContentEditMode = {
   type: "surface/content-edit-mode/try-enter";
+};
+
+export type EditorSurface_EnterFillGradientContentEditMode = {
+  node_id: string;
+  type: "surface/content-edit-mode/fill/gradient";
 };
 
 export type EditorSurface_ExitContentEditMode = {

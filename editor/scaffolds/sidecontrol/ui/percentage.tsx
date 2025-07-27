@@ -6,7 +6,7 @@ import type { TMixed } from "../controls/utils/types";
 import type { editor } from "@/grida-canvas";
 import { useNumberInput } from "./use-number-input";
 
-type NumericPropertyControlProps = Omit<
+type PercentagePropertyControlProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   "type" | "onChange" | "value" | "step"
 > & {
@@ -42,10 +42,14 @@ type NumericPropertyControlProps = Omit<
   );
 
 /**
- * A specialized number input component with advanced features for precise numeric control.
+ * A specialized percentage input component with advanced features for precise numeric control.
+ *
+ * This component is identical to InputPropertyNumber but automatically appends a "%" suffix
+ * to all displayed values. The underlying value is in decimal format (0.01 = 1%, 1.0 = 100%),
+ * but the UI shows it as a percentage with the "%" symbol.
  *
  * Key Features:
- * - Supports both integer and decimal number inputs
+ * - Supports both integer and decimal percentage inputs
  * - Arrow key increment/decrement with step size control
  * - Shift + Arrow for 10x step size
  * - Auto-selection of text on focus
@@ -58,6 +62,7 @@ type NumericPropertyControlProps = Omit<
  * - Reset to initial value on blur
  * - Mixed value state support
  * - Floating point precision handling
+ * - Automatic "%" suffix display
  *
  * Detailed Behavior:
  *
@@ -65,12 +70,12 @@ type NumericPropertyControlProps = Omit<
  *    - Typing: Updates internal state without commit
  *    - Arrow keys: Updates and commits in one operation
  *    - Enter: Commits current value and blurs
- *    - ESC: Cancels changes and blurs
+ *    - ESC: Cancels changes and blur
  *    - Blur without commit: Resets to initial value
  *
  * 2. Arrow Key Behavior:
  *    - Works on current input value, not just committed value
- *    - Example: Type "100" → Arrow Up → "101" (committed)
+ *    - Example: Type "100" → Arrow Up → "101%" (committed)
  *    - Shift + Arrow multiplies step by 10
  *    - Respects min/max constraints
  *    - Works identically in both "auto" and "fixed" modes
@@ -92,32 +97,37 @@ type NumericPropertyControlProps = Omit<
  *    - Empty: Shows empty string when no value is set
  *    - Invalid: Resets to last valid value on blur
  *
+ * 6. Percentage Display:
+ *    - All values are displayed with "%" suffix
+ *    - The underlying value is in decimal format (0.01 = 1%, 1.0 = 100%)
+ *    - Parsing automatically removes "%" and converts to decimal when processing input
+ *
  * Usage:
  * ```tsx
  * // Auto mode (delta-based changes)
- * <InputPropertyNumber
- *   value={100}
- *   step={0.1}
+ * <InputPropertyPercentage
+ *   value={0.5}  // 50%
+ *   step={0.001} // 0.1%
  *   min={0}
- *   max={1000}
+ *   max={1}      // 100%
  *   mode="auto"
  *   onValueChange={(change) => console.log('Value changing:', change)}
  *   onValueCommit={(change) => console.log('Value committed:', change)}
  * />
  *
  * // Fixed mode (absolute values)
- * <InputPropertyNumber
- *   value={100}
- *   step={0.1}
+ * <InputPropertyPercentage
+ *   value={0.75} // 75%
+ *   step={0.01}  // 1%
  *   min={0}
- *   max={1000}
+ *   max={1}      // 100%
  *   mode="fixed"
  *   onValueChange={(value) => console.log('Value changing:', value)}
  *   onValueCommit={(value) => console.log('Value committed:', value)}
  * />
  * ```
  */
-export default function InputPropertyNumber({
+export default function InputPropertyPercentage({
   type = "number",
   placeholder,
   value,
@@ -126,13 +136,13 @@ export default function InputPropertyNumber({
   mode = "auto",
   onValueChange,
   onValueCommit,
-  step = 1,
+  step = 0.01,
   autoSelect = true,
   min,
   max,
   appearance,
   ...props
-}: NumericPropertyControlProps & {
+}: PercentagePropertyControlProps & {
   appearance?: "none";
 }) {
   const {
@@ -152,6 +162,8 @@ export default function InputPropertyNumber({
     mode,
     onValueChange,
     onValueCommit,
+    suffix: "%",
+    scale: 100,
   });
 
   return (

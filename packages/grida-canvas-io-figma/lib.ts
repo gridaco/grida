@@ -104,7 +104,7 @@ export namespace iofigma {
     }
 
     export namespace factory {
-      function paint(paint: Paint, id: () => string): cg.Paint | undefined {
+      function paint(paint: Paint): cg.Paint | undefined {
         switch (paint.type) {
           case "SOLID": {
             return {
@@ -124,7 +124,6 @@ export namespace iofigma {
             } as const;
             return {
               type: _t[paint.type],
-              id: id(),
               // TODO: transform: paint.gradientHandlePositions
               transform: cmath.transform.identity,
               stops: paint.gradientStops.map((stop) => {
@@ -145,7 +144,6 @@ export namespace iofigma {
             // fallback to linear gradient
             return {
               type: "linear_gradient",
-              id: id(),
               transform: cmath.transform.identity,
               stops: [
                 { offset: 0, color: { r: 217, g: 217, b: 217, a: 1 } },
@@ -298,9 +296,7 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
 
-              fill: first_visible_fill
-                ? paint(first_visible_fill, context.gradient_id_generator)
-                : undefined,
+              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               //
               border:
                 first_visible_stroke?.type === "SOLID"
@@ -381,9 +377,7 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
 
-              fill: first_visible_fill
-                ? paint(first_visible_fill, context.gradient_id_generator)
-                : undefined,
+              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               //
               border:
                 first_visible_stroke?.type === "SOLID"
@@ -529,9 +523,7 @@ export namespace iofigma {
                 figma_text_resizing_model === "HEIGHT"
                   ? "auto"
                   : fixedheight,
-              fill: first_visible_fill
-                ? paint(first_visible_fill, context.gradient_id_generator)
-                : undefined,
+              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               //
               border:
                 first_visible_stroke?.type === "SOLID"
@@ -632,9 +624,7 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill
-                ? paint(first_visible_fill, context.gradient_id_generator)
-                : undefined,
+              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               strokeWidth: strokeWeight ?? 0,
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
@@ -664,9 +654,7 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill
-                ? paint(first_visible_fill, context.gradient_id_generator)
-                : undefined,
+              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               strokeWidth: strokeWeight ?? 0,
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
@@ -698,7 +686,7 @@ export namespace iofigma {
               type: "line",
               position: "absolute",
               stroke: first_visible_stroke
-                ? paint(first_visible_stroke, context.gradient_id_generator)
+                ? paint(first_visible_stroke)
                 : undefined,
               strokeWidth: strokeWeight ?? 0,
               strokeAlign: strokeAlign
@@ -765,9 +753,7 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill
-                ? paint(first_visible_fill, context.gradient_id_generator)
-                : undefined,
+              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               // effects: [], // TODO:
               // cornerRadius: node.cornerRadius
               //   ? node.cornerRadius
