@@ -1,7 +1,6 @@
-import { produce } from "immer";
 import type cg from "@grida/cg";
 import cmath from "@grida/cmath";
-import { ellipseMarkerRotation, degToRad } from "./ellipse-utils";
+import { ellipseMarkerRotation, degToRad } from "./utils/ellipse";
 
 export type GradientType = "linear" | "radial" | "sweep";
 
@@ -15,28 +14,11 @@ export interface Point {
   x: number;
   y: number;
 }
+
 export interface ControlPoints {
   A: Point;
   B: Point;
   C: Point;
-}
-
-export interface GradientState {
-  controlPoints: ControlPoints;
-  positions: number[];
-  colors: cg.RGBA8888[];
-  focusedStop: number | null;
-  focusedControl: "A" | "B" | "C" | null;
-  dragState: {
-    type: "stop" | "A" | "B" | "C" | null;
-    index?: number;
-    offset?: { x: number; y: number };
-  };
-  hoverPreview: {
-    position: number;
-    screenX: number;
-    screenY: number;
-  } | null;
 }
 
 // Base anchors for an identity transform
@@ -131,7 +113,31 @@ export const getTransformFromPoints = (
     ];
   }
 
-  let pts = points;
+  // For radial and sweep gradients, ensure C only affects scaleY
+  // First, ensure C is perpendicular to A-B
+  const dx = points.B.x - points.A.x;
+  const dy = points.B.y - points.A.y;
+  const len = Math.hypot(dx, dy) || 1e-6;
+  const perpX = -dy / len;
+  const perpY = dx / len;
+
+  // Project C onto the perpendicular direction
+  const cRelX = points.C.x - points.A.x;
+  const cRelY = points.C.y - points.A.y;
+  const cPerpDist = cRelX * perpX + cRelY * perpY;
+
+  // Create constrained C point
+  const constrainedC = {
+    x: points.A.x + perpX * cPerpDist,
+    y: points.A.y + perpY * cPerpDist,
+  };
+
+  // Use the constrained points for transform calculation
+  const pts = {
+    A: points.A,
+    B: points.B,
+    C: constrainedC,
+  };
 
   const u1 = base.B.x - base.A.x;
   const u2 = base.B.y - base.A.y;
@@ -391,7 +397,8 @@ export const sortStopsByOffset = (
 export const detectHitTarget = (
   x: number,
   y: number,
-  state: GradientState,
+  controlPoints: ControlPoints,
+  positions: number[],
   width: number,
   height: number,
   gradientType: GradientType,
@@ -401,7 +408,7 @@ export const detectHitTarget = (
   // Calculate relative sizes based on container dimensions
   const relativeControlSize = controlSize ?? Math.min(width, height) * 0.02; // 2% of smaller dimension
   const relativeStopSize = stopSize ?? 18; // Fixed stop size for consistent hit detection
-  const { A, B, C } = getControlPoints(state.controlPoints, width, height);
+  const { A, B, C } = getControlPoints(controlPoints, width, height);
 
   // Check control points
   const distA = getDistance(x, y, A.x, A.y);
@@ -416,12 +423,12 @@ export const detectHitTarget = (
     return { type: "control", target: "C", distance: distC };
 
   // Check stop markers
-  for (let i = 0; i < state.positions.length; i++) {
-    const position = state.positions[i];
+  for (let i = 0; i < positions.length; i++) {
+    const position = positions[i];
     const markerTransform = getStopMarkerTransform(
       position,
       gradientType,
-      state.controlPoints,
+      controlPoints,
       width,
       height
     );
@@ -436,14 +443,14 @@ export const detectHitTarget = (
     x,
     y,
     gradientType,
-    state.controlPoints,
+    controlPoints,
     width,
     height
   );
   const trackPos = gradientPositionToScreen(
     gradientPos,
     gradientType,
-    state.controlPoints,
+    controlPoints,
     width,
     height
   );
@@ -463,97 +470,6 @@ export const detectHitTarget = (
 
   return null;
 };
-
-// Action types
-export type GradientAction =
-  | {
-      type: "UPDATE_CONTROL_POINT";
-      payload: {
-        point: "A" | "B" | "C";
-        deltaX: number;
-        deltaY: number;
-        width: number;
-        height: number;
-        gradientType: GradientType;
-      };
-    }
-  | { type: "SET_POSITIONS"; payload: number[] }
-  | { type: "SET_COLORS"; payload: cg.RGBA8888[] }
-  | { type: "ADD_STOP"; payload: { position: number; color: cg.RGBA8888 } }
-  | {
-      type: "UPDATE_STOP_POSITION";
-      payload: { index: number; position: number };
-    }
-  | {
-      type: "UPDATE_STOP_COLOR";
-      payload: { index: number; color: cg.RGBA8888 };
-    }
-  | { type: "REMOVE_STOP"; payload: number }
-  | { type: "SET_FOCUSED_STOP"; payload: number | null }
-  | { type: "SET_FOCUSED_CONTROL"; payload: "A" | "B" | "C" | null }
-  | { type: "SET_CONTROL_POINTS"; payload: ControlPoints }
-  | { type: "SET_DRAG_STATE"; payload: GradientState["dragState"] }
-  | { type: "SET_HOVER_PREVIEW"; payload: GradientState["hoverPreview"] }
-  | { type: "RESET_FOCUS" }
-  | {
-      type: "HANDLE_POINTER_DOWN";
-      payload: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-        gradientType: GradientType;
-      };
-    }
-  | {
-      type: "HANDLE_POINTER_MOVE";
-      payload: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-        gradientType: GradientType;
-      };
-    }
-  | { type: "HANDLE_POINTER_UP" }
-  | { type: "HANDLE_POINTER_LEAVE" };
-
-const identity: cg.AffineTransform = [
-  [1, 0, 0],
-  [0, 1, 0],
-];
-
-// Initial state
-export function createInitialState(
-  type?: GradientType,
-  gradient?: GradientValue
-): GradientState {
-  if (type && gradient) {
-    return {
-      controlPoints: getPointsFromTransform(gradient.transform, type),
-      positions: gradient.positions,
-      colors: gradient.colors,
-      focusedStop: null,
-      focusedControl: null,
-      dragState: { type: null },
-      hoverPreview: null,
-    };
-  }
-  return {
-    controlPoints: getPointsFromTransform(identity, type ?? "linear"),
-    positions: [0, 1],
-    colors: [
-      { r: 255, g: 0, b: 0, a: 1 },
-      { r: 0, g: 0, b: 255, a: 1 },
-    ],
-    focusedStop: null,
-    focusedControl: null,
-    dragState: { type: null },
-    hoverPreview: null,
-  };
-}
-
-// --- Control Points Modularization ---
 
 // ControlPoints State (already defined as ControlPoints)
 // export interface ControlPoints { ... }
@@ -629,18 +545,25 @@ export function controlPointsReducer(
             },
           };
         } else if (point === "C") {
-          const newC = { x: C.x + rel.x, y: C.y + rel.y };
+          // C point should only move perpendicular to A-B axis (scaleY constraint)
           const dx = B.x - A.x;
           const dy = B.y - A.y;
           const len = Math.hypot(dx, dy) || 1e-6;
-          const dist = Math.hypot(newC.x - A.x, newC.y - A.y);
-          const nx = -dy / len;
-          const ny = dx / len;
+          const perpX = -dy / len;
+          const perpY = dx / len;
+
+          // Project the drag delta onto the perpendicular direction
+          const dragDotPerp = rel.x * perpX + rel.y * perpY;
+
+          // Get current distance of C from A along perpendicular direction
+          const currentDist = (C.x - A.x) * perpX + (C.y - A.y) * perpY;
+          const newDist = currentDist + dragDotPerp;
+
           return {
             ...state,
             C: {
-              x: A.x + nx * dist,
-              y: A.y + ny * dist,
+              x: A.x + perpX * newDist,
+              y: A.y + perpY * newDist,
             },
           };
         }
@@ -654,395 +577,3 @@ export function controlPointsReducer(
       return state;
   }
 }
-
-// --- End Control Points Modularization ---
-
-// Reducer
-export const gradientReducer = (
-  state: GradientState,
-  action: GradientAction
-): GradientState => {
-  return produce(state, (draft) => {
-    switch (action.type) {
-      // Control Points Actions
-      case "UPDATE_CONTROL_POINT":
-      case "SET_CONTROL_POINTS": {
-        draft.controlPoints = controlPointsReducer(
-          draft.controlPoints,
-          action as ControlPointsAction
-        );
-        break;
-      }
-
-      case "SET_POSITIONS":
-        draft.positions = action.payload;
-        break;
-
-      case "SET_COLORS":
-        draft.colors = action.payload;
-        break;
-
-      case "ADD_STOP": {
-        const {
-          positions: newPositions,
-          colors: newColors,
-          insertedIndex,
-        } = insertStopInSortedPosition(
-          draft.positions,
-          draft.colors,
-          action.payload.position,
-          action.payload.color
-        );
-        draft.positions = newPositions;
-        draft.colors = newColors;
-        // Update focused stop to the newly inserted stop
-        draft.focusedStop = insertedIndex;
-        break;
-      }
-
-      case "UPDATE_STOP_POSITION": {
-        const stopIndex = action.payload.index;
-        if (stopIndex >= 0 && stopIndex < draft.positions.length) {
-          draft.positions[stopIndex] = action.payload.position;
-        }
-        break;
-      }
-
-      case "UPDATE_STOP_COLOR": {
-        const stopIndex = action.payload.index;
-        if (stopIndex >= 0 && stopIndex < draft.colors.length) {
-          draft.colors[stopIndex] = action.payload.color;
-        }
-        break;
-      }
-
-      case "REMOVE_STOP":
-        if (draft.positions.length > 2) {
-          const indexToRemove = action.payload;
-          draft.positions.splice(indexToRemove, 1);
-          draft.colors.splice(indexToRemove, 1);
-          if (draft.focusedStop === indexToRemove) {
-            draft.focusedStop = null;
-          } else if (
-            draft.focusedStop !== null &&
-            draft.focusedStop > indexToRemove
-          ) {
-            // Adjust focused stop index if it was after the removed stop
-            draft.focusedStop--;
-          }
-        }
-        break;
-
-      case "SET_FOCUSED_STOP":
-        draft.focusedStop = action.payload;
-        if (action.payload !== null) {
-          draft.focusedControl = null;
-        }
-        break;
-
-      case "SET_FOCUSED_CONTROL":
-        draft.focusedControl = action.payload;
-        if (action.payload) {
-          draft.focusedStop = null;
-        }
-        break;
-
-      case "SET_DRAG_STATE":
-        draft.dragState = action.payload;
-        break;
-
-      case "SET_HOVER_PREVIEW":
-        draft.hoverPreview = action.payload;
-        break;
-
-      case "RESET_FOCUS":
-        draft.focusedStop = null;
-        draft.focusedControl = null;
-        break;
-
-      case "HANDLE_POINTER_DOWN": {
-        const { x, y, width, height, gradientType } = action.payload;
-        const hitTarget = detectHitTarget(
-          x,
-          y,
-          state,
-          width,
-          height,
-          gradientType
-        );
-
-        if (hitTarget?.type === "control") {
-          const { A, B, C } = getControlPoints(
-            draft.controlPoints,
-            width,
-            height
-          );
-          const controlPoint = hitTarget.target as "A" | "B" | "C";
-          const point = controlPoint === "A" ? A : controlPoint === "B" ? B : C;
-
-          draft.dragState = {
-            type: controlPoint,
-            offset: { x: x - point.x, y: y - point.y },
-          };
-          draft.focusedControl = controlPoint;
-          draft.focusedStop = null;
-        } else if (hitTarget?.type === "stop") {
-          const stopIndex = hitTarget.target as number;
-          const position = draft.positions[stopIndex];
-          if (position !== undefined) {
-            const markerTransform = getStopMarkerTransform(
-              position,
-              gradientType,
-              draft.controlPoints,
-              width,
-              height
-            );
-            draft.dragState = {
-              type: "stop",
-              index: stopIndex,
-              offset: { x: x - markerTransform.x, y: y - markerTransform.y },
-            };
-            draft.focusedStop = stopIndex;
-            draft.focusedControl = null;
-          }
-        } else if (
-          hitTarget?.type === "track" &&
-          hitTarget.position !== undefined
-        ) {
-          const newPosition = hitTarget.position;
-          const newColor: cg.RGBA8888 = { r: 128, g: 128, b: 128, a: 1 };
-          const {
-            positions: newPositions,
-            colors: newColors,
-            insertedIndex,
-          } = insertStopInSortedPosition(
-            draft.positions,
-            draft.colors,
-            newPosition,
-            newColor
-          );
-          draft.positions = newPositions;
-          draft.colors = newColors;
-          draft.focusedStop = insertedIndex;
-          draft.focusedControl = null;
-        } else {
-          draft.focusedStop = null;
-          draft.focusedControl = null;
-        }
-        break;
-      }
-
-      case "HANDLE_POINTER_MOVE": {
-        const { x, y, width, height, gradientType } = action.payload;
-
-        if (draft.dragState.type) {
-          const adjustedX = x - (draft.dragState.offset?.x || 0);
-          const adjustedY = y - (draft.dragState.offset?.y || 0);
-
-          if (draft.dragState.type === "A") {
-            const relativeX = adjustedX / width;
-            const relativeY = adjustedY / height;
-
-            if (gradientType === "linear") {
-              draft.controlPoints.A.x = relativeX;
-              draft.controlPoints.A.y = relativeY;
-            } else {
-              const A = draft.controlPoints.A;
-              const B = draft.controlPoints.B;
-              const C = draft.controlPoints.C;
-              const newA = { x: relativeX, y: relativeY };
-              const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
-              const newLen = Math.hypot(B.x - newA.x, B.y - newA.y) || 1e-6;
-              const ratio = newLen / oldLen;
-              const nx = -(B.y - newA.y) / newLen;
-              const ny = (B.x - newA.x) / newLen;
-              const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
-              draft.controlPoints.A = newA;
-              draft.controlPoints.C = {
-                x: newA.x + nx * distAC,
-                y: newA.y + ny * distAC,
-              };
-            }
-          } else if (draft.dragState.type === "B") {
-            const relativeX = adjustedX / width;
-            const relativeY = adjustedY / height;
-
-            if (gradientType === "linear") {
-              draft.controlPoints.B.x = relativeX;
-              draft.controlPoints.B.y = relativeY;
-            } else {
-              const A = draft.controlPoints.A;
-              const B = draft.controlPoints.B;
-              const C = draft.controlPoints.C;
-              const newB = { x: relativeX, y: relativeY };
-              const oldLen = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
-              const newLen = Math.hypot(newB.x - A.x, newB.y - A.y) || 1e-6;
-              const ratio = newLen / oldLen;
-              const nx = -(newB.y - A.y) / newLen;
-              const ny = (newB.x - A.x) / newLen;
-              const distAC = Math.hypot(C.x - A.x, C.y - A.y) * ratio;
-              draft.controlPoints.B = newB;
-              draft.controlPoints.C = {
-                x: A.x + nx * distAC,
-                y: A.y + ny * distAC,
-              };
-            }
-          } else if (draft.dragState.type === "C") {
-            const relativeX = adjustedX / width;
-            const relativeY = adjustedY / height;
-
-            if (gradientType === "linear") {
-              draft.controlPoints.C.x = relativeX;
-              draft.controlPoints.C.y = relativeY;
-            } else {
-              const A = draft.controlPoints.A;
-              const B = draft.controlPoints.B;
-              const dx = B.x - A.x;
-              const dy = B.y - A.y;
-              const len = Math.hypot(dx, dy) || 1e-6;
-              const dist = Math.hypot(relativeX - A.x, relativeY - A.y);
-              const nx = -dy / len;
-              const ny = dx / len;
-              draft.controlPoints.C = {
-                x: A.x + nx * dist,
-                y: A.y + ny * dist,
-              };
-            }
-          } else if (
-            draft.dragState.type === "stop" &&
-            draft.dragState.index !== undefined
-          ) {
-            const newPosition = screenToGradientPosition(
-              adjustedX,
-              adjustedY,
-              gradientType,
-              draft.controlPoints,
-              width, // Pass actual width
-              height // Pass actual height
-            );
-            const stopIndex = draft.dragState.index;
-            if (stopIndex >= 0 && stopIndex < draft.positions.length) {
-              draft.positions[stopIndex] = newPosition;
-            }
-          }
-
-          draft.hoverPreview = null;
-        } else {
-          // Show hover preview
-          const { A, B, C } = getControlPoints(
-            draft.controlPoints,
-            width,
-            height
-          );
-          let hoveringOverControl = false;
-
-          // Check if hovering over controls
-          const distA = getDistance(x, y, A.x, A.y);
-          const distB = getDistance(x, y, B.x, B.y);
-          const distC = getDistance(x, y, C.x, C.y);
-
-          const relativeControlHoverSize = Math.min(width, height) * 0.0375; // 3.75% of smaller dimension
-          if (
-            distA < relativeControlHoverSize ||
-            distB < relativeControlHoverSize ||
-            (gradientType !== "linear" && distC < relativeControlHoverSize)
-          ) {
-            hoveringOverControl = true;
-          }
-
-          // Check existing stops
-          if (!hoveringOverControl) {
-            for (let i = 0; i < draft.positions.length; i++) {
-              const position = draft.positions[i];
-              const markerTransform = getStopMarkerTransform(
-                position,
-                gradientType,
-                draft.controlPoints,
-                width,
-                height
-              );
-              const dist = getDistance(
-                x,
-                y,
-                markerTransform.x,
-                markerTransform.y
-              );
-              const relativeStopHoverSize = 18 / 2 + 10; // Fixed stop hover size
-              if (dist < relativeStopHoverSize) {
-                hoveringOverControl = true;
-                break;
-              }
-            }
-          }
-
-          if (!hoveringOverControl) {
-            const gradientPos = screenToGradientPosition(
-              x,
-              y,
-              gradientType,
-              draft.controlPoints,
-              width,
-              height
-            );
-            const trackPos = gradientPositionToScreen(
-              gradientPos,
-              gradientType,
-              draft.controlPoints,
-              width,
-              height
-            );
-            const trackDist = getDistance(x, y, trackPos.x, trackPos.y);
-
-            // Use a larger hit area for elliptical tracks (sweep only)
-            const relativeTrackHitThreshold =
-              gradientType === "sweep"
-                ? Math.min(width, height) * 0.05 // 5% for sweep
-                : Math.min(width, height) * 0.0375; // 3.75% for linear/radial
-
-            if (
-              trackDist < relativeTrackHitThreshold &&
-              gradientPos >= 0 &&
-              gradientPos <= 1
-            ) {
-              draft.hoverPreview = {
-                position: gradientPos,
-                screenX: trackPos.x,
-                screenY: trackPos.y,
-              };
-            } else {
-              draft.hoverPreview = null;
-            }
-          } else {
-            draft.hoverPreview = null;
-          }
-        }
-        break;
-      }
-
-      case "HANDLE_POINTER_UP": {
-        // If we were dragging a stop, sort the stops to maintain order
-        if (
-          draft.dragState.type === "stop" &&
-          draft.dragState.index !== undefined
-        ) {
-          const originalIndex = draft.dragState.index;
-          const {
-            positions: sortedPositions,
-            colors: sortedColors,
-            newIndex,
-          } = sortStopsByOffset(draft.positions, draft.colors, originalIndex);
-          draft.positions = sortedPositions;
-          draft.colors = sortedColors;
-          // Update focused stop to the new position
-          draft.focusedStop = newIndex;
-        }
-        draft.dragState = { type: null };
-        break;
-      }
-
-      case "HANDLE_POINTER_LEAVE":
-        draft.hoverPreview = null;
-        break;
-    }
-  });
-};

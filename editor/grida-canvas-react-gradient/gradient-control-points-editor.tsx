@@ -5,6 +5,7 @@ import {
   getControlPoints,
   getStopMarkerTransform,
   screenToGradientPosition,
+  gradientPositionToScreen,
   controlPointsReducer,
   type GradientType,
   type ControlPoints,
@@ -230,15 +231,19 @@ export default function GradientControlPointsEditor({
         // Handle hover preview (only when not dragging a stop)
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
+
+        // Calculate coordinates relative to container
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // Check if hovering over control points
+        // Check if hovering over control points with improved hit detection
+        const relativeControlHoverSize = Math.min(width, height) * 0.0375; // 3.75% of smaller dimension
         const hitControl = [A, B, C].some(
-          (pt) => Math.hypot(pt.x - x, pt.y - y) < 16
+          (pt) => Math.hypot(pt.x - x, pt.y - y) < relativeControlHoverSize
         );
 
-        // Check if hovering over stop markers
+        // Check if hovering over stop markers with improved hit detection
+        const relativeStopHoverSize = STOP_SIZE / 2 + 10; // Fixed stop hover size
         const hitStop = stops.some((stop) => {
           const { x: sx, y: sy } = getStopMarkerTransform(
             stop.offset,
@@ -247,12 +252,12 @@ export default function GradientControlPointsEditor({
             width,
             height
           );
-          return Math.hypot(sx - x, sy - y) < STOP_SIZE;
+          return Math.hypot(sx - x, sy - y) < relativeStopHoverSize;
         });
 
         if (!hitControl && !hitStop) {
-          // Use screenToGradientPosition for all types
-          const previewOffset = screenToGradientPosition(
+          // Use improved hit detection like the original component
+          const gradientPos = screenToGradientPosition(
             x,
             y,
             gradientType,
@@ -260,23 +265,46 @@ export default function GradientControlPointsEditor({
             width,
             height
           );
-          const {
-            x: px,
-            y: py,
-            rotation,
-          } = getStopMarkerTransform(
-            previewOffset,
+          const trackPos = gradientPositionToScreen(
+            gradientPos,
             gradientType,
             controlPoints,
             width,
             height
           );
-          setHoverPreview({
-            position: previewOffset,
-            x: px,
-            y: py,
-            rotation,
-          });
+          const trackDist = Math.hypot(x - trackPos.x, y - trackPos.y);
+
+          // Use a larger hit area for elliptical tracks (sweep only)
+          const relativeTrackHitThreshold =
+            gradientType === "sweep"
+              ? Math.min(width, height) * 0.05 // 5% for sweep
+              : Math.min(width, height) * 0.0375; // 3.75% for linear/radial
+
+          if (
+            trackDist < relativeTrackHitThreshold &&
+            gradientPos >= 0 &&
+            gradientPos <= 1
+          ) {
+            const {
+              x: px,
+              y: py,
+              rotation,
+            } = getStopMarkerTransform(
+              gradientPos,
+              gradientType,
+              controlPoints,
+              width,
+              height
+            );
+            setHoverPreview({
+              position: gradientPos,
+              x: px,
+              y: py,
+              rotation,
+            });
+          } else {
+            setHoverPreview(null);
+          }
         } else {
           setHoverPreview(null);
         }
@@ -299,20 +327,39 @@ export default function GradientControlPointsEditor({
     ]
   );
 
-  // Set up global pointer event listeners for dragging
+  // Set up global pointer event listeners for dragging and hover preview
   React.useEffect(() => {
-    if (!drag) return;
-    const move = (e: PointerEvent) => handlePointerMove(e);
-    const up = (e: PointerEvent) => {
-      handlePointerUp(e);
+    if (readonly) return;
+
+    const handleGlobalPointerMove = (e: PointerEvent) => {
+      if (drag) {
+        // Handle control point dragging
+        handlePointerMove(e);
+      } else if (!stopDrag) {
+        // Handle hover preview outside bounds
+        handlePointerMove(e);
+      }
     };
-    window.addEventListener("pointermove", move, { passive: false });
-    window.addEventListener("pointerup", up, { passive: false });
+
+    const handleGlobalPointerUp = (e: PointerEvent) => {
+      if (drag) {
+        handlePointerUp(e);
+      }
+    };
+
+    // Always set up global events for hover preview, and for drag when needed
+    window.addEventListener("pointermove", handleGlobalPointerMove, {
+      passive: false,
+    });
+    window.addEventListener("pointerup", handleGlobalPointerUp, {
+      passive: false,
+    });
+
     return () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointermove", handleGlobalPointerMove);
+      window.removeEventListener("pointerup", handleGlobalPointerUp);
     };
-  }, [drag, handlePointerMove, handlePointerUp]);
+  }, [drag, stopDrag, readonly, handlePointerMove, handlePointerUp]);
 
   // Handle pointer leave to clear hover preview
   const handlePointerLeave = useCallback(() => {
@@ -324,11 +371,17 @@ export default function GradientControlPointsEditor({
   const handleCanvasPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (readonly) return;
+
+      // Prevent popover from closing when clicking on canvas
+      e.preventDefault();
+      e.stopPropagation();
+
       // Only insert stop if not clicking on a control point or stop marker
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+
       // Check if click is on a stop marker or control point
       // (very basic hit test, can be improved)
       const hitControl = [A, B, C].some(
@@ -345,14 +398,19 @@ export default function GradientControlPointsEditor({
         return Math.hypot(sx - x, sy - y) < STOP_SIZE;
       });
       if (!hitControl && !hitStop && onInsertStop) {
-        // Calculate the gradient position for the click
-        // We'll use the linear interpolation between A and B for simplicity
-        // (for radial/sweep, you may want to improve this)
-        const t =
-          ((x - A.x) * (B.x - A.x) + (y - A.y) * (B.y - A.y)) /
-          ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
-        // Clamp t to [0, 1]
-        const clamped = Math.max(0, Math.min(1, t));
+        // Calculate the gradient position for the click using the same function as preview
+        const gradientPos = screenToGradientPosition(
+          x,
+          y,
+          gradientType,
+          controlPoints,
+          width,
+          height
+        );
+
+        // Clamp to [0, 1] range
+        const clamped = Math.max(0, Math.min(1, gradientPos));
+
         // Find where to insert
         let insertAt = stops.findIndex((s) => s.offset > clamped);
         if (insertAt === -1) insertAt = stops.length;
@@ -462,8 +520,8 @@ export default function GradientControlPointsEditor({
       className={`relative select-none overflow-visible z-10 ${readonly ? "cursor-default" : "cursor-crosshair"}`}
       style={{ width, height }}
       onPointerDown={handleCanvasPointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={drag ? handlePointerUp : undefined}
+      onPointerMove={drag ? undefined : handlePointerMove}
+      onPointerUp={drag ? undefined : handlePointerUp}
       onPointerLeave={handlePointerLeave}
       onKeyDown={handleKeyDown}
       data-popover-no-close

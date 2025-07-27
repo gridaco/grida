@@ -11,9 +11,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
-import GradientEditor, { useGradient } from "@/grida-canvas-react-gradient";
 import {
-  createInitialState,
+  GradientControlPointsEditor,
+  getPointsFromTransform,
+  getTransformFromPoints,
   type GradientType,
 } from "@/grida-canvas-react-gradient";
 import type cg from "@grida/cg";
@@ -36,40 +37,6 @@ const hexToRgba = (hex: string): cg.RGBA8888 => {
   return { r, g, b, a: 1 };
 };
 
-// Canvas component for the gradient editor
-function Canvas({
-  gradientType,
-  editor,
-  generateGradientCSS,
-  width,
-  height,
-}: {
-  gradientType: GradientType;
-  editor: ReturnType<typeof useGradient>;
-  generateGradientCSS: () => string;
-  width: number;
-  height: number;
-}) {
-  return (
-    <div className="relative w-full h-full p-6">
-      <div className="relative w-full h-full rounded-xl shadow-2xl overflow-hidden">
-        <GradientEditor
-          width={width}
-          height={height}
-          gradientType={gradientType}
-          editor={editor}
-        />
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: generateGradientCSS(),
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
 // Main gradient editor component that only renders when size is ready
 function GradientEditorContent() {
   const [gradientType, setGradientType] = useState<GradientType>("linear");
@@ -81,54 +48,106 @@ function GradientEditorContent() {
     height: (windowSize.height || 600) - 48,
   };
 
-  // Create the gradient editor instance only when we have dimensions
-  const controller = useGradient({
-    gradientType,
-    initialValue: {
-      positions: [0, 1],
-      colors: [
-        { r: 255, g: 0, b: 0, a: 1 },
-        { r: 0, g: 0, b: 255, a: 1 },
-      ],
-      transform: [
-        [1, 0, 0],
-        [0, 1, 0],
-      ],
-    },
-    width: dimensions.width,
-    height: dimensions.height,
-  });
+  // State for the gradient
+  const [stops, setStops] = useState<{ offset: number; color: cg.RGBA8888 }[]>([
+    { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } },
+    { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } },
+  ]);
+  const [focusedStop, setFocusedStop] = useState<number | null>(null);
+  const [points, setPoints] = useState<
+    [
+      { x: number; y: number },
+      { x: number; y: number },
+      { x: number; y: number },
+    ]
+  >([
+    { x: 0, y: 0.5 },
+    { x: 1, y: 0.5 },
+    { x: 0, y: 1 },
+  ]);
 
   // Update state when gradient type changes
-  const handleGradientTypeChange = useCallback(
-    (newType: GradientType) => {
-      setGradientType(newType);
-      // Recreate editor with new gradient type
-      const newInitialState = createInitialState(newType);
-      controller.setPositions(newInitialState.positions);
-      controller.setColors(newInitialState.colors);
-    },
-    [controller]
-  );
+  const handleGradientTypeChange = useCallback((newType: GradientType) => {
+    setGradientType(newType);
+    // Reset to default points for the new gradient type
+    if (newType === "linear") {
+      setPoints([
+        { x: 0, y: 0.5 },
+        { x: 1, y: 0.5 },
+        { x: 0, y: 1 },
+      ]);
+    } else {
+      setPoints([
+        { x: 0.5, y: 0.5 },
+        { x: 1, y: 0.5 },
+        { x: 0.5, y: 1 },
+      ]);
+    }
+  }, []);
 
   const generateGradientCSS = useCallback(() => {
-    const g = controller.getValue();
-    // Convert flattened structure back to the format expected by css.toGradientString
-    const stops = g.positions.map((position, index) => ({
-      offset: position,
-      color: g.colors[index],
-    }));
+    const transform = getTransformFromPoints(
+      { A: points[0], B: points[1], C: points[2] },
+      gradientType
+    );
     return css.toGradientString({
       type: `${gradientType}_gradient`,
       stops,
-      transform: g.transform,
+      transform,
     });
-  }, [
-    gradientType,
-    controller.positions,
-    controller.colors,
-    controller.controlPoints,
-  ]);
+  }, [gradientType, stops, points]);
+
+  const handlePointsChange = useCallback(
+    (
+      newPoints: [
+        { x: number; y: number },
+        { x: number; y: number },
+        { x: number; y: number },
+      ]
+    ) => {
+      setPoints(newPoints);
+    },
+    []
+  );
+
+  const handlePositionChange = useCallback(
+    (index: number, position: number) => {
+      setStops((prev) =>
+        prev.map((stop, i) =>
+          i === index ? { ...stop, offset: position } : stop
+        )
+      );
+    },
+    []
+  );
+
+  const handleInsertStop = useCallback((at: number, position: number) => {
+    const newColor: cg.RGBA8888 = { r: 128, g: 128, b: 128, a: 1 };
+    setStops((prev) => {
+      const newStops = [...prev];
+      newStops.splice(at, 0, { offset: position, color: newColor });
+      return newStops;
+    });
+    setFocusedStop(at);
+  }, []);
+
+  const handleDeleteStop = useCallback(
+    (index: number) => {
+      if (stops.length > 2) {
+        setStops((prev) => prev.filter((_, i) => i !== index));
+        if (focusedStop === index) {
+          setFocusedStop(null);
+        } else if (focusedStop !== null && focusedStop > index) {
+          setFocusedStop(focusedStop - 1);
+        }
+      }
+    },
+    [stops.length, focusedStop]
+  );
+
+  const handleFocusedStopChange = useCallback((index: number | null) => {
+    setFocusedStop(index);
+  }, []);
 
   return (
     <div className="fixed inset-0 overflow-hidden">
@@ -145,13 +164,29 @@ function GradientEditorContent() {
       </div>
 
       {/* Full Screen Gradient Canvas */}
-      <Canvas
-        gradientType={gradientType}
-        editor={controller}
-        generateGradientCSS={generateGradientCSS}
-        width={dimensions.width}
-        height={dimensions.height}
-      />
+      <div className="relative w-full h-full p-6">
+        <div className="relative w-full h-full rounded-xl shadow-2xl overflow-hidden">
+          <GradientControlPointsEditor
+            width={dimensions.width}
+            height={dimensions.height}
+            gradientType={gradientType}
+            stops={stops}
+            focusedStop={focusedStop}
+            points={points}
+            onPointsChange={handlePointsChange}
+            onPositionChange={handlePositionChange}
+            onInsertStop={handleInsertStop}
+            onDeleteStop={handleDeleteStop}
+            onFocusedStopChange={handleFocusedStopChange}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: generateGradientCSS(),
+            }}
+          />
+        </div>
+      </div>
 
       {/* Floating Control Bar at Bottom Center */}
       <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-50">
@@ -177,27 +212,22 @@ function GradientEditorContent() {
           </div>
 
           {/* Color Stop Controls */}
-          {controller.focusedStop !== null &&
+          {focusedStop !== null &&
             (() => {
-              const position = controller.positions[controller.focusedStop];
-              const color = controller.colors[controller.focusedStop];
-              if (position === undefined || color === undefined) return null;
+              const stop = stops[focusedStop];
+              if (!stop) return null;
 
               return (
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">
-                      Stop {controller.focusedStop + 1}
+                      Stop {focusedStop + 1}
                     </span>
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => {
-                        if (controller.positions.length > 2) {
-                          controller.removeStop(controller.focusedStop!);
-                        }
-                      }}
-                      disabled={controller.positions.length <= 2}
+                      onClick={() => handleDeleteStop(focusedStop)}
+                      disabled={stops.length <= 2}
                       aria-label="Delete selected color stop"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -211,16 +241,13 @@ function GradientEditorContent() {
                       min="0"
                       max="1"
                       step="0.01"
-                      value={position.toFixed(2)}
+                      value={stop.offset.toFixed(2)}
                       onChange={(e) => {
                         const pos = Math.max(
                           0,
                           Math.min(1, Number.parseFloat(e.target.value) || 0)
                         );
-                        controller.updateStopPosition(
-                          controller.focusedStop!,
-                          pos
-                        );
+                        handlePositionChange(focusedStop, pos);
                       }}
                       className="w-16"
                     />
@@ -230,13 +257,14 @@ function GradientEditorContent() {
                     <label className="text-xs">Color</label>
                     <Input
                       type="color"
-                      value={rgbaToHex(color)}
+                      value={rgbaToHex(stop.color)}
                       onChange={(e) => {
                         const hex = e.target.value;
                         const newColor = hexToRgba(hex);
-                        controller.updateStopColor(
-                          controller.focusedStop!,
-                          newColor
+                        setStops((prev) =>
+                          prev.map((s, i) =>
+                            i === focusedStop ? { ...s, color: newColor } : s
+                          )
                         );
                       }}
                       className="w-12"
@@ -248,16 +276,9 @@ function GradientEditorContent() {
 
           {/* Info Display */}
           <div className="text-xs text-muted-foreground mt-2">
-            <span>Stops: {controller.positions.length}</span>
+            <span>Stops: {stops.length}</span>
             <span className="mx-2">•</span>
-            <span>
-              Focus:{" "}
-              {controller.focusedStop !== null
-                ? "Color Stop"
-                : controller.focusedControl
-                  ? `Point ${controller.focusedControl}`
-                  : "None"}
-            </span>
+            <span>Focus: {focusedStop !== null ? "Color Stop" : "None"}</span>
           </div>
         </div>
       </div>
