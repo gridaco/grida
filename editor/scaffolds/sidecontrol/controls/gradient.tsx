@@ -11,7 +11,8 @@ import InputPropertyPercentage from "../ui/percentage";
 type GradientPaint =
   | cg.LinearGradientPaint
   | cg.RadialGradientPaint
-  | cg.SweepGradientPaint;
+  | cg.SweepGradientPaint
+  | cg.DiamondGradientPaint;
 
 export function GradientControl({
   value,

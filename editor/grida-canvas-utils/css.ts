@@ -290,6 +290,9 @@ export namespace css {
         return toRadialGradientString(paint);
       case "sweep_gradient":
         return toConicGradientString(paint);
+      case "diamond_gradient":
+      default:
+        return "";
     }
   }
 

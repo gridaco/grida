@@ -528,8 +528,7 @@ export function controlPointsReducer(
 
           const sign =
             Math.sign(
-              oldDxPx * ((C.y - A.y) * height) -
-                oldDyPx * ((C.x - A.x) * width)
+              oldDxPx * ((C.y - A.y) * height) - oldDyPx * ((C.x - A.x) * width)
             ) || 1;
 
           const perpXpx = (-newDyPx / newLenPx) * sign;
@@ -563,8 +562,7 @@ export function controlPointsReducer(
 
           const sign =
             Math.sign(
-              oldDxPx * ((C.y - A.y) * height) -
-                oldDyPx * ((C.x - A.x) * width)
+              oldDxPx * ((C.y - A.y) * height) - oldDyPx * ((C.x - A.x) * width)
             ) || 1;
 
           const perpXpx = (-newDyPx / newLenPx) * sign;

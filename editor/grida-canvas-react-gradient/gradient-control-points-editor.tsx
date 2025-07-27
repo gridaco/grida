@@ -538,10 +538,10 @@ export default function GradientControlPointsEditor({
         <defs>
           <filter
             id="trackShadow"
-            x="-50%"
-            y="-50%"
-            width="200%"
-            height="200%"
+            x={-(typeof window !== "undefined" ? window.innerWidth : width)}
+            y={-(typeof window !== "undefined" ? window.innerHeight : height)}
+            width={(typeof window !== "undefined" ? window.innerWidth : width) * 2}
+            height={(typeof window !== "undefined" ? window.innerHeight : height) * 2}
             filterUnits="userSpaceOnUse"
           >
             <feDropShadow

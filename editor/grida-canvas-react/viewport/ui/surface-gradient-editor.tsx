@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
+import React, { useState, useCallback, useEffect } from "react";
+import { useCurrentEditor } from "@/grida-canvas-react";
 import { useSingleSelection } from "../surface-hooks";
 import {
   GradientControlPointsEditor,
@@ -14,15 +14,9 @@ const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
   ["linear_gradient" satisfies cg.Paint["type"]]: "linear",
   ["radial_gradient" satisfies cg.Paint["type"]]: "radial",
   ["sweep_gradient" satisfies cg.Paint["type"]]: "sweep",
+  // diamond as radial is ok, because the control points are identical.
+  ["diamond_gradient" satisfies cg.Paint["type"]]: "radial",
 };
-
-function isGradientPaint(fill: cg.Paint): fill is cg.GradientPaint {
-  return (
-    fill.type === "linear_gradient" ||
-    fill.type === "radial_gradient" ||
-    fill.type === "sweep_gradient"
-  );
-}
 
 export function SurfaceGradientEditor({
   node_id,
@@ -35,7 +29,7 @@ export function SurfaceGradientEditor({
 
   if (!data) return null;
   if (!fill) return null;
-  if (!isGradientPaint(fill)) return null;
+  if (!cg.isGradientPaint(fill)) return null;
 
   return (
     <div
@@ -137,12 +131,12 @@ function EditorUser({
       );
 
       onValueChange?.({
-        type: `${gradientType}_gradient` as cg.GradientPaint["type"],
+        type: gradient.type,
         stops,
         transform,
       });
     },
-    [gradientType, stops, onValueChange]
+    [gradient.type, gradientType, stops, onValueChange]
   );
 
   const handlePositionChange = useCallback(
@@ -158,12 +152,12 @@ function EditorUser({
       );
 
       onValueChange?.({
-        type: `${gradientType}_gradient` as cg.GradientPaint["type"],
+        type: gradient.type,
         stops: newStops,
         transform,
       });
     },
-    [stops, points, gradientType, onValueChange]
+    [stops, points, gradient.type, gradientType, onValueChange]
   );
 
   const handleInsertStop = useCallback(
@@ -184,12 +178,12 @@ function EditorUser({
       );
 
       onValueChange?.({
-        type: `${gradientType}_gradient` as cg.GradientPaint["type"],
+        type: gradient.type,
         stops: newStops,
         transform,
       });
     },
-    [stops, points, gradientType, onValueChange]
+    [stops, points, gradient.type, gradientType, onValueChange]
   );
 
   const handleDeleteStop = useCallback(
@@ -218,7 +212,7 @@ function EditorUser({
         transform,
       });
     },
-    [stops, selected_stop, points, gradientType, onValueChange]
+    [stops, selected_stop, points, gradient.type, gradientType, onValueChange]
   );
 
   return (

@@ -159,6 +159,7 @@ const safe_properties: Partial<
         case "linear_gradient":
         case "radial_gradient":
         case "sweep_gradient":
+        case "diamond_gradient":
           draft.fill = {
             ...(value as
               | cg.LinearGradientPaint

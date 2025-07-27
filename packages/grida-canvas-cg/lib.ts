@@ -309,7 +309,8 @@ export namespace cg {
     | SolidPaint
     | LinearGradientPaint
     | RadialGradientPaint
-    | SweepGradientPaint;
+    | SweepGradientPaint
+    | DiamondGradientPaint;
 
   export namespace paints {
     export const transparent: Paint = {
@@ -332,7 +333,8 @@ export namespace cg {
     Partial<SolidPaint> &
       Partial<LinearGradientPaint> &
       Partial<RadialGradientPaint> &
-      Partial<SweepGradientPaint>,
+      Partial<SweepGradientPaint> &
+      Partial<DiamondGradientPaint>,
     "type"
   > & { type: Paint["type"] };
 
@@ -344,7 +346,17 @@ export namespace cg {
   export type GradientPaint =
     | LinearGradientPaint
     | RadialGradientPaint
-    | SweepGradientPaint;
+    | SweepGradientPaint
+    | DiamondGradientPaint;
+
+  export function isGradientPaint(paint: cg.Paint): paint is cg.GradientPaint {
+    return (
+      paint.type === "linear_gradient" ||
+      paint.type === "radial_gradient" ||
+      paint.type === "sweep_gradient" ||
+      paint.type === "diamond_gradient"
+    );
+  }
 
   export type LinearGradientPaint = {
     type: "linear_gradient";
@@ -360,6 +372,12 @@ export namespace cg {
 
   export type SweepGradientPaint = {
     type: "sweep_gradient";
+    transform: AffineTransform;
+    stops: Array<GradientStop>;
+  };
+
+  export type DiamondGradientPaint = {
+    type: "diamond_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
   };
