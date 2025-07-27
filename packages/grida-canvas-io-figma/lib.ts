@@ -9,6 +9,7 @@ import type {
   GroupNode,
   FrameNode,
   BlendMode,
+  GradientPaint,
 } from "@figma/rest-api-spec";
 import cmath from "@grida/cmath";
 import type cg from "@grida/cg";
@@ -104,6 +105,124 @@ export namespace iofigma {
     }
 
     export namespace factory {
+      type Point = { x: number; y: number };
+
+      type GradientType = "linear" | "radial" | "sweep";
+
+      function getBaseControlPoints(type: GradientType) {
+        if (type === "linear") {
+          return {
+            A: { x: 0, y: 0.5 },
+            B: { x: 1, y: 0.5 },
+            C: { x: 0, y: 1 },
+          };
+        }
+        return {
+          A: { x: 0.5, y: 0.5 },
+          B: { x: 1, y: 0.5 },
+          C: { x: 0.5, y: 1 },
+        };
+      }
+
+      // TODO: move under cmath
+      function transformFromPoints(
+        points: { A: Point; B: Point; C: Point },
+        type: GradientType
+      ): cg.AffineTransform {
+        const base = getBaseControlPoints(type);
+
+        if (type === "linear") {
+          const dx = points.B.x - points.A.x;
+          const dy = points.B.y - points.A.y;
+          const len = Math.hypot(dx, dy) || 1e-6;
+          const cos = dx / len;
+          const sin = dy / len;
+
+          const a = cos * len;
+          const d = sin * len;
+          const b = -sin;
+          const e = cos;
+          const tx = points.A.x - b * 0.5;
+          const ty = points.A.y - e * 0.5;
+
+          return [
+            [a, b, tx],
+            [d, e, ty],
+          ];
+        }
+
+        const dx = points.B.x - points.A.x;
+        const dy = points.B.y - points.A.y;
+        const len = Math.hypot(dx, dy) || 1e-6;
+        const perpX = -dy / len;
+        const perpY = dx / len;
+
+        const cRelX = points.C.x - points.A.x;
+        const cRelY = points.C.y - points.A.y;
+        const cPerpDist = cRelX * perpX + cRelY * perpY;
+
+        const constrainedC = {
+          x: points.A.x + perpX * cPerpDist,
+          y: points.A.y + perpY * cPerpDist,
+        };
+
+        const u1 = base.B.x - base.A.x;
+        const u2 = base.B.y - base.A.y;
+        const v1 = base.C.x - base.A.x;
+        const v2 = base.C.y - base.A.y;
+
+        const p1 = points.B.x - points.A.x;
+        const p2 = points.B.y - points.A.y;
+        const q1 = constrainedC.x - points.A.x;
+        const q2 = constrainedC.y - points.A.y;
+
+        const det = u1 * v2 - u2 * v1 || 1e-6;
+
+        const a = (p1 * v2 - q1 * u2) / det;
+        const b = (q1 * u1 - p1 * v1) / det;
+        const d = (p2 * v2 - q2 * u2) / det;
+        const e = (q2 * u1 - p2 * v1) / det;
+
+        const tx = points.A.x - a * base.A.x - b * base.A.y;
+        const ty = points.A.y - d * base.A.x - e * base.A.y;
+
+        return [
+          [a, b, tx],
+          [d, e, ty],
+        ];
+      }
+
+      function toGradientPaint(paint: GradientPaint) {
+        const map = {
+          GRADIENT_LINEAR: { type: "linear_gradient", g: "linear" },
+          GRADIENT_RADIAL: { type: "radial_gradient", g: "radial" },
+          GRADIENT_ANGULAR: { type: "sweep_gradient", g: "sweep" },
+          GRADIENT_DIAMOND: { type: "diamond_gradient", g: "radial" },
+        } as const;
+
+        const info = map[paint.type as keyof typeof map];
+        const handles = paint.gradientHandlePositions;
+        const points = handles
+          ? {
+              A: { x: handles[0].x, y: handles[0].y },
+              B: { x: handles[1].x, y: handles[1].y },
+              C: { x: handles[2].x, y: handles[2].y },
+            }
+          : getBaseControlPoints(info.g);
+
+        return {
+          type: info.type,
+          transform: transformFromPoints(points, info.g),
+          stops: paint.gradientStops.map((stop) => ({
+            offset: stop.position,
+            color: cmath.color.rgbaf_multiply_alpha(
+              cmath.color.rgbaf_to_rgba8888(stop.color),
+              paint.opacity ?? 1
+            ),
+          })),
+        } as cg.GradientPaint;
+      }
+
       function paint(paint: Paint): cg.Paint | undefined {
         switch (paint.type) {
           case "SOLID": {
@@ -111,37 +230,17 @@ export namespace iofigma {
               type: "solid",
               color: cmath.color.rgbaf_multiply_alpha(
                 cmath.color.rgbaf_to_rgba8888(paint.color),
-                // opacity is present only when it is not 1
                 paint.opacity ?? 1
               ),
             };
           }
           case "GRADIENT_LINEAR":
-          case "GRADIENT_RADIAL": {
-            const _t = {
-              GRADIENT_LINEAR: "linear_gradient",
-              GRADIENT_RADIAL: "radial_gradient",
-            } as const;
-            return {
-              type: _t[paint.type],
-              // TODO: transform: paint.gradientHandlePositions
-              transform: cmath.transform.identity,
-              stops: paint.gradientStops.map((stop) => {
-                return {
-                  offset: stop.position,
-                  color: cmath.color.rgbaf_multiply_alpha(
-                    cmath.color.rgbaf_to_rgba8888(stop.color),
-                    // opacity is present only when it is not 1
-                    paint.opacity ?? 1
-                  ),
-                };
-              }),
-            };
-          }
+          case "GRADIENT_RADIAL":
           case "GRADIENT_ANGULAR":
-          case "GRADIENT_DIAMOND":
+          case "GRADIENT_DIAMOND": {
+            return toGradientPaint(paint);
+          }
           case "IMAGE":
-            // fallback to linear gradient
             return {
               type: "linear_gradient",
               transform: cmath.transform.identity,
