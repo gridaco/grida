@@ -203,7 +203,7 @@ function ComputedPaintControl({
             <>
               <PopoverTrigger className="w-full">
                 <PaintInputContainer>
-                  <PaintChip paint={value} />
+                  <PaintChip paint={value} className="rounded-sm" />
                   <span className="ms-2 text-start text-xs flex-1 capitalize">
                     {paint_label[value.type]}
                   </span>
@@ -233,7 +233,7 @@ function ComputedPaintControl({
             )}
             onClick={onAddPaint}
           >
-            <PaintChip paint={cg.paints.transparent} />
+            <PaintChip paint={cg.paints.transparent} className="rounded-sm" />
             <span className="ms-2 text-xs">Add</span>
           </div>
         </PopoverTrigger>

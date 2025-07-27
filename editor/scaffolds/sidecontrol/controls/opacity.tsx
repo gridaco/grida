@@ -1,9 +1,9 @@
 import { Slider } from "./utils/slider";
 import { WorkbenchUI } from "@/components/workbench";
-import InputPropertyNumber from "../ui/number";
 import grida from "@grida/schema";
 import type { editor } from "@/grida-canvas";
 import type { TMixed } from "./utils/types";
+import InputPropertyPercentage from "../ui/percentage";
 
 export function OpacityControl({
   value,
@@ -22,7 +22,7 @@ export function OpacityControl({
       })}
     >
       <div className="flex-1">
-        <InputPropertyNumber
+        <InputPropertyPercentage
           mode="auto"
           type="number"
           value={value}
