@@ -19,6 +19,7 @@ pub fn gradient_paint(paint: &GradientPaint, opacity: f32, size: (f32, f32)) -> 
         GradientPaint::Linear(gradient) => linear_gradient_paint(gradient, opacity, size),
         GradientPaint::Radial(gradient) => radial_gradient_paint(gradient, opacity, size),
         GradientPaint::Sweep(gradient) => sweep_gradient_paint(gradient, opacity, size),
+        GradientPaint::Diamond(gradient) => diamond_gradient_paint(gradient, opacity, size),
     }
 }
 
@@ -97,6 +98,53 @@ pub fn sweep_gradient_paint(
         Some(&matrix),
     ) {
         paint.set_shader(shader);
+    }
+
+    paint.set_anti_alias(true);
+    paint
+}
+
+pub fn diamond_gradient_paint(
+    gradient: &DiamondGradientPaint,
+    opacity: f32,
+    (x, y): (f32, f32),
+) -> skia_safe::Paint {
+    let mut paint = skia_safe::Paint::default();
+
+    let (colors, positions) = build_gradient_stops(&gradient.stops, opacity * gradient.opacity);
+
+    let base = skia_safe::Shader::linear_gradient(
+        ((0.0, 0.0), (1.0, 0.0)),
+        &colors[..],
+        Some(&positions[..]),
+        skia_safe::TileMode::Clamp,
+        None,
+        None,
+    );
+
+    if let Some(base_shader) = base {
+        const SKSL: &str = r#"
+            uniform shader gradient;
+            half4 main(float2 coord) {
+                float2 p = coord - float2(0.5, 0.5);
+                float t = (abs(p.x) + abs(p.y)) * 2.0;
+                t = clamp(t, 0.0, 1.0);
+                return gradient.eval(float2(t, 0.0));
+            }
+        "#;
+
+        if let Ok(effect) = skia_safe::RuntimeEffect::make_for_shader(SKSL, None) {
+            let mut matrix = skia_safe::Matrix::scale((x, y));
+            matrix.pre_concat(&sk_matrix(gradient.transform.matrix));
+
+            if let Some(shader) = effect.make_shader(
+                skia_safe::Data::new_copy(&[]),
+                &[base_shader.into()],
+                Some(&matrix),
+            ) {
+                paint.set_shader(shader);
+            }
+        }
     }
 
     paint.set_anti_alias(true);

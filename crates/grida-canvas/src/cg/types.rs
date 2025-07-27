@@ -410,6 +410,7 @@ pub enum Paint {
     LinearGradient(LinearGradientPaint),
     RadialGradient(RadialGradientPaint),
     SweepGradient(SweepGradientPaint),
+    DiamondGradient(DiamondGradientPaint),
     Image(ImagePaint),
 }
 
@@ -420,6 +421,7 @@ impl Paint {
             Paint::LinearGradient(gradient) => gradient.opacity,
             Paint::RadialGradient(gradient) => gradient.opacity,
             Paint::SweepGradient(gradient) => gradient.opacity,
+            Paint::DiamondGradient(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
         }
     }
@@ -430,6 +432,7 @@ pub enum GradientPaint {
     Linear(LinearGradientPaint),
     Radial(RadialGradientPaint),
     Sweep(SweepGradientPaint),
+    Diamond(DiamondGradientPaint),
 }
 
 impl GradientPaint {
@@ -438,6 +441,7 @@ impl GradientPaint {
             GradientPaint::Linear(gradient) => gradient.opacity,
             GradientPaint::Radial(gradient) => gradient.opacity,
             GradientPaint::Sweep(gradient) => gradient.opacity,
+            GradientPaint::Diamond(gradient) => gradient.opacity,
         }
     }
 }
@@ -541,6 +545,28 @@ pub struct RadialGradientPaint {
     /// - The gradient definition is resolution-independent.
     /// - `width` and `height` determine how unit space is scaled — they do **not** directly affect center or radius.
     /// - All transforms (e.g. rotation, skew) should be encoded in the `user_transform`, not baked into radius or center.
+    pub transform: AffineTransform,
+    pub stops: Vec<GradientStop>,
+    pub opacity: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct DiamondGradientPaint {
+    /// # Diamond Gradient Transform Model
+    ///
+    /// Figma's Diamond Gradient is equivalent to a radial gradient evaluated
+    /// using the Manhattan distance metric. The gradient is defined in the same
+    /// unit space as [`RadialGradientPaint`]: center at `(0.5, 0.5)` with a
+    /// nominal radius of `0.5`.
+    ///
+    /// Scaling to object space follows the same rule:
+    ///
+    /// ```text
+    /// local_matrix = scale(width, height) × user_transform
+    /// ```
+    ///
+    /// - `scale(width, height)` maps the unit diamond to the target rectangle.
+    /// - `user_transform` applies any user supplied transform in gradient space.
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,

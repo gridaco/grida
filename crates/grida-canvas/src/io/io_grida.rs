@@ -53,6 +53,12 @@ pub enum JSONPaint {
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
     },
+    #[serde(rename = "diamond_gradient")]
+    DiamondGradient {
+        id: Option<String>,
+        transform: Option<[[f32; 3]; 2]>,
+        stops: Vec<JSONGradientStop>,
+    },
     #[serde(rename = "sweep_gradient")]
     SweepGradient {
         id: Option<String>,
@@ -142,6 +148,18 @@ impl From<Option<JSONPaint>> for Paint {
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::RadialGradient(RadialGradientPaint {
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    stops,
+                    opacity: 1.0,
+                })
+            }
+            Some(JSONPaint::DiamondGradient {
+                transform, stops, ..
+            }) => {
+                let stops = stops.into_iter().map(|s| s.into()).collect();
+                Paint::DiamondGradient(DiamondGradientPaint {
                     transform: transform
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),

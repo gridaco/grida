@@ -14,6 +14,7 @@ import {
   RadialGradientPaintIcon,
   SweepGradientPaintIcon,
   SolidPaintIcon,
+  DiamondGradientPaintIcon,
 } from "./icons/paint-icon";
 import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
@@ -25,6 +26,13 @@ import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
+
+const paint_label = {
+  linear_gradient: "linear",
+  radial_gradient: "radial",
+  sweep_gradient: "sweep",
+  diamond_gradient: "diamond",
+} as const;
 
 export function PaintControl({
   value,
@@ -89,7 +97,8 @@ function ComputedPaintControl({
           switch (to) {
             case "linear_gradient":
             case "radial_gradient":
-            case "sweep_gradient": {
+            case "sweep_gradient":
+            case "diamond_gradient": {
               onValueChange?.({
                 type: to,
                 transform: cmath.transform.identity,
@@ -113,7 +122,8 @@ function ComputedPaintControl({
         }
         case "linear_gradient":
         case "radial_gradient":
-        case "sweep_gradient": {
+        case "sweep_gradient":
+        case "diamond_gradient": {
           switch (to) {
             case "solid": {
               onValueChange?.({
@@ -124,7 +134,8 @@ function ComputedPaintControl({
             }
             case "linear_gradient":
             case "radial_gradient":
-            case "sweep_gradient": {
+            case "sweep_gradient":
+            case "diamond_gradient": {
               onValueChange?.({
                 type: to,
                 stops: value.stops,
@@ -186,56 +197,29 @@ function ComputedPaintControl({
               )}
             </PaintInputContainer>
           )}
-          {value.type === "linear_gradient" && (
-            <PopoverTrigger className="w-full">
-              <PaintInputContainer>
-                <PaintChip paint={value} />
-                <span className="ms-2 text-start text-xs flex-1">Linear</span>
-                {removable && (
-                  <span
-                    role="button"
-                    onClick={onRemovePaint}
-                    className="px-1 py-1 me-0.5 text-muted-foreground"
-                  >
-                    <Cross2Icon className="w-3.5 h-3.5" />
+          {(value.type === "linear_gradient" ||
+            value.type === "radial_gradient" ||
+            value.type === "sweep_gradient" ||
+            value.type === "diamond_gradient") && (
+            <>
+              <PopoverTrigger className="w-full">
+                <PaintInputContainer>
+                  <PaintChip paint={value} className="rounded-sm" />
+                  <span className="ms-2 text-start text-xs flex-1 capitalize">
+                    {paint_label[value.type]}
                   </span>
-                )}
-              </PaintInputContainer>
-            </PopoverTrigger>
-          )}
-          {value.type === "radial_gradient" && (
-            <PopoverTrigger className="w-full">
-              <PaintInputContainer>
-                <PaintChip paint={value} />
-                <span className="ms-2 text-start text-xs flex-1">Radial</span>
-                {removable && (
-                  <span
-                    role="button"
-                    onClick={onRemovePaint}
-                    className="px-1 py-1 me-0.5 text-muted-foreground"
-                  >
-                    <Cross2Icon className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </PaintInputContainer>
-            </PopoverTrigger>
-          )}
-          {value.type === "sweep_gradient" && (
-            <PopoverTrigger className="w-full">
-              <PaintInputContainer>
-                <PaintChip paint={value} />
-                <span className="ms-2 text-start text-xs flex-1">Sweep</span>
-                {removable && (
-                  <span
-                    role="button"
-                    onClick={onRemovePaint}
-                    className="px-1 py-1 me-0.5 text-muted-foreground"
-                  >
-                    <Cross2Icon className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </PaintInputContainer>
-            </PopoverTrigger>
+                  {removable && (
+                    <span
+                      role="button"
+                      onClick={onRemovePaint}
+                      className="px-1 py-1 me-0.5 text-muted-foreground"
+                    >
+                      <Cross2Icon className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+                </PaintInputContainer>
+              </PopoverTrigger>
+            </>
           )}
         </>
       ) : (
@@ -250,7 +234,7 @@ function ComputedPaintControl({
             )}
             onClick={onAddPaint}
           >
-            <PaintChip paint={cg.paints.transparent} />
+            <PaintChip paint={cg.paints.transparent} className="rounded-sm" />
             <span className="ms-2 text-xs">Add</span>
           </div>
         </PopoverTrigger>
@@ -274,6 +258,11 @@ function ComputedPaintControl({
             <TabsTrigger value="sweep_gradient">
               <SweepGradientPaintIcon
                 active={value?.type === "sweep_gradient"}
+              />
+            </TabsTrigger>
+            <TabsTrigger value="diamond_gradient">
+              <DiamondGradientPaintIcon
+                active={value?.type === "diamond_gradient"}
               />
             </TabsTrigger>
           </TabsList>
@@ -304,7 +293,8 @@ function ComputedPaintControl({
           <>
             {(value?.type === "linear_gradient" ||
               value?.type === "radial_gradient" ||
-              value?.type === "sweep_gradient") && (
+              value?.type === "sweep_gradient" ||
+              value?.type === "diamond_gradient") && (
               <div className="p-2">
                 <GradientControl
                   value={value}

@@ -277,7 +277,7 @@ export function useNumberInput({
 
       switch (mode) {
         case "auto":
-          if (e.key === "Enter") {
+          if (e.key === "Enter" || e.key === "Tab") {
             const currentValue = parseValueWithScaling(
               String(internalValue),
               type,
@@ -288,11 +288,10 @@ export function useNumberInput({
               handleCommit(currentValue);
             }
             e.currentTarget.blur();
-            e.preventDefault();
           }
           break;
         case "fixed":
-          if (e.key === "Enter") {
+          if (e.key === "Enter" || e.key === "Tab") {
             const currentValue = parseValueWithScaling(
               String(internalValue),
               type,
@@ -303,7 +302,6 @@ export function useNumberInput({
               handleCommit(currentValue);
             }
             e.currentTarget.blur();
-            e.preventDefault();
           }
           break;
       }

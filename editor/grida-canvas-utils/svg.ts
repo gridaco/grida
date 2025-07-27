@@ -180,6 +180,7 @@ ${gradientStops}
           };
         }
         case "sweep_gradient":
+        case "diamond_gradient":
         default: {
           // not supported
           return {
