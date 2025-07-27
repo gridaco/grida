@@ -97,7 +97,8 @@ function ComputedPaintControl({
           switch (to) {
             case "linear_gradient":
             case "radial_gradient":
-            case "sweep_gradient": {
+            case "sweep_gradient":
+            case "diamond_gradient": {
               onValueChange?.({
                 type: to,
                 transform: cmath.transform.identity,
