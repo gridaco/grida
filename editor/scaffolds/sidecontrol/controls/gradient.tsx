@@ -1,14 +1,12 @@
-import { Input } from "@/components/ui/input";
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./color";
-import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import cmath from "@grida/cmath";
 import { GradientStopsSlider } from "@/grida-canvas-react-gradient/gradient-stops-slider";
 import { ArrowRightLeftIcon, RotateCwIcon } from "lucide-react";
 import { Button } from "@/components/ui-editor/button";
 import { Label } from "@/components/ui/label";
+import InputPropertyPercentage from "../ui/percentage";
 
 type GradientPaint =
   | cg.LinearGradientPaint
@@ -116,18 +114,15 @@ function GradientStop({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <Input
-        type="number"
-        value={(stop.offset * 100).toFixed(2)}
-        step={0.01}
-        onChange={(e) => {
-          const v100 = parseFloat(e.target.value);
-          const v = v100 / 100;
-          if (isNaN(v)) return;
-
+      <InputPropertyPercentage
+        mode="fixed"
+        value={stop.offset}
+        min={0}
+        max={1}
+        onValueCommit={(v) => {
           onValueChange?.({ ...stop, offset: v });
         }}
-        className={cn("flex-1", WorkbenchUI.inputVariants({ size: "xs" }))}
+        className="flex-1"
       />
       <div className="flex-[2]">
         <RGBAColorControl
