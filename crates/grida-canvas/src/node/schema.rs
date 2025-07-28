@@ -662,6 +662,19 @@ pub struct VectorNode {
     pub effects: LayerEffects,
 }
 
+impl VectorNode {
+    /// Build a [`skia_safe::Path`] representing this vector node,
+    /// applying the node's `corner_radius` when greater than zero.
+    pub fn to_path(&self) -> skia_safe::Path {
+        let path: skia_safe::Path = self.network.clone().into();
+        if self.corner_radius <= 0.0 {
+            path
+        } else {
+            build_corner_radius_path(&path, self.corner_radius)
+        }
+    }
+}
+
 ///
 /// SVG Path compatible path node.
 ///

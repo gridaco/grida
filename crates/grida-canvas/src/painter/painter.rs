@@ -481,7 +481,8 @@ impl<'a> Painter<'a> {
 
     fn draw_vector_node(&self, node: &VectorNode) {
         self.with_transform(&node.transform.matrix, || {
-            let shape = PainterShape::from_path(node.network.clone().into());
+            let path = node.to_path();
+            let shape = PainterShape::from_path(path);
             self.draw_shape_with_effects(&node.effects, &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {

@@ -332,7 +332,7 @@ async fn demo_vectors() -> Scene {
                         },
                     ],
                 },
-                corner_radius: 0.0,
+                corner_radius: 4.0,
                 strokes: vec![Paint::Solid(SolidPaint {
                     color: CGColor(200, 0, 0, 255),
                     opacity: 1.0,

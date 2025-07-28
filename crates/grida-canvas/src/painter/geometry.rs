@@ -124,7 +124,10 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
                 PainterShape::from_rect(Rect::new(0.0, 0.0, 0.0, 0.0))
             }
         }
-        IntrinsicSizeNode::Vector(n) => PainterShape::from_path(n.network.clone().into()),
+        IntrinsicSizeNode::Vector(n) => {
+            let path = n.to_path();
+            PainterShape::from_path(path)
+        }
         IntrinsicSizeNode::Ellipse(n) => {
             let shape = n.to_shape();
             PainterShape::from_shape(&shape)
