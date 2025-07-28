@@ -1701,6 +1701,7 @@ export namespace grida.program.nodes {
       i.IBlendMode,
       i.IZIndex,
       i.IRotation,
+      i.ICornerRadius,
       i.IFill<cg.Paint>,
       i.IStroke {
     readonly type: "vector";

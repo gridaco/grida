@@ -141,6 +141,7 @@ function __self_try_enter_content_edit_mode_auto(
         type: "vector",
         id: node.id,
         active: node.active,
+        cornerRadius: modeCornerRadius(node),
         fillRule:
           (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
         vectorNetwork: v,
@@ -178,6 +179,27 @@ function __self_try_enter_content_edit_mode_auto(
       self_clearSelection(draft);
       break;
     }
+  }
+}
+
+/**
+ * maps the rectangular corner radius or corner radius into singular corner radius
+ * @param node
+ */
+function modeCornerRadius(node: grida.program.nodes.Node): number | undefined {
+  if ("cornerRadius" in node) {
+    return node.cornerRadius;
+  }
+
+  if ("cornerRadiusTopLeft" in node) {
+    const values: number[] = [
+      node.cornerRadiusTopLeft,
+      node.cornerRadiusTopRight,
+      node.cornerRadiusBottomLeft,
+      node.cornerRadiusBottomRight,
+    ].filter((it) => it !== undefined);
+
+    return cmath.mode(values);
   }
 }
 
