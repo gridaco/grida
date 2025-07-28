@@ -49,23 +49,23 @@ impl Default for VectorNetwork {
 impl Into<skia_safe::Path> for VectorNetwork {
     //
     fn into(self) -> skia_safe::Path {
-        let mut builder = skia_safe::PathBuilder::new();
+        let mut path = skia_safe::Path::new();
 
         let vertices = &self.vertices;
         let segments = &self.segments;
 
         // if no segments, return empty path
         if segments.is_empty() {
-            return builder.snapshot();
+            return path;
         }
 
         // initial M
         let segment_first = match segments.first() {
             Some(seg) => seg,
-            None => return builder.snapshot(),
+            None => return path,
         };
         let v_start = vertices[segment_first.a];
-        builder.move_to(skia_safe::Point::new(v_start.0, v_start.1));
+        path.move_to((v_start.0, v_start.1));
 
         for segment in segments {
             let a = self.vertices[segment.a];
@@ -75,23 +75,19 @@ impl Into<skia_safe::Path> for VectorNetwork {
             if let (Some(ta), Some(tb)) = (segment.ta, segment.tb) {
                 let c1 = [a.0 + ta[0], a.1 + ta[1]];
                 let c2 = [b.0 + tb[0], b.1 + tb[1]];
-                builder.cubic_to(
-                    skia_safe::Point::new(c1[0], c1[1]),
-                    skia_safe::Point::new(c2[0], c2[1]),
-                    skia_safe::Point::new(b.0, b.1),
-                );
+                path.cubic_to((c1[0], c1[1]), (c2[0], c2[1]), (b.0, b.1));
             } else {
-                builder.line_to(skia_safe::Point::new(b.0, b.1));
+                path.line_to((b.0, b.1));
             }
         }
 
         // final Z (if closed)
         if let Some(segment_last) = segments.last() {
             if segment_last.b == segment_first.a {
-                builder.close();
+                path.close();
             }
         }
 
-        return builder.snapshot();
+        return path;
     }
 }
