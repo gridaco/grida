@@ -22,7 +22,7 @@ pub struct VectorNetworkRegion {
 
 #[derive(Debug, Clone)]
 pub struct VectorNetwork {
-    pub vertices: Vec<[f32; 2]>,
+    pub vertices: Vec<(f32, f32)>,
     pub segments: Vec<VectorNetworkSegment>,
     // pub regions: Vec<VectorNetworkRegion>,
 }
@@ -32,13 +32,7 @@ impl VectorNetwork {
         if self.vertices.is_empty() {
             Rectangle::empty()
         } else {
-            Rectangle::from_points(
-                &self
-                    .vertices
-                    .iter()
-                    .map(|v| [v[0], v[1]])
-                    .collect::<Vec<_>>(),
-            )
+            Rectangle::from_points(&self.vertices.iter().map(|v| [v.0, v.1]).collect::<Vec<_>>())
         }
     }
 }
@@ -71,7 +65,7 @@ impl Into<skia_safe::Path> for VectorNetwork {
             None => return builder.snapshot(),
         };
         let v_start = vertices[segment_first.a];
-        builder.move_to(skia_safe::Point::new(v_start[0], v_start[1]));
+        builder.move_to(skia_safe::Point::new(v_start.0, v_start.1));
 
         for segment in segments {
             let a = self.vertices[segment.a];
@@ -79,15 +73,15 @@ impl Into<skia_safe::Path> for VectorNetwork {
 
             // if both ta and tb are Some, we need to add a cubic bezier curve
             if let (Some(ta), Some(tb)) = (segment.ta, segment.tb) {
-                let c1 = [a[0] + ta[0], a[1] + ta[1]];
-                let c2 = [b[0] + tb[0], b[1] + tb[1]];
+                let c1 = [a.0 + ta[0], a.1 + ta[1]];
+                let c2 = [b.0 + tb[0], b.1 + tb[1]];
                 builder.cubic_to(
                     skia_safe::Point::new(c1[0], c1[1]),
                     skia_safe::Point::new(c2[0], c2[1]),
-                    skia_safe::Point::new(b[0], b[1]),
+                    skia_safe::Point::new(b.0, b.1),
                 );
             } else {
-                builder.line_to(skia_safe::Point::new(b[0], b[1]));
+                builder.line_to(skia_safe::Point::new(b.0, b.1));
             }
         }
 

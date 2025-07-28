@@ -394,7 +394,11 @@ pub struct JSONVectorNetwork {
 impl From<JSONVectorNetwork> for VectorNetwork {
     fn from(network: JSONVectorNetwork) -> Self {
         VectorNetwork {
-            vertices: network.vertices.into_iter().map(|v| v.p).collect(),
+            vertices: network
+                .vertices
+                .into_iter()
+                .map(|v| (v.p[0], v.p[1]))
+                .collect(),
             segments: network
                 .segments
                 .into_iter()
@@ -777,13 +781,19 @@ impl From<JSONPathNode> for Node {
     fn from(node: JSONPathNode) -> Self {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
+        let network = node
+            .vector_network
+            .or(node.base.vector_network)
+            .map(|vn| vn.into())
+            .unwrap_or_default();
+
         Node::Vector(VectorNode {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
             transform,
             fill: Some(node.base.fill.into()),
-            network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
+            network,
             strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
