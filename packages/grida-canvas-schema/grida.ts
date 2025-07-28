@@ -766,7 +766,7 @@ export namespace grida.program.nodes {
     | HTMLIFrameNode
     | HTMLRichTextNode
     | BitmapNode
-    | VectorNode
+    | SVGPathNode
     | PathNode
     | LineNode
     | RectangleNode
@@ -785,7 +785,7 @@ export namespace grida.program.nodes {
     | ComputedContainerNode
     | ComputedHTMLIFrameNode
     | ComputedHTMLRichTextNode
-    | ComputedVectorNode
+    | ComputedSVGPathNode
     | ComputedPathNode
     | ComputedLineNode
     | ComputedRectangleNode
@@ -805,7 +805,7 @@ export namespace grida.program.nodes {
       Partial<ComputedContainerNode> &
       Partial<ComputedHTMLIFrameNode> &
       Partial<ComputedHTMLRichTextNode> &
-      Partial<ComputedVectorNode> &
+      Partial<ComputedSVGPathNode> &
       Partial<ComputedPathNode> &
       Partial<ComputedLineNode> &
       Partial<ComputedRectangleNode> &
@@ -830,7 +830,7 @@ export namespace grida.program.nodes {
       Partial<ContainerNode> &
       Partial<HTMLIFrameNode> &
       Partial<HTMLRichTextNode> &
-      Partial<VectorNode> &
+      Partial<SVGPathNode> &
       Partial<PathNode> &
       Partial<LineNode> &
       Partial<RectangleNode> &
@@ -892,7 +892,7 @@ export namespace grida.program.nodes {
         Omit<Partial<HTMLRichTextNode>, __base_scene_node_properties>
       >
     | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<VectorNode>, __base_scene_node_properties>>
+    | __TPrototypeNode<Omit<Partial<SVGPathNode>, __base_scene_node_properties>>
     | PathNodePrototype
     | LineNodePrototype
     | RectangleNodePrototype
@@ -1613,7 +1613,7 @@ export namespace grida.program.nodes {
   /**
    * @deprecated - not ready - do not use in production
    */
-  export interface VectorNode
+  export interface SVGPathNode
     extends i.IBaseNode,
       i.ISceneNode,
       i.IHrefable,
@@ -1626,7 +1626,7 @@ export namespace grida.program.nodes {
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
-    type: "vector";
+    type: "svgpath";
 
     /**
      * @deprecated - use vectorNetwork instead
@@ -1645,7 +1645,7 @@ export namespace grida.program.nodes {
   /**
    * @deprecated - not ready - do not use in production
    */
-  export type ComputedVectorNode = VectorNode;
+  export type ComputedSVGPathNode = SVGPathNode;
 
   export interface RegularPolygonNode
     extends i.IBaseNode,
@@ -1992,7 +1992,7 @@ export namespace grida.program.nodes {
         case "path":
         case "richtext":
         case "text":
-        case "vector":
+        case "svgpath":
         case "video": {
           // @ts-expect-error
           return {

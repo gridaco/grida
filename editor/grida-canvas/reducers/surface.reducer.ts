@@ -105,7 +105,7 @@ function __self_try_enter_content_edit_mode_auto(
       };
       break;
     }
-    // case "vector":
+    // case "svgpath":
     case "path": {
       draft.content_edit_mode = {
         type: "path",

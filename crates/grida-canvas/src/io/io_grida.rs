@@ -295,8 +295,8 @@ pub struct JSONUnknownNodeProperties {
 pub enum JSONNode {
     #[serde(rename = "container")]
     Container(JSONContainerNode),
-    #[serde(rename = "vector")]
-    Vector(JSONLegacyVectorNode),
+    #[serde(rename = "svgpath")]
+    SVGPath(JSONSVGPathNode),
     #[serde(rename = "path")]
     Path(JSONPathNode),
     #[serde(rename = "ellipse")]
@@ -363,7 +363,7 @@ pub struct JSONTextNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JSONLegacyVectorNode {
+pub struct JSONSVGPathNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
@@ -716,8 +716,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
     }
 }
 
-impl From<JSONLegacyVectorNode> for Node {
-    fn from(node: JSONLegacyVectorNode) -> Self {
+impl From<JSONSVGPathNode> for Node {
+    fn from(node: JSONSVGPathNode) -> Self {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         // For vector nodes, we'll create a path node with the path data
@@ -815,7 +815,7 @@ impl From<JSONNode> for Node {
         match node {
             JSONNode::Container(container) => Node::Container(container.into()),
             JSONNode::Text(text) => Node::TextSpan(text.into()),
-            JSONNode::Vector(vector) => vector.into(),
+            JSONNode::SVGPath(vector) => vector.into(),
             JSONNode::Path(path) => path.into(),
             JSONNode::Ellipse(ellipse) => ellipse.into(),
             JSONNode::Rectangle(rectangle) => rectangle.into(),

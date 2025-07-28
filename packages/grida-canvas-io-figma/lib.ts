@@ -843,7 +843,7 @@ export namespace iofigma {
               opacity: node.opacity ?? 1,
               blendMode: map.blendModeMap[node.blendMode],
               zIndex: 0,
-              type: "vector",
+              type: "svgpath",
               //
               position: "absolute",
               left: node.relativeTransform![0][2],
@@ -874,7 +874,7 @@ export namespace iofigma {
                   fill: "stroke" as const,
                 })) ?? []),
               ],
-            } satisfies grida.program.nodes.VectorNode;
+            } satisfies grida.program.nodes.SVGPathNode;
           }
 
           // components

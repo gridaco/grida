@@ -6,14 +6,14 @@ import queryattributes from "./utils/attributes";
  * @deprecated - not ready - do not use in production
  * @returns
  */
-export function VectorWidget({
+export function SVGPathWidget({
   width,
   height,
   fill,
   style,
   paths,
   ...props
-}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VectorNode>) {
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.SVGPathNode>) {
   const { defs, ref: fillDef } = fill
     ? svg.paint.defs(fill)
     : {
