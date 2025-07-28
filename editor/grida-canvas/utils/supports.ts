@@ -84,6 +84,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "star",
     "image",
     "video",
+    "path",
     "container",
     "component",
     "instance",

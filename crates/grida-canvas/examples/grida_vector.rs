@@ -48,6 +48,7 @@ async fn demo_vectors() -> Scene {
                         },
                     ],
                 },
+                corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint::red())],
                 stroke_width: 3.0,
                 stroke_align: StrokeAlign::Center,
@@ -91,6 +92,7 @@ async fn demo_vectors() -> Scene {
                         },
                     ],
                 },
+                corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint::red())],
                 stroke_width: 3.0,
                 stroke_align: StrokeAlign::Center,
@@ -135,6 +137,7 @@ async fn demo_vectors() -> Scene {
                         },
                     ],
                 },
+                corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint {
                     color: CGColor(255, 0, 0, 255),
                     opacity: 1.0,
@@ -181,6 +184,7 @@ async fn demo_vectors() -> Scene {
                         },
                     ],
                 },
+                corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint::red())],
                 stroke_width: 3.0,
                 stroke_align: StrokeAlign::Center,
@@ -232,6 +236,7 @@ async fn demo_vectors() -> Scene {
                         },
                     ],
                 },
+                corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint::red())],
                 stroke_width: 3.0,
                 stroke_align: StrokeAlign::Center,
@@ -269,6 +274,7 @@ async fn demo_vectors() -> Scene {
                         tb: Some([-30.0, 30.0]), // Tangent handle to end point
                     }],
                 },
+                corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint {
                     color: CGColor(0, 100, 255, 255),
                     opacity: 1.0,
@@ -326,6 +332,7 @@ async fn demo_vectors() -> Scene {
                         },
                     ],
                 },
+                corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint {
                     color: CGColor(200, 0, 0, 255),
                     opacity: 1.0,
@@ -386,6 +393,7 @@ async fn demo_vectors() -> Scene {
                         },
                     ],
                 },
+                corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint {
                     color: CGColor(0, 150, 0, 255),
                     opacity: 1.0,

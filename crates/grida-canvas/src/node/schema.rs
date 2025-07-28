@@ -648,8 +648,11 @@ pub struct VectorNode {
     pub name: Option<String>,
     pub active: bool,
     pub transform: AffineTransform,
-    pub fill: Option<Paint>,
     pub network: VectorNetwork,
+    /// The corner radius of the vector node.
+    pub corner_radius: f32,
+    /// The fill paint of the vector node. (currently only one fill is supported)
+    pub fill: Option<Paint>,
     pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
