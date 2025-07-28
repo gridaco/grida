@@ -115,6 +115,23 @@ export namespace vn {
     return { vertices, segments };
   }
 
+  /**
+   * creates a closed polygon vector network from given points
+   */
+  export function polygon(points: Vector2[]): VectorNetwork {
+    const vn = polyline(points);
+    if (vn.vertices.length > 1) {
+      const last = vn.vertices.length - 1;
+      vn.segments.push({
+        a: last,
+        b: 0,
+        ta: cmath.vector2.zero,
+        tb: cmath.vector2.zero,
+      });
+    }
+    return vn;
+  }
+
   export class VectorNetworkEditor {
     private _vertices: VectorNetworkVertex[] = [];
     private _segments: VectorNetworkSegment[] = [];
@@ -763,7 +780,7 @@ export namespace vn {
       return [x, y];
     });
 
-    return polyline(pts);
+    return polygon(pts);
   }
 
   export function fromRegularStarPolygon(
@@ -790,6 +807,6 @@ export namespace vn {
       pts.push([x, y]);
     }
 
-    return polyline(pts);
+    return polygon(pts);
   }
 }
