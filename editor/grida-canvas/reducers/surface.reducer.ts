@@ -194,6 +194,15 @@ function toVectorNetwork(
         height: size.height,
       });
     }
+    case "ellipse": {
+      // TODO: check if ellipse is arc, if so, rely on wasm backend.
+      return vn.fromEllipse({
+        x: 0,
+        y: 0,
+        width: size.width,
+        height: size.height,
+      });
+    }
     case "polygon": {
       return vn.fromRegularPolygon({
         x: 0,

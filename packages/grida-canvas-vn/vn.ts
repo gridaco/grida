@@ -703,7 +703,14 @@ export namespace vn {
     return { vertices, segments };
   }
 
-  // export function fromEllipse(shape: cmath.Rectangle) {}
+  /**
+   * @param shape ellipse shape defined with reactable (xywh)
+   * @returns vector network with 4 cubic bezier curves
+   */
+  export function fromEllipse(shape: cmath.Rectangle): vn.VectorNetwork {
+    throw new Error("Not implemented");
+  }
+
   // export function fromLine(shape) {}
 
   export function fromRegularPolygon(
