@@ -107,10 +107,8 @@ export namespace iofigma {
     export namespace factory {
       type Point = { x: number; y: number };
 
-      type GradientType = "linear" | "radial" | "sweep";
-
-      function getBaseControlPoints(type: GradientType) {
-        if (type === "linear") {
+      function getBaseControlPoints(type: cg.GradientPaint["type"]) {
+        if (type === "linear_gradient") {
           return {
             A: { x: 0, y: 0.5 },
             B: { x: 1, y: 0.5 },
@@ -127,11 +125,11 @@ export namespace iofigma {
       // TODO: move under cmath
       function transformFromPoints(
         points: { A: Point; B: Point; C: Point },
-        type: GradientType
+        type: cg.GradientPaint["type"]
       ): cg.AffineTransform {
         const base = getBaseControlPoints(type);
 
-        if (type === "linear") {
+        if (type === "linear_gradient") {
           const dx = points.B.x - points.A.x;
           const dy = points.B.y - points.A.y;
           const len = Math.hypot(dx, dy) || 1e-6;
@@ -194,13 +192,13 @@ export namespace iofigma {
 
       function toGradientPaint(paint: GradientPaint) {
         const map = {
-          GRADIENT_LINEAR: { type: "linear_gradient", g: "linear" },
-          GRADIENT_RADIAL: { type: "radial_gradient", g: "radial" },
-          GRADIENT_ANGULAR: { type: "sweep_gradient", g: "sweep" },
-          GRADIENT_DIAMOND: { type: "diamond_gradient", g: "radial" },
+          GRADIENT_LINEAR: "linear_gradient",
+          GRADIENT_RADIAL: "radial_gradient",
+          GRADIENT_ANGULAR: "sweep_gradient",
+          GRADIENT_DIAMOND: "diamond_gradient",
         } as const;
 
-        const info = map[paint.type as keyof typeof map];
+        const type = map[paint.type as keyof typeof map];
         const handles = paint.gradientHandlePositions;
         const points = handles
           ? {
@@ -208,11 +206,11 @@ export namespace iofigma {
               B: { x: handles[1].x, y: handles[1].y },
               C: { x: handles[2].x, y: handles[2].y },
             }
-          : getBaseControlPoints(info.g);
+          : getBaseControlPoints(type);
 
         return {
-          type: info.type,
-          transform: transformFromPoints(points, info.g),
+          type: type,
+          transform: transformFromPoints(points, type),
           stops: paint.gradientStops.map((stop) => ({
             offset: stop.position,
             color: cmath.color.rgbaf_multiply_alpha(
