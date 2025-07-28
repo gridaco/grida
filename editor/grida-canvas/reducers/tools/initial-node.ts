@@ -232,7 +232,7 @@ export default function initialNode(
       } satisfies grida.program.nodes.LineNode;
     }
     case "svgpath":
-    case "path":
+    case "vector":
     case "bitmap":
     case "component":
     case "instance":

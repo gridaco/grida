@@ -68,7 +68,7 @@ function __self_evt_on_pointer_move(
       const node = dq.__getNodeById(
         draft,
         node_id
-      ) as grida.program.nodes.PathNode;
+      ) as grida.program.nodes.VectorNode;
       const { left: nx, top: ny } = node;
       const n_offset: cmath.Vector2 = [nx!, ny!];
       const { vertices } = node.vectorNetwork;
@@ -263,7 +263,7 @@ function __self_evt_on_pointer_down(
         const node = dq.__getNodeById(
           draft,
           node_id
-        ) as grida.program.nodes.PathNode;
+        ) as grida.program.nodes.VectorNode;
 
         const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
 
@@ -305,8 +305,8 @@ function __self_evt_on_pointer_down(
         const new_node_id = nid();
 
         const vector = {
-          type: "path",
-          name: "path",
+          type: "vector",
+          name: "vector",
           id: new_node_id,
           active: true,
           locked: false,
@@ -325,7 +325,7 @@ function __self_evt_on_pointer_down(
             vertices: [{ p: cmath.vector2.zero }],
             segments: [],
           },
-        } satisfies grida.program.nodes.PathNode;
+        } satisfies grida.program.nodes.VectorNode;
 
         const pos = draft.pointer.position;
 
@@ -456,7 +456,7 @@ function __self_evt_on_drag_start(
     case "draw": {
       const tool = draft.tool.tool;
 
-      let vector: grida.program.nodes.PathNode | grida.program.nodes.LineNode;
+      let vector: grida.program.nodes.VectorNode | grida.program.nodes.LineNode;
 
       const new_node_id = nid();
       const __base = {
@@ -479,11 +479,11 @@ function __self_evt_on_drag_start(
         case "pencil": {
           vector = {
             ...__base,
-            type: "path",
-            name: "path",
+            type: "vector",
+            name: "vector",
             strokeWidth: 3,
             vectorNetwork: vn.polyline([cmath.vector2.zero]),
-          } satisfies grida.program.nodes.PathNode;
+          } satisfies grida.program.nodes.VectorNode;
           break;
         }
         case "line": {
@@ -495,11 +495,11 @@ function __self_evt_on_drag_start(
 
           vector = {
             ...__base,
-            type: "path",
+            type: "vector",
             name: "line",
             strokeWidth: 1,
             vectorNetwork: vn.polyline([cmath.vector2.zero]),
-          } satisfies grida.program.nodes.PathNode;
+          } satisfies grida.program.nodes.VectorNode;
           break;
         }
       }
@@ -556,7 +556,7 @@ function __self_evt_on_drag_start(
       const node = dq.__getNodeById(
         draft,
         node_id
-      ) as grida.program.nodes.PathNode;
+      ) as grida.program.nodes.VectorNode;
 
       const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
       const segments = vne.findSegments(vertex);
@@ -766,7 +766,7 @@ function __self_evt_on_drag(
         const node = dq.__getNodeById(
           draft,
           node_id
-        ) as grida.program.nodes.PathNode;
+        ) as grida.program.nodes.VectorNode;
 
         const vne = new vn.VectorNetworkEditor({
           vertices: points.map((p) => ({ p })),
@@ -813,7 +813,7 @@ function __self_evt_on_drag(
         const node = dq.__getNodeById(
           draft,
           node_id
-        ) as grida.program.nodes.PathNode;
+        ) as grida.program.nodes.VectorNode;
 
         const { vectorNetwork } = node;
         const vne = new vn.VectorNetworkEditor(vectorNetwork);
@@ -871,7 +871,7 @@ function __self_evt_on_drag(
         const node = dq.__getNodeById(
           draft,
           node_id
-        ) as grida.program.nodes.PathNode;
+        ) as grida.program.nodes.VectorNode;
 
         const { movement: _movement } = draft.gesture;
 

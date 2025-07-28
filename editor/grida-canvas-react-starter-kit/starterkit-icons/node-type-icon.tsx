@@ -56,7 +56,7 @@ export function NodeTypeIcon({
       return <CircleIcon className={className} />;
     case "svgpath":
     case "line":
-    case "path":
+    case "vector":
       return <TransformIcon className={className} />;
     case "bitmap":
       return <TransparencyGridIcon className={className} />;

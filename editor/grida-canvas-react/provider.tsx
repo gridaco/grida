@@ -1325,7 +1325,7 @@ export function useSurfacePathEditor() {
   const { hovered_vertex_idx: hovered_point, tool } = state;
   const { node_id, selected_vertices, a_point, path_cursor_position, next_ta } =
     state.content_edit_mode;
-  const node = state.document.nodes[node_id] as grida.program.nodes.PathNode;
+  const node = state.document.nodes[node_id] as grida.program.nodes.VectorNode;
 
   const vertices = node.vectorNetwork.vertices;
   const segments = node.vectorNetwork.segments;

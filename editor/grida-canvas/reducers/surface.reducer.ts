@@ -106,7 +106,7 @@ function __self_try_enter_content_edit_mode_auto(
       break;
     }
     // case "svgpath":
-    case "path": {
+    case "vector": {
       draft.content_edit_mode = {
         type: "path",
         node_id: node_id,
@@ -136,15 +136,15 @@ function __self_try_enter_content_edit_mode_auto(
       if (!v) return;
 
       // convert the shape to vector network
-      const pathnode: grida.program.nodes.PathNode = {
+      const pathnode: grida.program.nodes.VectorNode = {
         ...(node as grida.program.nodes.UnknwonNode),
-        type: "path",
+        type: "vector",
         id: node.id,
         active: node.active,
         fillRule:
           (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
         vectorNetwork: v,
-      } as grida.program.nodes.PathNode;
+      } as grida.program.nodes.VectorNode;
 
       // replace the node with the path node
       // TODO: need a way to revert this operation if no changes are made.
@@ -437,7 +437,7 @@ function __self_start_gesture(
       const node = dq.__getNodeById(
         draft,
         node_id
-      ) as grida.program.nodes.PathNode;
+      ) as grida.program.nodes.VectorNode;
 
       const verticies = node.vectorNetwork.vertices.map((v) => v.p);
 

@@ -558,7 +558,7 @@ function __self_update_gesture_transform_scale(
       });
     }
 
-    if (node.type === "path") {
+    if (node.type === "vector") {
       // TODO: mrege with the above
       const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
       const scale = cmath.rect.getScaleFactors(initial_rect, {
@@ -569,7 +569,7 @@ function __self_update_gesture_transform_scale(
       });
       vne.scale(scale);
       (
-        draft.document.nodes[node_id] as grida.program.nodes.PathNode
+        draft.document.nodes[node_id] as grida.program.nodes.VectorNode
       ).vectorNetwork = vne.value;
       //
     }

@@ -87,7 +87,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "text":
       case "bitmap":
       case "svgpath":
-      case "path":
+      case "vector":
       case "line":
       case "rectangle":
       case "component":
@@ -223,7 +223,7 @@ const fillings = {
   instance: "none",
   svgpath: "none",
   line: "none",
-  path: "none",
+  vector: "none",
   polyline: "none",
   bitmap: "background",
 } as const;

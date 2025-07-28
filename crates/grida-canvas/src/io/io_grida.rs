@@ -297,8 +297,8 @@ pub enum JSONNode {
     Container(JSONContainerNode),
     #[serde(rename = "svgpath")]
     SVGPath(JSONSVGPathNode),
-    #[serde(rename = "path")]
-    Path(JSONPathNode),
+    #[serde(rename = "vector")]
+    Path(JSONVectorNode),
     #[serde(rename = "ellipse")]
     Ellipse(JSONEllipseNode),
     #[serde(rename = "rectangle")]
@@ -420,7 +420,7 @@ pub struct JSONLineNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JSONPathNode {
+pub struct JSONVectorNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
@@ -777,8 +777,8 @@ impl From<JSONLineNode> for Node {
     }
 }
 
-impl From<JSONPathNode> for Node {
-    fn from(node: JSONPathNode) -> Self {
+impl From<JSONVectorNode> for Node {
+    fn from(node: JSONVectorNode) -> Self {
         let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
 
         let network = node
@@ -937,7 +937,7 @@ mod tests {
         };
         let parsed: JSONCanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
 
-        assert_eq!(parsed.version, "0.0.1-beta.1+20250303");
+        assert_eq!(parsed.version, "0.0.1-beta.1+20250728");
         assert!(
             !parsed.document.nodes.is_empty(),
             "nodes should not be empty"

@@ -458,7 +458,7 @@ export namespace iosvg {
           const bbox = vn.getBBox(vectorNetwork);
           return [
             {
-              type: "path",
+              type: "vector",
               name: nodename,
               vectorNetwork: vectorNetwork,
               opacity: map.opacity(opacity as string),

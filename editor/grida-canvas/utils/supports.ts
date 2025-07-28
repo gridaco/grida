@@ -68,12 +68,12 @@ const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
   ],
   border: ["container", "component", "instance", "image", "video"],
   children: ["container", "component", "instance"],
-  stroke: ["path", "line", "rectangle", "ellipse"],
+  stroke: ["vector", "line", "rectangle", "ellipse"],
   feDropShadow: ["container", "component", "instance"],
   /**
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
    */
-  strokeCap: ["path", "line"],
+  strokeCap: ["vector", "line"],
 } as const;
 
 const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
@@ -84,7 +84,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "star",
     "image",
     "video",
-    "path",
+    "vector",
     "container",
     "component",
     "instance",
@@ -105,7 +105,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "image",
     "video",
     "container",
-    "path",
+    "vector",
     "line",
     "rectangle",
     "ellipse",
@@ -120,7 +120,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "image",
     "video",
     "instance",
-    "path",
+    "vector",
     "line",
     "rectangle",
     "ellipse",
@@ -129,7 +129,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "container",
     "component",
   ],
-  strokeCap: ["path", "line"],
+  strokeCap: ["vector", "line"],
 } as const;
 
 type Context = {

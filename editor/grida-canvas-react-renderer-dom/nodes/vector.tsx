@@ -8,7 +8,7 @@ import vn from "@grida/vn";
  * @deprecated - not ready - do not use in production
  * @returns
  */
-export function PathWidget({
+export function VectorWidget({
   width: _width,
   height: _height,
   fill,
@@ -19,7 +19,7 @@ export function PathWidget({
   vectorNetwork,
   fillRule,
   ...props
-}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.PathNode>) {
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VectorNode>) {
   const width = Math.max(_width, 1);
   const height = Math.max(_height, 1);
 

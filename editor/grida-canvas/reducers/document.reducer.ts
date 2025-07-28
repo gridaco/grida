@@ -694,7 +694,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
         switch (action.type) {
           case "delete-vertex": {
-            if (node.type === "path") {
+            if (node.type === "vector") {
               const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
               vne.deleteVertex(vertex);
               const bb_b = vne.getBBox();
