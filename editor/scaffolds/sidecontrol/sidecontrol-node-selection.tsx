@@ -1418,6 +1418,7 @@ function SectionStrokes({
     })
   );
 
+  const has_stroke_paint = stroke !== undefined;
   const actions = useNodeActions(node_id)!;
 
   return (
@@ -1434,27 +1435,31 @@ function SectionStrokes({
             removable
           />
         </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Width</PropertyLineLabel>
-          <StrokeWidthControl
-            value={strokeWidth}
-            onValueCommit={actions.strokeWidth}
-          />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Align</PropertyLineLabel>
-          <StrokeAlignControl
-            value={strokeAlign}
-            onValueChange={actions.strokeAlign}
-          />
-        </PropertyLine>
-        <PropertyLine hidden={config.stroke_cap === "off"}>
-          <PropertyLineLabel>Cap</PropertyLineLabel>
-          <StrokeCapControl
-            value={strokeCap}
-            onValueChange={actions.strokeCap}
-          />
-        </PropertyLine>
+        {has_stroke_paint && (
+          <>
+            <PropertyLine>
+              <PropertyLineLabel>Width</PropertyLineLabel>
+              <StrokeWidthControl
+                value={strokeWidth}
+                onValueCommit={actions.strokeWidth}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Align</PropertyLineLabel>
+              <StrokeAlignControl
+                value={strokeAlign}
+                onValueChange={actions.strokeAlign}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={config.stroke_cap === "off"}>
+              <PropertyLineLabel>Cap</PropertyLineLabel>
+              <StrokeCapControl
+                value={strokeCap}
+                onValueChange={actions.strokeCap}
+              />
+            </PropertyLine>
+          </>
+        )}
       </SidebarMenuSectionContent>
     </SidebarSection>
   );
