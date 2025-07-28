@@ -708,7 +708,39 @@ export namespace vn {
    * @returns vector network with 4 cubic bezier curves
    */
   export function fromEllipse(shape: cmath.Rectangle): vn.VectorNetwork {
-    throw new Error("Not implemented");
+    const { x, y, width, height } = shape;
+
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const rx = width / 2;
+    const ry = height / 2;
+
+    // Constant for approximating a quarter of a circle with a cubic Bézier curve
+    // See: https://spencermortensen.com/articles/bezier-circle/
+    const KAPPA = 0.5522847498307936;
+
+    const kx = rx * KAPPA;
+    const ky = ry * KAPPA;
+
+    const vertices: vn.VectorNetworkVertex[] = [
+      { p: [cx, cy - ry] }, // Top
+      { p: [cx + rx, cy] }, // Right
+      { p: [cx, cy + ry] }, // Bottom
+      { p: [cx - rx, cy] }, // Left
+    ];
+
+    const segments: vn.VectorNetworkSegment[] = [
+      // Top -> Right
+      { a: 0, b: 1, ta: [kx, 0], tb: [0, -ky] },
+      // Right -> Bottom
+      { a: 1, b: 2, ta: [0, ky], tb: [kx, 0] },
+      // Bottom -> Left
+      { a: 2, b: 3, ta: [-kx, 0], tb: [0, ky] },
+      // Left -> Top
+      { a: 3, b: 0, ta: [0, -ky], tb: [-kx, 0] },
+    ];
+
+    return { vertices, segments };
   }
 
   // export function fromLine(shape) {}
