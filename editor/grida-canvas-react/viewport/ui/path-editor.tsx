@@ -19,8 +19,8 @@ function transformDelta(v: cmath.Vector2, t: cmath.Transform): cmath.Vector2 {
 }
 
 export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
+  const tool = useToolState();
   const { debug } = useEditorFlagsState();
-  const { tool } = useToolState();
   const { transform } = useTransformState();
   const {
     node_id,
@@ -288,7 +288,7 @@ const Point = React.forwardRef(
       style,
       selected,
       hovered,
-      size = 6,
+      size = 8,
       ...props
     }: React.HtmlHTMLAttributes<HTMLDivElement> & {
       point: cmath.Vector2;

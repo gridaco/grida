@@ -380,7 +380,7 @@ function SidebarLeft() {
 }
 
 function useArtboardListCondition() {
-  const { tool } = useToolState();
+  const tool = useToolState();
   const { constraints } = useCurrentSceneState();
   const should_show_artboards_list =
     tool.type === "insert" &&
@@ -493,7 +493,7 @@ function SidebarRight() {
 }
 
 function BrushToolbarPosition({ children }: React.PropsWithChildren<{}>) {
-  const { tool } = useToolState();
+  const tool = useToolState();
 
   if (!(tool.type === "brush" || tool.type === "eraser")) return null;
 

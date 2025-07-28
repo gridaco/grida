@@ -7,7 +7,10 @@ import {
   getTransformFromPoints,
 } from "@/grida-canvas-react-gradient";
 import cg from "@grida/cg";
-import { useNodeState } from "@/grida-canvas-react/provider";
+import {
+  useContentEditModeState,
+  useNodeState,
+} from "@/grida-canvas-react/provider";
 import { editor } from "@/grida-canvas";
 
 const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
@@ -18,10 +21,9 @@ const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
   ["diamond_gradient" satisfies cg.Paint["type"]]: "radial",
 };
 
-export function SurfaceGradientEditor({
-  node_id,
-  selected_stop,
-}: editor.state.FillGradientContentEditMode) {
+export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
+  const { selected_stop } =
+    useContentEditModeState()! as editor.state.FillGradientContentEditMode;
   const data = useSingleSelection(node_id);
   const { fill } = useNodeState(node_id, (node) => ({
     fill: node.fill,

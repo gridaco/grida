@@ -54,7 +54,7 @@ export function ToolbarPosition({
 
 export default function Toolbar() {
   const editor = useCurrentEditor();
-  const { tool } = useToolState();
+  const tool = useToolState();
   const { flags } = useEditorFlagsState();
   const value = toolmode_to_toolbar_value(tool);
 

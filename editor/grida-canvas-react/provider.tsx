@@ -818,25 +818,34 @@ export function useMultiplayerCursorState(): editor.state.IEditorMultiplayerCurs
   return useEditorState(editor, (state) => state.cursors);
 }
 
-interface UseToolState {
-  tool: editor.state.IEditorState["tool"];
-  content_edit_mode: editor.state.IEditorState["content_edit_mode"];
+export function useToolState(): editor.state.IEditorState["tool"] {
+  const editor = useCurrentEditor();
+  return useEditorState(editor, (state) => state.tool);
 }
 
-export function useToolState(): UseToolState {
+/**
+ * @deprecated {@link useContentEditModeState} can be expensive for certain modes.
+ * @returns
+ */
+export function useContentEditModeState(): editor.state.IEditorState["content_edit_mode"] {
   const editor = useCurrentEditor();
-  const tool = useEditorState(editor, (state) => state.tool);
-  const content_edit_mode = useEditorState(
-    editor,
-    (state) => state.content_edit_mode
-  );
 
-  return useMemo(() => {
+  return useEditorState(editor, (state) => state.content_edit_mode);
+}
+
+export function useContentEditModeMinimalState():
+  | { type: editor.state.ContentEditModeState["type"]; node_id: string }
+  | undefined {
+  const editor = useCurrentEditor();
+
+  return useEditorState(editor, (state) => {
+    const content_edit_mode = state.content_edit_mode;
+    if (!content_edit_mode) return undefined;
     return {
-      tool,
-      content_edit_mode,
+      type: content_edit_mode.type,
+      node_id: content_edit_mode.node_id,
     };
-  }, [tool, content_edit_mode]);
+  });
 }
 
 export function useBrushState() {
@@ -1330,8 +1339,11 @@ export function useSurfacePathEditor() {
   const vertices = node.vectorNetwork.vertices;
   const segments = node.vectorNetwork.segments;
 
-  // offset of the points (node position)
-  const offset: cmath.Vector2 = [node.left!, node.top!];
+  // offset of the points (node absolute position)
+  const absolute = instance.getNodeAbsoluteBoundingRect(node_id);
+  const offset: cmath.Vector2 = absolute
+    ? [absolute.x, absolute.y]
+    : [node.left!, node.top!];
 
   const selectVertex = useCallback(
     (vertex: number) => {

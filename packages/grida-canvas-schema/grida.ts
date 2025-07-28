@@ -874,6 +874,12 @@ export namespace grida.program.nodes {
   export type EllipseNodePrototype = __TPrototypeNode<
     Omit<Partial<EllipseNode>, __base_scene_node_properties>
   >;
+  export type PolygonNodePrototype = __TPrototypeNode<
+    Omit<Partial<RegularPolygonNode>, __base_scene_node_properties>
+  >;
+  export type StarNodePrototype = __TPrototypeNode<
+    Omit<Partial<RegularStarPolygonNode>, __base_scene_node_properties>
+  >;
 
   /**
    * A virtual, before-instantiation node that only stores the prototype of a node.
@@ -897,6 +903,8 @@ export namespace grida.program.nodes {
     | LineNodePrototype
     | RectangleNodePrototype
     | EllipseNodePrototype
+    | PolygonNodePrototype
+    | StarNodePrototype
     | __TPrototypeNode<
         Omit<
           Partial<ComponentNode>,
@@ -1993,6 +2001,8 @@ export namespace grida.program.nodes {
         case "text":
         case "vector":
         case "svgpath":
+        case "polygon":
+        case "star":
         case "video": {
           // @ts-expect-error
           return {

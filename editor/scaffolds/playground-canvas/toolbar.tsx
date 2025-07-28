@@ -39,7 +39,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useToolState } from "@/grida-canvas-react/provider";
+import {
+  useContentEditModeMinimalState,
+  useToolState,
+} from "@/grida-canvas-react/provider";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -147,7 +150,8 @@ ${userprompt}
 
 export function PlaygroundToolbar() {
   const editor = useCurrentEditor();
-  const { tool, content_edit_mode } = useToolState();
+  const tool = useToolState();
+  const content_edit_mode = useContentEditModeMinimalState();
 
   const value = toolmode_to_toolbar_value(tool);
 
@@ -243,7 +247,7 @@ export function PlaygroundToolbar() {
 
 function BitmapEditModeAuxiliaryToolbar() {
   const editor = useCurrentEditor();
-  const { tool } = useToolState();
+  const tool = useToolState();
 
   return (
     <div className="rounded-full flex justify-center items-center gap-2 border bg-background shadow px-3 py-1 pointer-events-auto select-none">

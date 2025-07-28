@@ -6,6 +6,7 @@ import {
   useBackendState,
   useBrushState,
   useClipboardSync,
+  useContentEditModeMinimalState,
   useCurrentSceneState,
   useDocumentState,
   useEventTargetCSSCursor,
@@ -127,13 +128,20 @@ function useSurfaceGesture(
 function SurfaceGroup({
   hidden,
   children,
-}: React.PropsWithChildren<{ hidden?: boolean }>) {
+  dontRenderWhenHidden,
+}: React.PropsWithChildren<{
+  hidden?: boolean;
+  /**
+   * completely remove from render tree, use this when the content is expensive and worth destroying.
+   */
+  dontRenderWhenHidden?: boolean;
+}>) {
   return (
     <div
       data-ux-hidden={hidden}
       className="opacity-100 data-[ux-hidden='true']:opacity-0 transition-colors"
     >
-      {children}
+      {hidden && dontRenderWhenHidden ? null : children}
     </div>
   );
 }
@@ -144,7 +152,8 @@ export function EditorSurface() {
   const { transform } = useTransformState();
   const { is_node_transforming, is_node_translating } = useGestureState();
   const { hovered_node_id, selection } = useSelectionState();
-  const { tool, content_edit_mode } = useToolState();
+  const tool = useToolState();
+  const content_edit_mode = useContentEditModeMinimalState();
   const pixelgrid = useEditorState(editor, (state) => state.pixelgrid);
   const ruler = useEditorState(editor, (state) => state.ruler);
   const dropzone = useEditorState(editor, (state) => state.dropzone);
@@ -350,7 +359,10 @@ export function EditorSurface() {
           <MeasurementGuide />
           <SnapGuide />
 
-          <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
+          <SurfaceGroup
+            hidden={is_node_translating || isWindowResizing}
+            dontRenderWhenHidden
+          >
             {content_edit_mode?.type === "text" && (
               <SurfaceTextEditor
                 key="text-editor"
@@ -366,7 +378,7 @@ export function EditorSurface() {
             {content_edit_mode?.type === "fill/gradient" && (
               <SurfaceGradientEditor
                 key="gradient-editor"
-                {...content_edit_mode}
+                node_id={content_edit_mode.node_id}
               />
             )}
           </SurfaceGroup>
@@ -815,7 +827,7 @@ function SelectionGroupOverlay({
   readonly?: boolean;
 }) {
   const editor = useCurrentEditor();
-  const { tool } = useToolState();
+  const tool = useToolState();
   const { multipleSelectionOverlayClick } = useMultipleSelectionOverlayClick();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
