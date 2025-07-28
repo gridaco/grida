@@ -10,6 +10,7 @@ import { dq } from "@/grida-canvas/query";
 import { self_clearSelection, self_selectNode } from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
+import vn from "@grida/vn";
 
 function createLayoutSnapshot(
   state: editor.state.IEditorState,
@@ -88,7 +89,8 @@ function __self_try_content_edit_mode_fill_gradient(
 
 function __self_try_enter_content_edit_mode_auto(
   draft: editor.state.IEditorState,
-  node_id: string
+  node_id: string,
+  context: ReducerContext
 ) {
   const node = dq.__getNodeById(draft, node_id);
 
@@ -124,48 +126,29 @@ function __self_try_enter_content_edit_mode_auto(
       // 1. convert the primitive to path
 
       const node = dq.__getNodeById(draft, node_id);
-      // TODO: convert the shape to vector network
-      // @ts-ignore
-      draft.document.nodes[node_id] = {
-        ...node,
+      const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+
+      const v = toVectorNetwork(node, {
+        width: rect.width,
+        height: rect.height,
+      });
+
+      if (!v) return;
+
+      // convert the shape to vector network
+      const pathnode: grida.program.nodes.PathNode = {
+        ...(node as grida.program.nodes.UnknwonNode),
         type: "path",
-        fillRule: "nonzero",
-        vectorNetwork: {
-          // dummy - make a rectangle
-          vertices: [
-            { p: [0, 0] },
-            { p: [100, 0] },
-            { p: [100, 100] },
-            { p: [0, 100] },
-          ],
-          segments: [
-            {
-              a: 0,
-              b: 1,
-              ta: [0, 0],
-              tb: [0, 0],
-            },
-            {
-              a: 1,
-              b: 2,
-              ta: [0, 0],
-              tb: [0, 0],
-            },
-            {
-              a: 2,
-              b: 3,
-              ta: [0, 0],
-              tb: [0, 0],
-            },
-            {
-              a: 3,
-              b: 0,
-              ta: [0, 0],
-              tb: [0, 0],
-            },
-          ],
-        },
-      };
+        id: node.id,
+        active: node.active,
+        fillRule:
+          (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
+        vectorNetwork: v,
+      } as grida.program.nodes.PathNode;
+
+      // replace the node with the path node
+      // TODO: need a way to revert this operation if no changes are made.
+      draft.document.nodes[node_id] = pathnode;
 
       // 2. enter path edit mode
       draft.content_edit_mode = {
@@ -196,6 +179,45 @@ function __self_try_enter_content_edit_mode_auto(
       break;
     }
   }
+}
+
+function toVectorNetwork(
+  node: grida.program.nodes.Node,
+  size: { width: number; height: number }
+): vn.VectorNetwork | null {
+  switch (node.type) {
+    case "rectangle": {
+      return vn.fromRect({
+        x: 0,
+        y: 0,
+        width: size.width,
+        height: size.height,
+      });
+    }
+    case "polygon": {
+      return vn.fromRegularPolygon({
+        x: 0,
+        y: 0,
+        width: size.width,
+        height: size.height,
+        points: node.pointCount ?? 3,
+      });
+    }
+    case "star": {
+      return vn.fromRegularStarPolygon({
+        x: 0,
+        y: 0,
+        width: size.width,
+        height: size.height,
+        points: node.pointCount ?? 5,
+        innerRadius: node.innerRadius ?? 0.5,
+      });
+    }
+    default: {
+      return null;
+    }
+  }
+  //
 }
 
 function __self_try_exit_content_edit_mode(draft: editor.state.IEditorState) {
@@ -692,7 +714,7 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       case "surface/content-edit-mode/try-enter": {
         if (state.selection.length !== 1) break;
         const node_id = state.selection[0];
-        __self_try_enter_content_edit_mode_auto(draft, node_id);
+        __self_try_enter_content_edit_mode_auto(draft, node_id, context);
         break;
       }
       case "surface/content-edit-mode/fill/gradient": {

@@ -680,4 +680,77 @@ export namespace vn {
 
     return vne.value;
   }
+
+  export function fromRect(shape: cmath.Rectangle): vn.VectorNetwork {
+    const { x, y, width, height } = shape;
+
+    // Create 4 vertices for the rectangle corners
+    const vertices: vn.VectorNetworkVertex[] = [
+      { p: [x, y] }, // Top-left
+      { p: [x + width, y] }, // Top-right
+      { p: [x + width, y + height] }, // Bottom-right
+      { p: [x, y + height] }, // Bottom-left
+    ];
+
+    // Create 4 segments connecting the vertices in order
+    const segments: vn.VectorNetworkSegment[] = [
+      { a: 0, b: 1, ta: [0, 0], tb: [0, 0] }, // Top edge
+      { a: 1, b: 2, ta: [0, 0], tb: [0, 0] }, // Right edge
+      { a: 2, b: 3, ta: [0, 0], tb: [0, 0] }, // Bottom edge
+      { a: 3, b: 0, ta: [0, 0], tb: [0, 0] }, // Left edge (closes the rectangle)
+    ];
+
+    return { vertices, segments };
+  }
+
+  // export function fromEllipse(shape: cmath.Rectangle) {}
+  // export function fromLine(shape) {}
+
+  export function fromRegularPolygon(
+    shape: cmath.Rectangle & {
+      points: number;
+    }
+  ): vn.VectorNetwork {
+    const { width, height, points } = shape;
+    const cx = width / 2;
+    const cy = height / 2;
+    const rx = (width / 2) * 0.9;
+    const ry = (height / 2) * 0.9;
+    const step = (Math.PI * 2) / points;
+    const pts: Vector2[] = Array.from({ length: points }, (_, i) => {
+      const angle = i * step - Math.PI / 2;
+      const x = cx + rx * Math.cos(angle);
+      const y = cy + ry * Math.sin(angle);
+      return [x, y];
+    });
+
+    return polyline(pts);
+  }
+
+  export function fromRegularStarPolygon(
+    shape: cmath.Rectangle & {
+      points: number;
+      innerRadius: number;
+    }
+  ): vn.VectorNetwork {
+    const { width, height, points, innerRadius } = shape;
+    const cx = width / 2;
+    const cy = height / 2;
+    const outerRx = (width / 2) * 0.9;
+    const outerRy = (height / 2) * 0.9;
+    const innerRx = outerRx * innerRadius;
+    const innerRy = outerRy * innerRadius;
+    const step = Math.PI / points;
+    const pts: Vector2[] = [];
+    for (let i = 0; i < points * 2; i++) {
+      const angle = i * step - Math.PI / 2;
+      const rx = i % 2 === 0 ? outerRx : innerRx;
+      const ry = i % 2 === 0 ? outerRy : innerRy;
+      const x = cx + rx * Math.cos(angle);
+      const y = cy + ry * Math.sin(angle);
+      pts.push([x, y]);
+    }
+
+    return polyline(pts);
+  }
 }
