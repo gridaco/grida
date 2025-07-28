@@ -4,5 +4,6 @@
     "jsx": "react-jsx",
     "moduleResolution": "node",
     "types": ["@webgpu/types"]
-  }
+  },
+  "exclude": ["dist"]
 }
