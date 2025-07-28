@@ -92,7 +92,7 @@ function CanvasContent({
     if (rendererRef.current && data) {
       rendererRef.current.loadScene(
         JSON.stringify({
-          version: "0.0.1-beta.1+20250303",
+          version: "0.0.1-beta.1+20250728",
           document: data,
         })
       );

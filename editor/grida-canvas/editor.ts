@@ -249,7 +249,7 @@ export class Editor
 
   public archive(): Blob {
     const documentData = {
-      version: "0.0.1-beta.1+20250303",
+      version: "0.0.1-beta.1+20250728",
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 

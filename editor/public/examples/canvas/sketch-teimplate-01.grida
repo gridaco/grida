@@ -21,8 +21,8 @@
         "id": "2"
       },
       "3": {
-        "name": "path",
-        "type": "path",
+        "name": "vector",
+        "type": "vector",
         "active": true,
         "locked": false,
         "zIndex": 0,
