@@ -2028,6 +2028,17 @@ export class Editor
     });
   }
 
+  startTranslateSegmentGesture(node_id: string, segment: number) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "translate-segment",
+        segment,
+        node_id,
+      },
+    });
+  }
+
   startCurveGesture(node_id: string, segment: number, control: "ta" | "tb") {
     this.dispatch({
       type: "surface/gesture/start",

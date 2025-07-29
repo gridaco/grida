@@ -1441,6 +1441,13 @@ export function useSurfacePathEditor() {
     [instance, node_id]
   );
 
+  const onSegmentDragStart = useCallback(
+    (segment: number) => {
+      instance.startTranslateSegmentGesture(node_id, segment);
+    },
+    [instance, node_id]
+  );
+
   return useMemo(
     () => ({
       node_id,
@@ -1457,6 +1464,7 @@ export function useSurfacePathEditor() {
       onVertexDragStart,
       onVertexDelete,
       onCurveControlPointDragStart,
+      onSegmentDragStart,
     }),
     [
       //
@@ -1474,6 +1482,7 @@ export function useSurfacePathEditor() {
       onVertexDragStart,
       onVertexDelete,
       onCurveControlPointDragStart,
+      onSegmentDragStart,
     ]
   );
 }

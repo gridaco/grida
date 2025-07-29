@@ -914,6 +914,52 @@ function __self_evt_on_drag(
 
         break;
       }
+      case "translate-segment": {
+        assert(draft.content_edit_mode?.type === "vector");
+        const { content_edit_mode } = draft;
+        const { node_id } = content_edit_mode;
+        const node = dq.__getNodeById(
+          draft,
+          node_id
+        ) as grida.program.nodes.VectorNode;
+
+        const { movement: _movement } = draft.gesture;
+
+        assert(draft.gesture.type === "translate-segment");
+        const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
+        const adj_movement =
+          tarnslate_with_axis_lock === "on"
+            ? cmath.ext.movement.axisLockedByDominance(_movement)
+            : _movement;
+
+        const { initial_verticies, initial_position, segment: segIndex } =
+          draft.gesture;
+
+        const vne = new vn.VectorNetworkEditor({
+          vertices: initial_verticies.map((p) => ({ p })),
+          segments: node.vectorNetwork.segments,
+        });
+
+        const bb_a = vne.getBBox();
+
+        vne.translateSegment(segIndex, cmath.ext.movement.normalize(adj_movement));
+
+        const bb_b = vne.getBBox();
+
+        const delta = cmath.vector2.sub([bb_b.x, bb_b.y], [bb_a.x, bb_a.y]);
+
+        vne.translate(cmath.vector2.invert(delta));
+
+        const new_pos = cmath.vector2.add(initial_position, delta);
+        node.left = new_pos[0];
+        node.top = new_pos[1];
+        node.width = bb_b.width;
+        node.height = bb_b.height;
+
+        node.vectorNetwork = vne.value;
+
+        break;
+      }
       case "corner-radius": {
         const { node_id } = draft.gesture;
         const [dx, dy] = delta;

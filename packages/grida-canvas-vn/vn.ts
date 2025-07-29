@@ -284,6 +284,15 @@ export namespace vn {
       this._vertices[i].p = [p[0] + delta[0], p[1] + delta[1]];
     }
 
+    translateSegment(i: number, delta: Vector2) {
+      if (i < 0 || i >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${i}`);
+      }
+      const seg = this._segments[i];
+      this.translateVertex(seg.a, delta);
+      this.translateVertex(seg.b, delta);
+    }
+
     translate(delta: Vector2) {
       this._vertices = this._vertices.map((v) => ({
         p: [v.p[0] + delta[0], v.p[1] + delta[1]],

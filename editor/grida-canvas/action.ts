@@ -582,6 +582,10 @@ export type EditorSurface_StartGesture = {
         "type" | "control" | "node_id" | "segment"
       >
     | Pick<
+        editor.gesture.GestureTranslateSegment,
+        "type" | "node_id" | "segment"
+      >
+    | Pick<
         editor.gesture.GestureTranslateVertex,
         "type" | "node_id" | "vertex"
       >;

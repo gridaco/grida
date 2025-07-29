@@ -488,6 +488,36 @@ function __self_start_gesture(
       break;
       //
     }
+    case "translate-segment": {
+      const { segment: segIndex } = gesture;
+
+      const { content_edit_mode } = draft;
+      assert(content_edit_mode && content_edit_mode.type === "vector");
+      const { node_id } = content_edit_mode;
+      const node = dq.__getNodeById(
+        draft,
+        node_id
+      ) as grida.program.nodes.VectorNode;
+
+      const verticies = node.vectorNetwork.vertices.map((v) => v.p);
+      const seg = node.vectorNetwork.segments[segIndex];
+
+      content_edit_mode.selected_vertices = [seg.a, seg.b];
+      content_edit_mode.a_point = seg.a;
+
+      draft.gesture = {
+        type: "translate-segment",
+        node_id: node_id,
+        segment: segIndex,
+        initial_verticies: verticies,
+        movement: cmath.vector2.zero,
+        first: cmath.vector2.zero,
+        last: cmath.vector2.zero,
+        initial_position: [node.left!, node.top!],
+      };
+      break;
+      //
+    }
     case "sort": {
       const { selection, node_id } = gesture;
 

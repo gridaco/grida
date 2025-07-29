@@ -207,6 +207,7 @@ function Segment({
   hovered: boolean;
   onHover: (segmentIndex: number | null) => void;
 }) {
+  const editor = useSurfacePathEditor();
   const bind = useGesture({
     onHover: (s) => {
       // enter
@@ -221,6 +222,10 @@ function Segment({
     onPointerDown: ({ event }) => {
       event.preventDefault();
       // TODO: Implement segment selection if needed
+    },
+    onDragStart: ({ event }) => {
+      event.preventDefault();
+      editor.onSegmentDragStart(segmentIndex);
     },
   });
 
