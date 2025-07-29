@@ -1329,7 +1329,7 @@ export function useSurfacePathEditor() {
     tool: state.tool,
   }));
 
-  assert(state.content_edit_mode && state.content_edit_mode.type === "path");
+  assert(state.content_edit_mode && state.content_edit_mode.type === "vector");
 
   const { hovered_vertex_idx: hovered_point, tool } = state;
   const { node_id, selected_vertices, a_point, path_cursor_position, next_ta } =

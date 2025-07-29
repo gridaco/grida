@@ -548,7 +548,7 @@ export namespace editor.state {
 
   export type ContentEditModeState =
     | TextContentEditMode
-    | PathContentEditMode
+    | VectorContentEditMode
     | BitmapContentEditMode
     | FillGradientContentEditMode;
 
@@ -561,8 +561,8 @@ export namespace editor.state {
     // selectedTextRange;
   };
 
-  type PathContentEditMode = {
-    type: "path";
+  type VectorContentEditMode = {
+    type: "vector";
     node_id: string;
 
     /**
@@ -1075,7 +1075,7 @@ export namespace editor.gesture {
    * Translate certain path point
    *
    * @remarks
-   * This is only valid with content edit mode is "path"
+   * This is only valid with content edit mode is "vector"
    */
   export type GestureTranslateVertex = IGesture & {
     type: "translate-vertex";

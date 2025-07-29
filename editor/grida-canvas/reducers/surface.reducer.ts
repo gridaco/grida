@@ -108,7 +108,7 @@ function __self_try_enter_content_edit_mode_auto(
     // case "svgpath":
     case "vector": {
       draft.content_edit_mode = {
-        type: "path",
+        type: "vector",
         node_id: node_id,
         selected_vertices: [],
         a_point: null,
@@ -153,7 +153,7 @@ function __self_try_enter_content_edit_mode_auto(
 
       // 2. enter path edit mode
       draft.content_edit_mode = {
-        type: "path",
+        type: "vector",
         node_id: node_id,
         selected_vertices: [],
         a_point: null,
@@ -285,7 +285,7 @@ function __self_set_tool(
   // validate cursor mode
   if (draft.content_edit_mode) {
     switch (draft.content_edit_mode.type) {
-      case "path":
+      case "vector":
         if (!path_edit_mode_valid_tool_modes.includes(tool.type)) return;
         break;
       case "text":
@@ -404,7 +404,7 @@ function __self_start_gesture(
     case "curve": {
       const { node_id, segment, control } = gesture;
 
-      assert(draft.content_edit_mode?.type === "path");
+      assert(draft.content_edit_mode?.type === "vector");
       assert(draft.content_edit_mode?.node_id === node_id);
 
       draft.gesture = getInitialCurveGesture(draft, {
@@ -463,7 +463,7 @@ function __self_start_gesture(
       const { vertex: index } = gesture;
 
       const { content_edit_mode } = draft;
-      assert(content_edit_mode && content_edit_mode.type === "path");
+      assert(content_edit_mode && content_edit_mode.type === "vector");
       const { node_id } = content_edit_mode;
       const node = dq.__getNodeById(
         draft,

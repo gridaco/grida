@@ -60,7 +60,7 @@ function __self_evt_on_pointer_move(
     last: draft.pointer.position,
   };
 
-  if (draft.content_edit_mode?.type === "path") {
+  if (draft.content_edit_mode?.type === "vector") {
     const { a_point, node_id } = draft.content_edit_mode;
     const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
 
@@ -255,7 +255,7 @@ function __self_evt_on_pointer_down(
       // ignore - insert mode will be handled via click or drag
       break;
     case "path": {
-      if (draft.content_edit_mode?.type === "path") {
+      if (draft.content_edit_mode?.type === "vector") {
         const { hovered_vertex_idx: hovered_point } = draft;
         const { node_id, path_cursor_position, a_point, next_ta } =
           draft.content_edit_mode;
@@ -337,7 +337,7 @@ function __self_evt_on_pointer_down(
         self_selectNode(draft, "reset", vector.id);
 
         draft.content_edit_mode = {
-          type: "path",
+          type: "vector",
           node_id: new_node_id,
           selected_vertices: [0], // select the first point
           a_point: 0,
@@ -548,7 +548,7 @@ function __self_evt_on_drag_start(
     }
     case "path": {
       // [path tool, drag start]
-      assert(draft.content_edit_mode?.type === "path");
+      assert(draft.content_edit_mode?.type === "vector");
       const { node_id, selected_vertices } = draft.content_edit_mode;
       assert(selected_vertices.length === 1);
       const vertex = selected_vertices[0];
@@ -807,7 +807,7 @@ function __self_evt_on_drag(
         break;
       }
       case "curve": {
-        assert(draft.content_edit_mode?.type === "path");
+        assert(draft.content_edit_mode?.type === "vector");
         const { node_id, segment, initial, control, invert } = draft.gesture;
 
         const node = dq.__getNodeById(
@@ -852,7 +852,7 @@ function __self_evt_on_drag(
         //
       }
       case "curve-a": {
-        assert(draft.content_edit_mode?.type === "path");
+        assert(draft.content_edit_mode?.type === "vector");
         const { node_id, vertex, initial, control, invert } = draft.gesture;
 
         const tangentPos = cmath.vector2.add(
@@ -865,7 +865,7 @@ function __self_evt_on_drag(
         break;
       }
       case "translate-vertex": {
-        assert(draft.content_edit_mode?.type === "path");
+        assert(draft.content_edit_mode?.type === "vector");
         const { content_edit_mode } = draft;
         const { node_id } = content_edit_mode;
         const node = dq.__getNodeById(

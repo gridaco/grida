@@ -369,7 +369,7 @@ export function EditorSurface() {
                 node_id={content_edit_mode.node_id}
               />
             )}
-            {content_edit_mode?.type === "path" && (
+            {content_edit_mode?.type === "vector" && (
               <SurfacePathEditor
                 key="path-editor"
                 node_id={content_edit_mode.node_id}
@@ -383,7 +383,7 @@ export function EditorSurface() {
             )}
           </SurfaceGroup>
           <SurfaceGroup
-            hidden={isWindowResizing || content_edit_mode?.type === "path"}
+            hidden={isWindowResizing || content_edit_mode?.type === "vector"}
           >
             <SelectionOverlay
               selection={selection}
@@ -391,7 +391,7 @@ export function EditorSurface() {
             />
           </SurfaceGroup>
           <SurfaceGroup
-            hidden={isWindowResizing || content_edit_mode?.type === "path"}
+            hidden={isWindowResizing || content_edit_mode?.type === "vector"}
           >
             <SurfaceGroup
               hidden={tool.type !== "cursor" || is_node_transforming}

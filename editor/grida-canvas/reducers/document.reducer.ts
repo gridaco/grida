@@ -709,7 +709,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
               node.vectorNetwork = vne.value;
 
-              if (draft.content_edit_mode?.type === "path") {
+              if (draft.content_edit_mode?.type === "vector") {
                 if (
                   draft.content_edit_mode.selected_vertices.includes(vertex)
                 ) {
@@ -722,7 +722,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             break;
           }
           case "select-vertex": {
-            assert(draft.content_edit_mode?.type === "path");
+            assert(draft.content_edit_mode?.type === "vector");
             draft.selection = [node_id];
             draft.content_edit_mode.selected_vertices = [vertex];
             draft.content_edit_mode.a_point = vertex;
