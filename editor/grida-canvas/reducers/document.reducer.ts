@@ -685,11 +685,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     //
     case "delete-vertex":
     case "select-vertex":
-    case "hover-vertex": {
+    case "hover-vertex":
+    case "insert-middle-vertex": {
       return produce(state, (draft) => {
-        const {
-          target: { node_id, vertex },
-        } = action;
+        const { node_id } = action.target;
+        const vertex = (action as any).target.vertex;
+        const segment = (action as any).target.segment;
         const node = dq.__getNodeById(draft, node_id);
 
         switch (action.type) {
@@ -739,7 +740,31 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 break;
               case "leave":
                 draft.hovered_vertex_idx = null;
-                break;
+              break;
+            }
+            break;
+          }
+          case "insert-middle-vertex": {
+            if (node.type === "vector") {
+              const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+              const newIndex = vne.insertMiddleVertex(segment);
+              const bb_b = vne.getBBox();
+              const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
+              vne.translate(cmath.vector2.invert(delta));
+              const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
+
+              node.left = new_pos[0];
+              node.top = new_pos[1];
+              node.width = bb_b.width;
+              node.height = bb_b.height;
+
+              node.vectorNetwork = vne.value;
+
+              if (draft.content_edit_mode?.type === "vector") {
+                draft.content_edit_mode.selected_vertices = [newIndex];
+                draft.content_edit_mode.a_point = newIndex;
+              }
+              break;
             }
             break;
           }

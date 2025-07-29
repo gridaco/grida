@@ -652,6 +652,16 @@ export class Editor
     });
   }
 
+  public insertMiddleVertex(node_id: editor.NodeID, segment: number) {
+    this.dispatch({
+      type: "insert-middle-vertex",
+      target: {
+        node_id,
+        segment,
+      },
+    });
+  }
+
   public selectGradientStop(node_id: editor.NodeID, stop: number): void {
     this.dispatch({
       type: "select-gradient-stop",

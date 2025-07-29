@@ -328,6 +328,43 @@ export namespace vn {
     }
 
     /**
+     * Inserts a new vertex at the middle of the given segment and splits the
+     * segment into two consecutive segments.
+     *
+     * Only straight segments (no tangents) are supported.
+     *
+     * @param segmentIndex index of the segment to split
+     * @returns index of the newly inserted vertex
+     */
+    insertMiddleVertex(segmentIndex: number): number {
+      if (segmentIndex < 0 || segmentIndex >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${segmentIndex}`);
+      }
+
+      const seg = this._segments[segmentIndex];
+
+      if (
+        !cmath.vector2.isZero(seg.ta) ||
+        !cmath.vector2.isZero(seg.tb)
+      ) {
+        throw new Error("only straight segments can be split");
+      }
+
+      const a = this._vertices[seg.a].p;
+      const b = this._vertices[seg.b].p;
+      const mid: Vector2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+
+      const vertexIndex = this._vertices.push({ p: mid }) - 1;
+
+      const s1: VectorNetworkSegment = { a: seg.a, b: vertexIndex, ta: [0, 0], tb: [0, 0] };
+      const s2: VectorNetworkSegment = { a: vertexIndex, b: seg.b, ta: [0, 0], tb: [0, 0] };
+
+      this._segments.splice(segmentIndex, 1, s1, s2);
+
+      return vertexIndex;
+    }
+
+    /**
      *
      * @param segment the index of the segment to update
      * @param control the control point to update (ta or tb)

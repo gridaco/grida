@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   useEditorFlagsState,
   useSurfacePathEditor,
@@ -208,6 +208,12 @@ function Segment({
   onHover: (segmentIndex: number | null) => void;
 }) {
   const editor = useSurfacePathEditor();
+  const showMiddle =
+    hovered && cmath.vector2.isZero(ta) && cmath.vector2.isZero(tb);
+  const middle = useMemo(() => {
+    if (!showMiddle) return null;
+    return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] as cmath.Vector2;
+  }, [showMiddle, a, b]);
   const bind = useGesture({
     onHover: (s) => {
       // enter
@@ -241,6 +247,9 @@ function Segment({
           strokeWidth={16}
           stroke="transparent"
         />
+        {showMiddle && middle && (
+          <MiddlePoint segmentIndex={segmentIndex} point={middle} />
+        )}
       </div>
       {/* Visible curve */}
       <div style={{ pointerEvents: "none" }}>
@@ -308,6 +317,24 @@ function Extension({
       <Curve a={a} b={b} ta={ta} tb={tb} />
     </>
   );
+}
+
+function MiddlePoint({
+  point,
+  segmentIndex,
+}: {
+  point: cmath.Vector2;
+  segmentIndex: number;
+}) {
+  const editor = useSurfacePathEditor();
+  const bind = useGesture({
+    onPointerDown: ({ event }) => {
+      event.preventDefault();
+      editor.onSegmentInsertMiddle(segmentIndex);
+    },
+  });
+
+  return <Point {...bind()} point={point} size={6} />;
 }
 
 function VertexPoint({

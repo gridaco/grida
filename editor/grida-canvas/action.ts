@@ -241,7 +241,8 @@ export interface EditorHierarchyMoveAction {
 export type EditorVectorPathAction =
   | EditorDeleteVertexAction
   | EditorSelectVertexAction
-  | EditorHoverVertexAction;
+  | EditorHoverVertexAction
+  | EditorInsertMiddleVertexAction;
 
 export interface EditorDeleteVertexAction {
   type: "delete-vertex";
@@ -257,6 +258,14 @@ export interface EditorHoverVertexAction {
   type: "hover-vertex";
   event: "enter" | "leave";
   target: VertexQuery;
+}
+
+export interface EditorInsertMiddleVertexAction {
+  type: "insert-middle-vertex";
+  target: {
+    node_id: string;
+    segment: number;
+  };
 }
 // #endregion
 

@@ -1448,6 +1448,15 @@ export function useSurfacePathEditor() {
     [instance, node_id]
   );
 
+  const onSegmentInsertMiddle = useCallback(
+    (segment: number) => {
+      const newIndex = vertices.length;
+      instance.insertMiddleVertex(node_id, segment);
+      instance.startTranslateVertexGesture(node_id, newIndex);
+    },
+    [instance, node_id, vertices.length]
+  );
+
   return useMemo(
     () => ({
       node_id,
@@ -1465,6 +1474,7 @@ export function useSurfacePathEditor() {
       onVertexDelete,
       onCurveControlPointDragStart,
       onSegmentDragStart,
+      onSegmentInsertMiddle,
     }),
     [
       //
@@ -1483,6 +1493,7 @@ export function useSurfacePathEditor() {
       onVertexDelete,
       onCurveControlPointDragStart,
       onSegmentDragStart,
+      onSegmentInsertMiddle,
     ]
   );
 }
