@@ -135,6 +135,12 @@ function __self_try_enter_content_edit_mode_auto(
 
       if (!v) return;
 
+      const vne = new vn.VectorNetworkEditor(v);
+      const bb_b = vne.getBBox();
+
+      const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
+      vne.translate(cmath.vector2.invert(delta));
+
       // convert the shape to vector network
       const pathnode: grida.program.nodes.VectorNode = {
         ...(node as grida.program.nodes.UnknwonNode),
@@ -144,7 +150,13 @@ function __self_try_enter_content_edit_mode_auto(
         cornerRadius: modeCornerRadius(node),
         fillRule:
           (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
-        vectorNetwork: v,
+        vectorNetwork: vne.value,
+
+        // re-map the transform (since star / polygon nodes size were not actual path bbox)
+        width: bb_b.width,
+        height: bb_b.height,
+        left: node.left! + delta[0],
+        top: node.top! + delta[1],
       } as grida.program.nodes.VectorNode;
 
       // replace the node with the path node
