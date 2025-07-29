@@ -43,9 +43,9 @@ import cmath from "@grida/cmath";
 import { cursors } from "../components/cursor";
 import { PointerCursor } from "@/components/multiplayer/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
-import { SurfacePathEditor } from "./ui/path-editor";
-import { SizeMeterLabel } from "./ui/meter";
+import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
+import { SizeMeterLabel } from "./ui/meter";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler/react";
@@ -370,7 +370,7 @@ export function EditorSurface() {
               />
             )}
             {content_edit_mode?.type === "vector" && (
-              <SurfacePathEditor
+              <SurfaceVectorEditor
                 key="path-editor"
                 node_id={content_edit_mode.node_id}
               />

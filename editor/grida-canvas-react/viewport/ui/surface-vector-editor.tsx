@@ -18,7 +18,11 @@ function transformDelta(v: cmath.Vector2, t: cmath.Transform): cmath.Vector2 {
   ]);
 }
 
-export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
+export function SurfaceVectorEditor({
+  node_id: _node_id,
+}: {
+  node_id: string;
+}) {
   const tool = useToolState();
   const { debug } = useEditorFlagsState();
   const { transform } = useTransformState();
