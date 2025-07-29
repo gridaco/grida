@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import { io } from "@grida/io";
@@ -771,6 +777,58 @@ export function useTransformState() {
       } as React.CSSProperties,
     };
   }, [transform]);
+}
+
+/**
+ * Hook to detect when the canvas is actively being transformed (panned, zoomed, etc.)
+ *
+ * @returns `true` when the canvas transform is changing, `false` when stable
+ * @example
+ * ```tsx
+ * const isTransforming = useIsTransforming();
+ * if (isTransforming) {
+ *   // Canvas is being panned, zoomed, or otherwise transformed
+ * }
+ * ```
+ */
+export function useIsTransforming() {
+  const editor = useCurrentEditor();
+  const transform = useEditorState(editor, (state) => state.transform);
+  const prevTransformRef = useRef(transform);
+  const [isTransforming, setIsTransforming] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const hasChanged = !equal(transform, prevTransformRef.current);
+
+    if (hasChanged) {
+      setIsTransforming(true);
+
+      // Clear existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Set timeout to mark as not transforming after a short delay
+      timeoutRef.current = setTimeout(() => {
+        setIsTransforming(false);
+      }, 100); // 100ms delay to detect when transform stops
+    }
+
+    // Update the previous transform reference
+    prevTransformRef.current = transform;
+  }, [transform]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return isTransforming;
 }
 
 export function useEventTargetCSSCursor() {

@@ -11,6 +11,7 @@ import {
   useDocumentState,
   useEventTargetCSSCursor,
   useGestureState,
+  useIsTransforming,
   useMultiplayerCursorState,
   useMultipleSelectionOverlayClick,
   useNode,
@@ -147,7 +148,8 @@ function SurfaceGroup({
 }
 
 export function EditorSurface() {
-  const isWindowResizing = useIsWindowResizing();
+  const is_window_resizing = useIsWindowResizing();
+  const is_transforming = useIsTransforming();
   const editor = useCurrentEditor();
   const { transform } = useTransformState();
   const { is_node_transforming, is_node_translating } = useGestureState();
@@ -360,7 +362,12 @@ export function EditorSurface() {
           <SnapGuide />
 
           <SurfaceGroup
-            hidden={is_node_translating || isWindowResizing}
+            hidden={
+              is_transforming ||
+              is_node_transforming ||
+              is_node_translating ||
+              is_window_resizing
+            }
             dontRenderWhenHidden
           >
             {content_edit_mode?.type === "text" && (
@@ -383,7 +390,7 @@ export function EditorSurface() {
             )}
           </SurfaceGroup>
           <SurfaceGroup
-            hidden={isWindowResizing || content_edit_mode?.type === "vector"}
+            hidden={is_window_resizing || content_edit_mode?.type === "vector"}
           >
             <SelectionOverlay
               selection={selection}
@@ -391,7 +398,7 @@ export function EditorSurface() {
             />
           </SurfaceGroup>
           <SurfaceGroup
-            hidden={isWindowResizing || content_edit_mode?.type === "vector"}
+            hidden={is_window_resizing || content_edit_mode?.type === "vector"}
           >
             <SurfaceGroup
               hidden={tool.type !== "cursor" || is_node_transforming}

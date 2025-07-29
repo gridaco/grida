@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   useEditorFlagsState,
   useSurfacePathEditor,
@@ -26,6 +26,7 @@ export function SurfaceVectorEditor({
   const tool = useToolState();
   const { debug } = useEditorFlagsState();
   const { transform } = useTransformState();
+  const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const {
     node_id,
     offset,
@@ -86,6 +87,28 @@ export function SurfaceVectorEditor({
           </svg>
         )}
       </div>
+
+      {/* Render all segments */}
+      {segments.map((s, i) => {
+        const a = vertices[s.a].p;
+        const b = vertices[s.b].p;
+        const ta = s.ta;
+        const tb = s.tb;
+
+        return (
+          <Segment
+            key={i}
+            segmentIndex={i}
+            a={cmath.vector2.transform(cmath.vector2.add(a, offset), transform)}
+            b={cmath.vector2.transform(cmath.vector2.add(b, offset), transform)}
+            ta={transformDelta(ta, transform)}
+            tb={transformDelta(tb, transform)}
+            hovered={hoveredSegment === i}
+            onHover={setHoveredSegment}
+          />
+        );
+      })}
+
       {tool.type === "path" && typeof a_point === "number" && (
         <>
           {/* next segment */}
@@ -110,7 +133,7 @@ export function SurfaceVectorEditor({
         if (!is_neighbouring) return null;
 
         return (
-          <React.Fragment key={i}>
+          <React.Fragment key={`control-${i}`}>
             <div
               style={{
                 position: "absolute",
@@ -164,6 +187,68 @@ export function SurfaceVectorEditor({
         );
       })}
     </div>
+  );
+}
+
+function Segment({
+  segmentIndex,
+  a,
+  b,
+  ta,
+  tb,
+  hovered,
+  onHover,
+}: {
+  segmentIndex: number;
+  a: cmath.Vector2;
+  b: cmath.Vector2;
+  ta: cmath.Vector2;
+  tb: cmath.Vector2;
+  hovered: boolean;
+  onHover: (segmentIndex: number | null) => void;
+}) {
+  const bind = useGesture({
+    onHover: (s) => {
+      // enter
+      if (s.first) {
+        onHover(segmentIndex);
+      }
+      // leave
+      if (s.last) {
+        onHover(null);
+      }
+    },
+    onPointerDown: ({ event }) => {
+      event.preventDefault();
+      // TODO: Implement segment selection if needed
+    },
+  });
+
+  return (
+    <>
+      {/* Invisible hit area curve */}
+      <div {...bind()}>
+        <Curve
+          a={a}
+          b={b}
+          ta={ta}
+          tb={tb}
+          strokeWidth={16}
+          stroke="transparent"
+        />
+      </div>
+      {/* Visible curve */}
+      <div style={{ pointerEvents: "none" }}>
+        <Curve
+          a={a}
+          b={b}
+          ta={ta}
+          tb={tb}
+          strokeWidth={hovered ? 3 : 1}
+          stroke={hovered ? "skyblue" : "gray"}
+        />
+      </div>
+    </>
   );
 }
 
@@ -337,11 +422,17 @@ function Curve({
   b,
   ta = [0, 0],
   tb = [0, 0],
+  className,
+  strokeWidth = 2,
+  stroke = "skyblue",
 }: {
   a: cmath.Vector2;
   b: cmath.Vector2;
   ta?: cmath.Vector2;
   tb?: cmath.Vector2;
+  className?: string;
+  strokeWidth?: number;
+  stroke?: string;
 }) {
   //
   const offset = a;
@@ -352,6 +443,7 @@ function Curve({
   return (
     <svg
       id="curve"
+      className={className}
       style={{
         position: "absolute",
         width: 1,
@@ -361,7 +453,7 @@ function Curve({
         overflow: "visible",
       }}
     >
-      <path d={path} stroke={"skyblue"} fill="none" strokeWidth="2" />
+      <path d={path} stroke={stroke} fill="none" strokeWidth={strokeWidth} />
     </svg>
   );
 }
