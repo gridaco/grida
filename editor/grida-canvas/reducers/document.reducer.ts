@@ -711,11 +711,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               node.vectorNetwork = vne.value;
 
               if (draft.content_edit_mode?.type === "vector") {
-                if (
+              if (
                   draft.content_edit_mode.selected_vertices.includes(vertex)
                 ) {
                   // clear the selection as deleted
                   draft.content_edit_mode.selected_vertices = [];
+                  draft.content_edit_mode.selected_segments = [];
                 }
               }
               break;
@@ -726,6 +727,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             assert(draft.content_edit_mode?.type === "vector");
             draft.selection = [node_id];
             draft.content_edit_mode.selected_vertices = [vertex];
+            draft.content_edit_mode.selected_segments = [];
             draft.content_edit_mode.a_point = vertex;
             break;
           }
@@ -762,6 +764,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
               if (draft.content_edit_mode?.type === "vector") {
                 draft.content_edit_mode.selected_vertices = [newIndex];
+                draft.content_edit_mode.selected_segments = [];
                 draft.content_edit_mode.a_point = newIndex;
               }
               break;

@@ -111,6 +111,7 @@ function __self_try_enter_content_edit_mode_auto(
         type: "vector",
         node_id: node_id,
         selected_vertices: [],
+        selected_segments: [],
         a_point: null,
         next_ta: null,
         path_cursor_position: draft.pointer.position,
@@ -168,6 +169,7 @@ function __self_try_enter_content_edit_mode_auto(
         type: "vector",
         node_id: node_id,
         selected_vertices: [],
+        selected_segments: [],
         a_point: null,
         next_ta: null,
         path_cursor_position: draft.pointer.position,
@@ -485,6 +487,7 @@ function __self_start_gesture(
       const verticies = node.vectorNetwork.vertices.map((v) => v.p);
 
       content_edit_mode.selected_vertices = [index];
+      content_edit_mode.selected_segments = [];
       content_edit_mode.a_point = index;
 
       draft.gesture = {
@@ -515,6 +518,7 @@ function __self_start_gesture(
       const seg = node.vectorNetwork.segments[segIndex];
 
       content_edit_mode.selected_vertices = [seg.a, seg.b];
+      content_edit_mode.selected_segments = [segIndex];
       content_edit_mode.a_point = seg.a;
 
       draft.gesture = {

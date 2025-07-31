@@ -571,6 +571,11 @@ export namespace editor.state {
     selected_vertices: number[];
 
     /**
+     * selected segment indices
+     */
+    selected_segments: number[];
+
+    /**
      * origin point - the new point will be connected to this point
      * also `selected_vertices[0]`
      */
