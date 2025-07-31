@@ -673,6 +673,23 @@ export class Editor
     });
   }
 
+  public selectTangent(
+    node_id: editor.NodeID,
+    vertex: number,
+    tangent: 0 | 1,
+    options: { additive?: boolean } = {}
+  ) {
+    this.dispatch({
+      type: "select-tangent",
+      target: {
+        node_id,
+        vertex,
+        tangent,
+      },
+      additive: options.additive,
+    });
+  }
+
   public deleteSegment(node_id: editor.NodeID, segment: number): void {
     this.dispatch({
       type: "delete-segment",

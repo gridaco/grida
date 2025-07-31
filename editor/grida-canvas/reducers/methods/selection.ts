@@ -64,12 +64,13 @@ export function self_clearSelection<S extends editor.state.IEditorState>(
 
 export type VectorContentSelectionState = Pick<
   editor.state.VectorContentEditMode,
-  "selected_vertices" | "selected_segments"
+  "selected_vertices" | "selected_segments" | "selected_tangents"
 >;
 
 export type VectorContentSelectionAction =
   | { type: "vertex"; index: number; additive?: boolean }
-  | { type: "segment"; index: number; additive?: boolean };
+  | { type: "segment"; index: number; additive?: boolean }
+  | { type: "tangent"; index: [number, 0 | 1]; additive?: boolean };
 
 /**
  * Reduces vector content selection state based on selection actions.
@@ -86,16 +87,24 @@ export function reduceVectorContentSelection(
   state: VectorContentSelectionState,
   action: VectorContentSelectionAction
 ): VectorContentSelectionState {
-  let { selected_vertices, selected_segments } = state;
+  let { selected_vertices, selected_segments, selected_tangents } = state;
   const additive = action.additive ?? false;
 
   if (!additive) {
     if (action.type === "vertex") {
       selected_vertices = [action.index];
       selected_segments = [];
+      selected_tangents = [];
     } else {
-      selected_vertices = [];
-      selected_segments = [action.index];
+      if (action.type === "segment") {
+        selected_vertices = [];
+        selected_segments = [action.index];
+        selected_tangents = [];
+      } else {
+        selected_vertices = [];
+        selected_segments = [];
+        selected_tangents = [action.index];
+      }
     }
   } else {
     if (action.type === "vertex") {
@@ -106,7 +115,7 @@ export function reduceVectorContentSelection(
         set.add(action.index);
       }
       selected_vertices = Array.from(set);
-    } else {
+    } else if (action.type === "segment") {
       const set = new Set(selected_segments);
       if (set.has(action.index)) {
         set.delete(action.index);
@@ -114,8 +123,21 @@ export function reduceVectorContentSelection(
         set.add(action.index);
       }
       selected_segments = Array.from(set);
+    } else {
+      const key = (t: [number, 0 | 1]) => `${t[0]}:${t[1]}`;
+      const set = new Set(selected_tangents.map(key));
+      const k = key(action.index);
+      if (set.has(k)) {
+        set.delete(k);
+      } else {
+        set.add(k);
+      }
+      selected_tangents = Array.from(set).map((s) => {
+        const [v, t] = s.split(":");
+        return [parseInt(v), Number(t) as 0 | 1];
+      });
     }
   }
 
-  return { selected_vertices, selected_segments };
+  return { selected_vertices, selected_segments, selected_tangents };
 }

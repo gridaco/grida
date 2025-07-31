@@ -32,6 +32,7 @@ export function SurfaceVectorEditor({
     offset,
     vertices,
     segments,
+    selected_tangents,
     path_cursor_position,
     a_point,
     next_ta,
@@ -129,7 +130,15 @@ export function SurfaceVectorEditor({
         const tb = s.tb;
         const ta_scaled = transformDelta(ta, transform);
         const tb_scaled = transformDelta(tb, transform);
-        const is_neighbouring = a_point === s.a || a_point === s.b;
+        const tangent_a_selected = selected_tangents.some(
+          ([v, t]) => v === s.a && t === 0
+        );
+        const tangent_b_selected = selected_tangents.some(
+          ([v, t]) => v === s.b && t === 1
+        );
+        const tangent_selected = tangent_a_selected || tangent_b_selected;
+        const is_neighbouring =
+          tangent_selected || a_point === s.a || a_point === s.b;
         if (!is_neighbouring) return null;
 
         return (
@@ -152,6 +161,7 @@ export function SurfaceVectorEditor({
                     transform
                   )}
                   ta={ta_scaled}
+                  selected={tangent_a_selected}
                 />
               )}
               {!cmath.vector2.isZero(tb) && (
@@ -167,6 +177,7 @@ export function SurfaceVectorEditor({
                     transform
                   )}
                   tb={tb_scaled}
+                  selected={tangent_b_selected}
                 />
               )}
               {/* preview the next ta - cannot be edited */}
@@ -253,7 +264,7 @@ function Segment({
           ta={ta}
           tb={tb}
           strokeWidth={16}
-          stroke="transparent"
+          className="stroke-transparent"
         />
         {showMiddle && middle && (
           <MiddlePoint segmentIndex={segmentIndex} point={middle} />
@@ -267,7 +278,11 @@ function Segment({
           ta={ta}
           tb={tb}
           strokeWidth={selected ? 3 : hovered ? 3 : 1}
-          stroke={selected ? "#3b82f6" : hovered ? "skyblue" : "gray"}
+          className={cn(
+            "stroke-gray-500",
+            selected && "stroke-workbench-accent-sky",
+            hovered && "stroke-workbench-accent-sky opacity-50"
+          )}
         />
       </div>
     </>
@@ -281,6 +296,7 @@ function CurveControlExtension({
   b,
   ta,
   tb,
+  selected,
 }: {
   segment: number;
   control: "ta" | "tb";
@@ -289,20 +305,43 @@ function CurveControlExtension({
   b: cmath.Vector2;
   ta?: cmath.Vector2;
   tb?: cmath.Vector2;
+  selected?: boolean;
 }) {
   const editor = useSurfaceVectorEditor();
-  const bind = useGesture({
-    onDragStart: ({ event }) => {
-      event.preventDefault();
-      editor.onCurveControlPointDragStart(segment, control);
+  const bind = useGesture(
+    {
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+        editor.selectTangent(segment, control, event.shiftKey);
+      },
+      onDragStart: ({ event }) => {
+        event.preventDefault();
+        editor.onCurveControlPointDragStart(segment, control);
+      },
     },
-  });
+    {
+      drag: {
+        threshold: 1,
+      },
+    }
+  );
 
   return (
     <>
       {/* cursor point */}
-      <Point {...bind()} point={b} style={{ cursor: "pointer", zIndex: 99 }} />
-      <Curve a={a} b={b} ta={ta} tb={tb} />
+      <Point
+        {...bind()}
+        point={b}
+        style={{ cursor: "pointer", zIndex: 99 }}
+        selected={selected}
+      />
+      <Curve
+        a={a}
+        b={b}
+        ta={ta}
+        tb={tb}
+        className="stroke-workbench-accent-sky"
+      />
     </>
   );
 }
@@ -322,7 +361,13 @@ function Extension({
     <>
       {/* cursor point */}
       <Point point={b} style={{ cursor: "crosshair" }} />
-      <Curve a={a} b={b} ta={ta} tb={tb} />
+      <Curve
+        a={a}
+        b={b}
+        ta={ta}
+        tb={tb}
+        className="stroke-workbench-accent-sky"
+      />
     </>
   );
 }
@@ -464,7 +509,7 @@ function Curve({
   tb = [0, 0],
   className,
   strokeWidth = 2,
-  stroke = "skyblue",
+  stroke,
 }: {
   a: cmath.Vector2;
   b: cmath.Vector2;

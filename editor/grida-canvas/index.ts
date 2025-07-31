@@ -576,6 +576,14 @@ export namespace editor.state {
     selected_segments: number[];
 
     /**
+     * selected tangent indices
+     *
+     * each tangent is represented as [vertex_index, a_or_b]
+     * where a_or_b is 0 for `a` and 1 for `b`
+     */
+    selected_tangents: [number, 0 | 1][];
+
+    /**
      * origin point - the new point will be connected to this point
      * also `selected_vertices[0]`
      */

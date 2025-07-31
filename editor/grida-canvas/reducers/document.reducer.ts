@@ -689,6 +689,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "delete-vertex":
     case "select-segment":
     case "delete-segment":
+    case "select-tangent":
     case "split-segment": {
       return produce(state, (draft) => {
         const { node_id } = action.target;
@@ -719,15 +720,19 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               {
                 selected_vertices: draft.content_edit_mode.selected_vertices,
                 selected_segments: draft.content_edit_mode.selected_segments,
+                selected_tangents: draft.content_edit_mode.selected_tangents,
               },
               { type: "vertex", index: vertex, additive: action.additive }
             );
             draft.content_edit_mode.selected_vertices = next.selected_vertices;
             draft.content_edit_mode.selected_segments = next.selected_segments;
+            draft.content_edit_mode.selected_tangents = next.selected_tangents;
             draft.content_edit_mode.a_point =
               next.selected_vertices.length > 0
                 ? next.selected_vertices[0]
-                : null;
+                : next.selected_tangents.length > 0
+                  ? next.selected_tangents[0][0]
+                  : null;
             break;
           }
           case "delete-vertex": {
@@ -748,10 +753,17 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             node.vectorNetwork = vne.value;
 
             if (draft.content_edit_mode?.type === "vector") {
-              if (draft.content_edit_mode.selected_vertices.includes(vertex)) {
+              if (
+                draft.content_edit_mode.selected_vertices.includes(vertex) ||
+                draft.content_edit_mode.selected_tangents.some(
+                  ([v]) => v === vertex
+                )
+              ) {
                 // clear the selection as deleted
                 draft.content_edit_mode.selected_vertices = [];
                 draft.content_edit_mode.selected_segments = [];
+                draft.content_edit_mode.selected_tangents = [];
+                draft.content_edit_mode.a_point = null;
               }
             }
             break;
@@ -763,15 +775,45 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               {
                 selected_vertices: draft.content_edit_mode.selected_vertices,
                 selected_segments: draft.content_edit_mode.selected_segments,
+                selected_tangents: draft.content_edit_mode.selected_tangents,
               },
               { type: "segment", index: segment, additive: action.additive }
             );
             draft.content_edit_mode.selected_vertices = next.selected_vertices;
             draft.content_edit_mode.selected_segments = next.selected_segments;
+            draft.content_edit_mode.selected_tangents = next.selected_tangents;
             draft.content_edit_mode.a_point =
               next.selected_vertices.length > 0
                 ? next.selected_vertices[0]
-                : null;
+                : next.selected_tangents.length > 0
+                  ? next.selected_tangents[0][0]
+                  : null;
+            break;
+          }
+          case "select-tangent": {
+            assert(draft.content_edit_mode?.type === "vector");
+            draft.selection = [node_id];
+            const next = reduceVectorContentSelection(
+              {
+                selected_vertices: draft.content_edit_mode.selected_vertices,
+                selected_segments: draft.content_edit_mode.selected_segments,
+                selected_tangents: draft.content_edit_mode.selected_tangents,
+              },
+              {
+                type: "tangent",
+                index: [vertex, action.target.tangent],
+                additive: action.additive,
+              }
+            );
+            draft.content_edit_mode.selected_vertices = next.selected_vertices;
+            draft.content_edit_mode.selected_segments = next.selected_segments;
+            draft.content_edit_mode.selected_tangents = next.selected_tangents;
+            draft.content_edit_mode.a_point =
+              next.selected_vertices.length > 0
+                ? next.selected_vertices[0]
+                : next.selected_tangents.length > 0
+                  ? next.selected_tangents[0][0]
+                  : null;
             break;
           }
           case "delete-segment": {
@@ -794,6 +836,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             if (draft.content_edit_mode?.type === "vector") {
               // Clear segment selection since the segment was deleted
               draft.content_edit_mode.selected_segments = [];
+              draft.content_edit_mode.selected_tangents = [];
               draft.content_edit_mode.a_point = null;
             }
             break;
@@ -817,6 +860,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               if (draft.content_edit_mode?.type === "vector") {
                 draft.content_edit_mode.selected_vertices = [newIndex];
                 draft.content_edit_mode.selected_segments = [];
+                draft.content_edit_mode.selected_tangents = [];
                 draft.content_edit_mode.a_point = newIndex;
               }
               break;

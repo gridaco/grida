@@ -84,6 +84,17 @@ interface SegmentQuery extends ISegmentIdx {
   node_id: NodeID;
 }
 
+interface TangentQuery extends IVertexIdx {
+  /**
+   * node id (must be a path node)
+   */
+  node_id: NodeID;
+  /**
+   * tangent index (0 for `a`, 1 for `b`)
+   */
+  tangent: 0 | 1;
+}
+
 interface IGradientStopIdx {
   /**
    * index of the gradient stop
@@ -258,7 +269,8 @@ export type EditorVectorEditorAction =
   | EditorVectorDeleteVertexAction
   | EditorVectorSelectSegmentAction
   | EditorVectorDeleteSegmentAction
-  | EditorVectorSplitSegmentAction;
+  | EditorVectorSplitSegmentAction
+  | EditorVectorSelectTangentAction;
 
 export interface EditorVectorHoverVertexAction {
   type: "hover-vertex";
@@ -296,6 +308,13 @@ export interface EditorVectorSplitSegmentAction {
     node_id: string;
     segment: number;
   };
+}
+
+export interface EditorVectorSelectTangentAction {
+  type: "select-tangent";
+  target: TangentQuery;
+  /** if true, toggle selection instead of resetting */
+  additive?: boolean;
 }
 // #endregion
 

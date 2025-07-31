@@ -1394,6 +1394,7 @@ export function useSurfaceVectorEditor() {
     node_id,
     selected_vertices,
     selected_segments,
+    selected_tangents,
     a_point,
     path_cursor_position,
     next_ta,
@@ -1454,6 +1455,16 @@ export function useSurfaceVectorEditor() {
     [instance, node_id]
   );
 
+  const selectTangent = useCallback(
+    (segment: number, control: "ta" | "tb", additive?: boolean) => {
+      const vertex = control === "ta" ? segments[segment].a : segments[segment].b;
+      instance.selectTangent(node_id, vertex, control === "ta" ? 0 : 1, {
+        additive,
+      });
+    },
+    [instance, node_id, segments]
+  );
+
   const deleteSegment = useCallback(
     (segment: number) => {
       instance.deleteSegment(node_id, segment);
@@ -1486,6 +1497,7 @@ export function useSurfaceVectorEditor() {
       offset,
       selected_vertices,
       selected_segments,
+      selected_tangents,
       hovered_point,
       a_point,
       next_ta,
@@ -1494,6 +1506,7 @@ export function useSurfaceVectorEditor() {
       onVertexDragStart,
       deleteVertex,
       selectSegment,
+      selectTangent,
       deleteSegment,
       onCurveControlPointDragStart,
       onSegmentDragStart,
@@ -1508,6 +1521,7 @@ export function useSurfaceVectorEditor() {
       offset,
       selected_vertices,
       selected_segments,
+      selected_tangents,
       hovered_point,
       a_point,
       next_ta,
@@ -1516,6 +1530,7 @@ export function useSurfaceVectorEditor() {
       onVertexDragStart,
       deleteVertex,
       selectSegment,
+      selectTangent,
       deleteSegment,
       onCurveControlPointDragStart,
       onSegmentDragStart,

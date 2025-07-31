@@ -298,6 +298,7 @@ function __self_evt_on_pointer_down(
 
         draft.content_edit_mode.selected_vertices = [new_vertex_idx];
         draft.content_edit_mode.selected_segments = [];
+        draft.content_edit_mode.selected_tangents = [];
         draft.content_edit_mode.a_point = new_vertex_idx;
 
         // ...
@@ -342,6 +343,7 @@ function __self_evt_on_pointer_down(
           node_id: new_node_id,
           selected_vertices: [0], // select the first point
           selected_segments: [],
+          selected_tangents: [],
           a_point: 0,
           next_ta: null,
           path_cursor_position: pos,
