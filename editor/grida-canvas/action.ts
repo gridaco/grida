@@ -63,7 +63,21 @@ interface IVertexIdx {
   vertex: number;
 }
 
+interface ISegmentIdx {
+  /**
+   * index of the segment
+   */
+  segment: number;
+}
+
 interface VertexQuery extends IVertexIdx {
+  /**
+   * node id (must be a path node)
+   */
+  node_id: NodeID;
+}
+
+interface SegmentQuery extends ISegmentIdx {
   /**
    * node id (must be a path node)
    */
@@ -239,13 +253,16 @@ export interface EditorHierarchyMoveAction {
 
 // #region [path]
 export type EditorVectorPathAction =
-  | EditorDeleteVertexAction
-  | EditorSelectVertexAction
   | EditorHoverVertexAction
+  | EditorSelectVertexAction
+  | EditorDeleteVertexAction
+  | EditorSelectSegmentAction
+  | EditorDeleteSegmentAction
   | EditorInsertMiddleVertexAction;
 
-export interface EditorDeleteVertexAction {
-  type: "delete-vertex";
+export interface EditorHoverVertexAction {
+  type: "hover-vertex";
+  event: "enter" | "leave";
   target: VertexQuery;
 }
 
@@ -254,10 +271,19 @@ export interface EditorSelectVertexAction {
   target: VertexQuery;
 }
 
-export interface EditorHoverVertexAction {
-  type: "hover-vertex";
-  event: "enter" | "leave";
+export interface EditorDeleteVertexAction {
+  type: "delete-vertex";
   target: VertexQuery;
+}
+
+export interface EditorSelectSegmentAction {
+  type: "select-segment";
+  target: SegmentQuery;
+}
+
+export interface EditorDeleteSegmentAction {
+  type: "delete-segment";
+  target: SegmentQuery;
 }
 
 export interface EditorInsertMiddleVertexAction {

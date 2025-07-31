@@ -517,7 +517,6 @@ function __self_start_gesture(
       const verticies = node.vectorNetwork.vertices.map((v) => v.p);
       const seg = node.vectorNetwork.segments[segIndex];
 
-      content_edit_mode.selected_vertices = [seg.a, seg.b];
       content_edit_mode.selected_segments = [segIndex];
       content_edit_mode.a_point = seg.a;
 

@@ -1678,9 +1678,12 @@ export namespace editor.api {
 
     setClipboardColor(color: cg.RGBA8888): void;
 
-    //
+    // vector editor
     selectVertex(node_id: NodeID, vertex: number): void;
     deleteVertex(node_id: NodeID, vertex: number): void;
+    selectSegment(node_id: NodeID, segment: number): void;
+    deleteSegment(node_id: NodeID, segment: number): void;
+    insertMiddleVertex(node_id: NodeID, segment: number): void;
     //
 
     //

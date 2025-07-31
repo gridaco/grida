@@ -632,6 +632,7 @@ export class Editor
     });
   }
 
+  //
   public selectVertex(node_id: editor.NodeID, vertex: number) {
     this.dispatch({
       type: "select-vertex",
@@ -648,6 +649,26 @@ export class Editor
       target: {
         node_id,
         vertex,
+      },
+    });
+  }
+
+  public selectSegment(node_id: editor.NodeID, segment: number): void {
+    this.dispatch({
+      type: "select-segment",
+      target: {
+        node_id,
+        segment,
+      },
+    });
+  }
+
+  public deleteSegment(node_id: editor.NodeID, segment: number): void {
+    this.dispatch({
+      type: "delete-segment",
+      target: {
+        node_id,
+        segment,
       },
     });
   }

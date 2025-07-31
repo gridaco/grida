@@ -683,9 +683,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       break;
     }
     //
-    case "delete-vertex":
-    case "select-vertex":
     case "hover-vertex":
+    case "select-vertex":
+    case "delete-vertex":
+    case "select-segment":
+    case "delete-segment":
     case "insert-middle-vertex": {
       return produce(state, (draft) => {
         const { node_id } = action.target;
@@ -694,43 +696,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const node = dq.__getNodeById(draft, node_id);
 
         switch (action.type) {
-          case "delete-vertex": {
-            if (node.type === "vector") {
-              const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-              vne.deleteVertex(vertex);
-              const bb_b = vne.getBBox();
-              const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
-              vne.translate(cmath.vector2.invert(delta));
-              const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
-
-              node.left = new_pos[0];
-              node.top = new_pos[1];
-              node.width = bb_b.width;
-              node.height = bb_b.height;
-
-              node.vectorNetwork = vne.value;
-
-              if (draft.content_edit_mode?.type === "vector") {
-              if (
-                  draft.content_edit_mode.selected_vertices.includes(vertex)
-                ) {
-                  // clear the selection as deleted
-                  draft.content_edit_mode.selected_vertices = [];
-                  draft.content_edit_mode.selected_segments = [];
-                }
-              }
-              break;
-            }
-            break;
-          }
-          case "select-vertex": {
-            assert(draft.content_edit_mode?.type === "vector");
-            draft.selection = [node_id];
-            draft.content_edit_mode.selected_vertices = [vertex];
-            draft.content_edit_mode.selected_segments = [];
-            draft.content_edit_mode.a_point = vertex;
-            break;
-          }
           case "hover-vertex": {
             assert(
               draft.selection[0] === node_id,
@@ -742,8 +707,55 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 break;
               case "leave":
                 draft.hovered_vertex_idx = null;
-              break;
+                break;
             }
+            break;
+          }
+          case "select-vertex": {
+            assert(draft.content_edit_mode?.type === "vector");
+            draft.selection = [node_id];
+            draft.content_edit_mode.selected_vertices = [vertex];
+            draft.content_edit_mode.selected_segments = [];
+            draft.content_edit_mode.a_point = vertex;
+            break;
+          }
+          case "delete-vertex": {
+            assert(node.type === "vector");
+
+            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+            vne.deleteVertex(vertex);
+            const bb_b = vne.getBBox();
+            const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
+            vne.translate(cmath.vector2.invert(delta));
+            const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
+
+            node.left = new_pos[0];
+            node.top = new_pos[1];
+            node.width = bb_b.width;
+            node.height = bb_b.height;
+
+            node.vectorNetwork = vne.value;
+
+            if (draft.content_edit_mode?.type === "vector") {
+              if (draft.content_edit_mode.selected_vertices.includes(vertex)) {
+                // clear the selection as deleted
+                draft.content_edit_mode.selected_vertices = [];
+                draft.content_edit_mode.selected_segments = [];
+              }
+            }
+            break;
+          }
+          case "select-segment": {
+            assert(draft.content_edit_mode?.type === "vector");
+            draft.selection = [node_id];
+            draft.content_edit_mode.selected_vertices = [];
+            draft.content_edit_mode.selected_segments = [segment];
+            draft.content_edit_mode.a_point = segment;
+            break;
+          }
+          case "delete-segment": {
+            assert(node.type === "vector");
+            // TODO: delete segment in vne
             break;
           }
           case "insert-middle-vertex": {

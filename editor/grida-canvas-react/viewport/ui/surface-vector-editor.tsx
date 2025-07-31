@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import {
   useEditorFlagsState,
-  useSurfacePathEditor,
+  useSurfaceVectorEditor,
   useToolState,
   useTransformState,
 } from "@/grida-canvas-react/provider";
@@ -35,7 +35,7 @@ export function SurfaceVectorEditor({
     path_cursor_position,
     a_point,
     next_ta,
-  } = useSurfacePathEditor();
+  } = useSurfaceVectorEditor();
 
   assert(node_id === _node_id);
 
@@ -207,7 +207,8 @@ function Segment({
   hovered: boolean;
   onHover: (segmentIndex: number | null) => void;
 }) {
-  const editor = useSurfacePathEditor();
+  const editor = useSurfaceVectorEditor();
+  const selected = editor.selected_segments.includes(segmentIndex);
   const showMiddle =
     hovered && cmath.vector2.isZero(ta) && cmath.vector2.isZero(tb);
   const middle = useMemo(() => {
@@ -227,7 +228,7 @@ function Segment({
     },
     onPointerDown: ({ event }) => {
       event.preventDefault();
-      // TODO: Implement segment selection if needed
+      editor.selectSegment(segmentIndex);
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
@@ -258,8 +259,8 @@ function Segment({
           b={b}
           ta={ta}
           tb={tb}
-          strokeWidth={hovered ? 3 : 1}
-          stroke={hovered ? "skyblue" : "gray"}
+          strokeWidth={selected ? 3 : hovered ? 3 : 1}
+          stroke={selected ? "#3b82f6" : hovered ? "skyblue" : "gray"}
         />
       </div>
     </>
@@ -282,7 +283,7 @@ function CurveControlExtension({
   ta?: cmath.Vector2;
   tb?: cmath.Vector2;
 }) {
-  const editor = useSurfacePathEditor();
+  const editor = useSurfaceVectorEditor();
   const bind = useGesture({
     onDragStart: ({ event }) => {
       event.preventDefault();
@@ -326,7 +327,7 @@ function MiddlePoint({
   point: cmath.Vector2;
   segmentIndex: number;
 }) {
-  const editor = useSurfacePathEditor();
+  const editor = useSurfaceVectorEditor();
   const bind = useGesture({
     onPointerDown: ({ event }) => {
       event.preventDefault();
@@ -344,7 +345,7 @@ function VertexPoint({
   point: cmath.Vector2;
   index: number;
 }) {
-  const editor = useSurfacePathEditor();
+  const editor = useSurfaceVectorEditor();
   const selected = editor.selected_vertices.includes(index);
   const hovered = editor.hovered_point === index;
   const bind = useGesture(
@@ -379,7 +380,7 @@ function VertexPoint({
         if (event.key === "Delete" || event.key === "Backspace") {
           event.stopPropagation();
           event.preventDefault();
-          editor.onVertexDelete(index);
+          editor.deleteVertex(index);
         }
       },
     },

@@ -1378,7 +1378,7 @@ export function useClipboardSync() {
   //
 }
 
-export function useSurfacePathEditor() {
+export function useSurfaceVectorEditor() {
   const instance = useCurrentEditor();
   const state = useEditorState(instance, (state) => ({
     content_edit_mode: state.content_edit_mode,
@@ -1433,7 +1433,7 @@ export function useSurfacePathEditor() {
     [instance, node_id]
   );
 
-  const onVertexDelete = useCallback(
+  const deleteVertex = useCallback(
     (vertex: number) => {
       instance.deleteVertex(node_id, vertex);
     },
@@ -1443,6 +1443,20 @@ export function useSurfacePathEditor() {
   const onCurveControlPointDragStart = useCallback(
     (segment: number, control: "ta" | "tb") => {
       instance.startCurveGesture(node_id, segment, control);
+    },
+    [instance, node_id]
+  );
+
+  const selectSegment = useCallback(
+    (segment: number) => {
+      instance.selectSegment(node_id, segment);
+    },
+    [instance, node_id]
+  );
+
+  const deleteSegment = useCallback(
+    (segment: number) => {
+      instance.deleteSegment(node_id, segment);
     },
     [instance, node_id]
   );
@@ -1478,7 +1492,9 @@ export function useSurfacePathEditor() {
       selectVertex,
       onVertexHover,
       onVertexDragStart,
-      onVertexDelete,
+      deleteVertex,
+      selectSegment,
+      deleteSegment,
       onCurveControlPointDragStart,
       onSegmentDragStart,
       onSegmentInsertMiddle,
@@ -1498,7 +1514,9 @@ export function useSurfacePathEditor() {
       selectVertex,
       onVertexHover,
       onVertexDragStart,
-      onVertexDelete,
+      deleteVertex,
+      selectSegment,
+      deleteSegment,
       onCurveControlPointDragStart,
       onSegmentDragStart,
       onSegmentInsertMiddle,
