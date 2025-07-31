@@ -69,6 +69,10 @@ export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
   const document = useEditorState(editor, (state) => state.document);
   const debug = useEditorState(editor, (state) => state.debug);
   const transform = useEditorState(editor, (state) => state.transform);
+  const hoveredNodeId = useEditorState(
+    editor,
+    (state) => state.hovered_node_id
+  );
 
   return (
     <SizeProvider className="w-full h-full">
@@ -78,6 +82,7 @@ export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
         transform={transform}
         data={document}
         debug={debug}
+        highlightStrokes={hoveredNodeId ? [hoveredNodeId] : undefined}
         onMount={editor.bind.bind(editor)}
       />
     </SizeProvider>

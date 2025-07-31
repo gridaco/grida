@@ -131,6 +131,12 @@ declare namespace createGridaCanvas {
       b: number
     ): void;
 
+    _highlight_strokes(
+      state: GridaCanvasWebGlApplicationPtr,
+      ptr: number,
+      len: number
+    ): void;
+
     _set_debug(state: GridaCanvasWebGlApplicationPtr, debug: boolean): void;
     _toggle_debug(state: GridaCanvasWebGlApplicationPtr): void;
     _set_verbose(state: GridaCanvasWebGlApplicationPtr, verbose: boolean): void;

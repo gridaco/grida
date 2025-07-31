@@ -288,6 +288,22 @@ pub unsafe extern "C" fn devtools_rendering_set_show_ruler(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn highlight_strokes(
+    app: *mut EmscriptenApplication,
+    ptr: *const u8,
+    len: usize,
+) {
+    use serde_json;
+    if let Some(app) = app.as_mut() {
+        if let Some(json) = __str_from_ptr_len(ptr, len) {
+            if let Ok(ids) = serde_json::from_str::<Vec<String>>(&json) {
+                app.highlight_strokes(ids);
+            }
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
     app: *mut EmscriptenApplication,
     enabled: bool,

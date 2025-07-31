@@ -12,6 +12,7 @@ function CanvasContent({
   data,
   transform,
   debug,
+  highlightStrokes,
   onMount,
   className,
   dpr,
@@ -22,6 +23,7 @@ function CanvasContent({
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
+  highlightStrokes?: string[];
   onMount?: (surface: Grida2D) => void;
   className?: string;
 }) {
@@ -100,6 +102,13 @@ function CanvasContent({
     }
   }, [data]);
 
+  useLayoutEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.highlightStrokes(highlightStrokes);
+      rendererRef.current.redraw();
+    }
+  }, [highlightStrokes]);
+
   return (
     <canvas
       ref={canvasRef}
@@ -130,6 +139,7 @@ export default function Canvas({
   data,
   transform,
   debug,
+  highlightStrokes,
   onMount,
   className,
 }: {
@@ -138,6 +148,7 @@ export default function Canvas({
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
+  highlightStrokes?: string[];
   onMount?: (surface: Grida2D) => void;
   className?: string;
 }) {
@@ -152,6 +163,7 @@ export default function Canvas({
       data={data}
       transform={transform}
       debug={debug}
+      highlightStrokes={highlightStrokes}
       onMount={onMount}
       className={className}
     />

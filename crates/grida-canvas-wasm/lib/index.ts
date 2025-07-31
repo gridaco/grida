@@ -314,6 +314,13 @@ export class Grida2D {
     this.module._pointer_move(this.appptr, x, y);
   }
 
+  highlightStrokes(ids?: string[]) {
+    const json = JSON.stringify(ids ?? []);
+    const [ptr, len] = this._alloc_string(json);
+    this.module._highlight_strokes(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
   // ====================================================================================================
   // DEVTOOLS
   // ====================================================================================================

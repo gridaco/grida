@@ -1,4 +1,5 @@
 use crate::cache::scene::SceneCache;
+use crate::devtools::stroke_overlay;
 use crate::fonts::geistmono::sk_font_geistmono;
 use crate::node::schema::NodeId;
 use crate::painter::{
@@ -32,15 +33,6 @@ thread_local! {
         p.set_color(Color::from_argb(200, 255, 0, 0));
         p.set_style(PaintStyle::Stroke);
         p.set_stroke_width(4.0);
-        p.set_anti_alias(true);
-        p
-    };
-
-    static PATH_STROKE: Paint = {
-        let mut p = Paint::default();
-        p.set_color(Color::from_argb(200, 0, 255, 0));
-        p.set_style(PaintStyle::Stroke);
-        p.set_stroke_width(3.0);
         p.set_anti_alias(true);
         p
     };
@@ -118,9 +110,14 @@ impl HitOverlay {
                         canvas.draw_rect(rect, stroke);
                     });
 
-                    PATH_STROKE.with(|stroke| {
-                        canvas.draw_path(&path, stroke);
-                    });
+                    // Use the canvas we already have instead of borrowing surface again
+                    stroke_overlay::StrokeOverlay::draw_on_canvas(
+                        canvas,
+                        std::slice::from_ref(id),
+                        camera,
+                        cache,
+                        fonts,
+                    );
                 }
             }
         }

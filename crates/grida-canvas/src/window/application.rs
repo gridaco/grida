@@ -1,4 +1,6 @@
-use crate::devtools::{fps_overlay, hit_overlay, ruler_overlay, stats_overlay, tile_overlay};
+use crate::devtools::{
+    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay, tile_overlay,
+};
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
 use crate::node::schema::Scene;
@@ -42,6 +44,8 @@ pub trait ApplicationApi {
     fn devtools_rendering_set_show_stats(&mut self, show: bool);
     fn devtools_rendering_set_show_hit_testing(&mut self, show: bool);
     fn devtools_rendering_set_show_ruler(&mut self, show: bool);
+
+    fn highlight_strokes(&mut self, ids: Vec<String>);
 
     /// Load a scene from a JSON string using the `io_grida` parser.
     fn load_scene_json(&mut self, json: &str);
@@ -108,6 +112,7 @@ pub struct UnknownTargetApplication {
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
     pub(crate) devtools_selection: Option<crate::node::schema::NodeId>,
+    pub(crate) highlight_strokes: Vec<crate::node::schema::NodeId>,
     pub(crate) devtools_rendering_show_fps: bool,
     pub(crate) devtools_rendering_show_tiles: bool,
     pub(crate) devtools_rendering_show_stats: bool,
@@ -265,6 +270,11 @@ impl ApplicationApi for UnknownTargetApplication {
         self.devtools_rendering_show_ruler = show;
     }
 
+    fn highlight_strokes(&mut self, ids: Vec<String>) {
+        self.highlight_strokes = ids;
+        self.queue();
+    }
+
     fn load_scene_json(&mut self, json: &str) {
         use crate::io::io_grida;
 
@@ -351,6 +361,7 @@ impl UnknownTargetApplication {
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
             devtools_selection: None,
+            highlight_strokes: Vec::new(),
             devtools_rendering_show_fps: debug,
             devtools_rendering_show_tiles: debug,
             devtools_rendering_show_stats: debug,
@@ -564,6 +575,15 @@ impl UnknownTargetApplication {
                     surface,
                     self.hit_test_result.as_ref(),
                     self.devtools_selection.as_ref(),
+                    &self.renderer.camera,
+                    self.renderer.get_cache(),
+                    &self.renderer.fonts,
+                );
+            }
+            if !self.highlight_strokes.is_empty() {
+                stroke_overlay::StrokeOverlay::draw(
+                    surface,
+                    &self.highlight_strokes,
                     &self.renderer.camera,
                     self.renderer.get_cache(),
                     &self.renderer.fonts,
