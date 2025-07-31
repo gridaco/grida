@@ -1078,7 +1078,7 @@ export namespace editor.gesture {
    * @remarks
    * This is only valid with content edit mode is "vector"
    */
-export type GestureTranslateVertex = IGesture & {
+  export type GestureTranslateVertex = IGesture & {
     type: "translate-vertex";
 
     /**
@@ -1096,16 +1096,16 @@ export type GestureTranslateVertex = IGesture & {
     /**
      * initial position of node
      */
-  readonly initial_position: cmath.Vector2;
-};
+    readonly initial_position: cmath.Vector2;
+  };
 
-export type GestureTranslateSegment = IGesture & {
-  type: "translate-segment";
-  readonly initial_verticies: cmath.Vector2[];
-  readonly segment: number;
-  readonly node_id: string;
-  readonly initial_position: cmath.Vector2;
-};
+  export type GestureTranslateSegment = IGesture & {
+    type: "translate-segment";
+    readonly initial_verticies: cmath.Vector2[];
+    readonly segment: number;
+    readonly node_id: string;
+    readonly initial_position: cmath.Vector2;
+  };
 
   /**
    * curves the existing segment
