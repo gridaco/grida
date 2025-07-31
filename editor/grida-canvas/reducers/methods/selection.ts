@@ -61,3 +61,50 @@ export function self_clearSelection<S extends editor.state.IEditorState>(
   draft.selection = [];
   return draft;
 }
+
+export type VectorContentSelectionState = Pick<
+  editor.state.VectorContentEditMode,
+  "selected_vertices" | "selected_segments"
+>;
+
+export type VectorContentSelectionAction =
+  | { type: "vertex"; index: number; additive?: boolean }
+  | { type: "segment"; index: number; additive?: boolean };
+
+export function reduceVectorContentSelection(
+  state: VectorContentSelectionState,
+  action: VectorContentSelectionAction
+): VectorContentSelectionState {
+  let { selected_vertices, selected_segments } = state;
+  const additive = action.additive ?? false;
+
+  if (!additive) {
+    if (action.type === "vertex") {
+      selected_vertices = [action.index];
+      selected_segments = [];
+    } else {
+      selected_vertices = [];
+      selected_segments = [action.index];
+    }
+  } else {
+    if (action.type === "vertex") {
+      const set = new Set(selected_vertices);
+      if (set.has(action.index)) {
+        set.delete(action.index);
+      } else {
+        set.add(action.index);
+      }
+      selected_vertices = Array.from(set);
+    } else {
+      const set = new Set(selected_segments);
+      if (set.has(action.index)) {
+        set.delete(action.index);
+      } else {
+        set.add(action.index);
+      }
+      selected_segments = Array.from(set);
+    }
+  }
+
+  return { selected_vertices, selected_segments };
+}

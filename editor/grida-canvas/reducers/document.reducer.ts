@@ -22,6 +22,7 @@ import {
   self_duplicateNode,
   self_insertSubDocument,
   self_selectNode,
+  reduceVectorContentSelection,
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
@@ -714,9 +715,19 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "select-vertex": {
             assert(draft.content_edit_mode?.type === "vector");
             draft.selection = [node_id];
-            draft.content_edit_mode.selected_vertices = [vertex];
-            draft.content_edit_mode.selected_segments = [];
-            draft.content_edit_mode.a_point = vertex;
+            const next = reduceVectorContentSelection(
+              {
+                selected_vertices: draft.content_edit_mode.selected_vertices,
+                selected_segments: draft.content_edit_mode.selected_segments,
+              },
+              { type: "vertex", index: vertex, additive: action.additive }
+            );
+            draft.content_edit_mode.selected_vertices = next.selected_vertices;
+            draft.content_edit_mode.selected_segments = next.selected_segments;
+            draft.content_edit_mode.a_point =
+              next.selected_vertices.length > 0
+                ? next.selected_vertices[0]
+                : null;
             break;
           }
           case "delete-vertex": {
@@ -748,9 +759,19 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "select-segment": {
             assert(draft.content_edit_mode?.type === "vector");
             draft.selection = [node_id];
-            draft.content_edit_mode.selected_vertices = [];
-            draft.content_edit_mode.selected_segments = [segment];
-            draft.content_edit_mode.a_point = segment;
+            const next = reduceVectorContentSelection(
+              {
+                selected_vertices: draft.content_edit_mode.selected_vertices,
+                selected_segments: draft.content_edit_mode.selected_segments,
+              },
+              { type: "segment", index: segment, additive: action.additive }
+            );
+            draft.content_edit_mode.selected_vertices = next.selected_vertices;
+            draft.content_edit_mode.selected_segments = next.selected_segments;
+            draft.content_edit_mode.a_point =
+              next.selected_vertices.length > 0
+                ? next.selected_vertices[0]
+                : null;
             break;
           }
           case "delete-segment": {

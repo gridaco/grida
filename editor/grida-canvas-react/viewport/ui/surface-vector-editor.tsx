@@ -215,26 +215,33 @@ function Segment({
     if (!showMiddle) return null;
     return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] as cmath.Vector2;
   }, [showMiddle, a, b]);
-  const bind = useGesture({
-    onHover: (s) => {
-      // enter
-      if (s.first) {
-        onHover(segmentIndex);
-      }
-      // leave
-      if (s.last) {
-        onHover(null);
-      }
+  const bind = useGesture(
+    {
+      onHover: (s) => {
+        // enter
+        if (s.first) {
+          onHover(segmentIndex);
+        }
+        // leave
+        if (s.last) {
+          onHover(null);
+        }
+      },
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+        editor.selectSegment(segmentIndex, event.shiftKey);
+      },
+      onDragStart: ({ event }) => {
+        event.preventDefault();
+        editor.onSegmentDragStart(segmentIndex);
+      },
     },
-    onPointerDown: ({ event }) => {
-      event.preventDefault();
-      editor.selectSegment(segmentIndex);
-    },
-    onDragStart: ({ event }) => {
-      event.preventDefault();
-      editor.onSegmentDragStart(segmentIndex);
-    },
-  });
+    {
+      drag: {
+        threshold: 1,
+      },
+    }
+  );
 
   return (
     <>
@@ -367,7 +374,7 @@ function VertexPoint({
           // focus explicitly for key events (as default behavior is prevented)
           element.focus();
         }
-        editor.selectVertex(index);
+        editor.selectVertex(index, event.shiftKey);
       },
       onDragStart: (state) => {
         const { event } = state;

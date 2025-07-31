@@ -269,6 +269,8 @@ export interface EditorVectorHoverVertexAction {
 export interface EditorVectorSelectVertexAction {
   type: "select-vertex";
   target: VertexQuery;
+  /** if true, toggle selection instead of resetting */
+  additive?: boolean;
 }
 
 export interface EditorVectorDeleteVertexAction {
@@ -279,6 +281,8 @@ export interface EditorVectorDeleteVertexAction {
 export interface EditorVectorSelectSegmentAction {
   type: "select-segment";
   target: SegmentQuery;
+  /** if true, toggle selection instead of resetting */
+  additive?: boolean;
 }
 
 export interface EditorVectorDeleteSegmentAction {

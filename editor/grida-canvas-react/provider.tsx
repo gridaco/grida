@@ -1410,11 +1410,11 @@ export function useSurfaceVectorEditor() {
     : [node.left!, node.top!];
 
   const selectVertex = useCallback(
-    (vertex: number) => {
+    (vertex: number, additive?: boolean) => {
       if (tool.type === "path") {
         return;
       }
-      instance.selectVertex(node_id, vertex);
+      instance.selectVertex(node_id, vertex, { additive });
     },
     [tool.type, instance.selectVertex, node_id]
   );
@@ -1448,8 +1448,8 @@ export function useSurfaceVectorEditor() {
   );
 
   const selectSegment = useCallback(
-    (segment: number) => {
-      instance.selectSegment(node_id, segment);
+    (segment: number, additive?: boolean) => {
+      instance.selectSegment(node_id, segment, { additive });
     },
     [instance, node_id]
   );

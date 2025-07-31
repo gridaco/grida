@@ -633,13 +633,18 @@ export class Editor
   }
 
   //
-  public selectVertex(node_id: editor.NodeID, vertex: number) {
+  public selectVertex(
+    node_id: editor.NodeID,
+    vertex: number,
+    options: { additive?: boolean } = {}
+  ) {
     this.dispatch({
       type: "select-vertex",
       target: {
         node_id,
         vertex,
       },
+      additive: options.additive,
     });
   }
 
@@ -653,13 +658,18 @@ export class Editor
     });
   }
 
-  public selectSegment(node_id: editor.NodeID, segment: number): void {
+  public selectSegment(
+    node_id: editor.NodeID,
+    segment: number,
+    options: { additive?: boolean } = {}
+  ): void {
     this.dispatch({
       type: "select-segment",
       target: {
         node_id,
         segment,
       },
+      additive: options.additive,
     });
   }
 
