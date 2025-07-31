@@ -673,9 +673,9 @@ export class Editor
     });
   }
 
-  public insertMiddleVertex(node_id: editor.NodeID, segment: number) {
+  public splitSegment(node_id: editor.NodeID, segment: number) {
     this.dispatch({
-      type: "insert-middle-vertex",
+      type: "split-segment",
       target: {
         node_id,
         segment,

@@ -1471,7 +1471,7 @@ export function useSurfaceVectorEditor() {
   const onSegmentInsertMiddle = useCallback(
     (segment: number) => {
       const newIndex = vertices.length;
-      instance.insertMiddleVertex(node_id, segment);
+      instance.splitSegment(node_id, segment);
       instance.startTranslateVertexGesture(node_id, newIndex);
     },
     [instance, node_id, vertices.length]

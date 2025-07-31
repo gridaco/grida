@@ -688,7 +688,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "delete-vertex":
     case "select-segment":
     case "delete-segment":
-    case "insert-middle-vertex": {
+    case "split-segment": {
       return produce(state, (draft) => {
         const { node_id } = action.target;
         const vertex = (action as any).target.vertex;
@@ -755,13 +755,32 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
           case "delete-segment": {
             assert(node.type === "vector");
-            // TODO: delete segment in vne
+
+            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+            vne.deleteSegment(segment);
+            const bb_b = vne.getBBox();
+            const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
+            vne.translate(cmath.vector2.invert(delta));
+            const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
+
+            node.left = new_pos[0];
+            node.top = new_pos[1];
+            node.width = bb_b.width;
+            node.height = bb_b.height;
+
+            node.vectorNetwork = vne.value;
+
+            if (draft.content_edit_mode?.type === "vector") {
+              // Clear segment selection since the segment was deleted
+              draft.content_edit_mode.selected_segments = [];
+              draft.content_edit_mode.a_point = null;
+            }
             break;
           }
-          case "insert-middle-vertex": {
+          case "split-segment": {
             if (node.type === "vector") {
               const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-              const newIndex = vne.insertMiddleVertex(segment);
+              const newIndex = vne.splitSegment(segment);
               const bb_b = vne.getBBox();
               const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
               vne.translate(cmath.vector2.invert(delta));

@@ -29,7 +29,7 @@ export type DocumentAction =
   | EditorCopyCutPasteAction
   | EditorDeleteAction
   | EditorHierarchyAction
-  | EditorVectorPathAction
+  | EditorVectorEditorAction
   | EditorGradientAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
@@ -251,43 +251,43 @@ export interface EditorHierarchyMoveAction {
   index?: number;
 }
 
-// #region [path]
-export type EditorVectorPathAction =
-  | EditorHoverVertexAction
-  | EditorSelectVertexAction
-  | EditorDeleteVertexAction
-  | EditorSelectSegmentAction
-  | EditorDeleteSegmentAction
-  | EditorInsertMiddleVertexAction;
+// #region [vector]
+export type EditorVectorEditorAction =
+  | EditorVectorHoverVertexAction
+  | EditorVectorSelectVertexAction
+  | EditorVectorDeleteVertexAction
+  | EditorVectorSelectSegmentAction
+  | EditorVectorDeleteSegmentAction
+  | EditorVectorSplitSegmentAction;
 
-export interface EditorHoverVertexAction {
+export interface EditorVectorHoverVertexAction {
   type: "hover-vertex";
   event: "enter" | "leave";
   target: VertexQuery;
 }
 
-export interface EditorSelectVertexAction {
+export interface EditorVectorSelectVertexAction {
   type: "select-vertex";
   target: VertexQuery;
 }
 
-export interface EditorDeleteVertexAction {
+export interface EditorVectorDeleteVertexAction {
   type: "delete-vertex";
   target: VertexQuery;
 }
 
-export interface EditorSelectSegmentAction {
+export interface EditorVectorSelectSegmentAction {
   type: "select-segment";
   target: SegmentQuery;
 }
 
-export interface EditorDeleteSegmentAction {
+export interface EditorVectorDeleteSegmentAction {
   type: "delete-segment";
   target: SegmentQuery;
 }
 
-export interface EditorInsertMiddleVertexAction {
-  type: "insert-middle-vertex";
+export interface EditorVectorSplitSegmentAction {
+  type: "split-segment";
   target: {
     node_id: string;
     segment: number;

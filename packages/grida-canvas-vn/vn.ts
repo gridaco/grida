@@ -328,25 +328,45 @@ export namespace vn {
     }
 
     /**
+     * Deletes the segment at the given index.
+     *
+     * @param segmentIndex - Index of the segment to delete
+     *
+     * @example
+     * ```
+     * => vertices: [ A, B, C, D ]
+     * => segments: [ AB, BC, CD ]
+     * => deleteSegment(1) // delete BC
+     * => vertices: [ A, B, C, D ]
+     * => segments: [ AB, CD ]
+     * ```
+     */
+    deleteSegment(segmentIndex: number) {
+      if (segmentIndex < 0 || segmentIndex >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${segmentIndex}`);
+      }
+
+      // Remove the segment at the given index
+      this._segments.splice(segmentIndex, 1);
+    }
+
+    /**
      * Inserts a new vertex at the middle of the given segment and splits the
      * segment into two consecutive segments.
      *
      * Only straight segments (no tangents) are supported.
      *
-     * @param segmentIndex index of the segment to split
+     * @param si index of the segment to split
      * @returns index of the newly inserted vertex
      */
-    insertMiddleVertex(segmentIndex: number): number {
-      if (segmentIndex < 0 || segmentIndex >= this._segments.length) {
-        throw new Error(`Invalid segment index: ${segmentIndex}`);
+    splitSegment(si: number): number {
+      if (si < 0 || si >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${si}`);
       }
 
-      const seg = this._segments[segmentIndex];
+      const seg = this._segments[si];
 
-      if (
-        !cmath.vector2.isZero(seg.ta) ||
-        !cmath.vector2.isZero(seg.tb)
-      ) {
+      if (!cmath.vector2.isZero(seg.ta) || !cmath.vector2.isZero(seg.tb)) {
         throw new Error("only straight segments can be split");
       }
 
@@ -356,10 +376,20 @@ export namespace vn {
 
       const vertexIndex = this._vertices.push({ p: mid }) - 1;
 
-      const s1: VectorNetworkSegment = { a: seg.a, b: vertexIndex, ta: [0, 0], tb: [0, 0] };
-      const s2: VectorNetworkSegment = { a: vertexIndex, b: seg.b, ta: [0, 0], tb: [0, 0] };
+      const s1: VectorNetworkSegment = {
+        a: seg.a,
+        b: vertexIndex,
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+      const s2: VectorNetworkSegment = {
+        a: vertexIndex,
+        b: seg.b,
+        ta: [0, 0],
+        tb: [0, 0],
+      };
 
-      this._segments.splice(segmentIndex, 1, s1, s2);
+      this._segments.splice(si, 1, s1, s2);
 
       return vertexIndex;
     }
