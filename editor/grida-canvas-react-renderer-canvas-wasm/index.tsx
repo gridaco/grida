@@ -23,7 +23,10 @@ function CanvasContent({
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
-  highlightStrokes?: string[];
+  highlightStrokes?: {
+    nodes: string[];
+    style?: { strokeWidth?: number; stroke?: string };
+  };
   onMount?: (surface: Grida2D) => void;
   className?: string;
 }) {
@@ -148,7 +151,10 @@ export default function Canvas({
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
-  highlightStrokes?: string[];
+  highlightStrokes?: {
+    nodes: string[];
+    style?: { strokeWidth?: number; stroke?: string };
+  };
   onMount?: (surface: Grida2D) => void;
   className?: string;
 }) {

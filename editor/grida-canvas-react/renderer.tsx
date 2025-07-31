@@ -82,7 +82,18 @@ export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
         transform={transform}
         data={document}
         debug={debug}
-        highlightStrokes={hoveredNodeId ? [hoveredNodeId] : undefined}
+        highlightStrokes={
+          hoveredNodeId
+            ? {
+                nodes: [hoveredNodeId],
+                style: {
+                  strokeWidth: 1.5,
+                  // --color-workbench-accent-sky
+                  stroke: "#00a6f4",
+                },
+              }
+            : undefined
+        }
         onMount={editor.bind.bind(editor)}
       />
     </SizeProvider>

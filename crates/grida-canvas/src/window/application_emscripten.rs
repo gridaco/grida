@@ -159,8 +159,12 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.devtools_rendering_set_show_ruler(show);
     }
 
-    fn highlight_strokes(&mut self, ids: Vec<String>) {
-        self.base.highlight_strokes(ids);
+    fn highlight_strokes(
+        &mut self,
+        ids: Vec<String>,
+        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+    ) {
+        self.base.highlight_strokes(ids, style);
     }
 
     fn load_scene_json(&mut self, json: &str) {

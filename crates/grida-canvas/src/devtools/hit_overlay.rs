@@ -117,6 +117,7 @@ impl HitOverlay {
                         camera,
                         cache,
                         fonts,
+                        None,
                     );
                 }
             }

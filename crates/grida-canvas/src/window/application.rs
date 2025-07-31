@@ -45,7 +45,11 @@ pub trait ApplicationApi {
     fn devtools_rendering_set_show_hit_testing(&mut self, show: bool);
     fn devtools_rendering_set_show_ruler(&mut self, show: bool);
 
-    fn highlight_strokes(&mut self, ids: Vec<String>);
+    fn highlight_strokes(
+        &mut self,
+        ids: Vec<String>,
+        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+    );
 
     /// Load a scene from a JSON string using the `io_grida` parser.
     fn load_scene_json(&mut self, json: &str);
@@ -113,6 +117,7 @@ pub struct UnknownTargetApplication {
     pub(crate) last_stats: Option<String>,
     pub(crate) devtools_selection: Option<crate::node::schema::NodeId>,
     pub(crate) highlight_strokes: Vec<crate::node::schema::NodeId>,
+    pub(crate) highlight_stroke_style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
     pub(crate) devtools_rendering_show_fps: bool,
     pub(crate) devtools_rendering_show_tiles: bool,
     pub(crate) devtools_rendering_show_stats: bool,
@@ -270,8 +275,13 @@ impl ApplicationApi for UnknownTargetApplication {
         self.devtools_rendering_show_ruler = show;
     }
 
-    fn highlight_strokes(&mut self, ids: Vec<String>) {
+    fn highlight_strokes(
+        &mut self,
+        ids: Vec<String>,
+        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+    ) {
         self.highlight_strokes = ids;
+        self.highlight_stroke_style = style;
         self.queue();
     }
 
@@ -362,6 +372,7 @@ impl UnknownTargetApplication {
             last_stats: None,
             devtools_selection: None,
             highlight_strokes: Vec::new(),
+            highlight_stroke_style: None,
             devtools_rendering_show_fps: debug,
             devtools_rendering_show_tiles: debug,
             devtools_rendering_show_stats: debug,
@@ -587,6 +598,7 @@ impl UnknownTargetApplication {
                     &self.renderer.camera,
                     self.renderer.get_cache(),
                     &self.renderer.fonts,
+                    self.highlight_stroke_style.as_ref(),
                 );
             }
             if self.devtools_rendering_show_tiles {

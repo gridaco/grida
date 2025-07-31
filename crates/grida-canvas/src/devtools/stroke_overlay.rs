@@ -10,16 +10,22 @@ use crate::runtime::repository::FontRepository;
 use crate::sk;
 use skia_safe::{textlayout, Canvas, Color, Font, Paint, PaintStyle, Path, Surface};
 
-thread_local! {
-    static PATH_STROKE: Paint = {
-        let mut p = Paint::default();
-        p.set_color(Color::from_argb(200, 0, 255, 0));
-        p.set_style(PaintStyle::Stroke);
-        p.set_stroke_width(3.0);
-        p.set_anti_alias(true);
-        p
-    };
+#[derive(Debug, Clone)]
+pub struct StrokeOverlayStyle {
+    pub stroke_width: f32,
+    pub stroke: crate::cg::CGColor,
+}
 
+impl Default for StrokeOverlayStyle {
+    fn default() -> Self {
+        Self {
+            stroke_width: 3.0,
+            stroke: crate::cg::CGColor(0, 255, 0, 200),
+        }
+    }
+}
+
+thread_local! {
     static FONT: Font = sk_font_geistmono(20.0);
 }
 
@@ -32,9 +38,10 @@ impl StrokeOverlay {
         camera: &Camera2D,
         cache: &SceneCache,
         fonts: &std::cell::RefCell<FontRepository>,
+        style: Option<&StrokeOverlayStyle>,
     ) {
         let canvas = surface.canvas();
-        Self::draw_on_canvas(canvas, nodes, camera, cache, fonts);
+        Self::draw_on_canvas(canvas, nodes, camera, cache, fonts, style);
     }
 
     pub fn draw_on_canvas(
@@ -43,7 +50,20 @@ impl StrokeOverlay {
         camera: &Camera2D,
         cache: &SceneCache,
         fonts: &std::cell::RefCell<FontRepository>,
+        style: Option<&StrokeOverlayStyle>,
     ) {
+        let style = style.cloned().unwrap_or_default();
+        let mut paint = Paint::default();
+        paint.set_color(Color::from_argb(
+            style.stroke.3,
+            style.stroke.0,
+            style.stroke.1,
+            style.stroke.2,
+        ));
+        paint.set_style(PaintStyle::Stroke);
+        paint.set_stroke_width(style.stroke_width);
+        paint.set_anti_alias(true);
+
         for id in nodes {
             if let Some(layer) = cache.layers.layers.iter().find(|l| l.id() == id) {
                 if cache.geometry.get_render_bounds(id).is_some() {
@@ -64,9 +84,7 @@ impl StrokeOverlay {
                     path.transform(&sk::sk_matrix(base.transform.matrix));
                     path.transform(&sk::sk_matrix(camera.view_matrix().matrix));
 
-                    PATH_STROKE.with(|stroke| {
-                        canvas.draw_path(&path, stroke);
-                    });
+                    canvas.draw_path(&path, &paint);
                 }
             }
         }
