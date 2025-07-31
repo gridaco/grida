@@ -561,7 +561,7 @@ export namespace editor.state {
     // selectedTextRange;
   };
 
-  type VectorContentEditMode = {
+  export type VectorContentEditMode = {
     type: "vector";
     node_id: string;
 

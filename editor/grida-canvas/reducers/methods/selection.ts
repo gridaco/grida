@@ -71,6 +71,17 @@ export type VectorContentSelectionAction =
   | { type: "vertex"; index: number; additive?: boolean }
   | { type: "segment"; index: number; additive?: boolean };
 
+/**
+ * Reduces vector content selection state based on selection actions.
+ *
+ * Handles mixed selection of vertices and segments in VectorContentEditMode.
+ * When not additive (normal select), clears existing selection and selects only the target.
+ * When additive (shift key), toggles the selection state of the target.
+ *
+ * @param state - Current selection state with selected_vertices and selected_segments
+ * @param action - Selection action specifying type (vertex/segment), index, and additive flag
+ * @returns Updated selection state with modified selected_vertices and selected_segments
+ */
 export function reduceVectorContentSelection(
   state: VectorContentSelectionState,
   action: VectorContentSelectionAction
