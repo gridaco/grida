@@ -30,10 +30,40 @@ pub struct VectorNetwork {
 impl VectorNetwork {
     pub fn bounds(&self) -> Rectangle {
         if self.vertices.is_empty() {
-            Rectangle::empty()
-        } else {
-            Rectangle::from_points(&self.vertices.iter().map(|v| [v.0, v.1]).collect::<Vec<_>>())
+            return Rectangle::empty();
         }
+
+        // When there are no segments we fall back to using the vertex points
+        // to compute the bounding box. This should rarely happen for a valid
+        // vector network but provides a safe default.
+        if self.segments.is_empty() {
+            return Rectangle::from_points(
+                &self.vertices.iter().map(|v| [v.0, v.1]).collect::<Vec<_>>(),
+            );
+        }
+
+        let mut bbox: Option<Rectangle> = None;
+        for seg in &self.segments {
+            let a = self.vertices[seg.a];
+            let b = self.vertices[seg.b];
+            let seg_box = if let (Some(ta), Some(tb)) = (seg.ta, seg.tb) {
+                math2::bezier_get_bbox(&math2::CubicBezierWithTangents {
+                    a: [a.0, a.1],
+                    b: [b.0, b.1],
+                    ta,
+                    tb,
+                })
+            } else {
+                Rectangle::from_points(&[[a.0, a.1], [b.0, b.1]])
+            };
+
+            bbox = Some(match bbox {
+                Some(prev) => math2::rect::union(&[prev, seg_box]),
+                None => seg_box,
+            });
+        }
+
+        bbox.unwrap_or_else(Rectangle::empty)
     }
 }
 
