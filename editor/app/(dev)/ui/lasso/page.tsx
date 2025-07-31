@@ -2,16 +2,20 @@
 
 import React from "react";
 import { Lasso } from "./lasso";
+import { useLasso } from "./use-lasso";
 
 export default function LassoDemoPage() {
-  const [points, setPoints] = React.useState<{ x: number; y: number }[]>([]);
+  const [completed, setCompleted] = React.useState<{ x: number; y: number }[]>(
+    []
+  );
+  const { ref, points } = useLasso({ onComplete: setCompleted });
 
   return (
     <main className="relative w-dvw h-dvh select-none">
-      <Lasso onComplete={setPoints} />
-      {points.length > 0 && (
+      <Lasso ref={ref} points={points} />
+      {completed.length > 0 && (
         <pre className="absolute top-4 left-4 z-10 bg-background/80 backdrop-blur-sm border rounded p-2 text-xs font-mono">
-          {JSON.stringify(points, null, 2)}
+          {JSON.stringify(completed, null, 2)}
         </pre>
       )}
     </main>
