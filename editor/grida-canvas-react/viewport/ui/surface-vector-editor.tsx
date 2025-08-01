@@ -251,7 +251,7 @@ function Segment({
       onDragStart: ({ event }) => {
         event.preventDefault();
         draggedRef.current = true;
-        editor.onSegmentDragStart();
+        editor.onDragStart();
       },
       onPointerUp: ({ event }) => {
         if (selectedRef.current && !draggedRef.current) {
@@ -463,7 +463,7 @@ function VertexPoint({
         const { event } = state;
         event.preventDefault();
         draggedRef.current = true;
-        editor.onVertexDragStart();
+        editor.onDragStart();
       },
       onPointerUp: ({ event }) => {
         if (selectedRef.current && !draggedRef.current) {

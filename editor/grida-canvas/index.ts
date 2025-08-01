@@ -1673,6 +1673,17 @@ export namespace editor.api {
     selectSegment(node_id: NodeID, segment: number): void;
     deleteSegment(node_id: NodeID, segment: number): void;
     splitSegment(node_id: NodeID, segment: number): void;
+    translateVertex(
+      node_id: NodeID,
+      vertex: number,
+      delta: cmath.Vector2
+    ): void;
+    translateSegment(
+      node_id: NodeID,
+      segment: number,
+      delta: cmath.Vector2
+    ): void;
+
     //
 
     //

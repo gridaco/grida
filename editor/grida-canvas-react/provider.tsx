@@ -1427,10 +1427,6 @@ export function useSurfaceVectorEditor() {
     [instance, node_id]
   );
 
-  const onVertexDragStart = useCallback(() => {
-    instance.startTranslateVectorNetwork(node_id);
-  }, [instance, node_id]);
-
   const deleteVertex = useCallback(
     (vertex: number) => {
       instance.deleteVertex(node_id, vertex);
@@ -1459,6 +1455,10 @@ export function useSurfaceVectorEditor() {
     ]
   );
 
+  const onDragStart = useCallback(() => {
+    instance.startTranslateVectorNetwork(node_id);
+  }, [instance, node_id]);
+
   const selectSegment = useCallback(
     (segment: number, additive?: boolean) => {
       instance.selectSegment(node_id, segment, { additive });
@@ -1468,7 +1468,8 @@ export function useSurfaceVectorEditor() {
 
   const selectTangent = useCallback(
     (segment: number, control: "ta" | "tb", additive?: boolean) => {
-      const vertex = control === "ta" ? segments[segment].a : segments[segment].b;
+      const vertex =
+        control === "ta" ? segments[segment].a : segments[segment].b;
       instance.selectTangent(node_id, vertex, control === "ta" ? 0 : 1, {
         additive,
       });
@@ -1482,10 +1483,6 @@ export function useSurfaceVectorEditor() {
     },
     [instance, node_id]
   );
-
-  const onSegmentDragStart = useCallback(() => {
-    instance.startTranslateVectorNetwork(node_id);
-  }, [instance, node_id]);
 
   const onSegmentInsertMiddle = useCallback(
     (segment: number) => {
@@ -1510,13 +1507,12 @@ export function useSurfaceVectorEditor() {
       next_ta,
       selectVertex,
       onVertexHover,
-      onVertexDragStart,
       deleteVertex,
       selectSegment,
       selectTangent,
       deleteSegment,
       onCurveControlPointDragStart,
-      onSegmentDragStart,
+      onDragStart,
       onSegmentInsertMiddle,
     }),
     [
@@ -1534,13 +1530,12 @@ export function useSurfaceVectorEditor() {
       next_ta,
       selectVertex,
       onVertexHover,
-      onVertexDragStart,
       deleteVertex,
       selectSegment,
       selectTangent,
       deleteSegment,
       onCurveControlPointDragStart,
-      onSegmentDragStart,
+      onDragStart,
       onSegmentInsertMiddle,
     ]
   );
