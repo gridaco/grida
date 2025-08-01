@@ -3,6 +3,17 @@ import { editor } from "@/grida-canvas";
 import cmath from "@grida/cmath";
 import type grida from "@grida/schema";
 
+/**
+ * Collects the vertices and tangents that need translation for the provided
+ * selection.
+ *
+ * Segment endpoints are added automatically. Tangent handles are ignored when
+ * their associated vertex is already included.
+ *
+ * @param network - Vector network containing the geometry.
+ * @param selection - Selected vertices, segments and tangents.
+ * @returns The vertex and tangent indices that should be moved.
+ */
 export function encodeTranslateVectorCommand(
   network: vn.VectorNetwork,
   selection: Pick<
@@ -38,6 +49,19 @@ export function encodeTranslateVectorCommand(
   };
 }
 
+/**
+ * Applies a mutation to a vector node using a `VectorNetworkEditor` and updates
+ * the node's bounding box and position.
+ *
+ * The editor callback can freely modify the network. After the edit completes,
+ * the node's dimensions and position are synchronized with the new bounding box
+ * while the network itself is shifted back to preserve its local origin.
+ *
+ * @template R - Return type of the edit callback.
+ * @param node - The vector node to update.
+ * @param edit - Callback that performs edits on the network editor.
+ * @returns The value returned by the `edit` callback.
+ */
 export function self_updateVectorNode<R>(
   node: grida.program.nodes.VectorNode,
   edit: (vne: vn.VectorNetworkEditor) => R
