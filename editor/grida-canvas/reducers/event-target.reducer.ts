@@ -630,6 +630,7 @@ function __self_evt_on_drag_end(
       break;
     case "path":
     case "hand":
+    case "lasso":
       // keep
       break;
     case "zoom": {
@@ -648,10 +649,6 @@ function __self_evt_on_drag_end(
       }
 
       // cancel to default
-      draft.tool = { type: "cursor" };
-      break;
-    }
-    case "lasso": {
       draft.tool = { type: "cursor" };
       break;
     }
@@ -697,7 +694,10 @@ function __self_evt_on_drag(
     draft.marquee!.b = draft.pointer.position;
   } else if (draft.lasso) {
     draft.lasso.points.push(draft.pointer.position);
-    if (draft.content_edit_mode?.type === "vector" && draft.lasso.points.length > 2) {
+    if (
+      draft.content_edit_mode?.type === "vector" &&
+      draft.lasso.points.length > 2
+    ) {
       const { node_id, neighbouring_vertices } = draft.content_edit_mode;
       const node = dq.__getNodeById(
         draft,
@@ -708,7 +708,9 @@ function __self_evt_on_drag(
 
       const verts = vne.getVerticesAbsolute([rect.x, rect.y]);
       const selected_vertices = verts
-        .map((p, i) => (cmath.polygon.pointInPolygon(p, draft.lasso!.points) ? i : -1))
+        .map((p, i) =>
+          cmath.polygon.pointInPolygon(p, draft.lasso!.points) ? i : -1
+        )
         .filter((i) => i !== -1);
 
       const control_points = vne
@@ -721,7 +723,9 @@ function __self_evt_on_drag(
           return neighbouring_vertices.includes(vert);
         });
       const selected_tangents = control_points
-        .filter(({ point }) => cmath.polygon.pointInPolygon(point, draft.lasso!.points))
+        .filter(({ point }) =>
+          cmath.polygon.pointInPolygon(point, draft.lasso!.points)
+        )
         .map(({ segment, control }) => [
           control === "ta"
             ? node.vectorNetwork.segments[segment].a
@@ -732,11 +736,14 @@ function __self_evt_on_drag(
       draft.content_edit_mode.selected_vertices = selected_vertices;
       draft.content_edit_mode.selected_segments = [];
       draft.content_edit_mode.selected_tangents = selected_tangents;
-      draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(node.vectorNetwork, {
-        selected_vertices: selected_vertices,
-        selected_segments: [],
-        selected_tangents: selected_tangents,
-      });
+      draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
+        node.vectorNetwork,
+        {
+          selected_vertices: selected_vertices,
+          selected_segments: [],
+          selected_tangents: selected_tangents,
+        }
+      );
       draft.content_edit_mode.a_point =
         selected_vertices.length > 0
           ? selected_vertices[0]
