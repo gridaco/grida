@@ -1,5 +1,4 @@
 - [add new property on inspection panel](./property-add-new.md)
 - [re-ordering properties](./property-re-order.md)
 - [hide and show right inspection panel](./right-inspector-panel-show-hide.md)
-- [surface vector editor middle point](./surface-vector-editor.md)
-
+- [vector network editor](./vector-network-editor.md)
