@@ -26,6 +26,7 @@ import {
   useEditor,
 } from "@/grida-canvas-react";
 import {
+  useContentEditModeMinimalState,
   useCurrentSceneState,
   useToolState,
 } from "@/grida-canvas-react/provider";
@@ -123,6 +124,7 @@ import colors, {
   randomcolorname,
 } from "@/theme/tailwindcolors";
 import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
+import { PathToolbar } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/path-toolbar";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -300,6 +302,9 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
                         <BrushToolbarPosition>
                           <BrushToolbar />
                         </BrushToolbarPosition>
+                        <PathToolbarPosition>
+                          <PathToolbar />
+                        </PathToolbarPosition>
                         <ToolbarPosition>
                           <PlaygroundToolbar />
                         </ToolbarPosition>
@@ -489,6 +494,18 @@ function SidebarRight() {
         )}
       </Sidebar>
     </aside>
+  );
+}
+
+function PathToolbarPosition({ children }: React.PropsWithChildren<{}>) {
+  const cem = useContentEditModeMinimalState();
+
+  if (cem?.type !== "vector") return null;
+
+  return (
+    <div className="absolute bottom-24 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+      {children}
+    </div>
   );
 }
 

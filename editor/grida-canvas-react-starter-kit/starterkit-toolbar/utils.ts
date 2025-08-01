@@ -15,7 +15,8 @@ export type ToolbarToolType =
   | "brush"
   | "eraser"
   | "flood-fill"
-  | "path";
+  | "path"
+  | "lasso";
 
 export function toolmode_to_toolbar_value(
   cm: editor.state.ToolMode
@@ -38,6 +39,8 @@ export function toolmode_to_toolbar_value(
       return "eraser";
     case "flood-fill":
       return "flood-fill";
+    case "lasso":
+      return "lasso";
   }
 }
 
@@ -68,6 +71,8 @@ export function toolbar_value_to_cursormode(
       return { type: "eraser" };
     case "flood-fill":
       return { type: "flood-fill" };
+    case "lasso":
+      return { type: "lasso" };
     default:
       return { type: "cursor" };
   }

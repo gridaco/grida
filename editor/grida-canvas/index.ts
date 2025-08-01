@@ -246,6 +246,9 @@ export namespace editor.state {
         type: "hand";
       }
     | {
+        type: "lasso";
+      }
+    | {
         type: "zoom";
       }
     | {

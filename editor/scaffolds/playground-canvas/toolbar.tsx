@@ -156,7 +156,7 @@ export function PlaygroundToolbar() {
   const value = toolmode_to_toolbar_value(tool);
 
   return (
-    <div className="relative">
+    <div className="relative" aria-label="Toolbar">
       {content_edit_mode?.type === "bitmap" && (
         <div className="relative bottom-2 w-full flex justify-center">
           <BitmapEditModeAuxiliaryToolbar />

@@ -13,7 +13,7 @@ import {
   EraserIcon,
   StarIcon,
 } from "@radix-ui/react-icons";
-import { BrushIcon, PenToolIcon, TriangleIcon } from "lucide-react";
+import { BrushIcon, LassoIcon, PenToolIcon, TriangleIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -226,6 +226,8 @@ export function ToolIcon({
       return <BrushIcon {...props} />;
     case "eraser":
       return <EraserIcon {...props} />;
+    case "lasso":
+      return <LassoIcon {...props} />;
     default:
       return null;
   }
