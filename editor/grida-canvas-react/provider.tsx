@@ -862,6 +862,8 @@ export function useEventTargetCSSCursor() {
       case "eraser":
       case "flood-fill":
         return "cell";
+      case "lasso":
+        return "crosshair";
     }
   }, [tool]);
 }

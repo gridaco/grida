@@ -7,7 +7,11 @@ import assert from "assert";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
-import { self_clearSelection, self_selectNode, encodeTranslateVectorCommand } from "./methods";
+import {
+  self_clearSelection,
+  self_selectNode,
+  encodeTranslateVectorCommand,
+} from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
 import vn from "@grida/vn";
@@ -284,10 +288,11 @@ function __self_set_tool(
     return;
   }
 
-  const path_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
+  const vector_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
     "cursor",
     "hand",
     "path",
+    "lasso",
   ];
   const text_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
     "cursor",
@@ -302,7 +307,7 @@ function __self_set_tool(
   if (draft.content_edit_mode) {
     switch (draft.content_edit_mode.type) {
       case "vector":
-        if (!path_edit_mode_valid_tool_modes.includes(tool.type)) return;
+        if (!vector_edit_mode_valid_tool_modes.includes(tool.type)) return;
         break;
       case "text":
         if (!text_edit_mode_valid_tool_modes.includes(tool.type)) return;
@@ -487,11 +492,14 @@ function __self_start_gesture(
       const verticies = node.vectorNetwork.vertices.map((v) => v.p);
       const segments = node.vectorNetwork.segments.map((s) => ({ ...s }));
 
-      const { vertices, tangents } = encodeTranslateVectorCommand(node.vectorNetwork, {
-        selected_vertices: content_edit_mode.selected_vertices,
-        selected_segments: content_edit_mode.selected_segments,
-        selected_tangents: content_edit_mode.selected_tangents,
-      });
+      const { vertices, tangents } = encodeTranslateVectorCommand(
+        node.vectorNetwork,
+        {
+          selected_vertices: content_edit_mode.selected_vertices,
+          selected_segments: content_edit_mode.selected_segments,
+          selected_tangents: content_edit_mode.selected_tangents,
+        }
+      );
 
       draft.gesture = {
         type: "translate-vector-controls",
