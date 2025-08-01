@@ -119,6 +119,7 @@ function __self_try_enter_content_edit_mode_auto(
         selected_tangents: [],
         a_point: null,
         next_ta: null,
+        neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
       };
       break;
@@ -178,6 +179,7 @@ function __self_try_enter_content_edit_mode_auto(
         selected_tangents: [],
         a_point: null,
         next_ta: null,
+        neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
       };
 

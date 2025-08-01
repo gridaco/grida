@@ -31,6 +31,8 @@ export function SurfaceVectorEditor({
     node_id,
     offset,
     vertices,
+    absolute_vertices,
+    absolute_tangents,
     segments,
     selected_tangents,
     neighbouring_vertices,
@@ -61,11 +63,11 @@ export function SurfaceVectorEditor({
         }}
         className="border border-transparent data-[debug='true']:border-pink-500"
       >
-        {vertices.map(({ p }, i) => (
+        {absolute_vertices.map((p, i) => (
           <VertexPoint
             key={i}
             point={cmath.vector2.transform(
-              cmath.vector2.add(offset, p),
+              p,
               transform
             )}
             index={i}
@@ -80,15 +82,15 @@ export function SurfaceVectorEditor({
             }}
           >
             {/* // debug */}
-            {vertices.map((v, i) => (
+            {absolute_vertices.map((v, i) => (
               <text
                 key={i}
-                x={v.p[0] - 8}
-                y={v.p[1] - 8}
+                x={v[0] - 8}
+                y={v[1] - 8}
                 fontSize={8}
                 fill="fuchsia"
               >
-                p{i} ({Math.round(v.p[0])}, {Math.round(v.p[1])})
+                p{i} ({Math.round(v[0])}, {Math.round(v[1])})
               </text>
             ))}
           </svg>
@@ -97,8 +99,8 @@ export function SurfaceVectorEditor({
 
       {/* Render all segments */}
       {segments.map((s, i) => {
-        const a = vertices[s.a].p;
-        const b = vertices[s.b].p;
+        const a = absolute_vertices[s.a];
+        const b = absolute_vertices[s.b];
         const ta = s.ta;
         const tb = s.tb;
 
@@ -106,8 +108,8 @@ export function SurfaceVectorEditor({
           <Segment
             key={i}
             segmentIndex={i}
-            a={cmath.vector2.transform(cmath.vector2.add(a, offset), transform)}
-            b={cmath.vector2.transform(cmath.vector2.add(b, offset), transform)}
+            a={cmath.vector2.transform(a, transform)}
+            b={cmath.vector2.transform(b, transform)}
             ta={transformDelta(ta, transform)}
             tb={transformDelta(tb, transform)}
             hovered={hoveredSegment === i}
@@ -121,7 +123,7 @@ export function SurfaceVectorEditor({
           {/* next segment */}
           <Extension
             a={cmath.vector2.transform(
-              cmath.vector2.add(offset, vertices[a_point].p),
+              absolute_vertices[a_point],
               transform
             )}
             b={cmath.vector2.transform(path_cursor_position, transform)}
@@ -130,8 +132,8 @@ export function SurfaceVectorEditor({
         </>
       )}
       {segments.map((s, i) => {
-        const a = vertices[s.a].p;
-        const b = vertices[s.b].p;
+        const a = absolute_vertices[s.a];
+        const b = absolute_vertices[s.b];
         const ta = s.ta;
         const tb = s.tb;
         const ta_scaled = transformDelta(ta, transform);
@@ -157,12 +159,9 @@ export function SurfaceVectorEditor({
                 <CurveControlExtension
                   segment={i}
                   control="ta"
-                  a={cmath.vector2.transform(
-                    cmath.vector2.add(a, offset),
-                    transform
-                  )}
+                  a={cmath.vector2.transform(a, transform)}
                   b={cmath.vector2.transform(
-                    cmath.vector2.add(a, offset, ta),
+                    cmath.vector2.add(a, ta),
                     transform
                   )}
                   ta={ta_scaled}
@@ -173,12 +172,9 @@ export function SurfaceVectorEditor({
                 <CurveControlExtension
                   segment={i}
                   control="tb"
-                  a={cmath.vector2.transform(
-                    cmath.vector2.add(b, offset),
-                    transform
-                  )}
+                  a={cmath.vector2.transform(b, transform)}
                   b={cmath.vector2.transform(
-                    cmath.vector2.add(b, offset, tb),
+                    cmath.vector2.add(b, tb),
                     transform
                   )}
                   ta={tb_scaled}
@@ -188,12 +184,9 @@ export function SurfaceVectorEditor({
               {/* preview the next ta - cannot be edited */}
               {a_point_is_last && (
                 <Extension
-                  a={cmath.vector2.transform(
-                    cmath.vector2.add(b, offset),
-                    transform
-                  )}
+                  a={cmath.vector2.transform(b, transform)}
                   b={cmath.vector2.transform(
-                    cmath.vector2.add(b, offset, cmath.vector2.invert(tb)),
+                    cmath.vector2.add(b, cmath.vector2.invert(tb)),
                     transform
                   )}
                 />

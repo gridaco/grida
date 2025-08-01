@@ -26,6 +26,7 @@ import {
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
 } from "./methods";
+import { getUXNeighbouringVertices } from "./methods/vector";
 import cmath from "@grida/cmath";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
@@ -346,6 +347,7 @@ function __self_evt_on_pointer_down(
           selected_tangents: [],
           a_point: 0,
           next_ta: null,
+          neighbouring_vertices: [0],
           path_cursor_position: pos,
         };
       }
@@ -650,6 +652,7 @@ function __self_evt_on_drag_end(
       break;
     }
     case "lasso": {
+      draft.tool = { type: "cursor" };
       break;
     }
     case "cursor": {
@@ -694,6 +697,53 @@ function __self_evt_on_drag(
     draft.marquee!.b = draft.pointer.position;
   } else if (draft.lasso) {
     draft.lasso.points.push(draft.pointer.position);
+    if (draft.content_edit_mode?.type === "vector" && draft.lasso.points.length > 2) {
+      const { node_id, neighbouring_vertices } = draft.content_edit_mode;
+      const node = dq.__getNodeById(
+        draft,
+        node_id
+      ) as grida.program.nodes.VectorNode;
+      const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+
+      const verts = vne.getVerticesAbsolute([rect.x, rect.y]);
+      const selected_vertices = verts
+        .map((p, i) => (cmath.polygon.pointInPolygon(p, draft.lasso!.points) ? i : -1))
+        .filter((i) => i !== -1);
+
+      const control_points = vne
+        .getControlPointsAbsolute([rect.x, rect.y])
+        .filter(({ segment, control }) => {
+          const vert =
+            control === "ta"
+              ? node.vectorNetwork.segments[segment].a
+              : node.vectorNetwork.segments[segment].b;
+          return neighbouring_vertices.includes(vert);
+        });
+      const selected_tangents = control_points
+        .filter(({ point }) => cmath.polygon.pointInPolygon(point, draft.lasso!.points))
+        .map(({ segment, control }) => [
+          control === "ta"
+            ? node.vectorNetwork.segments[segment].a
+            : node.vectorNetwork.segments[segment].b,
+          control === "ta" ? 0 : 1,
+        ]) as [number, 0 | 1][];
+
+      draft.content_edit_mode.selected_vertices = selected_vertices;
+      draft.content_edit_mode.selected_segments = [];
+      draft.content_edit_mode.selected_tangents = selected_tangents;
+      draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(node.vectorNetwork, {
+        selected_vertices: selected_vertices,
+        selected_segments: [],
+        selected_tangents: selected_tangents,
+      });
+      draft.content_edit_mode.a_point =
+        selected_vertices.length > 0
+          ? selected_vertices[0]
+          : selected_tangents.length > 0
+            ? selected_tangents[0][0]
+            : null;
+    }
   } else {
     if (draft.gesture.type === "idle") return;
     if (draft.gesture.type === "nudge") return;

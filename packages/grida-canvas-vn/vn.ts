@@ -473,6 +473,51 @@ export namespace vn {
       this._vertices = [a, { p: b }];
       this._segments = [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }];
     }
+
+    /**
+     * Returns absolute positions of vertices.
+     * @param offset translate offset
+     * @param indices optional subset of vertex indices
+     */
+    getVerticesAbsolute(offset: Vector2 = [0, 0], indices?: number[]): Vector2[] {
+      const idx = indices ?? this._vertices.map((_, i) => i);
+      return idx.map((i) => {
+        const p = this._vertices[i].p;
+        return [p[0] + offset[0], p[1] + offset[1]] as Vector2;
+      });
+    }
+
+    /**
+     * Returns absolute positions of tangent control points.
+     * @param offset translate offset
+     */
+    getControlPointsAbsolute(
+      offset: Vector2 = [0, 0],
+      targets?: [number, "ta" | "tb"][]
+    ): { segment: number; control: "ta" | "tb"; point: Vector2 }[] {
+      const result: { segment: number; control: "ta" | "tb"; point: Vector2 }[] = [];
+      const source = targets
+        ? targets.map((t) => ({ segment: t[0], control: t[1] }))
+        : this._segments.flatMap((_, i) => [
+            { segment: i, control: "ta" as const },
+            { segment: i, control: "tb" as const },
+          ]);
+
+      for (const { segment, control } of source) {
+        const seg = this._segments[segment];
+        const vertex = this._vertices[control === "ta" ? seg.a : seg.b].p;
+        const tangent = seg[control];
+        result.push({
+          segment,
+          control,
+          point: [
+            vertex[0] + tangent[0] + offset[0],
+            vertex[1] + tangent[1] + offset[1],
+          ],
+        });
+      }
+      return result;
+    }
   }
 
   /**

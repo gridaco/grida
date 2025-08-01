@@ -615,6 +615,11 @@ export namespace editor.state {
     next_ta: cmath.Vector2 | null;
 
     /**
+     * vertices considered active for showing tangent handles
+     */
+    neighbouring_vertices: number[];
+
+    /**
      * next points position
      *
      * @deprecated - remove me - use global sanp pointer

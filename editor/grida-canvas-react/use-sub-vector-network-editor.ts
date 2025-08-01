@@ -4,6 +4,7 @@ import cmath from "@grida/cmath";
 import assert from "assert";
 import type grida from "@grida/schema";
 import { getUXNeighbouringVertices } from "@/grida-canvas/reducers/methods";
+import vn from "@grida/vn";
 
 export default function useSurfaceVectorEditor() {
   const instance = useCurrentEditor();
@@ -30,32 +31,30 @@ export default function useSurfaceVectorEditor() {
 
   const vertices = node.vectorNetwork.vertices;
   const segments = node.vectorNetwork.segments;
-
-  const neighbouring_vertices = useMemo(
-    () =>
-      getUXNeighbouringVertices(node.vectorNetwork, {
-        selected_vertices,
-        selected_segments,
-        selected_tangents,
-      }),
-    [
-      node.vectorNetwork,
-      selected_vertices,
-      selected_segments,
-      selected_tangents,
-    ]
-  );
-
-  const multi =
-    selected_tangents.length > 1 ||
-    selected_vertices.length > 0 ||
-    selected_segments.length > 0;
+  const { neighbouring_vertices } = state.content_edit_mode;
 
   // offset of the points (node absolute position)
   const absolute = instance.getNodeAbsoluteBoundingRect(node_id);
   const offset: cmath.Vector2 = absolute
     ? [absolute.x, absolute.y]
     : [node.left!, node.top!];
+
+  const vne = useMemo(() => new vn.VectorNetworkEditor(node.vectorNetwork), [node.vectorNetwork]);
+
+  const absolute_vertices = useMemo(
+    () => vne.getVerticesAbsolute(offset),
+    [vne, offset]
+  );
+
+  const absolute_tangents = useMemo(
+    () => vne.getControlPointsAbsolute(offset),
+    [vne, offset]
+  );
+
+  const multi =
+    selected_tangents.length > 1 ||
+    selected_vertices.length > 0 ||
+    selected_segments.length > 0;
 
   const selectVertex = useCallback(
     (vertex: number, additive?: boolean) => {
@@ -133,6 +132,8 @@ export default function useSurfaceVectorEditor() {
     () => ({
       node_id,
       path_cursor_position,
+      absolute_vertices,
+      absolute_tangents,
       vertices,
       segments,
       offset,
@@ -157,6 +158,8 @@ export default function useSurfaceVectorEditor() {
       //
       node_id,
       path_cursor_position,
+      absolute_vertices,
+      absolute_tangents,
       vertices,
       segments,
       offset,
