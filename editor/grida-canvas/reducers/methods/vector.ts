@@ -1,7 +1,11 @@
+import type { Draft } from "immer";
 import vn from "@grida/vn";
 import { editor } from "@/grida-canvas";
 import cmath from "@grida/cmath";
 import type grida from "@grida/schema";
+import { dq } from "@/grida-canvas/query";
+import assert from "assert";
+import type { ReducerContext } from "..";
 
 /**
  * Collects the vertices and tangents that need translation for the provided
@@ -128,4 +132,82 @@ export function self_updateVectorNode<R>(
   node.vectorNetwork = vne.value;
 
   return result;
+}
+
+export function self_updateVectorAreaSelection<
+  S extends editor.state.IEditorState,
+>(
+  draft: Draft<S>,
+  context: ReducerContext,
+  predicate: (point: cmath.Vector2) => boolean,
+  additive: boolean,
+): void {
+  assert(draft.content_edit_mode?.type === "vector");
+  const { node_id, neighbouring_vertices } = draft.content_edit_mode;
+  const node = dq.__getNodeById(
+    draft,
+    node_id,
+  ) as grida.program.nodes.VectorNode;
+  const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+
+  const verts = vne.getVerticesAbsolute([rect.x, rect.y]);
+  let selected_vertices = verts
+    .map((p, i) => (predicate(p) ? i : -1))
+    .filter((i) => i !== -1);
+
+  const control_points = vne
+    .getControlPointsAbsolute([rect.x, rect.y])
+    .filter(({ segment, control }) => {
+      const vert =
+        control === "ta"
+          ? node.vectorNetwork.segments[segment].a
+          : node.vectorNetwork.segments[segment].b;
+      return neighbouring_vertices.includes(vert);
+    });
+  let selected_tangents = control_points
+    .filter(({ point }) => predicate(point))
+    .map(({ segment, control }) => [
+      control === "ta"
+        ? node.vectorNetwork.segments[segment].a
+        : node.vectorNetwork.segments[segment].b,
+      control === "ta" ? 0 : 1,
+    ]) as [number, 0 | 1][];
+  if (additive) {
+    const vset = new Set([
+      ...draft.content_edit_mode.selected_vertices,
+      ...selected_vertices,
+    ]);
+    selected_vertices = Array.from(vset);
+
+    const key = (t: [number, 0 | 1]) => `${t[0]}:${t[1]}`;
+    const tset = new Set(draft.content_edit_mode.selected_tangents.map(key));
+    for (const t of selected_tangents) tset.add(key(t));
+    selected_tangents = Array.from(tset).map((s) => {
+      const [v, t] = s.split(":");
+      return [parseInt(v), Number(t) as 0 | 1];
+    });
+  }
+
+  draft.content_edit_mode.selected_vertices = selected_vertices;
+  draft.content_edit_mode.selected_segments = additive
+    ? draft.content_edit_mode.selected_segments
+    : [];
+  draft.content_edit_mode.selected_tangents = selected_tangents;
+  draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
+    node.vectorNetwork,
+    {
+      selected_vertices,
+      selected_segments: additive
+        ? draft.content_edit_mode.selected_segments
+        : [],
+      selected_tangents,
+    },
+  );
+  draft.content_edit_mode.a_point =
+    selected_vertices.length > 0
+      ? selected_vertices[0]
+      : selected_tangents.length > 0
+        ? selected_tangents[0][0]
+        : null;
 }

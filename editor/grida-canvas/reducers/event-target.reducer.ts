@@ -26,7 +26,10 @@ import {
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
 } from "./methods";
-import { getUXNeighbouringVertices } from "./methods/vector";
+import {
+  getUXNeighbouringVertices,
+  self_updateVectorAreaSelection,
+} from "./methods/vector";
 import cmath from "@grida/cmath";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
@@ -397,6 +400,7 @@ function __self_evt_on_drag_start(
         draft.marquee = {
           a: draft.pointer.position,
           b: draft.pointer.position,
+          additive: shiftKey,
         };
       } else {
         // TODO: improve logic
@@ -408,6 +412,7 @@ function __self_evt_on_drag_start(
             draft.marquee = {
               a: draft.pointer.position,
               b: draft.pointer.position,
+              additive: shiftKey,
             };
           }
         } else {
@@ -416,6 +421,7 @@ function __self_evt_on_drag_start(
             draft.marquee = {
               a: draft.pointer.position,
               b: draft.pointer.position,
+              additive: shiftKey,
             };
           } else {
             __self_start_gesture_translate(draft, context);
@@ -429,6 +435,7 @@ function __self_evt_on_drag_start(
       draft.marquee = {
         a: draft.pointer.position,
         b: draft.pointer.position,
+        additive: shiftKey,
       };
       break;
     }
@@ -442,7 +449,7 @@ function __self_evt_on_drag_start(
       break;
     }
     case "lasso": {
-      draft.lasso = { points: [draft.pointer.position] };
+      draft.lasso = { points: [draft.pointer.position], additive: shiftKey };
       break;
     }
     case "insert": {
@@ -701,55 +708,13 @@ function __self_evt_on_drag(
   if (draft.marquee) {
     draft.marquee.b = draft.pointer.position;
     if (draft.content_edit_mode?.type === "vector") {
-      const { node_id, neighbouring_vertices } = draft.content_edit_mode;
-      const node = dq.__getNodeById(
-        draft,
-        node_id
-      ) as grida.program.nodes.VectorNode;
-      const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
-      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-
-      const verts = vne.getVerticesAbsolute([rect.x, rect.y]);
       const mrect = cmath.rect.fromPoints([draft.marquee.a, draft.marquee.b]);
-      const selected_vertices = verts
-        .map((p, i) => (cmath.rect.containsPoint(mrect, p) ? i : -1))
-        .filter((i) => i !== -1);
-
-      const control_points = vne
-        .getControlPointsAbsolute([rect.x, rect.y])
-        .filter(({ segment, control }) => {
-          const vert =
-            control === "ta"
-              ? node.vectorNetwork.segments[segment].a
-              : node.vectorNetwork.segments[segment].b;
-          return neighbouring_vertices.includes(vert);
-        });
-      const selected_tangents = control_points
-        .filter(({ point }) => cmath.rect.containsPoint(mrect, point))
-        .map(({ segment, control }) => [
-          control === "ta"
-            ? node.vectorNetwork.segments[segment].a
-            : node.vectorNetwork.segments[segment].b,
-          control === "ta" ? 0 : 1,
-        ]) as [number, 0 | 1][];
-
-      draft.content_edit_mode.selected_vertices = selected_vertices;
-      draft.content_edit_mode.selected_segments = [];
-      draft.content_edit_mode.selected_tangents = selected_tangents;
-      draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
-        node.vectorNetwork,
-        {
-          selected_vertices: selected_vertices,
-          selected_segments: [],
-          selected_tangents: selected_tangents,
-        }
+      self_updateVectorAreaSelection(
+        draft,
+        context,
+        (p) => cmath.rect.containsPoint(mrect, p),
+        draft.marquee.additive ?? false,
       );
-      draft.content_edit_mode.a_point =
-        selected_vertices.length > 0
-          ? selected_vertices[0]
-          : selected_tangents.length > 0
-            ? selected_tangents[0][0]
-            : null;
     }
   } else if (draft.lasso) {
     draft.lasso.points.push(draft.pointer.position);
@@ -757,58 +722,12 @@ function __self_evt_on_drag(
       draft.content_edit_mode?.type === "vector" &&
       draft.lasso.points.length > 2
     ) {
-      const { node_id, neighbouring_vertices } = draft.content_edit_mode;
-      const node = dq.__getNodeById(
+      self_updateVectorAreaSelection(
         draft,
-        node_id
-      ) as grida.program.nodes.VectorNode;
-      const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
-      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-
-      const verts = vne.getVerticesAbsolute([rect.x, rect.y]);
-      const selected_vertices = verts
-        .map((p, i) =>
-          cmath.polygon.pointInPolygon(p, draft.lasso!.points) ? i : -1
-        )
-        .filter((i) => i !== -1);
-
-      const control_points = vne
-        .getControlPointsAbsolute([rect.x, rect.y])
-        .filter(({ segment, control }) => {
-          const vert =
-            control === "ta"
-              ? node.vectorNetwork.segments[segment].a
-              : node.vectorNetwork.segments[segment].b;
-          return neighbouring_vertices.includes(vert);
-        });
-      const selected_tangents = control_points
-        .filter(({ point }) =>
-          cmath.polygon.pointInPolygon(point, draft.lasso!.points)
-        )
-        .map(({ segment, control }) => [
-          control === "ta"
-            ? node.vectorNetwork.segments[segment].a
-            : node.vectorNetwork.segments[segment].b,
-          control === "ta" ? 0 : 1,
-        ]) as [number, 0 | 1][];
-
-      draft.content_edit_mode.selected_vertices = selected_vertices;
-      draft.content_edit_mode.selected_segments = [];
-      draft.content_edit_mode.selected_tangents = selected_tangents;
-      draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
-        node.vectorNetwork,
-        {
-          selected_vertices: selected_vertices,
-          selected_segments: [],
-          selected_tangents: selected_tangents,
-        }
+        context,
+        (p) => cmath.polygon.pointInPolygon(p, draft.lasso!.points),
+        draft.lasso.additive ?? false,
       );
-      draft.content_edit_mode.a_point =
-        selected_vertices.length > 0
-          ? selected_vertices[0]
-          : selected_tangents.length > 0
-            ? selected_tangents[0][0]
-            : null;
     }
   } else {
     if (draft.gesture.type === "idle") return;

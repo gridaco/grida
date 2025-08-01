@@ -281,6 +281,8 @@ export namespace editor.state {
   export type Marquee = {
     a: cmath.Vector2;
     b: cmath.Vector2;
+    /** when true, adds to existing selection */
+    additive?: boolean;
   };
 
   /**
@@ -288,6 +290,8 @@ export namespace editor.state {
    */
   export type Lasso = {
     points: cmath.Vector2[];
+    /** when true, adds to existing selection */
+    additive?: boolean;
   };
 
   export type HitTestingConfig = {
