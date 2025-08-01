@@ -285,6 +285,56 @@ pub enum LeafNode {
     Image(ImageNode),
 }
 
+impl NodeTrait for LeafNode {
+    fn id(&self) -> NodeId {
+        match self {
+            LeafNode::Error(n) => n.id.clone(),
+            LeafNode::Rectangle(n) => n.id.clone(),
+            LeafNode::Ellipse(n) => n.id.clone(),
+            LeafNode::Polygon(n) => n.id.clone(),
+            LeafNode::RegularPolygon(n) => n.id.clone(),
+            LeafNode::RegularStarPolygon(n) => n.id.clone(),
+            LeafNode::Line(n) => n.id.clone(),
+            LeafNode::TextSpan(n) => n.id.clone(),
+            LeafNode::SVGPath(n) => n.id.clone(),
+            LeafNode::Vector(n) => n.id.clone(),
+            LeafNode::Image(n) => n.id.clone(),
+        }
+    }
+
+    fn name(&self) -> Option<String> {
+        match self {
+            LeafNode::Error(n) => n.name.clone(),
+            LeafNode::Rectangle(n) => n.name.clone(),
+            LeafNode::Ellipse(n) => n.name.clone(),
+            LeafNode::Polygon(n) => n.name.clone(),
+            LeafNode::RegularPolygon(n) => n.name.clone(),
+            LeafNode::RegularStarPolygon(n) => n.name.clone(),
+            LeafNode::Line(n) => n.name.clone(),
+            LeafNode::TextSpan(n) => n.name.clone(),
+            LeafNode::SVGPath(n) => n.name.clone(),
+            LeafNode::Vector(n) => n.name.clone(),
+            LeafNode::Image(n) => n.name.clone(),
+        }
+    }
+
+    fn active(&self) -> bool {
+        match self {
+            LeafNode::Error(n) => n.active,
+            LeafNode::Rectangle(n) => n.active,
+            LeafNode::Ellipse(n) => n.active,
+            LeafNode::Polygon(n) => n.active,
+            LeafNode::RegularPolygon(n) => n.active,
+            LeafNode::RegularStarPolygon(n) => n.active,
+            LeafNode::Line(n) => n.active,
+            LeafNode::TextSpan(n) => n.active,
+            LeafNode::SVGPath(n) => n.active,
+            LeafNode::Vector(n) => n.active,
+            LeafNode::Image(n) => n.active,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ErrorNode {
     pub id: NodeId,

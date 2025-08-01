@@ -790,6 +790,9 @@ impl<'a> Painter<'a> {
     }
 
     pub fn draw_node(&self, node: &LeafNode) {
+        if !node.active() {
+            return;
+        }
         match node {
             LeafNode::Error(n) => self.draw_error_node(n),
             LeafNode::Rectangle(n) => self.draw_rect_node(n),
@@ -814,6 +817,9 @@ impl<'a> Painter<'a> {
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
+        if !node.active() {
+            return;
+        }
         match node {
             Node::Error(n) => self.draw_error_node(n),
             Node::Group(n) => self.draw_group_node_recursively(n, repository, cache),

@@ -164,6 +164,9 @@ impl LayerList {
         out: &mut Vec<PainterPictureLayer>,
     ) {
         if let Some(node) = repo.get(id) {
+            if !node.active() {
+                return;
+            }
             let transform = cache
                 .get_world_transform(id)
                 .unwrap_or_else(AffineTransform::identity);
