@@ -167,6 +167,7 @@ pub enum Node {
 pub trait NodeTrait {
     fn id(&self) -> NodeId;
     fn name(&self) -> Option<String>;
+    fn active(&self) -> bool;
 }
 
 impl NodeTrait for Node {
@@ -205,6 +206,25 @@ impl NodeTrait for Node {
             Node::Vector(n) => n.name.clone(),
             Node::BooleanOperation(n) => n.name.clone(),
             Node::Image(n) => n.name.clone(),
+        }
+    }
+
+    fn active(&self) -> bool {
+        match self {
+            Node::Error(n) => n.active,
+            Node::Group(n) => n.active,
+            Node::Container(n) => n.active,
+            Node::Rectangle(n) => n.active,
+            Node::Ellipse(n) => n.active,
+            Node::Polygon(n) => n.active,
+            Node::RegularPolygon(n) => n.active,
+            Node::RegularStarPolygon(n) => n.active,
+            Node::Line(n) => n.active,
+            Node::TextSpan(n) => n.active,
+            Node::SVGPath(n) => n.active,
+            Node::Vector(n) => n.active,
+            Node::BooleanOperation(n) => n.active,
+            Node::Image(n) => n.active,
         }
     }
 }
