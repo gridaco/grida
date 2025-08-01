@@ -1712,10 +1712,6 @@ export namespace grida.program.nodes {
      */
     fillRule?: cg.FillRule;
 
-    /**
-     * @deprecated
-     * @todo
-     */
     vectorNetwork: vn.VectorNetwork;
   }
 

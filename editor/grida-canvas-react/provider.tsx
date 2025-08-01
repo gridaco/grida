@@ -1404,6 +1404,11 @@ export function useSurfaceVectorEditor() {
   const vertices = node.vectorNetwork.vertices;
   const segments = node.vectorNetwork.segments;
 
+  const multi =
+    selected_tangents.length > 1 ||
+    selected_vertices.length > 0 ||
+    selected_segments.length > 0;
+
   // offset of the points (node absolute position)
   const absolute = instance.getNodeAbsoluteBoundingRect(node_id);
   const offset: cmath.Vector2 = absolute
@@ -1436,23 +1441,13 @@ export function useSurfaceVectorEditor() {
 
   const onCurveControlPointDragStart = useCallback(
     (segment: number, control: "ta" | "tb") => {
-      const multi =
-        selected_tangents.length > 1 ||
-        selected_vertices.length > 0 ||
-        selected_segments.length > 0;
       if (multi) {
         instance.startTranslateVectorNetwork(node_id);
       } else {
         instance.startCurveGesture(node_id, segment, control);
       }
     },
-    [
-      instance,
-      node_id,
-      selected_tangents.length,
-      selected_vertices.length,
-      selected_segments.length,
-    ]
+    [multi, instance, node_id]
   );
 
   const onDragStart = useCallback(() => {
