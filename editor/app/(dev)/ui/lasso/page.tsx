@@ -2,20 +2,67 @@
 
 import React from "react";
 import { Lasso } from "./lasso";
-import { useLasso } from "./use-lasso";
+import { useLasso, type Point } from "./use-lasso";
+import cmath from "@grida/cmath";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/components/lib/utils";
+import { TransparencyGrid } from "@grida/transparency-grid/react";
 
 export default function LassoDemoPage() {
-  const [completed, setCompleted] = React.useState<{ x: number; y: number }[]>(
-    []
-  );
-  const { ref, points } = useLasso({ onComplete: setCompleted });
+  const [completed, setCompleted] = React.useState<Point[]>([]);
+  const [targets, setTargets] = React.useState<Point[]>([]);
+  const [selected, setSelected] = React.useState<Point[]>([]);
+  const { ref, points } = useLasso({
+    onComplete: (pts) => {
+      setCompleted(pts);
+      if (pts.length > 2) {
+        const poly = pts.map((p) => [p.x, p.y]) as cmath.Vector2[];
+        setSelected(
+          targets.filter((t) => cmath.polygon.pointInPolygon([t.x, t.y], poly))
+        );
+      } else {
+        setSelected([]);
+      }
+    },
+  });
+
+  const plotPoints = React.useCallback(() => {
+    const pts = Array.from({ length: 30 }, () => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+    }));
+    setTargets(pts);
+    setSelected([]);
+    setCompleted([]);
+  }, []);
 
   return (
     <main className="fixed inset-0 w-full h-full select-none">
       {/* Full Screen Lasso Canvas */}
       <div className="relative w-full h-full p-6">
         <div className="relative w-full h-full rounded-xl shadow-2xl overflow-hidden">
-          <Lasso ref={ref} points={points} />
+          <TransparencyGrid
+            className="absolute inset-0 pointer-events-none -z-10"
+            width={typeof window !== "undefined" ? window.innerWidth : 0}
+            height={typeof window !== "undefined" ? window.innerHeight : 0}
+            transform={cmath.transform.identity}
+          />
+
+          <svg className="absolute inset-0 pointer-events-none w-full h-full">
+            {targets.map((p, i) => (
+              <circle
+                key={i}
+                cx={p.x}
+                cy={p.y}
+                r={4}
+                className={cn(
+                  "fill-muted-foreground/50",
+                  selected.includes(p) && "fill-blue-500"
+                )}
+              />
+            ))}
+          </svg>
+          <Lasso ref={ref} points={points} className="absolute inset-0" />
         </div>
       </div>
 
@@ -27,18 +74,12 @@ export default function LassoDemoPage() {
           </h1>
           <p className="text-xs text-muted-foreground">Lasso selection demo</p>
         </div>
-      </div>
-
-      {completed.length > 0 && (
-        <div className="absolute top-4 right-4 z-10 bg-background/80 backdrop-blur-sm border rounded-lg shadow-lg p-3 max-h-64 max-w-96 min-w-52">
-          <div className="text-xs font-medium text-muted-foreground mb-2">
-            points
-          </div>
-          <pre className="text-xs font-mono overflow-y-auto max-h-48">
-            {JSON.stringify(completed, null, 2)}
-          </pre>
+        <div className="mt-2">
+          <Button size="sm" variant="default" onClick={plotPoints}>
+            Plot Points
+          </Button>
         </div>
-      )}
+      </div>
     </main>
   );
 }
