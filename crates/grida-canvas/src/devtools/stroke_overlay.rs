@@ -8,7 +8,7 @@ use crate::painter::{
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::FontRepository;
 use crate::sk;
-use skia_safe::{textlayout, Canvas, Color, Font, Paint, PaintStyle, Path, Surface};
+use skia_safe::{textlayout, Canvas, Color, Font, Paint, PaintStyle, Path};
 
 #[derive(Debug, Clone)]
 pub struct StrokeOverlayStyle {
@@ -33,18 +33,6 @@ pub struct StrokeOverlay;
 
 impl StrokeOverlay {
     pub fn draw(
-        surface: &mut Surface,
-        nodes: &[NodeId],
-        camera: &Camera2D,
-        cache: &SceneCache,
-        fonts: &std::cell::RefCell<FontRepository>,
-        style: Option<&StrokeOverlayStyle>,
-    ) {
-        let canvas = surface.canvas();
-        Self::draw_on_canvas(canvas, nodes, camera, cache, fonts, style);
-    }
-
-    pub fn draw_on_canvas(
         canvas: &Canvas,
         nodes: &[NodeId],
         camera: &Camera2D,

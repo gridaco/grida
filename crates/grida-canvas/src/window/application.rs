@@ -573,17 +573,18 @@ impl UnknownTargetApplication {
         {
             let __overlay_start = std::time::Instant::now();
             let surface = self.state.surface_mut();
+            let canvas = surface.canvas();
             if self.devtools_rendering_show_fps {
-                fps_overlay::FpsMeter::draw(surface, self.scheduler.average_fps());
+                fps_overlay::FpsMeter::draw(&canvas, self.scheduler.average_fps());
             }
             if self.devtools_rendering_show_stats {
                 if let Some(s) = self.last_stats.as_deref() {
-                    stats_overlay::StatsOverlay::draw(surface, s, &self.clock);
+                    stats_overlay::StatsOverlay::draw(&canvas, s, &self.clock);
                 }
             }
             if self.devtools_rendering_show_hit_overlay {
                 hit_overlay::HitOverlay::draw(
-                    surface,
+                    &canvas,
                     self.hit_test_result.as_ref(),
                     self.devtools_selection.as_ref(),
                     &self.renderer.camera,
@@ -593,7 +594,7 @@ impl UnknownTargetApplication {
             }
             if !self.highlight_strokes.is_empty() {
                 stroke_overlay::StrokeOverlay::draw(
-                    surface,
+                    &canvas,
                     &self.highlight_strokes,
                     &self.renderer.camera,
                     self.renderer.get_cache(),
@@ -603,13 +604,13 @@ impl UnknownTargetApplication {
             }
             if self.devtools_rendering_show_tiles {
                 tile_overlay::TileOverlay::draw(
-                    surface,
+                    &canvas,
                     &self.renderer.camera,
                     self.renderer.get_cache().tile.tiles(),
                 );
             }
             if self.devtools_rendering_show_ruler {
-                ruler_overlay::Ruler::draw(surface, &self.renderer.camera);
+                ruler_overlay::Ruler::draw(&canvas, &self.renderer.camera);
             }
             if let Some(mut ctx) = surface.recording_context() {
                 if let Some(mut direct) = ctx.as_direct_context() {

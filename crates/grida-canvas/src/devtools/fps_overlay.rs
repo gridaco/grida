@@ -1,5 +1,5 @@
 use crate::fonts::geistmono::sk_font_geistmono;
-use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
+use skia_safe::{Canvas, Color, Font, Paint, Point, Rect};
 
 pub struct FpsMeter;
 
@@ -22,8 +22,7 @@ thread_local! {
 }
 
 impl FpsMeter {
-    pub fn draw(surface: &mut Surface, fps: f32) {
-        let canvas = surface.canvas();
+    pub fn draw(canvas: &Canvas, fps: f32) {
         let rect = Rect::from_xywh(10.0, 10.0, 180.0, 60.0);
         BG_PAINT.with(|bg| {
             canvas.draw_rect(rect, bg);

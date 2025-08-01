@@ -1,21 +1,16 @@
 use crate::cache::tile::{TileAtZoom, TileRectKey};
 use crate::runtime::camera::Camera2D;
 use math2::rect;
-use skia_safe::{Color, Paint, PaintStyle, Rect, Surface};
+use skia_safe::{Canvas, Color, Paint, PaintStyle, Rect};
 use std::collections::HashMap;
 
 pub struct TileOverlay;
 
 impl TileOverlay {
-    pub fn draw(
-        surface: &mut Surface,
-        camera: &Camera2D,
-        tiles: &HashMap<TileRectKey, TileAtZoom>,
-    ) {
+    pub fn draw(canvas: &Canvas, camera: &Camera2D, tiles: &HashMap<TileRectKey, TileAtZoom>) {
         if tiles.is_empty() {
             return;
         }
-        let canvas = surface.canvas();
         let stroke_width = 1.0;
         let mut cell_paint = Paint::default();
         cell_paint.set_style(PaintStyle::Stroke);

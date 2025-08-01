@@ -9,7 +9,7 @@ use crate::painter::{
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::FontRepository;
 use crate::sk;
-use skia_safe::{textlayout, Color, Font, Paint, PaintStyle, Path, Point, Rect, Surface};
+use skia_safe::{textlayout, Canvas, Color, Font, Paint, PaintStyle, Path, Point, Rect};
 
 thread_local! {
     static BG_PAINT: Paint = {
@@ -51,15 +51,13 @@ pub struct HitOverlay;
 
 impl HitOverlay {
     pub fn draw(
-        surface: &mut Surface,
+        canvas: &Canvas,
         hit: Option<&NodeId>,
         focus: Option<&NodeId>,
         camera: &Camera2D,
         cache: &SceneCache,
         fonts: &std::cell::RefCell<FontRepository>,
     ) {
-        let canvas = surface.canvas();
-
         // Render hit if present
         if let Some(id) = hit {
             if let Some(layer) = cache.layers.layers.iter().find(|l| l.id() == id) {
@@ -111,7 +109,7 @@ impl HitOverlay {
                     });
 
                     // Use the canvas we already have instead of borrowing surface again
-                    stroke_overlay::StrokeOverlay::draw_on_canvas(
+                    stroke_overlay::StrokeOverlay::draw(
                         canvas,
                         std::slice::from_ref(id),
                         camera,
