@@ -271,6 +271,7 @@ export type EditorVectorEditorAction =
   | EditorVectorDeleteSegmentAction
   | EditorVectorSplitSegmentAction
   | EditorVectorSelectTangentAction
+  | EditorVectorDeleteTangentAction
   | EditorVectorTranslateVertexAction
   | EditorVectorTranslateSegmentAction;
 
@@ -317,6 +318,11 @@ export interface EditorVectorSelectTangentAction {
   target: TangentQuery;
   /** if true, toggle selection instead of resetting */
   additive?: boolean;
+}
+
+export interface EditorVectorDeleteTangentAction {
+  type: "delete-tangent";
+  target: TangentQuery;
 }
 
 export interface EditorVectorTranslateVertexAction {

@@ -470,15 +470,6 @@ function VertexPoint({
           editor.selectVertex(index, event.shiftKey);
         }
       },
-      onKeyDown: (state) => {
-        const { event } = state;
-
-        if (event.key === "Delete" || event.key === "Backspace") {
-          event.stopPropagation();
-          event.preventDefault();
-          editor.deleteVertex(index);
-        }
-      },
     },
     {
       drag: {

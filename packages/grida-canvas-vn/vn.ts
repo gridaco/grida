@@ -350,6 +350,13 @@ export namespace vn {
       this._segments.splice(segmentIndex, 1);
     }
 
+    deleteTangent(segmentIndex: number, control: "ta" | "tb") {
+      if (segmentIndex < 0 || segmentIndex >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${segmentIndex}`);
+      }
+      this._segments[segmentIndex][control] = [0, 0];
+    }
+
     /**
      * Inserts a new vertex at the middle of the given segment and splits the
      * segment into two consecutive segments.

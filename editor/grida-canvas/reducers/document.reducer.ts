@@ -23,6 +23,7 @@ import {
   self_insertSubDocument,
   self_selectNode,
   reduceVectorContentSelection,
+  self_updateVectorNode,
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
@@ -176,6 +177,50 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids =
         target === "selection" ? state.selection : [target];
+
+      if (state.content_edit_mode?.type === "vector") {
+        const {
+          node_id,
+          selected_vertices,
+          selected_segments,
+          selected_tangents,
+        } = state.content_edit_mode;
+        return produce(state, (draft) => {
+          const node = dq.__getNodeById(
+            draft,
+            node_id
+          ) as grida.program.nodes.VectorNode;
+
+          self_updateVectorNode(node, (vne) => {
+            // delete tangents
+            for (const [v_idx, t_idx] of selected_tangents) {
+              const point = t_idx === 0 ? "a" : "b";
+              const control = t_idx === 0 ? "ta" : "tb";
+              for (const si of vne.findSegments(v_idx, point)) {
+                vne.deleteTangent(si, control);
+              }
+            }
+
+            // delete segments
+            const segs = [...selected_segments].sort((a, b) => b - a);
+            for (const si of segs) {
+              vne.deleteSegment(si);
+            }
+
+            // delete vertices
+            const verts = [...selected_vertices].sort((a, b) => b - a);
+            for (const vi of verts) {
+              vne.deleteVertex(vi);
+            }
+          });
+
+          assert(draft.content_edit_mode?.type === "vector");
+          draft.content_edit_mode.selected_vertices = [];
+          draft.content_edit_mode.selected_segments = [];
+          draft.content_edit_mode.selected_tangents = [];
+          draft.content_edit_mode.a_point = null;
+        });
+      }
 
       return produce(state, (draft) => {
         for (const node_id of target_node_ids) {
@@ -361,6 +406,46 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       const target_node_ids =
         target === "selection" ? state.selection : [target];
+
+      if (state.content_edit_mode?.type === "vector") {
+        const delta_vec: cmath.Vector2 = [
+          nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0],
+          nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1],
+        ];
+        return produce(state, (draft) => {
+          const {
+            node_id,
+            selected_vertices,
+            selected_segments,
+            selected_tangents,
+          } = draft.content_edit_mode as editor.state.VectorContentEditMode;
+
+          const node = dq.__getNodeById(
+            draft,
+            node_id
+          ) as grida.program.nodes.VectorNode;
+
+          self_updateVectorNode(node, (vne) => {
+            for (const v of selected_vertices) {
+              vne.translateVertex(v, delta_vec);
+            }
+            for (const s of selected_segments) {
+              vne.translateSegment(s, delta_vec);
+            }
+            for (const [vi, ti] of selected_tangents) {
+              const point = ti === 0 ? "a" : "b";
+              const control = ti === 0 ? "ta" : "tb";
+              for (const si of vne.findSegments(vi, point)) {
+                const next = cmath.vector2.add(
+                  vne.segments[si][control],
+                  delta_vec
+                );
+                vne.updateTangent(si, control, next, false);
+              }
+            }
+          });
+        });
+      }
 
       const nodes = target_node_ids.map((node_id) =>
         dq.__getNodeById(state, node_id)
@@ -691,6 +776,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "delete-segment":
     case "translate-segment":
     case "select-tangent":
+    case "delete-tangent":
     case "translate-vertex":
     case "split-segment": {
       return produce(state, (draft) => {
@@ -740,19 +826,9 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "delete-vertex": {
             assert(node.type === "vector");
 
-            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-            vne.deleteVertex(vertex);
-            const bb_b = vne.getBBox();
-            const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
-            vne.translate(cmath.vector2.invert(delta));
-            const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
-
-            node.left = new_pos[0];
-            node.top = new_pos[1];
-            node.width = bb_b.width;
-            node.height = bb_b.height;
-
-            node.vectorNetwork = vne.value;
+            self_updateVectorNode(node, (vne) => {
+              vne.deleteVertex(vertex);
+            });
 
             if (draft.content_edit_mode?.type === "vector") {
               if (
@@ -818,58 +894,61 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   : null;
             break;
           }
+          case "delete-tangent": {
+            assert(node.type === "vector");
+
+            self_updateVectorNode(node, (vne) => {
+              const point = action.target.tangent === 0 ? "a" : "b";
+              for (const si of vne.findSegments(vertex, point)) {
+                const control = action.target.tangent === 0 ? "ta" : "tb";
+                vne.deleteTangent(si, control);
+              }
+            });
+
+            if (draft.content_edit_mode?.type === "vector") {
+              draft.content_edit_mode.selected_tangents =
+                draft.content_edit_mode.selected_tangents.filter(
+                  ([v, t]) => !(v === vertex && t === action.target.tangent)
+                );
+              draft.content_edit_mode.a_point = null;
+            }
+            break;
+          }
           case "translate-vertex": {
             assert(node.type === "vector");
-            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-            const bb_a = vne.getBBox();
-            vne.translateVertex(vertex, action.delta);
-            const bb_b = vne.getBBox();
-            const delta_vec: cmath.Vector2 = [bb_b.x - bb_a.x, bb_b.y - bb_a.y];
-            vne.translate(cmath.vector2.invert(delta_vec));
-            const new_pos = cmath.vector2.add([node.left!, node.top!], delta_vec);
 
-            node.left = new_pos[0];
-            node.top = new_pos[1];
-            node.width = bb_b.width;
-            node.height = bb_b.height;
-
-            node.vectorNetwork = vne.value;
+            self_updateVectorNode(node, (vne) => {
+              const bb_a = vne.getBBox();
+              vne.translateVertex(vertex, action.delta);
+              const bb_b = vne.getBBox();
+              const delta_vec: cmath.Vector2 = [
+                bb_b.x - bb_a.x,
+                bb_b.y - bb_a.y,
+              ];
+              vne.translate(cmath.vector2.invert(delta_vec));
+            });
             break;
           }
           case "translate-segment": {
             assert(node.type === "vector");
-            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-            const bb_a = vne.getBBox();
-            vne.translateSegment(segment, action.delta);
-            const bb_b = vne.getBBox();
-            const delta_vec: cmath.Vector2 = [bb_b.x - bb_a.x, bb_b.y - bb_a.y];
-            vne.translate(cmath.vector2.invert(delta_vec));
-            const new_pos = cmath.vector2.add([node.left!, node.top!], delta_vec);
-
-            node.left = new_pos[0];
-            node.top = new_pos[1];
-            node.width = bb_b.width;
-            node.height = bb_b.height;
-
-            node.vectorNetwork = vne.value;
+            self_updateVectorNode(node, (vne) => {
+              const bb_a = vne.getBBox();
+              vne.translateSegment(segment, action.delta);
+              const bb_b = vne.getBBox();
+              const delta_vec: cmath.Vector2 = [
+                bb_b.x - bb_a.x,
+                bb_b.y - bb_a.y,
+              ];
+              vne.translate(cmath.vector2.invert(delta_vec));
+            });
             break;
           }
           case "delete-segment": {
             assert(node.type === "vector");
 
-            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-            vne.deleteSegment(segment);
-            const bb_b = vne.getBBox();
-            const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
-            vne.translate(cmath.vector2.invert(delta));
-            const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
-
-            node.left = new_pos[0];
-            node.top = new_pos[1];
-            node.width = bb_b.width;
-            node.height = bb_b.height;
-
-            node.vectorNetwork = vne.value;
+            self_updateVectorNode(node, (vne) => {
+              vne.deleteSegment(segment);
+            });
 
             if (draft.content_edit_mode?.type === "vector") {
               // Clear segment selection since the segment was deleted
@@ -881,19 +960,9 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
           case "split-segment": {
             if (node.type === "vector") {
-              const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-              const newIndex = vne.splitSegment(segment);
-              const bb_b = vne.getBBox();
-              const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
-              vne.translate(cmath.vector2.invert(delta));
-              const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
-
-              node.left = new_pos[0];
-              node.top = new_pos[1];
-              node.width = bb_b.width;
-              node.height = bb_b.height;
-
-              node.vectorNetwork = vne.value;
+              const newIndex = self_updateVectorNode(node, (vne) =>
+                vne.splitSegment(segment)
+              );
 
               if (draft.content_edit_mode?.type === "vector") {
                 draft.content_edit_mode.selected_vertices = [newIndex];
