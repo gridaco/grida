@@ -50,6 +50,52 @@ export function encodeTranslateVectorCommand(
 }
 
 /**
+ * Calculates the list of active vertices based on the current selection.
+ *
+ * Selected vertices are always included. When a tangent or segment is
+ * selected, its related vertex endpoints are considered active as well. The
+ * previous and next vertices of each active vertex are also added to the
+ * result.
+ *
+ * @param network - Vector network containing the geometry.
+ * @param selection - Selected vertices, segments and tangents.
+ * @returns Array of unique vertex indices considered active.
+ */
+export function getUXNeighbouringVertices(
+  network: vn.VectorNetwork,
+  selection: Pick<
+    editor.state.VectorContentEditMode,
+    "selected_vertices" | "selected_segments" | "selected_tangents"
+  >
+): number[] {
+  const active = new Set<number>();
+
+  for (const v of selection.selected_vertices) {
+    active.add(v);
+  }
+
+  for (const [v] of selection.selected_tangents) {
+    active.add(v);
+  }
+
+  for (const segIndex of selection.selected_segments) {
+    const seg = network.segments[segIndex];
+    if (!seg) continue;
+    active.add(seg.a);
+    active.add(seg.b);
+  }
+
+  const limit = network.vertices.length - 1;
+  const neighbours = new Set<number>(active);
+  for (const v of active) {
+    if (v > 0) neighbours.add(v - 1);
+    if (v < limit) neighbours.add(v + 1);
+  }
+
+  return Array.from(neighbours).sort((a, b) => a - b);
+}
+
+/**
  * Applies a mutation to a vector node using a `VectorNetworkEditor` and updates
  * the node's bounding box and position.
  *

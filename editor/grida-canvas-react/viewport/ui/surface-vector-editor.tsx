@@ -33,12 +33,18 @@ export function SurfaceVectorEditor({
     vertices,
     segments,
     selected_tangents,
+    neighbouring_vertices,
     path_cursor_position,
     a_point,
     next_ta,
   } = useSurfaceVectorEditor();
 
   assert(node_id === _node_id);
+
+  const neighbouringSet = useMemo(
+    () => new Set(neighbouring_vertices),
+    [neighbouring_vertices]
+  );
 
   const a_point_is_last = a_point === vertices.length - 1;
 
@@ -136,10 +142,9 @@ export function SurfaceVectorEditor({
         const tangent_b_selected = selected_tangents.some(
           ([v, t]) => v === s.b && t === 1
         );
-        const tangent_selected = tangent_a_selected || tangent_b_selected;
-        const is_neighbouring =
-          tangent_selected || a_point === s.a || a_point === s.b;
-        if (!is_neighbouring) return null;
+        const show_ta = neighbouringSet.has(s.a);
+        const show_tb = neighbouringSet.has(s.b);
+        if (!show_ta && !show_tb) return null;
 
         return (
           <React.Fragment key={`control-${i}`}>
@@ -148,7 +153,7 @@ export function SurfaceVectorEditor({
                 position: "absolute",
               }}
             >
-              {!cmath.vector2.isZero(ta) && (
+              {show_ta && !cmath.vector2.isZero(ta) && (
                 <CurveControlExtension
                   segment={i}
                   control="ta"
@@ -164,7 +169,7 @@ export function SurfaceVectorEditor({
                   selected={tangent_a_selected}
                 />
               )}
-              {!cmath.vector2.isZero(tb) && (
+              {show_tb && !cmath.vector2.isZero(tb) && (
                 <CurveControlExtension
                   segment={i}
                   control="tb"

@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 import cmath from "@grida/cmath";
 import assert from "assert";
 import type grida from "@grida/schema";
+import { getUXNeighbouringVertices } from "@/grida-canvas/reducers/methods";
 
 export default function useSurfaceVectorEditor() {
   const instance = useCurrentEditor();
@@ -29,6 +30,21 @@ export default function useSurfaceVectorEditor() {
 
   const vertices = node.vectorNetwork.vertices;
   const segments = node.vectorNetwork.segments;
+
+  const neighbouring_vertices = useMemo(
+    () =>
+      getUXNeighbouringVertices(node.vectorNetwork, {
+        selected_vertices,
+        selected_segments,
+        selected_tangents,
+      }),
+    [
+      node.vectorNetwork,
+      selected_vertices,
+      selected_segments,
+      selected_tangents,
+    ]
+  );
 
   const multi =
     selected_tangents.length > 1 ||
@@ -120,6 +136,7 @@ export default function useSurfaceVectorEditor() {
       vertices,
       segments,
       offset,
+      neighbouring_vertices,
       selected_vertices,
       selected_segments,
       selected_tangents,
@@ -143,6 +160,7 @@ export default function useSurfaceVectorEditor() {
       vertices,
       segments,
       offset,
+      neighbouring_vertices,
       selected_vertices,
       selected_segments,
       selected_tangents,
