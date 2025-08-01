@@ -384,6 +384,7 @@ function __self_evt_on_drag_start(
 
   // clear all trasform state
   draft.marquee = undefined;
+  draft.lasso = undefined;
   draft.dropzone = undefined;
   draft.surface_snapping = undefined;
 
@@ -669,6 +670,7 @@ function __self_evt_on_drag_end(
   __self_maybe_end_gesture(draft);
   draft.gesture = { type: "idle" };
   draft.marquee = undefined;
+  draft.lasso = undefined;
 }
 
 function __self_evt_on_drag(

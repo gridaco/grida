@@ -283,6 +283,13 @@ export namespace editor.state {
     b: cmath.Vector2;
   };
 
+  /**
+   * A lasso is a list of points that is represented as a polygon (as its fill regions)
+   */
+  export type Lasso = {
+    points: cmath.Vector2[];
+  };
+
   export type HitTestingConfig = {
     /**
      * Determines how the target node is selected:
@@ -515,6 +522,11 @@ export namespace editor.state {
      * @default undefined
      */
     marquee?: editor.state.Marquee;
+
+    /**
+     * Lasso state
+     */
+    lasso?: editor.state.Lasso;
   }
 
   /**

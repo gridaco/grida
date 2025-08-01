@@ -1967,7 +1967,7 @@ export class Editor
   }
 
   dragEnd(event: PointerEvent) {
-    const { transform, marquee } = this.state;
+    const { marquee } = this.state;
     if (marquee) {
       // test area in canvas space
       const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
