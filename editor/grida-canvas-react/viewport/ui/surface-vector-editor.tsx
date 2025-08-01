@@ -176,7 +176,7 @@ export function SurfaceVectorEditor({
                     cmath.vector2.add(b, offset, tb),
                     transform
                   )}
-                  tb={tb_scaled}
+                  ta={tb_scaled}
                   selected={tangent_b_selected}
                 />
               )}
@@ -328,7 +328,10 @@ function CurveControlExtension({
         event.preventDefault();
         selectedRef.current = editor.selected_tangents.some(
           ([v, t]) =>
-            v === (control === "ta" ? editor.segments[segment].a : editor.segments[segment].b) &&
+            v ===
+              (control === "ta"
+                ? editor.segments[segment].a
+                : editor.segments[segment].b) &&
             t === (control === "ta" ? 0 : 1)
         );
         draggedRef.current = false;
