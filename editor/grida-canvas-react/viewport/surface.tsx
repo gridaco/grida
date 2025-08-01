@@ -527,11 +527,7 @@ function LassoOverlay() {
 
   if (!lasso) return null;
   const points = lasso.points.map((p) => cmath.vector2.transform(p, transform));
-  return (
-    <div id="lasso-container" className="absolute top-0 left-0 w-0 h-0">
-      <Lasso points={points} />
-    </div>
-  );
+  return <Lasso points={points} id="lasso-container" className="fixed" />;
 }
 
 function DropzoneOverlay(props: editor.state.DropzoneIndication) {
