@@ -392,26 +392,34 @@ function __self_evt_on_drag_start(
 
   switch (draft.tool.type) {
     case "cursor": {
-      // TODO: improve logic
-      if (shiftKey) {
-        if (draft.hovered_node_id) {
-          __self_start_gesture_translate(draft, context);
-        } else {
-          // marquee selection
-          draft.marquee = {
-            a: draft.pointer.position,
-            b: draft.pointer.position,
-          };
-        }
+      // when vector content edit mode is active, dragging should marquee select
+      if (draft.content_edit_mode?.type === "vector") {
+        draft.marquee = {
+          a: draft.pointer.position,
+          b: draft.pointer.position,
+        };
       } else {
-        if (draft.selection.length === 0) {
-          // marquee selection
-          draft.marquee = {
-            a: draft.pointer.position,
-            b: draft.pointer.position,
-          };
+        // TODO: improve logic
+        if (shiftKey) {
+          if (draft.hovered_node_id) {
+            __self_start_gesture_translate(draft, context);
+          } else {
+            // marquee selection
+            draft.marquee = {
+              a: draft.pointer.position,
+              b: draft.pointer.position,
+            };
+          }
         } else {
-          __self_start_gesture_translate(draft, context);
+          if (draft.selection.length === 0) {
+            // marquee selection
+            draft.marquee = {
+              a: draft.pointer.position,
+              b: draft.pointer.position,
+            };
+          } else {
+            __self_start_gesture_translate(draft, context);
+          }
         }
       }
       break;
@@ -653,7 +661,7 @@ function __self_evt_on_drag_end(
       break;
     }
     case "cursor": {
-      if (node_ids_from_area) {
+      if (draft.content_edit_mode?.type !== "vector" && node_ids_from_area) {
         const target_node_ids = getMarqueeSelection(draft, node_ids_from_area);
 
         self_selectNode(
@@ -691,7 +699,58 @@ function __self_evt_on_drag(
   } = <EditorEventTarget_Drag>action;
 
   if (draft.marquee) {
-    draft.marquee!.b = draft.pointer.position;
+    draft.marquee.b = draft.pointer.position;
+    if (draft.content_edit_mode?.type === "vector") {
+      const { node_id, neighbouring_vertices } = draft.content_edit_mode;
+      const node = dq.__getNodeById(
+        draft,
+        node_id
+      ) as grida.program.nodes.VectorNode;
+      const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+
+      const verts = vne.getVerticesAbsolute([rect.x, rect.y]);
+      const mrect = cmath.rect.fromPoints([draft.marquee.a, draft.marquee.b]);
+      const selected_vertices = verts
+        .map((p, i) => (cmath.rect.containsPoint(mrect, p) ? i : -1))
+        .filter((i) => i !== -1);
+
+      const control_points = vne
+        .getControlPointsAbsolute([rect.x, rect.y])
+        .filter(({ segment, control }) => {
+          const vert =
+            control === "ta"
+              ? node.vectorNetwork.segments[segment].a
+              : node.vectorNetwork.segments[segment].b;
+          return neighbouring_vertices.includes(vert);
+        });
+      const selected_tangents = control_points
+        .filter(({ point }) => cmath.rect.containsPoint(mrect, point))
+        .map(({ segment, control }) => [
+          control === "ta"
+            ? node.vectorNetwork.segments[segment].a
+            : node.vectorNetwork.segments[segment].b,
+          control === "ta" ? 0 : 1,
+        ]) as [number, 0 | 1][];
+
+      draft.content_edit_mode.selected_vertices = selected_vertices;
+      draft.content_edit_mode.selected_segments = [];
+      draft.content_edit_mode.selected_tangents = selected_tangents;
+      draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
+        node.vectorNetwork,
+        {
+          selected_vertices: selected_vertices,
+          selected_segments: [],
+          selected_tangents: selected_tangents,
+        }
+      );
+      draft.content_edit_mode.a_point =
+        selected_vertices.length > 0
+          ? selected_vertices[0]
+          : selected_tangents.length > 0
+            ? selected_tangents[0][0]
+            : null;
+    }
   } else if (draft.lasso) {
     draft.lasso.points.push(draft.pointer.position);
     if (
