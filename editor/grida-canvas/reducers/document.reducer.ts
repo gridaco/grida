@@ -24,6 +24,7 @@ import {
   self_updateVectorNode,
   reduceVectorContentSelection,
   getUXNeighbouringVertices,
+  encodeTranslateVectorCommand,
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
@@ -390,14 +391,20 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             node_id
           ) as grida.program.nodes.VectorNode;
 
+          const { vertices, tangents } = encodeTranslateVectorCommand(
+            node.vectorNetwork,
+            {
+              selected_vertices,
+              selected_segments,
+              selected_tangents,
+            }
+          );
+
           self_updateVectorNode(node, (vne) => {
-            for (const v of selected_vertices) {
+            for (const v of vertices) {
               vne.translateVertex(v, delta_vec);
             }
-            for (const s of selected_segments) {
-              vne.translateSegment(s, delta_vec);
-            }
-            for (const [vi, ti] of selected_tangents) {
+            for (const [vi, ti] of tangents) {
               const point = ti === 0 ? "a" : "b";
               const control = ti === 0 ? "ta" : "tb";
               for (const si of vne.findSegments(vi, point)) {
