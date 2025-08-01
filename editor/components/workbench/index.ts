@@ -1,6 +1,9 @@
 import { cva } from "class-variance-authority";
 
 export namespace WorkbenchUI {
+  /**
+   * input variants - to mimic style of a input for a div container
+   */
   export const inputVariants = cva("rounded-sm w-full", {
     variants: {
       variant: {
@@ -19,6 +22,24 @@ export namespace WorkbenchUI {
       size: "sm",
     },
   });
+
+  /**
+   * raw input variants - the default input style - to be applied to a real <input> element, that is used with the inputVariants container
+   */
+  export const rawInputVariants = cva(
+    "w-full bg-transparent border-none outline-none p-0",
+    {
+      variants: {
+        size: {
+          xs: "!text-[11px]",
+          sm: "!text-xs",
+        },
+      },
+      defaultVariants: {
+        size: "sm",
+      },
+    }
+  );
 
   export const selectVariants = cva("", {
     variants: {
