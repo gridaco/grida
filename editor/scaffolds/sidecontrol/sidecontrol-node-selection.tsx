@@ -74,6 +74,7 @@ import {
   useSelectionPaints,
   useSelectionState,
   useBackendState,
+  useContentEditModeMinimalState,
 } from "@/grida-canvas-react/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
@@ -133,6 +134,13 @@ export function Selection({
 }) {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
+  const cem = useContentEditModeMinimalState();
+
+  const is_vector_edit_mode = cem?.type === "vector";
+
+  if (is_vector_edit_mode) {
+    return <ModeVectorEditModeProperties node_id={cem.node_id} />;
+  }
 
   const selection_length = selection.length;
 
@@ -140,9 +148,9 @@ export function Selection({
     <div>
       {selection_length === 0 && empty && empty}
       {selection_length === 1 && (
-        <SelectedNodeProperties config={config} node_id={selection[0]} />
+        <ModeNodeProperties config={config} node_id={selection[0]} />
       )}
-      {selection_length > 1 && <SelectionMixedProperties config={config} />}
+      {selection_length > 1 && <ModeMixedNodeProperties config={config} />}
     </div>
   );
 }
@@ -174,7 +182,29 @@ const __default_controls_config: ControlsConfig = {
   image: "on",
 };
 
-function SelectionMixedProperties({
+function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
+  return (
+    <div key={node_id} className="mt-4 mb-10">
+      <SidebarSection className="border-b pb-4">
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine className="items-center gap-1">
+            <PropertyLineLabel>Position</PropertyLineLabel>
+            <InputPropertyNumber />
+            <InputPropertyNumber />
+          </PropertyLine>
+          <PropertyLine className="items-center gap-1">
+            <PropertyLineLabel>Mirroring</PropertyLineLabel>
+          </PropertyLine>
+          <PropertyLine className="items-center gap-1">
+            <PropertyLineLabel>Corner Radius</PropertyLineLabel>
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+    </div>
+  );
+}
+
+function ModeMixedNodeProperties({
   config = __default_controls_config,
 }: {
   config?: ControlsConfig;
@@ -695,7 +725,7 @@ function SelectionMixedProperties({
   );
 }
 
-function SelectedNodeProperties({
+function ModeNodeProperties({
   node_id,
   config = __default_controls_config,
 }: {
