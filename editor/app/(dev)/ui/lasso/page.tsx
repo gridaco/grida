@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Lasso } from "./lasso";
-import { useLasso, type Point } from "./use-lasso";
+import { Lasso } from "@/grida-canvas-react/viewport/ui/lasso/lasso";
+import { useLasso } from "@/grida-canvas-react/viewport/ui/lasso/use-lasso";
 import { useThrottle } from "@uidotdev/usehooks";
 import cmath from "@grida/cmath";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,9 @@ import { cn } from "@/components/lib/utils";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 
 export default function LassoDemoPage() {
-  const [completed, setCompleted] = React.useState<Point[]>([]);
-  const [targets, setTargets] = React.useState<Point[]>([]);
-  const [selected, setSelected] = React.useState<Point[]>([]);
+  const [completed, setCompleted] = React.useState<cmath.Vector2[]>([]);
+  const [targets, setTargets] = React.useState<cmath.Vector2[]>([]);
+  const [selected, setSelected] = React.useState<cmath.Vector2[]>([]);
   const { ref, points } = useLasso({
     onComplete: (pts) => {
       setCompleted(pts);
@@ -22,20 +22,18 @@ export default function LassoDemoPage() {
 
   React.useEffect(() => {
     if (throttledPoints.length > 2) {
-      const poly = throttledPoints.map((p) => [p.x, p.y]) as cmath.Vector2[];
-      setSelected(
-        targets.filter((t) => cmath.polygon.pointInPolygon([t.x, t.y], poly))
-      );
+      const poly = throttledPoints;
+      setSelected(targets.filter((t) => cmath.polygon.pointInPolygon(t, poly)));
     } else {
       setSelected([]);
     }
   }, [throttledPoints, targets]);
 
   const plotPoints = React.useCallback(() => {
-    const pts = Array.from({ length: 30 }, () => ({
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
-    }));
+    const pts: cmath.Vector2[] = Array.from({ length: 30 }, () => [
+      Math.random() * window.innerWidth,
+      Math.random() * window.innerHeight,
+    ]);
     setTargets(pts);
     setSelected([]);
     setCompleted([]);
@@ -57,8 +55,8 @@ export default function LassoDemoPage() {
             {targets.map((p, i) => (
               <circle
                 key={i}
-                cx={p.x}
-                cy={p.y}
+                cx={p[0]}
+                cy={p[1]}
                 r={4}
                 className={cn(
                   "fill-muted-foreground/50",

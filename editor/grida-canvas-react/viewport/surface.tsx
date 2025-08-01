@@ -27,6 +27,7 @@ import {
   supports,
 } from "@/grida-canvas/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
+import { Lasso } from "./ui/lasso/lasso";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext, useViewport } from "./context";
 import {
@@ -352,6 +353,7 @@ export function EditorSurface() {
           {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
           <RemoteCursorOverlay />
           <MarqueeOverlay />
+          <LassoOverlay />
         </div>
         <div
           className="w-full h-full"
@@ -514,6 +516,20 @@ function MarqueeOverlay() {
         a={cmath.vector2.transform(marquee.a, transform)}
         b={cmath.vector2.transform(marquee.b, transform)}
       />
+    </div>
+  );
+}
+
+function LassoOverlay() {
+  const editor = useCurrentEditor();
+  const lasso = useEditorState(editor, (state) => state.lasso);
+  const { transform } = useTransformState();
+
+  if (!lasso) return null;
+  const points = lasso.points.map((p) => cmath.vector2.transform(p, transform));
+  return (
+    <div id="lasso-container" className="absolute top-0 left-0 w-0 h-0">
+      <Lasso points={points} />
     </div>
   );
 }

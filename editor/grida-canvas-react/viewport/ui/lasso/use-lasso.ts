@@ -2,14 +2,10 @@
 
 import React from "react";
 import { useGesture } from "@use-gesture/react";
-
-export interface Point {
-  x: number;
-  y: number;
-}
+import type cmath from "@grida/cmath";
 
 export interface UseLassoOptions {
-  onComplete?: (points: Point[]) => void;
+  onComplete?: (points: cmath.Vector2[]) => void;
   /**
    * Quantization step in pixels. Higher number means
    * less points are generated during drawing.
@@ -21,16 +17,16 @@ export interface UseLassoOptions {
 export function useLasso(options?: UseLassoOptions) {
   const { onComplete, q = 4 } = options || {};
   const ref = React.useRef<SVGSVGElement>(null);
-  const [points, setPoints] = React.useState<Point[]>([]);
+  const [points, setPoints] = React.useState<cmath.Vector2[]>([]);
   const drawingRef = React.useRef(false);
-  const startRef = React.useRef<Point | null>(null);
+  const startRef = React.useRef<cmath.Vector2 | null>(null);
 
-  const getPoint = (event: PointerEvent | MouseEvent): Point => {
+  const getPoint = (event: PointerEvent | MouseEvent): cmath.Vector2 => {
     const rect = ref.current?.getBoundingClientRect();
-    return {
-      x: event.clientX - (rect?.left || 0),
-      y: event.clientY - (rect?.top || 0),
-    };
+    return [
+      event.clientX - (rect?.left || 0),
+      event.clientY - (rect?.top || 0),
+    ];
   };
 
   useGesture(
@@ -45,12 +41,12 @@ export function useLasso(options?: UseLassoOptions) {
         if (!drawingRef.current || !startRef.current) return;
         const current = getPoint(event as PointerEvent);
         const start = startRef.current;
-        const dx = Math.round((current.x - start.x) / q) * q;
-        const dy = Math.round((current.y - start.y) / q) * q;
-        const quantized = { x: start.x + dx, y: start.y + dy };
+        const dx = Math.round((current[0] - start[0]) / q) * q;
+        const dy = Math.round((current[1] - start[1]) / q) * q;
+        const quantized: cmath.Vector2 = [start[0] + dx, start[1] + dy];
         setPoints((prev) => {
           const last = prev[prev.length - 1];
-          if (last && last.x === quantized.x && last.y === quantized.y) {
+          if (last && last[0] === quantized[0] && last[1] === quantized[1]) {
             return prev;
           }
           return [...prev, quantized];

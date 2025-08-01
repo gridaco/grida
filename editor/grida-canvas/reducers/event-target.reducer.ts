@@ -431,6 +431,10 @@ function __self_evt_on_drag_start(
       };
       break;
     }
+    case "lasso": {
+      draft.lasso = { points: [draft.pointer.position] };
+      break;
+    }
     case "insert": {
       const parent = __get_insertion_target(draft);
 
@@ -645,6 +649,9 @@ function __self_evt_on_drag_end(
       draft.tool = { type: "cursor" };
       break;
     }
+    case "lasso": {
+      break;
+    }
     case "cursor": {
       if (node_ids_from_area) {
         const target_node_ids = getMarqueeSelection(draft, node_ids_from_area);
@@ -685,6 +692,8 @@ function __self_evt_on_drag(
 
   if (draft.marquee) {
     draft.marquee!.b = draft.pointer.position;
+  } else if (draft.lasso) {
+    draft.lasso.points.push(draft.pointer.position);
   } else {
     if (draft.gesture.type === "idle") return;
     if (draft.gesture.type === "nudge") return;
