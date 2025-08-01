@@ -291,7 +291,7 @@ function Segment({
           tb={tb}
           strokeWidth={selected ? 3 : hovered ? 3 : 1}
           className={cn(
-            "stroke-gray-500",
+            "stroke-gray-400",
             selected && "stroke-workbench-accent-sky",
             hovered && "stroke-workbench-accent-sky opacity-50"
           )}
@@ -371,7 +371,9 @@ function CurveControlExtension({
         b={b}
         ta={ta}
         tb={tb}
-        className="stroke-workbench-accent-sky"
+        data-focus={selected}
+        strokeWidth={selected ? 2 : 1}
+        className="stroke-gray-400 pointer-events-none data-[focus=true]:stroke-workbench-accent-sky"
       />
     </>
   );
@@ -552,7 +554,8 @@ function Curve({
   className,
   strokeWidth = 2,
   stroke,
-}: {
+  ...props
+}: React.HtmlHTMLAttributes<HTMLOrSVGElement> & {
   a: cmath.Vector2;
   b: cmath.Vector2;
   ta?: cmath.Vector2;
@@ -569,6 +572,7 @@ function Curve({
 
   return (
     <svg
+      {...props}
       id="curve"
       className={className}
       style={{
