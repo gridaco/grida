@@ -3,6 +3,7 @@
 import React from "react";
 import { Lasso } from "./lasso";
 import { useLasso, type Point } from "./use-lasso";
+import { useThrottle } from "@uidotdev/usehooks";
 import cmath from "@grida/cmath";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/lib/utils";
@@ -15,16 +16,20 @@ export default function LassoDemoPage() {
   const { ref, points } = useLasso({
     onComplete: (pts) => {
       setCompleted(pts);
-      if (pts.length > 2) {
-        const poly = pts.map((p) => [p.x, p.y]) as cmath.Vector2[];
-        setSelected(
-          targets.filter((t) => cmath.polygon.pointInPolygon([t.x, t.y], poly))
-        );
-      } else {
-        setSelected([]);
-      }
     },
   });
+  const throttledPoints = useThrottle(points, 50);
+
+  React.useEffect(() => {
+    if (throttledPoints.length > 2) {
+      const poly = throttledPoints.map((p) => [p.x, p.y]) as cmath.Vector2[];
+      setSelected(
+        targets.filter((t) => cmath.polygon.pointInPolygon([t.x, t.y], poly))
+      );
+    } else {
+      setSelected([]);
+    }
+  }, [throttledPoints, targets]);
 
   const plotPoints = React.useCallback(() => {
     const pts = Array.from({ length: 30 }, () => ({

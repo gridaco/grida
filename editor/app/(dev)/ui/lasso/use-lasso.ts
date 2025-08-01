@@ -60,6 +60,8 @@ export function useLasso(options?: UseLassoOptions) {
         if (!drawingRef.current) return;
         drawingRef.current = false;
         onComplete?.(points);
+        setPoints([]);
+        startRef.current = null;
       },
     },
     { target: ref }
