@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import {
   useEditorFlagsState,
-  useSurfaceVectorEditor,
   useToolState,
   useTransformState,
 } from "@/grida-canvas-react/provider";
@@ -10,6 +9,7 @@ import { useGesture } from "@use-gesture/react";
 import { cn } from "@/components/lib/utils";
 import { svg } from "@/grida-canvas-utils/svg";
 import assert from "assert";
+import useSurfaceVectorEditor from "@/grida-canvas-react/use-sub-vector-network-editor";
 
 function transformDelta(v: cmath.Vector2, t: cmath.Transform): cmath.Vector2 {
   return cmath.vector2.transform(v, [
