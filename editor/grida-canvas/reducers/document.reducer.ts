@@ -1,5 +1,4 @@
 import { produce, type Draft } from "immer";
-
 import type {
   DocumentAction,
   EditorSelectAction,
@@ -22,14 +21,13 @@ import {
   self_duplicateNode,
   self_insertSubDocument,
   self_selectNode,
-  reduceVectorContentSelection,
   self_updateVectorNode,
+  reduceVectorContentSelection,
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
-import vn from "@grida/vn";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
 import { v4 } from "uuid";
@@ -178,60 +176,26 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const target_node_ids =
         target === "selection" ? state.selection : [target];
 
+      return produce(state, (draft) => {
+        __self_delete_nodes(draft, target_node_ids);
+      });
+    }
+    case "a11y/delete": {
+      const target_node_ids = state.selection;
+
+      // TODO: add fill/gradient stop deletion
+
       if (state.content_edit_mode?.type === "vector") {
-        const {
-          node_id,
-          selected_vertices,
-          selected_segments,
-          selected_tangents,
-        } = state.content_edit_mode;
         return produce(state, (draft) => {
-          const node = dq.__getNodeById(
+          __self_delete_vector_network_selection(
             draft,
-            node_id
-          ) as grida.program.nodes.VectorNode;
-
-          self_updateVectorNode(node, (vne) => {
-            // delete tangents
-            for (const [v_idx, t_idx] of selected_tangents) {
-              const point = t_idx === 0 ? "a" : "b";
-              const control = t_idx === 0 ? "ta" : "tb";
-              for (const si of vne.findSegments(v_idx, point)) {
-                vne.deleteTangent(si, control);
-              }
-            }
-
-            // delete segments
-            const segs = [...selected_segments].sort((a, b) => b - a);
-            for (const si of segs) {
-              vne.deleteSegment(si);
-            }
-
-            // delete vertices
-            const verts = [...selected_vertices].sort((a, b) => b - a);
-            for (const vi of verts) {
-              vne.deleteVertex(vi);
-            }
-          });
-
-          assert(draft.content_edit_mode?.type === "vector");
-          draft.content_edit_mode.selected_vertices = [];
-          draft.content_edit_mode.selected_segments = [];
-          draft.content_edit_mode.selected_tangents = [];
-          draft.content_edit_mode.a_point = null;
+            draft.content_edit_mode as editor.state.VectorContentEditMode
+          );
         });
       }
 
       return produce(state, (draft) => {
-        for (const node_id of target_node_ids) {
-          if (
-            // the deleting node cannot be..
-            // - in content edit mode
-            node_id !== state.content_edit_mode?.node_id
-          ) {
-            self_try_remove_node(draft, node_id);
-          }
-        }
+        __self_delete_nodes(draft, target_node_ids);
       });
     }
     case "insert": {
@@ -1121,6 +1085,62 @@ export default function documentReducer<S extends editor.state.IEditorState>(
   }
 
   return state;
+}
+
+function __self_delete_nodes<S extends editor.state.IEditorState>(
+  draft: Draft<S>,
+  target_node_ids: string[]
+) {
+  for (const node_id of target_node_ids) {
+    if (
+      // the deleting node cannot be.. in content edit mode
+      node_id !== draft.content_edit_mode?.node_id
+    ) {
+      self_try_remove_node(draft, node_id);
+    }
+  }
+}
+
+function __self_delete_vector_network_selection(
+  draft: Draft<editor.state.IEditorState>,
+  ved: editor.state.VectorContentEditMode
+) {
+  assert(draft.content_edit_mode?.type === "vector");
+  const { node_id, selected_vertices, selected_segments, selected_tangents } =
+    ved;
+
+  const node = dq.__getNodeById(
+    draft,
+    node_id
+  ) as grida.program.nodes.VectorNode;
+
+  self_updateVectorNode(node, (vne) => {
+    // delete tangents
+    for (const [v_idx, t_idx] of selected_tangents) {
+      const point = t_idx === 0 ? "a" : "b";
+      const control = t_idx === 0 ? "ta" : "tb";
+      for (const si of vne.findSegments(v_idx, point)) {
+        vne.deleteTangent(si, control);
+      }
+    }
+
+    // delete segments
+    const segs = [...selected_segments].sort((a, b) => b - a);
+    for (const si of segs) {
+      vne.deleteSegment(si);
+    }
+
+    // delete vertices
+    const verts = [...selected_vertices].sort((a, b) => b - a);
+    for (const vi of verts) {
+      vne.deleteVertex(vi);
+    }
+  });
+
+  draft.content_edit_mode.selected_vertices = [];
+  draft.content_edit_mode.selected_segments = [];
+  draft.content_edit_mode.selected_tangents = [];
+  draft.content_edit_mode.a_point = null;
 }
 
 function __self_order(

@@ -955,6 +955,7 @@ interface UseA11yActions {
     shiftKey: boolean,
     config?: editor.api.NudgeUXConfig
   ) => void;
+  a11ydelete: () => void;
   nudge: (
     target: "selection" | editor.NodeID,
     axis: "x" | "y",
@@ -1043,9 +1044,14 @@ export function useA11yActions(): UseA11yActions {
     [dispatch]
   );
 
+  const a11ydelete = useCallback(() => {
+    dispatch({ type: "a11y/delete" });
+  }, [dispatch]);
+
   return {
     nudge,
     a11yarrow,
+    a11ydelete,
   };
 }
 
