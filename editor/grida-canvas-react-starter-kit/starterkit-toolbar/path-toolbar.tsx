@@ -21,11 +21,12 @@ export function PathToolbar() {
         onValueChange={(v) => {
           editor.setTool({ type: v as "cursor" | "lasso" });
         }}
+        className="gap-2"
       >
-        <ToggleGroupItem value="cursor">
+        <ToggleGroupItem value="cursor" className="rounded-sm aspect-square">
           <SplinePointerIcon className="size-4" />
         </ToggleGroupItem>
-        <ToggleGroupItem value="lasso">
+        <ToggleGroupItem value="lasso" className="rounded-sm aspect-square">
           <ToolIcon type="lasso" className="size-4" />
         </ToggleGroupItem>
       </ToggleGroup>

@@ -14,7 +14,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import grida from "@grida/schema";
 import { useMetaEnter } from "@/hooks/use-meta-enter";
 import { Cross2Icon, FrameIcon } from "@radix-ui/react-icons";
@@ -28,9 +27,11 @@ import {
   ToolbarToolType,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/utils";
 import {
+  ToolGroupItem,
   ToolIcon,
   ToolsGroup,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
+import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
 import { ColorPicker } from "../sidecontrol/controls/color-picker";
 import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { PaintBucketIcon } from "lucide-react";
@@ -163,7 +164,8 @@ export function PlaygroundToolbar() {
         </div>
       )}
       <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto select-none">
-        <ToggleGroup
+        <ToggleGroupPrimitive.Root
+          data-slot="toggle-group"
           onValueChange={(v) => {
             editor.setTool(
               v
@@ -174,6 +176,7 @@ export function PlaygroundToolbar() {
           value={value}
           defaultValue="cursor"
           type="single"
+          className="flex items-center justify-center gap-1"
         >
           <ToolsGroup
             value={value}
@@ -186,12 +189,12 @@ export function PlaygroundToolbar() {
             }}
           />
           <VerticalDivider />
-          <ToggleGroupItem value={"container" satisfies ToolbarToolType}>
+          <ToolGroupItem value={"container" satisfies ToolbarToolType}>
             <FrameIcon />
-          </ToggleGroupItem>
-          <ToggleGroupItem value={"text" satisfies ToolbarToolType}>
+          </ToolGroupItem>
+          <ToolGroupItem value={"text" satisfies ToolbarToolType}>
             <ToolIcon type="text" />
-          </ToggleGroupItem>
+          </ToolGroupItem>
           <ToolsGroup
             value={value}
             options={[
@@ -239,7 +242,7 @@ export function PlaygroundToolbar() {
           {/* <Button variant="ghost" className="px-3" onClick={onAddButtonClick}>
             <MixIcon />
           </Button> */}
-        </ToggleGroup>
+        </ToggleGroupPrimitive.Root>
       </div>
     </div>
   );

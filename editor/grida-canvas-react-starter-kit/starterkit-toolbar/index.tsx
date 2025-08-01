@@ -26,13 +26,32 @@ import {
   toolbar_value_to_cursormode,
   ToolbarToolType,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/utils";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
 import {
   useCurrentEditor,
   useEditorFlagsState,
   useToolState,
 } from "@/grida-canvas-react";
 import { cn } from "@/components/lib/utils";
+
+export function ToolGroupItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof ToggleGroupPrimitive.Item>) {
+  return (
+    <ToggleGroupPrimitive.Item
+      data-slot="toggle-group-item"
+      className={cn(
+        "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium hover:bg-muted hover:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none transition-[color,box-shadow] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive whitespace-nowrap h-9 px-2 min-w-9",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </ToggleGroupPrimitive.Item>
+  );
+}
 
 export function ToolbarPosition({
   className,
@@ -78,7 +97,8 @@ export default function Toolbar() {
 
   return (
     <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
-      <ToggleGroup
+      <ToggleGroupPrimitive.Root
+        data-slot="toggle-group"
         onValueChange={(v) => {
           editor.setTool(
             v
@@ -89,6 +109,7 @@ export default function Toolbar() {
         value={value}
         defaultValue="cursor"
         type="single"
+        className="flex items-center justify-center gap-1"
       >
         <ToolsGroup
           value={value}
@@ -101,12 +122,18 @@ export default function Toolbar() {
           }}
         />
         <VerticalDivider />
-        <ToggleGroupItem value={"container" satisfies ToolbarToolType}>
+        <ToolGroupItem
+          value={"container" satisfies ToolbarToolType}
+          className="aspect-square"
+        >
           <FrameIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"text" satisfies ToolbarToolType}>
+        </ToolGroupItem>
+        <ToolGroupItem
+          value={"text" satisfies ToolbarToolType}
+          className="aspect-square"
+        >
           <ToolIcon type="text" />
-        </ToggleGroupItem>
+        </ToolGroupItem>
         <ToolsGroup
           value={value}
           options={[
@@ -128,7 +155,7 @@ export default function Toolbar() {
             editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
-      </ToggleGroup>
+      </ToggleGroupPrimitive.Root>
     </div>
   );
 }
@@ -157,9 +184,9 @@ export function ToolsGroup({
 
   return (
     <>
-      <ToggleGroupItem value={primary}>
+      <ToolGroupItem value={primary} className="aspect-square">
         <ToolIcon type={primary} className="size-4" />
-      </ToggleGroupItem>
+      </ToolGroupItem>
       {options.length > 1 && (
         <DropdownMenu modal>
           <DropdownMenuTrigger>
