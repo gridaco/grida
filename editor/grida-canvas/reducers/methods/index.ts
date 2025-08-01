@@ -4,3 +4,4 @@ export * from "./insert";
 export * from "./delete";
 export * from "./transform";
 export * from "./duplicate";
+export * from "./vector";

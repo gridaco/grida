@@ -689,7 +689,9 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "delete-vertex":
     case "select-segment":
     case "delete-segment":
+    case "translate-segment":
     case "select-tangent":
+    case "translate-vertex":
     case "split-segment": {
       return produce(state, (draft) => {
         const { node_id } = action.target;
@@ -814,6 +816,42 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 : next.selected_tangents.length > 0
                   ? next.selected_tangents[0][0]
                   : null;
+            break;
+          }
+          case "translate-vertex": {
+            assert(node.type === "vector");
+            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+            const bb_a = vne.getBBox();
+            vne.translateVertex(vertex, action.delta);
+            const bb_b = vne.getBBox();
+            const delta_vec: cmath.Vector2 = [bb_b.x - bb_a.x, bb_b.y - bb_a.y];
+            vne.translate(cmath.vector2.invert(delta_vec));
+            const new_pos = cmath.vector2.add([node.left!, node.top!], delta_vec);
+
+            node.left = new_pos[0];
+            node.top = new_pos[1];
+            node.width = bb_b.width;
+            node.height = bb_b.height;
+
+            node.vectorNetwork = vne.value;
+            break;
+          }
+          case "translate-segment": {
+            assert(node.type === "vector");
+            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+            const bb_a = vne.getBBox();
+            vne.translateSegment(segment, action.delta);
+            const bb_b = vne.getBBox();
+            const delta_vec: cmath.Vector2 = [bb_b.x - bb_a.x, bb_b.y - bb_a.y];
+            vne.translate(cmath.vector2.invert(delta_vec));
+            const new_pos = cmath.vector2.add([node.left!, node.top!], delta_vec);
+
+            node.left = new_pos[0];
+            node.top = new_pos[1];
+            node.width = bb_b.width;
+            node.height = bb_b.height;
+
+            node.vectorNetwork = vne.value;
             break;
           }
           case "delete-segment": {

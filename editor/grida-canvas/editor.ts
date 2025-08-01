@@ -710,6 +710,30 @@ export class Editor
     });
   }
 
+  public translateVertex(
+    node_id: editor.NodeID,
+    vertex: number,
+    delta: cmath.Vector2
+  ) {
+    this.dispatch({
+      type: "translate-vertex",
+      target: { node_id, vertex },
+      delta,
+    });
+  }
+
+  public translateSegment(
+    node_id: editor.NodeID,
+    segment: number,
+    delta: cmath.Vector2
+  ) {
+    this.dispatch({
+      type: "translate-segment",
+      target: { node_id, segment },
+      delta,
+    });
+  }
+
   public selectGradientStop(node_id: editor.NodeID, stop: number): void {
     this.dispatch({
       type: "select-gradient-stop",
@@ -2075,23 +2099,11 @@ export class Editor
     });
   }
 
-  startTranslateVertexGesture(node_id: string, vertex: number) {
+  startTranslateVectorNetwork(node_id: string) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
-        type: "translate-vertex",
-        vertex,
-        node_id,
-      },
-    });
-  }
-
-  startTranslateSegmentGesture(node_id: string, segment: number) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "translate-segment",
-        segment,
+        type: "translate-vector-controls",
         node_id,
       },
     });

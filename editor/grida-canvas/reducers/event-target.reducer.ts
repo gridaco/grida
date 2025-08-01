@@ -868,7 +868,7 @@ function __self_evt_on_drag(
 
         break;
       }
-      case "translate-vertex": {
+      case "translate-vector-controls": {
         assert(draft.content_edit_mode?.type === "vector");
         const { content_edit_mode } = draft;
         const { node_id } = content_edit_mode;
@@ -879,74 +879,42 @@ function __self_evt_on_drag(
 
         const { movement: _movement } = draft.gesture;
 
-        assert(draft.gesture.type === "translate-vertex");
+        assert(draft.gesture.type === "translate-vector-controls");
         const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
-        // axis lock movement with dominant axis
         const adj_movement =
           tarnslate_with_axis_lock === "on"
             ? cmath.ext.movement.axisLockedByDominance(_movement)
             : _movement;
 
-        const { initial_verticies, initial_position } = draft.gesture;
+        const {
+          initial_verticies,
+          initial_segments,
+          initial_position,
+          vertices,
+          tangents,
+        } = draft.gesture;
 
         const vne = new vn.VectorNetworkEditor({
           vertices: initial_verticies.map((p) => ({ p })),
-          segments: node.vectorNetwork.segments,
+          segments: initial_segments.map((s) => ({ ...s })),
         });
 
         const bb_a = vne.getBBox();
 
-        for (const i of content_edit_mode.selected_vertices) {
-          vne.translateVertex(i, cmath.ext.movement.normalize(adj_movement));
+        const delta_vec = cmath.ext.movement.normalize(adj_movement);
+
+        for (const i of vertices) {
+          vne.translateVertex(i, delta_vec);
         }
-
-        const bb_b = vne.getBBox();
-
-        const delta = cmath.vector2.sub([bb_b.x, bb_b.y], [bb_a.x, bb_a.y]);
-
-        vne.translate(cmath.vector2.invert(delta));
-
-        // position & dimension
-        const new_pos = cmath.vector2.add(initial_position, delta);
-        node.left = new_pos[0];
-        node.top = new_pos[1];
-        node.width = bb_b.width;
-        node.height = bb_b.height;
-
-        // update the node's vector network
-        node.vectorNetwork = vne.value;
-
-        break;
-      }
-      case "translate-segment": {
-        assert(draft.content_edit_mode?.type === "vector");
-        const { content_edit_mode } = draft;
-        const { node_id } = content_edit_mode;
-        const node = dq.__getNodeById(
-          draft,
-          node_id
-        ) as grida.program.nodes.VectorNode;
-
-        const { movement: _movement } = draft.gesture;
-
-        assert(draft.gesture.type === "translate-segment");
-        const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
-        const adj_movement =
-          tarnslate_with_axis_lock === "on"
-            ? cmath.ext.movement.axisLockedByDominance(_movement)
-            : _movement;
-
-        const { initial_verticies, initial_position, segment: segIndex } =
-          draft.gesture;
-
-        const vne = new vn.VectorNetworkEditor({
-          vertices: initial_verticies.map((p) => ({ p })),
-          segments: node.vectorNetwork.segments,
-        });
-
-        const bb_a = vne.getBBox();
-
-        vne.translateSegment(segIndex, cmath.ext.movement.normalize(adj_movement));
+        for (const [v_idx, t_idx] of tangents) {
+          const point = t_idx === 0 ? "a" : "b";
+          for (const si of vne.findSegments(v_idx, point)) {
+            const seg = vne.segments[si];
+            const control = t_idx === 0 ? "ta" : "tb";
+            const next = cmath.vector2.add(seg[control], delta_vec);
+            vne.updateTangent(si, control, next, false);
+          }
+        }
 
         const bb_b = vne.getBBox();
 

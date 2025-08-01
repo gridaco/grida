@@ -7,7 +7,7 @@ import assert from "assert";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
-import { self_clearSelection, self_selectNode } from "./methods";
+import { self_clearSelection, self_selectNode, encodeTranslateVectorCommand } from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
 import vn from "@grida/vn";
@@ -475,9 +475,7 @@ function __self_start_gesture(
       //
       break;
     }
-    case "translate-vertex": {
-      const { vertex: index } = gesture;
-
+    case "translate-vector-controls": {
       const { content_edit_mode } = draft;
       assert(content_edit_mode && content_edit_mode.type === "vector");
       const { node_id } = content_edit_mode;
@@ -487,48 +485,21 @@ function __self_start_gesture(
       ) as grida.program.nodes.VectorNode;
 
       const verticies = node.vectorNetwork.vertices.map((v) => v.p);
+      const segments = node.vectorNetwork.segments.map((s) => ({ ...s }));
 
-      content_edit_mode.selected_vertices = [index];
-      content_edit_mode.selected_segments = [];
-      content_edit_mode.selected_tangents = [];
-      content_edit_mode.a_point = index;
-
-      draft.gesture = {
-        type: "translate-vertex",
-        node_id: node_id,
-        initial_verticies: verticies,
-        vertex: index,
-        movement: cmath.vector2.zero,
-        first: cmath.vector2.zero,
-        last: cmath.vector2.zero,
-        initial_position: [node.left!, node.top!],
-      };
-      break;
-      //
-    }
-    case "translate-segment": {
-      const { segment: segIndex } = gesture;
-
-      const { content_edit_mode } = draft;
-      assert(content_edit_mode && content_edit_mode.type === "vector");
-      const { node_id } = content_edit_mode;
-      const node = dq.__getNodeById(
-        draft,
-        node_id
-      ) as grida.program.nodes.VectorNode;
-
-      const verticies = node.vectorNetwork.vertices.map((v) => v.p);
-      const seg = node.vectorNetwork.segments[segIndex];
-
-      content_edit_mode.selected_segments = [segIndex];
-      content_edit_mode.selected_tangents = [];
-      content_edit_mode.a_point = seg.a;
+      const { vertices, tangents } = encodeTranslateVectorCommand(node.vectorNetwork, {
+        selected_vertices: content_edit_mode.selected_vertices,
+        selected_segments: content_edit_mode.selected_segments,
+        selected_tangents: content_edit_mode.selected_tangents,
+      });
 
       draft.gesture = {
-        type: "translate-segment",
+        type: "translate-vector-controls",
         node_id: node_id,
-        segment: segIndex,
         initial_verticies: verticies,
+        initial_segments: segments,
+        vertices,
+        tangents,
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,

@@ -10,6 +10,7 @@ import type { tokens } from "@grida/tokens";
 import type { NodeProxy } from "./editor";
 import { dq } from "./query";
 import cmath from "@grida/cmath";
+import vn from "@grida/vn";
 import grida from "@grida/schema";
 
 export { type Action };
@@ -861,8 +862,7 @@ export namespace editor.gesture {
     | GestureCornerRadius
     | GestureDraw
     | GestureBrush
-    | GestureTranslateSegment
-    | GestureTranslateVertex
+    | GestureTranslateVectorControls
     | GestureCurve
     | GestureCurveA;
 
@@ -1091,32 +1091,13 @@ export namespace editor.gesture {
    * @remarks
    * This is only valid with content edit mode is "vector"
    */
-  export type GestureTranslateVertex = IGesture & {
-    type: "translate-vertex";
-
-    /**
-     * initial (snapshot) value of the points
-     */
-    readonly initial_verticies: cmath.Vector2[];
-
-    /**
-     * index of the vertex
-     */
-    readonly vertex: number;
-
+  export type GestureTranslateVectorControls = IGesture & {
+    type: "translate-vector-controls";
     readonly node_id: string;
-
-    /**
-     * initial position of node
-     */
-    readonly initial_position: cmath.Vector2;
-  };
-
-  export type GestureTranslateSegment = IGesture & {
-    type: "translate-segment";
+    readonly vertices: number[];
+    readonly tangents: [number, 0 | 1][];
     readonly initial_verticies: cmath.Vector2[];
-    readonly segment: number;
-    readonly node_id: string;
+    readonly initial_segments: vn.VectorNetworkSegment[];
     readonly initial_position: cmath.Vector2;
   };
 
@@ -1530,7 +1511,7 @@ export namespace editor.api {
     startGapGesture(selection: string | string[], axis: "x" | "y"): void;
     startCornerRadiusGesture(selection: string): void;
     startRotateGesture(selection: string): void;
-    startTranslateVertexGesture(node_id: string, vertex: number): void;
+    startTranslateVectorNetwork(node_id: string): void;
     startCurveGesture(
       node_id: string,
       segment: number,

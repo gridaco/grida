@@ -220,6 +220,8 @@ function Segment({
 }) {
   const editor = useSurfaceVectorEditor();
   const selected = editor.selected_segments.includes(segmentIndex);
+  const selectedRef = React.useRef(false);
+  const draggedRef = React.useRef(false);
   const showMiddle =
     hovered && cmath.vector2.isZero(ta) && cmath.vector2.isZero(tb);
   const middle = useMemo(() => {
@@ -240,11 +242,21 @@ function Segment({
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
-        editor.selectSegment(segmentIndex, event.shiftKey);
+        selectedRef.current = editor.selected_segments.includes(segmentIndex);
+        draggedRef.current = false;
+        if (!selectedRef.current) {
+          editor.selectSegment(segmentIndex, event.shiftKey);
+        }
       },
       onDragStart: ({ event }) => {
         event.preventDefault();
-        editor.onSegmentDragStart(segmentIndex);
+        draggedRef.current = true;
+        editor.onSegmentDragStart();
+      },
+      onPointerUp: ({ event }) => {
+        if (selectedRef.current && !draggedRef.current) {
+          editor.selectSegment(segmentIndex, event.shiftKey);
+        }
       },
     },
     {
@@ -308,15 +320,31 @@ function CurveControlExtension({
   selected?: boolean;
 }) {
   const editor = useSurfaceVectorEditor();
+  const selectedRef = React.useRef(false);
+  const draggedRef = React.useRef(false);
   const bind = useGesture(
     {
       onPointerDown: ({ event }) => {
         event.preventDefault();
-        editor.selectTangent(segment, control, event.shiftKey);
+        selectedRef.current = editor.selected_tangents.some(
+          ([v, t]) =>
+            v === (control === "ta" ? editor.segments[segment].a : editor.segments[segment].b) &&
+            t === (control === "ta" ? 0 : 1)
+        );
+        draggedRef.current = false;
+        if (!selectedRef.current) {
+          editor.selectTangent(segment, control, event.shiftKey);
+        }
       },
       onDragStart: ({ event }) => {
         event.preventDefault();
+        draggedRef.current = true;
         editor.onCurveControlPointDragStart(segment, control);
+      },
+      onPointerUp: ({ event }) => {
+        if (selectedRef.current && !draggedRef.current) {
+          editor.selectTangent(segment, control, event.shiftKey);
+        }
       },
     },
     {
@@ -400,6 +428,8 @@ function VertexPoint({
   const editor = useSurfaceVectorEditor();
   const selected = editor.selected_vertices.includes(index);
   const hovered = editor.hovered_point === index;
+  const selectedRef = React.useRef(false);
+  const draggedRef = React.useRef(false);
   const bind = useGesture(
     {
       onHover: (s) => {
@@ -416,15 +446,24 @@ function VertexPoint({
         event.preventDefault();
         const element = event.target as HTMLDivElement;
         if (element.hasAttribute("tabindex")) {
-          // focus explicitly for key events (as default behavior is prevented)
           element.focus();
         }
-        editor.selectVertex(index, event.shiftKey);
+        selectedRef.current = editor.selected_vertices.includes(index);
+        draggedRef.current = false;
+        if (!selectedRef.current) {
+          editor.selectVertex(index, event.shiftKey);
+        }
       },
       onDragStart: (state) => {
         const { event } = state;
         event.preventDefault();
-        editor.onVertexDragStart(index);
+        draggedRef.current = true;
+        editor.onVertexDragStart();
+      },
+      onPointerUp: ({ event }) => {
+        if (selectedRef.current && !draggedRef.current) {
+          editor.selectVertex(index, event.shiftKey);
+        }
       },
       onKeyDown: (state) => {
         const { event } = state;

@@ -270,7 +270,9 @@ export type EditorVectorEditorAction =
   | EditorVectorSelectSegmentAction
   | EditorVectorDeleteSegmentAction
   | EditorVectorSplitSegmentAction
-  | EditorVectorSelectTangentAction;
+  | EditorVectorSelectTangentAction
+  | EditorVectorTranslateVertexAction
+  | EditorVectorTranslateSegmentAction;
 
 export interface EditorVectorHoverVertexAction {
   type: "hover-vertex";
@@ -315,6 +317,18 @@ export interface EditorVectorSelectTangentAction {
   target: TangentQuery;
   /** if true, toggle selection instead of resetting */
   additive?: boolean;
+}
+
+export interface EditorVectorTranslateVertexAction {
+  type: "translate-vertex";
+  target: VertexQuery;
+  delta: cmath.Vector2;
+}
+
+export interface EditorVectorTranslateSegmentAction {
+  type: "translate-segment";
+  target: SegmentQuery;
+  delta: cmath.Vector2;
 }
 // #endregion
 
@@ -640,12 +654,8 @@ export type EditorSurface_StartGesture = {
         "type" | "control" | "node_id" | "segment"
       >
     | Pick<
-        editor.gesture.GestureTranslateSegment,
-        "type" | "node_id" | "segment"
-      >
-    | Pick<
-        editor.gesture.GestureTranslateVertex,
-        "type" | "node_id" | "vertex"
+        editor.gesture.GestureTranslateVectorControls,
+        "type" | "node_id"
       >;
 };
 

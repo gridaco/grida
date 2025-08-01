@@ -1427,12 +1427,9 @@ export function useSurfaceVectorEditor() {
     [instance, node_id]
   );
 
-  const onVertexDragStart = useCallback(
-    (vertex: number) => {
-      instance.startTranslateVertexGesture(node_id, vertex);
-    },
-    [instance, node_id]
-  );
+  const onVertexDragStart = useCallback(() => {
+    instance.startTranslateVectorNetwork(node_id);
+  }, [instance, node_id]);
 
   const deleteVertex = useCallback(
     (vertex: number) => {
@@ -1472,18 +1469,14 @@ export function useSurfaceVectorEditor() {
     [instance, node_id]
   );
 
-  const onSegmentDragStart = useCallback(
-    (segment: number) => {
-      instance.startTranslateSegmentGesture(node_id, segment);
-    },
-    [instance, node_id]
-  );
+  const onSegmentDragStart = useCallback(() => {
+    instance.startTranslateVectorNetwork(node_id);
+  }, [instance, node_id]);
 
   const onSegmentInsertMiddle = useCallback(
     (segment: number) => {
-      const newIndex = vertices.length;
       instance.splitSegment(node_id, segment);
-      instance.startTranslateVertexGesture(node_id, newIndex);
+      instance.startTranslateVectorNetwork(node_id);
     },
     [instance, node_id, vertices.length]
   );
