@@ -435,6 +435,7 @@ function VertexPoint({
   index: number;
 }) {
   const editor = useSurfaceVectorEditor();
+  const tool = useToolState();
   const selected = editor.selected_vertices.includes(index);
   const hovered = editor.hovered_point === index;
   const selectedRef = React.useRef(false);
@@ -452,6 +453,7 @@ function VertexPoint({
         }
       },
       onPointerDown: ({ event }) => {
+        if (tool.type === "path") return;
         event.preventDefault();
         const element = event.target as HTMLDivElement;
         if (element.hasAttribute("tabindex")) {
@@ -465,11 +467,13 @@ function VertexPoint({
       },
       onDragStart: (state) => {
         const { event } = state;
+        if (tool.type === "path") return;
         event.preventDefault();
         draggedRef.current = true;
         editor.onDragStart();
       },
       onPointerUp: ({ event }) => {
+        if (tool.type === "path") return;
         if (selectedRef.current && !draggedRef.current) {
           editor.selectVertex(index, event.shiftKey);
         }

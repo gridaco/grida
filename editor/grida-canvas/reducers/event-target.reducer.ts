@@ -26,7 +26,10 @@ import {
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
 } from "./methods";
-import { self_updateVectorAreaSelection } from "./methods/vector";
+import {
+  self_updateVectorAreaSelection,
+  getUXNeighbouringVertices,
+} from "./methods/vector";
 import cmath from "@grida/cmath";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
@@ -268,6 +271,25 @@ function __self_evt_on_pointer_down(
 
         const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
 
+        if (typeof a_point !== "number" && typeof hovered_point === "number") {
+          draft.content_edit_mode.selected_vertices = [hovered_point];
+          draft.content_edit_mode.selected_segments = [];
+          draft.content_edit_mode.selected_tangents = [];
+          draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
+            node.vectorNetwork,
+            {
+              selected_vertices: [hovered_point],
+              selected_segments: [],
+              selected_tangents: [],
+            }
+          );
+          draft.content_edit_mode.a_point = hovered_point;
+          draft.content_edit_mode.next_ta = vne.getNextMirroredTangent(
+            hovered_point
+          );
+          break;
+        }
+
         const position =
           typeof hovered_point === "number"
             ? node.vectorNetwork.vertices[hovered_point].p
@@ -279,6 +301,9 @@ function __self_evt_on_pointer_down(
           a_point,
           next_ta ?? undefined
         );
+
+        const new_segment_idx =
+          typeof a_point === "number" ? vne.segments.length - 1 : null;
 
         // clear the next ta as it's used
         draft.content_edit_mode.next_ta = null;
@@ -298,7 +323,8 @@ function __self_evt_on_pointer_down(
         node.vectorNetwork = vne.value;
 
         draft.content_edit_mode.selected_vertices = [new_vertex_idx];
-        draft.content_edit_mode.selected_segments = [];
+        draft.content_edit_mode.selected_segments =
+          new_segment_idx !== null ? [new_segment_idx] : [];
         draft.content_edit_mode.selected_tangents = [];
         draft.content_edit_mode.a_point = new_vertex_idx;
 
@@ -574,19 +600,24 @@ function __self_evt_on_drag_start(
     case "path": {
       // [path tool, drag start]
       assert(draft.content_edit_mode?.type === "vector");
-      const { node_id, selected_vertices } = draft.content_edit_mode;
+      const { node_id, selected_vertices, selected_segments } =
+        draft.content_edit_mode;
       assert(selected_vertices.length === 1);
       const vertex = selected_vertices[0];
 
-      const node = dq.__getNodeById(
-        draft,
-        node_id
-      ) as grida.program.nodes.VectorNode;
+      if (selected_segments.length === 1) {
+        const segment_idx = selected_segments[0];
+        draft.content_edit_mode.selected_segments = [];
 
-      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-      const segments = vne.findSegments(vertex);
+        const gesture = getInitialCurveGesture(draft, {
+          node_id,
+          segment: segment_idx,
+          control: "tb",
+          invert: true,
+        });
 
-      if (segments.length === 0) {
+        draft.gesture = gesture;
+      } else {
         draft.gesture = {
           type: "curve-a",
           node_id,
@@ -598,21 +629,6 @@ function __self_evt_on_drag_start(
           last: cmath.vector2.zero,
           invert: false,
         };
-      } else if (segments.length === 1) {
-        const segment_idx = segments[0];
-
-        const gesture = getInitialCurveGesture(draft, {
-          node_id,
-          segment: segment_idx,
-          control: "tb",
-          invert: true,
-        });
-
-        draft.gesture = gesture;
-      } else {
-        reportError(
-          "invalid vector network path editing state. multiple segments found"
-        );
       }
 
       break;
