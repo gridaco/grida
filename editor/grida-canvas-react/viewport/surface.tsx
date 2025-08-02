@@ -945,6 +945,29 @@ function NodeOverlay({
 }) {
   const { scaleX, scaleY } = useTransformState();
   const backend = useBackendState();
+  const tool = useToolState();
+
+  // enable overlay dragging only when the cursor tool is active and editable
+  const enabled = !readonly && tool.type === "cursor";
+
+  const bind = useSurfaceGesture(
+    {
+      onPointerDown: ({ event }) => {
+        if (tool.type !== "insert" && tool.type !== "draw" && !event.shiftKey) {
+          // prevent default to keep selection when clicking empty overlay
+          // but allow shift+click to fall through for deselection
+          event.preventDefault();
+        }
+      },
+    },
+    {
+      drag: {
+        enabled,
+        threshold: DRAG_THRESHOLD,
+        keyboardDisplacement: 0,
+      },
+    }
+  );
 
   const data = useSingleSelection(node_id);
 
@@ -970,6 +993,7 @@ function NodeOverlay({
   return (
     <>
       <LayerOverlay
+        {...bind()}
         readonly={readonly}
         transform={style}
         zIndex={zIndex}
