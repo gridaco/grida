@@ -231,8 +231,8 @@ export default function initialNode(
         ...seed,
       } satisfies grida.program.nodes.LineNode;
     }
+    case "svgpath":
     case "vector":
-    case "path":
     case "bitmap":
     case "component":
     case "instance":

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import { io } from "@grida/io";
@@ -435,20 +441,20 @@ export function useCurrentSelection() {
 
   const fill = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      mixedProperties.fill?.ids.forEach((id) => {
-        instance.changeNodeFill(id, value);
-      });
+      const ids = mixedProperties.fill?.ids;
+      if (!ids) return;
+      instance.changeNodeFill(ids, value);
     },
-    [mixedProperties.fill?.ids, instance.changeNodeFill]
+    [mixedProperties.fill?.ids, instance]
   );
 
   const stroke = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      mixedProperties.stroke?.ids.forEach((id) => {
-        instance.changeNodeStroke(id, value);
-      });
+      const ids = mixedProperties.stroke?.ids;
+      if (!ids) return;
+      instance.changeNodeStroke(ids, value);
     },
-    [mixedProperties.stroke?.ids, instance.changeNodeStroke]
+    [mixedProperties.stroke?.ids, instance]
   );
 
   const strokeWidth = useCallback(
@@ -660,11 +666,9 @@ export function useSelectionPaints() {
         | null
     ) => {
       const group = paints[index];
-      group.ids.forEach((id) => {
-        instance.changeNodeFill(id, value);
-      });
+      instance.changeNodeFill(group.ids, value);
     },
-    [paints, instance.changeNodeFill]
+    [paints, instance]
   );
 
   return useMemo(() => {
@@ -773,6 +777,58 @@ export function useTransformState() {
   }, [transform]);
 }
 
+/**
+ * Hook to detect when the canvas is actively being transformed (panned, zoomed, etc.)
+ *
+ * @returns `true` when the canvas transform is changing, `false` when stable
+ * @example
+ * ```tsx
+ * const isTransforming = useIsTransforming();
+ * if (isTransforming) {
+ *   // Canvas is being panned, zoomed, or otherwise transformed
+ * }
+ * ```
+ */
+export function useIsTransforming() {
+  const editor = useCurrentEditor();
+  const transform = useEditorState(editor, (state) => state.transform);
+  const prevTransformRef = useRef(transform);
+  const [isTransforming, setIsTransforming] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const hasChanged = !equal(transform, prevTransformRef.current);
+
+    if (hasChanged) {
+      setIsTransforming(true);
+
+      // Clear existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Set timeout to mark as not transforming after a short delay
+      timeoutRef.current = setTimeout(() => {
+        setIsTransforming(false);
+      }, 100); // 100ms delay to detect when transform stops
+    }
+
+    // Update the previous transform reference
+    prevTransformRef.current = transform;
+  }, [transform]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return isTransforming;
+}
+
 export function useEventTargetCSSCursor() {
   const editor = useCurrentEditor();
   const tool = useEditorState(editor, (state) => state.tool);
@@ -804,6 +860,8 @@ export function useEventTargetCSSCursor() {
       case "eraser":
       case "flood-fill":
         return "cell";
+      case "lasso":
+        return "crosshair";
     }
   }, [tool]);
 }
@@ -818,25 +876,34 @@ export function useMultiplayerCursorState(): editor.state.IEditorMultiplayerCurs
   return useEditorState(editor, (state) => state.cursors);
 }
 
-interface UseToolState {
-  tool: editor.state.IEditorState["tool"];
-  content_edit_mode: editor.state.IEditorState["content_edit_mode"];
+export function useToolState(): editor.state.IEditorState["tool"] {
+  const editor = useCurrentEditor();
+  return useEditorState(editor, (state) => state.tool);
 }
 
-export function useToolState(): UseToolState {
+/**
+ * @deprecated {@link useContentEditModeState} can be expensive for certain modes.
+ * @returns
+ */
+export function useContentEditModeState(): editor.state.IEditorState["content_edit_mode"] {
   const editor = useCurrentEditor();
-  const tool = useEditorState(editor, (state) => state.tool);
-  const content_edit_mode = useEditorState(
-    editor,
-    (state) => state.content_edit_mode
-  );
 
-  return useMemo(() => {
+  return useEditorState(editor, (state) => state.content_edit_mode);
+}
+
+export function useContentEditModeMinimalState():
+  | { type: editor.state.ContentEditModeState["type"]; node_id: string }
+  | undefined {
+  const editor = useCurrentEditor();
+
+  return useEditorState(editor, (state) => {
+    const content_edit_mode = state.content_edit_mode;
+    if (!content_edit_mode) return undefined;
     return {
-      tool,
-      content_edit_mode,
+      type: content_edit_mode.type,
+      node_id: content_edit_mode.node_id,
     };
-  }, [tool, content_edit_mode]);
+  });
 }
 
 export function useBrushState() {
@@ -888,6 +955,7 @@ interface UseA11yActions {
     shiftKey: boolean,
     config?: editor.api.NudgeUXConfig
   ) => void;
+  a11ydelete: () => void;
   nudge: (
     target: "selection" | editor.NodeID,
     axis: "x" | "y",
@@ -976,9 +1044,14 @@ export function useA11yActions(): UseA11yActions {
     [dispatch]
   );
 
+  const a11ydelete = useCallback(() => {
+    dispatch({ type: "a11y/delete" });
+  }, [dispatch]);
+
   return {
     nudge,
     a11yarrow,
+    a11ydelete,
   };
 }
 
@@ -1309,103 +1382,6 @@ export function useClipboardSync() {
     }
   }, [user_clipboard]);
   //
-}
-
-export function useSurfacePathEditor() {
-  const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    content_edit_mode: state.content_edit_mode,
-    document: state.document,
-    hovered_vertex_idx: state.hovered_vertex_idx,
-    tool: state.tool,
-  }));
-
-  assert(state.content_edit_mode && state.content_edit_mode.type === "path");
-
-  const { hovered_vertex_idx: hovered_point, tool } = state;
-  const { node_id, selected_vertices, a_point, path_cursor_position, next_ta } =
-    state.content_edit_mode;
-  const node = state.document.nodes[node_id] as grida.program.nodes.PathNode;
-
-  const vertices = node.vectorNetwork.vertices;
-  const segments = node.vectorNetwork.segments;
-
-  // offset of the points (node position)
-  const offset: cmath.Vector2 = [node.left!, node.top!];
-
-  const selectVertex = useCallback(
-    (vertex: number) => {
-      if (tool.type === "path") {
-        return;
-      }
-      instance.selectVertex(node_id, vertex);
-    },
-    [tool.type, instance.selectVertex, node_id]
-  );
-
-  const onVertexHover = useCallback(
-    (vertex: number, eventType: "enter" | "leave") => {
-      instance.hoverVertex(node_id, vertex, eventType);
-    },
-    [instance, node_id]
-  );
-
-  const onVertexDragStart = useCallback(
-    (vertex: number) => {
-      instance.startTranslateVertexGesture(node_id, vertex);
-    },
-    [instance, node_id]
-  );
-
-  const onVertexDelete = useCallback(
-    (vertex: number) => {
-      instance.deleteVertex(node_id, vertex);
-    },
-    [node_id, instance.deleteVertex]
-  );
-
-  const onCurveControlPointDragStart = useCallback(
-    (segment: number, control: "ta" | "tb") => {
-      instance.startCurveGesture(node_id, segment, control);
-    },
-    [instance, node_id]
-  );
-
-  return useMemo(
-    () => ({
-      node_id,
-      path_cursor_position,
-      vertices,
-      segments,
-      offset,
-      selected_vertices,
-      hovered_point,
-      a_point,
-      next_ta,
-      selectVertex,
-      onVertexHover,
-      onVertexDragStart,
-      onVertexDelete,
-      onCurveControlPointDragStart,
-    }),
-    [
-      //
-      node_id,
-      path_cursor_position,
-      vertices,
-      segments,
-      offset,
-      selected_vertices,
-      hovered_point,
-      a_point,
-      next_ta,
-      selectVertex,
-      onVertexHover,
-      onVertexDragStart,
-      onVertexDelete,
-      onCurveControlPointDragStart,
-    ]
-  );
 }
 
 /**

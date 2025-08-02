@@ -1,7 +1,7 @@
 use crate::fonts::geistmono::sk_font_geistmono;
 use crate::runtime::camera::Camera2D;
 use math2::{rect::Rectangle, vector2};
-use skia_safe::{Color, Font, Paint, PaintStyle, Path, Point, Surface};
+use skia_safe::{Canvas, Color, Font, Paint, PaintStyle, Path, Point};
 use std::cell::RefCell;
 
 pub struct Ruler;
@@ -37,7 +37,7 @@ thread_local! {
 }
 
 impl Ruler {
-    pub fn draw(surface: &mut Surface, camera: &Camera2D) {
+    pub fn draw(canvas: &Canvas, camera: &Camera2D) {
         const STEPS: [f32; 12] = [
             1.0, 2.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0,
         ];
@@ -52,7 +52,6 @@ impl Ruler {
         let world_rect = camera.rect();
         let view = camera.view_matrix();
 
-        let canvas = surface.canvas();
         let width = camera.get_size().width;
         let height = camera.get_size().height;
 

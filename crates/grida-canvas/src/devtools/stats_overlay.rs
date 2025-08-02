@@ -1,6 +1,6 @@
 use crate::fonts::geistmono::sk_font_geistmono;
 use crate::sys::clock::Ticker;
-use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
+use skia_safe::{Canvas, Color, Font, Paint, Point, Rect};
 
 pub struct StatsOverlay;
 
@@ -23,7 +23,7 @@ thread_local! {
 }
 
 impl StatsOverlay {
-    pub fn draw<T: Ticker>(surface: &mut Surface, stats: &str, clock: &T) {
+    pub fn draw<T: Ticker>(canvas: &Canvas, stats: &str, clock: &T) {
         if stats.is_empty() {
             return;
         }
@@ -49,7 +49,6 @@ impl StatsOverlay {
         let width = 600.0;
         let height = padding * 2.0 + line_height * all_lines.len() as f32;
         let rect = Rect::from_xywh(10.0, 130.0, width, height);
-        let canvas = surface.canvas();
         BG_PAINT.with(|bg| canvas.draw_rect(rect, bg));
         TEXT_PAINT.with(|paint| {
             FONT.with(|font| {

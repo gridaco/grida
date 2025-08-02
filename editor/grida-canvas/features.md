@@ -47,6 +47,7 @@ This document lists all implemented features including the ones that are not yet
 | transform origin           | scale or rotate around center                   | `alt`   | `alt`   | canvas |
 | surface raycast targeting  | configure raycast targeting for deepest objects | `meta`  | `ctrl`  | canvas |
 | context-sensitive snapping | toggle snapping behavior dynamically            | `meta`  | `ctrl`  | canvas |
+| keep projecting path       | continue extending path after closing on vertex | `p`     | `p`     | vector |
 
 ### Actions
 

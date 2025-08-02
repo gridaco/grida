@@ -1,4 +1,6 @@
-use crate::devtools::{fps_overlay, hit_overlay, ruler_overlay, stats_overlay, tile_overlay};
+use crate::devtools::{
+    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay, tile_overlay,
+};
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
 use crate::node::schema::Scene;
@@ -36,12 +38,21 @@ pub trait ApplicationApi {
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
 
+    /// Enable or disable caching of raster tiles.
+    fn runtime_renderer_set_cache_tile(&mut self, cache: bool);
+
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
     fn devtools_rendering_set_show_fps_meter(&mut self, show: bool);
     fn devtools_rendering_set_show_stats(&mut self, show: bool);
     fn devtools_rendering_set_show_hit_testing(&mut self, show: bool);
     fn devtools_rendering_set_show_ruler(&mut self, show: bool);
+
+    fn highlight_strokes(
+        &mut self,
+        ids: Vec<String>,
+        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+    );
 
     /// Load a scene from a JSON string using the `io_grida` parser.
     fn load_scene_json(&mut self, json: &str);
@@ -108,6 +119,8 @@ pub struct UnknownTargetApplication {
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
     pub(crate) devtools_selection: Option<crate::node::schema::NodeId>,
+    pub(crate) highlight_strokes: Vec<crate::node::schema::NodeId>,
+    pub(crate) highlight_stroke_style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
     pub(crate) devtools_rendering_show_fps: bool,
     pub(crate) devtools_rendering_show_tiles: bool,
     pub(crate) devtools_rendering_show_stats: bool,
@@ -245,6 +258,10 @@ impl ApplicationApi for UnknownTargetApplication {
         return None;
     }
 
+    fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
+        self.renderer.set_cache_tile(cache);
+    }
+
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
         self.devtools_rendering_show_tiles = debug;
     }
@@ -263,6 +280,16 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
         self.devtools_rendering_show_ruler = show;
+    }
+
+    fn highlight_strokes(
+        &mut self,
+        ids: Vec<String>,
+        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+    ) {
+        self.highlight_strokes = ids;
+        self.highlight_stroke_style = style;
+        self.queue();
     }
 
     fn load_scene_json(&mut self, json: &str) {
@@ -351,6 +378,8 @@ impl UnknownTargetApplication {
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
             devtools_selection: None,
+            highlight_strokes: Vec::new(),
+            highlight_stroke_style: None,
             devtools_rendering_show_fps: debug,
             devtools_rendering_show_tiles: debug,
             devtools_rendering_show_stats: debug,
@@ -551,17 +580,18 @@ impl UnknownTargetApplication {
         {
             let __overlay_start = std::time::Instant::now();
             let surface = self.state.surface_mut();
+            let canvas = surface.canvas();
             if self.devtools_rendering_show_fps {
-                fps_overlay::FpsMeter::draw(surface, self.scheduler.average_fps());
+                fps_overlay::FpsMeter::draw(&canvas, self.scheduler.average_fps());
             }
             if self.devtools_rendering_show_stats {
                 if let Some(s) = self.last_stats.as_deref() {
-                    stats_overlay::StatsOverlay::draw(surface, s, &self.clock);
+                    stats_overlay::StatsOverlay::draw(&canvas, s, &self.clock);
                 }
             }
             if self.devtools_rendering_show_hit_overlay {
                 hit_overlay::HitOverlay::draw(
-                    surface,
+                    &canvas,
                     self.hit_test_result.as_ref(),
                     self.devtools_selection.as_ref(),
                     &self.renderer.camera,
@@ -569,15 +599,25 @@ impl UnknownTargetApplication {
                     &self.renderer.fonts,
                 );
             }
+            if !self.highlight_strokes.is_empty() {
+                stroke_overlay::StrokeOverlay::draw(
+                    &canvas,
+                    &self.highlight_strokes,
+                    &self.renderer.camera,
+                    self.renderer.get_cache(),
+                    &self.renderer.fonts,
+                    self.highlight_stroke_style.as_ref(),
+                );
+            }
             if self.devtools_rendering_show_tiles {
                 tile_overlay::TileOverlay::draw(
-                    surface,
+                    &canvas,
                     &self.renderer.camera,
                     self.renderer.get_cache().tile.tiles(),
                 );
             }
             if self.devtools_rendering_show_ruler {
-                ruler_overlay::Ruler::draw(surface, &self.renderer.camera);
+                ruler_overlay::Ruler::draw(&canvas, &self.renderer.camera);
             }
             if let Some(mut ctx) = surface.recording_context() {
                 if let Some(mut direct) = ctx.as_direct_context() {

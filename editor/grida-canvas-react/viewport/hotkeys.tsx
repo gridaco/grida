@@ -1,5 +1,10 @@
 import { useHotkeys } from "react-hotkeys-hook";
-import { useCurrentSelection, useToolState, useA11yActions } from "../provider";
+import {
+  useCurrentSelection,
+  useToolState,
+  useA11yActions,
+  useContentEditModeMinimalState,
+} from "../provider";
 import { toast } from "sonner";
 import type cg from "@grida/cg";
 import { useEffect, useRef } from "react";
@@ -318,8 +323,9 @@ function useSingleDoublePressHotkey(
 
 export function useEditorHotKeys() {
   const editor = useCurrentEditor();
-  const { tool, content_edit_mode } = useToolState();
-  const { a11yarrow } = useA11yActions();
+  const tool = useToolState();
+  const content_edit_mode = useContentEditModeMinimalState();
+  const { a11yarrow, a11ydelete } = useA11yActions();
 
   const { selection, actions } = useCurrentSelection();
 
@@ -667,7 +673,7 @@ export function useEditorHotKeys() {
   //   enableOnFormTags: false,
   // });
 
-  useHotkeys("backspace, delete", () => editor.deleteNode("selection"), {
+  useHotkeys("backspace, delete", () => a11ydelete(), {
     preventDefault: true,
     enableOnContentEditable: false,
     enableOnFormTags: false,
@@ -764,9 +770,23 @@ export function useEditorHotKeys() {
     editor.setTool({ type: "draw", tool: "line" });
   });
 
-  useHotkeys("p", () => {
-    editor.setTool({ type: "path" });
-  });
+  useHotkeys(
+    "p",
+    () => {
+      // Holding `p` continues a path even when closing on an existing vertex.
+      editor.configurePathKeepProjectingModifier("on");
+      editor.setTool({ type: "path" });
+    },
+    { keydown: true, keyup: false }
+  );
+
+  useHotkeys(
+    "p",
+    () => {
+      editor.configurePathKeepProjectingModifier("off");
+    },
+    { keydown: false, keyup: true }
+  );
 
   useHotkeys("shift+p", () => {
     editor.setTool({ type: "draw", tool: "pencil" });

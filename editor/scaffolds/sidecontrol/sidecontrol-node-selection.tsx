@@ -74,6 +74,7 @@ import {
   useSelectionPaints,
   useSelectionState,
   useBackendState,
+  useContentEditModeMinimalState,
 } from "@/grida-canvas-react/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
@@ -101,6 +102,7 @@ import { editor } from "@/grida-canvas";
 import { FeControl } from "./controls/fe";
 import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
+import useSurfaceVectorEditor from "@/grida-canvas-react/use-sub-vector-network-editor";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -133,6 +135,13 @@ export function Selection({
 }) {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
+  const cem = useContentEditModeMinimalState();
+
+  const is_vector_edit_mode = cem?.type === "vector";
+
+  if (is_vector_edit_mode) {
+    return <ModeVectorEditModeProperties node_id={cem.node_id} />;
+  }
 
   const selection_length = selection.length;
 
@@ -140,9 +149,9 @@ export function Selection({
     <div>
       {selection_length === 0 && empty && empty}
       {selection_length === 1 && (
-        <SelectedNodeProperties config={config} node_id={selection[0]} />
+        <ModeNodeProperties config={config} node_id={selection[0]} />
       )}
-      {selection_length > 1 && <SelectionMixedProperties config={config} />}
+      {selection_length > 1 && <ModeMixedNodeProperties config={config} />}
     </div>
   );
 }
@@ -174,7 +183,56 @@ const __default_controls_config: ControlsConfig = {
   image: "on",
 };
 
-function SelectionMixedProperties({
+function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
+  const { selected_vertices, selected_tangents, absolute_vertices, segments } =
+    useSurfaceVectorEditor();
+
+  let x: number | null = null;
+  let y: number | null = null;
+
+  if (selected_vertices.length === 1) {
+    const p = absolute_vertices[selected_vertices[0]];
+    x = p[0];
+    y = p[1];
+  } else if (selected_tangents.length === 1) {
+    const [v_idx, t_idx] = selected_tangents[0];
+    const seg = segments.find((s) =>
+      t_idx === 0 ? s.a === v_idx : s.b === v_idx
+    );
+    if (seg) {
+      const vertex = absolute_vertices[t_idx === 0 ? seg.a : seg.b];
+      const tangent = t_idx === 0 ? seg.ta : seg.tb;
+      x = vertex[0] + tangent[0];
+      y = vertex[1] + tangent[1];
+    }
+  }
+
+  return (
+    <div key={node_id} className="mt-4 mb-10">
+      <SidebarSection className="border-b pb-4">
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine className="items-center gap-1">
+            <PropertyLineLabel>Position</PropertyLineLabel>
+            <InputPropertyNumber
+              mode="fixed"
+              value={x ?? ""}
+              readOnly
+              icon={<span className="text-[9px] text-muted-foreground">X</span>}
+            />
+            <InputPropertyNumber
+              mode="fixed"
+              value={y ?? ""}
+              readOnly
+              icon={<span className="text-[9px] text-muted-foreground">Y</span>}
+            />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+    </div>
+  );
+}
+
+function ModeMixedNodeProperties({
   config = __default_controls_config,
 }: {
   config?: ControlsConfig;
@@ -695,7 +753,7 @@ function SelectionMixedProperties({
   );
 }
 
-function SelectedNodeProperties({
+function ModeNodeProperties({
   node_id,
   config = __default_controls_config,
 }: {
@@ -1127,18 +1185,19 @@ function SelectedNodeProperties({
             )}
             {(pointCount != null || innerRadius != null) && (
               <>
-                {pointCount != null && (
-                  <PropertyLine>
-                    <PropertyLineLabel>Count</PropertyLineLabel>
-                    <InputPropertyNumber
-                      mode="fixed"
-                      min={3}
-                      max={60}
-                      value={pointCount}
-                      onValueCommit={actions.pointCount}
-                    />
-                  </PropertyLine>
-                )}
+                {pointCount != null &&
+                  supports.pointCount(node.type, { backend }) && (
+                    <PropertyLine>
+                      <PropertyLineLabel>Count</PropertyLineLabel>
+                      <InputPropertyNumber
+                        mode="fixed"
+                        min={3}
+                        max={60}
+                        value={pointCount}
+                        onValueCommit={actions.pointCount}
+                      />
+                    </PropertyLine>
+                  )}
                 {innerRadius != null && type !== "ellipse" && (
                   <PropertyLine>
                     <PropertyLineLabel>Ratio</PropertyLineLabel>
@@ -1418,6 +1477,7 @@ function SectionStrokes({
     })
   );
 
+  const has_stroke_paint = stroke !== undefined;
   const actions = useNodeActions(node_id)!;
 
   return (
@@ -1434,27 +1494,31 @@ function SectionStrokes({
             removable
           />
         </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Width</PropertyLineLabel>
-          <StrokeWidthControl
-            value={strokeWidth}
-            onValueCommit={actions.strokeWidth}
-          />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Align</PropertyLineLabel>
-          <StrokeAlignControl
-            value={strokeAlign}
-            onValueChange={actions.strokeAlign}
-          />
-        </PropertyLine>
-        <PropertyLine hidden={config.stroke_cap === "off"}>
-          <PropertyLineLabel>Cap</PropertyLineLabel>
-          <StrokeCapControl
-            value={strokeCap}
-            onValueChange={actions.strokeCap}
-          />
-        </PropertyLine>
+        {has_stroke_paint && (
+          <>
+            <PropertyLine>
+              <PropertyLineLabel>Width</PropertyLineLabel>
+              <StrokeWidthControl
+                value={strokeWidth}
+                onValueCommit={actions.strokeWidth}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Align</PropertyLineLabel>
+              <StrokeAlignControl
+                value={strokeAlign}
+                onValueChange={actions.strokeAlign}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={config.stroke_cap === "off"}>
+              <PropertyLineLabel>Cap</PropertyLineLabel>
+              <StrokeCapControl
+                value={strokeCap}
+                onValueChange={actions.strokeCap}
+              />
+            </PropertyLine>
+          </>
+        )}
       </SidebarMenuSectionContent>
     </SidebarSection>
   );

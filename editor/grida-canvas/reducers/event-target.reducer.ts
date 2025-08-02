@@ -26,6 +26,10 @@ import {
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
 } from "./methods";
+import {
+  self_updateVectorAreaSelection,
+  getUXNeighbouringVertices,
+} from "./methods/vector";
 import cmath from "@grida/cmath";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
@@ -60,7 +64,7 @@ function __self_evt_on_pointer_move(
     last: draft.pointer.position,
   };
 
-  if (draft.content_edit_mode?.type === "path") {
+  if (draft.content_edit_mode?.type === "vector") {
     const { a_point, node_id } = draft.content_edit_mode;
     const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
 
@@ -68,7 +72,7 @@ function __self_evt_on_pointer_move(
       const node = dq.__getNodeById(
         draft,
         node_id
-      ) as grida.program.nodes.PathNode;
+      ) as grida.program.nodes.VectorNode;
       const { left: nx, top: ny } = node;
       const n_offset: cmath.Vector2 = [nx!, ny!];
       const { vertices } = node.vectorNetwork;
@@ -255,7 +259,7 @@ function __self_evt_on_pointer_down(
       // ignore - insert mode will be handled via click or drag
       break;
     case "path": {
-      if (draft.content_edit_mode?.type === "path") {
+      if (draft.content_edit_mode?.type === "vector") {
         const { hovered_vertex_idx: hovered_point } = draft;
         const { node_id, path_cursor_position, a_point, next_ta } =
           draft.content_edit_mode;
@@ -263,21 +267,48 @@ function __self_evt_on_pointer_down(
         const node = dq.__getNodeById(
           draft,
           node_id
-        ) as grida.program.nodes.PathNode;
+        ) as grida.program.nodes.VectorNode;
 
         const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+
+        if (typeof a_point !== "number" && typeof hovered_point === "number") {
+          draft.content_edit_mode.selected_vertices = [hovered_point];
+          draft.content_edit_mode.selected_segments = [];
+          draft.content_edit_mode.selected_tangents = [];
+          draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
+            node.vectorNetwork,
+            {
+              selected_vertices: [hovered_point],
+              selected_segments: [],
+              selected_tangents: [],
+            }
+          );
+          draft.content_edit_mode.a_point = hovered_point;
+          draft.content_edit_mode.next_ta = vne.getNextMirroredTangent(
+            hovered_point
+          );
+          break;
+        }
 
         const position =
           typeof hovered_point === "number"
             ? node.vectorNetwork.vertices[hovered_point].p
-            : // relative position
-              cmath.vector2.sub(path_cursor_position, [node.left!, node.top!]);
+            : // relative position (absolute -> local)
+              (() => {
+                const rect = context.geometry.getNodeAbsoluteBoundingRect(
+                  node_id
+                )!;
+                return cmath.vector2.sub(path_cursor_position, [rect.x, rect.y]);
+              })();
 
         const new_vertex_idx = vne.addVertex(
           position,
           a_point,
           next_ta ?? undefined
         );
+
+        const new_segment_idx =
+          typeof a_point === "number" ? vne.segments.length - 1 : null;
 
         // clear the next ta as it's used
         draft.content_edit_mode.next_ta = null;
@@ -295,9 +326,25 @@ function __self_evt_on_pointer_down(
         node.height = bb_b.height;
 
         node.vectorNetwork = vne.value;
-
         draft.content_edit_mode.selected_vertices = [new_vertex_idx];
-        draft.content_edit_mode.a_point = new_vertex_idx;
+        draft.content_edit_mode.selected_tangents = [];
+
+        const isClosingExisting =
+          typeof hovered_point === "number" && new_vertex_idx === hovered_point;
+
+        if (
+          isClosingExisting &&
+          draft.gesture_modifiers.path_keep_projecting !== "on"
+        ) {
+          // Close the path and conclude the gesture when connecting to an
+          // existing vertex, unless the user holds `p` to keep projecting.
+          draft.content_edit_mode.selected_segments = [];
+          draft.content_edit_mode.a_point = null;
+        } else {
+          draft.content_edit_mode.selected_segments =
+            new_segment_idx !== null ? [new_segment_idx] : [];
+          draft.content_edit_mode.a_point = new_vertex_idx;
+        }
 
         // ...
       } else {
@@ -305,8 +352,8 @@ function __self_evt_on_pointer_down(
         const new_node_id = nid();
 
         const vector = {
-          type: "path",
-          name: "path",
+          type: "vector",
+          name: "vector",
           id: new_node_id,
           active: true,
           locked: false,
@@ -325,23 +372,36 @@ function __self_evt_on_pointer_down(
             vertices: [{ p: cmath.vector2.zero }],
             segments: [],
           },
-        } satisfies grida.program.nodes.PathNode;
+        } satisfies grida.program.nodes.VectorNode;
 
         const pos = draft.pointer.position;
 
-        vector.left = pos[0];
-        vector.top = pos[1];
-
         const parent = __get_insertion_target(draft);
+
+        let relpos = pos;
+        if (parent) {
+          const parent_rect =
+            context.geometry.getNodeAbsoluteBoundingRect(parent)!;
+          relpos = cmath.vector2.sub(pos, [parent_rect.x, parent_rect.y]);
+        }
+
+        vector.left = relpos[0];
+        vector.top = relpos[1];
+
         self_try_insert_node(draft, parent, vector);
         self_selectNode(draft, "reset", vector.id);
 
         draft.content_edit_mode = {
-          type: "path",
+          type: "vector",
           node_id: new_node_id,
           selected_vertices: [0], // select the first point
+          selected_segments: [],
+          selected_tangents: [],
           a_point: 0,
           next_ta: null,
+          initial_vector_network: vector.vectorNetwork,
+          original: null,
+          neighbouring_vertices: [0],
           path_cursor_position: pos,
         };
       }
@@ -380,31 +440,43 @@ function __self_evt_on_drag_start(
 
   // clear all trasform state
   draft.marquee = undefined;
+  draft.lasso = undefined;
   draft.dropzone = undefined;
   draft.surface_snapping = undefined;
 
   switch (draft.tool.type) {
     case "cursor": {
-      // TODO: improve logic
-      if (shiftKey) {
-        if (draft.hovered_node_id) {
-          __self_start_gesture_translate(draft, context);
-        } else {
-          // marquee selection
-          draft.marquee = {
-            a: draft.pointer.position,
-            b: draft.pointer.position,
-          };
-        }
+      // when vector content edit mode is active, dragging should marquee select
+      if (draft.content_edit_mode?.type === "vector") {
+        draft.marquee = {
+          a: draft.pointer.position,
+          b: draft.pointer.position,
+          additive: shiftKey,
+        };
       } else {
-        if (draft.selection.length === 0) {
-          // marquee selection
-          draft.marquee = {
-            a: draft.pointer.position,
-            b: draft.pointer.position,
-          };
+        // TODO: improve logic
+        if (shiftKey) {
+          if (draft.hovered_node_id) {
+            __self_start_gesture_translate(draft, context);
+          } else {
+            // marquee selection
+            draft.marquee = {
+              a: draft.pointer.position,
+              b: draft.pointer.position,
+              additive: shiftKey,
+            };
+          }
         } else {
-          __self_start_gesture_translate(draft, context);
+          if (draft.selection.length === 0) {
+            // marquee selection
+            draft.marquee = {
+              a: draft.pointer.position,
+              b: draft.pointer.position,
+              additive: shiftKey,
+            };
+          } else {
+            __self_start_gesture_translate(draft, context);
+          }
         }
       }
       break;
@@ -414,6 +486,7 @@ function __self_evt_on_drag_start(
       draft.marquee = {
         a: draft.pointer.position,
         b: draft.pointer.position,
+        additive: shiftKey,
       };
       break;
     }
@@ -424,6 +497,10 @@ function __self_evt_on_drag_start(
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
       };
+      break;
+    }
+    case "lasso": {
+      draft.lasso = { points: [draft.pointer.position], additive: shiftKey };
       break;
     }
     case "insert": {
@@ -456,7 +533,7 @@ function __self_evt_on_drag_start(
     case "draw": {
       const tool = draft.tool.tool;
 
-      let vector: grida.program.nodes.PathNode | grida.program.nodes.LineNode;
+      let vector: grida.program.nodes.VectorNode | grida.program.nodes.LineNode;
 
       const new_node_id = nid();
       const __base = {
@@ -479,11 +556,11 @@ function __self_evt_on_drag_start(
         case "pencil": {
           vector = {
             ...__base,
-            type: "path",
-            name: "path",
+            type: "vector",
+            name: "vector",
             strokeWidth: 3,
             vectorNetwork: vn.polyline([cmath.vector2.zero]),
-          } satisfies grida.program.nodes.PathNode;
+          } satisfies grida.program.nodes.VectorNode;
           break;
         }
         case "line": {
@@ -495,11 +572,11 @@ function __self_evt_on_drag_start(
 
           vector = {
             ...__base,
-            type: "path",
+            type: "vector",
             name: "line",
             strokeWidth: 1,
             vectorNetwork: vn.polyline([cmath.vector2.zero]),
-          } satisfies grida.program.nodes.PathNode;
+          } satisfies grida.program.nodes.VectorNode;
           break;
         }
       }
@@ -548,20 +625,25 @@ function __self_evt_on_drag_start(
     }
     case "path": {
       // [path tool, drag start]
-      assert(draft.content_edit_mode?.type === "path");
-      const { node_id, selected_vertices } = draft.content_edit_mode;
+      assert(draft.content_edit_mode?.type === "vector");
+      const { node_id, selected_vertices, selected_segments } =
+        draft.content_edit_mode;
       assert(selected_vertices.length === 1);
       const vertex = selected_vertices[0];
 
-      const node = dq.__getNodeById(
-        draft,
-        node_id
-      ) as grida.program.nodes.PathNode;
+      if (selected_segments.length === 1) {
+        const segment_idx = selected_segments[0];
+        draft.content_edit_mode.selected_segments = [];
 
-      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-      const segments = vne.findSegments(vertex);
+        const gesture = getInitialCurveGesture(draft, {
+          node_id,
+          segment: segment_idx,
+          control: "tb",
+          invert: true,
+        });
 
-      if (segments.length === 0) {
+        draft.gesture = gesture;
+      } else {
         draft.gesture = {
           type: "curve-a",
           node_id,
@@ -573,21 +655,6 @@ function __self_evt_on_drag_start(
           last: cmath.vector2.zero,
           invert: false,
         };
-      } else if (segments.length === 1) {
-        const segment_idx = segments[0];
-
-        const gesture = getInitialCurveGesture(draft, {
-          node_id,
-          segment: segment_idx,
-          control: "tb",
-          invert: true,
-        });
-
-        draft.gesture = gesture;
-      } else {
-        reportError(
-          "invalid vector network path editing state. multiple segments found"
-        );
       }
 
       break;
@@ -619,6 +686,7 @@ function __self_evt_on_drag_end(
       break;
     case "path":
     case "hand":
+    case "lasso":
       // keep
       break;
     case "zoom": {
@@ -641,7 +709,7 @@ function __self_evt_on_drag_end(
       break;
     }
     case "cursor": {
-      if (node_ids_from_area) {
+      if (draft.content_edit_mode?.type !== "vector" && node_ids_from_area) {
         const target_node_ids = getMarqueeSelection(draft, node_ids_from_area);
 
         self_selectNode(
@@ -665,6 +733,7 @@ function __self_evt_on_drag_end(
   __self_maybe_end_gesture(draft);
   draft.gesture = { type: "idle" };
   draft.marquee = undefined;
+  draft.lasso = undefined;
 }
 
 function __self_evt_on_drag(
@@ -678,7 +747,29 @@ function __self_evt_on_drag(
   } = <EditorEventTarget_Drag>action;
 
   if (draft.marquee) {
-    draft.marquee!.b = draft.pointer.position;
+    draft.marquee.b = draft.pointer.position;
+    if (draft.content_edit_mode?.type === "vector") {
+      const mrect = cmath.rect.fromPoints([draft.marquee.a, draft.marquee.b]);
+      self_updateVectorAreaSelection(
+        draft,
+        context,
+        (p) => cmath.rect.containsPoint(mrect, p),
+        draft.marquee.additive ?? false
+      );
+    }
+  } else if (draft.lasso) {
+    draft.lasso.points.push(draft.pointer.position);
+    if (
+      draft.content_edit_mode?.type === "vector" &&
+      draft.lasso.points.length > 2
+    ) {
+      self_updateVectorAreaSelection(
+        draft,
+        context,
+        (p) => cmath.polygon.pointInPolygon(p, draft.lasso!.points),
+        draft.lasso.additive ?? false
+      );
+    }
   } else {
     if (draft.gesture.type === "idle") return;
     if (draft.gesture.type === "nudge") return;
@@ -766,7 +857,7 @@ function __self_evt_on_drag(
         const node = dq.__getNodeById(
           draft,
           node_id
-        ) as grida.program.nodes.PathNode;
+        ) as grida.program.nodes.VectorNode;
 
         const vne = new vn.VectorNetworkEditor({
           vertices: points.map((p) => ({ p })),
@@ -807,13 +898,13 @@ function __self_evt_on_drag(
         break;
       }
       case "curve": {
-        assert(draft.content_edit_mode?.type === "path");
+        assert(draft.content_edit_mode?.type === "vector");
         const { node_id, segment, initial, control, invert } = draft.gesture;
 
         const node = dq.__getNodeById(
           draft,
           node_id
-        ) as grida.program.nodes.PathNode;
+        ) as grida.program.nodes.VectorNode;
 
         const { vectorNetwork } = node;
         const vne = new vn.VectorNetworkEditor(vectorNetwork);
@@ -823,7 +914,7 @@ function __self_evt_on_drag(
           invert ? cmath.vector2.invert(movement) : movement
         );
 
-        vne.updateTangent(segment, control, tangentPos, true);
+        vne.updateTangent(segment, control, tangentPos, "all");
 
         if (segment === vne.segments.length - 1) {
           // TODO: add a new "curve-b" and make it isolated from control point editing.
@@ -852,7 +943,7 @@ function __self_evt_on_drag(
         //
       }
       case "curve-a": {
-        assert(draft.content_edit_mode?.type === "path");
+        assert(draft.content_edit_mode?.type === "vector");
         const { node_id, vertex, initial, control, invert } = draft.gesture;
 
         const tangentPos = cmath.vector2.add(
@@ -864,36 +955,52 @@ function __self_evt_on_drag(
 
         break;
       }
-      case "translate-vertex": {
-        assert(draft.content_edit_mode?.type === "path");
+      case "translate-vector-controls": {
+        assert(draft.content_edit_mode?.type === "vector");
         const { content_edit_mode } = draft;
         const { node_id } = content_edit_mode;
         const node = dq.__getNodeById(
           draft,
           node_id
-        ) as grida.program.nodes.PathNode;
+        ) as grida.program.nodes.VectorNode;
 
         const { movement: _movement } = draft.gesture;
 
-        assert(draft.gesture.type === "translate-vertex");
+        assert(draft.gesture.type === "translate-vector-controls");
         const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
-        // axis lock movement with dominant axis
         const adj_movement =
           tarnslate_with_axis_lock === "on"
             ? cmath.ext.movement.axisLockedByDominance(_movement)
             : _movement;
 
-        const { initial_verticies, initial_position } = draft.gesture;
+        const {
+          initial_verticies,
+          initial_segments,
+          initial_position,
+          vertices,
+          tangents,
+        } = draft.gesture;
 
         const vne = new vn.VectorNetworkEditor({
           vertices: initial_verticies.map((p) => ({ p })),
-          segments: node.vectorNetwork.segments,
+          segments: initial_segments.map((s) => ({ ...s })),
         });
 
         const bb_a = vne.getBBox();
 
-        for (const i of content_edit_mode.selected_vertices) {
-          vne.translateVertex(i, cmath.ext.movement.normalize(adj_movement));
+        const delta_vec = cmath.ext.movement.normalize(adj_movement);
+
+        for (const i of vertices) {
+          vne.translateVertex(i, delta_vec);
+        }
+        for (const [v_idx, t_idx] of tangents) {
+          const point = t_idx === 0 ? "a" : "b";
+          for (const si of vne.findSegments(v_idx, point)) {
+            const seg = vne.segments[si];
+            const control = t_idx === 0 ? "ta" : "tb";
+            const next = cmath.vector2.add(seg[control], delta_vec);
+            vne.updateTangent(si, control, next, "none");
+          }
         }
 
         const bb_b = vne.getBBox();
@@ -902,14 +1009,12 @@ function __self_evt_on_drag(
 
         vne.translate(cmath.vector2.invert(delta));
 
-        // position & dimension
         const new_pos = cmath.vector2.add(initial_position, delta);
         node.left = new_pos[0];
         node.top = new_pos[1];
         node.width = bb_b.width;
         node.height = bb_b.height;
 
-        // update the node's vector network
         node.vectorNetwork = vne.value;
 
         break;

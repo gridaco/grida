@@ -325,6 +325,12 @@ function _reducer<S extends editor.state.IEditorState>(
         self_update_gesture_transform(draft, context);
       });
     }
+    case "config/modifiers/path-keep-projecting": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.gesture_modifiers.path_keep_projecting =
+          action.path_keep_projecting;
+      });
+    }
     case "gesture/nudge": {
       return produce(state, (draft: Draft<S>) => {
         const { state } = action;

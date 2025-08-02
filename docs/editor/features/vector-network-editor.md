@@ -1,0 +1,28 @@
+# Surface Vector Editor - Middle Point Projection
+
+When hovering a straight segment in the vector editor, a preview point appears at the middle of the segment. Pressing and dragging on this preview splits the segment by inserting a new vertex at the midpoint and immediately begins a drag gesture for that vertex.
+
+- Midpoint preview only appears on straight segments.
+- Pointer down on the preview inserts the vertex and selects it.
+- Dragging continues without releasing the pointer.
+- Midpoint calculation is memoised and only recomputed when the hovered segment changes.
+
+This behaviour mirrors conventional vector editing tools where segments can be quickly subdivided by interacting with their midpoints.
+
+# Translate Vector Controls
+
+The `translate-vector-controls` gesture moves selected vertices and tangents while respecting their dependencies.
+
+Given a selection consisting of segments `S`, vertices `V` and tangents `T` (where each tangent is `[vertex, 0|1]` for `ta`/`tb`):
+
+1. Build the vertex set `V'` by adding the `a` and `b` vertices of each segment in `S` and all vertices in `V`.
+2. Build the tangent set `T'` by including tangents from `T` whose vertex is not in `V'`.
+
+Moving by a delta `d = (dx, dy)` results in
+
+- `p_i ← p_i + d` for every vertex index `i` in `V'`.
+- `t_{i,k} ← t_{i,k} + d` for every tangent `[i,k]` in `T'` where `k` is `0` for `ta` and `1` for `tb`.
+
+Tangents associated with a moved vertex become no-ops, as the vertex movement already offsets them.
+
+This encoding makes translating mixed selections predictable and easy to test.

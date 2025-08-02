@@ -1,24 +1,48 @@
 import { cva } from "class-variance-authority";
 
 export namespace WorkbenchUI {
-  export const inputVariants = cva("rounded-sm w-full", {
-    variants: {
-      variant: {
-        input: "shadow-sm border border-input",
-        container: "!px-0 flex items-center gap-2",
-        // for paint inputs
-        "paint-container": "!p-0.5",
+  /**
+   * input variants - to mimic style of a input for a div container
+   */
+  export const inputVariants = cva(
+    "rounded-sm w-full transition-[color,box-shadow] data-[focus=true]:border-ring data-[focus=true]:ring-ring/50 data-[focus=true]:ring-[3px]",
+    {
+      variants: {
+        variant: {
+          input: "shadow-sm border border-input",
+          container: "!px-0 flex items-center gap-2",
+          // for paint inputs
+          "paint-container": "!p-0.5",
+        },
+        size: {
+          xs: "!text-[11px] !h-6 px-1.5 min-w-none",
+          sm: "!text-xs !h-8 px-2 min-w-none",
+        },
       },
-      size: {
-        xs: "!text-[11px] !h-6 px-1.5 min-w-none",
-        sm: "!text-xs !h-8 px-2 min-w-none",
+      defaultVariants: {
+        variant: "input",
+        size: "sm",
       },
-    },
-    defaultVariants: {
-      variant: "input",
-      size: "sm",
-    },
-  });
+    }
+  );
+
+  /**
+   * raw input variants - the default input style - to be applied to a real <input> element, that is used with the inputVariants container
+   */
+  export const rawInputVariants = cva(
+    "w-full bg-transparent border-none outline-none p-0 placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground",
+    {
+      variants: {
+        size: {
+          xs: "!text-[11px]",
+          sm: "!text-xs",
+        },
+      },
+      defaultVariants: {
+        size: "sm",
+      },
+    }
+  );
 
   export const selectVariants = cva("", {
     variants: {

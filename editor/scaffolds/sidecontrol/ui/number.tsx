@@ -1,5 +1,4 @@
 import React from "react";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
 import type { TMixed } from "../controls/utils/types";
@@ -22,6 +21,8 @@ type NumericPropertyControlProps = Omit<
   min?: number;
   /** Maximum allowed value */
   max?: number;
+  /** Optional icon to display in the input */
+  icon?: React.ReactNode;
 } & (
     | {
         /** Mode for handling value changes with delta support */
@@ -121,7 +122,6 @@ export default function InputPropertyNumber({
   type = "number",
   placeholder,
   value,
-  className,
   onKeyDown,
   mode = "auto",
   onValueChange,
@@ -130,7 +130,9 @@ export default function InputPropertyNumber({
   autoSelect = true,
   min,
   max,
-  appearance,
+  appearance = "none",
+  icon,
+  className,
   ...props
 }: NumericPropertyControlProps & {
   appearance?: "none";
@@ -154,23 +156,80 @@ export default function InputPropertyNumber({
     onValueCommit,
   });
 
+  // Create a ref for the input element
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Track focus state for data-focus attribute
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  // Handle container click to focus the input
+  const handleContainerClick = React.useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Handle container pointer down to focus the input
+  const handleContainerPointerDown = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      // Only handle if clicking on the container itself, not on the input or icon
+      if (e.target === e.currentTarget) {
+        inputRef.current?.focus();
+      }
+    },
+    []
+  );
+
+  // Custom focus handler to track focus state
+  const handleInputFocus = React.useCallback(
+    (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(true);
+      handleFocus(e, props.onFocus);
+    },
+    [handleFocus, props.onFocus]
+  );
+
+  // Custom blur handler to track focus state
+  const handleInputBlur = React.useCallback(
+    (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(false);
+      handleBlur(e, props.onBlur);
+    },
+    [handleBlur, props.onBlur]
+  );
+
   return (
-    <Input
-      {...props}
-      type={inputType}
-      placeholder={placeholder}
+    <div
       className={cn(
         WorkbenchUI.inputVariants({ size: "xs" }),
-        appearance === "none"
-          ? "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          : "",
+        "flex items-center gap-2 cursor-text",
         className
       )}
-      value={internalValue}
-      onFocus={(e) => handleFocus(e, props.onFocus)}
-      onBlur={(e) => handleBlur(e, props.onBlur)}
-      onKeyDown={(e) => handleKeyDown(e, onKeyDown)}
-      onChange={handleChange}
-    />
+      data-focus={isFocused}
+      onClick={handleContainerClick}
+      onPointerDown={handleContainerPointerDown}
+      tabIndex={-1} // Make container focusable for accessibility
+    >
+      {icon && (
+        <div className="flex-shrink-0 text-muted-foreground">{icon}</div>
+      )}
+      <div className="flex-1 min-w-0">
+        <input
+          {...props}
+          ref={inputRef}
+          type={inputType}
+          placeholder={placeholder}
+          className={cn(
+            WorkbenchUI.rawInputVariants({ size: "xs" }),
+            appearance === "none"
+              ? "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              : ""
+          )}
+          value={internalValue}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          onKeyDown={(e) => handleKeyDown(e, onKeyDown)}
+          onChange={handleChange}
+        />
+      </div>
+    </div>
   );
 }

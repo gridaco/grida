@@ -45,6 +45,7 @@ export function PositioningConstraintsControl({
         <InputPropertyNumber
           mode="fixed"
           placeholder="--"
+          aria-label="Top"
           type="number"
           value={value.top ?? ""}
           onValueCommit={(v) => {
@@ -61,6 +62,7 @@ export function PositioningConstraintsControl({
           mode="fixed"
           placeholder="--"
           type="number"
+          aria-label="Left"
           value={value.left ?? ""}
           onValueCommit={(v) => {
             onValueCommit?.({
@@ -68,7 +70,7 @@ export function PositioningConstraintsControl({
               left: v,
             });
           }}
-          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}
+          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-auto")}
         />
         <ConstraintsBox
           constraint={{
@@ -88,6 +90,7 @@ export function PositioningConstraintsControl({
           mode="fixed"
           placeholder="--"
           type="number"
+          aria-label="Right"
           value={value.right ?? ""}
           onValueCommit={(v) => {
             onValueCommit?.({
@@ -95,7 +98,7 @@ export function PositioningConstraintsControl({
               right: v,
             });
           }}
-          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}
+          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-auto")}
         />
       </div>
       <div className="flex items-center justify-center">
@@ -103,6 +106,7 @@ export function PositioningConstraintsControl({
           mode="fixed"
           placeholder="--"
           type="number"
+          aria-label="Bottom"
           value={value.bottom ?? ""}
           onValueCommit={(v) => {
             onValueCommit?.({

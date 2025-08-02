@@ -4783,6 +4783,36 @@ namespace cmath {
       return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(precision);
     }
   }
+
+  export namespace polygon {
+    export type Polygon = Vector2[];
+
+    /**
+     * Determines whether a point lies inside a polygon using the ray-casting algorithm.
+     *
+     * Points on the boundary are considered inside.
+     */
+    export function pointInPolygon(point: Vector2, polygon: Polygon): boolean {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const [xi, yi] = polygon[i];
+        const [xj, yj] = polygon[j];
+
+        // check if point lies exactly on the edge
+        const onEdge =
+          (point[1] - yi) * (point[1] - yj) <= 0 &&
+          (point[0] - xi) * (point[0] - xj) <= 0 &&
+          (yj - yi) * (point[0] - xi) === (xj - xi) * (point[1] - yi);
+        if (onEdge) return true;
+
+        const intersect =
+          yi > point[1] !== yj > point[1] &&
+          point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+  }
 }
 
 // export namespace cmath.measure {}

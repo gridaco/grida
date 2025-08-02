@@ -249,7 +249,7 @@ export class Editor
 
   public archive(): Blob {
     const documentData = {
-      version: "0.0.1-beta.1+20250303",
+      version: "0.0.1-beta.1+20250728",
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
@@ -384,6 +384,25 @@ export class Editor
     });
     this._tid++;
     this.listeners.forEach((l) => l(this, action));
+  }
+
+  public dispatchAll(actions: Action[], force: boolean = false) {
+    if (this._locked && !force) return;
+    this.mstate = actions.reduce(
+      (state, action) =>
+        reducer(state, action, {
+          geometry: this,
+          viewport: {
+            width: this.viewport.size.width,
+            height: this.viewport.size.height,
+          },
+        }),
+      this.mstate
+    );
+    this._tid++;
+    if (actions.length) {
+      this.listeners.forEach((l) => l(this, actions[actions.length - 1]));
+    }
   }
 
   public subscribe(fn: (editor: this, action?: Action) => void) {
@@ -632,13 +651,19 @@ export class Editor
     });
   }
 
-  public selectVertex(node_id: editor.NodeID, vertex: number) {
+  //
+  public selectVertex(
+    node_id: editor.NodeID,
+    vertex: number,
+    options: { additive?: boolean } = {}
+  ) {
     this.dispatch({
       type: "select-vertex",
       target: {
         node_id,
         vertex,
       },
+      additive: options.additive,
     });
   }
 
@@ -649,6 +674,82 @@ export class Editor
         node_id,
         vertex,
       },
+    });
+  }
+
+  public selectSegment(
+    node_id: editor.NodeID,
+    segment: number,
+    options: { additive?: boolean } = {}
+  ): void {
+    this.dispatch({
+      type: "select-segment",
+      target: {
+        node_id,
+        segment,
+      },
+      additive: options.additive,
+    });
+  }
+
+  public selectTangent(
+    node_id: editor.NodeID,
+    vertex: number,
+    tangent: 0 | 1,
+    options: { additive?: boolean } = {}
+  ) {
+    this.dispatch({
+      type: "select-tangent",
+      target: {
+        node_id,
+        vertex,
+        tangent,
+      },
+      additive: options.additive,
+    });
+  }
+
+  public deleteSegment(node_id: editor.NodeID, segment: number): void {
+    this.dispatch({
+      type: "delete-segment",
+      target: {
+        node_id,
+        segment,
+      },
+    });
+  }
+
+  public splitSegment(node_id: editor.NodeID, segment: number) {
+    this.dispatch({
+      type: "split-segment",
+      target: {
+        node_id,
+        segment,
+      },
+    });
+  }
+
+  public translateVertex(
+    node_id: editor.NodeID,
+    vertex: number,
+    delta: cmath.Vector2
+  ) {
+    this.dispatch({
+      type: "translate-vertex",
+      target: { node_id, vertex },
+      delta,
+    });
+  }
+
+  public translateSegment(
+    node_id: editor.NodeID,
+    segment: number,
+    delta: cmath.Vector2
+  ) {
+    this.dispatch({
+      type: "translate-segment",
+      target: { node_id, segment },
+      delta,
     });
   }
 
@@ -905,6 +1006,23 @@ export class Editor
     this.dispatch({
       type: "config/modifiers/rotate-with-quantize",
       rotate_with_quantize,
+    });
+  }
+
+  /**
+   * Toggles whether the path tool should keep projecting after connecting
+   * to an existing vertex.
+   *
+   * When set to `"on"`, drawing a path and closing it on an existing
+   * vertex will continue extending the path from that vertex. When set to
+   * `"off"`, the path gesture concludes on close.
+   */
+  public configurePathKeepProjectingModifier(
+    path_keep_projecting: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/path-keep-projecting",
+      path_keep_projecting,
     });
   }
 
@@ -1227,30 +1345,35 @@ export class Editor
       });
     });
   }
+
   changeNodeFill(
-    node_id: string,
+    node_id: string | string[],
     fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => ({
         type: "node/change/*",
-        node_id: node_id,
+        node_id,
         fill: fill as cg.Paint,
-      });
-    });
+      }))
+    );
   }
+
   changeNodeStroke(
-    node_id: string,
+    node_id: string | string[],
     stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => ({
         type: "node/change/*",
-        node_id: node_id,
+        node_id,
         stroke: stroke as cg.Paint,
-      });
-    });
+      }))
+    );
   }
+
   changeNodeStrokeWidth(node_id: string, strokeWidth: editor.api.NumberChange) {
     try {
       const value = resolveNumberChangeValue(
@@ -1885,7 +2008,7 @@ export class Editor
   }
 
   dragEnd(event: PointerEvent) {
-    const { transform, marquee } = this.state;
+    const { marquee } = this.state;
     if (marquee) {
       // test area in canvas space
       const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
@@ -2017,12 +2140,11 @@ export class Editor
     });
   }
 
-  startTranslateVertexGesture(node_id: string, vertex: number) {
+  startTranslateVectorNetwork(node_id: string) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
-        type: "translate-vertex",
-        vertex,
+        type: "translate-vector-controls",
         node_id,
       },
     });

@@ -10,6 +10,10 @@
     "svg-pathdata": "^7.2.0"
   },
   "jest": {
-    "preset": "ts-jest"
+    "preset": "ts-jest",
+    "moduleNameMapper": {
+      "^@grida/cmath$": "<rootDir>/../grida-cmath/index.ts",
+      "^svg-pathdata$": "<rootDir>/__mocks__/svg-pathdata.ts"
+    }
   }
 }

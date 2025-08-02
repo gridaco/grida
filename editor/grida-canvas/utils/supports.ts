@@ -16,7 +16,8 @@ type Feature =
   | "children"
   | "stroke"
   | "feDropShadow"
-  | "strokeCap";
+  | "strokeCap"
+  | "pointCount";
 
 type INodePropertiesConfig = {
   opacity: boolean;
@@ -49,7 +50,7 @@ const GRIDA_TCANVAS_RECTANGLE_NODE: INodePropertiesConfig = {
 };
 
 const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
-  arcData: ["ellipse"],
+  arcData: [],
   cornerRadius: [
     "rectangle",
     "image",
@@ -68,12 +69,13 @@ const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
   ],
   border: ["container", "component", "instance", "image", "video"],
   children: ["container", "component", "instance"],
-  stroke: ["path", "line", "rectangle", "ellipse"],
+  stroke: ["vector", "line", "rectangle", "ellipse"],
   feDropShadow: ["container", "component", "instance"],
   /**
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
    */
-  strokeCap: ["path", "line"],
+  strokeCap: ["vector", "line"],
+  pointCount: ["polygon", "star"],
 } as const;
 
 const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
@@ -84,6 +86,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "star",
     "image",
     "video",
+    "vector",
     "container",
     "component",
     "instance",
@@ -104,7 +107,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "image",
     "video",
     "container",
-    "path",
+    "vector",
     "line",
     "rectangle",
     "ellipse",
@@ -119,7 +122,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "image",
     "video",
     "instance",
-    "path",
+    "vector",
     "line",
     "rectangle",
     "ellipse",
@@ -128,7 +131,8 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "container",
     "component",
   ],
-  strokeCap: ["path", "line"],
+  strokeCap: ["vector", "line"],
+  pointCount: ["polygon", "star"],
 } as const;
 
 type Context = {
@@ -198,6 +202,14 @@ export namespace supports {
         return dom_supports.feDropShadow.includes(type);
       case "canvas":
         return canvas_supports.feDropShadow.includes(type);
+    }
+  };
+  export const pointCount = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.pointCount.includes(type);
+      case "canvas":
+        return canvas_supports.pointCount.includes(type);
     }
   };
 }

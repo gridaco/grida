@@ -309,7 +309,7 @@
         "rotation": 0,
         "opacity": 1,
         "zIndex": 0,
-        "type": "vector",
+        "type": "svgpath",
         "position": "absolute",
         "left": 1.67,
         "top": 1.67,

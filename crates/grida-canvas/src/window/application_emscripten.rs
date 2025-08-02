@@ -134,6 +134,10 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.export_node_as(id, format)
     }
 
+    fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
+        self.base.runtime_renderer_set_cache_tile(cache);
+    }
+
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {
         self.base.set_main_camera_transform(transform);
     }
@@ -157,6 +161,14 @@ impl ApplicationApi for EmscriptenApplication {
 
     fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
         self.base.devtools_rendering_set_show_ruler(show);
+    }
+
+    fn highlight_strokes(
+        &mut self,
+        ids: Vec<String>,
+        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+    ) {
+        self.base.highlight_strokes(ids, style);
     }
 
     fn load_scene_json(&mut self, json: &str) {

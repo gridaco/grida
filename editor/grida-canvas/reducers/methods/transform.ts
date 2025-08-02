@@ -45,7 +45,7 @@ export function self_update_gesture_transform<
   if (draft.gesture.type === "draw") return;
   if (draft.gesture.type === "corner-radius") return;
   if (draft.gesture.type === "nudge") return; // nudge is not a transform gesture - only a virtual gesture
-  if (draft.gesture.type === "translate-vertex") return;
+  if (draft.gesture.type === "translate-vector-controls") return;
   if (draft.gesture.type === "curve") return;
   if (draft.gesture.type === "gap") return;
   if (draft.gesture.type === "brush") return;
@@ -559,7 +559,7 @@ function __self_update_gesture_transform_scale(
       });
     }
 
-    if (node.type === "path") {
+    if (node.type === "vector") {
       // TODO: mrege with the above
       const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
       const scale = cmath.rect.getScaleFactors(initial_rect, {
@@ -570,7 +570,7 @@ function __self_update_gesture_transform_scale(
       });
       vne.scale(scale);
       (
-        draft.document.nodes[node_id] as grida.program.nodes.PathNode
+        draft.document.nodes[node_id] as grida.program.nodes.VectorNode
       ).vectorNetwork = vne.value;
       //
     }

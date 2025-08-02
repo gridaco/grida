@@ -26,7 +26,7 @@ export function EdgeScrollingEffect(
 export function useEdgeScrolling({ enabled = true }: EdgeScrollingProps) {
   const instance = useCurrentEditor();
   const dragging = useEditorState(instance, (state) => state.dragging);
-  const { tool } = useToolState();
+  const tool = useToolState();
   const { transform } = useTransformState();
   const pointer = usePointerState();
   const viewport = useViewport();

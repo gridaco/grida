@@ -192,7 +192,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.0.1-beta.1+20250303";
+  export const SCHEMA_VERSION = "0.0.1-beta.1+20250728";
 
   /**
    * Simple Node Selector
@@ -766,8 +766,8 @@ export namespace grida.program.nodes {
     | HTMLIFrameNode
     | HTMLRichTextNode
     | BitmapNode
+    | SVGPathNode
     | VectorNode
-    | PathNode
     | LineNode
     | RectangleNode
     | EllipseNode
@@ -785,8 +785,8 @@ export namespace grida.program.nodes {
     | ComputedContainerNode
     | ComputedHTMLIFrameNode
     | ComputedHTMLRichTextNode
+    | ComputedSVGPathNode
     | ComputedVectorNode
-    | ComputedPathNode
     | ComputedLineNode
     | ComputedRectangleNode
     | ComputedEllipseNode
@@ -805,8 +805,8 @@ export namespace grida.program.nodes {
       Partial<ComputedContainerNode> &
       Partial<ComputedHTMLIFrameNode> &
       Partial<ComputedHTMLRichTextNode> &
+      Partial<ComputedSVGPathNode> &
       Partial<ComputedVectorNode> &
-      Partial<ComputedPathNode> &
       Partial<ComputedLineNode> &
       Partial<ComputedRectangleNode> &
       Partial<ComputedEllipseNode> &
@@ -830,8 +830,8 @@ export namespace grida.program.nodes {
       Partial<ContainerNode> &
       Partial<HTMLIFrameNode> &
       Partial<HTMLRichTextNode> &
+      Partial<SVGPathNode> &
       Partial<VectorNode> &
-      Partial<PathNode> &
       Partial<LineNode> &
       Partial<RectangleNode> &
       Partial<EllipseNode> &
@@ -863,7 +863,7 @@ export namespace grida.program.nodes {
       __IPrototypeNodeChildren
   >;
   export type PathNodePrototype = __TPrototypeNode<
-    Omit<Partial<PathNode>, __base_scene_node_properties>
+    Omit<Partial<VectorNode>, __base_scene_node_properties>
   >;
   export type LineNodePrototype = __TPrototypeNode<
     Omit<Partial<LineNode>, __base_scene_node_properties>
@@ -873,6 +873,12 @@ export namespace grida.program.nodes {
   >;
   export type EllipseNodePrototype = __TPrototypeNode<
     Omit<Partial<EllipseNode>, __base_scene_node_properties>
+  >;
+  export type PolygonNodePrototype = __TPrototypeNode<
+    Omit<Partial<RegularPolygonNode>, __base_scene_node_properties>
+  >;
+  export type StarNodePrototype = __TPrototypeNode<
+    Omit<Partial<RegularStarPolygonNode>, __base_scene_node_properties>
   >;
 
   /**
@@ -892,11 +898,13 @@ export namespace grida.program.nodes {
         Omit<Partial<HTMLRichTextNode>, __base_scene_node_properties>
       >
     | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<VectorNode>, __base_scene_node_properties>>
+    | __TPrototypeNode<Omit<Partial<SVGPathNode>, __base_scene_node_properties>>
     | PathNodePrototype
     | LineNodePrototype
     | RectangleNodePrototype
     | EllipseNodePrototype
+    | PolygonNodePrototype
+    | StarNodePrototype
     | __TPrototypeNode<
         Omit<
           Partial<ComponentNode>,
@@ -1613,7 +1621,7 @@ export namespace grida.program.nodes {
   /**
    * @deprecated - not ready - do not use in production
    */
-  export interface VectorNode
+  export interface SVGPathNode
     extends i.IBaseNode,
       i.ISceneNode,
       i.IHrefable,
@@ -1626,7 +1634,7 @@ export namespace grida.program.nodes {
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
-    type: "vector";
+    type: "svgpath";
 
     /**
      * @deprecated - use vectorNetwork instead
@@ -1645,7 +1653,7 @@ export namespace grida.program.nodes {
   /**
    * @deprecated - not ready - do not use in production
    */
-  export type ComputedVectorNode = VectorNode;
+  export type ComputedSVGPathNode = SVGPathNode;
 
   export interface RegularPolygonNode
     extends i.IBaseNode,
@@ -1682,7 +1690,7 @@ export namespace grida.program.nodes {
     innerRadius: number;
   }
 
-  export interface PathNode
+  export interface VectorNode
     extends i.IBaseNode,
       i.ISceneNode,
       i.IHrefable,
@@ -1693,9 +1701,10 @@ export namespace grida.program.nodes {
       i.IBlendMode,
       i.IZIndex,
       i.IRotation,
+      i.ICornerRadius,
       i.IFill<cg.Paint>,
       i.IStroke {
-    readonly type: "path";
+    readonly type: "vector";
 
     /**
      * @deprecated
@@ -1703,16 +1712,12 @@ export namespace grida.program.nodes {
      */
     fillRule?: cg.FillRule;
 
-    /**
-     * @deprecated
-     * @todo
-     */
     vectorNetwork: vn.VectorNetwork;
   }
 
-  export interface ComputedPathNode
-    extends __ReplaceSubset<PathNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
-    readonly type: "path";
+  export interface ComputedVectorNode
+    extends __ReplaceSubset<VectorNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
+    readonly type: "vector";
   }
 
   /**
@@ -1989,10 +1994,12 @@ export namespace grida.program.nodes {
         case "iframe":
         case "image":
         case "line":
-        case "path":
         case "richtext":
         case "text":
         case "vector":
+        case "svgpath":
+        case "polygon":
+        case "star":
         case "video": {
           // @ts-expect-error
           return {

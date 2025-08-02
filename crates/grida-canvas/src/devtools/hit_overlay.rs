@@ -1,4 +1,5 @@
 use crate::cache::scene::SceneCache;
+use crate::devtools::stroke_overlay;
 use crate::fonts::geistmono::sk_font_geistmono;
 use crate::node::schema::NodeId;
 use crate::painter::{
@@ -8,7 +9,7 @@ use crate::painter::{
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::FontRepository;
 use crate::sk;
-use skia_safe::{textlayout, Color, Font, Paint, PaintStyle, Path, Point, Rect, Surface};
+use skia_safe::{textlayout, Canvas, Color, Font, Paint, PaintStyle, Path, Point, Rect};
 
 thread_local! {
     static BG_PAINT: Paint = {
@@ -36,15 +37,6 @@ thread_local! {
         p
     };
 
-    static PATH_STROKE: Paint = {
-        let mut p = Paint::default();
-        p.set_color(Color::from_argb(200, 0, 255, 0));
-        p.set_style(PaintStyle::Stroke);
-        p.set_stroke_width(3.0);
-        p.set_anti_alias(true);
-        p
-    };
-
     static FOCUS_STROKE: Paint = {
         let mut p = Paint::default();
         p.set_color(Color::from_argb(200, 0, 0, 255));
@@ -59,15 +51,13 @@ pub struct HitOverlay;
 
 impl HitOverlay {
     pub fn draw(
-        surface: &mut Surface,
+        canvas: &Canvas,
         hit: Option<&NodeId>,
         focus: Option<&NodeId>,
         camera: &Camera2D,
         cache: &SceneCache,
         fonts: &std::cell::RefCell<FontRepository>,
     ) {
-        let canvas = surface.canvas();
-
         // Render hit if present
         if let Some(id) = hit {
             if let Some(layer) = cache.layers.layers.iter().find(|l| l.id() == id) {
@@ -118,9 +108,15 @@ impl HitOverlay {
                         canvas.draw_rect(rect, stroke);
                     });
 
-                    PATH_STROKE.with(|stroke| {
-                        canvas.draw_path(&path, stroke);
-                    });
+                    // Use the canvas we already have instead of borrowing surface again
+                    stroke_overlay::StrokeOverlay::draw(
+                        canvas,
+                        std::slice::from_ref(id),
+                        camera,
+                        cache,
+                        fonts,
+                        None,
+                    );
                 }
             }
         }

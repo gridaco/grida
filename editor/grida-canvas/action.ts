@@ -28,8 +28,9 @@ export type DocumentAction =
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
+  | EditorA11yDeleteAction
   | EditorHierarchyAction
-  | EditorVectorPathAction
+  | EditorVectorEditorAction
   | EditorGradientAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
@@ -63,11 +64,36 @@ interface IVertexIdx {
   vertex: number;
 }
 
+interface ISegmentIdx {
+  /**
+   * index of the segment
+   */
+  segment: number;
+}
+
 interface VertexQuery extends IVertexIdx {
   /**
    * node id (must be a path node)
    */
   node_id: NodeID;
+}
+
+interface SegmentQuery extends ISegmentIdx {
+  /**
+   * node id (must be a path node)
+   */
+  node_id: NodeID;
+}
+
+interface TangentQuery extends IVertexIdx {
+  /**
+   * node id (must be a path node)
+   */
+  node_id: NodeID;
+  /**
+   * tangent index (0 for `a`, 1 for `b`)
+   */
+  tangent: 0 | 1;
 }
 
 interface IGradientStopIdx {
@@ -220,6 +246,10 @@ export interface EditorDeleteAction {
   target: NodeID | "selection";
 }
 
+export interface EditorA11yDeleteAction {
+  type: "a11y/delete";
+}
+
 export type EditorHierarchyAction =
   | EditorHierarchyOrderAction
   | EditorHierarchyMoveAction;
@@ -237,26 +267,79 @@ export interface EditorHierarchyMoveAction {
   index?: number;
 }
 
-// #region [path]
-export type EditorVectorPathAction =
-  | EditorDeleteVertexAction
-  | EditorSelectVertexAction
-  | EditorHoverVertexAction;
+// #region [vector]
+export type EditorVectorEditorAction =
+  | EditorVectorHoverVertexAction
+  | EditorVectorSelectVertexAction
+  | EditorVectorDeleteVertexAction
+  | EditorVectorSelectSegmentAction
+  | EditorVectorDeleteSegmentAction
+  | EditorVectorSplitSegmentAction
+  | EditorVectorSelectTangentAction
+  | EditorVectorDeleteTangentAction
+  | EditorVectorTranslateVertexAction
+  | EditorVectorTranslateSegmentAction;
 
-export interface EditorDeleteVertexAction {
+export interface EditorVectorHoverVertexAction {
+  type: "hover-vertex";
+  event: "enter" | "leave";
+  target: VertexQuery;
+}
+
+export interface EditorVectorSelectVertexAction {
+  type: "select-vertex";
+  target: VertexQuery;
+  /** if true, toggle selection instead of resetting */
+  additive?: boolean;
+}
+
+export interface EditorVectorDeleteVertexAction {
   type: "delete-vertex";
   target: VertexQuery;
 }
 
-export interface EditorSelectVertexAction {
-  type: "select-vertex";
-  target: VertexQuery;
+export interface EditorVectorSelectSegmentAction {
+  type: "select-segment";
+  target: SegmentQuery;
+  /** if true, toggle selection instead of resetting */
+  additive?: boolean;
 }
 
-export interface EditorHoverVertexAction {
-  type: "hover-vertex";
-  event: "enter" | "leave";
+export interface EditorVectorDeleteSegmentAction {
+  type: "delete-segment";
+  target: SegmentQuery;
+}
+
+export interface EditorVectorSplitSegmentAction {
+  type: "split-segment";
+  target: {
+    node_id: string;
+    segment: number;
+  };
+}
+
+export interface EditorVectorSelectTangentAction {
+  type: "select-tangent";
+  target: TangentQuery;
+  /** if true, toggle selection instead of resetting */
+  additive?: boolean;
+}
+
+export interface EditorVectorDeleteTangentAction {
+  type: "delete-tangent";
+  target: TangentQuery;
+}
+
+export interface EditorVectorTranslateVertexAction {
+  type: "translate-vertex";
   target: VertexQuery;
+  delta: cmath.Vector2;
+}
+
+export interface EditorVectorTranslateSegmentAction {
+  type: "translate-segment";
+  target: SegmentQuery;
+  delta: cmath.Vector2;
 }
 // #endregion
 
@@ -342,7 +425,8 @@ export type EditorConfigAction =
   | EditorConfigureModifier_TranslateWithAxisLock
   | EditorConfigureModifier_TransformWithCenterOrigin
   | EditorConfigureModifier_TransformWithPreserveAspectRatio
-  | EditorConfigureModifier_RotateWithQuantize;
+  | EditorConfigureModifier_RotateWithQuantize
+  | EditorConfigureModifier_PathKeepProjecting;
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
@@ -376,6 +460,11 @@ export interface EditorConfigureModifier_TransformWithPreserveAspectRatio {
 export interface EditorConfigureModifier_RotateWithQuantize {
   type: "config/modifiers/rotate-with-quantize";
   rotate_with_quantize: number | "off";
+}
+
+export interface EditorConfigureModifier_PathKeepProjecting {
+  type: "config/modifiers/path-keep-projecting";
+  path_keep_projecting: "on" | "off";
 }
 
 /**
@@ -582,8 +671,8 @@ export type EditorSurface_StartGesture = {
         "type" | "control" | "node_id" | "segment"
       >
     | Pick<
-        editor.gesture.GestureTranslateVertex,
-        "type" | "node_id" | "vertex"
+        editor.gesture.GestureTranslateVectorControls,
+        "type" | "node_id"
       >;
 };
 

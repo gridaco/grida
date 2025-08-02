@@ -10,6 +10,7 @@ import type { tokens } from "@grida/tokens";
 import type { NodeProxy } from "./editor";
 import { dq } from "./query";
 import cmath from "@grida/cmath";
+import vn from "@grida/vn";
 import grida from "@grida/schema";
 
 export { type Action };
@@ -162,6 +163,7 @@ export namespace editor.config {
     tarnslate_with_axis_lock: "off",
     transform_with_center_origin: "off",
     transform_with_preserve_aspect_ratio: "off",
+    path_keep_projecting: "off",
     rotate_with_quantize: "off",
   };
 
@@ -245,6 +247,9 @@ export namespace editor.state {
         type: "hand";
       }
     | {
+        type: "lasso";
+      }
+    | {
         type: "zoom";
       }
     | {
@@ -277,6 +282,17 @@ export namespace editor.state {
   export type Marquee = {
     a: cmath.Vector2;
     b: cmath.Vector2;
+    /** when true, adds to existing selection */
+    additive?: boolean;
+  };
+
+  /**
+   * A lasso is a list of points that is represented as a polygon (as its fill regions)
+   */
+  export type Lasso = {
+    points: cmath.Vector2[];
+    /** when true, adds to existing selection */
+    additive?: boolean;
   };
 
   export type HitTestingConfig = {
@@ -327,6 +343,15 @@ export namespace editor.state {
     tarnslate_with_axis_lock: "on" | "off";
     transform_with_center_origin: "on" | "off";
     transform_with_preserve_aspect_ratio: "on" | "off";
+    /**
+     * Continue projecting a path after connecting to an existing vertex.
+     *
+     * This is typically toggled momentarily while the `p` key is held
+     * during a pen gesture.
+     *
+     * @default "off"
+     */
+    path_keep_projecting: "on" | "off";
     /**
      *
      * Set the quantize value for the rotation (in degrees)
@@ -511,6 +536,11 @@ export namespace editor.state {
      * @default undefined
      */
     marquee?: editor.state.Marquee;
+
+    /**
+     * Lasso state
+     */
+    lasso?: editor.state.Lasso;
   }
 
   /**
@@ -548,7 +578,7 @@ export namespace editor.state {
 
   export type ContentEditModeState =
     | TextContentEditMode
-    | PathContentEditMode
+    | VectorContentEditMode
     | BitmapContentEditMode
     | FillGradientContentEditMode;
 
@@ -561,14 +591,27 @@ export namespace editor.state {
     // selectedTextRange;
   };
 
-  type PathContentEditMode = {
-    type: "path";
+  export type VectorContentEditMode = {
+    type: "vector";
     node_id: string;
 
     /**
      * selected vertex indices
      */
     selected_vertices: number[];
+
+    /**
+     * selected segment indices
+     */
+    selected_segments: number[];
+
+    /**
+     * selected tangent indices
+     *
+     * each tangent is represented as [vertex_index, a_or_b]
+     * where a_or_b is 0 for `a` and 1 for `b`
+     */
+    selected_tangents: [number, 0 | 1][];
 
     /**
      * origin point - the new point will be connected to this point
@@ -584,6 +627,26 @@ export namespace editor.state {
      * @default zero
      */
     next_ta: cmath.Vector2 | null;
+
+    /**
+     * vertices considered active for showing tangent handles
+     */
+    neighbouring_vertices: number[];
+
+    /**
+     * initial vector network data
+     *
+     * The VectorNetwork data as entering the vector edit mode
+     *
+     * used to check if the content has changed, and revert the node if no changes were made
+     */
+    initial_vector_network: vn.VectorNetwork;
+
+    /**
+     * Snapshot of the node before entering vector edit mode. Used to revert the node
+     * when no edits were performed.
+     */
+    original: grida.program.nodes.UnknwonNode | null;
 
     /**
      * next points position
@@ -848,7 +911,7 @@ export namespace editor.gesture {
     | GestureCornerRadius
     | GestureDraw
     | GestureBrush
-    | GestureTranslateVertex
+    | GestureTranslateVectorControls
     | GestureCurve
     | GestureCurveA;
 
@@ -1075,26 +1138,15 @@ export namespace editor.gesture {
    * Translate certain path point
    *
    * @remarks
-   * This is only valid with content edit mode is "path"
+   * This is only valid with content edit mode is "vector"
    */
-  export type GestureTranslateVertex = IGesture & {
-    type: "translate-vertex";
-
-    /**
-     * initial (snapshot) value of the points
-     */
-    readonly initial_verticies: cmath.Vector2[];
-
-    /**
-     * index of the vertex
-     */
-    readonly vertex: number;
-
+  export type GestureTranslateVectorControls = IGesture & {
+    type: "translate-vector-controls";
     readonly node_id: string;
-
-    /**
-     * initial position of node
-     */
+    readonly vertices: number[];
+    readonly tangents: [number, 0 | 1][];
+    readonly initial_verticies: cmath.Vector2[];
+    readonly initial_segments: vn.VectorNetworkSegment[];
     readonly initial_position: cmath.Vector2;
   };
 
@@ -1369,8 +1421,16 @@ export namespace editor.api {
       node_id: NodeID,
       fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
     ): void;
+    changeNodeFill(
+      node_id: NodeID[],
+      fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
+    ): void;
     changeNodeStroke(
       node_id: NodeID,
+      stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
+    ): void;
+    changeNodeStroke(
+      node_id: NodeID[],
       stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
     ): void;
     changeNodeStrokeWidth(
@@ -1508,7 +1568,7 @@ export namespace editor.api {
     startGapGesture(selection: string | string[], axis: "x" | "y"): void;
     startCornerRadiusGesture(selection: string): void;
     startRotateGesture(selection: string): void;
-    startTranslateVertexGesture(node_id: string, vertex: number): void;
+    startTranslateVectorNetwork(node_id: string): void;
     startCurveGesture(
       node_id: string,
       segment: number,
@@ -1664,9 +1724,23 @@ export namespace editor.api {
 
     setClipboardColor(color: cg.RGBA8888): void;
 
-    //
+    // vector editor
     selectVertex(node_id: NodeID, vertex: number): void;
     deleteVertex(node_id: NodeID, vertex: number): void;
+    selectSegment(node_id: NodeID, segment: number): void;
+    deleteSegment(node_id: NodeID, segment: number): void;
+    splitSegment(node_id: NodeID, segment: number): void;
+    translateVertex(
+      node_id: NodeID,
+      vertex: number,
+      delta: cmath.Vector2
+    ): void;
+    translateSegment(
+      node_id: NodeID,
+      segment: number,
+      delta: cmath.Vector2
+    ): void;
+
     //
 
     //

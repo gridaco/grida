@@ -4,6 +4,19 @@ import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 type Vector2 = [number, number];
 export namespace vn {
   /**
+   * tangent mirroring mode
+   *
+   * **description based on moving ta (applies the same vice versa for tb)**
+   * - `none` - no mirroring
+   *   - moving ta will not affect tb at all.
+   * - `angle` - mirror the angle of the tangent, but keep the length
+   *   - moving ta will affect tb, but only the **exact (inverted)** angle will be mirrored.
+   * - `all` - mirror the angle and length of the tangent
+   *   - moving ta will affect tb, and mirror the **exact (inverted)** value of ta, not by the delta of angle/length.
+   */
+  export type TangentMirroringMode = "none" | "angle" | "all";
+
+  /**
    * Represents a vertex in the vector network.
    */
   export type VectorNetworkVertex = { p: Vector2 };
@@ -113,6 +126,23 @@ export namespace vn {
       tb: cmath.vector2.zero,
     }));
     return { vertices, segments };
+  }
+
+  /**
+   * creates a closed polygon vector network from given points
+   */
+  export function polygon(points: Vector2[]): VectorNetwork {
+    const vn = polyline(points);
+    if (vn.vertices.length > 1) {
+      const last = vn.vertices.length - 1;
+      vn.segments.push({
+        a: last,
+        b: 0,
+        ta: cmath.vector2.zero,
+        tb: cmath.vector2.zero,
+      });
+    }
+    return vn;
   }
 
   export class VectorNetworkEditor {
@@ -267,6 +297,15 @@ export namespace vn {
       this._vertices[i].p = [p[0] + delta[0], p[1] + delta[1]];
     }
 
+    translateSegment(i: number, delta: Vector2) {
+      if (i < 0 || i >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${i}`);
+      }
+      const seg = this._segments[i];
+      this.translateVertex(seg.a, delta);
+      this.translateVertex(seg.b, delta);
+    }
+
     translate(delta: Vector2) {
       this._vertices = this._vertices.map((v) => ({
         p: [v.p[0] + delta[0], v.p[1] + delta[1]],
@@ -302,24 +341,98 @@ export namespace vn {
     }
 
     /**
+     * Deletes the segment at the given index.
+     *
+     * @param segmentIndex - Index of the segment to delete
+     *
+     * @example
+     * ```
+     * => vertices: [ A, B, C, D ]
+     * => segments: [ AB, BC, CD ]
+     * => deleteSegment(1) // delete BC
+     * => vertices: [ A, B, C, D ]
+     * => segments: [ AB, CD ]
+     * ```
+     */
+    deleteSegment(segmentIndex: number) {
+      if (segmentIndex < 0 || segmentIndex >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${segmentIndex}`);
+      }
+
+      // Remove the segment at the given index
+      this._segments.splice(segmentIndex, 1);
+    }
+
+    deleteTangent(segmentIndex: number, control: "ta" | "tb") {
+      if (segmentIndex < 0 || segmentIndex >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${segmentIndex}`);
+      }
+      this._segments[segmentIndex][control] = [0, 0];
+    }
+
+    /**
+     * Inserts a new vertex at the middle of the given segment and splits the
+     * segment into two consecutive segments.
+     *
+     * Only straight segments (no tangents) are supported.
+     *
+     * @param si index of the segment to split
+     * @returns index of the newly inserted vertex
+     */
+    splitSegment(si: number): number {
+      if (si < 0 || si >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${si}`);
+      }
+
+      const seg = this._segments[si];
+
+      if (!cmath.vector2.isZero(seg.ta) || !cmath.vector2.isZero(seg.tb)) {
+        throw new Error("only straight segments can be split");
+      }
+
+      const a = this._vertices[seg.a].p;
+      const b = this._vertices[seg.b].p;
+      const mid: Vector2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+
+      const vertexIndex = this._vertices.push({ p: mid }) - 1;
+
+      const s1: VectorNetworkSegment = {
+        a: seg.a,
+        b: vertexIndex,
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+      const s2: VectorNetworkSegment = {
+        a: vertexIndex,
+        b: seg.b,
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+
+      this._segments.splice(si, 1, s1, s2);
+
+      return vertexIndex;
+    }
+
+    /**
      *
      * @param segment the index of the segment to update
      * @param control the control point to update (ta or tb)
      * @param value the new tangent value
-     * @param reflection if true, it will also update the previous (tb if ta) / next (ta if tb) segment's tangent (if available)
+     * @param mirroring the tangent mirroring mode
      *
      */
     updateTangent(
       segmentIndex: number,
       control: "ta" | "tb",
       value: Vector2,
-      reflection: boolean
+      mirroring: TangentMirroringMode = "none"
     ) {
       // 1. update the primary tangent
       this._segments[segmentIndex][control] = value;
 
       // 2. optional reflection
-      if (!reflection) return;
+      if (mirroring === "none") return;
 
       const seg = this._segments[segmentIndex];
       const vertexIndex = control === "ta" ? seg.a : seg.b;
@@ -336,8 +449,20 @@ export namespace vn {
       if (connected.length === 1) {
         const { s, i } = connected[0];
         const otherControl = s.a === vertexIndex ? "ta" : "tb";
-        // invert
-        this._segments[i][otherControl] = [-value[0], -value[1]];
+
+        if (mirroring === "all") {
+          // mirror angle and length
+          this._segments[i][otherControl] = [-value[0], -value[1]];
+        } else if (mirroring === "angle") {
+          // mirror only angle, keep existing length
+          const existing = this._segments[i][otherControl];
+          const length = Math.hypot(existing[0], existing[1]);
+          const angle = Math.atan2(value[1], value[0]) + Math.PI;
+          this._segments[i][otherControl] = [
+            Math.cos(angle) * length,
+            Math.sin(angle) * length,
+          ];
+        }
       }
     }
 
@@ -372,6 +497,58 @@ export namespace vn {
       const b = p;
       this._vertices = [a, { p: b }];
       this._segments = [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }];
+    }
+
+    /**
+     * Returns absolute positions of vertices.
+     * @param offset translate offset
+     * @param indices optional subset of vertex indices
+     */
+    getVerticesAbsolute(
+      offset: Vector2 = [0, 0],
+      indices?: number[]
+    ): Vector2[] {
+      const idx = indices ?? this._vertices.map((_, i) => i);
+      return idx.map((i) => {
+        const p = this._vertices[i].p;
+        return [p[0] + offset[0], p[1] + offset[1]] as Vector2;
+      });
+    }
+
+    /**
+     * Returns absolute positions of tangent control points.
+     * @param offset translate offset
+     */
+    getControlPointsAbsolute(
+      offset: Vector2 = [0, 0],
+      targets?: [number, "ta" | "tb"][]
+    ): { segment: number; control: "ta" | "tb"; point: Vector2 }[] {
+      const result: {
+        segment: number;
+        control: "ta" | "tb";
+        point: Vector2;
+      }[] = [];
+      const source = targets
+        ? targets.map((t) => ({ segment: t[0], control: t[1] }))
+        : this._segments.flatMap((_, i) => [
+            { segment: i, control: "ta" as const },
+            { segment: i, control: "tb" as const },
+          ]);
+
+      for (const { segment, control } of source) {
+        const seg = this._segments[segment];
+        const vertex = this._vertices[control === "ta" ? seg.a : seg.b].p;
+        const tangent = seg[control];
+        result.push({
+          segment,
+          control,
+          point: [
+            vertex[0] + tangent[0] + offset[0],
+            vertex[1] + tangent[1] + offset[1],
+          ],
+        });
+      }
+      return result;
     }
   }
 
@@ -679,5 +856,117 @@ export namespace vn {
     }
 
     return vne.value;
+  }
+
+  export function fromRect(shape: cmath.Rectangle): vn.VectorNetwork {
+    const { x, y, width, height } = shape;
+
+    // Create 4 vertices for the rectangle corners
+    const vertices: vn.VectorNetworkVertex[] = [
+      { p: [x, y] }, // Top-left
+      { p: [x + width, y] }, // Top-right
+      { p: [x + width, y + height] }, // Bottom-right
+      { p: [x, y + height] }, // Bottom-left
+    ];
+
+    // Create 4 segments connecting the vertices in order
+    const segments: vn.VectorNetworkSegment[] = [
+      { a: 0, b: 1, ta: [0, 0], tb: [0, 0] }, // Top edge
+      { a: 1, b: 2, ta: [0, 0], tb: [0, 0] }, // Right edge
+      { a: 2, b: 3, ta: [0, 0], tb: [0, 0] }, // Bottom edge
+      { a: 3, b: 0, ta: [0, 0], tb: [0, 0] }, // Left edge (closes the rectangle)
+    ];
+
+    return { vertices, segments };
+  }
+
+  /**
+   * @param shape ellipse shape defined with reactable (xywh)
+   * @returns vector network with 4 cubic bezier curves
+   */
+  export function fromEllipse(shape: cmath.Rectangle): vn.VectorNetwork {
+    const { x, y, width, height } = shape;
+
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const rx = width / 2;
+    const ry = height / 2;
+
+    // Constant for approximating a quarter of a circle with a cubic Bézier curve
+    // See: https://spencermortensen.com/articles/bezier-circle/
+    const KAPPA = 0.5522847498307936;
+
+    const kx = rx * KAPPA;
+    const ky = ry * KAPPA;
+
+    const vertices: vn.VectorNetworkVertex[] = [
+      { p: [cx, cy - ry] }, // Top
+      { p: [cx + rx, cy] }, // Right
+      { p: [cx, cy + ry] }, // Bottom
+      { p: [cx - rx, cy] }, // Left
+    ];
+
+    const segments: vn.VectorNetworkSegment[] = [
+      // Top -> Right
+      { a: 0, b: 1, ta: [kx, 0], tb: [0, -ky] },
+      // Right -> Bottom
+      { a: 1, b: 2, ta: [0, ky], tb: [kx, 0] },
+      // Bottom -> Left
+      { a: 2, b: 3, ta: [-kx, 0], tb: [0, ky] },
+      // Left -> Top
+      { a: 3, b: 0, ta: [0, -ky], tb: [-kx, 0] },
+    ];
+
+    return { vertices, segments };
+  }
+
+  // export function fromLine(shape) {}
+
+  export function fromRegularPolygon(
+    shape: cmath.Rectangle & {
+      points: number;
+    }
+  ): vn.VectorNetwork {
+    const { width, height, points } = shape;
+    const cx = width / 2;
+    const cy = height / 2;
+    const rx = (width / 2) * 0.9;
+    const ry = (height / 2) * 0.9;
+    const step = (Math.PI * 2) / points;
+    const pts: Vector2[] = Array.from({ length: points }, (_, i) => {
+      const angle = i * step - Math.PI / 2;
+      const x = cx + rx * Math.cos(angle);
+      const y = cy + ry * Math.sin(angle);
+      return [x, y];
+    });
+
+    return polygon(pts);
+  }
+
+  export function fromRegularStarPolygon(
+    shape: cmath.Rectangle & {
+      points: number;
+      innerRadius: number;
+    }
+  ): vn.VectorNetwork {
+    const { width, height, points, innerRadius } = shape;
+    const cx = width / 2;
+    const cy = height / 2;
+    const outerRx = (width / 2) * 0.9;
+    const outerRy = (height / 2) * 0.9;
+    const innerRx = outerRx * innerRadius;
+    const innerRy = outerRy * innerRadius;
+    const step = Math.PI / points;
+    const pts: Vector2[] = [];
+    for (let i = 0; i < points * 2; i++) {
+      const angle = i * step - Math.PI / 2;
+      const rx = i % 2 === 0 ? outerRx : innerRx;
+      const ry = i % 2 === 0 ? outerRy : innerRy;
+      const x = cx + rx * Math.cos(angle);
+      const y = cy + ry * Math.sin(angle);
+      pts.push([x, y]);
+    }
+
+    return polygon(pts);
   }
 }

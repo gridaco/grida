@@ -1,5 +1,4 @@
 import { produce, type Draft } from "immer";
-
 import type {
   DocumentAction,
   EditorSelectAction,
@@ -22,12 +21,15 @@ import {
   self_duplicateNode,
   self_insertSubDocument,
   self_selectNode,
+  self_updateVectorNodeVectorNetwork,
+  reduceVectorContentSelection,
+  getUXNeighbouringVertices,
+  encodeTranslateVectorCommand,
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
-import vn from "@grida/vn";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
 import { v4 } from "uuid";
@@ -177,15 +179,25 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         target === "selection" ? state.selection : [target];
 
       return produce(state, (draft) => {
-        for (const node_id of target_node_ids) {
-          if (
-            // the deleting node cannot be..
-            // - in content edit mode
-            node_id !== state.content_edit_mode?.node_id
-          ) {
-            self_try_remove_node(draft, node_id);
-          }
-        }
+        __self_delete_nodes(draft, target_node_ids);
+      });
+    }
+    case "a11y/delete": {
+      const target_node_ids = state.selection;
+
+      // TODO: add fill/gradient stop deletion
+
+      if (state.content_edit_mode?.type === "vector") {
+        return produce(state, (draft) => {
+          __self_delete_vector_network_selection(
+            draft,
+            draft.content_edit_mode as editor.state.VectorContentEditMode
+          );
+        });
+      }
+
+      return produce(state, (draft) => {
+        __self_delete_nodes(draft, target_node_ids);
       });
     }
     case "insert": {
@@ -360,6 +372,52 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       const target_node_ids =
         target === "selection" ? state.selection : [target];
+
+      if (state.content_edit_mode?.type === "vector") {
+        const delta_vec: cmath.Vector2 = [
+          nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0],
+          nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1],
+        ];
+        return produce(state, (draft) => {
+          const {
+            node_id,
+            selected_vertices,
+            selected_segments,
+            selected_tangents,
+          } = draft.content_edit_mode as editor.state.VectorContentEditMode;
+
+          const node = dq.__getNodeById(
+            draft,
+            node_id
+          ) as grida.program.nodes.VectorNode;
+
+          const { vertices, tangents } = encodeTranslateVectorCommand(
+            node.vectorNetwork,
+            {
+              selected_vertices,
+              selected_segments,
+              selected_tangents,
+            }
+          );
+
+          self_updateVectorNodeVectorNetwork(node, (vne) => {
+            for (const v of vertices) {
+              vne.translateVertex(v, delta_vec);
+            }
+            for (const [vi, ti] of tangents) {
+              const point = ti === 0 ? "a" : "b";
+              const control = ti === 0 ? "ta" : "tb";
+              for (const si of vne.findSegments(vi, point)) {
+                const next = cmath.vector2.add(
+                  vne.segments[si][control],
+                  delta_vec
+                );
+                vne.updateTangent(si, control, next, "none");
+              }
+            }
+          });
+        });
+      }
 
       const nodes = target_node_ids.map((node_id) =>
         dq.__getNodeById(state, node_id)
@@ -683,51 +741,23 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       break;
     }
     //
-    case "delete-vertex":
+    case "hover-vertex":
     case "select-vertex":
-    case "hover-vertex": {
+    case "delete-vertex":
+    case "select-segment":
+    case "delete-segment":
+    case "translate-segment":
+    case "select-tangent":
+    case "delete-tangent":
+    case "translate-vertex":
+    case "split-segment": {
       return produce(state, (draft) => {
-        const {
-          target: { node_id, vertex },
-        } = action;
+        const { node_id } = action.target;
+        const vertex = (action as any).target.vertex;
+        const segment = (action as any).target.segment;
         const node = dq.__getNodeById(draft, node_id);
 
         switch (action.type) {
-          case "delete-vertex": {
-            if (node.type === "path") {
-              const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-              vne.deleteVertex(vertex);
-              const bb_b = vne.getBBox();
-              const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
-              vne.translate(cmath.vector2.invert(delta));
-              const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
-
-              node.left = new_pos[0];
-              node.top = new_pos[1];
-              node.width = bb_b.width;
-              node.height = bb_b.height;
-
-              node.vectorNetwork = vne.value;
-
-              if (draft.content_edit_mode?.type === "path") {
-                if (
-                  draft.content_edit_mode.selected_vertices.includes(vertex)
-                ) {
-                  // clear the selection as deleted
-                  draft.content_edit_mode.selected_vertices = [];
-                }
-              }
-              break;
-            }
-            break;
-          }
-          case "select-vertex": {
-            assert(draft.content_edit_mode?.type === "path");
-            draft.selection = [node_id];
-            draft.content_edit_mode.selected_vertices = [vertex];
-            draft.content_edit_mode.a_point = vertex;
-            break;
-          }
           case "hover-vertex": {
             assert(
               draft.selection[0] === node_id,
@@ -740,6 +770,206 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               case "leave":
                 draft.hovered_vertex_idx = null;
                 break;
+            }
+            break;
+          }
+          case "select-vertex": {
+            assert(draft.content_edit_mode?.type === "vector");
+            draft.selection = [node_id];
+            const next = reduceVectorContentSelection(
+              {
+                selected_vertices: draft.content_edit_mode.selected_vertices,
+                selected_segments: draft.content_edit_mode.selected_segments,
+                selected_tangents: draft.content_edit_mode.selected_tangents,
+              },
+              { type: "vertex", index: vertex, additive: action.additive }
+            );
+            draft.content_edit_mode.selected_vertices = next.selected_vertices;
+            draft.content_edit_mode.selected_segments = next.selected_segments;
+            draft.content_edit_mode.selected_tangents = next.selected_tangents;
+            draft.content_edit_mode.neighbouring_vertices =
+              getUXNeighbouringVertices(
+                (node as grida.program.nodes.VectorNode).vectorNetwork,
+                {
+                  selected_vertices: next.selected_vertices,
+                  selected_segments: next.selected_segments,
+                  selected_tangents: next.selected_tangents,
+                }
+              );
+            draft.content_edit_mode.a_point =
+              next.selected_vertices.length > 0
+                ? next.selected_vertices[0]
+                : next.selected_tangents.length > 0
+                  ? next.selected_tangents[0][0]
+                  : null;
+            break;
+          }
+          case "delete-vertex": {
+            assert(node.type === "vector");
+
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
+              vne.deleteVertex(vertex);
+            });
+
+            if (draft.content_edit_mode?.type === "vector") {
+              if (
+                draft.content_edit_mode.selected_vertices.includes(vertex) ||
+                draft.content_edit_mode.selected_tangents.some(
+                  ([v]) => v === vertex
+                )
+              ) {
+                // clear the selection as deleted
+                draft.content_edit_mode.selected_vertices = [];
+                draft.content_edit_mode.selected_segments = [];
+                draft.content_edit_mode.selected_tangents = [];
+                draft.content_edit_mode.a_point = null;
+              }
+            }
+            break;
+          }
+          case "select-segment": {
+            assert(draft.content_edit_mode?.type === "vector");
+            draft.selection = [node_id];
+            const next = reduceVectorContentSelection(
+              {
+                selected_vertices: draft.content_edit_mode.selected_vertices,
+                selected_segments: draft.content_edit_mode.selected_segments,
+                selected_tangents: draft.content_edit_mode.selected_tangents,
+              },
+              { type: "segment", index: segment, additive: action.additive }
+            );
+            draft.content_edit_mode.selected_vertices = next.selected_vertices;
+            draft.content_edit_mode.selected_segments = next.selected_segments;
+            draft.content_edit_mode.selected_tangents = next.selected_tangents;
+            draft.content_edit_mode.neighbouring_vertices =
+              getUXNeighbouringVertices(
+                (node as grida.program.nodes.VectorNode).vectorNetwork,
+                {
+                  selected_vertices: next.selected_vertices,
+                  selected_segments: next.selected_segments,
+                  selected_tangents: next.selected_tangents,
+                }
+              );
+            draft.content_edit_mode.a_point =
+              next.selected_vertices.length > 0
+                ? next.selected_vertices[0]
+                : next.selected_tangents.length > 0
+                  ? next.selected_tangents[0][0]
+                  : null;
+            break;
+          }
+          case "select-tangent": {
+            assert(draft.content_edit_mode?.type === "vector");
+            draft.selection = [node_id];
+            const next = reduceVectorContentSelection(
+              {
+                selected_vertices: draft.content_edit_mode.selected_vertices,
+                selected_segments: draft.content_edit_mode.selected_segments,
+                selected_tangents: draft.content_edit_mode.selected_tangents,
+              },
+              {
+                type: "tangent",
+                index: [vertex, action.target.tangent],
+                additive: action.additive,
+              }
+            );
+            draft.content_edit_mode.selected_vertices = next.selected_vertices;
+            draft.content_edit_mode.selected_segments = next.selected_segments;
+            draft.content_edit_mode.selected_tangents = next.selected_tangents;
+            draft.content_edit_mode.neighbouring_vertices =
+              getUXNeighbouringVertices(
+                (node as grida.program.nodes.VectorNode).vectorNetwork,
+                {
+                  selected_vertices: next.selected_vertices,
+                  selected_segments: next.selected_segments,
+                  selected_tangents: next.selected_tangents,
+                }
+              );
+            draft.content_edit_mode.a_point =
+              next.selected_vertices.length > 0
+                ? next.selected_vertices[0]
+                : next.selected_tangents.length > 0
+                  ? next.selected_tangents[0][0]
+                  : null;
+            break;
+          }
+          case "delete-tangent": {
+            assert(node.type === "vector");
+
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
+              const point = action.target.tangent === 0 ? "a" : "b";
+              for (const si of vne.findSegments(vertex, point)) {
+                const control = action.target.tangent === 0 ? "ta" : "tb";
+                vne.deleteTangent(si, control);
+              }
+            });
+
+            if (draft.content_edit_mode?.type === "vector") {
+              draft.content_edit_mode.selected_tangents =
+                draft.content_edit_mode.selected_tangents.filter(
+                  ([v, t]) => !(v === vertex && t === action.target.tangent)
+                );
+              draft.content_edit_mode.a_point = null;
+            }
+            break;
+          }
+          case "translate-vertex": {
+            assert(node.type === "vector");
+
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
+              const bb_a = vne.getBBox();
+              vne.translateVertex(vertex, action.delta);
+              const bb_b = vne.getBBox();
+              const delta_vec: cmath.Vector2 = [
+                bb_b.x - bb_a.x,
+                bb_b.y - bb_a.y,
+              ];
+              vne.translate(cmath.vector2.invert(delta_vec));
+            });
+            break;
+          }
+          case "translate-segment": {
+            assert(node.type === "vector");
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
+              const bb_a = vne.getBBox();
+              vne.translateSegment(segment, action.delta);
+              const bb_b = vne.getBBox();
+              const delta_vec: cmath.Vector2 = [
+                bb_b.x - bb_a.x,
+                bb_b.y - bb_a.y,
+              ];
+              vne.translate(cmath.vector2.invert(delta_vec));
+            });
+            break;
+          }
+          case "delete-segment": {
+            assert(node.type === "vector");
+
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
+              vne.deleteSegment(segment);
+            });
+
+            if (draft.content_edit_mode?.type === "vector") {
+              // Clear segment selection since the segment was deleted
+              draft.content_edit_mode.selected_segments = [];
+              draft.content_edit_mode.selected_tangents = [];
+              draft.content_edit_mode.a_point = null;
+            }
+            break;
+          }
+          case "split-segment": {
+            if (node.type === "vector") {
+              const newIndex = self_updateVectorNodeVectorNetwork(node, (vne) =>
+                vne.splitSegment(segment)
+              );
+
+              if (draft.content_edit_mode?.type === "vector") {
+                draft.content_edit_mode.selected_vertices = [newIndex];
+                draft.content_edit_mode.selected_segments = [];
+                draft.content_edit_mode.selected_tangents = [];
+                draft.content_edit_mode.a_point = newIndex;
+              }
+              break;
             }
             break;
           }
@@ -890,6 +1120,62 @@ export default function documentReducer<S extends editor.state.IEditorState>(
   }
 
   return state;
+}
+
+function __self_delete_nodes<S extends editor.state.IEditorState>(
+  draft: Draft<S>,
+  target_node_ids: string[]
+) {
+  for (const node_id of target_node_ids) {
+    if (
+      // the deleting node cannot be.. in content edit mode
+      node_id !== draft.content_edit_mode?.node_id
+    ) {
+      self_try_remove_node(draft, node_id);
+    }
+  }
+}
+
+function __self_delete_vector_network_selection(
+  draft: Draft<editor.state.IEditorState>,
+  ved: editor.state.VectorContentEditMode
+) {
+  assert(draft.content_edit_mode?.type === "vector");
+  const { node_id, selected_vertices, selected_segments, selected_tangents } =
+    ved;
+
+  const node = dq.__getNodeById(
+    draft,
+    node_id
+  ) as grida.program.nodes.VectorNode;
+
+  self_updateVectorNodeVectorNetwork(node, (vne) => {
+    // delete tangents
+    for (const [v_idx, t_idx] of selected_tangents) {
+      const point = t_idx === 0 ? "a" : "b";
+      const control = t_idx === 0 ? "ta" : "tb";
+      for (const si of vne.findSegments(v_idx, point)) {
+        vne.deleteTangent(si, control);
+      }
+    }
+
+    // delete segments
+    const segs = [...selected_segments].sort((a, b) => b - a);
+    for (const si of segs) {
+      vne.deleteSegment(si);
+    }
+
+    // delete vertices
+    const verts = [...selected_vertices].sort((a, b) => b - a);
+    for (const vi of verts) {
+      vne.deleteVertex(vi);
+    }
+  });
+
+  draft.content_edit_mode.selected_vertices = [];
+  draft.content_edit_mode.selected_segments = [];
+  draft.content_edit_mode.selected_tangents = [];
+  draft.content_edit_mode.a_point = null;
 }
 
 function __self_order(

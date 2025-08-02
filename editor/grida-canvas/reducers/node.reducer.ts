@@ -140,8 +140,8 @@ const safe_properties: Partial<
   }),
   fill: defineNodeProperty<"fill">({
     assert: (node) =>
+      node.type === "svgpath" ||
       node.type === "vector" ||
-      node.type === "path" ||
       node.type === "image" ||
       node.type === "rectangle" ||
       node.type === "ellipse" ||
@@ -238,7 +238,7 @@ const safe_properties: Partial<
   }),
   stroke: defineNodeProperty<"stroke">({
     assert: (node) =>
-      node.type === "path" ||
+      node.type === "vector" ||
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse",
@@ -265,7 +265,7 @@ const safe_properties: Partial<
   }),
   strokeWidth: defineNodeProperty<"strokeWidth">({
     assert: (node) =>
-      node.type === "path" ||
+      node.type === "vector" ||
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse",
@@ -275,7 +275,7 @@ const safe_properties: Partial<
   }),
   strokeAlign: defineNodeProperty<"strokeAlign">({
     assert: (node) =>
-      node.type === "path" ||
+      node.type === "vector" ||
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse",

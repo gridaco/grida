@@ -12,6 +12,7 @@ function CanvasContent({
   data,
   transform,
   debug,
+  highlightStrokes,
   onMount,
   className,
   dpr,
@@ -22,6 +23,10 @@ function CanvasContent({
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
+  highlightStrokes?: {
+    nodes: string[];
+    style?: { strokeWidth?: number; stroke?: string };
+  };
   onMount?: (surface: Grida2D) => void;
   className?: string;
 }) {
@@ -36,6 +41,7 @@ function CanvasContent({
       }).then((factory) => {
         console.log("grida wasm initialized");
         const grida = factory.createWebGLCanvasSurface(canvasel);
+        grida.runtime_renderer_set_cache_tile(false);
         // grida.setDebug(true);
         // grida.setVerbose(true);
 
@@ -92,13 +98,20 @@ function CanvasContent({
     if (rendererRef.current && data) {
       rendererRef.current.loadScene(
         JSON.stringify({
-          version: "0.0.1-beta.1+20250303",
+          version: "0.0.1-beta.1+20250728",
           document: data,
         })
       );
       rendererRef.current.redraw();
     }
   }, [data]);
+
+  useLayoutEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.highlightStrokes(highlightStrokes);
+      rendererRef.current.redraw();
+    }
+  }, [highlightStrokes]);
 
   return (
     <canvas
@@ -130,6 +143,7 @@ export default function Canvas({
   data,
   transform,
   debug,
+  highlightStrokes,
   onMount,
   className,
 }: {
@@ -138,6 +152,10 @@ export default function Canvas({
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
+  highlightStrokes?: {
+    nodes: string[];
+    style?: { strokeWidth?: number; stroke?: string };
+  };
   onMount?: (surface: Grida2D) => void;
   className?: string;
 }) {
@@ -152,6 +170,7 @@ export default function Canvas({
       data={data}
       transform={transform}
       debug={debug}
+      highlightStrokes={highlightStrokes}
       onMount={onMount}
       className={className}
     />
