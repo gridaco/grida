@@ -50,7 +50,7 @@ const GRIDA_TCANVAS_RECTANGLE_NODE: INodePropertiesConfig = {
 };
 
 const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
-  arcData: ["ellipse"],
+  arcData: [],
   cornerRadius: [
     "rectangle",
     "image",
