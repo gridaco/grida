@@ -1185,18 +1185,19 @@ function ModeNodeProperties({
             )}
             {(pointCount != null || innerRadius != null) && (
               <>
-                {pointCount != null && (
-                  <PropertyLine>
-                    <PropertyLineLabel>Count</PropertyLineLabel>
-                    <InputPropertyNumber
-                      mode="fixed"
-                      min={3}
-                      max={60}
-                      value={pointCount}
-                      onValueCommit={actions.pointCount}
-                    />
-                  </PropertyLine>
-                )}
+                {pointCount != null &&
+                  supports.pointCount(node.type, { backend }) && (
+                    <PropertyLine>
+                      <PropertyLineLabel>Count</PropertyLineLabel>
+                      <InputPropertyNumber
+                        mode="fixed"
+                        min={3}
+                        max={60}
+                        value={pointCount}
+                        onValueCommit={actions.pointCount}
+                      />
+                    </PropertyLine>
+                  )}
                 {innerRadius != null && type !== "ellipse" && (
                   <PropertyLine>
                     <PropertyLineLabel>Ratio</PropertyLineLabel>

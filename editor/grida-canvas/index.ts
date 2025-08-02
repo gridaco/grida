@@ -624,6 +624,21 @@ export namespace editor.state {
     neighbouring_vertices: number[];
 
     /**
+     * initial vector network data
+     *
+     * The VectorNetwork data as entering the vector edit mode
+     *
+     * used to check if the content has changed, and revert the node if no changes were made
+     */
+    initial_vector_network: vn.VectorNetwork;
+
+    /**
+     * Snapshot of the node before entering vector edit mode. Used to revert the node
+     * when no edits were performed.
+     */
+    original: grida.program.nodes.UnknwonNode | null;
+
+    /**
      * next points position
      *
      * @deprecated - remove me - use global sanp pointer

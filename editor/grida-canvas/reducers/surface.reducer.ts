@@ -15,6 +15,7 @@ import {
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
 import vn from "@grida/vn";
+import equal from "fast-deep-equal";
 
 function createLayoutSnapshot(
   state: editor.state.IEditorState,
@@ -97,6 +98,9 @@ function __self_try_enter_content_edit_mode_auto(
   context: ReducerContext
 ) {
   const node = dq.__getNodeById(draft, node_id);
+  const nodeSnapshot: grida.program.nodes.UnknwonNode = JSON.parse(
+    JSON.stringify(node)
+  );
 
   switch (node.type) {
     case "text": {
@@ -119,6 +123,8 @@ function __self_try_enter_content_edit_mode_auto(
         selected_tangents: [],
         a_point: null,
         next_ta: null,
+        initial_vector_network: node.vectorNetwork,
+        original: nodeSnapshot,
         neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
       };
@@ -132,8 +138,9 @@ function __self_try_enter_content_edit_mode_auto(
     case "line": {
       // 1. convert the primitive to path
 
-      const node = dq.__getNodeById(draft, node_id);
       const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+
+      // keep a copy of the original primitive node for possible revert
 
       const v = toVectorNetwork(node, {
         width: rect.width,
@@ -148,8 +155,10 @@ function __self_try_enter_content_edit_mode_auto(
       const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
       vne.translate(cmath.vector2.invert(delta));
 
+      const vectorNetwork = vne.value;
+
       // convert the shape to vector network
-      const pathnode: grida.program.nodes.VectorNode = {
+      const vectornode: grida.program.nodes.VectorNode = {
         ...(node as grida.program.nodes.UnknwonNode),
         type: "vector",
         id: node.id,
@@ -157,7 +166,7 @@ function __self_try_enter_content_edit_mode_auto(
         cornerRadius: modeCornerRadius(node),
         fillRule:
           (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
-        vectorNetwork: vne.value,
+        vectorNetwork: vectorNetwork,
 
         // re-map the transform (since star / polygon nodes size were not actual path bbox)
         width: bb_b.width,
@@ -167,8 +176,7 @@ function __self_try_enter_content_edit_mode_auto(
       } as grida.program.nodes.VectorNode;
 
       // replace the node with the path node
-      // TODO: need a way to revert this operation if no changes are made.
-      draft.document.nodes[node_id] = pathnode;
+      draft.document.nodes[node_id] = vectornode;
 
       // 2. enter path edit mode
       draft.content_edit_mode = {
@@ -179,6 +187,8 @@ function __self_try_enter_content_edit_mode_auto(
         selected_tangents: [],
         a_point: null,
         next_ta: null,
+        initial_vector_network: vectorNetwork,
+        original: nodeSnapshot,
         neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
       };
@@ -273,7 +283,45 @@ function toVectorNetwork(
   //
 }
 
-function __self_try_exit_content_edit_mode(draft: editor.state.IEditorState) {
+/**
+ * For vector edit mode, if no edits were performed, the node is restored to the
+ * original primitive node that existed before entering the mode.
+ */
+function __self_before_exit_content_edit_mode(
+  draft: Draft<editor.state.IEditorState>
+) {
+  const mode = draft.content_edit_mode;
+
+  switch (mode?.type) {
+    case "vector": {
+      if (!mode.original) return;
+
+      const current = dq.__getNodeById(
+        draft,
+        mode.node_id
+      ) as grida.program.nodes.VectorNode;
+
+      const dirty = !equal(mode.initial_vector_network, current.vectorNetwork);
+      if (dirty) return;
+
+      draft.document.nodes[mode.node_id] =
+        mode.original as grida.program.nodes.Node;
+
+      break;
+    }
+    case "text": {
+      // TODO: when text is empty, remove that.
+    }
+  }
+}
+
+/**
+ * Attempts to exit the current content edit mode.
+ */
+function __self_try_exit_content_edit_mode(
+  draft: Draft<editor.state.IEditorState>
+) {
+  __self_before_exit_content_edit_mode(draft);
   draft.content_edit_mode = undefined;
   draft.tool = { type: "cursor" };
 }

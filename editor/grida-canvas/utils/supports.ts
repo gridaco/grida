@@ -16,7 +16,8 @@ type Feature =
   | "children"
   | "stroke"
   | "feDropShadow"
-  | "strokeCap";
+  | "strokeCap"
+  | "pointCount";
 
 type INodePropertiesConfig = {
   opacity: boolean;
@@ -74,6 +75,7 @@ const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
    */
   strokeCap: ["vector", "line"],
+  pointCount: ["polygon", "star"],
 } as const;
 
 const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
@@ -130,6 +132,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "component",
   ],
   strokeCap: ["vector", "line"],
+  pointCount: ["polygon", "star"],
 } as const;
 
 type Context = {
@@ -199,6 +202,14 @@ export namespace supports {
         return dom_supports.feDropShadow.includes(type);
       case "canvas":
         return canvas_supports.feDropShadow.includes(type);
+    }
+  };
+  export const pointCount = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.pointCount.includes(type);
+      case "canvas":
+        return canvas_supports.pointCount.includes(type);
     }
   };
 }

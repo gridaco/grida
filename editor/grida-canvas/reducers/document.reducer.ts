@@ -21,7 +21,7 @@ import {
   self_duplicateNode,
   self_insertSubDocument,
   self_selectNode,
-  self_updateVectorNode,
+  self_updateVectorNodeVectorNetwork,
   reduceVectorContentSelection,
   getUXNeighbouringVertices,
   encodeTranslateVectorCommand,
@@ -400,7 +400,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             }
           );
 
-          self_updateVectorNode(node, (vne) => {
+          self_updateVectorNodeVectorNetwork(node, (vne) => {
             for (const v of vertices) {
               vne.translateVertex(v, delta_vec);
             }
@@ -807,7 +807,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "delete-vertex": {
             assert(node.type === "vector");
 
-            self_updateVectorNode(node, (vne) => {
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
               vne.deleteVertex(vertex);
             });
 
@@ -896,7 +896,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "delete-tangent": {
             assert(node.type === "vector");
 
-            self_updateVectorNode(node, (vne) => {
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
               const point = action.target.tangent === 0 ? "a" : "b";
               for (const si of vne.findSegments(vertex, point)) {
                 const control = action.target.tangent === 0 ? "ta" : "tb";
@@ -916,7 +916,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "translate-vertex": {
             assert(node.type === "vector");
 
-            self_updateVectorNode(node, (vne) => {
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
               const bb_a = vne.getBBox();
               vne.translateVertex(vertex, action.delta);
               const bb_b = vne.getBBox();
@@ -930,7 +930,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
           case "translate-segment": {
             assert(node.type === "vector");
-            self_updateVectorNode(node, (vne) => {
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
               const bb_a = vne.getBBox();
               vne.translateSegment(segment, action.delta);
               const bb_b = vne.getBBox();
@@ -945,7 +945,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "delete-segment": {
             assert(node.type === "vector");
 
-            self_updateVectorNode(node, (vne) => {
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
               vne.deleteSegment(segment);
             });
 
@@ -959,7 +959,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
           case "split-segment": {
             if (node.type === "vector") {
-              const newIndex = self_updateVectorNode(node, (vne) =>
+              const newIndex = self_updateVectorNodeVectorNetwork(node, (vne) =>
                 vne.splitSegment(segment)
               );
 
@@ -1149,7 +1149,7 @@ function __self_delete_vector_network_selection(
     node_id
   ) as grida.program.nodes.VectorNode;
 
-  self_updateVectorNode(node, (vne) => {
+  self_updateVectorNodeVectorNetwork(node, (vne) => {
     // delete tangents
     for (const [v_idx, t_idx] of selected_tangents) {
       const point = t_idx === 0 ? "a" : "b";

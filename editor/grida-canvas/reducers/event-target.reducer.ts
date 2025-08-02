@@ -26,10 +26,7 @@ import {
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
 } from "./methods";
-import {
-  getUXNeighbouringVertices,
-  self_updateVectorAreaSelection,
-} from "./methods/vector";
+import { self_updateVectorAreaSelection } from "./methods/vector";
 import cmath from "@grida/cmath";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
@@ -350,6 +347,8 @@ function __self_evt_on_pointer_down(
           selected_tangents: [],
           a_point: 0,
           next_ta: null,
+          initial_vector_network: vector.vectorNetwork,
+          original: null,
           neighbouring_vertices: [0],
           path_cursor_position: pos,
         };
@@ -713,7 +712,7 @@ function __self_evt_on_drag(
         draft,
         context,
         (p) => cmath.rect.containsPoint(mrect, p),
-        draft.marquee.additive ?? false,
+        draft.marquee.additive ?? false
       );
     }
   } else if (draft.lasso) {
@@ -726,7 +725,7 @@ function __self_evt_on_drag(
         draft,
         context,
         (p) => cmath.polygon.pointInPolygon(p, draft.lasso!.points),
-        draft.lasso.additive ?? false,
+        draft.lasso.additive ?? false
       );
     }
   } else {

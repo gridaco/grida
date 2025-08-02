@@ -112,7 +112,7 @@ export function getUXNeighbouringVertices(
  * @param edit - Callback that performs edits on the network editor.
  * @returns The value returned by the `edit` callback.
  */
-export function self_updateVectorNode<R>(
+export function self_updateVectorNodeVectorNetwork<R>(
   node: grida.program.nodes.VectorNode,
   edit: (vne: vn.VectorNetworkEditor) => R
 ): R {
@@ -140,13 +140,13 @@ export function self_updateVectorAreaSelection<
   draft: Draft<S>,
   context: ReducerContext,
   predicate: (point: cmath.Vector2) => boolean,
-  additive: boolean,
+  additive: boolean
 ): void {
   assert(draft.content_edit_mode?.type === "vector");
   const { node_id, neighbouring_vertices } = draft.content_edit_mode;
   const node = dq.__getNodeById(
     draft,
-    node_id,
+    node_id
   ) as grida.program.nodes.VectorNode;
   const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
   const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
@@ -202,7 +202,7 @@ export function self_updateVectorAreaSelection<
         ? draft.content_edit_mode.selected_segments
         : [],
       selected_tangents,
-    },
+    }
   );
   draft.content_edit_mode.a_point =
     selected_vertices.length > 0
