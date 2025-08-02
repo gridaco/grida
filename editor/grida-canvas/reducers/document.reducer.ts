@@ -412,7 +412,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   vne.segments[si][control],
                   delta_vec
                 );
-                vne.updateTangent(si, control, next, false);
+                vne.updateTangent(si, control, next, "none");
               }
             }
           });

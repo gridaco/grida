@@ -419,20 +419,20 @@ export namespace vn {
      * @param segment the index of the segment to update
      * @param control the control point to update (ta or tb)
      * @param value the new tangent value
-     * @param reflection if true, it will also update the previous (tb if ta) / next (ta if tb) segment's tangent (if available)
+     * @param mirroring the tangent mirroring mode
      *
      */
     updateTangent(
       segmentIndex: number,
       control: "ta" | "tb",
       value: Vector2,
-      reflection: boolean
+      mirroring: TangentMirroringMode = "none"
     ) {
       // 1. update the primary tangent
       this._segments[segmentIndex][control] = value;
 
       // 2. optional reflection
-      if (!reflection) return;
+      if (mirroring === "none") return;
 
       const seg = this._segments[segmentIndex];
       const vertexIndex = control === "ta" ? seg.a : seg.b;
@@ -449,8 +449,20 @@ export namespace vn {
       if (connected.length === 1) {
         const { s, i } = connected[0];
         const otherControl = s.a === vertexIndex ? "ta" : "tb";
-        // invert
-        this._segments[i][otherControl] = [-value[0], -value[1]];
+
+        if (mirroring === "all") {
+          // mirror angle and length
+          this._segments[i][otherControl] = [-value[0], -value[1]];
+        } else if (mirroring === "angle") {
+          // mirror only angle, keep existing length
+          const existing = this._segments[i][otherControl];
+          const length = Math.hypot(existing[0], existing[1]);
+          const angle = Math.atan2(value[1], value[0]) + Math.PI;
+          this._segments[i][otherControl] = [
+            Math.cos(angle) * length,
+            Math.sin(angle) * length,
+          ];
+        }
       }
     }
 

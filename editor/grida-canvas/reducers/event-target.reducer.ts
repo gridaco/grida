@@ -914,7 +914,7 @@ function __self_evt_on_drag(
           invert ? cmath.vector2.invert(movement) : movement
         );
 
-        vne.updateTangent(segment, control, tangentPos, true);
+        vne.updateTangent(segment, control, tangentPos, "all");
 
         if (segment === vne.segments.length - 1) {
           // TODO: add a new "curve-b" and make it isolated from control point editing.
@@ -999,7 +999,7 @@ function __self_evt_on_drag(
             const seg = vne.segments[si];
             const control = t_idx === 0 ? "ta" : "tb";
             const next = cmath.vector2.add(seg[control], delta_vec);
-            vne.updateTangent(si, control, next, false);
+            vne.updateTangent(si, control, next, "none");
           }
         }
 
