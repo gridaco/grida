@@ -327,6 +327,10 @@ export class Grida2D {
     this._free_string(ptr, len);
   }
 
+  runtime_renderer_set_cache_tile(enable: boolean) {
+    this.module._runtime_renderer_set_cache_tile(this.appptr, enable);
+  }
+
   // ====================================================================================================
   // DEVTOOLS
   // ====================================================================================================

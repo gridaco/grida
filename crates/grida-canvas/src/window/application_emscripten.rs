@@ -134,6 +134,10 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.export_node_as(id, format)
     }
 
+    fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
+        self.base.runtime_renderer_set_cache_tile(cache);
+    }
+
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {
         self.base.set_main_camera_transform(transform);
     }

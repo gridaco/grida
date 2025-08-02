@@ -41,6 +41,7 @@ function CanvasContent({
       }).then((factory) => {
         console.log("grida wasm initialized");
         const grida = factory.createWebGLCanvasSurface(canvasel);
+        grida.runtime_renderer_set_cache_tile(false);
         // grida.setDebug(true);
         // grida.setVerbose(true);
 

@@ -163,6 +163,11 @@ declare namespace createGridaCanvas {
       state: GridaCanvasWebGlApplicationPtr,
       show: boolean
     ): void;
+
+    _runtime_renderer_set_cache_tile(
+      state: GridaCanvasWebGlApplicationPtr,
+      enabled: boolean
+    ): void;
   }
 }
 

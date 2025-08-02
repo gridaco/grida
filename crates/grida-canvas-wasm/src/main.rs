@@ -339,6 +339,16 @@ pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn runtime_renderer_set_cache_tile(
+    app: *mut EmscriptenApplication,
+    enabled: bool,
+) {
+    if let Some(app) = app.as_mut() {
+        app.runtime_renderer_set_cache_tile(enabled);
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
     app: *mut EmscriptenApplication,
     show: bool,

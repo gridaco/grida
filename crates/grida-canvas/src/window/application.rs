@@ -38,6 +38,9 @@ pub trait ApplicationApi {
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
 
+    /// Enable or disable caching of raster tiles.
+    fn runtime_renderer_set_cache_tile(&mut self, cache: bool);
+
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
     fn devtools_rendering_set_show_fps_meter(&mut self, show: bool);
@@ -253,6 +256,10 @@ impl ApplicationApi for UnknownTargetApplication {
             return export_node_as(scene, &self.renderer.get_cache().geometry, id, format);
         }
         return None;
+    }
+
+    fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
+        self.renderer.set_cache_tile(cache);
     }
 
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
