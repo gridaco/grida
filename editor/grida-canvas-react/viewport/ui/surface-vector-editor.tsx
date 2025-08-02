@@ -217,7 +217,13 @@ function Segment({
   onHover: (segmentIndex: number | null) => void;
 }) {
   const editor = useSurfaceVectorEditor();
+  const segment = editor.segments[segmentIndex];
   const selected = editor.selected_segments.includes(segmentIndex);
+  // activeAB when both vertices of the segment are selected
+  const activeAB =
+    editor.selected_vertices.includes(segment.a) &&
+    editor.selected_vertices.includes(segment.b);
+  const active = selected || activeAB;
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const showMiddle =
@@ -287,11 +293,11 @@ function Segment({
           b={b}
           ta={ta}
           tb={tb}
-          strokeWidth={selected ? 3 : hovered ? 3 : 1}
+          strokeWidth={active ? 3 : hovered ? 3 : 1}
           className={cn(
             "stroke-gray-400",
-            selected && "stroke-workbench-accent-sky",
-            hovered && "stroke-workbench-accent-sky opacity-50"
+            active && "stroke-workbench-accent-sky",
+            hovered && !active && "stroke-workbench-accent-sky opacity-50"
           )}
         />
       </div>
