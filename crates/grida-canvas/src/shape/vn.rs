@@ -50,20 +50,17 @@ impl VectorNetwork {
         for seg in &self.segments {
             let a = self.vertices[seg.a];
             let b = self.vertices[seg.b];
-            let seg_box = if let (Some(ta), Some(tb)) = (seg.ta, seg.tb) {
-                // Treat zero tangents the same as None
-                if is_zero(ta) || is_zero(tb) {
-                    Rectangle::from_points(&[[a.0, a.1], [b.0, b.1]])
-                } else {
-                    math2::bezier_get_bbox(&math2::CubicBezierWithTangents {
-                        a: [a.0, a.1],
-                        b: [b.0, b.1],
-                        ta: [ta.0, ta.1],
-                        tb: [tb.0, tb.1],
-                    })
-                }
-            } else {
+            let ta = seg.ta.unwrap_or((0.0, 0.0));
+            let tb = seg.tb.unwrap_or((0.0, 0.0));
+            let seg_box = if is_zero(ta) && is_zero(tb) {
                 Rectangle::from_points(&[[a.0, a.1], [b.0, b.1]])
+            } else {
+                math2::bezier_get_bbox(&math2::CubicBezierWithTangents {
+                    a: [a.0, a.1],
+                    b: [b.0, b.1],
+                    ta: [ta.0, ta.1],
+                    tb: [tb.0, tb.1],
+                })
             };
 
             bbox = Some(match bbox {
@@ -109,18 +106,15 @@ impl Into<skia_safe::Path> for VectorNetwork {
         for segment in segments {
             let a = self.vertices[segment.a];
             let b = self.vertices[segment.b];
+            let ta = segment.ta.unwrap_or((0.0, 0.0));
+            let tb = segment.tb.unwrap_or((0.0, 0.0));
 
-            // if both ta and tb are Some and non-zero, we need to add a cubic bezier curve
-            if let (Some(ta), Some(tb)) = (segment.ta, segment.tb) {
-                if !is_zero(ta) && !is_zero(tb) {
-                    let c1 = [a.0 + ta.0, a.1 + ta.1];
-                    let c2 = [b.0 + tb.0, b.1 + tb.1];
-                    path.cubic_to((c1[0], c1[1]), (c2[0], c2[1]), (b.0, b.1));
-                } else {
-                    path.line_to((b.0, b.1));
-                }
-            } else {
+            if is_zero(ta) && is_zero(tb) {
                 path.line_to((b.0, b.1));
+            } else {
+                let c1 = [a.0 + ta.0, a.1 + ta.1];
+                let c2 = [b.0 + tb.0, b.1 + tb.1];
+                path.cubic_to((c1[0], c1[1]), (c2[0], c2[1]), (b.0, b.1));
             }
         }
 
