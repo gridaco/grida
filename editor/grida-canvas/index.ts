@@ -163,6 +163,7 @@ export namespace editor.config {
     tarnslate_with_axis_lock: "off",
     transform_with_center_origin: "off",
     transform_with_preserve_aspect_ratio: "off",
+    path_keep_projecting: "off",
     rotate_with_quantize: "off",
   };
 
@@ -342,6 +343,15 @@ export namespace editor.state {
     tarnslate_with_axis_lock: "on" | "off";
     transform_with_center_origin: "on" | "off";
     transform_with_preserve_aspect_ratio: "on" | "off";
+    /**
+     * Continue projecting a path after connecting to an existing vertex.
+     *
+     * This is typically toggled momentarily while the `p` key is held
+     * during a pen gesture.
+     *
+     * @default "off"
+     */
+    path_keep_projecting: "on" | "off";
     /**
      *
      * Set the quantize value for the rotation (in degrees)

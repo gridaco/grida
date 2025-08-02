@@ -321,12 +321,25 @@ function __self_evt_on_pointer_down(
         node.height = bb_b.height;
 
         node.vectorNetwork = vne.value;
-
         draft.content_edit_mode.selected_vertices = [new_vertex_idx];
-        draft.content_edit_mode.selected_segments =
-          new_segment_idx !== null ? [new_segment_idx] : [];
         draft.content_edit_mode.selected_tangents = [];
-        draft.content_edit_mode.a_point = new_vertex_idx;
+
+        const isClosingExisting =
+          typeof hovered_point === "number" && new_vertex_idx === hovered_point;
+
+        if (
+          isClosingExisting &&
+          draft.gesture_modifiers.path_keep_projecting !== "on"
+        ) {
+          // Close the path and conclude the gesture when connecting to an
+          // existing vertex, unless the user holds `p` to keep projecting.
+          draft.content_edit_mode.selected_segments = [];
+          draft.content_edit_mode.a_point = null;
+        } else {
+          draft.content_edit_mode.selected_segments =
+            new_segment_idx !== null ? [new_segment_idx] : [];
+          draft.content_edit_mode.a_point = new_vertex_idx;
+        }
 
         // ...
       } else {

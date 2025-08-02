@@ -770,9 +770,23 @@ export function useEditorHotKeys() {
     editor.setTool({ type: "draw", tool: "line" });
   });
 
-  useHotkeys("p", () => {
-    editor.setTool({ type: "path" });
-  });
+  useHotkeys(
+    "p",
+    () => {
+      // Holding `p` continues a path even when closing on an existing vertex.
+      editor.configurePathKeepProjectingModifier("on");
+      editor.setTool({ type: "path" });
+    },
+    { keydown: true, keyup: false }
+  );
+
+  useHotkeys(
+    "p",
+    () => {
+      editor.configurePathKeepProjectingModifier("off");
+    },
+    { keydown: false, keyup: true }
+  );
 
   useHotkeys("shift+p", () => {
     editor.setTool({ type: "draw", tool: "pencil" });

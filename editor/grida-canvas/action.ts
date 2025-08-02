@@ -425,7 +425,8 @@ export type EditorConfigAction =
   | EditorConfigureModifier_TranslateWithAxisLock
   | EditorConfigureModifier_TransformWithCenterOrigin
   | EditorConfigureModifier_TransformWithPreserveAspectRatio
-  | EditorConfigureModifier_RotateWithQuantize;
+  | EditorConfigureModifier_RotateWithQuantize
+  | EditorConfigureModifier_PathKeepProjecting;
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
@@ -459,6 +460,11 @@ export interface EditorConfigureModifier_TransformWithPreserveAspectRatio {
 export interface EditorConfigureModifier_RotateWithQuantize {
   type: "config/modifiers/rotate-with-quantize";
   rotate_with_quantize: number | "off";
+}
+
+export interface EditorConfigureModifier_PathKeepProjecting {
+  type: "config/modifiers/path-keep-projecting";
+  path_keep_projecting: "on" | "off";
 }
 
 /**

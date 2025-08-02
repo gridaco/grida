@@ -990,6 +990,23 @@ export class Editor
     });
   }
 
+  /**
+   * Toggles whether the path tool should keep projecting after connecting
+   * to an existing vertex.
+   *
+   * When set to `"on"`, drawing a path and closing it on an existing
+   * vertex will continue extending the path from that vertex. When set to
+   * `"off"`, the path gesture concludes on close.
+   */
+  public configurePathKeepProjectingModifier(
+    path_keep_projecting: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/path-keep-projecting",
+      path_keep_projecting,
+    });
+  }
+
   public toggleActive(target: "selection" | editor.NodeID = "selection") {
     const target_ids =
       target === "selection" ? this.mstate.selection : [target];
