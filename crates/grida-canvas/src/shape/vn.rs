@@ -5,8 +5,8 @@ use skia_safe;
 pub struct VectorNetworkSegment {
     pub a: usize,
     pub b: usize,
-    pub ta: Option<[f32; 2]>,
-    pub tb: Option<[f32; 2]>,
+    pub ta: Option<(f32, f32)>,
+    pub tb: Option<(f32, f32)>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,8 +50,8 @@ impl VectorNetwork {
                 math2::bezier_get_bbox(&math2::CubicBezierWithTangents {
                     a: [a.0, a.1],
                     b: [b.0, b.1],
-                    ta,
-                    tb,
+                    ta: [ta.0, ta.1],
+                    tb: [tb.0, tb.1],
                 })
             } else {
                 Rectangle::from_points(&[[a.0, a.1], [b.0, b.1]])
@@ -103,8 +103,8 @@ impl Into<skia_safe::Path> for VectorNetwork {
 
             // if both ta and tb are Some, we need to add a cubic bezier curve
             if let (Some(ta), Some(tb)) = (segment.ta, segment.tb) {
-                let c1 = [a.0 + ta[0], a.1 + ta[1]];
-                let c2 = [b.0 + tb[0], b.1 + tb[1]];
+                let c1 = [a.0 + ta.0, a.1 + ta.1];
+                let c2 = [b.0 + tb.0, b.1 + tb.1];
                 path.cubic_to((c1[0], c1[1]), (c2[0], c2[1]), (b.0, b.1));
             } else {
                 path.line_to((b.0, b.1));

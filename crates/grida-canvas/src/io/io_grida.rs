@@ -379,8 +379,8 @@ pub struct JSONVectorNetworkVertex {
 pub struct JSONVectorNetworkSegment {
     pub a: usize,
     pub b: usize,
-    pub ta: [f32; 2],
-    pub tb: [f32; 2],
+    pub ta: Option<(f32, f32)>,
+    pub tb: Option<(f32, f32)>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -405,8 +405,8 @@ impl From<JSONVectorNetwork> for VectorNetwork {
                 .map(|s| VectorNetworkSegment {
                     a: s.a,
                     b: s.b,
-                    ta: Some(s.ta),
-                    tb: Some(s.tb),
+                    ta: s.ta,
+                    tb: s.tb,
                 })
                 .collect(),
         }
@@ -942,5 +942,101 @@ mod tests {
             !parsed.document.nodes.is_empty(),
             "nodes should not be empty"
         );
+    }
+
+    #[test]
+    fn deserialize_json_vector_network() {
+        // Test with a simple vector network
+        let json = r#"{
+            "vertices": [
+                {"p": [0.0, 0.0]},
+                {"p": [100.0, 0.0]},
+                {"p": [100.0, 100.0]},
+                {"p": [0.0, 100.0]}
+            ],
+            "segments": [
+                {"a": 0, "b": 1},
+                {"a": 1, "b": 2},
+                {"a": 2, "b": 3},
+                {"a": 3, "b": 0}
+            ]
+        }"#;
+
+        let network: JSONVectorNetwork =
+            serde_json::from_str(json).expect("failed to deserialize JSONVectorNetwork");
+
+        assert_eq!(network.vertices.len(), 4);
+        assert_eq!(network.segments.len(), 4);
+
+        // Check vertices
+        assert_eq!(network.vertices[0].p, [0.0, 0.0]);
+        assert_eq!(network.vertices[1].p, [100.0, 0.0]);
+        assert_eq!(network.vertices[2].p, [100.0, 100.0]);
+        assert_eq!(network.vertices[3].p, [0.0, 100.0]);
+
+        // Check segments
+        assert_eq!(network.segments[0].a, 0);
+        assert_eq!(network.segments[0].b, 1);
+        assert_eq!(network.segments[1].a, 1);
+        assert_eq!(network.segments[1].b, 2);
+        assert_eq!(network.segments[2].a, 2);
+        assert_eq!(network.segments[2].b, 3);
+        assert_eq!(network.segments[3].a, 3);
+        assert_eq!(network.segments[3].b, 0);
+    }
+
+    #[test]
+    fn deserialize_json_vector_network_with_tangents() {
+        // Test with segments that have tangent handles
+        let json = r#"{
+            "vertices": [
+                {"p": [0.0, 0.0]},
+                {"p": [100.0, 100.0]}
+            ],
+            "segments": [
+                {"a": 0, "b": 1, "ta": [10.0, -10.0], "tb": [-10.0, 10.0]}
+            ]
+        }"#;
+
+        let network: JSONVectorNetwork = serde_json::from_str(json)
+            .expect("failed to deserialize JSONVectorNetwork with tangents");
+
+        assert_eq!(network.vertices.len(), 2);
+        assert_eq!(network.segments.len(), 1);
+
+        // Check tangent handles
+        assert_eq!(network.segments[0].ta, Some((10.0, -10.0)));
+        assert_eq!(network.segments[0].tb, Some((-10.0, 10.0)));
+    }
+
+    #[test]
+    fn deserialize_json_vector_network_empty() {
+        // Test with empty vectors (should use defaults)
+        let json = r#"{}"#;
+
+        let network: JSONVectorNetwork =
+            serde_json::from_str(json).expect("failed to deserialize empty JSONVectorNetwork");
+
+        assert_eq!(network.vertices.len(), 0);
+        assert_eq!(network.segments.len(), 0);
+    }
+
+    #[test]
+    fn deserialize_json_vector_network_partial() {
+        // Test with only vertices, no segments
+        let json = r#"{
+            "vertices": [
+                {"p": [0.0, 0.0]},
+                {"p": [50.0, 50.0]}
+            ]
+        }"#;
+
+        let network: JSONVectorNetwork =
+            serde_json::from_str(json).expect("failed to deserialize partial JSONVectorNetwork");
+
+        assert_eq!(network.vertices.len(), 2);
+        assert_eq!(network.segments.len(), 0);
+        assert_eq!(network.vertices[0].p, [0.0, 0.0]);
+        assert_eq!(network.vertices[1].p, [50.0, 50.0]);
     }
 }

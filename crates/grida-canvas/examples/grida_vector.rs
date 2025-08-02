@@ -270,8 +270,8 @@ async fn demo_vectors() -> Scene {
                     segments: vec![VectorNetworkSegment {
                         a: 0,
                         b: 1,
-                        ta: Some([30.0, -30.0]), // Tangent handle from start point
-                        tb: Some([-30.0, 30.0]), // Tangent handle to end point
+                        ta: Some((30.0, -30.0)), // Tangent handle from start point
+                        tb: Some((-30.0, 30.0)), // Tangent handle to end point
                     }],
                 },
                 corner_radius: 0.0,
