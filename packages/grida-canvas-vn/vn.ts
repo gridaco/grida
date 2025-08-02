@@ -4,6 +4,19 @@ import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 type Vector2 = [number, number];
 export namespace vn {
   /**
+   * tangent mirroring mode
+   *
+   * **description based on moving ta (applies the same vice versa for tb)**
+   * - `none` - no mirroring
+   *   - moving ta will not affect tb at all.
+   * - `angle` - mirror the angle of the tangent, but keep the length
+   *   - moving ta will affect tb, but only the **exact (inverted)** angle will be mirrored.
+   * - `all` - mirror the angle and length of the tangent
+   *   - moving ta will affect tb, and mirror the **exact (inverted)** value of ta, not by the delta of angle/length.
+   */
+  export type TangentMirroringMode = "none" | "angle" | "all";
+
+  /**
    * Represents a vertex in the vector network.
    */
   export type VectorNetworkVertex = { p: Vector2 };
@@ -479,7 +492,10 @@ export namespace vn {
      * @param offset translate offset
      * @param indices optional subset of vertex indices
      */
-    getVerticesAbsolute(offset: Vector2 = [0, 0], indices?: number[]): Vector2[] {
+    getVerticesAbsolute(
+      offset: Vector2 = [0, 0],
+      indices?: number[]
+    ): Vector2[] {
       const idx = indices ?? this._vertices.map((_, i) => i);
       return idx.map((i) => {
         const p = this._vertices[i].p;
@@ -495,7 +511,11 @@ export namespace vn {
       offset: Vector2 = [0, 0],
       targets?: [number, "ta" | "tb"][]
     ): { segment: number; control: "ta" | "tb"; point: Vector2 }[] {
-      const result: { segment: number; control: "ta" | "tb"; point: Vector2 }[] = [];
+      const result: {
+        segment: number;
+        control: "ta" | "tb";
+        point: Vector2;
+      }[] = [];
       const source = targets
         ? targets.map((t) => ({ segment: t[0], control: t[1] }))
         : this._segments.flatMap((_, i) => [
