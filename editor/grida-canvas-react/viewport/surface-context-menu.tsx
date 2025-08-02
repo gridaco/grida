@@ -10,6 +10,7 @@ import {
   useDataTransferEventTarget,
   useCurrentSelection,
   useSelectionState,
+  useEditorFlagsState,
 } from "../provider";
 import { toast } from "sonner";
 import { cn } from "@/components/lib/utils";
@@ -23,6 +24,7 @@ export function EditorSurfaceContextMenu({
   const { selection } = useSelectionState();
   const { insertText } = useDataTransferEventTarget();
   const { actions } = useCurrentSelection();
+  const { debug } = useEditorFlagsState();
 
   const has_selection = selection.length > 0;
   const can_copy = has_selection;
@@ -145,20 +147,24 @@ export function EditorSurfaceContextMenu({
           Lock/Unlock
           <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
         </ContextMenuItem> */}
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          className="py-1"
-          onSelect={() => {
-            // copy id
-            navigator.clipboard.writeText(selection.join(", ")).then(() => {
-              toast.success("Copied ID to clipboard");
-            });
-          }}
-        >
-          <span className="font-mono text-[9px] text-muted-foreground truncate">
-            ID: {selection.join(", ")}
-          </span>
-        </ContextMenuItem>
+        {debug && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="py-1"
+              onSelect={() => {
+                // copy id
+                navigator.clipboard.writeText(selection.join(", ")).then(() => {
+                  toast.success("Copied ID to clipboard");
+                });
+              }}
+            >
+              <span className="font-mono text-[9px] text-muted-foreground truncate">
+                ID: {selection.join(", ")}
+              </span>
+            </ContextMenuItem>
+          </>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

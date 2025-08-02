@@ -392,7 +392,11 @@ export function EditorSurface() {
             )}
           </SurfaceGroup>
           <SurfaceGroup
-            hidden={is_window_resizing || content_edit_mode?.type === "vector"}
+            hidden={
+              is_transforming ||
+              is_window_resizing ||
+              content_edit_mode?.type === "vector"
+            }
           >
             <SelectionOverlay
               selection={selection}
