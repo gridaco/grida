@@ -441,20 +441,20 @@ export function useCurrentSelection() {
 
   const fill = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      mixedProperties.fill?.ids.forEach((id) => {
-        instance.changeNodeFill(id, value);
-      });
+      const ids = mixedProperties.fill?.ids;
+      if (!ids) return;
+      instance.changeNodeFill(ids, value);
     },
-    [mixedProperties.fill?.ids, instance.changeNodeFill]
+    [mixedProperties.fill?.ids, instance]
   );
 
   const stroke = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      mixedProperties.stroke?.ids.forEach((id) => {
-        instance.changeNodeStroke(id, value);
-      });
+      const ids = mixedProperties.stroke?.ids;
+      if (!ids) return;
+      instance.changeNodeStroke(ids, value);
     },
-    [mixedProperties.stroke?.ids, instance.changeNodeStroke]
+    [mixedProperties.stroke?.ids, instance]
   );
 
   const strokeWidth = useCallback(
@@ -666,11 +666,9 @@ export function useSelectionPaints() {
         | null
     ) => {
       const group = paints[index];
-      group.ids.forEach((id) => {
-        instance.changeNodeFill(id, value);
-      });
+      instance.changeNodeFill(group.ids, value);
     },
-    [paints, instance.changeNodeFill]
+    [paints, instance]
   );
 
   return useMemo(() => {

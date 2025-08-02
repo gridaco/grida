@@ -386,6 +386,25 @@ export class Editor
     this.listeners.forEach((l) => l(this, action));
   }
 
+  public dispatchAll(actions: Action[], force: boolean = false) {
+    if (this._locked && !force) return;
+    this.mstate = actions.reduce(
+      (state, action) =>
+        reducer(state, action, {
+          geometry: this,
+          viewport: {
+            width: this.viewport.size.width,
+            height: this.viewport.size.height,
+          },
+        }),
+      this.mstate
+    );
+    this._tid++;
+    if (actions.length) {
+      this.listeners.forEach((l) => l(this, actions[actions.length - 1]));
+    }
+  }
+
   public subscribe(fn: (editor: this, action?: Action) => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -1326,30 +1345,35 @@ export class Editor
       });
     });
   }
+
   changeNodeFill(
-    node_id: string,
+    node_id: string | string[],
     fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => ({
         type: "node/change/*",
-        node_id: node_id,
+        node_id,
         fill: fill as cg.Paint,
-      });
-    });
+      }))
+    );
   }
+
   changeNodeStroke(
-    node_id: string,
+    node_id: string | string[],
     stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => ({
         type: "node/change/*",
-        node_id: node_id,
+        node_id,
         stroke: stroke as cg.Paint,
-      });
-    });
+      }))
+    );
   }
+
   changeNodeStrokeWidth(node_id: string, strokeWidth: editor.api.NumberChange) {
     try {
       const value = resolveNumberChangeValue(
