@@ -293,8 +293,13 @@ function __self_evt_on_pointer_down(
         const position =
           typeof hovered_point === "number"
             ? node.vectorNetwork.vertices[hovered_point].p
-            : // relative position
-              cmath.vector2.sub(path_cursor_position, [node.left!, node.top!]);
+            : // relative position (absolute -> local)
+              (() => {
+                const rect = context.geometry.getNodeAbsoluteBoundingRect(
+                  node_id
+                )!;
+                return cmath.vector2.sub(path_cursor_position, [rect.x, rect.y]);
+              })();
 
         const new_vertex_idx = vne.addVertex(
           position,
@@ -371,10 +376,18 @@ function __self_evt_on_pointer_down(
 
         const pos = draft.pointer.position;
 
-        vector.left = pos[0];
-        vector.top = pos[1];
-
         const parent = __get_insertion_target(draft);
+
+        let relpos = pos;
+        if (parent) {
+          const parent_rect =
+            context.geometry.getNodeAbsoluteBoundingRect(parent)!;
+          relpos = cmath.vector2.sub(pos, [parent_rect.x, parent_rect.y]);
+        }
+
+        vector.left = relpos[0];
+        vector.top = relpos[1];
+
         self_try_insert_node(draft, parent, vector);
         self_selectNode(draft, "reset", vector.id);
 
