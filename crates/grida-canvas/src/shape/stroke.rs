@@ -55,7 +55,15 @@ pub fn stroke_geometry(
 ) -> Path {
     use StrokeAlign::*;
 
-    let adjusted_width = match stroke_align {
+    // Inside/outside alignments only make sense for closed paths. For open paths we
+    // fall back to center alignment to avoid producing an empty stroke geometry.
+    let effective_align = if !source_path.is_last_contour_closed() {
+        Center
+    } else {
+        stroke_align
+    };
+
+    let adjusted_width = match effective_align {
         Center => stroke_width,
         Inside => stroke_width * 2.0,  // we'll clip it later
         Outside => stroke_width * 2.0, // we'll subtract later
@@ -80,7 +88,7 @@ pub fn stroke_geometry(
     // Apply the stroke to create the outline
     let mut stroked_path = Path::new();
     if stroke_rec.apply_to_path(&mut stroked_path, &path_to_stroke) {
-        match stroke_align {
+        match effective_align {
             Center => stroked_path,
             Inside => {
                 // Clip to original path: intersection
