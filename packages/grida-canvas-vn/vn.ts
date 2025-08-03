@@ -750,6 +750,18 @@ export namespace vn {
     }
 
     /**
+     * Returns the vertex index associated with a segment's tangent control.
+     *
+     * @param segmentIndex the index of the segment
+     * @param control which tangent control of the segment ("ta" or "tb")
+     * @returns the index of the vertex owning the specified control
+     */
+    getTangentVertex(segmentIndex: number, control: "ta" | "tb"): number {
+      const seg = this._segments[segmentIndex];
+      return control === "ta" ? seg.a : seg.b;
+    }
+
+    /**
      * Returns absolute positions of vertices.
      * @param offset translate offset
      * @param indices optional subset of vertex indices

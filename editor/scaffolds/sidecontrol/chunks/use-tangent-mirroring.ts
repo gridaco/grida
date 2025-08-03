@@ -14,12 +14,12 @@ export default function useTangentMirroring(
 
   const value = useMemo(() => {
     if (selected_tangents.length === 1) {
-      const [v_idx, t_idx] = selected_tangents[0];
-      const seg = segments.find((s) =>
-        t_idx === 0 ? s.a === v_idx : s.b === v_idx
-      );
-      if (seg) {
-        return vn.inferMirroringMode(seg.ta, seg.tb);
+      const [v_idx] = selected_tangents[0];
+      const segs = segments.filter((s) => s.a === v_idx || s.b === v_idx);
+      if (segs.length === 2) {
+        const ta = segs[0].a === v_idx ? segs[0].ta : segs[0].tb;
+        const tb = segs[1].a === v_idx ? segs[1].ta : segs[1].tb;
+        return vn.inferMirroringMode(ta, tb);
       }
     } else if (selected_vertices.length === 1) {
       const v_idx = selected_vertices[0];
