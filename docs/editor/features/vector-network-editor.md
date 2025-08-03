@@ -26,3 +26,12 @@ Moving by a delta `d = (dx, dy)` results in
 Tangents associated with a moved vertex become no-ops, as the vertex movement already offsets them.
 
 This encoding makes translating mixed selections predictable and easy to test.
+
+# Tangent Mirroring Modes
+
+The editor supports several modes for mirroring tangent handles of connected Bézier segments:
+
+- `none` – moving one tangent does not affect the other.
+- `angle` – only the angle is mirrored; each tangent keeps its own length.
+- `all` – both angle and length are mirrored.
+- `auto` – infers the current relationship of the tangents and mirrors accordingly. When the tangents are perfectly mirrored it behaves like `all`; when only the angle matches it mirrors the angle; otherwise no mirroring occurs.

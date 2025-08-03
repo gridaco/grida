@@ -40,13 +40,23 @@ describe("VectorNetworkEditor tangent mirroring", () => {
     expect(vne.segments[1].ta[1]).toBeCloseTo(-5);
   });
 
-  it("auto does not mirror when tangents differ", () => {
+  it("auto mirrors angle when only angle matches", () => {
     const network = createNetwork();
     network.segments[1].ta = [-5, 0];
     const vne = new vn.VectorNetworkEditor(network);
     vne.updateTangent(0, "tb", [0, 5], "auto");
     expect(vne.segments[0].tb).toEqual([0, 5]);
-    expect(vne.segments[1].ta).toEqual([-5, 0]);
+    expect(vne.segments[1].ta[0]).toBeCloseTo(0);
+    expect(vne.segments[1].ta[1]).toBeCloseTo(-5);
+  });
+
+  it("auto does not mirror when tangents differ", () => {
+    const network = createNetwork();
+    network.segments[1].ta = [-5, 5];
+    const vne = new vn.VectorNetworkEditor(network);
+    vne.updateTangent(0, "tb", [0, 5], "auto");
+    expect(vne.segments[0].tb).toEqual([0, 5]);
+    expect(vne.segments[1].ta).toEqual([-5, 5]);
   });
 
   it("mirrors previous segment when editing ta", () => {
@@ -55,5 +65,17 @@ describe("VectorNetworkEditor tangent mirroring", () => {
     expect(vne.segments[1].ta).toEqual([0, 5]);
     expect(vne.segments[0].tb[0]).toBeCloseTo(0);
     expect(vne.segments[0].tb[1]).toBeCloseTo(-5);
+  });
+});
+
+describe("inferMirroringMode", () => {
+  it("detects full mirroring", () => {
+    expect(vn.inferMirroringMode([10, 0], [-10, 0])).toBe("all");
+  });
+  it("detects angle mirroring", () => {
+    expect(vn.inferMirroringMode([10, 0], [-5, 0])).toBe("angle");
+  });
+  it("detects no mirroring", () => {
+    expect(vn.inferMirroringMode([10, 0], [5, 5])).toBe("none");
   });
 });

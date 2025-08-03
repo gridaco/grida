@@ -7,17 +7,42 @@ export namespace vn {
    * tangent mirroring mode
    *
    * **description based on moving ta (applies the same vice versa for tb)**
-  * - `none` - no mirroring
-  *   - moving ta will not affect tb at all.
-  * - `angle` - mirror the angle of the tangent, but keep the length
-  *   - moving ta will affect tb, but only the **exact (inverted)** angle will be mirrored.
-  * - `all` - mirror the angle and length of the tangent
-  *   - moving ta will affect tb, and mirror the **exact (inverted)** value of ta, not by the delta of angle/length.
-  * - `auto` - automatically decide whether to mirror based on the current
-  *   relationship of the tangents. If they are already mirrored, behaves like
-  *   `all`, otherwise acts as `none`.
-  */
-  export type TangentMirroringMode = "none" | "angle" | "all" | "auto";
+   * - `none` - no mirroring
+   *   - moving ta will not affect tb at all.
+   * - `angle` - mirror the angle of the tangent, but keep the length
+   *   - moving ta will affect tb, but only the **exact (inverted)** angle will be mirrored.
+   * - `all` - mirror the angle and length of the tangent
+   *   - moving ta will affect tb, and mirror the **exact (inverted)** value of ta, not by the delta of angle/length.
+   * - `auto` - automatically decide whether to mirror based on the current
+   *   relationship of the tangents. If they are already mirrored, behaves like
+   *   `all`, if only the angle is mirrored behaves like `angle`, otherwise acts as `none`.
+   */
+  export type StrictTangentMirroringMode = "none" | "angle" | "all";
+  export type TangentMirroringMode =
+    | StrictTangentMirroringMode
+    | "auto";
+
+  /**
+   * infer the mirroring mode from two tangents
+   * @param ta tangent a
+   * @param tb tangent b
+   */
+  export function inferMirroringMode(
+    ta: Vector2,
+    tb: Vector2
+  ): StrictTangentMirroringMode {
+    const [ax, ay] = ta;
+    const [bx, by] = tb;
+    // cross product for 2D vectors
+    const cross = ax * by - ay * bx;
+    if (Math.abs(cross) > Number.EPSILON) return "none";
+    // dot product to determine direction
+    const dot = ax * bx + ay * by;
+    if (dot >= 0) return "none";
+    const la = Math.hypot(ax, ay);
+    const lb = Math.hypot(bx, by);
+    return Math.abs(la - lb) < Number.EPSILON ? "all" : "angle";
+  }
 
   /**
    * Represents a vertex in the vector network.
@@ -453,8 +478,7 @@ export namespace vn {
         if (mirroring === "auto") {
           const current = seg[control];
           const other = this._segments[i][otherControl];
-          const isMirrored = current[0] === -other[0] && current[1] === -other[1];
-          effectiveMirroring = isMirrored ? "all" : "none";
+          effectiveMirroring = inferMirroringMode(current, other);
         }
       } else if (mirroring === "auto") {
         effectiveMirroring = "none";
