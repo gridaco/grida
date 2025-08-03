@@ -183,6 +183,83 @@ export namespace vn {
   }
 
   export class VectorNetworkEditor {
+    /**
+     * Creates a new {@link VectorNetwork} by combining two networks into one.
+     *
+     * The union operation performs two steps:
+     *
+     * 1. **Vertex de-duplication** – vertices from the second network are
+     *    appended to the first while removing any points that already exist in
+     *    the first network. Vertex equality is determined by exact coordinate
+     *    comparison.
+     * 2. **Segment de-duplication** – after vertices are merged, segments from
+     *    both networks are combined. Any segment with identical endpoints and
+     *    tangent values is removed so that the resulting network contains each
+     *    segment at most once.
+     *
+     * The function does not mutate the provided networks; instead, it returns a
+     * new network containing the merged result. Segment orientation is
+     * respected, meaning that a segment `a -> b` is considered different from
+     * `b -> a`.
+     *
+     * @param a The base network.
+     * @param b The network to merge into {@code a}.
+     * @returns A new network containing the union of {@code a} and {@code b}.
+     */
+    static union(a: VectorNetwork, b: VectorNetwork): VectorNetwork {
+      // clone vertices and segments from the first network to avoid mutation
+      const vertices: VectorNetworkVertex[] = a.vertices.map((v) => ({
+        p: [v.p[0], v.p[1]],
+      }));
+
+      const segments: VectorNetworkSegment[] = a.segments.map((s) => ({
+        a: s.a,
+        b: s.b,
+        ta: [s.ta[0], s.ta[1]],
+        tb: [s.tb[0], s.tb[1]],
+      }));
+
+      // map of vertex indices from network b to their corresponding index in
+      // the merged vertex array
+      const indexMap = new Map<number, number>();
+
+      // merge vertices from network b, de-duplicating identical points
+      for (let i = 0; i < b.vertices.length; i++) {
+        const { p } = b.vertices[i];
+        let existing = vertices.findIndex(
+          (v) => v.p[0] === p[0] && v.p[1] === p[1]
+        );
+        if (existing === -1) {
+          existing = vertices.length;
+          vertices.push({ p: [p[0], p[1]] });
+        }
+        indexMap.set(i, existing);
+      }
+
+      // append segments from network b, remapping vertex indices
+      for (const seg of b.segments) {
+        segments.push({
+          a: indexMap.get(seg.a)!,
+          b: indexMap.get(seg.b)!,
+          ta: [seg.ta[0], seg.ta[1]],
+          tb: [seg.tb[0], seg.tb[1]],
+        });
+      }
+
+      // de-duplicate segments by constructing a unique key for each
+      const uniqueSegments: VectorNetworkSegment[] = [];
+      const seen = new Set<string>();
+      for (const seg of segments) {
+        const key = `${seg.a},${seg.b},${seg.ta[0]},${seg.ta[1]},${seg.tb[0]},${seg.tb[1]}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueSegments.push(seg);
+        }
+      }
+
+      return { vertices, segments: uniqueSegments };
+    }
+
     private _vertices: VectorNetworkVertex[] = [];
     private _segments: VectorNetworkSegment[] = [];
 
