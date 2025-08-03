@@ -27,6 +27,7 @@ import {
   getUXNeighbouringVertices,
   encodeTranslateVectorCommand,
   self_flattenNode,
+  supportsFlatten,
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
@@ -36,8 +37,8 @@ import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
 import { v4 } from "uuid";
 import type { ReducerContext } from ".";
-import "core-js/features/object/group-by";
 import cg from "@grida/cg";
+import "core-js/features/object/group-by";
 
 /**
  * the padding applied to the anchors (siblings) for dynamic next placement
@@ -181,8 +182,22 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const target_node_ids =
         target === "selection" ? state.selection : [target];
 
+      const flattenable: string[] = [];
+      const ignored: string[] = [];
+      for (const node_id of target_node_ids) {
+        const node = dq.__getNodeById(state, node_id);
+        if (node && supportsFlatten(node)) {
+          flattenable.push(node_id);
+        } else {
+          ignored.push(node_id);
+        }
+      }
+
       return produce(state, (draft) => {
-        __self_flatten_nodes(draft, target_node_ids, context);
+        const flattened = flatten_with_union(draft, flattenable, context);
+        // TODO: once vector network merging is ready, flatten_with_union should return
+        // a single id representing the merged vector node.
+        draft.selection = [...flattened, ...ignored];
       });
     }
     case "delete": {
@@ -1225,14 +1240,20 @@ export default function documentReducer<S extends editor.state.IEditorState>(
   return state;
 }
 
-function __self_flatten_nodes<S extends editor.state.IEditorState>(
+function flatten_with_union<S extends editor.state.IEditorState>(
   draft: Draft<S>,
-  target_node_ids: string[],
+  supported_node_ids: string[],
   context: ReducerContext
-) {
-  for (const node_id of target_node_ids) {
-    self_flattenNode(draft, node_id, context);
+): string[] {
+  // TODO: merge vector networks of supported nodes to create a single VectorNode.
+  const flattened: string[] = [];
+  for (const node_id of supported_node_ids) {
+    const v = self_flattenNode(draft, node_id, context);
+    if (v) {
+      flattened.push(v.id);
+    }
   }
+  return flattened;
 }
 
 function __self_delete_nodes<S extends editor.state.IEditorState>(
