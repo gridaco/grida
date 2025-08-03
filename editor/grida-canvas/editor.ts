@@ -761,11 +761,7 @@ export class Editor
     });
   }
 
-  public bendCorner(
-    node_id: editor.NodeID,
-    vertex: number,
-    ref?: "ta" | "tb"
-  ) {
+  public bendCorner(node_id: editor.NodeID, vertex: number, ref?: "ta" | "tb") {
     this.dispatch({
       type: "bend-corner",
       target: { node_id, vertex, ref },
@@ -998,6 +994,15 @@ export class Editor
     this.dispatch({
       type: "config/modifiers/translate-with-axis-lock",
       tarnslate_with_axis_lock,
+    });
+  }
+
+  public configureTranslateWithForceDisableSnap(
+    translate_with_force_disable_snap: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/translate-with-force-disable-snap",
+      translate_with_force_disable_snap,
     });
   }
 

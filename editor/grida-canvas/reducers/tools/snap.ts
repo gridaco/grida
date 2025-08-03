@@ -47,6 +47,19 @@ export function snapGuideTranslation(
   return { translated: v + delta };
 }
 
+/**
+ * Main universal function for translating objects with optional snapping.
+ *
+ * Always applies pixel quantization. When snapping is enabled, performs full snapping
+ * calculations. When disabled, skips snapping entirely and applies movement directly.
+ *
+ * @param agents - Objects to translate
+ * @param anchors - Snap targets (objects and guides)
+ * @param movement - Movement vector
+ * @param threshold - Snap threshold
+ * @param enabled - Whether to perform snapping (default: true)
+ * @returns Translated positions and optional snapping result
+ */
 export function snapObjectsTranslation(
   agents: cmath.Rectangle[],
   anchors: {
@@ -54,7 +67,8 @@ export function snapObjectsTranslation(
     guides?: grida.program.document.Guide2D[];
   },
   movement: cmath.ext.movement.Movement,
-  threshold: number
+  threshold: number,
+  enabled = true
 ): {
   translated: { position: cmath.Vector2 }[];
   snapping: SnapToObjectsResult | undefined;
@@ -70,27 +84,31 @@ export function snapObjectsTranslation(
     q
   );
 
-  const result = snapToCanvasGeometry(
-    _virtually_moved_rect,
-    { objects: anchorObjects, guides: anchors.guides ?? [] },
-    {
-      x: movement[0] === null ? false : threshold,
-      y: movement[1] === null ? false : threshold,
-    }
-  );
+  let result: SnapToObjectsResult | undefined;
+  let bounding_box_xy: cmath.Vector2;
 
-  const { translated: _translated } = result;
+  if (enabled) {
+    result = snapToCanvasGeometry(
+      _virtually_moved_rect,
+      { objects: anchorObjects, guides: anchors.guides ?? [] },
+      {
+        x: movement[0] === null ? false : threshold,
+        y: movement[1] === null ? false : threshold,
+      }
+    );
+    bounding_box_xy = [result.translated.x, result.translated.y];
+  } else {
+    result = undefined;
+    bounding_box_xy = [_virtually_moved_rect.x, _virtually_moved_rect.y];
+  }
 
-  // top left point of the bounding box
-  const bounding_box_snapped_xy: cmath.Vector2 = [_translated.x, _translated.y];
-
-  // return each xy point of input selection relative to the snapped bounding box
+  // return each xy point of input selection relative to the bounding box
   const translated = agents.map((r) => {
     const offset = cmath.vector2.sub(
       [r.x, r.y],
       [bounding_rect.x, bounding_rect.y]
     );
-    const position = cmath.vector2.add(bounding_box_snapped_xy, offset);
+    const position = cmath.vector2.add(bounding_box_xy, offset);
     return { position };
   });
 

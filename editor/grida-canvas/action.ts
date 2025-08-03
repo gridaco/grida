@@ -436,6 +436,7 @@ export type EditorConfigAction =
   | EditorConfigure_Measurement
   | EditorConfigureModifier_TranslateWithClone
   | EditorConfigureModifier_TranslateWithAxisLock
+  | EditorConfigureModifier_TranslateWithForceDisableSnap
   | EditorConfigureModifier_TransformWithCenterOrigin
   | EditorConfigureModifier_TransformWithPreserveAspectRatio
   | EditorConfigureModifier_RotateWithQuantize
@@ -459,6 +460,11 @@ export interface EditorConfigureModifier_TranslateWithClone {
 export interface EditorConfigureModifier_TranslateWithAxisLock {
   type: "config/modifiers/translate-with-axis-lock";
   tarnslate_with_axis_lock: "on" | "off";
+}
+
+export interface EditorConfigureModifier_TranslateWithForceDisableSnap {
+  type: "config/modifiers/translate-with-force-disable-snap";
+  translate_with_force_disable_snap: "on" | "off";
 }
 
 export interface EditorConfigureModifier_TransformWithCenterOrigin {
@@ -689,10 +695,7 @@ export type EditorSurface_StartGesture = {
         editor.gesture.GestureCurve,
         "type" | "control" | "node_id" | "segment"
       >
-    | Pick<
-        editor.gesture.GestureTranslateVectorControls,
-        "type" | "node_id"
-      >;
+    | Pick<editor.gesture.GestureTranslateVectorControls, "type" | "node_id">;
 };
 
 // #endregion surface action

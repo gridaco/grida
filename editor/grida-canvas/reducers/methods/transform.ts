@@ -89,7 +89,10 @@ function __self_update_gesture_transform_translate(
     translate_with_clone,
     tarnslate_with_axis_lock,
     translate_with_hierarchy_change,
+    translate_with_force_disable_snap: __translate_with_force_disable_snap,
   } = draft.gesture_modifiers;
+
+  const should_snap = __translate_with_force_disable_snap !== "on";
 
   // TODO: translate_with_clone - move it somewhere else
   // FIXME: this does not respect the hierarchy and relative position
@@ -299,7 +302,8 @@ function __self_update_gesture_transform_translate(
     threshold(
       editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
       draft.transform
-    )
+    ),
+    should_snap
   );
 
   draft.surface_snapping = snapping;

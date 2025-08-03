@@ -166,6 +166,7 @@ export namespace editor.config {
     translate_with_hierarchy_change: "on",
     translate_with_clone: "off",
     tarnslate_with_axis_lock: "off",
+    translate_with_force_disable_snap: "off",
     transform_with_center_origin: "off",
     transform_with_preserve_aspect_ratio: "off",
     path_keep_projecting: "off",
@@ -347,6 +348,12 @@ export namespace editor.state {
      * user can configure the axis lock mode (turn this on when shift key is pressed, the node will move only in x or y axis)
      */
     tarnslate_with_axis_lock: "on" | "off";
+    /**
+     * force disable snapping while translating
+     *
+     * when on, translation will ignore any snap guides and move freely
+     */
+    translate_with_force_disable_snap: "on" | "off";
     transform_with_center_origin: "on" | "off";
     transform_with_preserve_aspect_ratio: "on" | "off";
     /**
@@ -1816,6 +1823,9 @@ export namespace editor.api {
     ): void;
     configureTranslateWithAxisLockModifier(
       tarnslate_with_axis_lock: "on" | "off"
+    ): void;
+    configureTranslateWithForceDisableSnap(
+      translate_with_force_disable_snap: "on" | "off"
     ): void;
     configureTransformWithCenterOriginModifier(
       transform_with_center_origin: "on" | "off"

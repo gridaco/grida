@@ -362,8 +362,11 @@ export function useEditorHotKeys() {
     (e) => {
       switch (e.key) {
         case "Meta":
+          editor.configureSurfaceRaycastTargeting({ target: "deepest" });
+          break;
         case "Control":
           editor.configureSurfaceRaycastTargeting({ target: "deepest" });
+          editor.configureTranslateWithForceDisableSnap("on");
           break;
         case "Alt":
           editor.configureMeasurement("on");
@@ -392,8 +395,11 @@ export function useEditorHotKeys() {
     (e) => {
       switch (e.key) {
         case "Meta":
+          editor.configureSurfaceRaycastTargeting({ target: "auto" });
+          break;
         case "Control":
           editor.configureSurfaceRaycastTargeting({ target: "auto" });
+          editor.configureTranslateWithForceDisableSnap("off");
           break;
         case "Alt":
           editor.configureMeasurement("off");

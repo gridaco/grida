@@ -39,16 +39,16 @@ This document lists all implemented features including the ones that are not yet
 
 **Modifiers (while pressed)**
 
-| action                     | description                                     | macos   | windows | env    |
-| -------------------------- | ----------------------------------------------- | ------- | ------- | ------ |
-| lock to dominant axis      | lock to dominant axis while translating         | `shift` | `shift` | canvas |
-| preserve aspect ratio      | preserve aspect ratio while scaling             | `shift` | `shift` | canvas |
-| quantize rotation          | quantize rotation while rotating                | `shift` | `shift` | canvas |
-| translate with clone       | duplicate selection while dragging              | `alt`   | `alt`   | canvas |
-| transform origin           | scale or rotate around center                   | `alt`   | `alt`   | canvas |
-| surface raycast targeting  | configure raycast targeting for deepest objects | `meta`  | `ctrl`  | canvas |
-| context-sensitive snapping | toggle snapping behavior dynamically            | `meta`  | `ctrl`  | canvas |
-| keep projecting path       | continue extending path after closing on vertex | `p`     | `p`     | vector |
+| action                    | description                                     | macos   | windows | env    |
+| ------------------------- | ----------------------------------------------- | ------- | ------- | ------ |
+| lock to dominant axis     | lock to dominant axis while translating         | `shift` | `shift` | canvas |
+| preserve aspect ratio     | preserve aspect ratio while scaling             | `shift` | `shift` | canvas |
+| quantize rotation         | quantize rotation while rotating                | `shift` | `shift` | canvas |
+| translate with clone      | duplicate selection while dragging              | `alt`   | `alt`   | canvas |
+| transform origin          | scale or rotate around center                   | `alt`   | `alt`   | canvas |
+| surface raycast targeting | configure raycast targeting for deepest objects | `meta`  | `ctrl`  | canvas |
+| force disable snapping    | move selection freely without snapping          | `ctrl`  | `ctrl`  | canvas |
+| keep projecting path      | continue extending path after closing on vertex | `p`     | `p`     | vector |
 
 ### Actions
 
