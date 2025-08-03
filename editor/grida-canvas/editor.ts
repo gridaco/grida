@@ -761,6 +761,17 @@ export class Editor
     });
   }
 
+  public bendCorner(
+    node_id: editor.NodeID,
+    vertex: number,
+    ref?: "ta" | "tb"
+  ) {
+    this.dispatch({
+      type: "bend-corner",
+      target: { node_id, vertex, ref },
+    });
+  }
+
   public selectGradientStop(node_id: editor.NodeID, stop: number): void {
     this.dispatch({
       type: "select-gradient-stop",

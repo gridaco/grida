@@ -7,6 +7,7 @@ import type {
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
   EditorSelectGradientStopAction,
+  EditorVectorBendCornerAction,
 } from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
@@ -1062,6 +1063,20 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             break;
           }
         }
+      });
+    }
+    //
+    case "bend-corner": {
+      const { target } = <EditorVectorBendCornerAction>action;
+      const { node_id, vertex, ref } = target;
+      return produce(state, (draft) => {
+        const node = dq.__getNodeById(
+          draft,
+          node_id
+        ) as grida.program.nodes.VectorNode;
+        self_updateVectorNodeVectorNetwork(node, (vne) => {
+          vne.bendCorner(vertex, ref);
+        });
       });
     }
     //

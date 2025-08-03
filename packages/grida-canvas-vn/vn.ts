@@ -4,6 +4,15 @@ import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 type Vector2 = [number, number];
 export namespace vn {
   /**
+   * Approximation constant used to convert a circular arc into a cubic Bézier
+   * curve. Commonly known as KAPPA, `4 * (sqrt(2) - 1) / 3`.
+   *
+   * When bending a right angle corner to approximate a quarter circle, the
+   * tangents will have a magnitude of `KAPPA * radius` where the radius is half
+   * of the chosen reference segment's length.
+   */
+  export const KAPPA = 0.5522847498307936;
+  /**
    * tangent mirroring mode
    *
    * **description based on moving ta (applies the same vice versa for tb)**
@@ -227,6 +236,85 @@ export namespace vn {
         }
       }
       return result;
+    }
+
+    /**
+     * Returns the length of the segment at the given index.
+     */
+    segmentLength(segmentIndex: number): number {
+      const seg = this._segments[segmentIndex];
+      const a = this._vertices[seg.a].p;
+      const b = this._vertices[seg.b].p;
+      return Math.hypot(b[0] - a[0], b[1] - a[1]);
+    }
+
+    /**
+     * checks whether the vertex is connected to exactly two segments
+     */
+    isExactCorner(vertex: number): boolean {
+      return this.findSegments(vertex).length === 2;
+    }
+
+    /**
+     * Bends a sharp corner into a smooth one by assigning mirrored tangents.
+     *
+     * The tangent length is derived from the length of the reference segment
+     * and the {@link KAPPA} constant so that bending four equal-length sides
+     * yields a perfect circle.
+     *
+     * @param vertex index of the vertex to bend
+     * @param ref optional reference control (`"ta"` or `"tb"`) used only to
+     *            determine which connected segment provides the length used for
+     *            both tangents. The angle of the tangents is computed from the
+     *            geometry of the two connected segments and is unaffected by
+     *            the reference.
+     */
+    bendCorner(vertex: number, ref?: "ta" | "tb") {
+      if (!this.isExactCorner(vertex)) return;
+
+      const segs = this.findSegments(vertex);
+      if (segs.length !== 2) return;
+
+      const data = segs.map((si) => {
+        const seg = this._segments[si];
+        const control = seg.a === vertex ? "ta" : "tb";
+        const other = seg.a === vertex ? seg.b : seg.a;
+        const p = this._vertices[vertex].p;
+        const op = this._vertices[other].p;
+        const vx = op[0] - p[0];
+        const vy = op[1] - p[1];
+        const len = Math.hypot(vx, vy);
+        const dir: Vector2 = len === 0 ? [0, 0] : [vx / len, vy / len];
+        return { si, control, dir, len } as const;
+      });
+
+      // determine the reference segment for length calculation
+      const refData =
+        (ref && data.find((d) => d.control === ref)) || data[0];
+      const radius = (refData.len / 2) * KAPPA;
+
+      // compute the angle bisector
+      const bx = data[0].dir[0] + data[1].dir[0];
+      const by = data[0].dir[1] + data[1].dir[1];
+      if (bx === 0 && by === 0) return; // degenerate (straight line)
+      const bisector: Vector2 = [bx, by];
+
+      // base tangent direction: bisector rotated 90° counter-clockwise
+      const tangent: Vector2 = [-bisector[1] * radius, bisector[0] * radius];
+
+      // determine orientation using cross product
+      const cross =
+        bisector[0] * data[0].dir[1] - bisector[1] * data[0].dir[0];
+      const segA = this._segments[data[0].si];
+      const segB = this._segments[data[1].si];
+
+      if (cross < 0) {
+        segA[data[0].control] = [-tangent[0], -tangent[1]];
+        segB[data[1].control] = tangent;
+      } else {
+        segA[data[0].control] = tangent;
+        segB[data[1].control] = [-tangent[0], -tangent[1]];
+      }
     }
 
     /**

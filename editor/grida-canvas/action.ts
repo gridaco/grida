@@ -285,7 +285,8 @@ export type EditorVectorEditorAction =
   | EditorVectorSelectTangentAction
   | EditorVectorDeleteTangentAction
   | EditorVectorTranslateVertexAction
-  | EditorVectorTranslateSegmentAction;
+  | EditorVectorTranslateSegmentAction
+  | EditorVectorBendCornerAction;
 
 export interface EditorVectorHoverVertexAction {
   type: "hover-vertex";
@@ -347,6 +348,11 @@ export interface EditorVectorTranslateSegmentAction {
   type: "translate-segment";
   target: SegmentQuery;
   delta: cmath.Vector2;
+}
+
+export interface EditorVectorBendCornerAction {
+  type: "bend-corner";
+  target: VertexQuery & { ref?: "ta" | "tb" };
 }
 // #endregion
 
