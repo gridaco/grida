@@ -1435,6 +1435,13 @@ function __self_start_gesture_translate(
   };
 }
 
+/**
+ * Cleans up the vector network before a translate-vector-controls gesture ends.
+ *
+ * This merges duplicated vertices/segments by running `vne.clean()` on the
+ * vector network of the node being edited, ensuring the network stays
+ * normalized after user interaction.
+ */
 function __before_end_translate_vector_controls(
   draft: Draft<editor.state.IEditorState>
 ) {
