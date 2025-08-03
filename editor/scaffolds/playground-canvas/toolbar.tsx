@@ -189,10 +189,18 @@ export function PlaygroundToolbar() {
             }}
           />
           <VerticalDivider />
-          <ToolGroupItem value={"container" satisfies ToolbarToolType}>
+          <ToolGroupItem
+            value={"container" satisfies ToolbarToolType}
+            label="Container tool"
+            shortcut="A, F"
+          >
             <FrameIcon />
           </ToolGroupItem>
-          <ToolGroupItem value={"text" satisfies ToolbarToolType}>
+          <ToolGroupItem
+            value={"text" satisfies ToolbarToolType}
+            label="Text tool"
+            shortcut="T"
+          >
             <ToolIcon type="text" />
           </ToolGroupItem>
           <ToolsGroup

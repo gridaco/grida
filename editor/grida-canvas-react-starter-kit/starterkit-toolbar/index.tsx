@@ -22,6 +22,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
@@ -37,9 +42,14 @@ import { cn } from "@/components/lib/utils";
 export function ToolGroupItem({
   className,
   children,
+  label,
+  shortcut,
   ...props
-}: React.ComponentProps<typeof ToggleGroupPrimitive.Item>) {
-  return (
+}: React.ComponentProps<typeof ToggleGroupPrimitive.Item> & {
+  label?: string;
+  shortcut?: string;
+}) {
+  const content = (
     <ToggleGroupPrimitive.Item
       data-slot="toggle-group-item"
       className={cn(
@@ -50,6 +60,22 @@ export function ToolGroupItem({
     >
       {children}
     </ToggleGroupPrimitive.Item>
+  );
+
+  if (!label) {
+    return content;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>{content}</span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {label}
+        {shortcut ? ` (${shortcut})` : null}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -125,12 +151,16 @@ export default function Toolbar() {
         <ToolGroupItem
           value={"container" satisfies ToolbarToolType}
           className="aspect-square"
+          label="Container tool"
+          shortcut="A, F"
         >
           <FrameIcon />
         </ToolGroupItem>
         <ToolGroupItem
           value={"text" satisfies ToolbarToolType}
           className="aspect-square"
+          label="Text tool"
+          shortcut="T"
         >
           <ToolIcon type="text" />
         </ToolGroupItem>
@@ -184,7 +214,12 @@ export function ToolsGroup({
 
   return (
     <>
-      <ToolGroupItem value={primary} className="aspect-square">
+      <ToolGroupItem
+        value={primary}
+        className="aspect-square"
+        label={options.find((o) => o.value === primary)?.label}
+        shortcut={options.find((o) => o.value === primary)?.shortcut}
+      >
         <ToolIcon type={primary} className="size-4" />
       </ToolGroupItem>
       {options.length > 1 && (

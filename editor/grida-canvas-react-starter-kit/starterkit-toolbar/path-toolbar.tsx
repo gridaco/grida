@@ -4,6 +4,11 @@ import { useCurrentEditor, useToolState } from "@/grida-canvas-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SplinePointerIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function PathToolbar() {
   const tool = useToolState();
@@ -23,24 +28,43 @@ export function PathToolbar() {
         }}
         className="gap-2"
       >
-        <ToggleGroupItem value="cursor" className="rounded-sm aspect-square">
-          <SplinePointerIcon className="size-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="lasso" className="rounded-sm aspect-square">
-          <ToolIcon type="lasso" className="size-4" />
-        </ToggleGroupItem>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <ToggleGroupItem value="cursor" className="rounded-sm aspect-square">
+                <SplinePointerIcon className="size-4" />
+              </ToggleGroupItem>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Cursor (V)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <ToggleGroupItem value="lasso" className="rounded-sm aspect-square">
+                <ToolIcon type="lasso" className="size-4" />
+              </ToggleGroupItem>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Lasso tool (Q)</TooltipContent>
+        </Tooltip>
       </ToggleGroup>
 
       <VerticalDivider />
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          editor.tryExitContentEditMode();
-        }}
-      >
-        <Cross2Icon className="size-4" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              editor.tryExitContentEditMode();
+            }}
+          >
+            <Cross2Icon className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Exit path mode (Esc)</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
