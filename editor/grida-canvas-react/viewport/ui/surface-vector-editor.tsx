@@ -29,10 +29,7 @@ export function SurfaceVectorEditor({
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const {
     node_id,
-    offset,
-    vertices,
     absolute_vertices,
-    absolute_tangents,
     segments,
     selected_tangents,
     neighbouring_vertices,
@@ -47,8 +44,6 @@ export function SurfaceVectorEditor({
     () => new Set(neighbouring_vertices),
     [neighbouring_vertices]
   );
-
-  const a_point_is_last = a_point === vertices.length - 1;
 
   return (
     <div id="path-editor-surface" className="fixed left-0 top-0 w-0 h-0 z-10">
@@ -66,10 +61,7 @@ export function SurfaceVectorEditor({
         {absolute_vertices.map((p, i) => (
           <VertexPoint
             key={i}
-            point={cmath.vector2.transform(
-              p,
-              transform
-            )}
+            point={cmath.vector2.transform(p, transform)}
             index={i}
           />
         ))}
@@ -122,10 +114,7 @@ export function SurfaceVectorEditor({
         <>
           {/* next segment */}
           <Extension
-            a={cmath.vector2.transform(
-              absolute_vertices[a_point],
-              transform
-            )}
+            a={cmath.vector2.transform(absolute_vertices[a_point], transform)}
             b={cmath.vector2.transform(path_cursor_position, transform)}
             ta={next_ta ? transformDelta(next_ta, transform) : undefined}
           />
@@ -179,16 +168,6 @@ export function SurfaceVectorEditor({
                   )}
                   ta={tb_scaled}
                   selected={tangent_b_selected}
-                />
-              )}
-              {/* preview the next ta - cannot be edited */}
-              {a_point_is_last && (
-                <Extension
-                  a={cmath.vector2.transform(b, transform)}
-                  b={cmath.vector2.transform(
-                    cmath.vector2.add(b, cmath.vector2.invert(tb)),
-                    transform
-                  )}
                 />
               )}
             </div>
@@ -370,6 +349,7 @@ function CurveControlExtension({
         style={{ cursor: "pointer", zIndex: 99 }}
         selected={selected}
         shape="diamond"
+        size={6}
       />
       <Curve
         a={a}
