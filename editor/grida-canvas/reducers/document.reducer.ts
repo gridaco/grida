@@ -33,7 +33,7 @@ import {
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
-import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
+import { getSnapTargets, snapObjectsTranslation, snapMovement } from "./tools/snap";
 import nid from "./tools/id";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
@@ -455,7 +455,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             break;
           }
           case "vector": {
-            const delta_vec: cmath.Vector2 = [
+            const base_movement: cmath.ext.movement.Movement = [
               nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0],
               nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1],
             ];
@@ -480,6 +480,29 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   selected_tangents,
                 }
               );
+
+              const scene = draft.document.scenes[draft.scene_id!];
+              const agent_points = vertices.map((i) =>
+                cmath.vector2.add(node.vectorNetwork.vertices[i].p, [
+                  node.left!,
+                  node.top!,
+                ])
+              );
+              const anchor_points = node.vectorNetwork.vertices
+                .map((v, i) => ({ p: v.p, i }))
+                .filter(({ i }) => !vertices.includes(i))
+                .map(({ p }) => cmath.vector2.add(p, [node.left!, node.top!]));
+
+              const { movement: snappedMovement, snapping } = snapMovement(
+                agent_points,
+                { points: anchor_points, guides: scene.guides },
+                base_movement,
+                editor.config.DEFAULT_SNAP_NUDGE_THRESHOLD
+              );
+
+              draft.surface_snapping = snapping;
+
+              const delta_vec = cmath.ext.movement.normalize(snappedMovement);
 
               self_updateVectorNodeVectorNetwork(node, (vne) => {
                 for (const v of vertices) {

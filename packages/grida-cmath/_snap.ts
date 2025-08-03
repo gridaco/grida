@@ -41,7 +41,7 @@ function bestAxisAlignedDistance(
 }
 
 type SnapAnchors = {
-  // points?: cmath.Vector2[];
+  points?: cmath.Vector2[];
   objects?: cmath.Rectangle[];
   guides?: Guide[];
 };
@@ -120,6 +120,34 @@ type ByGuidesResult = {
 };
 
 /**
+ * Snap results from point anchors.
+ *
+ * Contains information about how the agent points snapped to anchor points,
+ * including hit indices for both agent and anchors.
+ */
+type ByPointsResult = {
+  /**
+   * The translated points after snapping.
+   */
+  translated: cmath.Vector2[];
+  /**
+   * Snap result for the X-axis. Null if no snapping occurred on this axis.
+   */
+  x: cmath.ext.snap.Snap1DResult | null;
+  /**
+   * Snap result for the Y-axis. Null if no snapping occurred on this axis.
+   */
+  y: cmath.ext.snap.Snap1DResult | null;
+  /**
+   * Hit point information for both agent and anchor points.
+   */
+  hit_points: {
+    agent: [boolean, boolean][];
+    anchors: [boolean, boolean][];
+  };
+};
+
+/**
  * Smart-typed snap result that adapts its properties based on the anchors provided.
  *
  * This type uses conditional types to provide better type safety:
@@ -174,6 +202,16 @@ export type SnapResult<TAnchors extends SnapAnchors = SnapAnchors> = {
   by_guides: TAnchors extends { guides: Guide[] }
     ? ByGuidesResult
     : ByGuidesResult | false;
+
+  /**
+   * Snap results from point anchors.
+   *
+   * **Smart typing**: This is never `false` when `anchors.points` is provided.
+   * When `false`, it means no point snapping occurred.
+   */
+  by_points: TAnchors extends { points: cmath.Vector2[] }
+    ? ByPointsResult
+    : ByPointsResult | false;
 };
 
 const dist2delta = (dist: number | undefined) =>
@@ -231,7 +269,7 @@ type Guide = {
 export function snapToCanvasGeometry<
   TAnchors extends SnapAnchors = SnapAnchors,
 >(
-  agent: cmath.Rectangle,
+  agent: cmath.Rectangle | cmath.Vector2[],
   anchors: TAnchors,
   config: cmath.ext.snap.Snap2DAxisonfig,
   tolerance = 0
@@ -242,17 +280,22 @@ export function snapToCanvasGeometry<
   //   "Anchors must contain at least one rectangle or guide."
   // );
 
-  const { objects: anchorObjects, guides: anchorGuides } = anchors;
+  const {
+    objects: anchorObjects,
+    guides: anchorGuides,
+    points: anchorPoints,
+  } = anchors;
 
   let snap_guide: SnapToGuidesResult | null = null;
   let snap_objgeo: SnapToObjects9PointsGeometryResult | null = null;
   let snap_objspc: SnapToObjectsSpaceResult | null = null;
+  let snap_points: SnapToPointsResult | null = null;
 
   if (anchorGuides) {
     snap_guide = snapToGuides(agent, anchorGuides, config, tolerance);
   }
 
-  if (anchorObjects) {
+  if (anchorObjects && !Array.isArray(agent)) {
     snap_objgeo = snapToObjects9PointsGeometry(
       agent,
       anchorObjects,
@@ -261,17 +304,23 @@ export function snapToCanvasGeometry<
     );
   }
 
+  if (anchorPoints && Array.isArray(agent)) {
+    snap_points = snapToPoints(agent, anchorPoints, config, tolerance);
+  }
+
   const _sofar_bestx = bestDistance(
     snap_guide?.x?.distance,
-    snap_objgeo?.x?.distance
+    snap_objgeo?.x?.distance,
+    snap_points?.x?.distance
   );
 
   const _sofar_besty = bestDistance(
     snap_guide?.y?.distance,
-    snap_objgeo?.y?.distance
+    snap_objgeo?.y?.distance,
+    snap_points?.y?.distance
   );
 
-  if (anchorObjects) {
+  if (anchorObjects && !Array.isArray(agent)) {
     snap_objspc = snapToObjectsSpace(
       cmath.rect.translate(agent, [
         dist2delta(_sofar_bestx),
@@ -287,25 +336,31 @@ export function snapToCanvasGeometry<
   const x = bestAxisAlignedDistance(
     snap_guide?.x,
     snap_objgeo?.x,
-    snap_objspc?.x
+    snap_objspc?.x,
+    snap_points?.x
   );
   const y = bestAxisAlignedDistance(
     snap_guide?.y,
     snap_objgeo?.y,
-    snap_objspc?.y
+    snap_objspc?.y,
+    snap_points?.y
   );
 
-  // Determine the final delta for each axis
   const x_delta = dist2delta(x?.distance);
   const y_delta = dist2delta(y?.distance);
 
-  const translated_agent = cmath.rect.translate(agent, [x_delta, y_delta]);
+  const translated_agent_rect = !Array.isArray(agent)
+    ? cmath.rect.translate(agent, [x_delta, y_delta])
+    : undefined;
+  const translated_points = Array.isArray(agent)
+    ? agent.map((p) => cmath.vector2.add(p, [x_delta, y_delta]))
+    : undefined;
 
   return {
     anchors,
     by_objects: (snap_objgeo
       ? {
-          translated: translated_agent,
+          translated: translated_agent_rect!,
           x: snap_objgeo.x?.distance === x?.distance ? snap_objgeo.x : null,
           y: snap_objgeo.y?.distance === y?.distance ? snap_objgeo.y : null,
           hit_points: {
@@ -329,6 +384,19 @@ export function snapToCanvasGeometry<
     }
       ? ByGuidesResult
       : ByGuidesResult | false,
+    by_points: (snap_points
+      ? {
+          translated: translated_points!,
+          x: snap_points.x?.distance === x?.distance ? snap_points.x : null,
+          y: snap_points.y?.distance === y?.distance ? snap_points.y : null,
+          hit_points: {
+            agent: snap_points.agent_hits,
+            anchors: snap_points.anchor_hits,
+          },
+        }
+      : false) as TAnchors extends { points: cmath.Vector2[] }
+      ? ByPointsResult
+      : ByPointsResult | false,
     delta: [x_delta, y_delta],
   };
 }
@@ -339,17 +407,25 @@ type SnapToGuidesResult = {
 };
 
 function snapToGuides(
-  agent: cmath.Rectangle,
+  agent: cmath.Rectangle | cmath.Vector2[],
   anchors: Guide[],
   config: cmath.ext.snap.Snap2DAxisonfig,
   tolerance = 0
 ): SnapToGuidesResult {
-  const x_agent_points = cmath.range.to3PointsChunk(
-    cmath.range.fromRectangle(agent, "x")
-  );
-  const y_agent_points = cmath.range.to3PointsChunk(
-    cmath.range.fromRectangle(agent, "y")
-  );
+  let x_agent_points: number[];
+  let y_agent_points: number[];
+
+  if (Array.isArray(agent)) {
+    x_agent_points = agent.map(([x]) => x);
+    y_agent_points = agent.map(([_, y]) => y);
+  } else {
+    x_agent_points = cmath.range.to3PointsChunk(
+      cmath.range.fromRectangle(agent, "x")
+    );
+    y_agent_points = cmath.range.to3PointsChunk(
+      cmath.range.fromRectangle(agent, "y")
+    );
+  }
 
   const x_anchors: number[] = [];
   const y_anchors: number[] = [];
@@ -394,6 +470,13 @@ type SnapToObjects9PointsGeometryResult = {
   anchor_hits: Object9PointGeometryHitResult[];
   agent_points: cmath.Vector2[];
   anchor_points: cmath.ext.snap.AxisAlignedPoint[];
+};
+
+type SnapToPointsResult = {
+  x: cmath.ext.snap.Snap1DResult | null;
+  y: cmath.ext.snap.Snap1DResult | null;
+  agent_hits: [boolean, boolean][];
+  anchor_hits: [boolean, boolean][];
 };
 
 function snapToObjects9PointsGeometry(
@@ -443,6 +526,39 @@ function snapToObjects9PointsGeometry(
     anchor_points,
     x: snap.x,
     y: snap.y,
+  };
+}
+
+function snapToPoints(
+  agent: cmath.Vector2[],
+  anchors: cmath.Vector2[],
+  config: cmath.ext.snap.Snap2DAxisonfig,
+  tolerance = 0
+): SnapToPointsResult {
+  const snap = cmath.ext.snap.snap2DAxisAligned(
+    agent,
+    anchors,
+    config,
+    tolerance
+  );
+
+  const agent_hits = agent.map((_, index) => {
+    const xHit = snap.x?.hit_agent_indices.includes(index) ?? false;
+    const yHit = snap.y?.hit_agent_indices.includes(index) ?? false;
+    return [xHit, yHit] as [boolean, boolean];
+  });
+
+  const anchor_hits = anchors.map((_, index) => {
+    const xHit = snap.x?.hit_anchor_indices.includes(index) ?? false;
+    const yHit = snap.y?.hit_anchor_indices.includes(index) ?? false;
+    return [xHit, yHit] as [boolean, boolean];
+  });
+
+  return {
+    x: snap.x,
+    y: snap.y,
+    agent_hits,
+    anchor_hits,
   };
 }
 
@@ -712,6 +828,72 @@ export namespace guide {
     return { points, lines };
   }
 
+  function __surface_snap_guide_by_points<TAnchors extends SnapAnchors>(
+    context: SnapResult<TAnchors>
+  ): {
+    lines: cmath.ui.Line[];
+    points: cmath.Vector2[];
+  } {
+    const { by_points, anchors } = context;
+    if (!by_points) return { lines: [], points: [] };
+
+    const { x, y, translated, hit_points } = by_points;
+
+    const lines: cmath.ui.Line[] = [];
+    const points: cmath.Vector2[] = [];
+
+    const xPoints: cmath.Vector2[] = [];
+    const yPoints: cmath.Vector2[] = [];
+
+    hit_points.anchors.forEach(([xhit, yhit], i) => {
+      const p = anchors.points![i];
+      if (x && xhit) xPoints.push(p);
+      if (y && yhit) yPoints.push(p);
+      if ((x && xhit) || (y && yhit)) points.push(p);
+    });
+
+    translated.forEach((p, i) => {
+      const [xhit, yhit] = hit_points.agent[i];
+      if (x && xhit) xPoints.push(p);
+      if (y && yhit) yPoints.push(p);
+      if ((x && xhit) || (y && yhit)) points.push(p);
+    });
+
+    const xs = new Map<number, number[]>();
+    xPoints.forEach(([x, y]) => {
+      if (!xs.has(x)) xs.set(x, []);
+      xs.get(x)!.push(y);
+    });
+    xs.forEach((arrY, x) => {
+      if (arrY.length > 1) {
+        lines.push({
+          x1: x,
+          y1: Math.min(...arrY),
+          x2: x,
+          y2: Math.max(...arrY),
+        });
+      }
+    });
+
+    const ys = new Map<number, number[]>();
+    yPoints.forEach(([x, y]) => {
+      if (!ys.has(y)) ys.set(y, []);
+      ys.get(y)!.push(x);
+    });
+    ys.forEach((arrX, y) => {
+      if (arrX.length > 1) {
+        lines.push({
+          x1: Math.min(...arrX),
+          y1: y,
+          x2: Math.max(...arrX),
+          y2: y,
+        });
+      }
+    });
+
+    return { lines, points };
+  }
+
   function __calc_spacing_loop_gap_line({
     loop,
     gap,
@@ -953,6 +1135,12 @@ export namespace guide {
     points.push(...by_objects.points);
     lines.push(...by_objects.lines);
     // #endregion by_objects
+
+    // #region by_points
+    const by_points = __surface_snap_guide_by_points(snapping);
+    points.push(...by_points.points);
+    lines.push(...by_points.lines);
+    // #endregion by_points
 
     // #region by_spacing
     const by_spacing = __surface_snap_guide_by_objects_spacing(snapping);

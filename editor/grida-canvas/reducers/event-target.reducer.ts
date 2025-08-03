@@ -35,7 +35,7 @@ import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import vn from "@grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
-import { snapGuideTranslation, threshold } from "./tools/snap";
+import { snapGuideTranslation, threshold, snapMovement } from "./tools/snap";
 import { BitmapLayerEditor } from "@grida/bitmap";
 import cg from "@grida/cg";
 import type { ReducerContext } from ".";
@@ -909,9 +909,34 @@ function __self_evt_on_drag(
         const { vectorNetwork } = node;
         const vne = new vn.VectorNetworkEditor(vectorNetwork);
 
+        const vertex_index =
+          vne.segments[segment][control === "ta" ? "a" : "b"];
+        const vertex_local = vne.vertices[vertex_index].p;
+        const node_pos: cmath.Vector2 = [node.left!, node.top!];
+        const vertex_abs = cmath.vector2.add(vertex_local, node_pos);
+        const agent_initial = cmath.vector2.add(vertex_abs, initial);
+
+        const anchor_points = vne.vertices.map((v) =>
+          cmath.vector2.add(v.p, node_pos)
+        );
+        const scene = draft.document.scenes[draft.scene_id!];
+
+        const { movement: snappedMovement, snapping } = snapMovement(
+          [agent_initial],
+          { points: anchor_points, guides: scene.guides },
+          [movement[0], movement[1]],
+          threshold(
+            editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+            draft.transform
+          )
+        );
+
+        draft.surface_snapping = snapping;
+
+        const snapped_vec = cmath.ext.movement.normalize(snappedMovement);
         const tangentPos = cmath.vector2.add(
           initial,
-          invert ? cmath.vector2.invert(movement) : movement
+          invert ? cmath.vector2.invert(snapped_vec) : snapped_vec
         );
 
         vne.updateTangent(
@@ -986,6 +1011,28 @@ function __self_evt_on_drag(
           tangents,
         } = draft.gesture;
 
+        const scene = draft.document.scenes[draft.scene_id!];
+
+        const agent_points = vertices.map((i) =>
+          cmath.vector2.add(initial_verticies[i], initial_position)
+        );
+        const anchor_points = initial_verticies
+          .map((p, i) => ({ p, i }))
+          .filter(({ i }) => !vertices.includes(i))
+          .map(({ p }) => cmath.vector2.add(p, initial_position));
+
+        const { movement: snappedMovement, snapping } = snapMovement(
+          agent_points,
+          { points: anchor_points, guides: scene.guides },
+          adj_movement,
+          threshold(
+            editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+            draft.transform
+          )
+        );
+
+        draft.surface_snapping = snapping;
+
         const vne = new vn.VectorNetworkEditor({
           vertices: initial_verticies.map((p) => ({ p })),
           segments: initial_segments.map((s) => ({ ...s })),
@@ -993,7 +1040,7 @@ function __self_evt_on_drag(
 
         const bb_a = vne.getBBox();
 
-        const delta_vec = cmath.ext.movement.normalize(adj_movement);
+        const delta_vec = cmath.ext.movement.normalize(snappedMovement);
 
         for (const i of vertices) {
           vne.translateVertex(i, delta_vec);

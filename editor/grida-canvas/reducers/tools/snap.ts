@@ -46,6 +46,64 @@ export function snapGuideTranslation(
   return { translated: v + delta };
 }
 
+export function snapMovement(
+  agent: cmath.Rectangle | cmath.Vector2[],
+  anchors: {
+    objects?: cmath.Rectangle[];
+    guides?: grida.program.document.Guide2D[];
+    points?: cmath.Vector2[];
+  },
+  movement: cmath.ext.movement.Movement,
+  threshold: number,
+  enabled = true
+): {
+  movement: cmath.ext.movement.Movement;
+  snapping: SnapResult | undefined;
+} {
+  // we are intentionally not falling back with ?? [] here.
+  const anchor_objects: cmath.Rectangle[] | undefined = anchors.objects
+    ? anchors.objects.map((r) => cmath.rect.quantize(r, q))
+    : undefined;
+  const anchor_points: cmath.Vector2[] | undefined = anchors.points
+    ? anchors.points.map((p) => cmath.vector2.quantize(p, q))
+    : undefined;
+
+  const normalized = cmath.ext.movement.normalize(movement);
+
+  let snapping: SnapResult | undefined;
+  let resultMovement: cmath.ext.movement.Movement = movement;
+
+  if (enabled) {
+    const agent_q = Array.isArray(agent)
+      ? agent.map((p) => cmath.vector2.quantize(p, q))
+      : cmath.rect.quantize(agent, q);
+    const moved_agent = Array.isArray(agent_q)
+      ? agent_q.map((p) => cmath.vector2.add(p, normalized))
+      : cmath.rect.translate(agent_q, normalized);
+
+    snapping = snapToCanvasGeometry(
+      moved_agent as any,
+      {
+        objects: anchor_objects,
+        guides: anchors.guides,
+        points: anchor_points,
+      },
+      {
+        x: movement[0] === null ? false : threshold,
+        y: movement[1] === null ? false : threshold,
+      }
+    );
+
+    const [dx, dy] = snapping.delta;
+    resultMovement = [
+      movement[0] === null ? null : normalized[0] + dx,
+      movement[1] === null ? null : normalized[1] + dy,
+    ];
+  }
+
+  return { movement: resultMovement, snapping };
+}
+
 type SnapObjectsResult = SnapResult<{
   objects: cmath.Rectangle[];
   guides: grida.program.document.Guide2D[];
