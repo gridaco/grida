@@ -213,6 +213,11 @@ export const keybindings_sheet = [
     keys: ["v"],
   },
   {
+    name: "lasso",
+    description: "Lasso tool (vector mode)",
+    keys: ["q"],
+  },
+  {
     name: "hand",
     description: "Hand tool",
     keys: ["h"],
@@ -338,6 +343,7 @@ export function useEditorHotKeys() {
       editor.configureTranslateWithAxisLockModifier("off");
       editor.configureTransformWithPreserveAspectRatioModifier("off");
       editor.configureRotateWithQuantizeModifier("off");
+      editor.configureCurveTangentMirroringModifier("all");
     };
     window.addEventListener("blur", cb);
     return () => {
@@ -358,6 +364,7 @@ export function useEditorHotKeys() {
           editor.configureMeasurement("on");
           editor.configureTranslateWithCloneModifier("on");
           editor.configureTransformWithCenterOriginModifier("on");
+          editor.configureCurveTangentMirroringModifier("none");
           // NOTE: on some systems, the alt key focuses to the browser menu, so we need to prevent that. (e.g. alt key on windows/chrome)
           e.preventDefault();
           break;
@@ -387,6 +394,7 @@ export function useEditorHotKeys() {
           editor.configureMeasurement("off");
           editor.configureTranslateWithCloneModifier("off");
           editor.configureTransformWithCenterOriginModifier("off");
+          editor.configureCurveTangentMirroringModifier("all");
           break;
         case "Shift":
           editor.configureTranslateWithAxisLockModifier("off");
@@ -744,6 +752,12 @@ export function useEditorHotKeys() {
 
   useHotkeys("v, escape", () => {
     editor.setTool({ type: "cursor" });
+  });
+
+  useHotkeys("q", () => {
+    if (content_edit_mode?.type === "vector") {
+      editor.setTool({ type: "lasso" });
+    }
   });
 
   useHotkeys("h", () => {

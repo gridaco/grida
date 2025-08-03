@@ -325,6 +325,12 @@ function _reducer<S extends editor.state.IEditorState>(
         self_update_gesture_transform(draft, context);
       });
     }
+    case "config/modifiers/curve-tangent-mirroring": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.gesture_modifiers.curve_tangent_mirroring =
+          action.curve_tangent_mirroring;
+      });
+    }
     case "config/modifiers/path-keep-projecting": {
       return produce(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.path_keep_projecting =

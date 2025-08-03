@@ -16,6 +16,7 @@ import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
 import type { Grida2D } from "@grida/canvas-wasm";
+import vn from "@grida/vn";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
@@ -1006,6 +1007,15 @@ export class Editor
     this.dispatch({
       type: "config/modifiers/rotate-with-quantize",
       rotate_with_quantize,
+    });
+  }
+
+  public configureCurveTangentMirroringModifier(
+    curve_tangent_mirroring: vn.TangentMirroringMode
+  ) {
+    this.dispatch({
+      type: "config/modifiers/curve-tangent-mirroring",
+      curve_tangent_mirroring,
     });
   }
 

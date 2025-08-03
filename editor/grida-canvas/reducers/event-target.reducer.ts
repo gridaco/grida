@@ -914,7 +914,12 @@ function __self_evt_on_drag(
           invert ? cmath.vector2.invert(movement) : movement
         );
 
-        vne.updateTangent(segment, control, tangentPos, "all");
+        vne.updateTangent(
+          segment,
+          control,
+          tangentPos,
+          draft.gesture_modifiers.curve_tangent_mirroring
+        );
 
         if (segment === vne.segments.length - 1) {
           // TODO: add a new "curve-b" and make it isolated from control point editing.

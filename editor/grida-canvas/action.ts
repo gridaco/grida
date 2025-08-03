@@ -3,6 +3,7 @@ import type cmath from "@grida/cmath";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
+import type vn from "@grida/vn";
 
 export type Action =
   | InternalAction
@@ -426,7 +427,8 @@ export type EditorConfigAction =
   | EditorConfigureModifier_TransformWithCenterOrigin
   | EditorConfigureModifier_TransformWithPreserveAspectRatio
   | EditorConfigureModifier_RotateWithQuantize
-  | EditorConfigureModifier_PathKeepProjecting;
+  | EditorConfigureModifier_PathKeepProjecting
+  | EditorConfigureModifier_CurveTangentMirroring;
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
@@ -465,6 +467,11 @@ export interface EditorConfigureModifier_RotateWithQuantize {
 export interface EditorConfigureModifier_PathKeepProjecting {
   type: "config/modifiers/path-keep-projecting";
   path_keep_projecting: "on" | "off";
+}
+
+export interface EditorConfigureModifier_CurveTangentMirroring {
+  type: "config/modifiers/curve-tangent-mirroring";
+  curve_tangent_mirroring: vn.TangentMirroringMode;
 }
 
 /**
