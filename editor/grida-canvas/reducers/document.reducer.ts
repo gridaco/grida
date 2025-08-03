@@ -493,11 +493,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 .filter(({ i }) => !vertices.includes(i))
                 .map(({ p }) => cmath.vector2.add(p, [node.left!, node.top!]));
 
+              const should_snap =
+                draft.gesture_modifiers.translate_with_force_disable_snap !==
+                "on";
+
               const { movement: snappedMovement, snapping } = snapMovement(
                 agent_points,
                 { points: anchor_points, guides: scene.guides },
                 base_movement,
-                editor.config.DEFAULT_SNAP_NUDGE_THRESHOLD
+                editor.config.DEFAULT_SNAP_NUDGE_THRESHOLD,
+                should_snap
               );
 
               draft.surface_snapping = snapping;

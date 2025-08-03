@@ -921,6 +921,9 @@ function __self_evt_on_drag(
         );
         const scene = draft.document.scenes[draft.scene_id!];
 
+        const should_snap =
+          draft.gesture_modifiers.translate_with_force_disable_snap !== "on";
+
         const { movement: snappedMovement, snapping } = snapMovement(
           [agent_initial],
           { points: anchor_points, guides: scene.guides },
@@ -928,7 +931,8 @@ function __self_evt_on_drag(
           threshold(
             editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
             draft.transform
-          )
+          ),
+          should_snap
         );
 
         draft.surface_snapping = snapping;
@@ -997,7 +1001,11 @@ function __self_evt_on_drag(
         const { movement: _movement } = draft.gesture;
 
         assert(draft.gesture.type === "translate-vector-controls");
-        const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
+        const {
+          tarnslate_with_axis_lock,
+          translate_with_force_disable_snap,
+        } = draft.gesture_modifiers;
+        const should_snap = translate_with_force_disable_snap !== "on";
         const adj_movement =
           tarnslate_with_axis_lock === "on"
             ? cmath.ext.movement.axisLockedByDominance(_movement)
@@ -1028,7 +1036,8 @@ function __self_evt_on_drag(
           threshold(
             editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
             draft.transform
-          )
+          ),
+          should_snap
         );
 
         draft.surface_snapping = snapping;
