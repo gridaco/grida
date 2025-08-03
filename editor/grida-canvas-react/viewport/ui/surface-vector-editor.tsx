@@ -61,7 +61,7 @@ export function SurfaceVectorEditor({
           resize: "none",
           zIndex: 1,
         }}
-        className="border border-transparent data-[debug='true']:border-pink-500"
+        className="border-0 data-[debug='true']:border data-[debug='true']:border-pink-500"
       >
         {absolute_vertices.map((p, i) => (
           <VertexPoint
@@ -369,6 +369,7 @@ function CurveControlExtension({
         point={b}
         style={{ cursor: "pointer", zIndex: 99 }}
         selected={selected}
+        shape="diamond"
       />
       <Curve
         a={a}
@@ -506,12 +507,14 @@ const Point = React.forwardRef(
       selected,
       hovered,
       size = 8,
+      shape = "circle",
       ...props
     }: React.HtmlHTMLAttributes<HTMLDivElement> & {
       point: cmath.Vector2;
       selected?: boolean;
       hovered?: boolean;
       size?: number;
+      shape?: "circle" | "diamond";
     },
     ref: React.Ref<HTMLDivElement>
   ) => {
@@ -522,7 +525,8 @@ const Point = React.forwardRef(
         data-selected={selected}
         data-hovered={hovered}
         className={cn(
-          "rounded-full border border-workbench-accent-sky bg-background",
+          "border border-workbench-accent-sky bg-background",
+          shape === "circle" ? "rounded-full" : undefined,
           "data-[selected='true']:shadow-sm data-[selected='true']:bg-workbench-accent-sky data-[selected='true']:border-spacing-1.5 data-[selected='true']:border-background",
           "data-[hovered='true']:opacity-50",
           className
@@ -533,10 +537,10 @@ const Point = React.forwardRef(
           top: point[1],
           width: size,
           height: size,
-          transform: "translate(-50%, -50%)",
           cursor: "pointer",
           touchAction: "none",
           ...style,
+          transform: `translate(-50%, -50%)${shape === "diamond" ? " rotate(45deg)" : ""}${style?.transform ? ` ${style.transform}` : ""}`,
         }}
       />
     );
