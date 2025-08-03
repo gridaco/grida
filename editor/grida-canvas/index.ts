@@ -165,7 +165,7 @@ export namespace editor.config {
     transform_with_preserve_aspect_ratio: "off",
     path_keep_projecting: "off",
     rotate_with_quantize: "off",
-    curve_tangent_mirroring: "all",
+    curve_tangent_mirroring: "auto",
   };
 
   export const DEFAULT_BRUSH: state.CurrentBrush = {
@@ -365,7 +365,7 @@ export namespace editor.state {
     /**
      * tangent control mirroring mode for curve gestures
      *
-     * @default "all"
+     * @default "auto"
      */
     curve_tangent_mirroring: vn.TangentMirroringMode;
   };

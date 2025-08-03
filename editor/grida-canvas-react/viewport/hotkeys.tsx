@@ -343,7 +343,7 @@ export function useEditorHotKeys() {
       editor.configureTranslateWithAxisLockModifier("off");
       editor.configureTransformWithPreserveAspectRatioModifier("off");
       editor.configureRotateWithQuantizeModifier("off");
-      editor.configureCurveTangentMirroringModifier("all");
+      editor.configureCurveTangentMirroringModifier("auto");
     };
     window.addEventListener("blur", cb);
     return () => {
@@ -394,7 +394,7 @@ export function useEditorHotKeys() {
           editor.configureMeasurement("off");
           editor.configureTranslateWithCloneModifier("off");
           editor.configureTransformWithCenterOriginModifier("off");
-          editor.configureCurveTangentMirroringModifier("all");
+          editor.configureCurveTangentMirroringModifier("auto");
           break;
         case "Shift":
           editor.configureTranslateWithAxisLockModifier("off");

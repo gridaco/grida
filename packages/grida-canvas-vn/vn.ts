@@ -7,14 +7,17 @@ export namespace vn {
    * tangent mirroring mode
    *
    * **description based on moving ta (applies the same vice versa for tb)**
-   * - `none` - no mirroring
-   *   - moving ta will not affect tb at all.
-   * - `angle` - mirror the angle of the tangent, but keep the length
-   *   - moving ta will affect tb, but only the **exact (inverted)** angle will be mirrored.
-   * - `all` - mirror the angle and length of the tangent
-   *   - moving ta will affect tb, and mirror the **exact (inverted)** value of ta, not by the delta of angle/length.
-   */
-  export type TangentMirroringMode = "none" | "angle" | "all";
+  * - `none` - no mirroring
+  *   - moving ta will not affect tb at all.
+  * - `angle` - mirror the angle of the tangent, but keep the length
+  *   - moving ta will affect tb, but only the **exact (inverted)** angle will be mirrored.
+  * - `all` - mirror the angle and length of the tangent
+  *   - moving ta will affect tb, and mirror the **exact (inverted)** value of ta, not by the delta of angle/length.
+  * - `auto` - automatically decide whether to mirror based on the current
+  *   relationship of the tangents. If they are already mirrored, behaves like
+  *   `all`, otherwise acts as `none`.
+  */
+  export type TangentMirroringMode = "none" | "angle" | "all" | "auto";
 
   /**
    * Represents a vertex in the vector network.
@@ -426,14 +429,8 @@ export namespace vn {
       segmentIndex: number,
       control: "ta" | "tb",
       value: Vector2,
-      mirroring: TangentMirroringMode = "none"
+      mirroring: TangentMirroringMode = "auto"
     ) {
-      // 1. update the primary tangent
-      this._segments[segmentIndex][control] = value;
-
-      // 2. optional reflection
-      if (mirroring === "none") return;
-
       const seg = this._segments[segmentIndex];
       const vertexIndex = control === "ta" ? seg.a : seg.b;
 
@@ -445,24 +442,42 @@ export namespace vn {
             i !== segmentIndex && (s.a === vertexIndex || s.b === vertexIndex)
         );
 
-      // reflect if there's exactly one connecting segment
+      let effectiveMirroring: TangentMirroringMode = mirroring;
+      let connection: { i: number; otherControl: "ta" | "tb" } | null = null;
+
       if (connected.length === 1) {
         const { s, i } = connected[0];
         const otherControl = s.a === vertexIndex ? "ta" : "tb";
+        connection = { i, otherControl };
 
-        if (mirroring === "all") {
-          // mirror angle and length
-          this._segments[i][otherControl] = [-value[0], -value[1]];
-        } else if (mirroring === "angle") {
-          // mirror only angle, keep existing length
-          const existing = this._segments[i][otherControl];
-          const length = Math.hypot(existing[0], existing[1]);
-          const angle = Math.atan2(value[1], value[0]) + Math.PI;
-          this._segments[i][otherControl] = [
-            Math.cos(angle) * length,
-            Math.sin(angle) * length,
-          ];
+        if (mirroring === "auto") {
+          const current = seg[control];
+          const other = this._segments[i][otherControl];
+          const isMirrored = current[0] === -other[0] && current[1] === -other[1];
+          effectiveMirroring = isMirrored ? "all" : "none";
         }
+      } else if (mirroring === "auto") {
+        effectiveMirroring = "none";
+      }
+
+      // 1. update the primary tangent
+      this._segments[segmentIndex][control] = value;
+
+      // 2. optional reflection
+      if (effectiveMirroring === "none" || !connection) return;
+
+      if (effectiveMirroring === "all") {
+        // mirror angle and length
+        this._segments[connection.i][connection.otherControl] = [-value[0], -value[1]];
+      } else if (effectiveMirroring === "angle") {
+        // mirror only angle, keep existing length
+        const existing = this._segments[connection.i][connection.otherControl];
+        const length = Math.hypot(existing[0], existing[1]);
+        const angle = Math.atan2(value[1], value[0]) + Math.PI;
+        this._segments[connection.i][connection.otherControl] = [
+          Math.cos(angle) * length,
+          Math.sin(angle) * length,
+        ];
       }
     }
 
