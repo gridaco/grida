@@ -27,9 +27,7 @@ export namespace vn {
    *   `all`, if only the angle is mirrored behaves like `angle`, otherwise acts as `none`.
    */
   export type StrictTangentMirroringMode = "none" | "angle" | "all";
-  export type TangentMirroringMode =
-    | StrictTangentMirroringMode
-    | "auto";
+  export type TangentMirroringMode = StrictTangentMirroringMode | "auto";
 
   /**
    * infer the mirroring mode from two tangents
@@ -200,6 +198,17 @@ export namespace vn {
      * network by merging vertices that share the same coordinates and by
      * collapsing segments with identical endpoints and tangents. The input
      * network is not mutated; a new, cleaned network is returned instead.
+     *
+     * ## Deduplication Criteria
+     *
+     * - **Vertices**: Two vertices are considered duplicates if they have identical coordinates.
+     * - **Segments**: Two segments are considered duplicates if they have:
+     *   - Identical endpoint indices (after vertex deduplication and index remapping)
+     *   - Identical tangent control points (`ta` and `tb` values)
+     *
+     * Segment orientation is preserved - a segment `a -> b` is considered different from `b -> a`.
+     * The deduplication process first remaps segment indices to account for merged vertices, then
+     * removes segments with identical geometry.
      *
      * @param net - The network to clean.
      * @returns A new {@link VectorNetwork} without duplicate vertices or
@@ -412,8 +421,7 @@ export namespace vn {
       });
 
       // determine the reference segment for length calculation
-      const refData =
-        (ref && data.find((d) => d.control === ref)) || data[0];
+      const refData = (ref && data.find((d) => d.control === ref)) || data[0];
       const radius = (refData.len / 2) * KAPPA;
 
       // compute the angle bisector
@@ -426,8 +434,7 @@ export namespace vn {
       const tangent: Vector2 = [-bisector[1] * radius, bisector[0] * radius];
 
       // determine orientation using cross product
-      const cross =
-        bisector[0] * data[0].dir[1] - bisector[1] * data[0].dir[0];
+      const cross = bisector[0] * data[0].dir[1] - bisector[1] * data[0].dir[0];
       const segA = this._segments[data[0].si];
       const segB = this._segments[data[1].si];
 
@@ -703,7 +710,10 @@ export namespace vn {
 
       if (effectiveMirroring === "all") {
         // mirror angle and length
-        this._segments[connection.i][connection.otherControl] = [-value[0], -value[1]];
+        this._segments[connection.i][connection.otherControl] = [
+          -value[0],
+          -value[1],
+        ];
       } else if (effectiveMirroring === "angle") {
         // mirror only angle, keep existing length
         const existing = this._segments[connection.i][connection.otherControl];
