@@ -22,6 +22,7 @@ function useSnapGuide(): guide.SnapGuide | undefined {
   return useMemo(() => {
     if (
       (gesture.type === "translate" ||
+        gesture.type === "translate-vector-controls" ||
         gesture.type === "nudge" ||
         gesture.type === "scale") &&
       surface_snapping
