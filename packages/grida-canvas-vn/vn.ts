@@ -50,14 +50,16 @@ export namespace vn {
     }
     const [ax, ay] = ta;
     const [bx, by] = tb;
+    const la = Math.hypot(ax, ay);
+    const lb = Math.hypot(bx, by);
     // cross product for 2D vectors
     const cross = ax * by - ay * bx;
-    if (Math.abs(cross) > Number.EPSILON) return "none";
+    const crossNorm = cross / (la * lb);
+    const ANGLE_EPSILON = 1e-3;
+    if (Math.abs(crossNorm) > ANGLE_EPSILON) return "none";
     // dot product to determine direction
     const dot = ax * bx + ay * by;
     if (dot >= 0) return "none";
-    const la = Math.hypot(ax, ay);
-    const lb = Math.hypot(bx, by);
     return Math.abs(la - lb) < Number.EPSILON ? "all" : "angle";
   }
 

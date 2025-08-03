@@ -75,6 +75,9 @@ describe("inferMirroringMode", () => {
   it("detects angle mirroring", () => {
     expect(vn.inferMirroringMode([10, 0], [-5, 0])).toBe("angle");
   });
+  it("detects angle mirroring with slight deviation", () => {
+    expect(vn.inferMirroringMode([10, 0], [-5, 0.001])).toBe("angle");
+  });
   it("detects no mirroring", () => {
     expect(vn.inferMirroringMode([10, 0], [5, 5])).toBe("none");
   });
