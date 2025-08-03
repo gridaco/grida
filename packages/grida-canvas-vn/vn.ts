@@ -194,69 +194,43 @@ export namespace vn {
 
   export class VectorNetworkEditor {
     /**
-     * Creates a new {@link VectorNetwork} by combining two networks into one.
+     * Removes duplicate vertices and segments from a {@link VectorNetwork}.
      *
-     * The union operation performs two steps:
+     * Also known as *simplify* or *deduplicate*, this method normalizes the
+     * network by merging vertices that share the same coordinates and by
+     * collapsing segments with identical endpoints and tangents. The input
+     * network is not mutated; a new, cleaned network is returned instead.
      *
-     * 1. **Vertex de-duplication** – vertices from the second network are
-     *    appended to the first while removing any points that already exist in
-     *    the first network. Vertex equality is determined by exact coordinate
-     *    comparison.
-     * 2. **Segment de-duplication** – after vertices are merged, segments from
-     *    both networks are combined. Any segment with identical endpoints and
-     *    tangent values is removed so that the resulting network contains each
-     *    segment at most once.
-     *
-     * The function does not mutate the provided networks; instead, it returns a
-     * new network containing the merged result. Segment orientation is
-     * respected, meaning that a segment `a -> b` is considered different from
-     * `b -> a`.
-     *
-     * @param a The base network.
-     * @param b The network to merge into {@code a}.
-     * @returns A new network containing the union of {@code a} and {@code b}.
+     * @param net - The network to clean.
+     * @returns A new {@link VectorNetwork} without duplicate vertices or
+     *          segments.
      */
-    static union(a: VectorNetwork, b: VectorNetwork): VectorNetwork {
-      // clone vertices and segments from the first network to avoid mutation
-      const vertices: VectorNetworkVertex[] = a.vertices.map((v) => ({
-        p: [v.p[0], v.p[1]],
-      }));
-
-      const segments: VectorNetworkSegment[] = a.segments.map((s) => ({
-        a: s.a,
-        b: s.b,
-        ta: [s.ta[0], s.ta[1]],
-        tb: [s.tb[0], s.tb[1]],
-      }));
-
-      // map of vertex indices from network b to their corresponding index in
-      // the merged vertex array
+    static clean(net: VectorNetwork): VectorNetwork {
+      const vertices: VectorNetworkVertex[] = [];
       const indexMap = new Map<number, number>();
 
-      // merge vertices from network b, de-duplicating identical points
-      for (let i = 0; i < b.vertices.length; i++) {
-        const { p } = b.vertices[i];
+      for (let i = 0; i < net.vertices.length; i++) {
+        const { p } = net.vertices[i];
         let existing = vertices.findIndex(
           (v) => v.p[0] === p[0] && v.p[1] === p[1]
         );
         if (existing === -1) {
           existing = vertices.length;
-          vertices.push({ p: [p[0], p[1]] });
+          vertices.push({ p: [p[0], p[1]] as Vector2 });
         }
         indexMap.set(i, existing);
       }
 
-      // append segments from network b, remapping vertex indices
-      for (const seg of b.segments) {
+      const segments: VectorNetworkSegment[] = [];
+      for (const seg of net.segments) {
         segments.push({
           a: indexMap.get(seg.a)!,
           b: indexMap.get(seg.b)!,
-          ta: [seg.ta[0], seg.ta[1]],
-          tb: [seg.tb[0], seg.tb[1]],
+          ta: [seg.ta[0], seg.ta[1]] as Vector2,
+          tb: [seg.tb[0], seg.tb[1]] as Vector2,
         });
       }
 
-      // de-duplicate segments by constructing a unique key for each
       const uniqueSegments: VectorNetworkSegment[] = [];
       const seen = new Set<string>();
       for (const seg of segments) {
@@ -268,6 +242,51 @@ export namespace vn {
       }
 
       return { vertices, segments: uniqueSegments };
+    }
+
+    /**
+     * Creates a new {@link VectorNetwork} by combining two networks into one.
+     *
+     * The resulting network is cleaned via {@link VectorNetworkEditor.clean}
+     * so that duplicate vertices or segments are removed. Segment orientation
+     * is respected, meaning that a segment `a -> b` is considered different
+     * from `b -> a`.
+     *
+     * @param a The base network.
+     * @param b The network to merge into {@code a}.
+     * @returns A new network containing the union of {@code a} and {@code b}.
+     */
+    static union(a: VectorNetwork, b: VectorNetwork): VectorNetwork {
+      const vertices: VectorNetworkVertex[] = [
+        ...a.vertices.map(
+          (v): VectorNetworkVertex => ({ p: [v.p[0], v.p[1]] as Vector2 })
+        ),
+        ...b.vertices.map(
+          (v): VectorNetworkVertex => ({ p: [v.p[0], v.p[1]] as Vector2 })
+        ),
+      ];
+
+      const offset = a.vertices.length;
+      const segments: VectorNetworkSegment[] = [
+        ...a.segments.map(
+          (s): VectorNetworkSegment => ({
+            a: s.a,
+            b: s.b,
+            ta: [s.ta[0], s.ta[1]] as Vector2,
+            tb: [s.tb[0], s.tb[1]] as Vector2,
+          })
+        ),
+        ...b.segments.map(
+          (s): VectorNetworkSegment => ({
+            a: s.a + offset,
+            b: s.b + offset,
+            ta: [s.ta[0], s.ta[1]] as Vector2,
+            tb: [s.tb[0], s.tb[1]] as Vector2,
+          })
+        ),
+      ];
+
+      return VectorNetworkEditor.clean({ vertices, segments });
     }
 
     private _vertices: VectorNetworkVertex[] = [];
@@ -302,6 +321,23 @@ export namespace vn {
         }
       }
       return null;
+    }
+
+    /**
+     * Cleans the current network in-place by removing duplicate vertices and
+     * segments.
+     *
+     * This is the instance counterpart to
+     * {@link VectorNetworkEditor.clean | VectorNetworkEditor.clean()} and is
+     * sometimes referred to as *simplify* or *deduplicate*.
+     *
+     * @returns The cleaned {@link VectorNetwork}.
+     */
+    clean(): VectorNetwork {
+      const cleaned = VectorNetworkEditor.clean(this.value);
+      this._vertices = cleaned.vertices;
+      this._segments = cleaned.segments;
+      return cleaned;
     }
 
     /**
