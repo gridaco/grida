@@ -1,7 +1,6 @@
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
-import { SnapToObjectsResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
-import { editor } from "@/grida-canvas";
+import { SnapResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
 import { dq } from "@/grida-canvas/query";
 
 const q = 1;
@@ -47,6 +46,11 @@ export function snapGuideTranslation(
   return { translated: v + delta };
 }
 
+type SnapObjectsResult = SnapResult<{
+  objects: cmath.Rectangle[];
+  guides: grida.program.document.Guide2D[];
+}>;
+
 /**
  * Main universal function for translating objects with optional snapping.
  *
@@ -71,7 +75,7 @@ export function snapObjectsTranslation(
   enabled = true
 ): {
   translated: { position: cmath.Vector2 }[];
-  snapping: SnapToObjectsResult | undefined;
+  snapping: SnapObjectsResult | undefined;
 } {
   agents = agents.map((r) => cmath.rect.quantize(r, q));
   const anchorObjects =
@@ -84,8 +88,11 @@ export function snapObjectsTranslation(
     q
   );
 
-  let result: SnapToObjectsResult | undefined;
-  let bounding_box_xy: cmath.Vector2;
+  let result: SnapObjectsResult | undefined;
+  let bounding_box_xy: cmath.Vector2 = [
+    _virtually_moved_rect.x,
+    _virtually_moved_rect.y,
+  ];
 
   if (enabled) {
     result = snapToCanvasGeometry(
@@ -96,10 +103,14 @@ export function snapObjectsTranslation(
         y: movement[1] === null ? false : threshold,
       }
     );
-    bounding_box_xy = [result.translated.x, result.translated.y];
+    if (result.by_objects) {
+      bounding_box_xy = [
+        result.by_objects.translated.x,
+        result.by_objects.translated.y,
+      ];
+    }
   } else {
     result = undefined;
-    bounding_box_xy = [_virtually_moved_rect.x, _virtually_moved_rect.y];
   }
 
   // return each xy point of input selection relative to the bounding box

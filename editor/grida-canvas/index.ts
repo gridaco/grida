@@ -5,7 +5,7 @@ import type {
 } from "@/grida-canvas/action";
 import type { BitmapEditorBrush, BitmapLayerEditor } from "@grida/bitmap";
 import type cg from "@grida/cg";
-import type { SnapToObjectsResult } from "@grida/cmath/_snap";
+import type { SnapResult } from "@grida/cmath/_snap";
 import type { tokens } from "@grida/tokens";
 import type { NodeProxy } from "./editor";
 import { dq } from "./query";
@@ -517,7 +517,7 @@ export namespace editor.state {
     /**
      * the latest snap result from the gesture
      */
-    surface_snapping?: SnapToObjectsResult;
+    surface_snapping?: SnapResult;
 
     /**
      * general hover state
