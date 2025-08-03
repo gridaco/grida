@@ -134,18 +134,23 @@ export function PropertyEnum<T extends string>({
   enum: enums,
   placeholder,
   value,
+  tabIndex,
   ...props
 }: Omit<React.ComponentProps<typeof Select>, "value" | "onValueChange"> & {
   enum: EnumItem<T>[];
   value?: TMixed<T>;
   placeholder?: string;
   onValueChange?: (value: T) => void;
+  tabIndex?: number;
 }) {
   const mixed = value === grida.mixed;
   const hasIcon = enums.some((e) => typeof e !== "string" && e.icon);
   return (
     <Select value={mixed ? undefined : value} {...props}>
-      <SelectTrigger className={cn(WorkbenchUI.inputVariants({ size: "xs" }))}>
+      <SelectTrigger
+        tabIndex={tabIndex}
+        className={cn(WorkbenchUI.inputVariants({ size: "xs" }))}
+      >
         <SelectValue placeholder={mixed ? "mixed" : placeholder} />
       </SelectTrigger>
       <SelectContent>
