@@ -95,19 +95,22 @@ impl Into<skia_safe::Path> for VectorNetwork {
             return path;
         }
 
-        // initial M
-        let segment_first = match segments.first() {
-            Some(seg) => seg,
-            None => return path,
-        };
-        let v_start = vertices[segment_first.a];
-        path.move_to((v_start.0, v_start.1));
+        let mut current_start: Option<usize> = None;
+        let mut previous_end: Option<usize> = None;
 
         for segment in segments {
-            let a = self.vertices[segment.a];
-            let b = self.vertices[segment.b];
+            let a_idx = segment.a;
+            let b_idx = segment.b;
+            let a = vertices[a_idx];
+            let b = vertices[b_idx];
             let ta = segment.ta.unwrap_or((0.0, 0.0));
             let tb = segment.tb.unwrap_or((0.0, 0.0));
+
+            // Start a new subpath if this segment does not connect
+            if previous_end != Some(a_idx) {
+                path.move_to((a.0, a.1));
+                current_start = Some(a_idx);
+            }
 
             if is_zero(ta) && is_zero(tb) {
                 path.line_to((b.0, b.1));
@@ -116,15 +119,16 @@ impl Into<skia_safe::Path> for VectorNetwork {
                 let c2 = [b.0 + tb.0, b.1 + tb.1];
                 path.cubic_to((c1[0], c1[1]), (c2[0], c2[1]), (b.0, b.1));
             }
-        }
 
-        // final Z (if closed)
-        if let Some(segment_last) = segments.last() {
-            if segment_last.b == segment_first.a {
+            previous_end = Some(b_idx);
+
+            if Some(b_idx) == current_start {
                 path.close();
+                previous_end = None;
+                current_start = None;
             }
         }
 
-        return path;
+        path
     }
 }
