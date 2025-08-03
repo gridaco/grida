@@ -8,6 +8,7 @@ import cmath from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/components/lib/utils";
 import { svg } from "@/grida-canvas-utils/svg";
+import { Point } from "./point";
 import assert from "assert";
 import useSurfaceVectorEditor from "@/grida-canvas-react/use-sub-vector-network-editor";
 
@@ -477,57 +478,6 @@ function VertexPoint({
     />
   );
 }
-
-const Point = React.forwardRef(
-  (
-    {
-      point,
-      className,
-      style,
-      selected,
-      hovered,
-      size = 8,
-      shape = "circle",
-      ...props
-    }: React.HtmlHTMLAttributes<HTMLDivElement> & {
-      point: cmath.Vector2;
-      selected?: boolean;
-      hovered?: boolean;
-      size?: number;
-      shape?: "circle" | "diamond";
-    },
-    ref: React.Ref<HTMLDivElement>
-  ) => {
-    return (
-      <div
-        ref={ref}
-        {...props}
-        data-selected={selected}
-        data-hovered={hovered}
-        className={cn(
-          "border border-workbench-accent-sky bg-background",
-          shape === "circle" ? "rounded-full" : undefined,
-          "data-[selected='true']:shadow-sm data-[selected='true']:bg-workbench-accent-sky data-[selected='true']:border-spacing-1.5 data-[selected='true']:border-background",
-          "data-[hovered='true']:opacity-50",
-          className
-        )}
-        style={{
-          position: "absolute",
-          left: point[0],
-          top: point[1],
-          width: size,
-          height: size,
-          cursor: "pointer",
-          touchAction: "none",
-          ...style,
-          transform: `translate(-50%, -50%)${shape === "diamond" ? " rotate(45deg)" : ""}${style?.transform ? ` ${style.transform}` : ""}`,
-        }}
-      />
-    );
-  }
-);
-
-Point.displayName = "Point";
 
 function Curve({
   a,
