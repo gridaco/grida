@@ -1,19 +1,18 @@
-import { useCurrentEditor, useEditorState } from "@/grida-canvas-react/use-editor";
+import { useCurrentEditor } from "@/grida-canvas-react/use-editor";
 import vn from "@grida/vn";
 import { useCallback, useMemo } from "react";
 
 export default function useTangentMirroring(
   node_id: string,
+  vectorNetwork: vn.VectorNetwork,
   selected_tangents: [number, 0 | 1][],
-  segments: vn.VectorNetworkSegment[],
   selected_vertices: number[]
 ) {
   const instance = useCurrentEditor();
-  const { curve_tangent_mirroring } = useEditorState(instance, (s) => ({
-    curve_tangent_mirroring: s.gesture_modifiers.curve_tangent_mirroring,
-  }));
 
-  const inferred = useMemo(() => {
+  const { segments } = vectorNetwork;
+
+  const value = useMemo(() => {
     if (selected_tangents.length === 1) {
       const [v_idx, t_idx] = selected_tangents[0];
       const seg = segments.find((s) =>
@@ -34,11 +33,6 @@ export default function useTangentMirroring(
     return "none" as vn.StrictTangentMirroringMode;
   }, [selected_tangents, selected_vertices, segments]);
 
-  const value: vn.StrictTangentMirroringMode =
-    curve_tangent_mirroring === "auto"
-      ? inferred
-      : curve_tangent_mirroring;
-
   const setValue = useCallback(
     (mode: vn.StrictTangentMirroringMode) => {
       if (mode === "none") {
@@ -51,7 +45,7 @@ export default function useTangentMirroring(
         instance.configureCurveTangentMirroringModifier(mode);
       }
     },
-    [instance, node_id, selected_tangents, selected_vertices]
+    [instance, selected_tangents, selected_vertices]
   );
 
   return {

@@ -78,4 +78,9 @@ describe("inferMirroringMode", () => {
   it("detects no mirroring", () => {
     expect(vn.inferMirroringMode([10, 0], [5, 5])).toBe("none");
   });
+  it("returns none when a tangent is zero", () => {
+    expect(vn.inferMirroringMode([0, 0], [-10, 0])).toBe("none");
+    expect(vn.inferMirroringMode([10, 0], [0, 0])).toBe("none");
+    expect(vn.inferMirroringMode([0, 0], [0, 0])).toBe("none");
+  });
 });

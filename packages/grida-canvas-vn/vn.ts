@@ -33,13 +33,21 @@ export namespace vn {
 
   /**
    * infer the mirroring mode from two tangents
+   *
    * @param ta tangent a
    * @param tb tangent b
+   *
+   * @remarks
+   * When either tangent is the zero vector, there is no meaningful direction
+   * or length to mirror, so this returns `"none"`.
    */
   export function inferMirroringMode(
     ta: Vector2,
     tb: Vector2
   ): StrictTangentMirroringMode {
+    if (cmath.vector2.isZero(ta) || cmath.vector2.isZero(tb)) {
+      return "none";
+    }
     const [ax, ay] = ta;
     const [bx, by] = tb;
     // cross product for 2D vectors

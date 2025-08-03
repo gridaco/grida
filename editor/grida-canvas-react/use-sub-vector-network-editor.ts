@@ -39,7 +39,10 @@ export default function useSurfaceVectorEditor() {
     ? [absolute.x, absolute.y]
     : [node.left!, node.top!];
 
-  const vne = useMemo(() => new vn.VectorNetworkEditor(node.vectorNetwork), [node.vectorNetwork]);
+  const vne = useMemo(
+    () => new vn.VectorNetworkEditor(node.vectorNetwork),
+    [node.vectorNetwork]
+  );
 
   const absolute_vertices = useMemo(
     () => vne.getVerticesAbsolute(offset),
@@ -131,6 +134,7 @@ export default function useSurfaceVectorEditor() {
   return useMemo(
     () => ({
       node_id,
+      vectorNetwork: node.vectorNetwork,
       path_cursor_position,
       absolute_vertices,
       absolute_tangents,
@@ -157,6 +161,7 @@ export default function useSurfaceVectorEditor() {
     [
       //
       node_id,
+      node.vectorNetwork,
       path_cursor_position,
       absolute_vertices,
       absolute_tangents,

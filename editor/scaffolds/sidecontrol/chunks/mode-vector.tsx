@@ -20,16 +20,21 @@ import useTangentMirroring from "./use-tangent-mirroring";
 import vn from "@grida/vn";
 
 export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
-  const { selected_vertices, selected_tangents, absolute_vertices, segments } =
-    useSurfaceVectorEditor();
+  const {
+    selected_vertices,
+    selected_tangents,
+    absolute_vertices,
+    segments,
+    vectorNetwork,
+  } = useSurfaceVectorEditor();
   const {
     value: mirroring,
     setValue: setMirroring,
     disabled: mirroringDisabled,
   } = useTangentMirroring(
     node_id,
+    vectorNetwork,
     selected_tangents,
-    segments,
     selected_vertices
   );
 
@@ -77,7 +82,8 @@ export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
             <Select
               value={mirroring}
               onValueChange={(v) =>
-                setMirroring(v as vn.StrictTangentMirroringMode)}
+                setMirroring(v as vn.StrictTangentMirroringMode)
+              }
               disabled={mirroringDisabled}
             >
               <SelectTrigger size="xs">
