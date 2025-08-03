@@ -14,7 +14,8 @@ import {
 } from "../provider";
 import { toast } from "sonner";
 import { cn } from "@/components/lib/utils";
-import { useCurrentEditor } from "../use-editor";
+import { useCurrentEditor, useEditorState } from "../use-editor";
+import { supportsFlatten } from "@/grida-canvas/reducers/methods/flatten";
 
 export function EditorSurfaceContextMenu({
   children,
@@ -25,11 +26,14 @@ export function EditorSurfaceContextMenu({
   const { insertText } = useDataTransferEventTarget();
   const { actions } = useCurrentSelection();
   const { debug } = useEditorFlagsState();
+  const nodes = useEditorState(editor, (s) => s.document.nodes);
 
   const has_selection = selection.length > 0;
   const can_copy = has_selection;
   const can_send_to_back = has_selection;
   const can_bring_to_front = has_selection;
+  const can_flatten =
+    has_selection && selection.every((id) => supportsFlatten(nodes[id]));
   // const can_toggle_active = has_selection;
   // const can_toggle_locked = has_selection;
   // TODO: valid ids (not locked, not active, not root)
@@ -120,6 +124,16 @@ export function EditorSurfaceContextMenu({
         >
           Auto-Layout
           <ContextMenuShortcut>{"⇧A"}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={!can_flatten}
+          onSelect={() => {
+            editor.flatten("selection");
+          }}
+          className="text-xs"
+        >
+          Flatten
+          <ContextMenuShortcut>{"⌘E"}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem

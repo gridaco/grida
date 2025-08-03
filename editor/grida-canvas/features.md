@@ -14,6 +14,7 @@ This document lists all implemented features including the ones that are not yet
 | select children         | select all children of the current node | `enter`        | `enter`        | canvas |
 | nudge                   | move selection by 1px                   | `arrow keys`   | `arrow keys`   | canvas |
 | duplicate               | duplicate the current selection         | `meta+d`       | `ctrl+d`       | canvas |
+| flatten                 | convert selection to vector paths       | `meta+e`       | `ctrl+e`       | canvas |
 | undo                    | undo the last action                    | `meta+z`       | `ctrl+z`       | canvas |
 | redo                    | redo the last undone action             | `meta+shift+z` | `ctrl+shift+z` | canvas |
 | cut                     | cut the current selection               | `meta+x`       | `ctrl+x`       | canvas |
@@ -59,6 +60,7 @@ This document lists all implemented features including the ones that are not yet
 - [x] delete (`delete, backspace`)
 - [x] duplicate (`meta+d`)
 - [x] repeating duplicate (`meta+d`)
+- [x] flatten (`meta+e`)
 - [x] undo (`meta+z`)
 - [x] redo (`meta+shift+z`)
 - [x] select all siblings (`meta+a`)

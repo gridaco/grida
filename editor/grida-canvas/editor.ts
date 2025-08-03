@@ -645,6 +645,13 @@ export class Editor
     });
   }
 
+  public flatten(target: "selection" | editor.NodeID) {
+    this.dispatch({
+      type: "flatten",
+      target,
+    });
+  }
+
   public setClipboardColor(color: cg.RGBA8888) {
     this.dispatch({
       type: "clip/color",

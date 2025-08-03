@@ -1733,6 +1733,7 @@ export namespace editor.api {
     copy(target: "selection" | NodeID): void;
     paste(): void;
     duplicate(target: "selection" | NodeID): void;
+    flatten(target: "selection" | NodeID): void;
 
     setClipboardColor(color: cg.RGBA8888): void;
 

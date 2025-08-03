@@ -46,6 +46,7 @@ import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/node-type-icon";
 import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
+import { supportsFlatten } from "@/grida-canvas/reducers/methods/flatten";
 
 function SceneItemContextMenuWrapper({
   scene_id,
@@ -202,6 +203,8 @@ function NodeHierarchyItemContextMenuWrapper({
   onStartRenaming?: () => void;
 }>) {
   const editor = useCurrentEditor();
+  const node = useEditorState(editor, (s) => s.document.nodes[node_id]);
+  const canFlatten = supportsFlatten(node);
 
   return (
     <ContextMenu>
@@ -223,6 +226,14 @@ function NodeHierarchyItemContextMenuWrapper({
           className="text-xs"
         >
           Rename
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={!canFlatten}
+          onSelect={() => editor.flatten(node_id)}
+          className="text-xs"
+        >
+          Flatten
+          <ContextMenuShortcut>{"⌘E"}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuSeparator />
         {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}

@@ -11,10 +11,10 @@ import {
   self_clearSelection,
   self_selectNode,
   encodeTranslateVectorCommand,
+  self_flattenNode,
 } from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
-import vn from "@grida/vn";
 import equal from "fast-deep-equal";
 
 function createLayoutSnapshot(
@@ -136,49 +136,8 @@ function __self_try_enter_content_edit_mode_auto(
     case "polygon":
     case "ellipse":
     case "line": {
-      // 1. convert the primitive to path
-
-      const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
-
-      // keep a copy of the original primitive node for possible revert
-
-      const v = toVectorNetwork(node, {
-        width: rect.width,
-        height: rect.height,
-      });
-
-      if (!v) return;
-
-      const vne = new vn.VectorNetworkEditor(v);
-      const bb_b = vne.getBBox();
-
-      const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
-      vne.translate(cmath.vector2.invert(delta));
-
-      const vectorNetwork = vne.value;
-
-      // convert the shape to vector network
-      const vectornode: grida.program.nodes.VectorNode = {
-        ...(node as grida.program.nodes.UnknwonNode),
-        type: "vector",
-        id: node.id,
-        active: node.active,
-        cornerRadius: modeCornerRadius(node),
-        fillRule:
-          (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
-        vectorNetwork: vectorNetwork,
-
-        // re-map the transform (since star / polygon nodes size were not actual path bbox)
-        width: bb_b.width,
-        height: bb_b.height,
-        left: node.left! + delta[0],
-        top: node.top! + delta[1],
-      } as grida.program.nodes.VectorNode;
-
-      // replace the node with the path node
-      draft.document.nodes[node_id] = vectornode;
-
-      // 2. enter path edit mode
+      const vectornode = self_flattenNode(draft, node_id, context);
+      if (!vectornode) return;
       draft.content_edit_mode = {
         type: "vector",
         node_id: node_id,
@@ -187,7 +146,7 @@ function __self_try_enter_content_edit_mode_auto(
         selected_tangents: [],
         a_point: null,
         next_ta: null,
-        initial_vector_network: vectorNetwork,
+        initial_vector_network: vectornode.vectorNetwork,
         original: nodeSnapshot,
         neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
@@ -214,74 +173,6 @@ function __self_try_enter_content_edit_mode_auto(
   }
 }
 
-/**
- * maps the rectangular corner radius or corner radius into singular corner radius
- * @param node
- */
-function modeCornerRadius(node: grida.program.nodes.Node): number | undefined {
-  if ("cornerRadius" in node) {
-    return node.cornerRadius;
-  }
-
-  if ("cornerRadiusTopLeft" in node) {
-    const values: number[] = [
-      node.cornerRadiusTopLeft,
-      node.cornerRadiusTopRight,
-      node.cornerRadiusBottomLeft,
-      node.cornerRadiusBottomRight,
-    ].filter((it) => it !== undefined);
-
-    return cmath.mode(values);
-  }
-}
-
-function toVectorNetwork(
-  node: grida.program.nodes.Node,
-  size: { width: number; height: number }
-): vn.VectorNetwork | null {
-  switch (node.type) {
-    case "rectangle": {
-      return vn.fromRect({
-        x: 0,
-        y: 0,
-        width: size.width,
-        height: size.height,
-      });
-    }
-    case "ellipse": {
-      // TODO: check if ellipse is arc, if so, rely on wasm backend.
-      return vn.fromEllipse({
-        x: 0,
-        y: 0,
-        width: size.width,
-        height: size.height,
-      });
-    }
-    case "polygon": {
-      return vn.fromRegularPolygon({
-        x: 0,
-        y: 0,
-        width: size.width,
-        height: size.height,
-        points: node.pointCount ?? 3,
-      });
-    }
-    case "star": {
-      return vn.fromRegularStarPolygon({
-        x: 0,
-        y: 0,
-        width: size.width,
-        height: size.height,
-        points: node.pointCount ?? 5,
-        innerRadius: node.innerRadius ?? 0.5,
-      });
-    }
-    default: {
-      return null;
-    }
-  }
-  //
-}
 
 /**
  * For vector edit mode, if no edits were performed, the node is restored to the

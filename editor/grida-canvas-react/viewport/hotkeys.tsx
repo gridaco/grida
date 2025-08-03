@@ -33,6 +33,11 @@ export const keybindings_sheet = [
     keys: ["meta+d"],
   },
   {
+    name: "flatten",
+    description: "Flatten the current selection",
+    keys: ["meta+e"],
+  },
+  {
     name: "undo",
     description: "Undo the last action",
     keys: ["meta+z"],
@@ -646,6 +651,16 @@ export function useEditorHotKeys() {
     "meta+d, ctrl+d",
     () => {
       editor.duplicate("selection");
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys(
+    "meta+e, ctrl+e",
+    () => {
+      editor.flatten("selection");
     },
     {
       preventDefault: true,

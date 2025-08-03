@@ -25,6 +25,7 @@ import {
   reduceVectorContentSelection,
   getUXNeighbouringVertices,
   encodeTranslateVectorCommand,
+  self_flattenNode,
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
@@ -173,6 +174,15 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         self_duplicateNode(draft, new Set(target_node_ids), context);
       });
       break;
+    }
+    case "flatten": {
+      const { target } = action;
+      const target_node_ids =
+        target === "selection" ? state.selection : [target];
+
+      return produce(state, (draft) => {
+        __self_flatten_nodes(draft, target_node_ids, context);
+      });
     }
     case "delete": {
       const { target } = action;
@@ -1198,6 +1208,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
   }
 
   return state;
+}
+
+function __self_flatten_nodes<S extends editor.state.IEditorState>(
+  draft: Draft<S>,
+  target_node_ids: string[],
+  context: ReducerContext
+) {
+  for (const node_id of target_node_ids) {
+    self_flattenNode(draft, node_id, context);
+  }
 }
 
 function __self_delete_nodes<S extends editor.state.IEditorState>(

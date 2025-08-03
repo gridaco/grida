@@ -29,6 +29,7 @@ export type DocumentAction =
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
+  | EditorFlattenAction
   | EditorA11yDeleteAction
   | EditorHierarchyAction
   | EditorVectorEditorAction
@@ -244,6 +245,11 @@ export interface EditorDuplicateAction {
 
 export interface EditorDeleteAction {
   type: "delete";
+  target: NodeID | "selection";
+}
+
+export interface EditorFlattenAction {
+  type: "flatten";
   target: NodeID | "selection";
 }
 
