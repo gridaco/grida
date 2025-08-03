@@ -35,6 +35,7 @@ import { self_moveNode } from "./methods/move";
 import { v4 } from "uuid";
 import type { ReducerContext } from ".";
 import "core-js/features/object/group-by";
+import cg from "@grida/cg";
 
 /**
  * the padding applied to the anchors (siblings) for dynamic next placement
@@ -185,7 +186,29 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "a11y/delete": {
       const target_node_ids = state.selection;
 
-      // TODO: add fill/gradient stop deletion
+      if (state.content_edit_mode?.type === "fill/gradient") {
+        const { node_id } = state.content_edit_mode;
+
+        return produce(state, (draft) => {
+          const mode =
+            draft.content_edit_mode as editor.state.FillGradientContentEditMode;
+          const node = dq.__getNodeById(draft, node_id)!;
+          if (
+            node &&
+            "fill" in node &&
+            cg.isGradientPaint(node.fill as cg.Paint)
+          ) {
+            const fill = node.fill as cg.GradientPaint;
+            if (fill.stops.length > 2) {
+              fill.stops.splice(mode.selected_stop, 1);
+              mode.selected_stop = Math.min(
+                mode.selected_stop,
+                fill.stops.length - 1
+              );
+            }
+          }
+        });
+      }
 
       if (state.content_edit_mode?.type === "vector") {
         return produce(state, (draft) => {
@@ -366,7 +389,35 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "a11y/right":
     case "a11y/down":
     case "a11y/left": {
-      const { type: direction, target, shiftKey } = action;
+      const { target, shiftKey } = action;
+      const direction = action.type as
+        | "a11y/up"
+        | "a11y/right"
+        | "a11y/down"
+        | "a11y/left";
+
+      const direction_1d =
+        direction === "a11y/right" || direction === "a11y/down" ? 1 : -1;
+
+      if (state.content_edit_mode?.type === "fill/gradient") {
+        const { node_id, selected_stop } = state.content_edit_mode;
+        return produce(state, (draft) => {
+          const node = dq.__getNodeById(draft, node_id);
+          const fill: cg.GradientPaint | undefined =
+            "fill" in node && cg.isGradientPaint(node?.fill as cg.Paint)
+              ? (node.fill as cg.GradientPaint)
+              : undefined;
+          const mod = shiftKey ? 0.1 : 0.01;
+
+          if (!fill) return;
+
+          const stop = fill.stops[selected_stop];
+          stop.offset = Math.min(
+            1,
+            Math.max(0, stop.offset + direction_1d * mod)
+          );
+        });
+      }
 
       const nudge_mod = shiftKey ? 10 : 1;
 

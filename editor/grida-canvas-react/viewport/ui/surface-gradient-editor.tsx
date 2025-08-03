@@ -188,35 +188,6 @@ function EditorUser({
     [stops, points, gradient.type, gradientType, onValueChange]
   );
 
-  const handleDeleteStop = useCallback(
-    (index: number) => {
-      if (stops.length <= 2) return; // Don't allow deleting if only 2 stops remain
-
-      const newStops = stops.filter((_, i) => i !== index);
-      setStops(newStops);
-
-      // Adjust focused stop
-      if (selected_stop === index) {
-        setFocusedStop(null);
-      } else if (selected_stop !== null && selected_stop > index) {
-        setFocusedStop(selected_stop - 1);
-      }
-
-      // Convert points to transform
-      const transform = getTransformFromPoints(
-        { A: points[0], B: points[1], C: points[2] },
-        gradientType
-      );
-
-      onValueChange?.({
-        type: `${gradientType}_gradient` as cg.GradientPaint["type"],
-        stops: newStops,
-        transform,
-      });
-    },
-    [stops, selected_stop, points, gradient.type, gradientType, onValueChange]
-  );
-
   return (
     <GradientControlPointsEditor
       stops={stops}
@@ -228,7 +199,6 @@ function EditorUser({
       onPointsChange={handlePointsChange}
       onPositionChange={handlePositionChange}
       onInsertStop={handleInsertStop}
-      onDeleteStop={handleDeleteStop}
       onFocusedStopChange={setFocusedStop}
     />
   );

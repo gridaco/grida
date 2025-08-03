@@ -176,7 +176,6 @@ function GradientEditorContent() {
             onPointsChange={handlePointsChange}
             onPositionChange={handlePositionChange}
             onInsertStop={handleInsertStop}
-            onDeleteStop={handleDeleteStop}
             onFocusedStopChange={handleFocusedStopChange}
           />
           <div
