@@ -125,6 +125,11 @@ export namespace editor.config {
   export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
 
   /**
+   * The camera movement to be multiplied when panning with keyboard input.
+   */
+  export const DEFAULT_CAMERA_KEYBOARD_MOVEMENT = 50;
+
+  /**
    * The base snap threshold (in px) used during a real pointer movement (drag gesture).
    *
    * In practice, the final threshold often scales inversely with the current zoom level:

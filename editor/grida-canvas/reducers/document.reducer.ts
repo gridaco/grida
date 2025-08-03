@@ -399,118 +399,145 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const direction_1d =
         direction === "a11y/right" || direction === "a11y/down" ? 1 : -1;
 
-      if (state.content_edit_mode?.type === "fill/gradient") {
-        const { node_id, selected_stop } = state.content_edit_mode;
-        return produce(state, (draft) => {
-          const node = dq.__getNodeById(draft, node_id);
-          const fill: cg.GradientPaint | undefined =
-            "fill" in node && cg.isGradientPaint(node?.fill as cg.Paint)
-              ? (node.fill as cg.GradientPaint)
-              : undefined;
-          const mod = shiftKey ? 0.1 : 0.01;
-
-          if (!fill) return;
-
-          const stop = fill.stops[selected_stop];
-          stop.offset = Math.min(
-            1,
-            Math.max(0, stop.offset + direction_1d * mod)
-          );
-        });
-      }
-
       const nudge_mod = shiftKey ? 10 : 1;
 
       const target_node_ids =
         target === "selection" ? state.selection : [target];
 
-      if (state.content_edit_mode?.type === "vector") {
-        const delta_vec: cmath.Vector2 = [
-          nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0],
-          nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1],
-        ];
+      // handle a11y for content edit mode
+      if (state.content_edit_mode) {
+        switch (state.content_edit_mode.type) {
+          case "fill/gradient": {
+            const { node_id, selected_stop } = state.content_edit_mode;
+            return produce(state, (draft) => {
+              const node = dq.__getNodeById(draft, node_id);
+              const fill: cg.GradientPaint | undefined =
+                "fill" in node && cg.isGradientPaint(node?.fill as cg.Paint)
+                  ? (node.fill as cg.GradientPaint)
+                  : undefined;
+              const mod = shiftKey ? 0.1 : 0.01;
+
+              if (!fill) return;
+
+              const stop = fill.stops[selected_stop];
+              stop.offset = Math.min(
+                1,
+                Math.max(0, stop.offset + direction_1d * mod)
+              );
+            });
+            break;
+          }
+          case "vector": {
+            const delta_vec: cmath.Vector2 = [
+              nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0],
+              nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1],
+            ];
+            return produce(state, (draft) => {
+              const {
+                node_id,
+                selected_vertices,
+                selected_segments,
+                selected_tangents,
+              } = draft.content_edit_mode as editor.state.VectorContentEditMode;
+
+              const node = dq.__getNodeById(
+                draft,
+                node_id
+              ) as grida.program.nodes.VectorNode;
+
+              const { vertices, tangents } = encodeTranslateVectorCommand(
+                node.vectorNetwork,
+                {
+                  selected_vertices,
+                  selected_segments,
+                  selected_tangents,
+                }
+              );
+
+              self_updateVectorNodeVectorNetwork(node, (vne) => {
+                for (const v of vertices) {
+                  vne.translateVertex(v, delta_vec);
+                }
+                for (const [vi, ti] of tangents) {
+                  const point = ti === 0 ? "a" : "b";
+                  const control = ti === 0 ? "ta" : "tb";
+                  for (const si of vne.findSegments(vi, point)) {
+                    const next = cmath.vector2.add(
+                      vne.segments[si][control],
+                      delta_vec
+                    );
+                    vne.updateTangent(si, control, next, "none");
+                  }
+                }
+              });
+            });
+            break;
+          }
+        }
+      }
+      // if movement target exists, nudge the nodes
+      else if (target_node_ids.length > 0) {
+        const nodes = target_node_ids.map((node_id) =>
+          dq.__getNodeById(state, node_id)
+        );
+
+        const in_flow_node_ids = nodes
+          .filter((node) => {
+            if ("position" in node) {
+              return (
+                node.position === "relative" &&
+                node.top === undefined &&
+                node.right === undefined &&
+                node.bottom === undefined &&
+                node.left === undefined
+              );
+            }
+          })
+          .map((node) => node.id);
+
+        const out_flow_node_ids = nodes
+          .filter((node) => {
+            return !in_flow_node_ids.includes(node.id);
+          })
+          .map((node) => node.id);
+
         return produce(state, (draft) => {
-          const {
-            node_id,
-            selected_vertices,
-            selected_segments,
-            selected_tangents,
-          } = draft.content_edit_mode as editor.state.VectorContentEditMode;
+          for (const node_id of in_flow_node_ids) {
+            __self_order(
+              draft,
+              node_id,
+              editor.a11y.a11y_direction_to_order[direction]
+            );
+          }
 
-          const node = dq.__getNodeById(
-            draft,
-            node_id
-          ) as grida.program.nodes.VectorNode;
+          if (out_flow_node_ids.length > 0) {
+            const nudge_dx =
+              nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0];
+            const nudge_dy =
+              nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1];
+            __self_nudge(draft, out_flow_node_ids, nudge_dx, nudge_dy, context);
+          }
+        });
+      }
+      // delta transform the camera (pan)
+      else {
+        return produce(state, (draft) => {
+          const [scaleX, scaleY] = cmath.transform.getScale(draft.transform);
+          const delta: cmath.Vector2 = [
+            -nudge_mod *
+              editor.config.DEFAULT_CAMERA_KEYBOARD_MOVEMENT *
+              editor.a11y.a11y_direction_to_vector[direction][0] *
+              scaleX,
+            -nudge_mod *
+              editor.config.DEFAULT_CAMERA_KEYBOARD_MOVEMENT *
+              editor.a11y.a11y_direction_to_vector[direction][1] *
+              scaleY,
+          ];
 
-          const { vertices, tangents } = encodeTranslateVectorCommand(
-            node.vectorNetwork,
-            {
-              selected_vertices,
-              selected_segments,
-              selected_tangents,
-            }
-          );
-
-          self_updateVectorNodeVectorNetwork(node, (vne) => {
-            for (const v of vertices) {
-              vne.translateVertex(v, delta_vec);
-            }
-            for (const [vi, ti] of tangents) {
-              const point = ti === 0 ? "a" : "b";
-              const control = ti === 0 ? "ta" : "tb";
-              for (const si of vne.findSegments(vi, point)) {
-                const next = cmath.vector2.add(
-                  vne.segments[si][control],
-                  delta_vec
-                );
-                vne.updateTangent(si, control, next, "none");
-              }
-            }
-          });
+          draft.transform = cmath.transform.translate(draft.transform, delta);
         });
       }
 
-      const nodes = target_node_ids.map((node_id) =>
-        dq.__getNodeById(state, node_id)
-      );
-
-      const in_flow_node_ids = nodes
-        .filter((node) => {
-          if ("position" in node) {
-            return (
-              node.position === "relative" &&
-              node.top === undefined &&
-              node.right === undefined &&
-              node.bottom === undefined &&
-              node.left === undefined
-            );
-          }
-        })
-        .map((node) => node.id);
-
-      const out_flow_node_ids = nodes
-        .filter((node) => {
-          return !in_flow_node_ids.includes(node.id);
-        })
-        .map((node) => node.id);
-
-      return produce(state, (draft) => {
-        for (const node_id of in_flow_node_ids) {
-          __self_order(
-            draft,
-            node_id,
-            editor.a11y.a11y_direction_to_order[direction]
-          );
-        }
-
-        if (out_flow_node_ids.length > 0) {
-          const nudge_dx =
-            nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0];
-          const nudge_dy =
-            nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1];
-          __self_nudge(draft, out_flow_node_ids, nudge_dx, nudge_dy, context);
-        }
-      });
       //
       //
       break;
