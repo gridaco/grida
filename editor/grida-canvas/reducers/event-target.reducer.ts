@@ -275,18 +275,15 @@ function __self_evt_on_pointer_down(
           draft.content_edit_mode.selected_vertices = [hovered_point];
           draft.content_edit_mode.selected_segments = [];
           draft.content_edit_mode.selected_tangents = [];
-          draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
-            node.vectorNetwork,
-            {
+          draft.content_edit_mode.neighbouring_vertices =
+            getUXNeighbouringVertices(node.vectorNetwork, {
               selected_vertices: [hovered_point],
               selected_segments: [],
               selected_tangents: [],
-            }
-          );
+            });
           draft.content_edit_mode.a_point = hovered_point;
-          draft.content_edit_mode.next_ta = vne.getNextMirroredTangent(
-            hovered_point
-          );
+          draft.content_edit_mode.next_ta =
+            vne.getNextMirroredTangent(hovered_point);
           break;
         }
 
@@ -295,10 +292,12 @@ function __self_evt_on_pointer_down(
             ? node.vectorNetwork.vertices[hovered_point].p
             : // relative position (absolute -> local)
               (() => {
-                const rect = context.geometry.getNodeAbsoluteBoundingRect(
-                  node_id
-                )!;
-                return cmath.vector2.sub(path_cursor_position, [rect.x, rect.y]);
+                const rect =
+                  context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+                return cmath.vector2.sub(path_cursor_position, [
+                  rect.x,
+                  rect.y,
+                ]);
               })();
 
         const new_vertex_idx = vne.addVertex(
@@ -1001,10 +1000,8 @@ function __self_evt_on_drag(
         const { movement: _movement } = draft.gesture;
 
         assert(draft.gesture.type === "translate-vector-controls");
-        const {
-          tarnslate_with_axis_lock,
-          translate_with_force_disable_snap,
-        } = draft.gesture_modifiers;
+        const { tarnslate_with_axis_lock, translate_with_force_disable_snap } =
+          draft.gesture_modifiers;
         const should_snap = translate_with_force_disable_snap !== "on";
         const adj_movement =
           tarnslate_with_axis_lock === "on"
@@ -1438,6 +1435,19 @@ function __self_start_gesture_translate(
   };
 }
 
+function __before_end_translate_vector_controls(
+  draft: Draft<editor.state.IEditorState>
+) {
+  if (draft.content_edit_mode?.type !== "vector") return;
+  const { node_id } = draft.content_edit_mode;
+  const node = dq.__getNodeById(
+    draft,
+    node_id
+  ) as grida.program.nodes.VectorNode;
+  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+  node.vectorNetwork = vne.clean();
+}
+
 function __self_maybe_end_gesture(draft: Draft<editor.state.IEditorState>) {
   switch (draft.gesture.type) {
     case "brush": {
@@ -1450,6 +1460,10 @@ function __self_maybe_end_gesture(draft: Draft<editor.state.IEditorState>) {
         self_selectNode(draft, "reset", ...draft.gesture.selection);
       }
       draft.surface_measurement_targeting_locked = false;
+      break;
+    }
+    case "translate-vector-controls": {
+      __before_end_translate_vector_controls(draft);
       break;
     }
     case "sort": {

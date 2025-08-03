@@ -64,9 +64,6 @@ export function snapMovement(
   const anchor_objects: cmath.Rectangle[] | undefined = anchors.objects
     ? anchors.objects.map((r) => cmath.rect.quantize(r, q))
     : undefined;
-  const anchor_points: cmath.Vector2[] | undefined = anchors.points
-    ? anchors.points.map((p) => cmath.vector2.quantize(p, q))
-    : undefined;
 
   const normalized = cmath.ext.movement.normalize(movement);
 
@@ -86,7 +83,7 @@ export function snapMovement(
       {
         objects: anchor_objects,
         guides: anchors.guides,
-        points: anchor_points,
+        points: anchors.points,
       },
       {
         x: movement[0] === null ? false : threshold,
