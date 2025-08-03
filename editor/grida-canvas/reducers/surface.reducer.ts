@@ -136,8 +136,9 @@ function __self_try_enter_content_edit_mode_auto(
     case "polygon":
     case "ellipse":
     case "line": {
-      const vectornode = self_flattenNode(draft, node_id, context);
-      if (!vectornode) return;
+      const flattened = self_flattenNode(draft, node_id, context);
+      if (!flattened) return;
+      const { node: vectornode } = flattened;
       draft.content_edit_mode = {
         type: "vector",
         node_id: node_id,

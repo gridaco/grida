@@ -5,6 +5,7 @@ import type { ReducerContext } from "..";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
+import { normalizeVectorNodeBBox } from "./vector";
 
 /**
  * Node types that can be flattened into vector paths.
@@ -22,15 +23,16 @@ export function supportsFlatten(node: grida.program.nodes.Node): boolean {
 }
 
 /**
- * Converts a primitive shape node into a vector node in-place.
- * Returns the newly created vector node or `null` if the node
- * type is not supported for flattening.
+ * Converts a primitive shape node into a vector node in-place and normalizes
+ * it to its real bounding box.
+ *
+ * @returns The vector node and the offset applied to align the network.
  */
 export function self_flattenNode<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   node_id: string,
   context: ReducerContext
-): grida.program.nodes.VectorNode | null {
+): { node: grida.program.nodes.VectorNode; delta: cmath.Vector2 } | null {
   const node = dq.__getNodeById(draft, node_id);
   if (!node || !supportsFlatten(node)) {
     return null;
@@ -39,17 +41,8 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
   const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id);
   if (!rect) return null;
 
-  const v = toVectorNetwork(node, {
-    width: rect.width,
-    height: rect.height,
-  });
+  const v = toVectorNetwork(node, { width: rect.width, height: rect.height });
   if (!v) return null;
-
-  const vne = new vn.VectorNetworkEditor(v);
-  const bb_b = vne.getBBox();
-  const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
-  vne.translate(cmath.vector2.invert(delta));
-  const vectorNetwork = vne.value;
 
   const vectornode: grida.program.nodes.VectorNode = {
     ...(node as grida.program.nodes.UnknwonNode),
@@ -58,15 +51,17 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
     active: node.active,
     cornerRadius: modeCornerRadius(node),
     fillRule: (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
-    vectorNetwork,
-    width: bb_b.width,
-    height: bb_b.height,
-    left: (node as any).left! + delta[0],
-    top: (node as any).top! + delta[1],
+    vectorNetwork: v,
+    width: rect.width,
+    height: rect.height,
+    left: (node as any).left!,
+    top: (node as any).top!,
   } as grida.program.nodes.VectorNode;
 
+  const delta = normalizeVectorNodeBBox(vectornode);
+
   draft.document.nodes[node_id] = vectornode;
-  return vectornode;
+  return { node: vectornode, delta };
 }
 
 function modeCornerRadius(node: grida.program.nodes.Node): number | undefined {

@@ -134,6 +134,34 @@ export function self_updateVectorNodeVectorNetwork<R>(
   return result;
 }
 
+/**
+ * Normalizes a vector node so that its vector network starts at the origin
+ * (0,0) and the node's position reflects the network's real bounding box.
+ *
+ * The network is translated by the negative offset of its bounding box and the
+ * node's `left` and `top` are increased by the same amount. The node's size is
+ * updated to match the bounding box dimensions.
+ *
+ * @param node - Vector node to normalize.
+ * @returns The translation delta applied to the node `[dx, dy]`.
+ */
+export function normalizeVectorNodeBBox(
+  node: grida.program.nodes.VectorNode
+): cmath.Vector2 {
+  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+  const bb = vne.getBBox();
+  const delta: cmath.Vector2 = [bb.x, bb.y];
+  vne.translate(cmath.vector2.invert(delta));
+
+  node.left = (node.left ?? 0) + delta[0];
+  node.top = (node.top ?? 0) + delta[1];
+  node.width = bb.width;
+  node.height = bb.height;
+  node.vectorNetwork = vne.value;
+
+  return delta;
+}
+
 export function self_updateVectorAreaSelection<
   S extends editor.state.IEditorState,
 >(

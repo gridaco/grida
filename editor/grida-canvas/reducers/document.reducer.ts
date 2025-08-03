@@ -21,12 +21,14 @@ import {
   self_try_remove_node,
   self_duplicateNode,
   self_insertSubDocument,
+  self_try_insert_node,
   self_selectNode,
   self_updateVectorNodeVectorNetwork,
   reduceVectorContentSelection,
   getUXNeighbouringVertices,
   encodeTranslateVectorCommand,
   self_flattenNode,
+  normalizeVectorNodeBBox,
   supportsFlatten,
 } from "./methods";
 import cmath from "@grida/cmath";
@@ -38,6 +40,7 @@ import { self_moveNode } from "./methods/move";
 import { v4 } from "uuid";
 import type { ReducerContext } from ".";
 import cg from "@grida/cg";
+import vn from "@grida/vn";
 import "core-js/features/object/group-by";
 
 /**
@@ -195,8 +198,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return produce(state, (draft) => {
         const flattened = flatten_with_union(draft, flattenable, context);
-        // TODO: once vector network merging is ready, flatten_with_union should return
-        // a single id representing the merged vector node.
         draft.selection = [...flattened, ...ignored];
       });
     }
@@ -1240,20 +1241,103 @@ export default function documentReducer<S extends editor.state.IEditorState>(
   return state;
 }
 
+/**
+ * Flattens nodes into unioned vector nodes grouped by their parent hierarchy.
+ * Each group of sibling nodes is merged into a single vector node, inserted at
+ * the earliest sibling order, and the originals are removed. The resulting
+ * nodes are positioned relative to their parent using the shapes' real bounding
+ * boxes so visuals remain unchanged.
+ *
+ * @returns ids of newly created vector nodes.
+ */
 function flatten_with_union<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   supported_node_ids: string[],
   context: ReducerContext
 ): string[] {
-  // TODO: merge vector networks of supported nodes to create a single VectorNode.
-  const flattened: string[] = [];
-  for (const node_id of supported_node_ids) {
-    const v = self_flattenNode(draft, node_id, context);
-    if (v) {
-      flattened.push(v.id);
-    }
+  if (supported_node_ids.length === 0) return [];
+
+  const groups = Object.groupBy(
+    supported_node_ids,
+    (id) => dq.getParentId(draft.document_ctx, id) ?? "<root>"
+  );
+
+  const ids: string[] = [];
+
+  Object.entries(groups).forEach(([parent, group]) => {
+    if (!group) return;
+    const inserted = __flatten_group_with_union(
+      draft,
+      group,
+      parent === "<root>" ? null : parent,
+      context
+    );
+    if (inserted) ids.push(inserted);
+  });
+
+  return ids;
+}
+
+function __flatten_group_with_union<S extends editor.state.IEditorState>(
+  draft: Draft<S>,
+  group: string[],
+  parent_id: string | null,
+  context: ReducerContext
+): string | null {
+  if (group.length === 0) return null;
+
+  const scene = draft.document.scenes[draft.scene_id!];
+  const siblings = parent_id
+    ? draft.document_ctx.__ctx_nid_to_children_ids[parent_id] || []
+    : scene.children;
+  const order = Math.min(
+    ...group.map((id) => siblings.indexOf(id)).filter((i) => i >= 0)
+  );
+
+  const parent_rect = parent_id
+    ? context.geometry.getNodeAbsoluteBoundingRect(parent_id)!
+    : { x: 0, y: 0, width: 0, height: 0 };
+
+  let union_net: vn.VectorNetwork | null = null;
+  for (const node_id of group) {
+    const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id);
+    const flattened = self_flattenNode(draft, node_id, context);
+    if (!rect || !flattened) continue;
+    const { node: v, delta } = flattened;
+    const abs_pos: cmath.Vector2 = [rect.x + delta[0], rect.y + delta[1]];
+    const vne = new vn.VectorNetworkEditor(v.vectorNetwork);
+    vne.translate(abs_pos);
+    union_net = union_net
+      ? vn.VectorNetworkEditor.union(union_net, vne.value)
+      : vne.value;
   }
-  return flattened;
+
+  if (!union_net) return null;
+
+  const base = dq.__getNodeById(
+    draft,
+    group[0]
+  ) as grida.program.nodes.VectorNode;
+  const id = nid();
+  const node: grida.program.nodes.VectorNode = {
+    ...base,
+    id,
+    vectorNetwork: union_net,
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+  };
+
+  normalizeVectorNodeBBox(node);
+  node.left! -= parent_rect.x;
+  node.top! -= parent_rect.y;
+
+  self_try_insert_node(draft, parent_id, node);
+  __self_delete_nodes(draft, group);
+  self_moveNode(draft, id, parent_id ?? "<root>", order);
+
+  return id;
 }
 
 function __self_delete_nodes<S extends editor.state.IEditorState>(
