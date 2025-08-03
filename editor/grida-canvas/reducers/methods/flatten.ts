@@ -17,12 +17,8 @@ export const FLATTENABLE_NODE_TYPES = new Set<grida.program.nodes.NodeType>([
   "line",
 ]);
 
-export function supportsFlatten(
-  node: grida.program.nodes.Node
-): boolean {
-  return FLATTENABLE_NODE_TYPES.has(
-    node.type as grida.program.nodes.NodeType
-  );
+export function supportsFlatten(node: grida.program.nodes.Node): boolean {
+  return FLATTENABLE_NODE_TYPES.has(node.type as grida.program.nodes.NodeType);
 }
 
 /**
@@ -61,8 +57,7 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
     id: node.id,
     active: node.active,
     cornerRadius: modeCornerRadius(node),
-    fillRule:
-      (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
+    fillRule: (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
     vectorNetwork,
     width: bb_b.width,
     height: bb_b.height,
@@ -133,12 +128,12 @@ function toVectorNetwork(
       });
     }
     case "line": {
-      return vn.fromLine({
-        x1: 0,
-        y1: 0,
-        x2: size.width,
-        y2: size.height,
-      });
+      // return vn.fromLine({
+      //   x1: 0,
+      //   y1: 0,
+      //   x2: size.width,
+      //   y2: size.height,
+      // });
     }
     default: {
       return null;
