@@ -239,3 +239,22 @@ export function self_updateVectorAreaSelection<
         ? selected_tangents[0][0]
         : null;
 }
+
+/**
+ * Optimizes the vector network of the currently edited vector node, merging
+ * duplicated vertices and segments and optionally removing unused vertices.
+ */
+export function self_optimizeVectorNetwork(
+  draft: Draft<editor.state.IEditorState>
+) {
+  if (draft.content_edit_mode?.type !== "vector") return;
+  const { node_id } = draft.content_edit_mode;
+  const node = dq.__getNodeById(
+    draft,
+    node_id
+  ) as grida.program.nodes.VectorNode;
+  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+  node.vectorNetwork = vne.optimize(
+    editor.config.DEFAULT_VECTOR_OPTIMIZATION_CONFIG
+  );
+}

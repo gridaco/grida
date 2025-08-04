@@ -158,6 +158,14 @@ export namespace editor.config {
   export const DEFAULT_VECTOR_GEOMETRY_VERTEX_TOLERANCE = 0.5;
 
   /**
+   * Default optimization configuration for vector networks.
+   */
+  export const DEFAULT_VECTOR_OPTIMIZATION_CONFIG: vn.OptimizationConfig = {
+    vertex_tolerance: DEFAULT_VECTOR_GEOMETRY_VERTEX_TOLERANCE,
+    remove_unused_verticies: true,
+  };
+
+  /**
    * default quantization step for rotation gestures (in degrees)
    */
   export const DEFAULT_ROTATION_QUANTIZE_STEP = 1;
@@ -1341,7 +1349,6 @@ export namespace editor.a11y {
     "a11y/down": [0, 1],
     "a11y/left": [-1, 0],
   } as const;
-
 }
 
 export namespace editor.api {

@@ -25,6 +25,7 @@ import {
   self_selectNode,
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
+  self_optimizeVectorNetwork,
 } from "./methods";
 import {
   self_updateVectorAreaSelection,
@@ -70,10 +71,8 @@ function __self_evt_on_pointer_move(
 
   if (draft.content_edit_mode?.type === "vector") {
     const { a_point, node_id } = draft.content_edit_mode;
-    const {
-      tarnslate_with_axis_lock,
-      translate_with_force_disable_snap,
-    } = draft.gesture_modifiers;
+    const { tarnslate_with_axis_lock, translate_with_force_disable_snap } =
+      draft.gesture_modifiers;
 
     let logical_pos = canvas_space_pointer_position;
 
@@ -1479,26 +1478,16 @@ function __self_start_gesture_translate(
 }
 
 /**
- * Cleans up the vector network before a translate-vector-controls gesture ends.
+ * Optimizes the vector network before a translate-vector-controls gesture ends.
  *
- * This merges duplicated vertices/segments by running `vne.clean()` on the
+ * This merges duplicated vertices/segments by running `vne.optimize()` on the
  * vector network of the node being edited, ensuring the network stays
  * normalized after user interaction.
  */
 function __before_end_translate_vector_controls(
   draft: Draft<editor.state.IEditorState>
 ) {
-  if (draft.content_edit_mode?.type !== "vector") return;
-  const { node_id } = draft.content_edit_mode;
-  const node = dq.__getNodeById(
-    draft,
-    node_id
-  ) as grida.program.nodes.VectorNode;
-  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-  node.vectorNetwork = vne.clean({
-    // uses 0.5 for merging the snapped vertices - will be removed for better accuracy
-    vertex_tolerance: editor.config.DEFAULT_VECTOR_GEOMETRY_VERTEX_TOLERANCE,
-  });
+  self_optimizeVectorNetwork(draft);
 }
 
 function __self_maybe_end_gesture(draft: Draft<editor.state.IEditorState>) {

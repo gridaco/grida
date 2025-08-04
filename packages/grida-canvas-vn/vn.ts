@@ -147,13 +147,20 @@ export namespace vn {
     segments: VectorNetworkSegment[];
   }
 
-  export interface CleanConfig {
+  export interface OptimizationConfig {
     /**
      * Maximum distance between two vertices for them to be considered identical.
      *
      * @defaultValue 0
      */
     vertex_tolerance: number;
+
+    /**
+     * Remove vertices that are not referenced by any segment.
+     *
+     * @defaultValue true
+     */
+    remove_unused_verticies: boolean;
   }
 
   /**
@@ -192,12 +199,13 @@ export namespace vn {
 
   export class VectorNetworkEditor {
     /**
-     * Removes duplicate vertices and segments from a {@link VectorNetwork}.
+     * Optimizes a {@link VectorNetwork} by removing duplicate vertices and
+     * segments, optionally removing unused vertices.
      *
      * Also known as *simplify* or *deduplicate*, this method normalizes the
      * network by merging vertices that share the same coordinates and by
      * collapsing segments with identical endpoints and tangents. The input
-     * network is not mutated; a new, cleaned network is returned instead.
+     * network is not mutated; a new, optimized network is returned instead.
      *
      * ## Deduplication Criteria
      *
@@ -210,17 +218,19 @@ export namespace vn {
      * The deduplication process first remaps segment indices to account for merged vertices, then
      * removes segments with identical geometry.
      *
-     * @param net - The network to clean.
-     * @param config - Cleaning options. Currently only `vertex_tolerance` is
-     * supported.
-     * @returns A new {@link VectorNetwork} without duplicate vertices or
-     *          segments.
+     * @param net - The network to optimize.
+     * @param config - Optimization options.
+     * @returns A new {@link VectorNetwork} without duplicate or unused
+     *          vertices and segments.
      */
-    static clean(
+    static optimize(
       net: VectorNetwork,
-      config: CleanConfig = { vertex_tolerance: 0 }
+      config: OptimizationConfig = {
+        vertex_tolerance: 0,
+        remove_unused_verticies: true,
+      }
     ): VectorNetwork {
-      const { vertex_tolerance } = config;
+      const { vertex_tolerance, remove_unused_verticies } = config;
       const vertices: VectorNetworkVertex[] = [];
       const indexMap = new Map<number, number>();
 
@@ -258,13 +268,36 @@ export namespace vn {
         }
       }
 
-      return { vertices, segments: uniqueSegments };
+      if (!remove_unused_verticies) {
+        return { vertices, segments: uniqueSegments };
+      }
+
+      const used = new Set<number>();
+      for (const seg of uniqueSegments) {
+        used.add(seg.a);
+        used.add(seg.b);
+      }
+      const vertexMap = new Map<number, number>();
+      const filteredVertices: VectorNetworkVertex[] = [];
+      vertices.forEach((v, i) => {
+        if (used.has(i)) {
+          vertexMap.set(i, filteredVertices.length);
+          filteredVertices.push(v);
+        }
+      });
+      const remappedSegments = uniqueSegments.map((seg) => ({
+        a: vertexMap.get(seg.a)!,
+        b: vertexMap.get(seg.b)!,
+        ta: seg.ta,
+        tb: seg.tb,
+      }));
+      return { vertices: filteredVertices, segments: remappedSegments };
     }
 
     /**
      * Creates a new {@link VectorNetwork} by combining two networks into one.
      *
-     * The resulting network is cleaned via {@link VectorNetworkEditor.clean}
+     * The resulting network is optimized via {@link VectorNetworkEditor.optimize}
      * so that duplicate vertices or segments are removed. Segment orientation
      * is respected, meaning that a segment `a -> b` is considered different
      * from `b -> a`.
@@ -303,7 +336,7 @@ export namespace vn {
         ),
       ];
 
-      return VectorNetworkEditor.clean({ vertices, segments });
+      return VectorNetworkEditor.optimize({ vertices, segments });
     }
 
     private _vertices: VectorNetworkVertex[] = [];
@@ -341,22 +374,26 @@ export namespace vn {
     }
 
     /**
-     * Cleans the current network in-place by removing duplicate vertices and
+     * Optimizes the current network in-place by removing duplicate vertices and
      * segments.
      *
      * This is the instance counterpart to
-     * {@link VectorNetworkEditor.clean | VectorNetworkEditor.clean()} and is
-     * sometimes referred to as *simplify* or *deduplicate*.
+     * {@link VectorNetworkEditor.optimize | VectorNetworkEditor.optimize()} and
+     * is sometimes referred to as *simplify* or *deduplicate*.
      *
-     * @param config - Cleaning options. Currently only `vertex_tolerance` is
-     * supported.
-     * @returns The cleaned {@link VectorNetwork}.
+     * @param config - Optimization options.
+     * @returns The optimized {@link VectorNetwork}.
      */
-    clean(config: CleanConfig = { vertex_tolerance: 0 }): VectorNetwork {
-      const cleaned = VectorNetworkEditor.clean(this.value, config);
-      this._vertices = cleaned.vertices;
-      this._segments = cleaned.segments;
-      return cleaned;
+    optimize(
+      config: OptimizationConfig = {
+        vertex_tolerance: 0,
+        remove_unused_verticies: true,
+      }
+    ): VectorNetwork {
+      const optimized = VectorNetworkEditor.optimize(this.value, config);
+      this._vertices = optimized.vertices;
+      this._segments = optimized.segments;
+      return optimized;
     }
 
     /**

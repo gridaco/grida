@@ -12,6 +12,7 @@ import {
   self_selectNode,
   encodeTranslateVectorCommand,
   self_flattenNode,
+  self_optimizeVectorNetwork,
 } from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
@@ -214,6 +215,7 @@ function __self_try_exit_content_edit_mode(
   draft: Draft<editor.state.IEditorState>
 ) {
   __self_before_exit_content_edit_mode(draft);
+  self_optimizeVectorNetwork(draft);
   draft.content_edit_mode = undefined;
   draft.tool = { type: "cursor" };
 }
@@ -380,8 +382,9 @@ function __self_start_gesture(
     }
     case "scale": {
       const { selection, direction } = gesture;
-      //
-
+      if (draft.content_edit_mode?.type === "vector") {
+        self_optimizeVectorNetwork(draft);
+      }
       draft.content_edit_mode = undefined;
       draft.hovered_node_id = null;
 
