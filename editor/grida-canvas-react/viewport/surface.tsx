@@ -626,8 +626,18 @@ function NodeTitleBar({
   // TODO: knwon issue: when initially firing up the drag on not-selected node, it will cause the root to fire onDragEnd as soon as the drag starts.
   const bind = useSurfaceGesture(
     {
-      onPointerMove: ({ event }) => {
+      // TODO: this is required to make the node stays focused, as as soon as pointer moves, the editor will be calling its own on pointer move, causing empty hit testing, cancelling the hover.
+      // but whith this enabled, it will re-render every time. making the react's rendering very slow.
+      // need a graceful way to handle this.
+      // DISABLED: disabled for now, because keep-hovering when hovering on title bar is not a critical feature.
+      // onPointerMove: () => {
+      //   editor.hoverEnterNode(node.id);
+      // },
+      onPointerEnter: () => {
         editor.hoverEnterNode(node.id);
+      },
+      onPointerLeave: () => {
+        editor.hoverLeaveNode(node.id);
       },
       onDoubleClick: ({ event }) => {
         const name = prompt("rename", node.name);
