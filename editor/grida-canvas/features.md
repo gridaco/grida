@@ -8,34 +8,34 @@ This document lists all implemented features including the ones that are not yet
 
 **Bindings**
 
-| action                  | description                             | macos          | windows        | env    |
-| ----------------------- | --------------------------------------- | -------------- | -------------- | ------ |
-| select all siblings     | select all siblings of the current node | `meta+a`       | `ctrl+a`       | canvas |
-| select children         | select all children of the current node | `enter`        | `enter`        | canvas |
-| nudge                   | move selection by 1px                   | `arrow keys`   | `arrow keys`   | canvas |
-| duplicate               | duplicate the current selection         | `meta+d`       | `ctrl+d`       | canvas |
-| flatten                 | convert selection to vector paths       | `meta+e`       | `ctrl+e`       | canvas |
-| undo                    | undo the last action                    | `meta+z`       | `ctrl+z`       | canvas |
-| redo                    | redo the last undone action             | `meta+shift+z` | `ctrl+shift+z` | canvas |
-| cut                     | cut the current selection               | `meta+x`       | `ctrl+x`       | canvas |
-| copy                    | copy the current selection              | `meta+c`       | `ctrl+c`       | canvas |
-| paste                   | paste from the clipboard                | `meta+v`       | `ctrl+v`       | canvas |
-| toggle bold             | toggle bold style                       | `meta+b`       | `ctrl+b`       | canvas |
-| toggle active           | toggle active state for the selection   | `meta+shift+h` | `ctrl+shift+h` | canvas |
-| toggle locked           | toggle locked state for the selection   | `meta+shift+l` | `ctrl+shift+l` | canvas |
-| select parent           | select the parent of the current node   | `shift+enter`  | `shift+enter`  | canvas |
-| select next sibling     | select the next sibling of the node     | `tab`          | `tab`          | canvas |
-| select previous sibling | select the previous sibling of the node | `shift+tab`    | `shift+tab`    | canvas |
-| delete node             | delete the current selection            | `delete`       | `delete`       | canvas |
-| align left              | align selection to the left             | `alt+a`        | `alt+a`        | canvas |
-| align right             | align selection to the right            | `alt+d`        | `alt+d`        | canvas |
-| align top               | align selection to the top              | `alt+w`        | `alt+w`        | canvas |
-| align bottom            | align selection to the bottom           | `alt+s`        | `alt+s`        | canvas |
-| align horizontal center | center selection horizontally           | `alt+h`        | `alt+h`        | canvas |
-| align vertical center   | center selection vertically             | `alt+v`        | `alt+v`        | canvas |
-| distribute horizontally | distribute selection horizontally       | `alt+ctrl+v`   | `alt+ctrl+v`   | canvas |
-| distribute vertically   | distribute selection vertically         | `alt+ctrl+h`   | `alt+ctrl+h`   | canvas |
-| eye dropper             | open eye dropper                        | `i`            | `i`            | canvas |
+| action                  | description                             | macos                      | windows                 | env    |
+| ----------------------- | --------------------------------------- | -------------------------- | ----------------------- | ------ |
+| select all siblings     | select all siblings of the current node | `meta+a`                   | `ctrl+a`                | canvas |
+| select children         | select all children of the current node | `enter`                    | `enter`                 | canvas |
+| nudge                   | move selection by 1px                   | `arrow keys`               | `arrow keys`            | canvas |
+| duplicate               | duplicate the current selection         | `meta+d`                   | `ctrl+d`                | canvas |
+| flatten                 | convert selection to vector paths       | `meta+e`, `option+shift+f` | `ctrl+e`, `alt+shift+f` | canvas |
+| undo                    | undo the last action                    | `meta+z`                   | `ctrl+z`                | canvas |
+| redo                    | redo the last undone action             | `meta+shift+z`             | `ctrl+shift+z`          | canvas |
+| cut                     | cut the current selection               | `meta+x`                   | `ctrl+x`                | canvas |
+| copy                    | copy the current selection              | `meta+c`                   | `ctrl+c`                | canvas |
+| paste                   | paste from the clipboard                | `meta+v`                   | `ctrl+v`                | canvas |
+| toggle bold             | toggle bold style                       | `meta+b`                   | `ctrl+b`                | canvas |
+| toggle active           | toggle active state for the selection   | `meta+shift+h`             | `ctrl+shift+h`          | canvas |
+| toggle locked           | toggle locked state for the selection   | `meta+shift+l`             | `ctrl+shift+l`          | canvas |
+| select parent           | select the parent of the current node   | `shift+enter`              | `shift+enter`           | canvas |
+| select next sibling     | select the next sibling of the node     | `tab`                      | `tab`                   | canvas |
+| select previous sibling | select the previous sibling of the node | `shift+tab`                | `shift+tab`             | canvas |
+| delete node             | delete the current selection            | `delete`                   | `delete`                | canvas |
+| align left              | align selection to the left             | `alt+a`                    | `alt+a`                 | canvas |
+| align right             | align selection to the right            | `alt+d`                    | `alt+d`                 | canvas |
+| align top               | align selection to the top              | `alt+w`                    | `alt+w`                 | canvas |
+| align bottom            | align selection to the bottom           | `alt+s`                    | `alt+s`                 | canvas |
+| align horizontal center | center selection horizontally           | `alt+h`                    | `alt+h`                 | canvas |
+| align vertical center   | center selection vertically             | `alt+v`                    | `alt+v`                 | canvas |
+| distribute horizontally | distribute selection horizontally       | `alt+ctrl+v`               | `alt+ctrl+v`            | canvas |
+| distribute vertically   | distribute selection vertically         | `alt+ctrl+h`               | `alt+ctrl+h`            | canvas |
+| eye dropper             | open eye dropper                        | `i`                        | `i`                     | canvas |
 
 **Modifiers (while pressed)**
 
@@ -60,7 +60,7 @@ This document lists all implemented features including the ones that are not yet
 - [x] delete (`delete, backspace`)
 - [x] duplicate (`meta+d`)
 - [x] repeating duplicate (`meta+d`)
-- [x] flatten (`meta+e`)
+- [x] flatten (`meta+e`, `option+shift+f`)
 - [x] undo (`meta+z`)
 - [x] redo (`meta+shift+z`)
 - [x] select all siblings (`meta+a`)

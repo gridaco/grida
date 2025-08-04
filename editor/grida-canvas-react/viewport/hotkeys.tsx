@@ -35,7 +35,7 @@ export const keybindings_sheet = [
   {
     name: "flatten",
     description: "Flatten the current selection",
-    keys: ["meta+e"],
+    keys: ["meta+e", "alt+shift+f"],
   },
   {
     name: "undo",
@@ -664,7 +664,7 @@ export function useEditorHotKeys() {
   );
 
   useHotkeys(
-    "meta+e, ctrl+e",
+    "meta+e, ctrl+e, alt+shift+f",
     () => {
       editor.flatten("selection");
     },
