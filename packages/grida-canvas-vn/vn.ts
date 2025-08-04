@@ -538,6 +538,38 @@ export namespace vn {
       }));
     }
 
+    /**
+     * Removes the vertex at the given index if no segments reference it.
+     *
+     * If the vertex has any dependent segments, the network is left unchanged
+     * and `false` is returned. When the vertex is removed, all segment indices
+     * greater than the removed index are decremented to reflect the new
+     * positions of vertices.
+     *
+     * @param i - Index of the vertex to remove
+     * @returns `true` if the vertex was removed, `false` otherwise
+     */
+    removeUnusedVertex(i: number): boolean {
+      if (i < 0 || i >= this._vertices.length) {
+        throw new Error(`Invalid vertex index: ${i}`);
+      }
+
+      const hasDependents = this._segments.some(
+        (segment) => segment.a === i || segment.b === i
+      );
+      if (hasDependents) {
+        return false;
+      }
+
+      this._vertices.splice(i, 1);
+      for (const seg of this._segments) {
+        if (seg.a > i) seg.a--;
+        if (seg.b > i) seg.b--;
+      }
+
+      return true;
+    }
+
     moveVertex(i: number, p: Vector2) {
       if (i < 0 || i >= this._vertices.length) {
         throw new Error(`Invalid vertex index: ${i}`);
