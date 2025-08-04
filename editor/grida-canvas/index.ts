@@ -1167,6 +1167,13 @@ export namespace editor.gesture {
     readonly initial_verticies: cmath.Vector2[];
     readonly initial_segments: vn.VectorNetworkSegment[];
     readonly initial_position: cmath.Vector2;
+    /**
+     * Absolute position of the node when the gesture started.
+     *
+     * Used for snap guide rendering inside nested containers where the local
+     * position does not reflect the node's location on the canvas.
+     */
+    readonly initial_absolute_position: cmath.Vector2;
   };
 
   /**

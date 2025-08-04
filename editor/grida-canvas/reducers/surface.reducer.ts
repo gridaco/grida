@@ -443,6 +443,9 @@ function __self_start_gesture(
         }
       );
 
+      const abs = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+      const absolute_position: cmath.Vector2 = [abs.x, abs.y];
+
       draft.gesture = {
         type: "translate-vector-controls",
         node_id: node_id,
@@ -454,6 +457,7 @@ function __self_start_gesture(
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
         initial_position: [node.left!, node.top!],
+        initial_absolute_position: absolute_position,
       };
       break;
       //

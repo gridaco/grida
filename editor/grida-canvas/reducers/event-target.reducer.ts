@@ -1012,6 +1012,7 @@ function __self_evt_on_drag(
           initial_verticies,
           initial_segments,
           initial_position,
+          initial_absolute_position,
           vertices,
           tangents,
         } = draft.gesture;
@@ -1019,12 +1020,12 @@ function __self_evt_on_drag(
         const scene = draft.document.scenes[draft.scene_id!];
 
         const agent_points = vertices.map((i) =>
-          cmath.vector2.add(initial_verticies[i], initial_position)
+          cmath.vector2.add(initial_verticies[i], initial_absolute_position)
         );
         const anchor_points = initial_verticies
           .map((p, i) => ({ p, i }))
           .filter(({ i }) => !vertices.includes(i))
-          .map(({ p }) => cmath.vector2.add(p, initial_position));
+          .map(({ p }) => cmath.vector2.add(p, initial_absolute_position));
 
         const { movement: snappedMovement, snapping } = snapMovement(
           agent_points,
