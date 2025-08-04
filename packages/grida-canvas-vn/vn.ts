@@ -900,83 +900,64 @@ export namespace vn {
   export function toSVGPathData(vn: vn.VectorNetwork) {
     const { vertices, segments } = vn;
 
-    // Prepare path commands
     const commands: SVGCommand[] = [];
 
-    // Keep track of visited segments to avoid duplicates
-    const visitedSegments = new Set();
-
-    if (vertices.length === 0) {
+    // No segments means nothing to draw
+    if (segments.length === 0) {
       return "";
     }
 
-    // Move to the first vertex
-    commands.push({
-      type: SVGPathData.MOVE_TO,
-      x: vertices[0].p[0],
-      y: vertices[0].p[1],
-      relative: false,
-    });
+    let current_start: number | null = null;
+    let previous_end: number | null = null;
 
-    segments.forEach((segment, i) => {
+    for (const segment of segments) {
       const { a, b, ta, tb } = segment;
-
-      // Skip if the segment is already visited
-      if (
-        visitedSegments.has(`${a}-${b}`) ||
-        visitedSegments.has(`${b}-${a}`)
-      ) {
-        return;
-      }
-
-      visitedSegments.add(`${a}-${b}`);
-
-      // if this segment is not sequential (using a new starting point), move to the starting point
-      const prev_b = segments[i - 1]?.b ?? 0;
-      if (prev_b !== a) {
-        commands.push(
-          {
-            type: SVGPathData.MOVE_TO,
-            x: vertices[a].p[0],
-            y: vertices[a].p[1],
-            relative: false,
-          } // Move to
-        );
-      }
-
-      // if ta and tb are 0, use line.
-      if (ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0) {
-        commands.push(
-          {
-            type: SVGPathData.LINE_TO,
-            x: vertices[b].p[0],
-            y: vertices[b].p[1],
-            relative: false,
-          } // Line to
-        );
-        return;
-      }
-
       const start = vertices[a].p;
       const end = vertices[b].p;
-      const control1 = [start[0] + ta[0], start[1] + ta[1]];
-      const control2 = [end[0] + tb[0], end[1] + tb[1]];
 
-      commands.push(
-        {
-          type: SVGPathData.CURVE_TO,
-          x1: control1[0],
-          y1: control1[1],
-          x2: control2[0],
-          y2: control2[1],
+      // Start a new subpath if this segment does not connect
+      if (previous_end !== a) {
+        commands.push({
+          type: SVGPathData.MOVE_TO,
+          x: start[0],
+          y: start[1],
+          relative: false,
+        });
+        current_start = a;
+      }
+
+      // Straight line when both tangents are zero
+      if (ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0) {
+        commands.push({
+          type: SVGPathData.LINE_TO,
           x: end[0],
           y: end[1],
           relative: false,
-        } // Cubic Bezier curve
-      );
-    });
+        });
+      } else {
+        const c1 = [start[0] + ta[0], start[1] + ta[1]];
+        const c2 = [end[0] + tb[0], end[1] + tb[1]];
+        commands.push({
+          type: SVGPathData.CURVE_TO,
+          x1: c1[0],
+          y1: c1[1],
+          x2: c2[0],
+          y2: c2[1],
+          x: end[0],
+          y: end[1],
+          relative: false,
+        });
+      }
 
-    // Encode the path commands to SVG path data
+      previous_end = b;
+
+      if (current_start !== null && b === current_start) {
+        commands.push({ type: SVGPathData.CLOSE_PATH });
+        previous_end = null;
+        current_start = null;
+      }
+    }
+
     return encodeSVGPath(commands);
 
     //
