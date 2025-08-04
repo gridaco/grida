@@ -47,3 +47,23 @@ impl Into<skia_safe::Path> for &Shape {
         }
     }
 }
+
+impl Shape {
+    /// Convert this shape into a [`VectorNetwork`].
+    pub fn to_vector_network(&self) -> VectorNetwork {
+        match self {
+            Shape::RRect(shape) => build_rrect_vector_network(shape),
+            Shape::SimplePolygon(shape) => build_simple_polygon_vector_network(shape),
+            Shape::Ellipse(shape) => build_ellipse_vector_network(shape),
+            Shape::EllipticalRingSector(_shape) => {
+                todo!("Arc shape to vector network requires manual implementation")
+            }
+            Shape::EllipticalSector(_shape) => {
+                todo!("Arc shape to vector network requires manual implementation")
+            }
+            Shape::EllipticalRing(shape) => build_ring_vector_network(shape),
+            Shape::RegularStarPolygon(shape) => build_star_vector_network(shape),
+            Shape::RegularPolygon(shape) => build_regular_polygon_vector_network(shape),
+        }
+    }
+}

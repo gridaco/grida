@@ -251,6 +251,7 @@ pub trait NodeGeometryMixin {
 pub trait NodeShapeMixin {
     fn to_shape(&self) -> Shape;
     fn to_path(&self) -> skia_safe::Path;
+    fn to_vector_network(&self) -> VectorNetwork;
 }
 
 /// Intrinsic size node is a node that has a fixed size, and can be rendered soley on its own.
@@ -439,6 +440,10 @@ impl NodeShapeMixin for ContainerNode {
     fn to_path(&self) -> skia_safe::Path {
         build_rrect_path(&self.to_own_shape())
     }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_rrect_vector_network(&self.to_own_shape())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -499,6 +504,20 @@ impl NodeGeometryMixin for RectangleNode {
         } else {
             0.0
         }
+    }
+}
+
+impl NodeShapeMixin for RectangleNode {
+    fn to_shape(&self) -> Shape {
+        Shape::RRect(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        build_rrect_path(&self.to_own_shape())
+    }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_rrect_vector_network(&self.to_own_shape())
     }
 }
 
@@ -665,6 +684,10 @@ impl NodeShapeMixin for EllipseNode {
 
     fn to_path(&self) -> skia_safe::Path {
         (&self.to_shape()).into()
+    }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        self.to_shape().to_vector_network()
     }
 }
 
@@ -844,6 +867,10 @@ impl NodeShapeMixin for PolygonNode {
         let shape = self.to_own_shape();
         build_simple_polygon_path(&shape)
     }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_simple_polygon_vector_network(&self.to_own_shape())
+    }
 }
 
 /// A node representing a regular polygon (triangle, square, pentagon, etc.)
@@ -951,6 +978,10 @@ impl NodeShapeMixin for RegularPolygonNode {
             corner_radius: self.corner_radius,
         })
     }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_regular_polygon_vector_network(&self.to_own_shape())
+    }
 }
 
 /// A regular star polygon node rendered within a bounding box.
@@ -1045,6 +1076,10 @@ impl NodeShapeMixin for RegularStarPolygonNode {
 
     fn to_path(&self) -> skia_safe::Path {
         build_star_path(&self.to_own_shape())
+    }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_star_vector_network(&self.to_own_shape())
     }
 }
 
