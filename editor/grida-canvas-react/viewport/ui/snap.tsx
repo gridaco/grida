@@ -23,6 +23,7 @@ function useSnapGuide(): guide.SnapGuide | undefined {
     if (
       (gesture.type === "translate" ||
         gesture.type === "translate-vector-controls" ||
+        gesture.type === "curve" ||
         gesture.type === "nudge" ||
         gesture.type === "scale") &&
       surface_snapping
