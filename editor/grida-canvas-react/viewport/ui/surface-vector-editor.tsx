@@ -11,6 +11,7 @@ import { svg } from "@/grida-canvas-utils/svg";
 import { Point } from "./point";
 import assert from "assert";
 import useSurfaceVectorEditor from "@/grida-canvas-react/use-sub-vector-network-editor";
+import { useCurrentEditor } from "@/grida-canvas-react";
 
 function transformDelta(v: cmath.Vector2, t: cmath.Transform): cmath.Vector2 {
   return cmath.vector2.transform(v, [
@@ -416,11 +417,12 @@ function VertexPoint({
   point: cmath.Vector2;
   index: number;
 }) {
-  const editor = useSurfaceVectorEditor();
+  const ve = useSurfaceVectorEditor();
+  const instance = useCurrentEditor();
   const tool = useToolState();
-  const selected = editor.selected_vertices.includes(index);
+  const selected = ve.selected_vertices.includes(index);
   const [internalHovered, setInternalHovered] = React.useState(false);
-  const hovered = internalHovered || editor.snapped_point === index;
+  const hovered = internalHovered || ve.snapped_point === index;
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const bind = useGesture(
@@ -434,29 +436,33 @@ function VertexPoint({
         }
       },
       onPointerDown: ({ event }) => {
-        if (tool.type === "path") return;
+        if (tool.type === "path" || tool.type === "bend") return;
         event.preventDefault();
         const element = event.target as HTMLDivElement;
         if (element.hasAttribute("tabindex")) {
           element.focus();
         }
-        selectedRef.current = editor.selected_vertices.includes(index);
+        selectedRef.current = ve.selected_vertices.includes(index);
         draggedRef.current = false;
         if (!selectedRef.current) {
-          editor.selectVertex(index, event.shiftKey);
+          ve.selectVertex(index, event.shiftKey);
         }
       },
       onDragStart: (state) => {
         const { event } = state;
-        if (tool.type === "path") return;
+        if (tool.type === "path" || tool.type === "bend") return;
         event.preventDefault();
         draggedRef.current = true;
-        editor.onDragStart();
+        ve.onDragStart();
       },
       onPointerUp: ({ event }) => {
         if (tool.type === "path") return;
+        if (tool.type === "bend") {
+          instance.bendCorner(ve.node_id, index);
+          return;
+        }
         if (selectedRef.current && !draggedRef.current) {
-          editor.selectVertex(index, event.shiftKey);
+          ve.selectVertex(index, event.shiftKey);
         }
       },
     },

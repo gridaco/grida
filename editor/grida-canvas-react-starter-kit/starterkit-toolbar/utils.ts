@@ -16,6 +16,7 @@ export type ToolbarToolType =
   | "eraser"
   | "flood-fill"
   | "path"
+  | "bend"
   | "lasso";
 
 export function toolmode_to_toolbar_value(
@@ -41,6 +42,8 @@ export function toolmode_to_toolbar_value(
       return "flood-fill";
     case "lasso":
       return "lasso";
+    case "bend":
+      return "bend";
   }
 }
 
@@ -73,6 +76,8 @@ export function toolbar_value_to_cursormode(
       return { type: "flood-fill" };
     case "lasso":
       return { type: "lasso" };
+    case "bend":
+      return { type: "bend" };
     default:
       return { type: "cursor" };
   }

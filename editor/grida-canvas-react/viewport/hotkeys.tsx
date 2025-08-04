@@ -7,7 +7,7 @@ import {
 } from "../provider";
 import { toast } from "sonner";
 import type cg from "@grida/cg";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import cmath from "@grida/cmath";
 import { useCurrentEditor } from "../use-editor";
 
@@ -338,6 +338,7 @@ export function useEditorHotKeys() {
   const { a11yarrow, a11ydelete, a11yalign } = useA11yActions();
 
   const { selection, actions } = useCurrentSelection();
+  const [altKey, setAltKey] = useState(false);
 
   useEffect(() => {
     const cb = (e: any) => {
@@ -348,13 +349,25 @@ export function useEditorHotKeys() {
       editor.configureTranslateWithAxisLockModifier("off");
       editor.configureTransformWithPreserveAspectRatioModifier("off");
       editor.configureRotateWithQuantizeModifier("off");
-      editor.configureCurveTangentMirroringModifier("auto");
+      setAltKey(false);
+      editor.setTool({ type: "cursor" });
     };
     window.addEventListener("blur", cb);
     return () => {
       window.removeEventListener("blur", cb);
     };
   }, [editor]);
+
+  useEffect(() => {
+    let mode: "auto" | "all" | "none" = "auto";
+    if (tool.type === "bend") {
+      mode = "all";
+    }
+    if (altKey) {
+      mode = "none";
+    }
+    editor.configureCurveTangentMirroringModifier(mode);
+  }, [tool.type, altKey, editor]);
 
   // always triggering. (alt, meta, ctrl, shift)
   useHotkeys(
@@ -363,18 +376,16 @@ export function useEditorHotKeys() {
       switch (e.key) {
         case "Meta":
           editor.configureSurfaceRaycastTargeting({ target: "deepest" });
-          editor.configureCurveTangentMirroringModifier("all");
           break;
         case "Control":
           editor.configureSurfaceRaycastTargeting({ target: "deepest" });
           editor.configureTranslateWithForceDisableSnap("on");
-          editor.configureCurveTangentMirroringModifier("all");
           break;
         case "Alt":
           editor.configureMeasurement("on");
           editor.configureTranslateWithCloneModifier("on");
           editor.configureTransformWithCenterOriginModifier("on");
-          editor.configureCurveTangentMirroringModifier("none");
+          setAltKey(true);
           // NOTE: on some systems, the alt key focuses to the browser menu, so we need to prevent that. (e.g. alt key on windows/chrome)
           e.preventDefault();
           break;
@@ -398,18 +409,16 @@ export function useEditorHotKeys() {
       switch (e.key) {
         case "Meta":
           editor.configureSurfaceRaycastTargeting({ target: "auto" });
-          editor.configureCurveTangentMirroringModifier("auto");
           break;
         case "Control":
           editor.configureSurfaceRaycastTargeting({ target: "auto" });
           editor.configureTranslateWithForceDisableSnap("off");
-          editor.configureCurveTangentMirroringModifier("auto");
           break;
         case "Alt":
           editor.configureMeasurement("off");
           editor.configureTranslateWithCloneModifier("off");
           editor.configureTransformWithCenterOriginModifier("off");
-          editor.configureCurveTangentMirroringModifier("auto");
+          setAltKey(false);
           break;
         case "Shift":
           editor.configureTranslateWithAxisLockModifier("off");
@@ -471,6 +480,32 @@ export function useEditorHotKeys() {
         case "keyup":
           editor.setTool({ type: "cursor" });
           __zoom_tool_triggered_by_hotkey.current = false;
+          break;
+      }
+    },
+    {
+      keydown: true,
+      keyup: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  const __bend_tool_triggered_by_hotkey = useRef(false);
+  useHotkeys(
+    "meta, ctrl",
+    (e) => {
+      if (tool.type === "bend" && !__bend_tool_triggered_by_hotkey.current)
+        return;
+
+      switch (e.type) {
+        case "keydown":
+          editor.setTool({ type: "bend" });
+          __bend_tool_triggered_by_hotkey.current = true;
+          break;
+        case "keyup":
+          editor.setTool({ type: "cursor" });
+          __bend_tool_triggered_by_hotkey.current = false;
           break;
       }
     },

@@ -17,6 +17,9 @@ import { BrushIcon, LassoIcon, PenToolIcon, TriangleIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
@@ -238,27 +241,28 @@ export function ToolsGroup({
           <DropdownMenuTrigger>
             <CaretDownIcon />
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" sideOffset={16}>
-            {options.map((option) => (
-              <DropdownMenuItem
-                key={option.value}
-                onSelect={() => {
-                  setPrimary(option.value);
-                  onValueChange?.(option.value);
-                }}
-                asChild
-              >
-                <button className="w-full flex items-center gap-2">
-                  <ToolIcon type={option.value} className="size-4" />
+          <DropdownMenuContent align="start" side="top" sideOffset={16}>
+            <DropdownMenuRadioGroup
+              onValueChange={(v) => {
+                setPrimary(v as ToolbarToolType);
+                onValueChange?.(v as ToolbarToolType);
+              }}
+              value={primary}
+            >
+              {options.map((option) => (
+                <DropdownMenuRadioItem value={option.value} key={option.value}>
+                  {/* <div className="w-full flex items-center gap-2"> */}
+                  <ToolIcon type={option.value} />
                   <span>{option.label}</span>
                   {option.shortcut && (
                     <DropdownMenuShortcut>
                       {option.shortcut}
                     </DropdownMenuShortcut>
                   )}
-                </button>
-              </DropdownMenuItem>
-            ))}
+                  {/* </div> */}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       )}

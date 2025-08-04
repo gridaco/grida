@@ -19,6 +19,7 @@ export function self_select_tool<S extends editor.state.IEditorState>(
   const vector_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
     "cursor",
     "hand",
+    "bend",
     "path",
     "lasso",
   ];

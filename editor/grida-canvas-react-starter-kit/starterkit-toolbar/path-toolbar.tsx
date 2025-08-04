@@ -3,7 +3,7 @@ import { ToolIcon } from ".";
 import { useCurrentEditor, useToolState } from "@/grida-canvas-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { SplinePointerIcon } from "lucide-react";
+import { SplineIcon, SplinePointerIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -24,14 +24,17 @@ export function PathToolbar() {
         size="sm"
         value={tool.type}
         onValueChange={(v) => {
-          editor.setTool({ type: v as "cursor" | "lasso" });
+          editor.setTool({ type: v as "cursor" | "lasso" | "bend" });
         }}
         className="gap-2"
       >
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              <ToggleGroupItem value="cursor" className="rounded-sm aspect-square">
+              <ToggleGroupItem
+                value="cursor"
+                className="rounded-sm aspect-square"
+              >
                 <SplinePointerIcon className="size-4" />
               </ToggleGroupItem>
             </span>
@@ -41,12 +44,28 @@ export function PathToolbar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              <ToggleGroupItem value="lasso" className="rounded-sm aspect-square">
+              <ToggleGroupItem
+                value="lasso"
+                className="rounded-sm aspect-square"
+              >
                 <ToolIcon type="lasso" className="size-4" />
               </ToggleGroupItem>
             </span>
           </TooltipTrigger>
           <TooltipContent>Lasso tool (Q)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <ToggleGroupItem
+                value="bend"
+                className="rounded-sm aspect-square"
+              >
+                <SplineIcon className="size-4" />
+              </ToggleGroupItem>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Bend tool (⌘)</TooltipContent>
         </Tooltip>
       </ToggleGroup>
 

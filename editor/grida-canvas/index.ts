@@ -271,6 +271,9 @@ export namespace editor.state {
         type: "lasso";
       }
     | {
+        type: "bend";
+      }
+    | {
         type: "zoom";
       }
     | {
