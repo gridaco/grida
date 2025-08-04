@@ -1,7 +1,14 @@
 import cmath from "@grida/cmath";
 import { MeterLabel } from "./meter";
 
-export function Line({ x1, y1, x2, y2, label }: cmath.ui.Line) {
+export function Line({
+  x1,
+  y1,
+  x2,
+  y2,
+  label,
+  zIndex = 10,
+}: cmath.ui.Line & { zIndex?: number }) {
   const angle = cmath.vector2.angle([x1, y1], [x2, y2]);
   const side = cmath.angleToAxis(angle) === "x" ? "bottom" : "right";
   const midX = (x1 + x2) / 2;
@@ -17,7 +24,7 @@ export function Line({ x1, y1, x2, y2, label }: cmath.ui.Line) {
           pointerEvents: "none",
           cursor: "none",
           willChange: "transform",
-          zIndex: 10,
+          zIndex,
         }}
         className="stroke-workbench-accent-red text-workbench-accent-red"
       >

@@ -419,19 +419,18 @@ function VertexPoint({
   const editor = useSurfaceVectorEditor();
   const tool = useToolState();
   const selected = editor.selected_vertices.includes(index);
-  const hovered = editor.hovered_point === index;
+  const [internalHovered, setInternalHovered] = React.useState(false);
+  const hovered = internalHovered || editor.snapped_point === index;
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const bind = useGesture(
     {
       onHover: (s) => {
-        // enter
         if (s.first) {
-          editor.onVertexHover(index, "enter");
+          setInternalHovered(true);
         }
-        // leave
         if (s.last) {
-          editor.onVertexHover(index, "leave");
+          setInternalHovered(false);
         }
       },
       onPointerDown: ({ event }) => {

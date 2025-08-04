@@ -2089,21 +2089,6 @@ export class Editor
     this.hoverNode(node_id, "leave");
   }
 
-  public hoverVertex(
-    node_id: string,
-    vertex: number,
-    event: "enter" | "leave"
-  ) {
-    this.dispatch({
-      type: "hover-vertex",
-      event: event,
-      target: {
-        node_id,
-        vertex,
-      },
-    });
-  }
-
   startGuideGesture(axis: cmath.Axis, idx: number | -1) {
     this.dispatch({
       type: "surface/gesture/start",

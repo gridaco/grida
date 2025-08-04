@@ -533,11 +533,11 @@ export namespace editor.state {
     hovered_node_id: string | null;
 
     /**
-     * hovered vertex index (of a selected path node)
+     * snapped vertex index (of a selected path node)
      *
      * @default null
      */
-    hovered_vertex_idx: number | null;
+    snapped_vertex_idx: number | null;
 
     /**
      * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
@@ -581,6 +581,7 @@ export namespace editor.state {
       client: cmath.Vector2;
       position: cmath.Vector2;
       last: cmath.Vector2;
+      logical: cmath.Vector2;
       // position_snap: cmath.Vector2;
     };
 
@@ -803,7 +804,7 @@ export namespace editor.state {
     dropzone: undefined,
     gesture: { type: "idle" },
     hovered_node_id: null,
-    hovered_vertex_idx: null,
+    snapped_vertex_idx: null,
     marquee: undefined,
     selection: [],
     hits: [],
@@ -858,6 +859,7 @@ export namespace editor.state {
         client: cmath.vector2.zero,
         position: cmath.vector2.zero,
         last: cmath.vector2.zero,
+        logical: cmath.vector2.zero,
       },
       cursors: [],
       history: {
@@ -1274,7 +1276,7 @@ export namespace editor.history {
 
     // hover state should be cleared to prevent errors
     draft.hovered_node_id = null;
-    draft.hovered_vertex_idx = null;
+    draft.snapped_vertex_idx = null;
     return;
   }
 
@@ -1585,11 +1587,6 @@ export namespace editor.api {
     hoverNode(node_id: string, event: "enter" | "leave"): void;
     hoverEnterNode(node_id: string): void;
     hoverLeaveNode(node_id: string): void;
-    hoverVertex(
-      node_id: string,
-      vertex: number,
-      event: "enter" | "leave"
-    ): void;
 
     startGuideGesture(axis: cmath.Axis, idx: number | -1): void;
     startScaleGesture(

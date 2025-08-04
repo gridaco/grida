@@ -727,7 +727,7 @@ export function useDocumentState(): UseDocumentState {
 type UseSceneState = grida.program.document.Scene & {
   selection: editor.state.IEditorState["selection"];
   hovered_node_id: editor.state.IEditorState["hovered_node_id"];
-  hovered_vertex_idx: editor.state.IEditorState["hovered_vertex_idx"];
+  snapped_vertex_idx: editor.state.IEditorState["snapped_vertex_idx"];
   document_ctx: editor.state.IEditorState["document_ctx"];
 };
 
@@ -737,7 +737,7 @@ export function useSceneState(scene_id: string): UseSceneState {
     return {
       selection: state.selection,
       hovered_node_id: state.hovered_node_id,
-      hovered_vertex_idx: state.hovered_vertex_idx,
+      snapped_vertex_idx: state.snapped_vertex_idx,
       document_ctx: state.document_ctx,
       ...state.document.scenes[scene_id],
     } satisfies Omit<UseSceneState, "setBackgroundColor">;

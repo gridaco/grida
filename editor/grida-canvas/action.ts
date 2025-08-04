@@ -276,7 +276,6 @@ export interface EditorHierarchyMoveAction {
 
 // #region [vector]
 export type EditorVectorEditorAction =
-  | EditorVectorHoverVertexAction
   | EditorVectorSelectVertexAction
   | EditorVectorDeleteVertexAction
   | EditorVectorSelectSegmentAction
@@ -287,12 +286,6 @@ export type EditorVectorEditorAction =
   | EditorVectorTranslateVertexAction
   | EditorVectorTranslateSegmentAction
   | EditorVectorBendCornerAction;
-
-export interface EditorVectorHoverVertexAction {
-  type: "hover-vertex";
-  event: "enter" | "leave";
-  target: VertexQuery;
-}
 
 export interface EditorVectorSelectVertexAction {
   type: "select-vertex";

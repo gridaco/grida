@@ -42,9 +42,12 @@ import type { ReducerContext } from ".";
 
 const black = { r: 0, g: 0, b: 0, a: 1 };
 
+import { snapToCanvasGeometry } from "@grida/cmath/_snap";
+
 function __self_evt_on_pointer_move(
   draft: editor.state.IEditorState,
-  action: EditorEventTarget_PointerMove
+  action: EditorEventTarget_PointerMove,
+  context: ReducerContext
 ) {
   const {
     position_canvas: { x, y },
@@ -62,11 +65,17 @@ function __self_evt_on_pointer_move(
     client: [position_client.x, position_client.y],
     position: canvas_space_pointer_position,
     last: draft.pointer.position,
+    logical: canvas_space_pointer_position,
   };
 
   if (draft.content_edit_mode?.type === "vector") {
     const { a_point, node_id } = draft.content_edit_mode;
-    const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
+    const {
+      tarnslate_with_axis_lock,
+      translate_with_force_disable_snap,
+    } = draft.gesture_modifiers;
+
+    let logical_pos = canvas_space_pointer_position;
 
     if (typeof a_point === "number" && tarnslate_with_axis_lock === "on") {
       const node = dq.__getNodeById(
@@ -78,24 +87,57 @@ function __self_evt_on_pointer_move(
       const { vertices } = node.vectorNetwork;
       const a = vertices[a_point];
 
-      // mock the movement (movement = cursor pos - anchor pos)
       const movement = cmath.vector2.sub(
         draft.pointer.position,
         cmath.vector2.add(n_offset, a.p)
       );
 
-      // movement relative to `a` point
       const adj_movement = cmath.ext.movement.axisLockedByDominance(movement);
 
-      const adj_pos = cmath.vector2.add(
+      logical_pos = cmath.vector2.add(
         a.p,
         cmath.ext.movement.normalize(adj_movement),
         n_offset
       );
-      draft.content_edit_mode.path_cursor_position = adj_pos;
+    }
+
+    draft.pointer.logical = logical_pos;
+
+    const node = dq.__getNodeById(
+      draft,
+      node_id
+    ) as grida.program.nodes.VectorNode;
+    const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+    const anchor_points = node.vectorNetwork.vertices.map((v) =>
+      cmath.vector2.add(v.p, [rect.x, rect.y])
+    );
+
+    const should_snap =
+      translate_with_force_disable_snap !== "on" && anchor_points.length > 0;
+
+    if (should_snap) {
+      const t = threshold(5, draft.transform);
+      const res = snapToCanvasGeometry(
+        [logical_pos],
+        { points: anchor_points },
+        { x: t, y: t }
+      );
+      draft.content_edit_mode.path_cursor_position = res.by_points
+        ? res.by_points.translated[0]
+        : logical_pos;
+      draft.surface_snapping = res;
+      if (res.by_points) {
+        const idx = res.by_points.hit_points.anchors.findIndex(
+          ([xhit, yhit]) => xhit && yhit
+        );
+        draft.snapped_vertex_idx = idx !== -1 ? idx : null;
+      } else {
+        draft.snapped_vertex_idx = null;
+      }
     } else {
-      draft.content_edit_mode.path_cursor_position =
-        canvas_space_pointer_position;
+      draft.content_edit_mode.path_cursor_position = logical_pos;
+      draft.surface_snapping = undefined;
+      draft.snapped_vertex_idx = null;
     }
   }
 }
@@ -260,7 +302,7 @@ function __self_evt_on_pointer_down(
       break;
     case "path": {
       if (draft.content_edit_mode?.type === "vector") {
-        const { hovered_vertex_idx: hovered_point } = draft;
+        const { snapped_vertex_idx: snapped_point } = draft;
         const { node_id, path_cursor_position, a_point, next_ta } =
           draft.content_edit_mode;
 
@@ -271,25 +313,25 @@ function __self_evt_on_pointer_down(
 
         const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
 
-        if (typeof a_point !== "number" && typeof hovered_point === "number") {
-          draft.content_edit_mode.selected_vertices = [hovered_point];
+        if (typeof a_point !== "number" && typeof snapped_point === "number") {
+          draft.content_edit_mode.selected_vertices = [snapped_point];
           draft.content_edit_mode.selected_segments = [];
           draft.content_edit_mode.selected_tangents = [];
           draft.content_edit_mode.neighbouring_vertices =
             getUXNeighbouringVertices(node.vectorNetwork, {
-              selected_vertices: [hovered_point],
+              selected_vertices: [snapped_point],
               selected_segments: [],
               selected_tangents: [],
             });
-          draft.content_edit_mode.a_point = hovered_point;
+          draft.content_edit_mode.a_point = snapped_point;
           draft.content_edit_mode.next_ta =
-            vne.getNextMirroredTangent(hovered_point);
+            vne.getNextMirroredTangent(snapped_point);
           break;
         }
 
         const position =
-          typeof hovered_point === "number"
-            ? node.vectorNetwork.vertices[hovered_point].p
+          typeof snapped_point === "number"
+            ? node.vectorNetwork.vertices[snapped_point].p
             : // relative position (absolute -> local)
               (() => {
                 const rect =
@@ -329,7 +371,7 @@ function __self_evt_on_pointer_down(
         draft.content_edit_mode.selected_tangents = [];
 
         const isClosingExisting =
-          typeof hovered_point === "number" && new_vertex_idx === hovered_point;
+          typeof snapped_point === "number" && new_vertex_idx === snapped_point;
 
         if (
           isClosingExisting &&
@@ -1547,7 +1589,7 @@ export default function eventTargetReducer<S extends editor.state.IEditorState>(
     // #region [html backend] canvas event target
     case "event-target/event/on-pointer-move": {
       return produce(state, (draft) => {
-        __self_evt_on_pointer_move(draft, action);
+        __self_evt_on_pointer_move(draft, action, context);
       });
     }
     case "event-target/event/on-pointer-move-raycast": {

@@ -11,13 +11,13 @@ export default function useSurfaceVectorEditor() {
   const state = useEditorState(instance, (state) => ({
     content_edit_mode: state.content_edit_mode,
     document: state.document,
-    hovered_vertex_idx: state.hovered_vertex_idx,
+    snapped_vertex_idx: state.snapped_vertex_idx,
     tool: state.tool,
   }));
 
   assert(state.content_edit_mode && state.content_edit_mode.type === "vector");
 
-  const { hovered_vertex_idx: hovered_point, tool } = state;
+  const { snapped_vertex_idx: snapped_point, tool } = state;
   const {
     node_id,
     selected_vertices,
@@ -67,13 +67,6 @@ export default function useSurfaceVectorEditor() {
       instance.selectVertex(node_id, vertex, { additive });
     },
     [tool.type, instance.selectVertex, node_id]
-  );
-
-  const onVertexHover = useCallback(
-    (vertex: number, eventType: "enter" | "leave") => {
-      instance.hoverVertex(node_id, vertex, eventType);
-    },
-    [instance, node_id]
   );
 
   const deleteVertex = useCallback(
@@ -145,11 +138,10 @@ export default function useSurfaceVectorEditor() {
       selected_vertices,
       selected_segments,
       selected_tangents,
-      hovered_point,
+      snapped_point,
       a_point,
       next_ta,
       selectVertex,
-      onVertexHover,
       deleteVertex,
       selectSegment,
       selectTangent,
@@ -172,11 +164,10 @@ export default function useSurfaceVectorEditor() {
       selected_vertices,
       selected_segments,
       selected_tangents,
-      hovered_point,
+      snapped_point,
       a_point,
       next_ta,
       selectVertex,
-      onVertexHover,
       deleteVertex,
       selectSegment,
       selectTangent,

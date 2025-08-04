@@ -874,7 +874,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       break;
     }
     //
-    case "hover-vertex":
     case "select-vertex":
     case "delete-vertex":
     case "select-segment":
@@ -891,21 +890,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const node = dq.__getNodeById(draft, node_id);
 
         switch (action.type) {
-          case "hover-vertex": {
-            assert(
-              draft.selection[0] === node_id,
-              "hovered vertex should be in the selected node"
-            );
-            switch (action.event) {
-              case "enter":
-                draft.hovered_vertex_idx = vertex;
-                break;
-              case "leave":
-                draft.hovered_vertex_idx = null;
-                break;
-            }
-            break;
-          }
           case "select-vertex": {
             assert(draft.content_edit_mode?.type === "vector");
             draft.selection = [node_id];
