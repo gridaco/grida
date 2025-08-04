@@ -37,6 +37,7 @@ export type DocumentAction =
   | EditorNudgeAction
   | EditorNudgeResizeAction
   | EditorA11yArrowAction
+  | EditorA11yAlignAction
   | EditorAlignAction
   | EditorDistributeEvenlyAction
   | EditorAutoLayoutAction
@@ -397,6 +398,14 @@ export interface EditorA11yArrowAction {
   type: "a11y/up" | "a11y/down" | "a11y/left" | "a11y/right";
   target: NodeID | "selection";
   shiftKey?: boolean;
+}
+
+export interface EditorA11yAlignAction {
+  type: "a11y/align";
+  alignment: {
+    horizontal?: "min" | "max" | "center";
+    vertical?: "min" | "max" | "center";
+  };
 }
 
 export interface EditorAlignAction {

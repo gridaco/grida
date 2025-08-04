@@ -1341,6 +1341,7 @@ export namespace editor.a11y {
     "a11y/down": [0, 1],
     "a11y/left": [-1, 0],
   } as const;
+
 }
 
 export namespace editor.api {

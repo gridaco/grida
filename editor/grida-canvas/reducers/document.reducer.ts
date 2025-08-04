@@ -597,6 +597,18 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       //
       break;
     }
+    case "a11y/align": {
+      const { alignment } = action;
+      return documentReducer(
+        state,
+        {
+          type: "align",
+          target: "selection",
+          alignment,
+        },
+        context
+      );
+    }
     case "align": {
       const {
         target,

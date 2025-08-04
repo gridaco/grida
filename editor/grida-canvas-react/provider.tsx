@@ -956,6 +956,10 @@ interface UseA11yActions {
     config?: editor.api.NudgeUXConfig
   ) => void;
   a11ydelete: () => void;
+  a11yalign: (alignment: {
+    horizontal?: "min" | "max" | "center";
+    vertical?: "min" | "max" | "center";
+  }) => void;
   nudge: (
     target: "selection" | editor.NodeID,
     axis: "x" | "y",
@@ -1048,10 +1052,21 @@ export function useA11yActions(): UseA11yActions {
     dispatch({ type: "a11y/delete" });
   }, [dispatch]);
 
+  const a11yalign = useCallback(
+    (alignment: {
+      horizontal?: "min" | "max" | "center";
+      vertical?: "min" | "max" | "center";
+    }) => {
+      dispatch({ type: "a11y/align", alignment });
+    },
+    [dispatch]
+  );
+
   return {
     nudge,
     a11yarrow,
     a11ydelete,
+    a11yalign,
   };
 }
 

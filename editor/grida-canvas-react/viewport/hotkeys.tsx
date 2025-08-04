@@ -335,7 +335,7 @@ export function useEditorHotKeys() {
   const editor = useCurrentEditor();
   const tool = useToolState();
   const content_edit_mode = useContentEditModeMinimalState();
-  const { a11yarrow, a11ydelete } = useA11yActions();
+  const { a11yarrow, a11ydelete, a11yalign } = useA11yActions();
 
   const { selection, actions } = useCurrentSelection();
 
@@ -909,40 +909,28 @@ export function useEditorHotKeys() {
     }
   });
 
-  useHotkeys("alt+a", (e) => {
-    editor.align("selection", {
-      horizontal: "min",
-    });
+  useHotkeys("alt+a", () => {
+    a11yalign({ horizontal: "min" });
   });
   useHotkeys(
     "alt+d",
-    (e) => {
-      editor.align("selection", {
-        horizontal: "max",
-      });
+    () => {
+      a11yalign({ horizontal: "max" });
     },
     { preventDefault: true }
   );
-  useHotkeys("alt+w", (e) => {
-    editor.align("selection", {
-      vertical: "min",
-    });
+  useHotkeys("alt+w", () => {
+    a11yalign({ vertical: "min" });
   });
-  useHotkeys("alt+s", (e) => {
-    editor.align("selection", {
-      vertical: "max",
-    });
+  useHotkeys("alt+s", () => {
+    a11yalign({ vertical: "max" });
   });
 
-  useHotkeys("alt+v", (e) => {
-    editor.align("selection", {
-      vertical: "center",
-    });
+  useHotkeys("alt+v", () => {
+    a11yalign({ vertical: "center" });
   });
-  useHotkeys("alt+h", (e) => {
-    editor.align("selection", {
-      horizontal: "center",
-    });
+  useHotkeys("alt+h", () => {
+    a11yalign({ horizontal: "center" });
   });
 
   useHotkeys("alt+ctrl+v", (e) => {
