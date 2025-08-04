@@ -152,6 +152,12 @@ export namespace editor.config {
   export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
 
   /**
+   * the tolerance for the vector geometry vertex (when cleaning the vector geometry)
+   * @deprecated - will be removed
+   */
+  export const DEFAULT_VECTOR_GEOMETRY_VERTEX_TOLERANCE = 0.5;
+
+  /**
    * default quantization step for rotation gestures (in degrees)
    */
   export const DEFAULT_ROTATION_QUANTIZE_STEP = 1;

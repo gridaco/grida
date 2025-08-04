@@ -156,6 +156,15 @@ export namespace vn {
     segments: VectorNetworkSegment[];
   }
 
+  export interface CleanConfig {
+    /**
+     * Maximum distance between two vertices for them to be considered identical.
+     *
+     * @defaultValue 0
+     */
+    vertex_tolerance: number;
+  }
+
   /**
    * creates a vector network from a polyline points
    * @param points points in the polyline
@@ -211,17 +220,25 @@ export namespace vn {
      * removes segments with identical geometry.
      *
      * @param net - The network to clean.
+     * @param config - Cleaning options. Currently only `vertex_tolerance` is
+     * supported.
      * @returns A new {@link VectorNetwork} without duplicate vertices or
      *          segments.
      */
-    static clean(net: VectorNetwork): VectorNetwork {
+    static clean(
+      net: VectorNetwork,
+      config: CleanConfig = { vertex_tolerance: 0 }
+    ): VectorNetwork {
+      const { vertex_tolerance } = config;
       const vertices: VectorNetworkVertex[] = [];
       const indexMap = new Map<number, number>();
 
       for (let i = 0; i < net.vertices.length; i++) {
         const { p } = net.vertices[i];
         let existing = vertices.findIndex(
-          (v) => v.p[0] === p[0] && v.p[1] === p[1]
+          (v) =>
+            Math.abs(v.p[0] - p[0]) <= vertex_tolerance &&
+            Math.abs(v.p[1] - p[1]) <= vertex_tolerance
         );
         if (existing === -1) {
           existing = vertices.length;
@@ -340,10 +357,12 @@ export namespace vn {
      * {@link VectorNetworkEditor.clean | VectorNetworkEditor.clean()} and is
      * sometimes referred to as *simplify* or *deduplicate*.
      *
+     * @param config - Cleaning options. Currently only `vertex_tolerance` is
+     * supported.
      * @returns The cleaned {@link VectorNetwork}.
      */
-    clean(): VectorNetwork {
-      const cleaned = VectorNetworkEditor.clean(this.value);
+    clean(config: CleanConfig = { vertex_tolerance: 0 }): VectorNetwork {
+      const cleaned = VectorNetworkEditor.clean(this.value, config);
       this._vertices = cleaned.vertices;
       this._segments = cleaned.segments;
       return cleaned;

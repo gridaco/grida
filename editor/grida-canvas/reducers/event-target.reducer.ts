@@ -1453,7 +1453,10 @@ function __before_end_translate_vector_controls(
     node_id
   ) as grida.program.nodes.VectorNode;
   const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-  node.vectorNetwork = vne.clean();
+  node.vectorNetwork = vne.clean({
+    // uses 0.5 for merging the snapped vertices - will be removed for better accuracy
+    vertex_tolerance: editor.config.DEFAULT_VECTOR_GEOMETRY_VERTEX_TOLERANCE,
+  });
 }
 
 function __self_maybe_end_gesture(draft: Draft<editor.state.IEditorState>) {
