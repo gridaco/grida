@@ -13,6 +13,7 @@ import {
   encodeTranslateVectorCommand,
   self_flattenNode,
   self_optimizeVectorNetwork,
+  self_try_remove_node,
 } from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
@@ -175,7 +176,6 @@ function __self_try_enter_content_edit_mode_auto(
   }
 }
 
-
 /**
  * For vector edit mode, if no edits were performed, the node is restored to the
  * original primitive node that existed before entering the mode.
@@ -187,23 +187,39 @@ function __self_before_exit_content_edit_mode(
 
   switch (mode?.type) {
     case "vector": {
-      if (!mode.original) return;
+      // optimize the vector network before exiting the mode.
+      self_optimizeVectorNetwork(draft);
 
-      const current = dq.__getNodeById(
-        draft,
-        mode.node_id
-      ) as grida.program.nodes.VectorNode;
+      // restore the original node if no changes were made.
+      {
+        if (!mode.original) return;
 
-      const dirty = !equal(mode.initial_vector_network, current.vectorNetwork);
-      if (dirty) return;
+        const current = dq.__getNodeById(
+          draft,
+          mode.node_id
+        ) as grida.program.nodes.VectorNode;
 
-      draft.document.nodes[mode.node_id] =
-        mode.original as grida.program.nodes.Node;
+        const dirty = !equal(
+          mode.initial_vector_network,
+          current.vectorNetwork
+        );
+        if (dirty) return;
 
+        draft.document.nodes[mode.node_id] =
+          mode.original as grida.program.nodes.Node;
+      }
       break;
     }
     case "text": {
-      // TODO: when text is empty, remove that.
+      const current = dq.__getNodeById(
+        draft,
+        mode.node_id
+      ) as grida.program.nodes.TextNode;
+      // when text is empty, remove that. - (when perfectly empty)
+      if (typeof current.text === "string" && current.text === "") {
+        self_try_remove_node(draft, mode.node_id);
+      }
+      break;
     }
   }
 }
@@ -215,7 +231,6 @@ function __self_try_exit_content_edit_mode(
   draft: Draft<editor.state.IEditorState>
 ) {
   __self_before_exit_content_edit_mode(draft);
-  self_optimizeVectorNetwork(draft);
   draft.content_edit_mode = undefined;
   draft.tool = { type: "cursor" };
 }

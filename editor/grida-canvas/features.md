@@ -117,6 +117,11 @@ This document lists all implemented features including the ones that are not yet
 - [x] edge scrolling
 - [ ] edge scrolling with pointer synchronization (the updated transform should also be applied to current gesture)
 
+### Content Edit Mode
+
+- [x] Exiting vector edit mode automatically removes unused points from the vector network.
+- [x] Exiting text edit mode automatically deletes the text node when its content is empty.
+
 ### Controls
 
 **Mixed Properties**
