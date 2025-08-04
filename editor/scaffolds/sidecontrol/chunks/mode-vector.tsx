@@ -18,10 +18,15 @@ import {
 } from "@/components/ui-editor/select";
 import useTangentMirroring from "./use-tangent-mirroring";
 import vn from "@grida/vn";
+import grida from "@grida/schema";
+import type { editor } from "@/grida-canvas";
+import { useA11yActions } from "@/grida-canvas-react/provider";
+import { encodeTranslateVectorCommand } from "@/grida-canvas/reducers/methods";
 
 export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
   const {
     selected_vertices,
+    selected_segments,
     selected_tangents,
     absolute_vertices,
     segments,
@@ -38,25 +43,66 @@ export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
     selected_vertices
   );
 
-  let x: number | null = null;
-  let y: number | null = null;
+  const { a11yarrow } = useA11yActions();
 
-  if (selected_vertices.length === 1) {
-    const p = absolute_vertices[selected_vertices[0]];
-    x = p[0];
-    y = p[1];
-  } else if (selected_tangents.length === 1) {
-    const [v_idx, t_idx] = selected_tangents[0];
-    const seg = segments.find((s) =>
-      t_idx === 0 ? s.a === v_idx : s.b === v_idx
-    );
-    if (seg) {
+  const points = React.useMemo(() => {
+    const { vertices, tangents } = encodeTranslateVectorCommand(vectorNetwork, {
+      selected_vertices,
+      selected_segments,
+      selected_tangents,
+    });
+    const result: [number, number][] = [];
+    for (const v of vertices) {
+      result.push(absolute_vertices[v]);
+    }
+    for (const [v_idx, t_idx] of tangents) {
+      const seg = segments.find((s) =>
+        t_idx === 0 ? s.a === v_idx : s.b === v_idx
+      );
+      if (!seg) continue;
       const vertex = absolute_vertices[t_idx === 0 ? seg.a : seg.b];
       const tangent = t_idx === 0 ? seg.ta : seg.tb;
-      x = vertex[0] + tangent[0];
-      y = vertex[1] + tangent[1];
+      result.push([vertex[0] + tangent[0], vertex[1] + tangent[1]]);
     }
-  }
+    return result;
+  }, [
+    vectorNetwork,
+    selected_vertices,
+    selected_segments,
+    selected_tangents,
+    absolute_vertices,
+    segments,
+  ]);
+
+  const computeMixed = React.useCallback(
+    (values: number[]): typeof grida.mixed | number | "" => {
+      if (values.length === 0) return "";
+      const first = values[0];
+      return values.every((v) => v === first) ? first : grida.mixed;
+    },
+    []
+  );
+
+  const x = computeMixed(points.map((p) => p[0]));
+  const y = computeMixed(points.map((p) => p[1]));
+
+  const handleDelta = React.useCallback(
+    (axis: "x" | "y") =>
+      (change: editor.api.NumberChange) => {
+        if (change.type !== "delta") return;
+        const direction =
+          axis === "x"
+            ? change.value > 0
+              ? "right"
+              : "left"
+            : change.value > 0
+              ? "down"
+              : "up";
+        const shift = Math.abs(change.value) > 1;
+        a11yarrow("selection", direction, shift);
+      },
+    [a11yarrow]
+  );
 
   return (
     <div key={node_id} className="mt-4 mb-10">
@@ -65,15 +111,15 @@ export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
           <PropertyLine className="items-center gap-1">
             <PropertyLineLabel>Position</PropertyLineLabel>
             <InputPropertyNumber
-              mode="fixed"
-              value={x ?? ""}
-              readOnly
+              mode="auto"
+              value={x}
+              onValueChange={handleDelta("x")}
               icon={<span className="text-[9px] text-muted-foreground">X</span>}
             />
             <InputPropertyNumber
-              mode="fixed"
-              value={y ?? ""}
-              readOnly
+              mode="auto"
+              value={y}
+              onValueChange={handleDelta("y")}
               icon={<span className="text-[9px] text-muted-foreground">Y</span>}
             />
           </PropertyLine>
