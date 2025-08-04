@@ -13,6 +13,16 @@ namespace cmath {
   export const tan = Math.tan;
 
   /**
+   * Approximation constant used to convert a circular arc into a cubic Bézier
+   * curve. Commonly known as KAPPA, defined as `4 * (sqrt(2) - 1) / 3`.
+   *
+   * When bending a right angle corner to approximate a quarter circle, the
+   * tangents will have a magnitude of `KAPPA * radius` where the radius is
+   * half of the chosen reference segment's length.
+   */
+  export const KAPPA = (4 * (Math.SQRT2 - 1)) / 3;
+
+  /**
    * Represents a single axis in 2D space.
    *
    * Also known as horizontal (x-axis) or vertical (y-axis) direction.

@@ -4,15 +4,6 @@ import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 type Vector2 = [number, number];
 export namespace vn {
   /**
-   * Approximation constant used to convert a circular arc into a cubic Bézier
-   * curve. Commonly known as KAPPA, `4 * (sqrt(2) - 1) / 3`.
-   *
-   * When bending a right angle corner to approximate a quarter circle, the
-   * tangents will have a magnitude of `KAPPA * radius` where the radius is half
-   * of the chosen reference segment's length.
-   */
-  export const KAPPA = 0.5522847498307936;
-  /**
    * tangent mirroring mode
    *
    * **description based on moving ta (applies the same vice versa for tb)**
@@ -410,7 +401,7 @@ export namespace vn {
      * Bends a sharp corner into a smooth one by assigning mirrored tangents.
      *
      * The tangent length is derived from the length of the reference segment
-     * and the {@link KAPPA} constant so that bending four equal-length sides
+     * and the {@link cmath.KAPPA} constant so that bending four equal-length sides
      * yields a perfect circle.
      *
      * @param vertex index of the vertex to bend
@@ -441,7 +432,7 @@ export namespace vn {
 
       // determine the reference segment for length calculation
       const refData = (ref && data.find((d) => d.control === ref)) || data[0];
-      const radius = (refData.len / 2) * KAPPA;
+      const radius = (refData.len / 2) * cmath.KAPPA;
 
       // compute the angle bisector
       const bx = data[0].dir[0] + data[1].dir[0];
@@ -1166,10 +1157,8 @@ export namespace vn {
 
     // Constant for approximating a quarter of a circle with a cubic Bézier curve
     // See: https://spencermortensen.com/articles/bezier-circle/
-    const KAPPA = 0.5522847498307936;
-
-    const kx = rx * KAPPA;
-    const ky = ry * KAPPA;
+    const kx = rx * cmath.KAPPA;
+    const ky = ry * cmath.KAPPA;
 
     const vertices: vn.VectorNetworkVertex[] = [
       { p: [cx, cy - ry] }, // Top

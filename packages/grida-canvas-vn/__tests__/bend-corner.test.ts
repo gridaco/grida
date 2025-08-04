@@ -1,4 +1,5 @@
 import { vn } from "../vn";
+import cmath from "@grida/cmath";
 
 describe("bendCorner", () => {
   it("uses KAPPA to create mirrored tangents", () => {
@@ -19,7 +20,7 @@ describe("bendCorner", () => {
     // tangents should be mirrored
     expect(vn.inferMirroringMode(ta, tb)).toBe("all");
 
-    const r = vn.KAPPA * (editor.segmentLength(0) / 2);
+    const r = cmath.KAPPA * (editor.segmentLength(0) / 2);
     expect(ta[0]).toBeCloseTo(r, 5);
     expect(ta[1]).toBeCloseTo(-r, 5);
     expect(tb[0]).toBeCloseTo(-r, 5);
@@ -38,7 +39,7 @@ describe("bendCorner", () => {
 
     const seg0 = editor.segments[0];
     const seg3 = editor.segments[3];
-    const r = vn.KAPPA * (editor.segmentLength(0) / 2);
+    const r = cmath.KAPPA * (editor.segmentLength(0) / 2);
 
     expect(seg0.ta[0]).toBeCloseTo(r, 5);
     expect(seg0.ta[1]).toBeCloseTo(-r, 5);
@@ -62,7 +63,7 @@ describe("bendCorner", () => {
     editor.bendCorner(0, "tb");
 
     const ta = editor.segments[0].ta;
-    const r = vn.KAPPA * (editor.segmentLength(1) / 2);
+    const r = cmath.KAPPA * (editor.segmentLength(1) / 2);
     expect(ta[0]).toBeCloseTo(r, 5);
     expect(ta[1]).toBeCloseTo(-r, 5);
     expect(vn.inferMirroringMode(ta, editor.segments[1].tb)).toBe("all");

@@ -1,14 +1,14 @@
 import { vn } from "../vn";
+import cmath from "@grida/cmath";
 
 describe("fromEllipse", () => {
   it("creates four cubic segments for an ellipse", () => {
     const result = vn.fromEllipse({ x: 0, y: 0, width: 100, height: 200 });
 
-    const KAPPA = 0.5522847498307936;
     const rx = 50;
     const ry = 100;
-    const kx = rx * KAPPA;
-    const ky = ry * KAPPA;
+    const kx = rx * cmath.KAPPA;
+    const ky = ry * cmath.KAPPA;
 
     expect(result.vertices).toEqual([
       { p: [50, 0] },
