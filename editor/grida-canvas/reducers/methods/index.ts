@@ -6,3 +6,4 @@ export * from "./transform";
 export * from "./duplicate";
 export * from "./vector";
 export * from "./flatten";
+export * from "./tool";

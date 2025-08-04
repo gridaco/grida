@@ -363,10 +363,12 @@ export function useEditorHotKeys() {
       switch (e.key) {
         case "Meta":
           editor.configureSurfaceRaycastTargeting({ target: "deepest" });
+          editor.configureCurveTangentMirroringModifier("all");
           break;
         case "Control":
           editor.configureSurfaceRaycastTargeting({ target: "deepest" });
           editor.configureTranslateWithForceDisableSnap("on");
+          editor.configureCurveTangentMirroringModifier("all");
           break;
         case "Alt":
           editor.configureMeasurement("on");
@@ -396,10 +398,12 @@ export function useEditorHotKeys() {
       switch (e.key) {
         case "Meta":
           editor.configureSurfaceRaycastTargeting({ target: "auto" });
+          editor.configureCurveTangentMirroringModifier("auto");
           break;
         case "Control":
           editor.configureSurfaceRaycastTargeting({ target: "auto" });
           editor.configureTranslateWithForceDisableSnap("off");
+          editor.configureCurveTangentMirroringModifier("auto");
           break;
         case "Alt":
           editor.configureMeasurement("off");

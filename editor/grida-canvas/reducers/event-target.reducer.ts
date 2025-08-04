@@ -26,6 +26,7 @@ import {
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
   self_optimizeVectorNetwork,
+  self_select_tool,
 } from "./methods";
 import {
   self_updateVectorAreaSelection,
@@ -209,7 +210,7 @@ function __self_evt_on_click(
       }
 
       self_try_insert_node(draft, parent, nnode);
-      draft.tool = { type: "cursor" };
+      self_select_tool(draft, { type: "cursor" });
       self_selectNode(draft, "reset", nnode.id);
 
       // if the node is text, enter content edit mode
@@ -561,7 +562,7 @@ function __self_evt_on_drag_start(
       });
 
       self_try_insert_node(draft, parent, nnode);
-      draft.tool = { type: "cursor" };
+      self_select_tool(draft, { type: "cursor" });
       self_selectNode(draft, "reset", nnode.id);
       __self_start_gesture_scale_draw_new_node(draft, {
         new_node_id: nnode.id,
@@ -745,7 +746,7 @@ function __self_evt_on_drag_end(
       }
 
       // cancel to default
-      draft.tool = { type: "cursor" };
+      self_select_tool(draft, { type: "cursor" });
       break;
     }
     case "cursor": {
@@ -760,13 +761,13 @@ function __self_evt_on_drag_end(
       }
 
       // cancel to default
-      draft.tool = { type: "cursor" };
+      self_select_tool(draft, { type: "cursor" });
       break;
     }
     case "insert":
     default:
       // cancel to default
-      draft.tool = { type: "cursor" };
+      self_select_tool(draft, { type: "cursor" });
       break;
   }
 

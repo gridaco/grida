@@ -608,6 +608,13 @@ export namespace editor.state {
      * @default {type: "cursor"}
      */
     tool: editor.state.ToolMode;
+
+    /**
+     * @private - internal use only
+     *
+     * previously selected tool type
+     */
+    __tool_previous: editor.state.ToolMode | null;
   }
 
   export type ContentEditModeState =
@@ -886,6 +893,7 @@ export namespace editor.state {
       googlefonts: s.fonts().map((family) => ({ family })),
       brushes: [],
       tool: { type: "cursor" },
+      __tool_previous: null,
       brush: editor.config.DEFAULT_BRUSH,
       scene_id: doc.entry_scene_id ?? Object.keys(doc.scenes)[0] ?? undefined,
       flags: {

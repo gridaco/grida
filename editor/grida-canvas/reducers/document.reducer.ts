@@ -30,6 +30,7 @@ import {
   self_flattenNode,
   normalizeVectorNodeBBox,
   supportsFlatten,
+  self_select_tool,
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
@@ -167,7 +168,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
 
         // after
-        draft.tool = { type: "cursor" };
+        self_select_tool(draft, { type: "cursor" });
         self_selectNode(draft, "reset", ...new_top_ids);
       });
     }
@@ -357,7 +358,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         );
 
         // after
-        draft.tool = { type: "cursor" };
+        self_select_tool(draft, { type: "cursor" });
         self_selectNode(draft, "reset", ...new_top_ids);
       });
     }

@@ -14,6 +14,8 @@ import {
   self_flattenNode,
   self_optimizeVectorNetwork,
   self_try_remove_node,
+  self_select_tool,
+  self_revert_tool,
 } from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
@@ -167,9 +169,9 @@ function __self_try_enter_content_edit_mode_auto(
         node_id: node.id,
         imageRef: node.imageRef,
       };
-      draft.tool = {
+      self_select_tool(draft, {
         type: "brush",
-      };
+      });
       self_clearSelection(draft);
       break;
     }
@@ -232,54 +234,7 @@ function __self_try_exit_content_edit_mode(
 ) {
   __self_before_exit_content_edit_mode(draft);
   draft.content_edit_mode = undefined;
-  draft.tool = { type: "cursor" };
-}
-
-function __self_set_tool(
-  draft: editor.state.IEditorState,
-  tool: editor.state.ToolMode
-) {
-  if (
-    draft.flags.__unstable_brush_tool !== "on" &&
-    (tool.type === "brush" || tool.type === "eraser")
-  ) {
-    console.warn("unstable brush tool is not enabled");
-    return;
-  }
-
-  const vector_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
-    "cursor",
-    "hand",
-    "path",
-    "lasso",
-  ];
-  const text_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
-    "cursor",
-  ];
-  const bitmap_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
-    "brush",
-    "eraser",
-    "flood-fill",
-  ];
-
-  // validate cursor mode
-  if (draft.content_edit_mode) {
-    switch (draft.content_edit_mode.type) {
-      case "vector":
-        if (!vector_edit_mode_valid_tool_modes.includes(tool.type)) return;
-        break;
-      case "text":
-        if (!text_edit_mode_valid_tool_modes.includes(tool.type)) return;
-        break;
-      case "bitmap":
-        if (!bitmap_edit_mode_valid_tool_modes.includes(tool.type)) {
-          draft.content_edit_mode = undefined;
-        }
-        break;
-    }
-  }
-
-  draft.tool = tool;
+  self_revert_tool(draft);
 }
 
 function __self_set_brush(
@@ -751,7 +706,7 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       }
       case "surface/tool": {
         const { tool } = action;
-        __self_set_tool(draft, tool);
+        self_select_tool(draft, tool);
         break;
       }
       case "surface/brush": {
