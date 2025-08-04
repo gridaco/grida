@@ -9,6 +9,7 @@ import { normalizeVectorNodeBBox } from "./vector";
 
 /**
  * Node types that can be flattened into vector paths.
+ * Includes primitive shapes and vector nodes.
  */
 export const FLATTENABLE_NODE_TYPES = new Set<grida.program.nodes.NodeType>([
   "rectangle",
@@ -16,6 +17,7 @@ export const FLATTENABLE_NODE_TYPES = new Set<grida.program.nodes.NodeType>([
   "polygon",
   "ellipse",
   "line",
+  "vector",
 ]);
 
 export function supportsFlatten(node: grida.program.nodes.Node): boolean {
@@ -36,6 +38,14 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
   const node = dq.__getNodeById(draft, node_id);
   if (!node || !supportsFlatten(node)) {
     return null;
+  }
+
+  if (node.type === "vector") {
+    normalizeVectorNodeBBox(node as grida.program.nodes.VectorNode);
+    return {
+      node: node as grida.program.nodes.VectorNode,
+      delta: [0, 0] as cmath.Vector2,
+    };
   }
 
   const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id);
