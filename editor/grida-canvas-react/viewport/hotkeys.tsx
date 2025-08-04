@@ -493,8 +493,9 @@ export function useEditorHotKeys() {
 
   const __bend_tool_triggered_by_hotkey = useRef(false);
   useHotkeys(
-    "meta, ctrl",
+    "meta",
     (e) => {
+      if (e.type === "keydown" && content_edit_mode?.type !== "vector") return;
       if (tool.type === "bend" && !__bend_tool_triggered_by_hotkey.current)
         return;
 

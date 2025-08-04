@@ -31,6 +31,8 @@ export function self_select_tool<S extends editor.state.IEditorState>(
     "eraser",
     "flood-fill",
   ];
+  const no_content_edit_mode_valid_enter_tool_modes: editor.state.ToolModeType[] =
+    ["cursor", "hand", "zoom", "insert", "draw", "path"];
 
   // validate cursor mode
   if (draft.content_edit_mode) {
@@ -47,6 +49,9 @@ export function self_select_tool<S extends editor.state.IEditorState>(
         }
         break;
     }
+  } else {
+    if (!no_content_edit_mode_valid_enter_tool_modes.includes(tool.type))
+      return;
   }
 
   draft.__tool_previous = draft.tool;
