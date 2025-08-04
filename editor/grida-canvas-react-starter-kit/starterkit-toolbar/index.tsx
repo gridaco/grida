@@ -102,6 +102,7 @@ export default function Toolbar() {
   const tool = useToolState();
   const { flags } = useEditorFlagsState();
   const value = toolmode_to_toolbar_value(tool);
+  const [open, setOpen] = useState<string | null>(null);
 
   const tools = useMemo(() => {
     const stable: Array<{
@@ -139,6 +140,8 @@ export default function Toolbar() {
       >
         <ToolsGroup
           value={value}
+          open={open === "cursor"}
+          onOpenChange={(o) => setOpen(o ? "cursor" : null)}
           options={[
             { value: "cursor", label: "Cursor", shortcut: "V" },
             { value: "hand", label: "Hand tool", shortcut: "H" },
@@ -166,6 +169,8 @@ export default function Toolbar() {
         </ToolGroupItem>
         <ToolsGroup
           value={value}
+          open={open === "shape"}
+          onOpenChange={(o) => setOpen(o ? "shape" : null)}
           options={[
             { value: "rectangle", label: "Rectangle", shortcut: "R" },
             { value: "ellipse", label: "Ellipse", shortcut: "O" },
@@ -180,6 +185,8 @@ export default function Toolbar() {
         />
         <ToolsGroup
           value={value}
+          open={open === "draw"}
+          onOpenChange={(o) => setOpen(o ? "draw" : null)}
           options={tools}
           onValueChange={(v) => {
             editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
@@ -196,10 +203,14 @@ export function ToolsGroup({
   value,
   options,
   onValueChange,
+  open,
+  onOpenChange,
 }: {
   value: ToolbarToolType;
   options: Array<{ value: ToolbarToolType; label: string; shortcut?: string }>;
   onValueChange?: (value: ToolbarToolType) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [primary, setPrimary] = useState<ToolbarToolType>(
     options.find((o) => o.value === value)?.value ?? options[0].value
@@ -223,7 +234,7 @@ export function ToolsGroup({
         <ToolIcon type={primary} className="size-4" />
       </ToolGroupItem>
       {options.length > 1 && (
-        <DropdownMenu modal>
+        <DropdownMenu modal open={open} onOpenChange={onOpenChange}>
           <DropdownMenuTrigger>
             <CaretDownIcon />
           </DropdownMenuTrigger>
