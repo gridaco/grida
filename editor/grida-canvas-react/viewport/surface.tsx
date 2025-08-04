@@ -581,7 +581,7 @@ function RootFramesBarOverlay() {
         sideOffset={8}
       >
         <FloatingBarContent>
-          <FloatingBarTitle>{rootframe.name} (single mode)</FloatingBarTitle>
+          <NodeTitleBarTitle node={rootframe}>{" (single mode)"}</NodeTitleBarTitle>
         </FloatingBarContent>
       </NodeTitleBar>
     );
@@ -602,7 +602,7 @@ function RootFramesBarOverlay() {
                 : "idle"
           }
         >
-          <FloatingBarTitle>{node.name}</FloatingBarTitle>
+          <NodeTitleBarTitle node={node} />
         </NodeTitleBar>
       ))}
     </>
@@ -639,10 +639,6 @@ function NodeTitleBar({
       onPointerLeave: () => {
         editor.hoverLeaveNode(node.id);
       },
-      onDoubleClick: ({ event }) => {
-        const name = prompt("rename", node.name);
-        if (name) editor.changeNodeName(node.id, name);
-      },
       onPointerDown: ({ event }) => {
         event.preventDefault();
         if (event.shiftKey) {
@@ -670,6 +666,71 @@ function NodeTitleBar({
         {children}
       </div>
     </FloatingBar>
+  );
+}
+
+function NodeTitleBarTitle({
+  node,
+  children,
+}: React.PropsWithChildren<{
+  node: grida.program.nodes.Node;
+}>) {
+  const editor = useCurrentEditor();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(node.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setValue(node.name);
+  }, [node.name]);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  const commit = () => {
+    const name = value.trim();
+    if (name && name !== node.name) {
+      editor.changeNodeName(node.id, name);
+    }
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setValue(node.name);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        className="max-w-full w-min pointer-events-auto text-xs truncate text-muted-foreground/65 bg-transparent outline-none"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onPointerDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") cancel();
+        }}
+      />
+    );
+  }
+
+  return (
+    <FloatingBarTitle
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+    >
+      {node.name}
+      {children}
+    </FloatingBarTitle>
   );
 }
 
