@@ -443,13 +443,66 @@ export namespace vn {
 
       for (let i = 0; i < segmentIndices.length; i++) {
         const current = this._segments[segmentIndices[i]];
-        const next = this._segments[segmentIndices[(i + 1) % segmentIndices.length]];
+        const next =
+          this._segments[segmentIndices[(i + 1) % segmentIndices.length]];
 
         if (!current || !next) return false;
         if (current.b !== next.a) return false;
       }
 
       return true;
+    }
+
+    /**
+     * Returns all closed regions in the network.
+     *
+     * Each region is represented as an array of absolute points forming a
+     * closed loop. Segments that do not form a closed loop are ignored.
+     */
+    getLoops(): Vector2[][] {
+      const regions: Vector2[][] = [];
+      const visited = new Set<number>();
+
+      for (let si = 0; si < this._segments.length; si++) {
+        if (visited.has(si)) continue;
+        const seg = this._segments[si];
+        const loop: number[] = [seg.a];
+        let currentVertex = seg.b;
+        visited.add(si);
+        let closed = false;
+
+        while (true) {
+          loop.push(currentVertex);
+          if (currentVertex === loop[0]) {
+            closed = true;
+            break;
+          }
+          const nextIndex = this._segments.findIndex(
+            (s, idx) => !visited.has(idx) && s.a === currentVertex
+          );
+          if (nextIndex === -1) break;
+          visited.add(nextIndex);
+          currentVertex = this._segments[nextIndex].b;
+        }
+
+        if (closed) {
+          loop.pop();
+          regions.push(loop.map((vi) => this._vertices[vi].p));
+        }
+      }
+
+      return regions;
+    }
+
+    /**
+     * Checks if the given point lies inside any region of the network.
+     */
+    isPointInRegion(point: Vector2): boolean {
+      const regions = this.getLoops();
+      for (const region of regions) {
+        if (cmath.polygon.pointInPolygon(point, region)) return true;
+      }
+      return false;
     }
 
     /**
