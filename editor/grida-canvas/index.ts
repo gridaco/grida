@@ -952,6 +952,7 @@ export namespace editor.gesture {
     | GestureTranslate
     | GestureSort
     | GestureGap
+    | GestureInsertAndResize
     | GestureScale
     | GestureRotate
     | GestureCornerRadius
@@ -1118,6 +1119,14 @@ export namespace editor.gesture {
     readonly initial_snapshot: editor.state.IMinimalDocumentState;
     readonly initial_rects: cmath.Rectangle[];
     readonly direction: cmath.CardinalDirection;
+  };
+
+  export type GestureInsertAndResize = Omit<GestureScale, "type"> & {
+    readonly type: "insert-and-resize";
+    pending_insertion: {
+      node_id: string;
+      prototype: grida.program.nodes.Node;
+    } | null;
   };
 
   export type GestureRotate = IGesture & {

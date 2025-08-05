@@ -28,6 +28,7 @@ import {
   self_optimizeVectorNetwork,
   self_select_tool,
 } from "./methods";
+import { self_moveNode } from "./methods/move";
 import {
   self_updateVectorAreaSelection,
   getUXNeighbouringVertices,
@@ -561,12 +562,26 @@ function __self_evt_on_drag_start(
         height: initial_rect.height as 0, // casting for line node
       });
 
+      let pending: {
+        node_id: string;
+        prototype: grida.program.nodes.Node;
+      } | null = null;
+      if (draft.tool.node === "container") {
+        pending = {
+          node_id: nnode.id,
+          prototype: JSON.parse(JSON.stringify(nnode)),
+        };
+        // UX: temporary remove fill to let user see whats behind.
+        (nnode as grida.program.nodes.ContainerNode).fill = undefined;
+      }
+
       self_try_insert_node(draft, parent, nnode);
       self_select_tool(draft, { type: "cursor" });
       self_selectNode(draft, "reset", nnode.id);
-      __self_start_gesture_scale_draw_new_node(draft, {
+      __self_start_gesture_insert_and_resize_draw_new_node(draft, {
         new_node_id: nnode.id,
         new_node_rect: initial_rect,
+        pending_insertion: pending,
       });
 
       break;
@@ -771,7 +786,7 @@ function __self_evt_on_drag_end(
       break;
   }
 
-  __self_maybe_end_gesture(draft);
+  __self_maybe_end_gesture(draft, context);
   draft.gesture = { type: "idle" };
   draft.marquee = undefined;
   draft.lasso = undefined;
@@ -861,6 +876,7 @@ function __self_evt_on_drag(
         break;
       }
       // [insertion mode - resize after insertion]
+      case "insert-and-resize":
       case "scale": {
         self_update_gesture_transform(draft, context);
         break;
@@ -1431,18 +1447,23 @@ function get_next_brush_pain_color(
   );
 }
 
-function __self_start_gesture_scale_draw_new_node(
+function __self_start_gesture_insert_and_resize_draw_new_node(
   draft: Draft<editor.state.IEditorState>,
   {
     new_node_id,
     new_node_rect,
+    pending_insertion,
   }: {
     new_node_id: string;
     new_node_rect: cmath.Rectangle;
+    pending_insertion: {
+      node_id: string;
+      prototype: grida.program.nodes.Node;
+    } | null;
   }
 ) {
   draft.gesture = {
-    type: "scale",
+    type: "insert-and-resize",
     initial_snapshot: editor.state.snapshot(draft),
     initial_rects: [new_node_rect],
     movement: cmath.vector2.zero,
@@ -1450,6 +1471,7 @@ function __self_start_gesture_scale_draw_new_node(
     last: cmath.vector2.zero,
     selection: [new_node_id],
     direction: "se",
+    pending_insertion,
   };
 }
 
@@ -1491,10 +1513,69 @@ function __before_end_translate_vector_controls(
   self_optimizeVectorNetwork(draft);
 }
 
-function __self_maybe_end_gesture(draft: Draft<editor.state.IEditorState>) {
+function __before_end_insert_and_resize(
+  draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext
+) {
+  assert(draft.gesture.type === "insert-and-resize");
+  const pending = draft.gesture.pending_insertion;
+  if (!pending) return;
+
+  const node = dq.__getNodeById(
+    draft,
+    pending.node_id
+  ) as grida.program.nodes.ContainerNode;
+  node.fill = (
+    pending.prototype as grida.program.nodes.ContainerNodePrototype
+  ).fill;
+
+  if (cmath.vector2.isZero(draft.gesture.movement)) return;
+
+  const container_rect = context.geometry.getNodeAbsoluteBoundingRect(
+    pending.node_id
+  )!;
+  const parent_id = dq.getParentId(draft.document_ctx, pending.node_id);
+  const siblings = parent_id
+    ? [
+        ...(
+          dq.__getNodeById(
+            draft,
+            parent_id
+          ) as grida.program.nodes.i.IChildrenReference
+        ).children,
+      ]
+    : [...draft.document.scenes[draft.scene_id!].children];
+
+  siblings.forEach((id) => {
+    if (id === pending.node_id) return;
+    const rect = context.geometry.getNodeAbsoluteBoundingRect(id)!;
+    if (rect_contains_rect(container_rect, rect)) {
+      self_moveNode(draft, id, pending.node_id);
+      const child = dq.__getNodeById(
+        draft,
+        id
+      ) as grida.program.nodes.i.IPositioning;
+      if (typeof child.left === "number")
+        child.left = rect.x - container_rect.x;
+      if (typeof child.top === "number") child.top = rect.y - container_rect.y;
+    }
+  });
+}
+
+function __self_maybe_end_gesture(
+  draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext
+) {
   switch (draft.gesture.type) {
     case "brush": {
       editor.__global_editors.bitmap?.close();
+      break;
+    }
+    case "insert-and-resize": {
+      __before_end_insert_and_resize(draft, context);
+      break;
+    }
+    case "scale": {
       break;
     }
     case "translate": {
@@ -1523,6 +1604,15 @@ function __self_maybe_end_gesture(draft: Draft<editor.state.IEditorState>) {
 
   draft.gesture = { type: "idle" };
   draft.dropzone = undefined;
+}
+
+function rect_contains_rect(a: cmath.Rectangle, b: cmath.Rectangle) {
+  return (
+    b.x >= a.x &&
+    b.y >= a.y &&
+    b.x + b.width <= a.x + a.width &&
+    b.y + b.height <= a.y + a.height
+  );
 }
 
 /**

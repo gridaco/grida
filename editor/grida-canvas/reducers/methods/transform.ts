@@ -58,6 +58,7 @@ export function self_update_gesture_transform<
     case "sort": {
       return __self_update_gesture_transform_translate_sort(draft);
     }
+    case "insert-and-resize":
     case "scale": {
       return __self_update_gesture_transform_scale(draft, context);
     }
@@ -442,7 +443,11 @@ function __self_update_gesture_transform_scale(
   draft: Draft<editor.state.IEditorState>,
   context: ReducerContext
 ) {
-  assert(draft.gesture.type === "scale", "Gesture type must be scale");
+  assert(
+    draft.gesture.type === "scale" ||
+      draft.gesture.type === "insert-and-resize",
+    "Gesture type must be scale or insert-and-resize"
+  );
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.scenes[draft.scene_id];
   const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =

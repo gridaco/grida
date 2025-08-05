@@ -117,6 +117,12 @@ This document lists all implemented features including the ones that are not yet
 - [x] edge scrolling
 - [ ] edge scrolling with pointer synchronization (the updated transform should also be applied to current gesture)
 
+**Inserting**
+
+- [x] insert with click (with static size)
+- [x] insert with drag (with user-resizing size)
+- [x] contain after insert-and-resize (when drag ends, contains the contained node behind that container)
+
 ### Content Edit Mode
 
 - [x] Exiting vector edit mode automatically removes unused points from the vector network.
