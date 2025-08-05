@@ -58,7 +58,22 @@ export function self_selectNode<S extends editor.state.IEditorState>(
 export function self_clearSelection<S extends editor.state.IEditorState>(
   draft: Draft<S>
 ) {
-  draft.selection = [];
+  if (draft.content_edit_mode) {
+    switch (draft.content_edit_mode.type) {
+      case "vector": {
+        draft.content_edit_mode.selected_vertices = [];
+        draft.content_edit_mode.selected_segments = [];
+        draft.content_edit_mode.selected_tangents = [];
+        draft.content_edit_mode.neighbouring_vertices = [];
+        draft.content_edit_mode.a_point = null;
+        draft.content_edit_mode.next_ta = null;
+        break;
+      }
+    }
+  } else {
+    draft.selection = [];
+  }
+
   return draft;
 }
 

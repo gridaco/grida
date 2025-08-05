@@ -283,12 +283,7 @@ function __self_evt_on_pointer_down(
       if (draft.content_edit_mode?.type === "vector") {
         if (!shiftKey && draft.snapped_vertex_idx === null) {
           // clear the selection for vector content edit mode
-          draft.content_edit_mode.selected_vertices = [];
-          draft.content_edit_mode.selected_segments = [];
-          draft.content_edit_mode.selected_tangents = [];
-          draft.content_edit_mode.neighbouring_vertices = [];
-          draft.content_edit_mode.a_point = null;
-          draft.content_edit_mode.next_ta = null;
+          self_clearSelection(draft);
         }
         break;
       }

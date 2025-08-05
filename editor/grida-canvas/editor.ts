@@ -600,9 +600,61 @@ export class Editor
     return ids;
   }
 
+  private _stackEscapeSteps(
+    state: editor.state.IEditorState
+  ): editor.a11y.EscapeStep[] {
+    const steps: editor.a11y.EscapeStep[] = [];
+
+    // p1. if the tool is selected, escape the tool
+    if (state.tool.type !== "cursor") {
+      steps.push("escape-tool");
+    }
+
+    // p2. if the selection is not empty, escape the selection
+    if (!state.content_edit_mode) {
+      if (state.selection.length > 0) {
+        steps.push("escape-selection");
+      }
+    } else {
+      switch (state.content_edit_mode.type) {
+        case "vector": {
+          const { selected_vertices, selected_segments, selected_tangents } =
+            state.content_edit_mode;
+          const hasSelection =
+            selected_vertices.length > 0 ||
+            selected_segments.length > 0 ||
+            selected_tangents.length > 0;
+          if (hasSelection) {
+            steps.push("escape-selection");
+          }
+          break;
+        }
+      }
+
+      // p3. if the content edit mode is active, escape the content edit mode
+      steps.push("escape-content-edit-mode");
+    }
+
+    return steps;
+  }
+
   public a11yEscape() {
-    this.blur();
-    this.tryExitContentEditMode();
+    const step = this._stackEscapeSteps(this.mstate)[0];
+    switch (step) {
+      case "escape-tool": {
+        this.setTool({ type: "cursor" });
+        break;
+      }
+      case "escape-selection": {
+        this.blur();
+        break;
+      }
+      case "escape-content-edit-mode":
+      default: {
+        this.tryExitContentEditMode();
+        break;
+      }
+    }
   }
 
   public blur() {

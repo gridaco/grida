@@ -1356,6 +1356,11 @@ export namespace editor.history {
 }
 
 export namespace editor.a11y {
+  export type EscapeStep =
+    | "escape-tool"
+    | "escape-selection"
+    | "escape-content-edit-mode";
+
   export const a11y_direction_to_order = {
     "a11y/up": "backward",
     "a11y/right": "forward",
@@ -1773,7 +1778,14 @@ export namespace editor.api {
     select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
 
     /**
-     * ux a11y escape command - either exits the content edit mode, or blur the selection - varies by the current state.
+     * ux a11y escape command.
+     *
+     * - In vector content edit mode, prioritizes:
+     *   1. resetting active tool to cursor,
+     *   2. clearing vector selection,
+     *   3. exiting the content edit mode.
+     * - Otherwise exits the content edit mode.
+     *
      * bind this to `escape` key.
      */
     a11yEscape(): void;
