@@ -54,6 +54,39 @@ export default function useSurfaceVectorEditor() {
     [vne, offset]
   );
 
+  const loops = useMemo(() => {
+    const visited = new Set<number>();
+    const res: { vertices: number[]; segments: number[] }[] = [];
+    for (let si = 0; si < segments.length; si++) {
+      if (visited.has(si)) continue;
+      const seg = segments[si];
+      const loopVertices = [seg.a];
+      const loopSegments = [si];
+      let currentVertex = seg.b;
+      visited.add(si);
+      let closed = false;
+      while (true) {
+        loopVertices.push(currentVertex);
+        if (currentVertex === loopVertices[0]) {
+          closed = true;
+          break;
+        }
+        const nextIndex = segments.findIndex(
+          (s, idx) => !visited.has(idx) && s.a === currentVertex
+        );
+        if (nextIndex === -1) break;
+        loopSegments.push(nextIndex);
+        visited.add(nextIndex);
+        currentVertex = segments[nextIndex].b;
+      }
+      if (closed) {
+        loopVertices.pop();
+        res.push({ vertices: loopVertices, segments: loopSegments });
+      }
+    }
+    return res;
+  }, [segments]);
+
   const multi =
     selected_tangents.length > 1 ||
     selected_vertices.length > 0 ||
@@ -149,6 +182,7 @@ export default function useSurfaceVectorEditor() {
       onCurveControlPointDragStart,
       onDragStart,
       onSegmentInsertMiddle,
+      loops,
     }),
     [
       //
@@ -175,6 +209,7 @@ export default function useSurfaceVectorEditor() {
       onCurveControlPointDragStart,
       onDragStart,
       onSegmentInsertMiddle,
+      loops,
     ]
   );
 }

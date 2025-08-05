@@ -12,6 +12,7 @@ import { Point } from "./point";
 import assert from "assert";
 import useSurfaceVectorEditor from "@/grida-canvas-react/use-sub-vector-network-editor";
 import { useCurrentEditor } from "@/grida-canvas-react";
+import { VectorRegion } from "./vector-region";
 
 function transformDelta(v: cmath.Vector2, t: cmath.Transform): cmath.Vector2 {
   return cmath.vector2.transform(v, [
@@ -33,6 +34,7 @@ export function SurfaceVectorEditor({
     node_id,
     absolute_vertices,
     segments,
+    loops,
     selected_tangents,
     neighbouring_vertices,
     path_cursor_position,
@@ -90,6 +92,30 @@ export function SurfaceVectorEditor({
           </svg>
         )}
       </div>
+
+      {loops.map((loop, i) => {
+        const vertexPositions = loop.vertices.map((v) =>
+          cmath.vector2.transform(absolute_vertices[v], transform)
+        );
+        const indexMap = new Map(loop.vertices.map((v, idx) => [v, idx]));
+        const loopSegments = loop.segments.map((si) => {
+          const s = segments[si];
+          return {
+            idx: si,
+            a: indexMap.get(s.a)!,
+            b: indexMap.get(s.b)!,
+            ta: transformDelta(s.ta, transform),
+            tb: transformDelta(s.tb, transform),
+          };
+        });
+        return (
+          <VectorRegion
+            key={`region-${i}`}
+            vertices={vertexPositions}
+            segments={loopSegments}
+          />
+        );
+      })}
 
       {/* Render all segments */}
       {segments.map((s, i) => {
