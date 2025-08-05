@@ -2,6 +2,7 @@ import React from "react";
 import { cn } from "@/components/lib/utils";
 import type cmath from "@grida/cmath";
 import { cursors } from "@/grida-canvas-react/components/cursor";
+import { Point } from "./point";
 
 export const Knob = React.forwardRef(function Knob(
   {
@@ -39,47 +40,31 @@ export const Knob = React.forwardRef(function Knob(
     w: { top: "50%", left: "0" },
   };
 
-  // Map directions to their translation offsets
-  const anchorTranslationMap: Record<
-    cmath.CardinalDirection,
-    { translateX: string; translateY: string }
-  > = {
-    nw: { translateX: "-50%", translateY: "-50%" },
-    n: { translateX: "-50%", translateY: "-50%" },
-    ne: { translateX: "-50%", translateY: "-50%" },
-    e: { translateX: "-50%", translateY: "-50%" },
-    se: { translateX: "-50%", translateY: "-50%" },
-    s: { translateX: "-50%", translateY: "-50%" },
-    sw: { translateX: "-50%", translateY: "-50%" },
-    w: { translateX: "-50%", translateY: "-50%" },
-  };
-
-  // Get the correct position and translation for the current anchor
+  // Get the correct position for the current anchor
   const anchorPosition = anchorPositionMap[anchor];
-  const anchorTranslation = anchorTranslationMap[anchor];
 
   return (
-    <div
+    <Point
       {...props}
       ref={ref}
+      point={[0, 0]}
+      size={size}
+      shape="square"
       data-layer-is-component-consumer={isComponentConsumer}
       className={cn(
-        "border bg-white border-workbench-accent-sky group-data-[layer-is-component-consumer='true']:border-workbench-accent-violet data-[layer-is-component-consumer='true']:border-workbench-accent-violet absolute z-10 pointer-events-auto",
+        "border bg-white border-workbench-accent-sky group-data-[layer-is-component-consumer='true']:border-workbench-accent-violet data-[layer-is-component-consumer='true']:border-workbench-accent-violet",
         className
       )}
       style={{
         top: anchorPosition.top,
         left: anchorPosition.left,
-        transform: `translate(${anchorTranslation.translateX}, ${anchorTranslation.translateY})`,
-        width: size,
-        height: size,
         cursor: readonly ? "default" : cursors.resize_handle_cursor_map[anchor],
         touchAction: "none",
-        zIndex: 11,
+        zIndex: zIndex ?? 11,
         ...transform,
       }}
     >
       {children}
-    </div>
+    </Point>
   );
 });

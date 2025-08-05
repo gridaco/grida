@@ -3,7 +3,7 @@ import { cn } from "@/components/lib/utils";
 import type cmath from "@grida/cmath";
 
 /**
- * UI control Point, with shapes and extra hit region.
+ * UI control Point, with selectable shapes (circle, square, diamond) and extra hit region.
  */
 export const Point = React.forwardRef(
   (
@@ -21,7 +21,7 @@ export const Point = React.forwardRef(
       selected?: boolean;
       hovered?: boolean;
       size?: number;
-      shape?: "circle" | "diamond";
+      shape?: "circle" | "diamond" | "square";
     },
     ref: React.Ref<HTMLDivElement>
   ) => {
