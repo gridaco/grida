@@ -31,6 +31,7 @@ import {
   normalizeVectorNodeBBox,
   supportsFlatten,
   self_select_tool,
+  getVectorSelectionStartPoint,
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
@@ -926,12 +927,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   selected_tangents: next.selected_tangents,
                 }
               );
-            draft.content_edit_mode.a_point =
-              next.selected_vertices.length > 0
-                ? next.selected_vertices[0]
-                : next.selected_tangents.length > 0
-                  ? next.selected_tangents[0][0]
-                  : null;
+            draft.content_edit_mode.a_point = getVectorSelectionStartPoint(next);
             break;
           }
           case "delete-vertex": {
@@ -980,12 +976,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   selected_tangents: next.selected_tangents,
                 }
               );
-            draft.content_edit_mode.a_point =
-              next.selected_vertices.length > 0
-                ? next.selected_vertices[0]
-                : next.selected_tangents.length > 0
-                  ? next.selected_tangents[0][0]
-                  : null;
+            draft.content_edit_mode.a_point = getVectorSelectionStartPoint(next);
             break;
           }
           case "select-tangent": {
@@ -1015,12 +1006,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   selected_tangents: next.selected_tangents,
                 }
               );
-            draft.content_edit_mode.a_point =
-              next.selected_vertices.length > 0
-                ? next.selected_vertices[0]
-                : next.selected_tangents.length > 0
-                  ? next.selected_tangents[0][0]
-                  : null;
+            draft.content_edit_mode.a_point = getVectorSelectionStartPoint(next);
             break;
           }
           case "delete-tangent": {

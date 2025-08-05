@@ -156,3 +156,18 @@ export function reduceVectorContentSelection(
 
   return { selected_vertices, selected_segments, selected_tangents };
 }
+
+export function getVectorSelectionStartPoint(
+  selection: Pick<
+    editor.state.VectorContentEditMode,
+    "selected_vertices" | "selected_tangents"
+  >
+): number | null {
+  if (selection.selected_vertices.length === 1) {
+    return selection.selected_vertices[0];
+  }
+  if (selection.selected_tangents.length === 1) {
+    return selection.selected_tangents[0][0];
+  }
+  return null;
+}

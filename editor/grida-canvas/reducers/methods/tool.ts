@@ -1,5 +1,6 @@
 import type { Draft } from "immer";
 import { editor } from "@/grida-canvas";
+import { getVectorSelectionStartPoint } from "./selection";
 
 /**
  * Selects the given tool and stores the previous tool type.
@@ -56,6 +57,14 @@ export function self_select_tool<S extends editor.state.IEditorState>(
 
   draft.__tool_previous = draft.tool;
   draft.tool = tool;
+
+  if (tool.type === "path" && draft.content_edit_mode?.type === "vector") {
+    const { selected_vertices, selected_tangents } = draft.content_edit_mode;
+    draft.content_edit_mode.a_point = getVectorSelectionStartPoint({
+      selected_vertices,
+      selected_tangents,
+    });
+  }
 }
 
 /**
