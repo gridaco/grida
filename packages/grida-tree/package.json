@@ -5,6 +5,9 @@
   "scripts": {
     "test": "jest"
   },
+  "dependencies": {
+    "@grida/cmath": "workspace:*"
+  },
   "jest": {
     "preset": "ts-jest"
   }
