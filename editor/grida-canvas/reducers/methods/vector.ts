@@ -184,6 +184,14 @@ export function self_updateVectorAreaSelection<
   let selected_vertices = verts
     .map((p, i) => (predicate(p) ? i : -1))
     .filter((i) => i !== -1);
+  if (additive) {
+    const vset = new Set([
+      ...draft.content_edit_mode.selected_vertices,
+      ...selected_vertices,
+    ]);
+    selected_vertices = Array.from(vset);
+  }
+  const selected_vertex_set = new Set(selected_vertices);
 
   const control_points = vne
     .getControlPointsAbsolute([node_rect.x, node_rect.y])
@@ -208,6 +216,13 @@ export function self_updateVectorAreaSelection<
     const offset: cmath.Vector2 = [node_rect.x, node_rect.y];
     selected_segments = node.vectorNetwork.segments
       .map((seg, i) => {
+        if (
+          selected_vertex_set.has(seg.a) ||
+          selected_vertex_set.has(seg.b)
+        ) {
+          // vertex takes priority; skip expensive segment test
+          return -1;
+        }
         const va = cmath.vector2.add(
           node.vectorNetwork.vertices[seg.a].p,
           offset
@@ -233,13 +248,18 @@ export function self_updateVectorAreaSelection<
       ? draft.content_edit_mode.selected_segments
       : [];
   }
-  if (additive) {
-    const vset = new Set([
-      ...draft.content_edit_mode.selected_vertices,
-      ...selected_vertices,
-    ]);
-    selected_vertices = Array.from(vset);
 
+  // vertex selection has higher priority than segments –
+  // any segment touching a selected vertex is dropped
+  // from the selection.
+  selected_segments = selected_segments.filter((i) => {
+    const seg = node.vectorNetwork.segments[i];
+    return (
+      !selected_vertex_set.has(seg.a) && !selected_vertex_set.has(seg.b)
+    );
+  });
+
+  if (additive) {
     const key = (t: [number, 0 | 1]) => `${t[0]}:${t[1]}`;
     const tset = new Set(draft.content_edit_mode.selected_tangents.map(key));
     for (const t of selected_tangents) tset.add(key(t));
