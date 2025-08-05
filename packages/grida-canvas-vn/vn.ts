@@ -428,6 +428,31 @@ export namespace vn {
     }
 
     /**
+     * Determines whether the specified segments form a closed loop.
+     *
+     * The segments must be provided in order such that each segment's
+     * ending vertex (`b`) matches the starting vertex (`a`) of the next
+     * segment. A loop is considered closed when all segments connect in
+     * sequence and the final segment links back to the first.
+     *
+     * @param segmentIndices - indices of segments to check
+     * @returns `true` if the segments form a closed loop, otherwise `false`
+     */
+    isLoopClosed(segmentIndices: number[]): boolean {
+      if (segmentIndices.length === 0) return false;
+
+      for (let i = 0; i < segmentIndices.length; i++) {
+        const current = this._segments[segmentIndices[i]];
+        const next = this._segments[segmentIndices[(i + 1) % segmentIndices.length]];
+
+        if (!current || !next) return false;
+        if (current.b !== next.a) return false;
+      }
+
+      return true;
+    }
+
+    /**
      * checks whether the vertex is connected to exactly two segments
      */
     isExactCorner(vertex: number): boolean {
