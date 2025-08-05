@@ -1771,6 +1771,12 @@ export namespace editor.api {
      * @returns the selected node ids. or `false` if ignored.
      */
     select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
+
+    /**
+     * ux a11y escape command - either exits the content edit mode, or blur the selection - varies by the current state.
+     * bind this to `escape` key.
+     */
+    a11yEscape(): void;
     blur(): void;
     undo(): void;
     redo(): void;

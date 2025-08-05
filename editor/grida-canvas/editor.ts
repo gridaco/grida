@@ -600,6 +600,11 @@ export class Editor
     return ids;
   }
 
+  public a11yEscape() {
+    this.blur();
+    this.tryExitContentEditMode();
+  }
+
   public blur() {
     this.dispatch({
       type: "blur",

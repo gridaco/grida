@@ -635,9 +635,8 @@ export function useEditorHotKeys() {
     }
   );
 
-  useHotkeys("escape, clear", (e) => {
-    editor.tryExitContentEditMode();
-    editor.blur();
+  useHotkeys("escape, clear", () => {
+    editor.a11yEscape();
   });
 
   useHotkeys(
