@@ -33,13 +33,13 @@ import {
   self_updateVectorAreaSelection,
   getUXNeighbouringVertices,
 } from "./methods/vector";
-import cmath from "@grida/cmath";
-import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
-import vn from "@grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { snapGuideTranslation, threshold, snapMovement } from "./tools/snap";
 import { BitmapLayerEditor } from "@grida/bitmap";
+import nid from "./tools/id";
+import cmath from "@grida/cmath";
+import vn from "@grida/vn";
 import cg from "@grida/cg";
 import type { ReducerContext } from ".";
 
@@ -1549,7 +1549,7 @@ function __before_end_insert_and_resize(
   siblings.forEach((id) => {
     if (id === pending.node_id) return;
     const rect = context.geometry.getNodeAbsoluteBoundingRect(id)!;
-    if (rect_contains_rect(container_rect, rect)) {
+    if (cmath.rect.contains(rect, container_rect)) {
       self_moveNode(draft, id, pending.node_id);
       const child = dq.__getNodeById(
         draft,
@@ -1604,15 +1604,6 @@ function __self_maybe_end_gesture(
 
   draft.gesture = { type: "idle" };
   draft.dropzone = undefined;
-}
-
-function rect_contains_rect(a: cmath.Rectangle, b: cmath.Rectangle) {
-  return (
-    b.x >= a.x &&
-    b.y >= a.y &&
-    b.x + b.width <= a.x + a.width &&
-    b.y + b.height <= a.y + a.height
-  );
 }
 
 /**
