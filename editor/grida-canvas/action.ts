@@ -286,7 +286,7 @@ export type EditorVectorEditorAction =
   | EditorVectorDeleteTangentAction
   | EditorVectorTranslateVertexAction
   | EditorVectorTranslateSegmentAction
-  | EditorVectorBendCornerAction;
+  | EditorVectorBendOrClearCornerAction;
 
 export interface EditorVectorSelectVertexAction {
   type: "select-vertex";
@@ -344,9 +344,14 @@ export interface EditorVectorTranslateSegmentAction {
   delta: cmath.Vector2;
 }
 
-export interface EditorVectorBendCornerAction {
-  type: "bend-corner";
+export interface EditorVectorBendOrClearCornerAction {
+  type: "bend-or-clear-corner";
   target: VertexQuery & { ref?: "ta" | "tb" };
+  /**
+   * If provided, explicitly sets corner tangents to this value (or clears when 0).
+   * When omitted, the corner is bent or cleared based on existing tangents.
+   */
+  tangent?: Vector2 | 0;
 }
 // #endregion
 

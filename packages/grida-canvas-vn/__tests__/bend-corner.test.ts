@@ -69,3 +69,37 @@ describe("bendCorner", () => {
     expect(vn.inferMirroringMode(ta, editor.segments[1].tb)).toBe("all");
   });
 });
+
+describe("setCornerTangents", () => {
+  it("clears both tangents when passed 0", () => {
+    const square = vn.polygon([
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [0, 100],
+    ]);
+    const editor = new vn.VectorNetworkEditor(square);
+    editor.segments[0].ta = [10, 0];
+    editor.segments[3].tb = [-10, 0];
+
+    editor.setCornerTangents(0, 0);
+
+    expect(editor.segments[0].ta).toEqual([0, 0]);
+    expect(editor.segments[3].tb).toEqual([0, 0]);
+  });
+
+  it("mirrors tangent to the opposite segment", () => {
+    const square = vn.polygon([
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [0, 100],
+    ]);
+    const editor = new vn.VectorNetworkEditor(square);
+
+    editor.setCornerTangents(0, [5, 7]);
+
+    expect(editor.segments[0].ta).toEqual([5, 7]);
+    expect(editor.segments[3].tb).toEqual([-5, -7]);
+  });
+});

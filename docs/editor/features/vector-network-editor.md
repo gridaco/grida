@@ -35,3 +35,12 @@ The editor supports several modes for mirroring tangent handles of connected Bé
 - `angle` – only the angle is mirrored; each tangent keeps its own length.
 - `all` – both angle and length are mirrored.
 - `auto` – infers the current relationship of the tangents and mirrors accordingly. When the tangents are perfectly mirrored it behaves like `all`; when only the angle matches it mirrors the angle; otherwise no mirroring occurs.
+
+# Bend Tool
+
+The **bend** tool adjusts the curvature at a vertex:
+
+- Clicking a sharp corner assigns mirrored tangents based on the angle bisector.
+- If both tangents already exist, clicking removes them, restoring the sharp corner.
+- If only one tangent exists, clicking mirrors its length and direction onto the missing side.
+- Dragging deletes existing tangents and begins a freeform curve gesture.

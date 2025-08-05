@@ -435,6 +435,29 @@ export namespace vn {
     }
 
     /**
+     * Sets tangents for a corner by assigning the given tangent to one
+     * connected segment and its mirrored counterpart to the other. When `t`
+     * is `0`, all tangents at the corner are cleared.
+     */
+    setCornerTangents(vertex: number, t: Vector2 | 0) {
+      const segs = this.findSegments(vertex);
+      if (segs.length !== 2) return;
+
+      const segA = this._segments[segs[0]];
+      const segB = this._segments[segs[1]];
+      const controlA = segA.a === vertex ? "ta" : "tb";
+      const controlB = segB.a === vertex ? "ta" : "tb";
+
+      if (t === 0 || cmath.vector2.isZero(t)) {
+        segA[controlA] = [0, 0];
+        segB[controlB] = [0, 0];
+      } else {
+        segA[controlA] = [t[0], t[1]];
+        segB[controlB] = [-t[0], -t[1]];
+      }
+    }
+
+    /**
      * Bends a sharp corner into a smooth one by assigning mirrored tangents.
      *
      * The tangent length is derived from the length of the reference segment

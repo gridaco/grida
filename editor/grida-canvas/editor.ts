@@ -761,10 +761,16 @@ export class Editor
     });
   }
 
-  public bendCorner(node_id: editor.NodeID, vertex: number, ref?: "ta" | "tb") {
+  public bendOrClearCorner(
+    node_id: editor.NodeID,
+    vertex: number,
+    tangent?: cmath.Vector2 | 0,
+    ref?: "ta" | "tb"
+  ) {
     this.dispatch({
-      type: "bend-corner",
+      type: "bend-or-clear-corner",
       target: { node_id, vertex, ref },
+      tangent,
     });
   }
 

@@ -7,7 +7,7 @@ import type {
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
   EditorSelectGradientStopAction,
-  EditorVectorBendCornerAction,
+  EditorVectorBendOrClearCornerAction,
 } from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
@@ -1107,8 +1107,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     //
-    case "bend-corner": {
-      const { target } = <EditorVectorBendCornerAction>action;
+    case "bend-or-clear-corner": {
+      const { target, tangent } = <EditorVectorBendOrClearCornerAction>action;
       const { node_id, vertex, ref } = target;
       return produce(state, (draft) => {
         const node = dq.__getNodeById(
@@ -1116,6 +1116,34 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           node_id
         ) as grida.program.nodes.VectorNode;
         self_updateVectorNodeVectorNetwork(node, (vne) => {
+          if (typeof tangent !== "undefined") {
+            vne.setCornerTangents(vertex, tangent);
+            return;
+          }
+
+          const segs = vne.findSegments(vertex);
+          if (segs.length === 2) {
+            const segA = vne.segments[segs[0]];
+            const segB = vne.segments[segs[1]];
+            const controlA = segA.a === vertex ? "ta" : "tb";
+            const controlB = segB.a === vertex ? "ta" : "tb";
+            const tA = segA[controlA];
+            const tB = segB[controlB];
+            const tAExists = !cmath.vector2.isZero(tA);
+            const tBExists = !cmath.vector2.isZero(tB);
+
+            if (tAExists && tBExists) {
+              vne.setCornerTangents(vertex, 0);
+              return;
+            }
+
+            if (tAExists || tBExists) {
+              const src = tAExists ? tA : tB;
+              vne.setCornerTangents(vertex, src);
+              return;
+            }
+          }
+
           vne.bendCorner(vertex, ref);
         });
       });

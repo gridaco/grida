@@ -454,14 +454,7 @@ function VertexPoint({
         event.preventDefault();
         draggedRef.current = true;
         if (tool.type === "bend") {
-          instance.dispatch({
-            type: "delete-tangent",
-            target: { node_id: ve.node_id, vertex: index, tangent: 0 },
-          });
-          instance.dispatch({
-            type: "delete-tangent",
-            target: { node_id: ve.node_id, vertex: index, tangent: 1 },
-          });
+          instance.bendOrClearCorner(ve.node_id, index, 0);
           const segment = ve.segments.findIndex(
             (s) => s.a === index || s.b === index
           );
@@ -477,7 +470,7 @@ function VertexPoint({
         if (tool.type === "path") return;
         if (tool.type === "bend") {
           if (!draggedRef.current) {
-            instance.bendCorner(ve.node_id, index);
+            instance.bendOrClearCorner(ve.node_id, index);
           }
           return;
         }

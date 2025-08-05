@@ -1,5 +1,6 @@
 import { useCurrentEditor } from "@/grida-canvas-react/use-editor";
 import vn from "@grida/vn";
+import cmath from "@grida/cmath";
 import { useCallback, useMemo } from "react";
 
 export default function useTangentMirroring(
@@ -41,11 +42,20 @@ export default function useTangentMirroring(
         const verts = new Set<number>();
         for (const [v] of selected_tangents) verts.add(v);
         for (const v of selected_vertices) verts.add(v);
-        verts.forEach((v) => instance.bendCorner(node_id, v));
+        verts.forEach((v) => {
+          const segs = segments.filter((s) => s.a === v || s.b === v);
+          if (segs.length >= 2) {
+            const tA = segs[0].a === v ? segs[0].ta : segs[0].tb;
+            const tB = segs[1].a === v ? segs[1].ta : segs[1].tb;
+            if (cmath.vector2.isZero(tA) && cmath.vector2.isZero(tB)) {
+              instance.bendOrClearCorner(node_id, v);
+            }
+          }
+        });
         instance.configureCurveTangentMirroringModifier(mode);
       }
     },
-    [instance, selected_tangents, selected_vertices]
+    [instance, selected_tangents, selected_vertices, segments]
   );
 
   return {
