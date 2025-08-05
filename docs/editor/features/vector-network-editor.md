@@ -13,6 +13,10 @@ This behaviour mirrors conventional vector editing tools where segments can be q
 
 Clicking on an empty area while editing a vector clears any selected vertices, segments or tangents. Hold `Shift` to preserve the current selection.
 
+# Segment Selection with Marquee
+
+Dragging a rectangular marquee selects any segment that intersects the marquee area. Curved segments are tested with `cmath.bezier.intersectsRect`, enabling accurate selection without expensive curve–polygon comparisons. Lasso selections only target vertices and tangents for performance reasons.
+
 # Translate Vector Controls
 
 The `translate-vector-controls` gesture moves selected vertices and tangents while respecting their dependencies.

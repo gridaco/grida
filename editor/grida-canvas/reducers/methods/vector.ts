@@ -168,7 +168,8 @@ export function self_updateVectorAreaSelection<
   draft: Draft<S>,
   context: ReducerContext,
   predicate: (point: cmath.Vector2) => boolean,
-  additive: boolean
+  additive: boolean,
+  rect?: cmath.Rectangle
 ): void {
   assert(draft.content_edit_mode?.type === "vector");
   const { node_id, neighbouring_vertices } = draft.content_edit_mode;
@@ -176,16 +177,16 @@ export function self_updateVectorAreaSelection<
     draft,
     node_id
   ) as grida.program.nodes.VectorNode;
-  const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+  const node_rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
   const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
 
-  const verts = vne.getVerticesAbsolute([rect.x, rect.y]);
+  const verts = vne.getVerticesAbsolute([node_rect.x, node_rect.y]);
   let selected_vertices = verts
     .map((p, i) => (predicate(p) ? i : -1))
     .filter((i) => i !== -1);
 
   const control_points = vne
-    .getControlPointsAbsolute([rect.x, rect.y])
+    .getControlPointsAbsolute([node_rect.x, node_rect.y])
     .filter(({ segment, control }) => {
       const vert =
         control === "ta"
@@ -201,6 +202,37 @@ export function self_updateVectorAreaSelection<
         : node.vectorNetwork.segments[segment].b,
       control === "ta" ? 0 : 1,
     ]) as [number, 0 | 1][];
+
+  let selected_segments: number[] = [];
+  if (rect) {
+    const offset: cmath.Vector2 = [node_rect.x, node_rect.y];
+    selected_segments = node.vectorNetwork.segments
+      .map((seg, i) => {
+        const va = cmath.vector2.add(
+          node.vectorNetwork.vertices[seg.a].p,
+          offset
+        );
+        const vb = cmath.vector2.add(
+          node.vectorNetwork.vertices[seg.b].p,
+          offset
+        );
+        return cmath.bezier.intersectsRect(va, vb, seg.ta, seg.tb, rect)
+          ? i
+          : -1;
+      })
+      .filter((i) => i !== -1);
+    if (additive) {
+      const sset = new Set([
+        ...draft.content_edit_mode.selected_segments,
+        ...selected_segments,
+      ]);
+      selected_segments = Array.from(sset);
+    }
+  } else {
+    selected_segments = additive
+      ? draft.content_edit_mode.selected_segments
+      : [];
+  }
   if (additive) {
     const vset = new Set([
       ...draft.content_edit_mode.selected_vertices,
@@ -218,26 +250,24 @@ export function self_updateVectorAreaSelection<
   }
 
   draft.content_edit_mode.selected_vertices = selected_vertices;
-  draft.content_edit_mode.selected_segments = additive
-    ? draft.content_edit_mode.selected_segments
-    : [];
+  draft.content_edit_mode.selected_segments = selected_segments;
   draft.content_edit_mode.selected_tangents = selected_tangents;
   draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
     node.vectorNetwork,
     {
       selected_vertices,
-      selected_segments: additive
-        ? draft.content_edit_mode.selected_segments
-        : [],
+      selected_segments,
       selected_tangents,
     }
   );
   draft.content_edit_mode.a_point =
     selected_vertices.length > 0
       ? selected_vertices[0]
-      : selected_tangents.length > 0
-        ? selected_tangents[0][0]
-        : null;
+      : selected_segments.length > 0
+        ? node.vectorNetwork.segments[selected_segments[0]].a
+        : selected_tangents.length > 0
+          ? selected_tangents[0][0]
+          : null;
 }
 
 /**

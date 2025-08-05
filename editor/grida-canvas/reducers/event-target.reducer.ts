@@ -816,7 +816,8 @@ function __self_evt_on_drag(
         draft,
         context,
         (p) => cmath.rect.containsPoint(mrect, p),
-        draft.marquee.additive ?? false
+        draft.marquee.additive ?? false,
+        mrect
       );
     }
   } else if (draft.lasso) {

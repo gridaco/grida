@@ -81,6 +81,7 @@ This document lists all implemented features including the ones that are not yet
 - [x] marquee
 - [x] marquee selection (`drag`)
 - [x] marquee boolean selection (`shift + drag`)
+- [x] marquee segment selection in vector edit mode
 
 ### Measurement
 
