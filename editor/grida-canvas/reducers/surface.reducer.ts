@@ -178,6 +178,31 @@ function __self_try_enter_content_edit_mode_auto(
   }
 }
 
+function __try_restore_vector_mode_original_node(
+  draft: Draft<editor.state.IEditorState>,
+  mode: editor.state.VectorContentEditMode
+) {
+  if (!mode.original) return;
+
+  const current = dq.__getNodeById(
+    draft,
+    mode.node_id
+  ) as grida.program.nodes.VectorNode;
+
+  const dirty = !equal(mode.initial_vector_network, current.vectorNetwork);
+  if (dirty) return;
+
+  draft.document.nodes[mode.node_id] = {
+    ...mode.original,
+    // TODO: need to implement this by having the initial xy position and comparing that diff.
+    // // while the vector data itself is not changed, the position of the node may have been changed. - keep that.
+    // // this happens when translating the node, by dragging the region. - when even the data is translated, it's 0,0 relative, so the data itself may be identical.
+    // left: current.left,
+    // top: current.top,
+  } as grida.program.nodes.Node;
+  //
+}
+
 /**
  * For vector edit mode, if no edits were performed, the node is restored to the
  * original primitive node that existed before entering the mode.
@@ -191,8 +216,9 @@ function __self_before_exit_content_edit_mode(
     case "vector": {
       // optimize the vector network before exiting the mode.
       self_optimizeVectorNetwork(draft);
-
       // restore the original node if no changes were made.
+      __try_restore_vector_mode_original_node(draft, mode);
+
       {
         if (!mode.original) return;
 
