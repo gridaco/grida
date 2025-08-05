@@ -29,7 +29,7 @@ only target vertices and tangents for performance reasons.
 
 # Translate Vector Controls
 
-The `translate-vector-controls` gesture moves selected vertices and tangents while respecting their dependencies.
+The `translate-vector-controls` gesture moves selected vertices and tangents while respecting their dependencies. When dragging any active part of the selection—vertices, tangents or segments—the entire selection translates as a single unit.
 
 Given a selection consisting of segments `S`, vertices `V` and tangents `T` (where each tangent is `[vertex, 0|1]` for `ta`/`tb`):
 

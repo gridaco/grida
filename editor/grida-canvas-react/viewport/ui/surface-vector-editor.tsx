@@ -227,7 +227,8 @@ function Segment({
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
-        selectedRef.current = editor.selected_segments.includes(segmentIndex);
+        selectedRef.current =
+          editor.selected_segments.includes(segmentIndex) || activeAB;
         draggedRef.current = false;
         if (!selectedRef.current) {
           editor.selectSegment(segmentIndex, event.shiftKey);
