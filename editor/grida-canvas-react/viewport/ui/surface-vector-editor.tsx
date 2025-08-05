@@ -436,7 +436,7 @@ function VertexPoint({
         }
       },
       onPointerDown: ({ event }) => {
-        if (tool.type === "path" || tool.type === "bend") return;
+        if (tool.type === "path") return;
         event.preventDefault();
         const element = event.target as HTMLDivElement;
         if (element.hasAttribute("tabindex")) {
@@ -450,15 +450,35 @@ function VertexPoint({
       },
       onDragStart: (state) => {
         const { event } = state;
-        if (tool.type === "path" || tool.type === "bend") return;
+        if (tool.type === "path") return;
         event.preventDefault();
         draggedRef.current = true;
-        ve.onDragStart();
+        if (tool.type === "bend") {
+          instance.dispatch({
+            type: "delete-tangent",
+            target: { node_id: ve.node_id, vertex: index, tangent: 0 },
+          });
+          instance.dispatch({
+            type: "delete-tangent",
+            target: { node_id: ve.node_id, vertex: index, tangent: 1 },
+          });
+          const segment = ve.segments.findIndex(
+            (s) => s.a === index || s.b === index
+          );
+          if (segment !== -1) {
+            const control = ve.segments[segment].a === index ? "ta" : "tb";
+            instance.startCurveGesture(ve.node_id, segment, control);
+          }
+        } else {
+          ve.onDragStart();
+        }
       },
       onPointerUp: ({ event }) => {
         if (tool.type === "path") return;
         if (tool.type === "bend") {
-          instance.bendCorner(ve.node_id, index);
+          if (!draggedRef.current) {
+            instance.bendCorner(ve.node_id, index);
+          }
           return;
         }
         if (selectedRef.current && !draggedRef.current) {
