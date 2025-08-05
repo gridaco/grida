@@ -9,6 +9,10 @@ When hovering a straight segment in the vector editor, a preview point appears a
 
 This behaviour mirrors conventional vector editing tools where segments can be quickly subdivided by interacting with their midpoints.
 
+# Clearing Selection
+
+Clicking on an empty area while editing a vector clears any selected vertices, segments or tangents. Hold `Shift` to preserve the current selection.
+
 # Translate Vector Controls
 
 The `translate-vector-controls` gesture moves selected vertices and tangents while respecting their dependencies.

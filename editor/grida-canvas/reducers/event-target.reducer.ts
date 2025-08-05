@@ -279,8 +279,19 @@ function __self_evt_on_pointer_down(
   switch (draft.tool.type) {
     case "cursor": {
       const { hovered_node_id } = self_updateSurfaceHoverState(draft);
-      // ignore if in content edit mode
-      if (draft.content_edit_mode) break;
+
+      if (draft.content_edit_mode?.type === "vector") {
+        if (!shiftKey && draft.snapped_vertex_idx === null) {
+          // clear the selection for vector content edit mode
+          draft.content_edit_mode.selected_vertices = [];
+          draft.content_edit_mode.selected_segments = [];
+          draft.content_edit_mode.selected_tangents = [];
+          draft.content_edit_mode.neighbouring_vertices = [];
+          draft.content_edit_mode.a_point = null;
+          draft.content_edit_mode.next_ta = null;
+        }
+        break;
+      }
 
       if (shiftKey) {
         if (hovered_node_id) {
