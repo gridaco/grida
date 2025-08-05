@@ -144,3 +144,47 @@ describe("cmath.bezier.a2c", () => {
     expect(bezierPoints[bezierPoints.length - 1]).toBeCloseTo(y2, 6);
   });
 });
+
+describe("cmath.bezier.intersectsRect", () => {
+  const rect = { x: 0, y: 0, width: 10, height: 10 };
+
+  test("returns true when an endpoint lies inside the rectangle", () => {
+    const a: cmath.Vector2 = [5, 5];
+    const b: cmath.Vector2 = [15, 15];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+    expect(cmath.bezier.intersectsRect(a, b, ta, tb, rect)).toBe(true);
+  });
+
+  test("returns true when the entire curve is inside the rectangle", () => {
+    const a: cmath.Vector2 = [1, 1];
+    const b: cmath.Vector2 = [9, 9];
+    const ta: cmath.Vector2 = [2, 0]; // control point [3,1]
+    const tb: cmath.Vector2 = [-2, 0]; // control point [7,9]
+    expect(cmath.bezier.intersectsRect(a, b, ta, tb, rect)).toBe(true);
+  });
+
+  test("returns true for a straight line segment crossing the rectangle", () => {
+    const a: cmath.Vector2 = [-5, 5];
+    const b: cmath.Vector2 = [15, 5];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+    expect(cmath.bezier.intersectsRect(a, b, ta, tb, rect)).toBe(true);
+  });
+
+  test("returns false when the curve's bounding box overlaps but the curve misses the rectangle", () => {
+    const a: cmath.Vector2 = [-10, -10];
+    const b: cmath.Vector2 = [20, -10];
+    const ta: cmath.Vector2 = [10, 30]; // control point [0,20]
+    const tb: cmath.Vector2 = [-10, 30]; // control point [10,20]
+    expect(cmath.bezier.intersectsRect(a, b, ta, tb, rect)).toBe(false);
+  });
+
+  test("returns false when the curve is completely outside the rectangle", () => {
+    const a: cmath.Vector2 = [-10, 20];
+    const b: cmath.Vector2 = [20, 20];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+    expect(cmath.bezier.intersectsRect(a, b, ta, tb, rect)).toBe(false);
+  });
+});

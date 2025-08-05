@@ -2738,6 +2738,173 @@ namespace cmath {
     }
 
     /**
+     * Tests whether a single cubic Bézier curve segment intersects with a given axis-aligned rectangle.
+     *
+     * A Bézier segment is defined by two endpoints `a`, `b`, and their corresponding control points `ta`, `tb`.
+     * The rectangle is defined by its top-left `(x, y)` and dimensions `(width, height)`.
+     *
+     * This function performs fast hierarchical rejection and adaptive subdivision to avoid unnecessary computation.
+     *
+     * @param a - Start point of the Bézier curve.
+     * @param b - End point of the Bézier curve.
+     * @param ta - Tangent control point relative to `a`.
+     * @param tb - Tangent control point relative to `b`.
+     * @param rect - Target rectangle to test intersection against.
+     * @param tolerance - Optional tolerance threshold for curve flatness (default: `0.5`).
+     * @returns `true` if the curve intersects the rectangle, otherwise `false`.
+     */
+    export function intersectsRect(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      rect: Rectangle,
+      tolerance = 0.5
+    ): boolean {
+      const c1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const c2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+
+      // 1. Early exit: all control points inside
+      if (
+        cmath.rect.containsPoint(rect, a) &&
+        cmath.rect.containsPoint(rect, b) &&
+        cmath.rect.containsPoint(rect, c1) &&
+        cmath.rect.containsPoint(rect, c2)
+      ) {
+        return true;
+      }
+
+      // 1. Early exit: either endpoint inside
+      if (
+        cmath.rect.containsPoint(rect, a) ||
+        cmath.rect.containsPoint(rect, b)
+      ) {
+        return true;
+      }
+
+      // 2. Bounding box rejection
+      const bbox = getBBox({ a, b, ta, tb });
+      if (!cmath.rect.intersects(bbox, rect)) {
+        return false;
+      }
+
+      // 3. Recursive subdivision
+      const recur = (
+        p0: Vector2,
+        p1: Vector2,
+        p2: Vector2,
+        p3: Vector2
+      ): boolean => {
+        const segmentBBox = cmath.rect.fromPoints([p0, p1, p2, p3]);
+        if (!cmath.rect.intersects(segmentBBox, rect)) return false;
+
+        // Flatness check using distance to chord
+        const dx = p3[0] - p0[0];
+        const dy = p3[1] - p0[1];
+        const length = Math.hypot(dx, dy);
+        if (length === 0) {
+          return cmath.rect.containsPoint(rect, p0);
+        }
+        const d1 = Math.abs(dy * (p1[0] - p0[0]) - dx * (p1[1] - p0[1]));
+        const d2 = Math.abs(dy * (p2[0] - p0[0]) - dx * (p2[1] - p0[1]));
+        const flat = Math.max(d1, d2) / length <= tolerance;
+
+        if (flat) {
+          return lineIntersectsRect(p0, p3, rect);
+        }
+
+        // Subdivide using de Casteljau (t = 0.5)
+        const p01: Vector2 = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2];
+        const p12: Vector2 = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+        const p23: Vector2 = [(p2[0] + p3[0]) / 2, (p2[1] + p3[1]) / 2];
+        const p012: Vector2 = [(p01[0] + p12[0]) / 2, (p01[1] + p12[1]) / 2];
+        const p123: Vector2 = [(p12[0] + p23[0]) / 2, (p12[1] + p23[1]) / 2];
+        const p0123: Vector2 = [(p012[0] + p123[0]) / 2, (p012[1] + p123[1]) / 2];
+
+        return (
+          recur(p0, p01, p012, p0123) ||
+          recur(p0123, p123, p23, p3)
+        );
+      };
+
+      return recur(a, c1, c2, b);
+    }
+
+    function lineIntersectsRect(
+      p0: Vector2,
+      p1: Vector2,
+      rect: Rectangle
+    ): boolean {
+      if (
+        cmath.rect.containsPoint(rect, p0) ||
+        cmath.rect.containsPoint(rect, p1)
+      ) {
+        return true;
+      }
+
+      const [x1, y1] = p0;
+      const [x2, y2] = p1;
+      const xMin = rect.x;
+      const xMax = rect.x + rect.width;
+      const yMin = rect.y;
+      const yMax = rect.y + rect.height;
+
+      // Quick rejection by bounding boxes
+      if (
+        Math.max(x1, x2) < xMin ||
+        Math.min(x1, x2) > xMax ||
+        Math.max(y1, y2) < yMin ||
+        Math.min(y1, y2) > yMax
+      ) {
+        return false;
+      }
+
+      const edges: [Vector2, Vector2][] = [
+        [[xMin, yMin], [xMax, yMin]],
+        [[xMax, yMin], [xMax, yMax]],
+        [[xMax, yMax], [xMin, yMax]],
+        [[xMin, yMax], [xMin, yMin]],
+      ];
+
+      for (const [e0, e1] of edges) {
+        if (segmentsIntersect(p0, p1, e0, e1)) return true;
+      }
+      return false;
+    }
+
+    function segmentsIntersect(
+      p1: Vector2,
+      p2: Vector2,
+      q1: Vector2,
+      q2: Vector2
+    ): boolean {
+      const o1 = orientation(p1, p2, q1);
+      const o2 = orientation(p1, p2, q2);
+      const o3 = orientation(q1, q2, p1);
+      const o4 = orientation(q1, q2, p2);
+
+      if (o1 === 0 && onSegment(p1, q1, p2)) return true;
+      if (o2 === 0 && onSegment(p1, q2, p2)) return true;
+      if (o3 === 0 && onSegment(q1, p1, q2)) return true;
+      if (o4 === 0 && onSegment(q1, p2, q2)) return true;
+
+      return (o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0);
+    }
+
+    function orientation(a: Vector2, b: Vector2, c: Vector2): number {
+      return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    }
+
+    function onSegment(a: Vector2, c: Vector2, b: Vector2): boolean {
+      return (
+        Math.min(a[0], b[0]) <= c[0] &&
+        c[0] <= Math.max(a[0], b[0]) &&
+        Math.min(a[1], b[1]) <= c[1] &&
+        c[1] <= Math.max(a[1], b[1])
+      );
+    }
+
+    /**
      * Converts an SVG elliptical arc to one or more cubic Bézier curve segments.
      *
      * The `a2c` function transforms the parameters of an SVG elliptical arc into a series of cubic Bézier curves,
