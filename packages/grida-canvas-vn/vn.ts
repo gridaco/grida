@@ -418,6 +418,26 @@ export namespace vn {
     }
 
     /**
+     * Returns the vertices that are directly connected to the specified
+     * vertex via segments.
+     *
+     * A vertex is considered a neighbour when it shares a segment with the
+     * input vertex. The result does not include the input vertex itself and
+     * duplicates are removed.
+     *
+     * @param vertexIndex - index of the vertex to query
+     * @returns array of neighbouring vertex indices
+     */
+    getNeighboringVerticies(vertexIndex: number): number[] {
+      const neighbours = new Set<number>();
+      for (const seg of this._segments) {
+        if (seg.a === vertexIndex) neighbours.add(seg.b);
+        if (seg.b === vertexIndex) neighbours.add(seg.a);
+      }
+      return Array.from(neighbours).sort((a, b) => a - b);
+    }
+
+    /**
      * Returns the length of the segment at the given index.
      */
     segmentLength(segmentIndex: number): number {

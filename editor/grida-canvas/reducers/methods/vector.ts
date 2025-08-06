@@ -89,11 +89,12 @@ export function getUXNeighbouringVertices(
     active.add(seg.b);
   }
 
-  const limit = network.vertices.length - 1;
+  const vne = new vn.VectorNetworkEditor(network);
   const neighbours = new Set<number>(active);
   for (const v of active) {
-    if (v > 0) neighbours.add(v - 1);
-    if (v < limit) neighbours.add(v + 1);
+    for (const n of vne.getNeighboringVerticies(v)) {
+      neighbours.add(n);
+    }
   }
 
   return Array.from(neighbours).sort((a, b) => a - b);
