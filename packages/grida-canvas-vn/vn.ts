@@ -397,6 +397,72 @@ export namespace vn {
     }
 
     /**
+     * Creates a packed {@link VectorNetwork} containing only the specified
+     * vertices and segments from the current network.
+     *
+     * The copied network is normalized through
+     * {@link VectorNetworkEditor.optimize}, ensuring that vertex indices are
+     * re-packed starting from zero and that duplicate vertices or segments are
+     * removed. Vertices referenced by the copied segments are automatically
+     * included. Vertices explicitly provided in the selection are preserved
+     * even if they are not part of any segment unless
+     * `config.remove_unused_verticies` is set to `true`.
+     *
+     * @param selection - Indices of elements to copy.
+     * @param selection.vertices - Vertex indices to include. These vertices are
+     *   always copied and are kept even if no segment references them.
+     * @param selection.segments - Segment indices to include. The endpoint
+     *   vertices for these segments are automatically added to the selection.
+     * @param config - Optimization options applied to the resulting network.
+     *   Defaults to keeping unused vertices.
+     * @returns A new, packed {@link VectorNetwork} containing the selected
+     *   subset of this editor's network.
+     */
+    copy(
+      selection: { vertices?: number[]; segments?: number[] },
+      config: OptimizationConfig = {
+        vertex_tolerance: 0,
+        remove_unused_verticies: false,
+      }
+    ): VectorNetwork {
+      const vertexSet = new Set<number>(selection.vertices ?? []);
+      const segments: VectorNetworkSegment[] = [];
+
+      for (const si of selection.segments ?? []) {
+        const seg = this._segments[si];
+        if (!seg) continue;
+        segments.push({
+          a: seg.a,
+          b: seg.b,
+          ta: [seg.ta[0], seg.ta[1]] as Vector2,
+          tb: [seg.tb[0], seg.tb[1]] as Vector2,
+        });
+        vertexSet.add(seg.a);
+        vertexSet.add(seg.b);
+      }
+
+      const vertexIndices = Array.from(vertexSet).sort((a, b) => a - b);
+      const indexMap = new Map<number, number>();
+      const vertices: VectorNetworkVertex[] = vertexIndices.map((vi, idx) => {
+        indexMap.set(vi, idx);
+        const v = this._vertices[vi];
+        return { p: [v.p[0], v.p[1]] as Vector2 };
+      });
+
+      const packedSegments = segments.map((seg) => ({
+        a: indexMap.get(seg.a)!,
+        b: indexMap.get(seg.b)!,
+        ta: seg.ta,
+        tb: seg.tb,
+      }));
+
+      return VectorNetworkEditor.optimize(
+        { vertices, segments: packedSegments },
+        config
+      );
+    }
+
+    /**
      * finds the segment that contains the given vertex index
      * @param v
      * @returns
