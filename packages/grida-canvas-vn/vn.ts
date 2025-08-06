@@ -346,6 +346,28 @@ export namespace vn {
       return VectorNetworkEditor.optimize(result, config ?? undefined);
     }
 
+    /**
+     * Translates every vertex in a {@link VectorNetwork} by the given delta.
+     *
+     * The returned network is a new object with all vertex positions shifted by
+     * the provided offset. Segments and their tangents are preserved.
+     *
+     * @param net - The network to translate.
+     * @param delta - The `[dx, dy]` offset applied to each vertex.
+     * @returns A new {@link VectorNetwork} with translated vertices.
+     */
+    static translate(net: VectorNetwork, delta: Vector2): VectorNetwork {
+      const [dx, dy] = delta;
+      return {
+        vertices: net.vertices.map(
+          (v): VectorNetworkVertex => ({
+            p: [v.p[0] + dx, v.p[1] + dy] as Vector2,
+          })
+        ),
+        segments: net.segments.map((s) => ({ ...s })),
+      };
+    }
+
     private _vertices: VectorNetworkVertex[] = [];
     private _segments: VectorNetworkSegment[] = [];
 
