@@ -1128,6 +1128,10 @@ export namespace vn {
     if (vn.vertices.length === 0) {
       return { x: 0, y: 0, width: 0, height: 0 };
     }
+    if (vn.segments.length === 0) {
+      // fallback to a simple point-based bounding box when no segments exist
+      return cmath.rect.fromPoints(vn.vertices.map((v) => v.p));
+    }
 
     let box = { x: Infinity, y: Infinity, width: 0, height: 0 };
     for (const seg of vn.segments) {
