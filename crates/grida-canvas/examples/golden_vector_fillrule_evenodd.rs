@@ -47,9 +47,8 @@ fn main() {
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    // Convert VectorNetwork to Skia Path using the Into trait
-    // The implementation automatically handles multiple overlapping shapes
-    let mut path: skia_safe::Path = network.into();
+    // Convert VectorNetwork to a single Skia Path and apply even-odd fill rule
+    let mut path = network.to_path();
     path.set_fill_type(skia_safe::PathFillType::EvenOdd);
 
     let mut fill_paint = Paint::default();

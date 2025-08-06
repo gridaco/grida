@@ -1,5 +1,6 @@
+use cg::cg::types::*;
 use cg::shape::*;
-use skia_safe::{surfaces, Color, Paint, PaintStyle, PathFillType};
+use skia_safe::{surfaces, Color, Paint, PaintStyle};
 
 fn main() {
     // Helper to create a segment without tangents
@@ -51,11 +52,13 @@ fn main() {
                 VectorNetworkLoop(vec![0, 1, 2, 3]), // outer
                 VectorNetworkLoop(vec![4, 5, 6, 7]), // inner hole
             ],
+            fill_rule: FillRule::NonZero,
         }],
     };
 
-    // Build paths for each region (currently one)
-    let paths = build_paths(&network);
+    // Prepare a copy with even-odd fill rule for comparison
+    let mut network_evenodd = network.clone();
+    network_evenodd.regions[0].fill_rule = FillRule::EvenOdd;
 
     let mut surface = surfaces::raster_n32_premul((400, 200)).expect("surface");
     let canvas = surface.canvas();
@@ -66,19 +69,15 @@ fn main() {
     fill_paint.set_color(Color::BLACK);
     fill_paint.set_style(PaintStyle::Fill);
 
-    // Draw with winding fill rule on the left
-    for path in &paths {
-        let mut p = path.clone();
-        p.set_fill_type(PathFillType::Winding);
-        canvas.draw_path(&p, &fill_paint);
+    // Draw with non-zero (winding) fill rule on the left
+    for path in network.to_paths() {
+        canvas.draw_path(&path, &fill_paint);
     }
 
     // Draw with even-odd fill rule on the right
     canvas.translate((200.0, 0.0));
-    for path in &paths {
-        let mut p = path.clone();
-        p.set_fill_type(PathFillType::EvenOdd);
-        canvas.draw_path(&p, &fill_paint);
+    for path in network_evenodd.to_paths() {
+        canvas.draw_path(&path, &fill_paint);
     }
 
     let image = surface.image_snapshot();
@@ -86,56 +85,4 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     std::fs::write("goldens/vector_fillrule.png", data.as_bytes()).unwrap();
-}
-
-// Convert a VectorNetwork with regions into individual Skia paths
-fn build_paths(vn: &VectorNetwork) -> Vec<skia_safe::Path> {
-    fn is_zero(t: (f32, f32)) -> bool {
-        t.0 == 0.0 && t.1 == 0.0
-    }
-
-    let mut paths = Vec::new();
-    for region in &vn.regions {
-        let mut path = skia_safe::Path::new();
-        for VectorNetworkLoop(seg_indices) in &region.loops {
-            if seg_indices.is_empty() {
-                continue;
-            }
-
-            let first = &vn.segments[seg_indices[0]];
-            let mut current_start = first.a;
-            let mut previous_end = None;
-
-            for &idx in seg_indices {
-                let seg = &vn.segments[idx];
-                let a_idx = seg.a;
-                let b_idx = seg.b;
-                let a = vn.vertices[a_idx];
-                let b = vn.vertices[b_idx];
-                let ta = seg.ta.unwrap_or((0.0, 0.0));
-                let tb = seg.tb.unwrap_or((0.0, 0.0));
-
-                if previous_end != Some(a_idx) {
-                    path.move_to((a.0, a.1));
-                    current_start = a_idx;
-                }
-
-                if is_zero(ta) && is_zero(tb) {
-                    path.line_to((b.0, b.1));
-                } else {
-                    let c1 = (a.0 + ta.0, a.1 + ta.1);
-                    let c2 = (b.0 + tb.0, b.1 + tb.1);
-                    path.cubic_to(c1, c2, (b.0, b.1));
-                }
-
-                previous_end = Some(b_idx);
-                if Some(b_idx) == Some(current_start) {
-                    path.close();
-                    previous_end = None;
-                }
-            }
-        }
-        paths.push(path);
-    }
-    paths
 }

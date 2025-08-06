@@ -64,14 +64,13 @@ pub struct VectorNetworkRegion {
     /// The first loop is assumed to be the outer boundary.
     /// Subsequent loops are treated as holes.
     pub loops: Vec<VectorNetworkLoop>,
-    // /// Fill rule used to determine how the area enclosed by the loops is filled.
-    // ///
-    // /// - `EvenOdd`: fill if the number of crossings is odd.
-    // /// - `NonZero`: fill if the winding number ≠ 0 (based on loop direction).
-    // ///
-    // /// This field maps directly to SVG’s `fill-rule` attribute and Skia’s `PathFillType`.
-    // #[deprecated(note = "not implemented")]
-    // pub fill_rule: FillRule,
+    /// Fill rule used to determine how the area enclosed by the loops is filled.
+    ///
+    /// - `EvenOdd`: fill if the number of crossings is odd.
+    /// - `NonZero`: fill if the winding number ≠ 0 (based on loop direction).
+    ///
+    /// This field maps directly to SVG's `fill-rule` attribute and Skia's `PathFillType`.
+    pub fill_rule: FillRule,
 }
 
 /// A full vector network representing a graph of vertices and segments.
@@ -100,7 +99,130 @@ fn is_zero(tangent: (f32, f32)) -> bool {
     tangent.0 == 0.0 && tangent.1 == 0.0
 }
 
+fn build_path_from_segments(
+    vertices: &[(f32, f32)],
+    segments: &[VectorNetworkSegment],
+) -> skia_safe::Path {
+    let mut path = skia_safe::Path::new();
+
+    if segments.is_empty() {
+        return path;
+    }
+
+    let mut current_start: Option<usize> = None;
+    let mut previous_end: Option<usize> = None;
+
+    for segment in segments {
+        let a_idx = segment.a;
+        let b_idx = segment.b;
+        let a = vertices[a_idx];
+        let b = vertices[b_idx];
+        let ta = segment.ta.unwrap_or((0.0, 0.0));
+        let tb = segment.tb.unwrap_or((0.0, 0.0));
+
+        if previous_end != Some(a_idx) {
+            path.move_to((a.0, a.1));
+            current_start = Some(a_idx);
+        }
+
+        if is_zero(ta) && is_zero(tb) {
+            path.line_to((b.0, b.1));
+        } else {
+            let c1 = [a.0 + ta.0, a.1 + ta.1];
+            let c2 = [b.0 + tb.0, b.1 + tb.1];
+            path.cubic_to((c1[0], c1[1]), (c2[0], c2[1]), (b.0, b.1));
+        }
+
+        previous_end = Some(b_idx);
+
+        if Some(b_idx) == current_start {
+            path.close();
+            previous_end = None;
+            current_start = None;
+        }
+    }
+
+    path
+}
+
 impl VectorNetwork {
+    /// Convert this vector network into a list of [`skia_safe::Path`].
+    ///
+    /// When regions are defined, each region becomes its own path with the
+    /// appropriate [`skia_safe::PathFillType`] set according to the region's
+    /// [`FillRule`]. If no regions exist, a single path built from all segments
+    /// is returned.
+    pub fn to_paths(&self) -> Vec<skia_safe::Path> {
+        let vertices = &self.vertices;
+        let segments = &self.segments;
+
+        if self.regions.is_empty() {
+            return vec![build_path_from_segments(vertices, segments)];
+        }
+
+        let mut paths = Vec::with_capacity(self.regions.len());
+        for region in &self.regions {
+            let mut path = skia_safe::Path::new();
+            for VectorNetworkLoop(seg_indices) in &region.loops {
+                if seg_indices.is_empty() {
+                    continue;
+                }
+
+                let mut current_start = None;
+                let mut previous_end = None;
+                for &idx in seg_indices {
+                    let seg = &segments[idx];
+                    let a_idx = seg.a;
+                    let b_idx = seg.b;
+                    let a = vertices[a_idx];
+                    let b = vertices[b_idx];
+                    let ta = seg.ta.unwrap_or((0.0, 0.0));
+                    let tb = seg.tb.unwrap_or((0.0, 0.0));
+
+                    if previous_end != Some(a_idx) {
+                        path.move_to((a.0, a.1));
+                        current_start = Some(a_idx);
+                    }
+
+                    if is_zero(ta) && is_zero(tb) {
+                        path.line_to((b.0, b.1));
+                    } else {
+                        let c1 = (a.0 + ta.0, a.1 + ta.1);
+                        let c2 = (b.0 + tb.0, b.1 + tb.1);
+                        path.cubic_to(c1, c2, (b.0, b.1));
+                    }
+
+                    previous_end = Some(b_idx);
+                    if Some(b_idx) == current_start {
+                        path.close();
+                        previous_end = None;
+                        current_start = None;
+                    }
+                }
+            }
+
+            let fill_type = match region.fill_rule {
+                FillRule::NonZero => skia_safe::PathFillType::Winding,
+                FillRule::EvenOdd => skia_safe::PathFillType::EvenOdd,
+            };
+            path.set_fill_type(fill_type);
+            paths.push(path);
+        }
+
+        paths
+    }
+
+    /// Merge all paths returned by [`to_paths`](Self::to_paths) into a single
+    /// path. This is a temporary convenience and may not preserve fill rules
+    /// across separate regions.
+    pub fn to_path(&self) -> skia_safe::Path {
+        let mut merged = skia_safe::Path::new();
+        for p in self.to_paths() {
+            merged.add_path(&p, (0.0, 0.0), skia_safe::path::AddPathMode::Append);
+        }
+        merged
+    }
+
     pub fn bounds(&self) -> Rectangle {
         if self.vertices.is_empty() {
             return Rectangle::empty();
@@ -153,52 +275,7 @@ impl Default for VectorNetwork {
 }
 
 impl Into<skia_safe::Path> for VectorNetwork {
-    //
     fn into(self) -> skia_safe::Path {
-        let mut path = skia_safe::Path::new();
-
-        let vertices = &self.vertices;
-        let segments = &self.segments;
-
-        // if no segments, return empty path
-        if segments.is_empty() {
-            return path;
-        }
-
-        let mut current_start: Option<usize> = None;
-        let mut previous_end: Option<usize> = None;
-
-        for segment in segments {
-            let a_idx = segment.a;
-            let b_idx = segment.b;
-            let a = vertices[a_idx];
-            let b = vertices[b_idx];
-            let ta = segment.ta.unwrap_or((0.0, 0.0));
-            let tb = segment.tb.unwrap_or((0.0, 0.0));
-
-            // Start a new subpath if this segment does not connect
-            if previous_end != Some(a_idx) {
-                path.move_to((a.0, a.1));
-                current_start = Some(a_idx);
-            }
-
-            if is_zero(ta) && is_zero(tb) {
-                path.line_to((b.0, b.1));
-            } else {
-                let c1 = [a.0 + ta.0, a.1 + ta.1];
-                let c2 = [b.0 + tb.0, b.1 + tb.1];
-                path.cubic_to((c1[0], c1[1]), (c2[0], c2[1]), (b.0, b.1));
-            }
-
-            previous_end = Some(b_idx);
-
-            if Some(b_idx) == current_start {
-                path.close();
-                previous_end = None;
-                current_start = None;
-            }
-        }
-
-        path
+        self.to_path()
     }
 }
