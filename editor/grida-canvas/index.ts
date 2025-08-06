@@ -693,6 +693,11 @@ export namespace editor.state {
     original: grida.program.nodes.UnknwonNode | null;
 
     /**
+     * clipboard data for vector content copy/paste
+     */
+    clipboard: vn.VectorNetwork | null;
+
+    /**
      * next points position
      *
      * @deprecated - remove me - use global sanp pointer

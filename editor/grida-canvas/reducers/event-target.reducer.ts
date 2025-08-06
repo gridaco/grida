@@ -451,6 +451,7 @@ function __self_evt_on_pointer_down(
           original: null,
           neighbouring_vertices: [0],
           path_cursor_position: pos,
+          clipboard: null,
         };
       }
 

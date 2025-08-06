@@ -235,6 +235,7 @@ export interface EditorCutAction {
 
 export interface EditorPasteAction {
   type: "paste";
+  vector_network?: vn.VectorNetwork;
 }
 
 export interface EditorDuplicateAction {

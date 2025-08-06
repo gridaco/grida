@@ -306,7 +306,11 @@ export namespace vn {
      * @param b The network to merge into {@code a}.
      * @returns A new network containing the union of {@code a} and {@code b}.
      */
-    static union(a: VectorNetwork, b: VectorNetwork): VectorNetwork {
+    static union(
+      a: VectorNetwork,
+      b: VectorNetwork,
+      config?: OptimizationConfig | null
+    ): VectorNetwork {
       const vertices: VectorNetworkVertex[] = [
         ...a.vertices.map(
           (v): VectorNetworkVertex => ({ p: [v.p[0], v.p[1]] as Vector2 })
@@ -335,8 +339,11 @@ export namespace vn {
           })
         ),
       ];
-
-      return VectorNetworkEditor.optimize({ vertices, segments });
+      const result = { vertices, segments };
+      if (config === null) {
+        return result;
+      }
+      return VectorNetworkEditor.optimize(result, config ?? undefined);
     }
 
     private _vertices: VectorNetworkVertex[] = [];

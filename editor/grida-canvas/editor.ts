@@ -696,6 +696,18 @@ export class Editor
   }
 
   public a11yCopy() {
+    if (this.mstate.content_edit_mode?.type === "vector") {
+      const {
+        selected_vertices,
+        selected_segments,
+        selected_tangents,
+      } = this.mstate.content_edit_mode;
+      const hasSelection =
+        selected_vertices.length > 0 ||
+        selected_segments.length > 0 ||
+        selected_tangents.length > 0;
+      if (!hasSelection) return;
+    }
     this.copy("selection");
   }
 

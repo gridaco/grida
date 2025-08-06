@@ -101,6 +101,36 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "copy":
     case "cut": {
+      if (state.content_edit_mode?.type === "vector") {
+        if (action.type === "cut") break; // not supported yet
+        const {
+          node_id,
+          selected_vertices,
+          selected_segments,
+          selected_tangents,
+        } = state.content_edit_mode;
+        const node = dq.__getNodeById(
+          state,
+          node_id
+        ) as grida.program.nodes.VectorNode;
+        const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+        const vertices = Array.from(
+          new Set([
+            ...selected_vertices,
+            ...selected_tangents.map(([v]) => v),
+          ])
+        );
+        const copied = vne.copy({
+          vertices,
+          segments: selected_segments,
+        });
+        return produce(state, (draft) => {
+          const mode = draft.content_edit_mode as editor.state.VectorContentEditMode;
+          mode.clipboard = copied;
+          draft.user_clipboard = undefined;
+        });
+      }
+
       const { target } = action;
       const target_node_ids =
         target === "selection" ? state.selection : [target];
@@ -126,12 +156,52 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "paste": {
+      if (state.content_edit_mode?.type === "vector") {
+        const net = action.vector_network ?? state.content_edit_mode.clipboard;
+        if (!net) break;
+        return produce(state, (draft) => {
+          const mode = draft.content_edit_mode as editor.state.VectorContentEditMode;
+          const node = dq.__getNodeById(
+            draft,
+            mode.node_id
+          ) as grida.program.nodes.VectorNode;
+          const vertex_offset = node.vectorNetwork.vertices.length;
+          const segment_offset = node.vectorNetwork.segments.length;
+          node.vectorNetwork = vn.VectorNetworkEditor.union(
+            node.vectorNetwork,
+            net,
+            null
+          );
+          const new_vertices = Array.from(
+            { length: net.vertices.length },
+            (_, i) => i + vertex_offset
+          );
+          const new_segments = Array.from(
+            { length: net.segments.length },
+            (_, i) => i + segment_offset
+          );
+          mode.selected_vertices = new_vertices;
+          mode.selected_segments = new_segments;
+          mode.selected_tangents = [];
+          mode.neighbouring_vertices = getUXNeighbouringVertices(
+            node.vectorNetwork,
+            {
+              selected_vertices: new_vertices,
+              selected_segments: new_segments,
+              selected_tangents: [],
+            }
+          );
+          mode.a_point = getVectorSelectionStartPoint({
+            selected_vertices: new_vertices,
+            selected_tangents: [],
+          });
+          mode.clipboard = net;
+        });
+      }
+
       if (!state.user_clipboard) break;
       const { user_clipboard, selection } = state;
       const { ids, prototypes } = user_clipboard;
-      // const clipboard_nodes: grida.program.nodes.Node[] =
-      //   user_clipboard.prototypes;
-      // const clipboard_node_ids = clipboard_nodes.map((node) => node.id);
 
       return produce(state, (draft) => {
         const new_top_ids: string[] = [];
@@ -161,10 +231,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
             const top_ids = self_insertSubDocument(draft, target, sub);
             new_top_ids.push(...top_ids);
-
-            // const offset = 10; // Offset to avoid overlapping
-            // if (newNode.left !== undefined) newNode.left += offset;
-            // if (newNode.top !== undefined) newNode.top += offset;
           }
         }
 

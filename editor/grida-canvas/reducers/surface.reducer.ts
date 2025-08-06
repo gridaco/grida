@@ -131,6 +131,7 @@ function __self_try_enter_content_edit_mode_auto(
         original: nodeSnapshot,
         neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
+        clipboard: null,
       };
       break;
     }
@@ -155,6 +156,7 @@ function __self_try_enter_content_edit_mode_auto(
         original: nodeSnapshot,
         neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
+        clipboard: null,
       };
 
       break;

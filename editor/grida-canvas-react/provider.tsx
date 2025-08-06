@@ -1258,63 +1258,82 @@ export function useDataTransferEventTarget() {
         )
       ).filter((item) => item !== null);
 
-      const grida_payload = items.find((item) => item.type === "clipboard");
-
-      // 1. if there is a grida html clipboard, use it and ignore all others.
-      if (grida_payload) {
-        if (
-          current_clipboard?.payload_id === grida_payload.clipboard.payload_id
-        ) {
-          instance.paste();
+      const vector_payload = items.find(
+        (item) => item.type === "text" && item.text.startsWith("grida:vn:")
+      );
+      if (vector_payload) {
+        try {
+          const net = JSON.parse(
+            atob(vector_payload.text.slice("grida:vn:".length))
+          );
+          instance.dispatch({ type: "paste", vector_network: net });
           pasted_from_data_transfer = true;
-        } else {
-          grida_payload.clipboard.prototypes.forEach((p) => {
-            const sub =
-              grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-                p,
-                nid
-              );
-            instance.insert({ document: sub });
-          });
-          pasted_from_data_transfer = true;
-        }
-      }
-      // 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
-      else {
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          try {
-            switch (item.type) {
-              case "text": {
-                const { text } = item;
-                insertText(text, {
-                  clientX: window.innerWidth / 2,
-                  clientY: window.innerHeight / 2,
-                });
-                pasted_from_data_transfer = true;
-                break;
-              }
-              case "image/gif":
-              case "image/jpeg":
-              case "image/png":
-              case "image/svg+xml": {
-                const { type, file } = item;
-                insertFromFile(type, file, {
-                  clientX: window.innerWidth / 2,
-                  clientY: window.innerHeight / 2,
-                });
-                pasted_from_data_transfer = true;
-                break;
-              }
-            }
-          } catch {}
-        }
+        } catch {}
       }
 
-      // 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
-      if (!pasted_from_data_transfer) {
-        instance.paste();
+      if (pasted_from_data_transfer) {
         event.preventDefault();
+      } else {
+        const grida_payload = items.find(
+          (item) => item.type === "clipboard"
+        );
+
+        // 1. if there is a grida html clipboard, use it and ignore all others.
+        if (grida_payload) {
+          if (
+            current_clipboard?.payload_id === grida_payload.clipboard.payload_id
+          ) {
+            instance.paste();
+            pasted_from_data_transfer = true;
+          } else {
+            grida_payload.clipboard.prototypes.forEach((p) => {
+              const sub =
+                grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+                  p,
+                  nid
+                );
+              instance.insert({ document: sub });
+            });
+            pasted_from_data_transfer = true;
+          }
+        }
+        // 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
+        else {
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            try {
+              switch (item.type) {
+                case "text": {
+                  const { text } = item;
+                  insertText(text, {
+                    clientX: window.innerWidth / 2,
+                    clientY: window.innerHeight / 2,
+                  });
+                  pasted_from_data_transfer = true;
+                  break;
+                }
+                case "image/gif":
+                case "image/jpeg":
+                case "image/png":
+                case "image/svg+xml": {
+                  const { type, file } = item;
+                  insertFromFile(type, file, {
+                    clientX: window.innerWidth / 2,
+                    clientY: window.innerHeight / 2,
+                  });
+                  pasted_from_data_transfer = true;
+                  break;
+                }
+              }
+            } catch {}
+          }
+        }
+
+        // 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
+        if (!pasted_from_data_transfer) {
+          instance.paste();
+          event.preventDefault();
+        }
       }
     },
     [instance, insertFromFile, insertText, current_clipboard]
@@ -1379,10 +1398,20 @@ export function useClipboardSync() {
     instance,
     (state) => state.user_clipboard
   );
+  const vector_clipboard = useEditorState(
+    instance,
+    (state) =>
+      state.content_edit_mode?.type === "vector"
+        ? state.content_edit_mode.clipboard
+        : null
+  );
 
   useEffect(() => {
     try {
-      if (user_clipboard) {
+      if (vector_clipboard) {
+        const txt = `grida:vn:${btoa(JSON.stringify(vector_clipboard))}`;
+        navigator.clipboard.writeText(txt);
+      } else if (user_clipboard) {
         const items = io.clipboard.encode(
           user_clipboard as io.clipboard.ClipboardPayload
         );
@@ -1395,7 +1424,7 @@ export function useClipboardSync() {
     } catch (e) {
       reportError(e);
     }
-  }, [user_clipboard]);
+  }, [user_clipboard, vector_clipboard]);
   //
 }
 
