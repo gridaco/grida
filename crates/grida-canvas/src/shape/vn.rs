@@ -9,17 +9,77 @@ pub struct VectorNetworkSegment {
     pub tb: Option<(f32, f32)>,
 }
 
+/// A sequence of segment indices that form a closed contour (loop).
+///
+/// Each `VectorNetworkLoop` corresponds to a single closed ring in the
+/// vector network. The segments must form a connected, circular path,
+/// where the end of one segment connects to the start of the next,
+/// eventually returning to the starting point.
+///
+/// This structure aligns conceptually with subpaths in SVG `<path>` data,
+/// specifically each `M...Z` section.
+///
+/// # Example
+/// ```
+/// // A square made of 4 segments:
+/// VectorNetworkLoop(vec![0, 1, 2, 3])
+/// ```
 #[derive(Debug, Clone)]
 pub struct VectorNetworkLoop(
     /// Indices of the segments that make up the loop.
     pub Vec<usize>,
 );
 
+/// A filled region composed of one or more closed loops.
+///
+/// A region defines a topological "face" in the vector network. Each region
+/// consists of one or more `VectorNetworkLoop`s, where:
+/// - The **first loop** is the outer boundary (positive area),
+/// - Subsequent loops (if any) represent holes (negative space).
+///
+/// This structure enables representation of compound paths, including
+/// shapes with holes (e.g. letter “O” or donuts), multiple disjoint islands,
+/// and nested fill areas.
+///
+/// This maps to SVG `<path>` with multiple `M...Z` subpaths and fill rules
+/// like `evenodd` or `nonzero`, though the current model assumes even-odd
+/// by loop parity.
+///
+/// # Example
+/// ```
+/// // A donut shape: outer square, inner square hole
+/// VectorNetworkRegion {
+///     loops: vec![
+///         VectorNetworkLoop(vec![0, 1, 2, 3]), // outer
+///         VectorNetworkLoop(vec![4, 5, 6, 7]), // hole
+///     ]
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct VectorNetworkRegion {
+    /// One or more loops that define this region.
+    ///
+    /// Each loop is a list of segment indices that form a closed contour.
+    /// The first loop is assumed to be the outer boundary.
+    /// Subsequent loops are treated as holes.
     pub loops: Vec<VectorNetworkLoop>,
 }
 
+/// A full vector network representing a graph of vertices and segments.
+///
+/// - Vertices define points in 2D space.
+/// - Segments connect pairs of vertices and may contain tangents for Bézier control.
+/// - Regions (optional) define filled areas using loops of segments.
+///
+/// This structure is designed for SVG `<path>` compatibility and supports:
+/// - Linear and cubic Bézier segments
+/// - Multiple subpaths (via looped regions)
+/// - Compound shapes with holes
+///
+/// # Notes
+/// - The segments list is flat; ordering and connectivity must be tracked
+///   separately to construct regions or faces.
+/// - Regions are optional and may be omitted for stroke-only paths.
 #[derive(Debug, Clone)]
 pub struct VectorNetwork {
     pub vertices: Vec<(f32, f32)>,
