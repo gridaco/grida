@@ -1263,6 +1263,7 @@ export function useDataTransferEventTarget() {
       );
       if (vector_payload) {
         try {
+          assert(vector_payload.type === "text");
           const net = JSON.parse(
             atob(vector_payload.text.slice("grida:vn:".length))
           );
@@ -1274,9 +1275,7 @@ export function useDataTransferEventTarget() {
       if (pasted_from_data_transfer) {
         event.preventDefault();
       } else {
-        const grida_payload = items.find(
-          (item) => item.type === "clipboard"
-        );
+        const grida_payload = items.find((item) => item.type === "clipboard");
 
         // 1. if there is a grida html clipboard, use it and ignore all others.
         if (grida_payload) {
@@ -1398,12 +1397,10 @@ export function useClipboardSync() {
     instance,
     (state) => state.user_clipboard
   );
-  const vector_clipboard = useEditorState(
-    instance,
-    (state) =>
-      state.content_edit_mode?.type === "vector"
-        ? state.content_edit_mode.clipboard
-        : null
+  const vector_clipboard = useEditorState(instance, (state) =>
+    state.content_edit_mode?.type === "vector"
+      ? state.content_edit_mode.clipboard
+      : null
   );
 
   useEffect(() => {

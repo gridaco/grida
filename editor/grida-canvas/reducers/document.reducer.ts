@@ -156,8 +156,91 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "paste": {
+      if (action.vector_network) {
+        if (state.content_edit_mode?.type === "vector") {
+          const net = action.vector_network;
+          return produce(state, (draft) => {
+            const mode = draft.content_edit_mode as editor.state.VectorContentEditMode;
+            const node = dq.__getNodeById(
+              draft,
+              mode.node_id
+            ) as grida.program.nodes.VectorNode;
+            const vertex_offset = node.vectorNetwork.vertices.length;
+            const segment_offset = node.vectorNetwork.segments.length;
+            node.vectorNetwork = vn.VectorNetworkEditor.union(
+              node.vectorNetwork,
+              net,
+              null
+            );
+            const new_vertices = Array.from(
+              { length: net.vertices.length },
+              (_, i) => i + vertex_offset
+            );
+            const new_segments = Array.from(
+              { length: net.segments.length },
+              (_, i) => i + segment_offset
+            );
+            mode.selected_vertices = new_vertices;
+            mode.selected_segments = new_segments;
+            mode.selected_tangents = [];
+            mode.neighbouring_vertices = getUXNeighbouringVertices(
+              node.vectorNetwork,
+              {
+                selected_vertices: new_vertices,
+                selected_segments: new_segments,
+                selected_tangents: [],
+              }
+            );
+            mode.a_point = getVectorSelectionStartPoint({
+              selected_vertices: new_vertices,
+              selected_tangents: [],
+            });
+            mode.clipboard = net;
+          });
+        }
+
+        return produce(state, (draft) => {
+          const net = action.vector_network!;
+          const id = nid();
+          const black = { r: 0, g: 0, b: 0, a: 1 };
+          const node: grida.program.nodes.VectorNode = {
+            type: "vector",
+            name: "vector",
+            id,
+            active: true,
+            locked: false,
+            position: "absolute",
+            left: 0,
+            top: 0,
+            opacity: 1,
+            width: 0,
+            height: 0,
+            rotation: 0,
+            zIndex: 0,
+            stroke: { type: "solid", color: black },
+            strokeCap: "butt",
+            strokeWidth: 1,
+            vectorNetwork: net,
+          };
+
+          normalizeVectorNodeBBox(node);
+
+          const valid_target_selection = state.selection.filter((node_id) => {
+            const n = dq.__getNodeById(draft, node_id);
+            return n.type === "container";
+          });
+
+          const target = valid_target_selection[0] ?? null;
+
+          self_try_insert_node(draft, target, node);
+
+          self_select_tool(draft, { type: "cursor" });
+          self_selectNode(draft, "reset", node.id);
+        });
+      }
+
       if (state.content_edit_mode?.type === "vector") {
-        const net = action.vector_network ?? state.content_edit_mode.clipboard;
+        const net = state.content_edit_mode.clipboard;
         if (!net) break;
         return produce(state, (draft) => {
           const mode = draft.content_edit_mode as editor.state.VectorContentEditMode;

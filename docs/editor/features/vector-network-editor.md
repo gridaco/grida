@@ -9,6 +9,10 @@ When hovering a straight segment in the vector editor, a preview point appears a
 
 This behaviour mirrors conventional vector editing tools where segments can be quickly subdivided by interacting with their midpoints.
 
+# Copy and Paste
+
+Selections in vector edit mode can be copied and pasted across windows using the system clipboard. When the editor is not in vector edit mode, pasting inserts the copied network as a new vector node. Cutting and translating with clone are not yet supported.
+
 # Clearing Selection
 
 Clicking on an empty area while editing a vector clears any selected vertices, segments or tangents. Hold `Shift` to preserve the current selection.
