@@ -8,7 +8,6 @@ pub mod regular_polygon;
 pub mod regular_star;
 pub mod rrect;
 pub mod stroke;
-pub mod vn;
 
 pub use corner::*;
 pub use ellipse::*;
@@ -20,7 +19,8 @@ pub use regular_polygon::*;
 pub use regular_star::*;
 pub use rrect::*;
 pub use stroke::*;
-pub use vn::*;
+
+use crate::vectornetwork::*;
 
 pub enum Shape {
     RRect(RRectShape),

@@ -16,4 +16,5 @@ pub mod shape;
 pub mod sk;
 pub mod sys;
 pub mod text;
+pub mod vectornetwork;
 pub mod window;

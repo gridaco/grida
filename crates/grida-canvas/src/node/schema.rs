@@ -1,9 +1,9 @@
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::shape::*;
+use crate::vectornetwork::*;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
-
 pub type NodeId = String;
 
 #[derive(Debug, Clone)]

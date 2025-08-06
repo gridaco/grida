@@ -1,5 +1,5 @@
 use cg::cg::types::*;
-use cg::shape::*;
+use cg::vectornetwork::*;
 use skia_safe::{surfaces, Color, Paint, PaintStyle};
 
 fn main() {

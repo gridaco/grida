@@ -21,7 +21,7 @@ pub struct VectorNetworkSegment {
 /// specifically each `M...Z` section.
 ///
 /// # Example
-/// ```
+/// ```rust,ignore
 /// // A square made of 4 segments:
 /// VectorNetworkLoop(vec![0, 1, 2, 3])
 /// ```
@@ -47,7 +47,7 @@ pub struct VectorNetworkLoop(
 /// by loop parity.
 ///
 /// # Example
-/// ```
+/// ```rust,ignore
 /// // A donut shape: outer square, inner square hole
 /// VectorNetworkRegion {
 ///     loops: vec![

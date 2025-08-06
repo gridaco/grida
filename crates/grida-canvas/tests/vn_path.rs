@@ -1,4 +1,4 @@
-use cg::shape::vn::{VectorNetwork, VectorNetworkSegment};
+use cg::vectornetwork::*;
 
 #[test]
 fn vector_network_into_path_handles_multiple_shapes() {

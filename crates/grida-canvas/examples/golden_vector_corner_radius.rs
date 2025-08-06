@@ -1,4 +1,5 @@
 use cg::shape::*;
+use cg::vectornetwork::*;
 use skia_safe::{surfaces, Color, Paint};
 
 fn main() {

@@ -1,6 +1,6 @@
 use crate::cg::types::*;
 use crate::node::schema::*;
-use crate::shape::*;
+use crate::vectornetwork::*;
 use math2::transform::AffineTransform;
 use serde::Deserialize;
 use serde_json::Value;
