@@ -695,6 +695,18 @@ export class Editor
     });
   }
 
+  public a11yCopy() {
+    this.copy("selection");
+  }
+
+  public a11yCut() {
+    this.cut("selection");
+  }
+
+  public a11yPaste() {
+    this.paste();
+  }
+
   public duplicate(target: "selection" | editor.NodeID) {
     this.dispatch({
       type: "duplicate",

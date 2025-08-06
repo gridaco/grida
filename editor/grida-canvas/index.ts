@@ -1789,6 +1789,27 @@ export namespace editor.api {
      * bind this to `escape` key.
      */
     a11yEscape(): void;
+
+    /**
+     * semantic copy command for accessibility features.
+     *
+     * currently proxies to copying the current selection.
+     */
+    a11yCopy(): void;
+
+    /**
+     * semantic cut command for accessibility features.
+     *
+     * currently proxies to cutting the current selection.
+     */
+    a11yCut(): void;
+
+    /**
+     * semantic paste command for accessibility features.
+     *
+     * currently proxies to the standard paste behavior.
+     */
+    a11yPaste(): void;
     blur(): void;
     undo(): void;
     redo(): void;

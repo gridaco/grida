@@ -722,20 +722,20 @@ export function useEditorHotKeys() {
     toast.error("[flip vertical] is not implemented yet");
   });
 
-  useHotkeys("cut, meta+x, ctrl+x", () => editor.cut("selection"), {
+  useHotkeys("cut, meta+x, ctrl+x", () => editor.a11yCut(), {
     preventDefault: true,
     enableOnContentEditable: false,
     enableOnFormTags: false,
   });
 
-  useHotkeys("copy, meta+c, ctrl+c", () => editor.copy("selection"), {
+  useHotkeys("copy, meta+c, ctrl+c", () => editor.a11yCopy(), {
     preventDefault: false,
     enableOnContentEditable: false,
     enableOnFormTags: false,
   });
 
   // paste is handled via data transfer
-  // useHotkeys("paste, meta+v, ctrl+v", () => paste(), {
+  // useHotkeys("paste, meta+v, ctrl+v", () => editor.a11yPaste(), {
   //   preventDefault: false,
   //   enableOnContentEditable: false,
   //   enableOnFormTags: false,
