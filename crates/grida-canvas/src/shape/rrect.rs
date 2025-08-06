@@ -160,5 +160,9 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         segments.push(line(prev, start_idx));
     }
 
-    VectorNetwork { vertices, segments }
+    VectorNetwork {
+        vertices,
+        segments,
+        regions: vec![],
+    }
 }

@@ -11,6 +11,7 @@ fn main() {
             ta: None,
             tb: None,
         }],
+        regions: vec![],
     };
 
     let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");

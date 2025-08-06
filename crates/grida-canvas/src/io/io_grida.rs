@@ -409,6 +409,7 @@ impl From<JSONVectorNetwork> for VectorNetwork {
                     tb: s.tb,
                 })
                 .collect(),
+            regions: vec![],
         }
     }
 }

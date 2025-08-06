@@ -57,5 +57,9 @@ pub fn build_simple_polygon_vector_network(shape: &SimplePolygonShape) -> Vector
             tb: None,
         });
     }
-    VectorNetwork { vertices, segments }
+    VectorNetwork {
+        vertices,
+        segments,
+        regions: vec![],
+    }
 }

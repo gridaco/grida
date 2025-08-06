@@ -94,5 +94,9 @@ fn ellipse_to_vector_network(shape: &EllipseShape, clockwise: bool) -> VectorNet
         });
     }
 
-    VectorNetwork { vertices, segments }
+    VectorNetwork {
+        vertices,
+        segments,
+        regions: vec![],
+    }
 }

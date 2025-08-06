@@ -30,6 +30,7 @@ fn main() {
             segment(6, 7),
             segment(7, 4),
         ],
+        regions: vec![],
     };
 
     // Helper

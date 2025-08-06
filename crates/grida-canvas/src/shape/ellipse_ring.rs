@@ -59,5 +59,9 @@ pub fn build_ring_vector_network(shape: &EllipticalRingShape) -> VectorNetwork {
         s
     }));
 
-    VectorNetwork { vertices, segments }
+    VectorNetwork {
+        vertices,
+        segments,
+        regions: vec![],
+    }
 }

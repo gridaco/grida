@@ -47,6 +47,7 @@ async fn demo_vectors() -> Scene {
                             tb: None,
                         },
                     ],
+                    regions: vec![],
                 },
                 corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint::red())],
@@ -91,6 +92,7 @@ async fn demo_vectors() -> Scene {
                             tb: None,
                         },
                     ],
+                    regions: vec![],
                 },
                 corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint::red())],
@@ -136,6 +138,7 @@ async fn demo_vectors() -> Scene {
                             tb: None,
                         },
                     ],
+                    regions: vec![],
                 },
                 corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint {
@@ -183,6 +186,7 @@ async fn demo_vectors() -> Scene {
                             tb: None,
                         },
                     ],
+                    regions: vec![],
                 },
                 corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint::red())],
@@ -235,6 +239,7 @@ async fn demo_vectors() -> Scene {
                             tb: None,
                         },
                     ],
+                    regions: vec![],
                 },
                 corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint::red())],
@@ -273,6 +278,7 @@ async fn demo_vectors() -> Scene {
                         ta: Some((30.0, -30.0)), // Tangent handle from start point
                         tb: Some((-30.0, 30.0)), // Tangent handle to end point
                     }],
+                    regions: vec![],
                 },
                 corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint {
@@ -331,6 +337,7 @@ async fn demo_vectors() -> Scene {
                             tb: None,
                         },
                     ],
+                    regions: vec![],
                 },
                 corner_radius: 4.0,
                 strokes: vec![Paint::Solid(SolidPaint {
@@ -392,6 +399,7 @@ async fn demo_vectors() -> Scene {
                             tb: None,
                         },
                     ],
+                    regions: vec![],
                 },
                 corner_radius: 0.0,
                 strokes: vec![Paint::Solid(SolidPaint {

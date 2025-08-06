@@ -84,7 +84,7 @@ pub struct VectorNetworkRegion {
 pub struct VectorNetwork {
     pub vertices: Vec<(f32, f32)>,
     pub segments: Vec<VectorNetworkSegment>,
-    // pub regions: Vec<VectorNetworkRegion>,
+    pub regions: Vec<VectorNetworkRegion>,
 }
 
 fn is_zero(tangent: (f32, f32)) -> bool {
@@ -138,6 +138,7 @@ impl Default for VectorNetwork {
         VectorNetwork {
             vertices: vec![],
             segments: vec![],
+            regions: vec![],
         }
     }
 }

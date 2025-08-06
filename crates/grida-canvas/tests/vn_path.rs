@@ -64,7 +64,11 @@ fn vector_network_into_path_handles_multiple_shapes() {
         },
     ];
 
-    let vn = VectorNetwork { vertices, segments };
+    let vn = VectorNetwork {
+        vertices,
+        segments,
+        regions: vec![],
+    };
     let path: skia_safe::Path = vn.into();
 
     let mut iter = skia_safe::path::Iter::new(&path, false);

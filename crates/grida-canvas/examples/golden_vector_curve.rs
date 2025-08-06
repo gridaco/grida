@@ -14,6 +14,7 @@ fn main() {
             ta: Some((100.0, -100.0)), // Tangent handle from start point
             tb: Some((-100.0, 100.0)), // Tangent handle to end point
         }],
+        regions: vec![],
     };
 
     let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");
