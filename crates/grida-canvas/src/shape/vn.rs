@@ -1,3 +1,4 @@
+use crate::cg::types::*;
 use math2::Rectangle;
 use skia_safe;
 
@@ -63,6 +64,14 @@ pub struct VectorNetworkRegion {
     /// The first loop is assumed to be the outer boundary.
     /// Subsequent loops are treated as holes.
     pub loops: Vec<VectorNetworkLoop>,
+    // /// Fill rule used to determine how the area enclosed by the loops is filled.
+    // ///
+    // /// - `EvenOdd`: fill if the number of crossings is odd.
+    // /// - `NonZero`: fill if the winding number ≠ 0 (based on loop direction).
+    // ///
+    // /// This field maps directly to SVG’s `fill-rule` attribute and Skia’s `PathFillType`.
+    // #[deprecated(note = "not implemented")]
+    // pub fill_rule: FillRule,
 }
 
 /// A full vector network representing a graph of vertices and segments.
