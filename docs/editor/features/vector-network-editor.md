@@ -22,16 +22,22 @@ Clicking on an empty area while editing a vector clears any selected vertices, s
 # Marquee and Lasso Selection Priorities
 
 Dragging a rectangular marquee selects vertices and segments with a priority on
-vertices. To select a vertex, simply drag the marquee over it. Selecting a
-segment requires dragging over the segment while **excluding** both of its
-endpoints; if either endpoint is inside the marquee, only the vertex is
-selected and the segment is ignored. When an already selected segment later has
-one of its vertices captured by the marquee, the segment selection is cancelled
-in favour of the vertex.
+vertices. To select a vertex, simply drag the marquee over it. Segments are
+selected when they intersect the marquee **and** neither of their endpoints are
+individually captured. If both endpoints fall inside the marquee, the segment is
+still selected only when the entire curve is contained within the marquee area.
 
-Curved segments are tested with `cmath.bezier.intersectsRect`, allowing accurate
-segment selection without expensive curve–polygon comparisons. Lasso selections
-only target vertices and tangents for performance reasons.
+Curved segments are tested with `cmath.bezier.intersectsRect` for intersection
+checks and `cmath.bezier.containedByRect` to confirm full containment, enabling
+accurate segment selection without expensive curve–polygon comparisons. Lasso
+selections only target vertices and tangents for performance reasons.
+
+| Intersects Rect | Endpoint Selected | Fully Contained | Segment Selected |
+| ---------------- | ---------------- | --------------- | ---------------- |
+| ✅                | ❌                | ❌               | ✅                |
+| ✅                | ✅                | ❌               | ❌               |
+| ✅                | ✅                | ✅               | ✅                |
+| ❌                | –                | –               | ❌               |
 
 # Translate Vector Controls
 

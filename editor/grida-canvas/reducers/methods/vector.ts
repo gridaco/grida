@@ -212,18 +212,11 @@ export function self_updateVectorAreaSelection<
       control === "ta" ? 0 : 1,
     ]) as [number, 0 | 1][];
 
+  const offset: cmath.Vector2 = [node_rect.x, node_rect.y];
   let selected_segments: number[] = [];
   if (rect) {
-    const offset: cmath.Vector2 = [node_rect.x, node_rect.y];
     selected_segments = node.vectorNetwork.segments
       .map((seg, i) => {
-        if (
-          selected_vertex_set.has(seg.a) ||
-          selected_vertex_set.has(seg.b)
-        ) {
-          // vertex takes priority; skip expensive segment test
-          return -1;
-        }
         const va = cmath.vector2.add(
           node.vectorNetwork.vertices[seg.a].p,
           offset
@@ -252,11 +245,23 @@ export function self_updateVectorAreaSelection<
 
   // vertex selection has higher priority than segments –
   // any segment touching a selected vertex is dropped
-  // from the selection.
+  // from the selection unless the segment is fully contained by the marquee.
   selected_segments = selected_segments.filter((i) => {
     const seg = node.vectorNetwork.segments[i];
+    const va = cmath.vector2.add(
+      node.vectorNetwork.vertices[seg.a].p,
+      offset
+    );
+    const vb = cmath.vector2.add(
+      node.vectorNetwork.vertices[seg.b].p,
+      offset
+    );
+    const contained = rect
+      ? cmath.bezier.containedByRect(va, vb, seg.ta, seg.tb, rect)
+      : false;
     return (
-      !selected_vertex_set.has(seg.a) && !selected_vertex_set.has(seg.b)
+      contained ||
+      (!selected_vertex_set.has(seg.a) && !selected_vertex_set.has(seg.b))
     );
   });
 
