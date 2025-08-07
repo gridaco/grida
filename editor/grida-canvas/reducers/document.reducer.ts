@@ -887,36 +887,38 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      // group by parent
+      // group by parent, including root nodes
       const groups = Object.groupBy(
-        // omit root node
-        target_node_ids.filter((id) => !scene.children.includes(id)),
-        (node_id) => {
-          return dq.getParentId(state.document_ctx, node_id)!;
-        }
+        target_node_ids,
+        (node_id) => dq.getParentId(state.document_ctx, node_id) ?? "<root>"
       );
 
       const layouts = Object.keys(groups).map((parent_id) => {
         const g = groups[parent_id]!;
+        const is_root = parent_id === "<root>";
 
-        const parent_rect =
-          context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
+        let delta: cmath.Vector2;
+        if (is_root) {
+          delta = [0, 0];
+        } else {
+          const parent_rect =
+            context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
+          delta = [-parent_rect.x, -parent_rect.y];
+        }
 
         const rects = g
           .map(
             (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
           )
           // make the rects relative to the parent
-          .map((rect) =>
-            cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y])
-          )
+          .map((rect) => cmath.rect.translate(rect, delta))
           .map((rect) => cmath.rect.quantize(rect, 1));
 
         // guess the layout
         const lay = layout.flex.guess(rects);
 
         return {
-          parent: parent_id,
+          parent: is_root ? null : parent_id,
           layout: lay,
           children: g,
         };
@@ -955,13 +957,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           )[0];
 
           // [move children to container]
-          children = layout.orders.map((i) => children[i]);
-          children.forEach((child_id) => {
+          const ordered = layout.orders.map((i) => children[i]);
+          ordered.forEach((child_id) => {
             self_moveNode(draft, child_id, container_id);
           });
 
           // [reset children position]
-          children.forEach((child_id) => {
+          ordered.forEach((child_id) => {
             const child = dq.__getNodeById(draft, child_id);
             (draft.document.nodes[
               child_id
