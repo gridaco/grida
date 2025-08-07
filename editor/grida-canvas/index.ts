@@ -1850,6 +1850,12 @@ export namespace editor.api {
       segment: number,
       delta: cmath.Vector2
     ): void;
+    bendSegment(
+      node_id: NodeID,
+      segment: number,
+      ca: cmath.Vector2,
+      cb: cmath.Vector2
+    ): void;
 
     //
 

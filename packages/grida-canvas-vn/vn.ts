@@ -711,6 +711,75 @@ export namespace vn {
     }
 
     /**
+     * Bends a straight segment so that the resulting cubic Bézier curve passes
+     * through the given target point while maintaining the relative offset of
+     * the cursor from the segment's start.
+     *
+     * The offset point `ca` represents where the bending gesture started and is
+     * used to derive the parametric location along the segment. The point `cb`
+     * is the current cursor position that the curve should pass through. Both
+     * coordinates are in the editor's vector space.
+     *
+     * If the cursor lies on the original straight line (i.e. `cb` equals the
+     * linear interpolation of the segment at the computed offset), the tangents
+     * are cleared and the segment remains straight.
+     *
+     * @param segment index of the segment to bend
+     * @param ca canvas-space point where the bending started
+     * @param cb canvas-space point the segment should pass through
+     */
+    bendSegment(segment: number, ca: Vector2, cb: Vector2) {
+      const seg = this._segments[segment];
+      if (!seg) return;
+
+      const p0 = this._vertices[seg.a].p;
+      const p3 = this._vertices[seg.b].p;
+
+      const vx = p3[0] - p0[0];
+      const vy = p3[1] - p0[1];
+      const len2 = vx * vx + vy * vy;
+      if (len2 === 0) return;
+
+      // Parametric position along the straight segment where the gesture
+      // started. Clamp to avoid degenerate cases at the ends.
+      let t =
+        ((ca[0] - p0[0]) * vx + (ca[1] - p0[1]) * vy) / len2;
+      if (t <= 0 || t >= 1) return;
+      const s = 1 - t;
+
+      const v0: Vector2 = [cb[0] - p0[0], cb[1] - p0[1]];
+      const v3: Vector2 = [cb[0] - p3[0], cb[1] - p3[1]];
+
+      const coeff0 = s * s * s + 3 * s * s * t;
+      const coeff3 = 3 * s * t * t + t * t * t;
+      const qx = cb[0] - coeff0 * p0[0] - coeff3 * p3[0];
+      const qy = cb[1] - coeff0 * p0[1] - coeff3 * p3[1];
+      const denom = 3 * s * t;
+      if (denom === 0) return;
+      const qdx = qx / denom;
+      const qdy = qy / denom;
+
+      const m00 = s * v0[0];
+      const m01 = t * v3[0];
+      const m10 = s * v0[1];
+      const m11 = t * v3[1];
+      const det = m00 * m11 - m01 * m10;
+      if (Math.abs(det) < 1e-8) {
+        seg.ta = [0, 0];
+        seg.tb = [0, 0];
+        return;
+      }
+      const u = (qdx * m11 - qdy * m01) / det;
+      const v = (m00 * qdy - m10 * qdx) / det;
+
+      const p1: Vector2 = [p0[0] + u * v0[0], p0[1] + u * v0[1]];
+      const p2: Vector2 = [p3[0] + v * v3[0], p3[1] + v * v3[1]];
+
+      seg.ta = [p1[0] - p0[0], p1[1] - p0[1]];
+      seg.tb = [p2[0] - p3[0], p2[1] - p3[1]];
+    }
+
+    /**
      * adds a vertex to the network (optionally connecting it to the selected vertex)
      * @param p the position of the new vertex
      * @param origin the index of the vertex to connect the new vertex to

@@ -157,6 +157,13 @@ export default function useSurfaceVectorEditor() {
     [instance, node_id, vertices.length]
   );
 
+  const bendSegment = useCallback(
+    (segment: number, ca: cmath.Vector2, cb: cmath.Vector2) => {
+      instance.bendSegment(node_id, segment, ca, cb);
+    },
+    [instance, node_id]
+  );
+
   return useMemo(
     () => ({
       node_id,
@@ -182,6 +189,7 @@ export default function useSurfaceVectorEditor() {
       onCurveControlPointDragStart,
       onDragStart,
       onSegmentInsertMiddle,
+      bendSegment,
       loops,
     }),
     [
@@ -209,6 +217,7 @@ export default function useSurfaceVectorEditor() {
       onCurveControlPointDragStart,
       onDragStart,
       onSegmentInsertMiddle,
+      bendSegment,
       loops,
     ]
   );

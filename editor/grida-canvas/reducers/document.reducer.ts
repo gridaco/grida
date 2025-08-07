@@ -1073,6 +1073,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "select-segment":
     case "delete-segment":
     case "translate-segment":
+    case "bend-segment":
     case "select-tangent":
     case "delete-tangent":
     case "translate-vertex":
@@ -1238,6 +1239,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 bb_b.y - bb_a.y,
               ];
               vne.translate(cmath.vector2.invert(delta_vec));
+            });
+            break;
+          }
+          case "bend-segment": {
+            assert(node.type === "vector");
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
+              vne.bendSegment(segment, action.ca, action.cb);
             });
             break;
           }

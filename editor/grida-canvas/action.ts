@@ -287,6 +287,7 @@ export type EditorVectorEditorAction =
   | EditorVectorDeleteTangentAction
   | EditorVectorTranslateVertexAction
   | EditorVectorTranslateSegmentAction
+  | EditorVectorBendSegmentAction
   | EditorVectorBendOrClearCornerAction;
 
 export interface EditorVectorSelectVertexAction {
@@ -343,6 +344,15 @@ export interface EditorVectorTranslateSegmentAction {
   type: "translate-segment";
   target: SegmentQuery;
   delta: cmath.Vector2;
+}
+
+export interface EditorVectorBendSegmentAction {
+  type: "bend-segment";
+  target: SegmentQuery;
+  /** starting point of the bend gesture in node space */
+  ca: cmath.Vector2;
+  /** current cursor position in node space */
+  cb: cmath.Vector2;
 }
 
 export interface EditorVectorBendOrClearCornerAction {

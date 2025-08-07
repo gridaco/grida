@@ -223,12 +223,15 @@ function Segment({
   hovered: boolean;
   onHover: (segmentIndex: number | null) => void;
 }) {
-  const editor = useSurfaceVectorEditor();
-  const segment = editor.segments[segmentIndex];
-  const selected = editor.selected_segments.includes(segmentIndex);
+  const ve = useSurfaceVectorEditor();
+  const instance = useCurrentEditor();
+  const tool = useToolState();
+  const segment = ve.segments[segmentIndex];
+  const selected = ve.selected_segments.includes(segmentIndex);
   const active = selected;
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
+  const startRef = React.useRef<cmath.Vector2 | null>(null);
   const showMiddle =
     hovered && cmath.vector2.isZero(ta) && cmath.vector2.isZero(tb);
   const middle = useMemo(() => {
@@ -238,31 +241,54 @@ function Segment({
   const bind = useGesture(
     {
       onHover: (s) => {
-        // enter
         if (s.first) {
           onHover(segmentIndex);
         }
-        // leave
         if (s.last) {
           onHover(null);
         }
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
-        selectedRef.current = editor.selected_segments.includes(segmentIndex);
+        selectedRef.current = ve.selected_segments.includes(segmentIndex);
         draggedRef.current = false;
         if (!selectedRef.current) {
-          editor.selectSegment(segmentIndex, event.shiftKey);
+          ve.selectSegment(segmentIndex, event.shiftKey);
         }
       },
       onDragStart: ({ event }) => {
         event.preventDefault();
         draggedRef.current = true;
-        editor.onDragStart();
+        if (tool.type === "bend") {
+          const canvasPoint = instance.clientPointToCanvasPoint([
+            (event as MouseEvent).clientX,
+            (event as MouseEvent).clientY,
+          ]);
+          startRef.current = cmath.vector2.sub(canvasPoint, ve.offset);
+        } else {
+          ve.onDragStart();
+        }
+      },
+      onDrag: ({ event }) => {
+        if (tool.type === "bend" && startRef.current) {
+          event.preventDefault();
+          const canvasPoint = instance.clientPointToCanvasPoint([
+            (event as MouseEvent).clientX,
+            (event as MouseEvent).clientY,
+          ]);
+          const cb = cmath.vector2.sub(canvasPoint, ve.offset);
+          ve.bendSegment(segmentIndex, startRef.current, cb);
+        }
       },
       onPointerUp: ({ event }) => {
+        if (tool.type === "bend") {
+          if (selectedRef.current && !draggedRef.current) {
+            ve.selectSegment(segmentIndex, event.shiftKey);
+          }
+          return;
+        }
         if (selectedRef.current && !draggedRef.current) {
-          editor.selectSegment(segmentIndex, event.shiftKey);
+          ve.selectSegment(segmentIndex, event.shiftKey);
         }
       },
     },

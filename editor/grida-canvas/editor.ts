@@ -842,6 +842,20 @@ export class Editor
     });
   }
 
+  public bendSegment(
+    node_id: editor.NodeID,
+    segment: number,
+    ca: cmath.Vector2,
+    cb: cmath.Vector2
+  ) {
+    this.dispatch({
+      type: "bend-segment",
+      target: { node_id, segment },
+      ca,
+      cb,
+    });
+  }
+
   public bendOrClearCorner(
     node_id: editor.NodeID,
     vertex: number,
