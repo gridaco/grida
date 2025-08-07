@@ -226,11 +226,7 @@ function Segment({
   const editor = useSurfaceVectorEditor();
   const segment = editor.segments[segmentIndex];
   const selected = editor.selected_segments.includes(segmentIndex);
-  // activeAB when both vertices of the segment are selected
-  const activeAB =
-    editor.selected_vertices.includes(segment.a) &&
-    editor.selected_vertices.includes(segment.b);
-  const active = selected || activeAB;
+  const active = selected;
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const showMiddle =
@@ -253,8 +249,7 @@ function Segment({
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
-        selectedRef.current =
-          editor.selected_segments.includes(segmentIndex) || activeAB;
+        selectedRef.current = editor.selected_segments.includes(segmentIndex);
         draggedRef.current = false;
         if (!selectedRef.current) {
           editor.selectSegment(segmentIndex, event.shiftKey);
