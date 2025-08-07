@@ -5,6 +5,8 @@ import React from "react";
 import {
   SidebarMenuSectionContent,
   SidebarSection,
+  SidebarSectionHeaderItem,
+  SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
 import { PropertyLine, PropertyLineLabel } from "../ui";
 import InputPropertyNumber from "../ui/number";
@@ -20,8 +22,14 @@ import useTangentMirroring from "./use-tangent-mirroring";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
 import type { editor } from "@/grida-canvas";
-import { useA11yActions } from "@/grida-canvas-react/provider";
+import {
+  useA11yActions,
+  useNodeActions,
+  useNodeState,
+} from "@/grida-canvas-react/provider";
 import { encodeTranslateVectorCommand } from "@/grida-canvas/reducers/methods";
+import { FillControl } from "../controls/fill";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 
 export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
   const {
@@ -87,20 +95,19 @@ export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
   const y = computeMixed(points.map((p) => p[1]));
 
   const handleDelta = React.useCallback(
-    (axis: "x" | "y") =>
-      (change: editor.api.NumberChange) => {
-        if (change.type !== "delta") return;
-        const direction =
-          axis === "x"
-            ? change.value > 0
-              ? "right"
-              : "left"
-            : change.value > 0
-              ? "down"
-              : "up";
-        const shift = Math.abs(change.value) > 1;
-        a11yarrow("selection", direction, shift);
-      },
+    (axis: "x" | "y") => (change: editor.api.NumberChange) => {
+      if (change.type !== "delta") return;
+      const direction =
+        axis === "x"
+          ? change.value > 0
+            ? "right"
+            : "left"
+          : change.value > 0
+            ? "down"
+            : "up";
+      const shift = Math.abs(change.value) > 1;
+      a11yarrow("selection", direction, shift);
+    },
     [a11yarrow]
   );
 
@@ -144,6 +151,55 @@ export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
+      <SectionFills node_id={node_id} />
     </div>
+  );
+}
+
+function SectionFills({ node_id }: { node_id: string }) {
+  const instance = useCurrentEditor();
+  const { content_edit_mode } = useEditorState(instance, (state) => ({
+    content_edit_mode: state.content_edit_mode,
+  }));
+
+  const { fill } = useNodeState(node_id, (node) => ({
+    fill: node.fill,
+  }));
+
+  const selectedGradientStop =
+    content_edit_mode?.type === "fill/gradient"
+      ? content_edit_mode.selected_stop
+      : undefined;
+
+  const actions = useNodeActions(node_id)!;
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Fill</PropertyLineLabel>
+          <FillControl
+            value={fill}
+            onValueChange={actions.fill}
+            removable
+            selectedGradientStop={selectedGradientStop}
+            onSelectedGradientStopChange={(stop) => {
+              instance.selectGradientStop(node_id, stop);
+            }}
+            // onOpenChange={(open) => {
+            //   if (open) {
+            //     instance.tryEnterContentEditMode(node_id, "fill/gradient");
+            //   } else {
+            //     instance.tryExitContentEditMode();
+            //   }
+            //   //
+            // }}
+          />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
   );
 }

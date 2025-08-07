@@ -34,6 +34,15 @@ const paint_label = {
   diamond_gradient: "diamond",
 } as const;
 
+export interface PaintControlProps {
+  value?: grida.program.nodes.i.props.PropsPaintValue;
+  onValueChange?: (value: ComputedPaint | TokenizedPaint | null) => void;
+  onOpenChange?: (open: boolean) => void;
+  selectedGradientStop?: number;
+  removable?: boolean;
+  onSelectedGradientStopChange?: (stop: number) => void;
+}
+
 export function PaintControl({
   value,
   onValueChange,
@@ -41,14 +50,7 @@ export function PaintControl({
   selectedGradientStop,
   onOpenChange,
   onSelectedGradientStopChange,
-}: {
-  value?: grida.program.nodes.i.props.PropsPaintValue;
-  onValueChange?: (value: ComputedPaint | TokenizedPaint | null) => void;
-  onOpenChange?: (open: boolean) => void;
-  selectedGradientStop?: number;
-  removable?: boolean;
-  onSelectedGradientStopChange?: (stop: number) => void;
-}) {
+}: PaintControlProps) {
   if (tokens.is.tokenized(value)) {
     return (
       <TokenizedPaintControl
