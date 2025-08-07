@@ -452,6 +452,7 @@ function __self_evt_on_pointer_down(
           neighbouring_vertices: [0],
           path_cursor_position: pos,
           clipboard: null,
+          clipboard_node_position: null,
         };
       }
 

@@ -132,6 +132,7 @@ function __self_try_enter_content_edit_mode_auto(
         neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
         clipboard: null,
+        clipboard_node_position: null,
       };
       break;
     }
@@ -157,6 +158,7 @@ function __self_try_enter_content_edit_mode_auto(
         neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
         clipboard: null,
+        clipboard_node_position: null,
       };
 
       break;

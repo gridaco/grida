@@ -698,6 +698,14 @@ export namespace editor.state {
     clipboard: vn.VectorNetwork | null;
 
     /**
+     * Position of the vector node when the clipboard was populated.
+     *
+     * This allows pasted geometry to retain the absolute coordinates
+     * it had at copy time, even if the node moves before pasting.
+     */
+    clipboard_node_position: cmath.Vector2 | null;
+
+    /**
      * next points position
      *
      * @deprecated - remove me - use global sanp pointer

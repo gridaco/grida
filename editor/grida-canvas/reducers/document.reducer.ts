@@ -35,7 +35,11 @@ import {
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
-import { getSnapTargets, snapObjectsTranslation, snapMovement } from "./tools/snap";
+import {
+  getSnapTargets,
+  snapObjectsTranslation,
+  snapMovement,
+} from "./tools/snap";
 import nid from "./tools/id";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
@@ -115,18 +119,17 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         ) as grida.program.nodes.VectorNode;
         const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
         const vertices = Array.from(
-          new Set([
-            ...selected_vertices,
-            ...selected_tangents.map(([v]) => v),
-          ])
+          new Set([...selected_vertices, ...selected_tangents.map(([v]) => v)])
         );
         const copied = vne.copy({
           vertices,
           segments: selected_segments,
         });
         return produce(state, (draft) => {
-          const mode = draft.content_edit_mode as editor.state.VectorContentEditMode;
+          const mode =
+            draft.content_edit_mode as editor.state.VectorContentEditMode;
           mode.clipboard = copied;
+          mode.clipboard_node_position = [node.left ?? 0, node.top ?? 0];
           draft.user_clipboard = undefined;
         });
       }
@@ -160,18 +163,32 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         if (state.content_edit_mode?.type === "vector") {
           const net = action.vector_network;
           return produce(state, (draft) => {
-            const mode = draft.content_edit_mode as editor.state.VectorContentEditMode;
+            const mode =
+              draft.content_edit_mode as editor.state.VectorContentEditMode;
             const node = dq.__getNodeById(
               draft,
               mode.node_id
             ) as grida.program.nodes.VectorNode;
             const vertex_offset = node.vectorNetwork.vertices.length;
             const segment_offset = node.vectorNetwork.segments.length;
+
+            let net_to_union = net;
+            if (mode.clipboard && mode.clipboard_node_position) {
+              const delta: [number, number] = [
+                mode.clipboard_node_position[0] - (node.left ?? 0),
+                mode.clipboard_node_position[1] - (node.top ?? 0),
+              ];
+              if (JSON.stringify(mode.clipboard) === JSON.stringify(net)) {
+                net_to_union = vn.VectorNetworkEditor.translate(net, delta);
+              }
+            }
+
             node.vectorNetwork = vn.VectorNetworkEditor.union(
               node.vectorNetwork,
-              net,
+              net_to_union,
               null
             );
+            normalizeVectorNodeBBox(node);
             const new_vertices = Array.from(
               { length: net.vertices.length },
               (_, i) => i + vertex_offset
@@ -243,18 +260,30 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const net = state.content_edit_mode.clipboard;
         if (!net) break;
         return produce(state, (draft) => {
-          const mode = draft.content_edit_mode as editor.state.VectorContentEditMode;
+          const mode =
+            draft.content_edit_mode as editor.state.VectorContentEditMode;
           const node = dq.__getNodeById(
             draft,
             mode.node_id
           ) as grida.program.nodes.VectorNode;
           const vertex_offset = node.vectorNetwork.vertices.length;
           const segment_offset = node.vectorNetwork.segments.length;
+
+          let net_to_union = net;
+          if (mode.clipboard_node_position) {
+            const delta: [number, number] = [
+              mode.clipboard_node_position[0] - (node.left ?? 0),
+              mode.clipboard_node_position[1] - (node.top ?? 0),
+            ];
+            net_to_union = vn.VectorNetworkEditor.translate(net, delta);
+          }
+
           node.vectorNetwork = vn.VectorNetworkEditor.union(
             node.vectorNetwork,
-            net,
+            net_to_union,
             null
           );
+          normalizeVectorNodeBBox(node);
           const new_vertices = Array.from(
             { length: net.vertices.length },
             (_, i) => i + vertex_offset
@@ -1076,7 +1105,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   selected_tangents: next.selected_tangents,
                 }
               );
-            draft.content_edit_mode.a_point = getVectorSelectionStartPoint(next);
+            draft.content_edit_mode.a_point =
+              getVectorSelectionStartPoint(next);
             break;
           }
           case "delete-vertex": {
@@ -1125,7 +1155,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   selected_tangents: next.selected_tangents,
                 }
               );
-            draft.content_edit_mode.a_point = getVectorSelectionStartPoint(next);
+            draft.content_edit_mode.a_point =
+              getVectorSelectionStartPoint(next);
             break;
           }
           case "select-tangent": {
@@ -1155,7 +1186,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   selected_tangents: next.selected_tangents,
                 }
               );
-            draft.content_edit_mode.a_point = getVectorSelectionStartPoint(next);
+            draft.content_edit_mode.a_point =
+              getVectorSelectionStartPoint(next);
             break;
           }
           case "delete-tangent": {
