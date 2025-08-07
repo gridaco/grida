@@ -71,6 +71,12 @@ pub struct VectorNetworkRegion {
     ///
     /// This field maps directly to SVG's `fill-rule` attribute and Skia's `PathFillType`.
     pub fill_rule: FillRule,
+    /// Fills applied to this region.
+    ///
+    /// When `None`, the region will not be filled by the vector-network painter.
+    /// This mirrors node-level fill semantics where multiple paints may be
+    /// stacked.
+    pub fills: Option<Vec<Paint>>,
 }
 
 /// A full vector network representing a graph of vertices and segments.

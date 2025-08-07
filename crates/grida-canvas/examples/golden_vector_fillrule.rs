@@ -53,6 +53,7 @@ fn main() {
                 VectorNetworkLoop(vec![4, 5, 6, 7]), // inner hole
             ],
             fill_rule: FillRule::NonZero,
+            fills: None,
         }],
     };
 
