@@ -2920,6 +2920,33 @@ namespace cmath {
     }
 
     /**
+     * Checks whether a single cubic Bézier curve segment is fully contained
+     * within an axis-aligned rectangle.
+     *
+     * The segment is defined by start and end points `a`, `b` and their
+     * respective tangents `ta`, `tb`. The function computes the exact bounding
+     * box of the curve and verifies that it lies entirely inside the provided
+     * rectangle.
+     *
+     * @param a - Start point of the Bézier curve.
+     * @param b - End point of the Bézier curve.
+     * @param ta - Tangent control point relative to `a`.
+     * @param tb - Tangent control point relative to `b`.
+     * @param rect - Rectangle to test containment against.
+     * @returns `true` if the entire curve is contained within `rect`, otherwise `false`.
+     */
+    export function containedByRect(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      rect: Rectangle
+    ): boolean {
+      const bbox = getBBox({ a, b, ta, tb });
+      return cmath.rect.contains(bbox, rect);
+    }
+
+    /**
      * Converts an SVG elliptical arc to one or more cubic Bézier curve segments.
      *
      * The `a2c` function transforms the parameters of an SVG elliptical arc into a series of cubic Bézier curves,

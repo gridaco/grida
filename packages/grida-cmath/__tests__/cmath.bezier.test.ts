@@ -188,3 +188,39 @@ describe("cmath.bezier.intersectsRect", () => {
     expect(cmath.bezier.intersectsRect(a, b, ta, tb, rect)).toBe(false);
   });
 });
+
+describe("cmath.bezier.containedByRect", () => {
+  const rect = { x: 0, y: 0, width: 10, height: 10 };
+
+  test("returns true for a curve fully inside the rectangle", () => {
+    const a: cmath.Vector2 = [1, 1];
+    const b: cmath.Vector2 = [9, 9];
+    const ta: cmath.Vector2 = [2, 0];
+    const tb: cmath.Vector2 = [-2, 0];
+    expect(cmath.bezier.containedByRect(a, b, ta, tb, rect)).toBe(true);
+  });
+
+  test("returns true when the curve lies on the rectangle boundary", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [10, 0];
+    const ta: cmath.Vector2 = [5, 0];
+    const tb: cmath.Vector2 = [-5, 0];
+    expect(cmath.bezier.containedByRect(a, b, ta, tb, rect)).toBe(true);
+  });
+
+  test("returns false when control points push the curve outside", () => {
+    const a: cmath.Vector2 = [2, 2];
+    const b: cmath.Vector2 = [8, 8];
+    const ta: cmath.Vector2 = [0, -20]; // control point far above rect
+    const tb: cmath.Vector2 = [0, 20]; // control point far below rect
+    expect(cmath.bezier.containedByRect(a, b, ta, tb, rect)).toBe(false);
+  });
+
+  test("returns false when the curve is completely outside", () => {
+    const a: cmath.Vector2 = [15, 15];
+    const b: cmath.Vector2 = [20, 20];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+    expect(cmath.bezier.containedByRect(a, b, ta, tb, rect)).toBe(false);
+  });
+});
