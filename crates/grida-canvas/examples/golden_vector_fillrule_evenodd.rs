@@ -48,7 +48,7 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     // Convert VectorNetwork to a single Skia Path and apply even-odd fill rule
-    let mut path = network.to_path();
+    let mut path = network.to_appended_path();
     path.set_fill_type(skia_safe::PathFillType::EvenOdd);
 
     let mut fill_paint = Paint::default();

@@ -1,8 +1,16 @@
 use crate::cg::types::*;
 use crate::painter::cvt;
+use crate::shape::stroke::stroke_geometry;
 use skia_safe::{Canvas, PaintStyle};
 
 use super::vn::VectorNetwork;
+
+#[derive(Debug, Clone, Copy)]
+pub struct StrokeOptions {
+    pub width: f32,
+    pub align: StrokeAlign,
+    pub color: CGColor,
+}
 
 /// Painter for [`VectorNetwork`]s that renders region-specific fills.
 ///
@@ -19,7 +27,7 @@ impl<'a> VNPainter<'a> {
     }
 
     /// Draw the provided vector network onto the canvas.
-    pub fn draw(&self, vn: &VectorNetwork) {
+    pub fn draw(&self, vn: &VectorNetwork, stroke: Option<&StrokeOptions>) {
         let paths = vn.to_paths();
         for (region, path) in vn.regions.iter().zip(paths.iter()) {
             let Some(fills) = &region.fills else { continue };
@@ -34,6 +42,20 @@ impl<'a> VNPainter<'a> {
                 }
                 self.canvas.draw_path(path, &sk_paint);
             }
+        }
+
+        if let Some(stroke_opts) = stroke {
+            let merged = vn.to_union_path();
+            let stroke_path = stroke_geometry(&merged, stroke_opts.width, stroke_opts.align, None);
+            let bounds = stroke_path.compute_tight_bounds();
+            let size = (bounds.width(), bounds.height());
+            let paint = Paint::Solid(SolidPaint {
+                color: stroke_opts.color,
+                opacity: 1.0,
+            });
+            let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
+            sk_paint.set_style(PaintStyle::Fill);
+            self.canvas.draw_path(&stroke_path, &sk_paint);
         }
     }
 }

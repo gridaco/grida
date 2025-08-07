@@ -221,10 +221,23 @@ impl VectorNetwork {
     /// Merge all paths returned by [`to_paths`](Self::to_paths) into a single
     /// path. This is a temporary convenience and may not preserve fill rules
     /// across separate regions.
-    pub fn to_path(&self) -> skia_safe::Path {
+    pub fn to_appended_path(&self) -> skia_safe::Path {
         let mut merged = skia_safe::Path::new();
         for p in self.to_paths() {
             merged.add_path(&p, (0.0, 0.0), skia_safe::path::AddPathMode::Append);
+        }
+        merged
+    }
+
+    /// Union all paths returned by [`to_union`](Self::to_union) into a single path.
+    pub fn to_union_path(&self) -> skia_safe::Path {
+        let mut merged = skia_safe::Path::new();
+        for p in self.to_paths() {
+            if let Some(unioned) = skia_safe::op(&merged, &p, skia_safe::PathOp::Union) {
+                merged = unioned;
+            } else {
+                continue;
+            }
         }
         merged
     }
@@ -282,6 +295,6 @@ impl Default for VectorNetwork {
 
 impl Into<skia_safe::Path> for VectorNetwork {
     fn into(self) -> skia_safe::Path {
-        self.to_path()
+        self.to_union_path()
     }
 }
