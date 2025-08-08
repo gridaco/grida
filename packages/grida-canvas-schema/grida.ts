@@ -759,6 +759,7 @@ export namespace grida.program.nodes {
   export type NodeType = Node["type"];
 
   export type Node =
+    | GroupNode
     | TextNode
     | ImageNode
     | VideoNode
@@ -823,7 +824,8 @@ export namespace grida.program.nodes {
    * Unknwon node utility type - use within the correct context
    */
   export type UnknwonNode = Omit<
-    Partial<TextNode> &
+    Partial<GroupNode> &
+      Partial<TextNode> &
       Partial<BitmapNode> &
       Partial<ImageNode> &
       Partial<VideoNode> &
@@ -1442,16 +1444,20 @@ export namespace grida.program.nodes {
   //   b: ConnectorPoint;
   // }
 
-  // /**
-  //  * @deprecated - not ready - do not use in production
-  //  */
-  // export interface GroupNode
-  //   extends i.IBaseNode,
-  //     i.ISceneNode,
-  //     i.IChildrenReference,
-  //     i.IExpandable {
-  //   //
-  // }
+  /**
+   * Group Node
+   *
+   * [GroupNode] is not supported in the html/svg backend.
+   */
+  export interface GroupNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IChildrenReference,
+      i.IExpandable,
+      i.IPositioning {
+    type: "group";
+    //
+  }
 
   export interface TextNode
     extends i.IBaseNode,

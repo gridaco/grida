@@ -208,6 +208,7 @@ export function NodeElement<P extends Record<string, any>>({
 }
 
 const fillings = {
+  group: "none",
   text: "color",
   container: "background",
   component: "background",
