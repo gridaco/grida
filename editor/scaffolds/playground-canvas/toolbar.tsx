@@ -214,7 +214,7 @@ export function PlaygroundToolbar() {
               { value: "rectangle", label: "Rectangle", shortcut: "R" },
               { value: "ellipse", label: "Ellipse", shortcut: "O" },
               { value: "line", label: "Line", shortcut: "L" },
-              { value: "polygon", label: "Polygon" },
+              { value: "polygon", label: "Polygon", shortcut: "Y" },
               { value: "star", label: "Star" },
               { value: "image", label: "Image" },
             ]}

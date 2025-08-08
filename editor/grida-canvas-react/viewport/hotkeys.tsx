@@ -238,6 +238,11 @@ export const keybindings_sheet = [
     keys: ["o"],
   },
   {
+    name: "polygon",
+    description: "Polygon tool",
+    keys: ["y"],
+  },
+  {
     name: "text",
     description: "Text tool",
     keys: ["t"],
@@ -834,6 +839,10 @@ export function useEditorHotKeys() {
 
   useHotkeys("o", () => {
     editor.setTool({ type: "insert", node: "ellipse" });
+  });
+
+  useHotkeys("y", () => {
+    editor.setTool({ type: "insert", node: "polygon" });
   });
 
   useHotkeys("t", () => {
