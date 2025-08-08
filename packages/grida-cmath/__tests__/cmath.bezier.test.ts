@@ -224,3 +224,115 @@ describe("cmath.bezier.containedByRect", () => {
     expect(cmath.bezier.containedByRect(a, b, ta, tb, rect)).toBe(false);
   });
 });
+
+describe("cmath.bezier.projectParametric", () => {
+  /**
+   * Evaluates a cubic Bézier segment defined by endpoints `a`, `b` and tangents `ta`, `tb`.
+   */
+  function evalBezier(
+    a: cmath.Vector2,
+    b: cmath.Vector2,
+    ta: cmath.Vector2,
+    tb: cmath.Vector2,
+    t: number
+  ): cmath.Vector2 {
+    const p0 = a;
+    const p1: cmath.Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+    const p2: cmath.Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+    const p3 = b;
+    const mt = 1 - t;
+    const mt2 = mt * mt;
+    const t2 = t * t;
+    const x =
+      mt2 * mt * p0[0] +
+      3 * mt2 * t * p1[0] +
+      3 * mt * t2 * p2[0] +
+      t2 * t * p3[0];
+    const y =
+      mt2 * mt * p0[1] +
+      3 * mt2 * t * p1[1] +
+      3 * mt * t2 * p2[1] +
+      t2 * t * p3[1];
+    return [x, y];
+  }
+
+  /**
+   * Evaluates derivative of cubic Bézier for computing normals in tests.
+   */
+  function evalDerivative(
+    a: cmath.Vector2,
+    b: cmath.Vector2,
+    ta: cmath.Vector2,
+    tb: cmath.Vector2,
+    t: number
+  ): cmath.Vector2 {
+    const p0 = a;
+    const p1: cmath.Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+    const p2: cmath.Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+    const p3 = b;
+    const mt = 1 - t;
+    const x =
+      3 * mt * mt * (p1[0] - p0[0]) +
+      6 * mt * t * (p2[0] - p1[0]) +
+      3 * t * t * (p3[0] - p2[0]);
+    const y =
+      3 * mt * mt * (p1[1] - p0[1]) +
+      6 * mt * t * (p2[1] - p1[1]) +
+      3 * t * t * (p3[1] - p2[1]);
+    return [x, y];
+  }
+
+  test("projects correctly on a straight line", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [10, 0];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+
+    // point above the midpoint of the segment
+    expect(
+      cmath.bezier.projectParametric(a, b, ta, tb, [5, 5])
+    ).toBeCloseTo(0.5, 6);
+
+    // point before the start should clamp to 0
+    expect(
+      cmath.bezier.projectParametric(a, b, ta, tb, [-5, 0])
+    ).toBeCloseTo(0, 6);
+
+    // point after the end should clamp to 1
+    expect(
+      cmath.bezier.projectParametric(a, b, ta, tb, [15, 0])
+    ).toBeCloseTo(1, 6);
+  });
+
+  test("returns original t for points on a curved segment", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [10, 0];
+    const ta: cmath.Vector2 = [0, 10];
+    const tb: cmath.Vector2 = [0, -10];
+
+    const t = 0.3;
+    const p = evalBezier(a, b, ta, tb, t);
+    expect(cmath.bezier.projectParametric(a, b, ta, tb, p)).toBeCloseTo(
+      t,
+      6
+    );
+  });
+
+  test("handles points offset from the curve", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [10, 0];
+    const ta: cmath.Vector2 = [0, 10];
+    const tb: cmath.Vector2 = [0, -10];
+    const t = 0.4;
+    const point = evalBezier(a, b, ta, tb, t);
+    const tangent = evalDerivative(a, b, ta, tb, t);
+    const normal: cmath.Vector2 = [-tangent[1], tangent[0]];
+    const len = Math.hypot(normal[0], normal[1]);
+    const offset: cmath.Vector2 = [
+      point[0] + (normal[0] / len) * 1,
+      point[1] + (normal[1] / len) * 1,
+    ];
+    const projected = cmath.bezier.projectParametric(a, b, ta, tb, offset);
+    expect(projected).toBeCloseTo(t, 2); // allow some tolerance
+  });
+});

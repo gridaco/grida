@@ -2947,6 +2947,154 @@ namespace cmath {
     }
 
     /**
+     * Projects a point onto a cubic Bézier segment and returns its normalized parametric position.
+     *
+     * This function performs a closest-point projection from a canvas-space point `p`
+     * onto the Bézier curve defined by endpoints `a`, `b` and control tangents `ta`, `tb`.
+     * The output is a parametric scalar `t \in [0, 1]` such that the evaluated curve
+     * point `B(t)` is as close as possible to `p` in Euclidean distance.
+     *
+     * The algorithm works in two phases:
+     *
+     * 1. **Coarse sampling** – the curve is sampled at several uniformly spaced
+     *    parameters to obtain a good initial guess.
+     * 2. **Newton–Raphson refinement** – starting from the best sample, the method
+     *    iteratively minimizes the squared distance function
+     *    `f(t) = |B(t) - p|^2`. The derivative `f'(t)` and second derivative
+     *    `f''(t)` are evaluated analytically, yielding quadratic and linear terms
+     *    respectively. The iteration continues for a small fixed number of steps
+     *    while clamping `t` to `[0,1]` after each update.
+     *
+     * Degenerate segments where both tangents are zero are handled as simple
+     * linear projections onto the line segment `ab`.
+     *
+     * This operation is known as:
+     * - "parametric projection"
+     * - "inverse Bézier evaluation"
+     * - "closest-point projection on a Bézier curve"
+     *
+     * It is commonly used in interactive vector editing to determine:
+     * - Where a user clicked or dragged on the curve
+     * - How to distribute deformation across curve tangents
+     * - Where to insert or split the curve
+     *
+     * The resulting `t` does not correspond to arc length, but to Bézier parameter space.
+     * For accurate geometric interpretation, `B(t)` can be evaluated and used in
+     * follow-up logic.
+     *
+     * @param a - Start point of the segment.
+     * @param b - End point of the segment.
+     * @param ta - Tangent vector at start (relative to `a`).
+     * @param tb - Tangent vector at end (relative to `b`).
+     * @param p - The canvas-space point to project onto the curve.
+     * @returns The normalized parametric scalar `t \in [0, 1]` along the Bézier segment.
+     */
+    export function projectParametric(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      p: Vector2
+    ): number {
+      // Handle degenerate (straight-line) case fast
+      if (ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0) {
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) return 0;
+        const tLine =
+          ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq;
+        return Math.max(0, Math.min(1, tLine));
+      }
+
+      const p0 = a;
+      const p1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const p2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+      const p3 = b;
+
+      // Helper to evaluate point on curve
+      const evalPoint = (t: number): Vector2 => {
+        const mt = 1 - t;
+        const mt2 = mt * mt;
+        const t2 = t * t;
+        const x =
+          mt2 * mt * p0[0] +
+          3 * mt2 * t * p1[0] +
+          3 * mt * t2 * p2[0] +
+          t2 * t * p3[0];
+        const y =
+          mt2 * mt * p0[1] +
+          3 * mt2 * t * p1[1] +
+          3 * mt * t2 * p2[1] +
+          t2 * t * p3[1];
+        return [x, y];
+      };
+
+      // First derivative of the curve
+      const evalDerivative = (t: number): Vector2 => {
+        const mt = 1 - t;
+        const x =
+          3 * mt * mt * (p1[0] - p0[0]) +
+          6 * mt * t * (p2[0] - p1[0]) +
+          3 * t * t * (p3[0] - p2[0]);
+        const y =
+          3 * mt * mt * (p1[1] - p0[1]) +
+          6 * mt * t * (p2[1] - p1[1]) +
+          3 * t * t * (p3[1] - p2[1]);
+        return [x, y];
+      };
+
+      // Second derivative of the curve
+      const evalSecondDerivative = (t: number): Vector2 => {
+        const mt = 1 - t;
+        const x =
+          6 * mt * (p2[0] - 2 * p1[0] + p0[0]) +
+          6 * t * (p3[0] - 2 * p2[0] + p1[0]);
+        const y =
+          6 * mt * (p2[1] - 2 * p1[1] + p0[1]) +
+          6 * t * (p3[1] - 2 * p2[1] + p1[1]);
+        return [x, y];
+      };
+
+      // coarse sampling for initial guess
+      let bestT = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i <= 20; i++) {
+        const t = i / 20;
+        const [x, y] = evalPoint(t);
+        const dx = x - p[0];
+        const dy = y - p[1];
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestT = t;
+        }
+      }
+
+      // refine using Newton-Raphson
+      let t = bestT;
+      for (let i = 0; i < 5; i++) {
+        const pt = evalPoint(t);
+        const d1 = evalDerivative(t);
+        const d2 = evalSecondDerivative(t);
+        const rx = pt[0] - p[0];
+        const ry = pt[1] - p[1];
+        const f = rx * d1[0] + ry * d1[1];
+        const df =
+          d1[0] * d1[0] +
+          d1[1] * d1[1] +
+          rx * d2[0] +
+          ry * d2[1];
+        if (df === 0) break;
+        t -= f / df;
+        if (t < 0) t = 0;
+        else if (t > 1) t = 1;
+      }
+
+      return t;
+    }
+
+    /**
      * Converts an SVG elliptical arc to one or more cubic Bézier curve segments.
      *
      * The `a2c` function transforms the parameters of an SVG elliptical arc into a series of cubic Bézier curves,
