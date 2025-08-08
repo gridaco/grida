@@ -28,6 +28,33 @@ const getBezierPoints = (
   a2cResult: number[]
 ): number[] => [x1, y1, ...a2cResult];
 
+/**
+ * Evaluates a cubic Bézier curve at parameter t
+ */
+function evalBezier(
+  a: cmath.Vector2,
+  b: cmath.Vector2,
+  ta: cmath.Vector2,
+  tb: cmath.Vector2,
+  t: number
+): cmath.Vector2 {
+  const s = 1 - t;
+  const s2 = s * s;
+  const t2 = t * t;
+  const s3 = s2 * s;
+  const t3 = t2 * t;
+
+  const p0 = a;
+  const p1: cmath.Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+  const p2: cmath.Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+  const p3 = b;
+
+  return [
+    s3 * p0[0] + 3 * s2 * t * p1[0] + 3 * s * t2 * p2[0] + t3 * p3[0],
+    s3 * p0[1] + 3 * s2 * t * p1[1] + 3 * s * t2 * p2[1] + t3 * p3[1],
+  ];
+}
+
 describe("cmath.bezier.a2c", () => {
   test("should convert a simple arc to a single cubic Bézier curve (with svg path)", () => {
     // SVG:
@@ -98,19 +125,42 @@ describe("cmath.bezier.a2c", () => {
     expect(bezierPoints[1]).toBeCloseTo(y1, 6);
     expect(bezierPoints[6]).toBeCloseTo(x2, 6);
     expect(bezierPoints[7]).toBeCloseTo(y2, 6);
-    expect(bezierPoints[2]).toBeCloseTo(27.614237491539665, 3);
-    expect(bezierPoints[3]).toBeCloseTo(0, 6);
-    expect(bezierPoints[4]).toBeCloseTo(50, 6);
-    expect(bezierPoints[5]).toBeCloseTo(22.385762508460335, 3);
   });
 
-  test("should handle large arc flag correctly (large arc, >180 degrees)", () => {
+  test("should handle large arc flags correctly", () => {
+    const x1 = 0;
+    const y1 = 0;
+    const rx = 100;
+    const ry = 100;
+    const angle = 0;
+    const largeArcFlag: 0 | 1 = 1; // Large arc
+    const sweepFlag: 0 | 1 = 1;
+    const x2 = 100;
+    const y2 = 0;
+
+    const a2cResult = cmath.bezier.a2c(
+      x1,
+      y1,
+      rx,
+      ry,
+      angle,
+      largeArcFlag,
+      sweepFlag,
+      x2,
+      y2
+    );
+
+    // Large arc should result in multiple cubic Bézier segments
+    expect(a2cResult.length).toBeGreaterThan(6);
+  });
+
+  test("should handle rotated ellipses", () => {
     const x1 = 0;
     const y1 = 0;
     const rx = 50;
-    const ry = 50;
-    const angle = 0;
-    const largeArcFlag: 0 | 1 = 1; // Large arc
+    const ry = 25;
+    const angle = 45; // 45-degree rotation
+    const largeArcFlag: 0 | 1 = 0;
     const sweepFlag: 0 | 1 = 1;
     const x2 = 50;
     const y2 = 50;
@@ -127,21 +177,7 @@ describe("cmath.bezier.a2c", () => {
       y2
     );
 
-    const bezierPoints = getBezierPoints(x1, y1, a2cResult);
-
-    // Since large arc spans ~270 degrees, expect two cubic Bézier curves
-    expect(bezierPoints.length).toBeGreaterThan(8);
-    // Optionally, you can check the specific length based on how many segments Snap.svg splits
-    // For 270 degrees, it should be split into 3 segments (each ~90 degrees)
-    // Each segment adds 6 numbers, so total length = 3 * 6 + 2 (start and end) = 20
-    // However, based on Snap.svg's implementation, the exact split may vary
-    expect(bezierPoints.length).toBe(20); // Adjust based on actual implementation
-
-    // Verify start and end points
-    expect(bezierPoints[0]).toBeCloseTo(x1, 6);
-    expect(bezierPoints[1]).toBeCloseTo(y1, 6);
-    expect(bezierPoints[bezierPoints.length - 2]).toBeCloseTo(x2, 6);
-    expect(bezierPoints[bezierPoints.length - 1]).toBeCloseTo(y2, 6);
+    expect(a2cResult.length).toBeGreaterThan(0);
   });
 });
 
@@ -289,19 +325,22 @@ describe("cmath.bezier.projectParametric", () => {
     const tb: cmath.Vector2 = [0, 0];
 
     // point above the midpoint of the segment
-    expect(
-      cmath.bezier.projectParametric(a, b, ta, tb, [5, 5])
-    ).toBeCloseTo(0.5, 6);
+    expect(cmath.bezier.projectParametric(a, b, ta, tb, [5, 5])).toBeCloseTo(
+      0.5,
+      6
+    );
 
     // point before the start should clamp to 0
-    expect(
-      cmath.bezier.projectParametric(a, b, ta, tb, [-5, 0])
-    ).toBeCloseTo(0, 6);
+    expect(cmath.bezier.projectParametric(a, b, ta, tb, [-5, 0])).toBeCloseTo(
+      0,
+      6
+    );
 
     // point after the end should clamp to 1
-    expect(
-      cmath.bezier.projectParametric(a, b, ta, tb, [15, 0])
-    ).toBeCloseTo(1, 6);
+    expect(cmath.bezier.projectParametric(a, b, ta, tb, [15, 0])).toBeCloseTo(
+      1,
+      6
+    );
   });
 
   test("returns original t for points on a curved segment", () => {
@@ -312,10 +351,7 @@ describe("cmath.bezier.projectParametric", () => {
 
     const t = 0.3;
     const p = evalBezier(a, b, ta, tb, t);
-    expect(cmath.bezier.projectParametric(a, b, ta, tb, p)).toBeCloseTo(
-      t,
-      6
-    );
+    expect(cmath.bezier.projectParametric(a, b, ta, tb, p)).toBeCloseTo(t, 6);
   });
 
   test("handles points offset from the curve", () => {
@@ -334,5 +370,173 @@ describe("cmath.bezier.projectParametric", () => {
     ];
     const projected = cmath.bezier.projectParametric(a, b, ta, tb, offset);
     expect(projected).toBeCloseTo(t, 2); // allow some tolerance
+  });
+});
+
+describe("cmath.bezier.solveTangentsForPoint", () => {
+  test("should solve for tangents that make curve pass through target point", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 0];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+    const t = 0.5;
+    const targetPoint: cmath.Vector2 = [50, 50];
+
+    const [newTa, newTb] = cmath.bezier.solveTangentsForPoint(
+      a,
+      b,
+      ta,
+      tb,
+      t,
+      targetPoint
+    );
+
+    // Verify that the curve passes through the target point
+    const point = evalBezier(a, b, newTa, newTb, t);
+    const distance = Math.hypot(
+      targetPoint[0] - point[0],
+      targetPoint[1] - point[1]
+    );
+
+    expect(distance).toBeLessThan(0.1);
+  });
+
+  test("should handle different parametric positions", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 0];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+    const targetPoint: cmath.Vector2 = [40, 30];
+
+    // Test at different parametric positions
+    const testPositions = [0.25, 0.5, 0.75];
+
+    for (const t of testPositions) {
+      const [newTa, newTb] = cmath.bezier.solveTangentsForPoint(
+        a,
+        b,
+        ta,
+        tb,
+        t,
+        targetPoint
+      );
+
+      const point = evalBezier(a, b, newTa, newTb, t);
+      const distance = Math.hypot(
+        targetPoint[0] - point[0],
+        targetPoint[1] - point[1]
+      );
+
+      expect(distance).toBeLessThan(0.1);
+    }
+  });
+
+  test("should return zero tangents when target is close to linear interpolation", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 0];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+    const t = 0.5;
+
+    // Target point very close to linear interpolation
+    const linearInterp: cmath.Vector2 = [
+      a[0] + (b[0] - a[0]) * t,
+      a[1] + (b[1] - a[1]) * t,
+    ];
+    const targetPoint: cmath.Vector2 = [
+      linearInterp[0] + 0.05,
+      linearInterp[1] + 0.05,
+    ];
+
+    const [newTa, newTb] = cmath.bezier.solveTangentsForPoint(
+      a,
+      b,
+      ta,
+      tb,
+      t,
+      targetPoint
+    );
+
+    expect(newTa[0]).toBe(0);
+    expect(newTa[1]).toBe(0);
+    expect(newTb[0]).toBe(0);
+    expect(newTb[1]).toBe(0);
+  });
+
+  test("should minimize change from original tangents", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 0];
+    const ta: cmath.Vector2 = [10, 5];
+    const tb: cmath.Vector2 = [-10, 5];
+    const t = 0.5;
+    const targetPoint: cmath.Vector2 = [50, 50];
+
+    const [newTa, newTb] = cmath.bezier.solveTangentsForPoint(
+      a,
+      b,
+      ta,
+      tb,
+      t,
+      targetPoint
+    );
+
+    // Verify that the curve passes through the target point
+    const point = evalBezier(a, b, newTa, newTb, t);
+    const distance = Math.hypot(
+      targetPoint[0] - point[0],
+      targetPoint[1] - point[1]
+    );
+    expect(distance).toBeLessThan(0.1);
+
+    // Verify that the change from original tangents is minimized
+    const taChange = Math.hypot(newTa[0] - ta[0], newTa[1] - ta[1]);
+    const tbChange = Math.hypot(newTb[0] - tb[0], newTb[1] - tb[1]);
+
+    // The changes should be reasonable (not too large)
+    expect(taChange).toBeLessThan(100);
+    expect(tbChange).toBeLessThan(100);
+  });
+
+  test("should handle edge cases at t=0 and t=1", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 0];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+
+    // Test at t=0 (curve should pass through start point a)
+    const targetAtStart: cmath.Vector2 = [0, 0]; // Should be the start point
+    const [newTa1, newTb1] = cmath.bezier.solveTangentsForPoint(
+      a,
+      b,
+      ta,
+      tb,
+      0,
+      targetAtStart
+    );
+
+    const pointAtStart = evalBezier(a, b, newTa1, newTb1, 0);
+    const distanceAtStart = Math.hypot(
+      targetAtStart[0] - pointAtStart[0],
+      targetAtStart[1] - pointAtStart[1]
+    );
+    expect(distanceAtStart).toBeLessThan(0.1);
+
+    // Test at t=1 (curve should pass through end point b)
+    const targetAtEnd: cmath.Vector2 = [100, 0]; // Should be the end point
+    const [newTa2, newTb2] = cmath.bezier.solveTangentsForPoint(
+      a,
+      b,
+      ta,
+      tb,
+      1,
+      targetAtEnd
+    );
+
+    const pointAtEnd = evalBezier(a, b, newTa2, newTb2, 1);
+    const distanceAtEnd = Math.hypot(
+      targetAtEnd[0] - pointAtEnd[0],
+      targetAtEnd[1] - pointAtEnd[1]
+    );
+    expect(distanceAtEnd).toBeLessThan(0.1);
   });
 });

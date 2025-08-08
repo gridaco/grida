@@ -272,10 +272,11 @@ function Segment({
           ]);
           const point = cmath.vector2.sub(canvasPoint, ve.offset);
           const seg = ve.segments[segmentIndex];
-          const a0 = [...ve.vertices[seg.a].p] as cmath.Vector2;
-          const b0 = [...ve.vertices[seg.b].p] as cmath.Vector2;
-          const ta0 = [...seg.ta] as cmath.Vector2;
-          const tb0 = [...seg.tb] as cmath.Vector2;
+          // Store frozen state in local coordinates (relative to vector network origin)
+          const a0 = ve.vertices[seg.a].p;
+          const b0 = ve.vertices[seg.b].p;
+          const ta0 = seg.ta;
+          const tb0 = seg.tb;
           frozenRef.current = { a: a0, b: b0, ta: ta0, tb: tb0 };
           t0Ref.current = cmath.bezier.projectParametric(
             a0,
@@ -289,7 +290,11 @@ function Segment({
         }
       },
       onDrag: ({ event }) => {
-        if (tool.type === "bend" && t0Ref.current !== null && frozenRef.current) {
+        if (
+          tool.type === "bend" &&
+          t0Ref.current !== null &&
+          frozenRef.current
+        ) {
           event.preventDefault();
           const canvasPoint = instance.clientPointToCanvasPoint([
             (event as MouseEvent).clientX,

@@ -140,7 +140,7 @@ namespace cmath {
   export type Transform = [[number, number, number], [number, number, number]];
 
   /**
-   * A Rectangle specifies an area that is enclosed by it’s top-left point (x, y), its width, and its height.
+   * A Rectangle specifies an area that is enclosed by it's top-left point (x, y), its width, and its height.
    *
    * width and height are non-negative values.
    */
@@ -1292,7 +1292,7 @@ namespace cmath {
         [0, scaleY, 0],
       ];
 
-      // Step 3: Finally translate to B’s (x, y).
+      // Step 3: Finally translate to B's (x, y).
       const T3: cmath.Transform = [
         [1, 0, b.x],
         [0, 1, b.y],
@@ -2606,7 +2606,7 @@ namespace cmath {
       if (o3 === 0 && onSegment(q1, p1, q2)) return true;
       if (o4 === 0 && onSegment(q1, p2, q2)) return true;
 
-      return (o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0);
+      return o1 > 0 !== o2 > 0 && o3 > 0 !== o4 > 0;
     }
 
     /**
@@ -2642,10 +2642,22 @@ namespace cmath {
       }
 
       const edges: [Vector2, Vector2][] = [
-        [[xMin, yMin], [xMax, yMin]],
-        [[xMax, yMin], [xMax, yMax]],
-        [[xMax, yMax], [xMin, yMax]],
-        [[xMin, yMax], [xMin, yMin]],
+        [
+          [xMin, yMin],
+          [xMax, yMin],
+        ],
+        [
+          [xMax, yMin],
+          [xMax, yMax],
+        ],
+        [
+          [xMax, yMax],
+          [xMin, yMax],
+        ],
+        [
+          [xMin, yMax],
+          [xMin, yMin],
+        ],
       ];
 
       for (const [e0, e1] of edges) {
@@ -2908,12 +2920,12 @@ namespace cmath {
         const p23: Vector2 = [(p2[0] + p3[0]) / 2, (p2[1] + p3[1]) / 2];
         const p012: Vector2 = [(p01[0] + p12[0]) / 2, (p01[1] + p12[1]) / 2];
         const p123: Vector2 = [(p12[0] + p23[0]) / 2, (p12[1] + p23[1]) / 2];
-        const p0123: Vector2 = [(p012[0] + p123[0]) / 2, (p012[1] + p123[1]) / 2];
+        const p0123: Vector2 = [
+          (p012[0] + p123[0]) / 2,
+          (p012[1] + p123[1]) / 2,
+        ];
 
-        return (
-          recur(p0, p01, p012, p0123) ||
-          recur(p0123, p123, p23, p3)
-        );
+        return recur(p0, p01, p012, p0123) || recur(p0123, p123, p23, p3);
       };
 
       return recur(a, c1, c2, b);
@@ -3002,8 +3014,7 @@ namespace cmath {
         const dy = b[1] - a[1];
         const lenSq = dx * dx + dy * dy;
         if (lenSq === 0) return 0;
-        const tLine =
-          ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq;
+        const tLine = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq;
         return Math.max(0, Math.min(1, tLine));
       }
 
@@ -3080,11 +3091,7 @@ namespace cmath {
         const rx = pt[0] - p[0];
         const ry = pt[1] - p[1];
         const f = rx * d1[0] + ry * d1[1];
-        const df =
-          d1[0] * d1[0] +
-          d1[1] * d1[1] +
-          rx * d2[0] +
-          ry * d2[1];
+        const df = d1[0] * d1[0] + d1[1] * d1[1] + rx * d2[0] + ry * d2[1];
         if (df === 0) break;
         t -= f / df;
         if (t < 0) t = 0;
@@ -3281,6 +3288,146 @@ namespace cmath {
               : rotate(res[i], res[i + 1], rad).x;
         }
         return newres;
+      }
+    }
+
+    /**
+     * Solves for tangent values that make a cubic Bézier curve pass through a specific point
+     * at a given parametric position.
+     *
+     * This function solves the constrained optimization problem:
+     * - Minimize the change from original tangents
+     * - Subject to the constraint that the curve passes through the target point at the specified parametric position
+     *
+     * The solution uses Lagrange multipliers to find tangent values that satisfy:
+     * B(t) = targetPoint, where B(t) is the cubic Bézier curve evaluated at parametric position t.
+     *
+     * @param a - Start point of the curve
+     * @param b - End point of the curve
+     * @param ta - Original tangent at start point (relative to a)
+     * @param tb - Original tangent at end point (relative to b)
+     * @param t - Parametric position (0-1) where the curve should pass through the target point
+     * @param targetPoint - The point that the curve should pass through at parametric position t
+     * @returns New tangent values [ta, tb] that make the curve pass through the target point
+     */
+    export function solveTangentsForPoint(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      t: number,
+      targetPoint: Vector2
+    ): [Vector2, Vector2] {
+      // Handle edge cases at t=0 and t=1
+      if (t === 0) {
+        // At t=0, the curve should pass through point a
+        // We need to adjust ta to make the curve pass through targetPoint at t=0
+        const displacement: Vector2 = [
+          targetPoint[0] - a[0],
+          targetPoint[1] - a[1],
+        ];
+        return [displacement, tb];
+      }
+
+      if (t === 1) {
+        // At t=1, the curve should pass through point b
+        // We need to adjust tb to make the curve pass through targetPoint at t=1
+        const displacement: Vector2 = [
+          targetPoint[0] - b[0],
+          targetPoint[1] - b[1],
+        ];
+        return [ta, displacement];
+      }
+
+      // If the target point is very close to the linear interpolation,
+      // return zero tangents to make it straight
+      const linearInterp: Vector2 = [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+      ];
+      const distToLinear = Math.hypot(
+        targetPoint[0] - linearInterp[0],
+        targetPoint[1] - linearInterp[1]
+      );
+      if (distToLinear < 0.1) {
+        return [
+          [0, 0],
+          [0, 0],
+        ];
+      }
+
+      // Solve for new tangent values that make the curve pass through targetPoint at parametric position t
+      // The cubic Bézier equation at t should equal targetPoint:
+      // (1-t)³ * a + 3(1-t)² * t * (a+ta) + 3(1-t) * t² * (b+tb) + t³ * b = targetPoint
+
+      const s = 1 - t;
+      const s2 = s * s;
+      const t2 = t * t;
+      const s3 = s2 * s;
+      const t3 = t2 * t;
+
+      // The equation we need to solve:
+      // s³ * a + 3s²t * (a+ta) + 3st² * (b+tb) + t³ * b = targetPoint
+      // Rearranging:
+      // 3s²t * ta + 3st² * tb = targetPoint - (s³ * a + 3s²t * a + 3st² * b + t³ * b)
+
+      // Calculate the right-hand side
+      const rhs: Vector2 = [
+        targetPoint[0] -
+          (s3 * a[0] + 3 * s2 * t * a[0] + 3 * s * t2 * b[0] + t3 * b[0]),
+        targetPoint[1] -
+          (s3 * a[1] + 3 * s2 * t * a[1] + 3 * s * t2 * b[1] + t3 * b[1]),
+      ];
+
+      // Coefficients for ta and tb
+      const coefTa = 3 * s2 * t;
+      const coefTb = 3 * s * t2;
+
+      // We have the equation: coefTa * ta + coefTb * tb = rhs
+      // This is an underdetermined system (2 equations, 4 unknowns)
+      // We need to add constraints to get a unique solution
+
+      // Let's use a constraint that minimizes the change from the original tangents
+      // while ensuring the curve passes through the target point
+
+      // We'll solve this using a least-squares approach with regularization
+      // The objective is to minimize ||ta - ta_original||² + ||tb - tb_original||²
+      // subject to the constraint coefTa * ta + coefTb * tb = rhs
+
+      // Using Lagrange multipliers, we get:
+      // ta = ta_original + λ * coefTa
+      // tb = tb_original + λ * coefTb
+      // where λ = (rhs - coefTa * ta_original - coefTb * tb_original) / (coefTa² + coefTb²)
+
+      const denominator = coefTa * coefTa + coefTb * coefTb;
+
+      if (Math.abs(denominator) > 1e-10) {
+        // Calculate the current contribution of the original tangents
+        const currentContribution: Vector2 = [
+          coefTa * ta[0] + coefTb * tb[0],
+          coefTa * ta[1] + coefTb * tb[1],
+        ];
+
+        // Calculate the Lagrange multiplier
+        const lambda = [
+          (rhs[0] - currentContribution[0]) / denominator,
+          (rhs[1] - currentContribution[1]) / denominator,
+        ];
+
+        // Apply the solution
+        const newTa: Vector2 = [
+          ta[0] + lambda[0] * coefTa,
+          ta[1] + lambda[1] * coefTa,
+        ];
+        const newTb: Vector2 = [
+          tb[0] + lambda[0] * coefTb,
+          tb[1] + lambda[1] * coefTb,
+        ];
+
+        return [newTa, newTb];
+      } else {
+        // Edge case: both coefficients are zero (shouldn't happen for valid t values)
+        return [ta, tb];
       }
     }
   }
@@ -4727,17 +4874,17 @@ namespace cmath {
        *    - are aligned ranges with identical gaps (2 or more ranges). but for simplicity, we do this by combinations of ranges (exactly 2 ranges)
        * - each loop has a projected snap extension, `next` (`a`) and `center` (virtually a, b, and center, where b being mirror of a)
        *    - a projected loop data will contain multiple delta (space)
-       *      - one is from ‘this’ loop, others from other loops’ space, but within the same direction.
+       *      - one is from 'this' loop, others from other loops' space, but within the same direction.
        *    - the delta can be interpreted as ...
        *      - a = loop[-1] + delta (the a point is last loop item (biggest) plus delta.
        *      - b = loop[0] - delta (b is mirrored a)
        *      - center = mean(loop[0].a, loop[-1].b)
        * - the hit test of the range will take direction 1 or -1 (mirrored)
-       *    - the `a` testing is used for testing hit between `a` and input’s `a`
-       *    - the mirrored testing is used for testing hit between `b` (mirrored a) and input’s `b`
-       * - how to tell why it’s snapped
-       *    - when input’s a, b or c is hit, it will contain to which loop it’s hit. and the space (except c).
-       *    - since the space can be originated from other loops, and multiple loops can have identical spaces, we can return all loops that contains that delta as original space, plus the hit one’s loop
+       *    - the `a` testing is used for testing hit between `a` and input's `a`
+       *    - the mirrored testing is used for testing hit between `b` (mirrored a) and input's `b`
+       * - how to tell why it's snapped
+       *    - when input's a, b or c is hit, it will contain to which loop it's hit. and the space (except c).
+       *    - since the space can be originated from other loops, and multiple loops can have identical spaces, we can return all loops that contains that delta as original space, plus the hit one's loop
        *
        *
        * ```
@@ -5084,7 +5231,7 @@ namespace cmath {
      * - If `line.x1 === line.x2` but `y1 > y2`, swaps the endpoints.
      *
      * This is often useful so that two line segments describing the
-     * “same” geometric positions will have identical (x1, y1, x2, y2).
+     * "same" geometric positions will have identical (x1, y1, x2, y2).
      *
      * @param line - The line to be normalized, e.g. `{ x1, y1, x2, y2, label? }`.
      * @returns A new `Line` object with possibly swapped endpoints, ensuring
@@ -5101,7 +5248,7 @@ namespace cmath {
     >(line: T): T {
       let { x1, y1, x2, y2 } = line;
 
-      // If the line is “backwards” in x, or has the same x but backwards in y, swap:
+      // If the line is "backwards" in x, or has the same x but backwards in y, swap:
       if (x1 > x2 || (x1 === x2 && y1 > y2)) {
         const tempX = x1;
         const tempY = y1;

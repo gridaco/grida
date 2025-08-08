@@ -718,7 +718,10 @@ export namespace vn {
      * The offset point `ca` represents where the bending gesture started and is
      * used to derive the parametric location along the segment. The point `cb`
      * is the current cursor position that the curve should pass through. Both
-     * coordinates are in the editor's vector space.
+     * coordinates are in the vector network's local space.
+     *
+     * The function handles coordinate space transformations to ensure consistency
+     * when the vector network is repositioned by the editor.
      *
      * If the cursor lies on the original straight line (i.e. `cb` equals the
      * linear interpolation of the segment at the computed offset), the tangents
@@ -726,7 +729,8 @@ export namespace vn {
      *
      * @param segment index of the segment to bend
      * @param ca parametric position (0-1) where the bend gesture started
-     * @param cb canvas-space point the segment should pass through
+     * @param cb vector network local space point the segment should pass through
+     * @param frozen frozen segment state containing original coordinates and tangents
      */
     bendSegment(
       segment: number,
@@ -737,89 +741,29 @@ export namespace vn {
       const seg = this._segments[segment];
       if (!seg) return;
 
-      const { a, b, ta, tb } = frozen;
-
-      // If the target point is very close to the linear interpolation,
-      // clear the tangents to make it straight
-      const linearInterp: Vector2 = [
-        a[0] + (b[0] - a[0]) * ca,
-        a[1] + (b[1] - a[1]) * ca,
+      // Calculate the offset from frozen state to current state
+      const currentA = this._vertices[seg.a].p;
+      const offsetA: Vector2 = [
+        currentA[0] - frozen.a[0],
+        currentA[1] - frozen.a[1],
       ];
-      const distToLinear = Math.hypot(
-        cb[0] - linearInterp[0],
-        cb[1] - linearInterp[1]
+
+      // Adjust cb to be relative to the frozen segment position
+      const adjustedCb: Vector2 = [cb[0] - offsetA[0], cb[1] - offsetA[1]];
+
+      // Use the cmath.bezier.solveTangentsForPoint function to solve for new tangent values
+      const [newTa, newTb] = cmath.bezier.solveTangentsForPoint(
+        frozen.a,
+        frozen.b,
+        frozen.ta,
+        frozen.tb,
+        ca,
+        adjustedCb
       );
-      if (distToLinear < 0.1) {
-        seg.ta = [0, 0];
-        seg.tb = [0, 0];
-        return;
-      }
 
-      // Solve for new tangent values that make the curve pass through cb at parametric position ca
-      // The cubic Bézier equation at t=ca should equal cb:
-      // (1-ca)³ * a + 3(1-ca)² * ca * (a+ta) + 3(1-ca) * ca² * (b+tb) + ca³ * b = cb
-
-      const t = ca;
-      const s = 1 - t;
-      const s2 = s * s;
-      const t2 = t * t;
-      const s3 = s2 * s;
-      const t3 = t2 * t;
-
-      // The equation we need to solve:
-      // s³ * a + 3s²t * (a+ta) + 3st² * (b+tb) + t³ * b = cb
-      // Rearranging:
-      // 3s²t * ta + 3st² * tb = cb - (s³ * a + 3s²t * a + 3st² * b + t³ * b)
-
-      // Calculate the right-hand side
-      const rhs: Vector2 = [
-        cb[0] - (s3 * a[0] + 3 * s2 * t * a[0] + 3 * s * t2 * b[0] + t3 * b[0]),
-        cb[1] - (s3 * a[1] + 3 * s2 * t * a[1] + 3 * s * t2 * b[1] + t3 * b[1]),
-      ];
-
-      // Coefficients for ta and tb
-      const coefTa = 3 * s2 * t;
-      const coefTb = 3 * s * t2;
-
-      // We have the equation: coefTa * ta + coefTb * tb = rhs
-      // This is an underdetermined system (2 equations, 4 unknowns)
-      // We need to add constraints to get a unique solution
-
-      // Let's use a constraint that minimizes the change from the original tangents
-      // while ensuring the curve passes through the target point
-
-      // We'll solve this using a least-squares approach with regularization
-      // The objective is to minimize ||ta - ta_original||² + ||tb - tb_original||²
-      // subject to the constraint coefTa * ta + coefTb * tb = rhs
-
-      // Using Lagrange multipliers, we get:
-      // ta = ta_original + λ * coefTa
-      // tb = tb_original + λ * coefTb
-      // where λ = (rhs - coefTa * ta_original - coefTb * tb_original) / (coefTa² + coefTb²)
-
-      const denominator = coefTa * coefTa + coefTb * coefTb;
-
-      if (Math.abs(denominator) > 1e-10) {
-        // Calculate the current contribution of the original tangents
-        const currentContribution: Vector2 = [
-          coefTa * ta[0] + coefTb * tb[0],
-          coefTa * ta[1] + coefTb * tb[1],
-        ];
-
-        // Calculate the Lagrange multiplier
-        const lambda = [
-          (rhs[0] - currentContribution[0]) / denominator,
-          (rhs[1] - currentContribution[1]) / denominator,
-        ];
-
-        // Apply the solution
-        seg.ta = [ta[0] + lambda[0] * coefTa, ta[1] + lambda[1] * coefTa];
-        seg.tb = [tb[0] + lambda[0] * coefTb, tb[1] + lambda[1] * coefTb];
-      } else {
-        // Edge case: both coefficients are zero (shouldn't happen for valid t values)
-        seg.ta = ta;
-        seg.tb = tb;
-      }
+      // Apply the solution
+      seg.ta = newTa;
+      seg.tb = newTb;
     }
 
     /**
