@@ -987,8 +987,12 @@ export function useEditorHotKeys() {
   useHotkeys(
     "ctrl+g, meta+g",
     () => {
-      // TODO:
-      toast("use ⌥⌘G for grouping");
+      try {
+        editor.group("selection");
+      } catch (e) {
+        console.error(e);
+        toast.error("use ⌥⌘G for grouping");
+      }
     },
     {
       preventDefault: true,

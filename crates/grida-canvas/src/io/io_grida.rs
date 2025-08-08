@@ -233,10 +233,18 @@ pub struct JSONUnknownNodeProperties {
     pub border: Option<CSSBorder>,
     #[serde(rename = "style")]
     pub style: Option<HashMap<String, serde_json::Value>>,
-    // geometry
-    #[serde(rename = "width", deserialize_with = "de_css_length")]
+    // geometry - defaults to 0 for non-intrinsic size nodes
+    #[serde(
+        rename = "width",
+        default = "default_width",
+        deserialize_with = "de_css_length"
+    )]
     pub width: f32,
-    #[serde(rename = "height", deserialize_with = "de_css_length")]
+    #[serde(
+        rename = "height",
+        default = "default_height",
+        deserialize_with = "de_css_length"
+    )]
     pub height: f32,
 
     #[serde(rename = "cornerRadius", default)]
@@ -293,6 +301,8 @@ pub struct JSONUnknownNodeProperties {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 pub enum JSONNode {
+    #[serde(rename = "group")]
+    Group(JSONGroupNode),
     #[serde(rename = "container")]
     Container(JSONContainerNode),
     #[serde(rename = "svgpath")]
@@ -336,6 +346,17 @@ pub struct JSONContainerNode {
     pub main_axis_gap: Option<f32>,
     #[serde(rename = "crossAxisGap")]
     pub cross_axis_gap: Option<f32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONGroupNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "expanded")]
+    pub expanded: Option<bool>,
+    #[serde(rename = "children")]
+    pub children: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -490,6 +511,12 @@ fn default_rotation() -> f32 {
 fn default_z_index() -> i32 {
     0
 }
+fn default_width() -> f32 {
+    0.0
+}
+fn default_height() -> f32 {
+    0.0
+}
 fn default_text_align() -> TextAlign {
     TextAlign::Left
 }
@@ -508,6 +535,20 @@ fn default_stroke_width() -> f32 {
 
 pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
     serde_json::from_str(file)
+}
+
+impl From<JSONGroupNode> for GroupNode {
+    fn from(node: JSONGroupNode) -> Self {
+        GroupNode {
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
+            transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
+            children: node.children.unwrap_or_default(),
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+        }
+    }
 }
 
 impl From<JSONContainerNode> for ContainerNode {
@@ -814,6 +855,7 @@ impl From<JSONVectorNode> for Node {
 impl From<JSONNode> for Node {
     fn from(node: JSONNode) -> Self {
         match node {
+            JSONNode::Group(group) => Node::Group(group.into()),
             JSONNode::Container(container) => Node::Container(container.into()),
             JSONNode::Text(text) => Node::TextSpan(text.into()),
             JSONNode::SVGPath(vector) => vector.into(),

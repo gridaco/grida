@@ -851,6 +851,10 @@ export namespace grida.program.nodes {
   export type UnknownNodeProperties<T = unknown> = Record<keyof UnknwonNode, T>;
 
   // #region node prototypes
+  export type GroupNodePrototype = __TPrototypeNode<
+    Omit<Partial<GroupNode>, __base_scene_node_properties | "children"> &
+      __IPrototypeNodeChildren
+  >;
   export type TextNodePrototype = __TPrototypeNode<
     Omit<Partial<TextNode>, __base_scene_node_properties>
   >;
@@ -889,6 +893,7 @@ export namespace grida.program.nodes {
    * Main difference between an actual node or node data is, a prototype is only required to have a partial node data, and it has its own hierarchy of children.
    */
   export type NodePrototype =
+    | GroupNodePrototype
     | TextNodePrototype
     | ImageNodePrototype
     | VideoNodePrototype
@@ -1976,6 +1981,7 @@ export namespace grida.program.nodes {
           } satisfies RectangleNode;
         }
         // TODO:
+        case "group":
         case "container":
         case "component":
         case "instance":
