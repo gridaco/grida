@@ -33,6 +33,7 @@ import {
   self_select_tool,
   getVectorSelectionStartPoint,
 } from "./methods";
+import { self_wrapNodes } from "./methods/wrap";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
 import {
@@ -989,80 +990,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      // group by parent, considering root nodes when scene allows
-      const groups = Object.groupBy(
-        target_node_ids.filter((id) => {
-          const is_root = scene.children.includes(id);
-          return scene.constraints.children !== "single" || !is_root;
-        }),
-        (node_id) => dq.getParentId(state.document_ctx, node_id) ?? "<root>"
-      );
-
       return produce(state, (draft) => {
-        const insertions: grida.program.nodes.NodeID[] = [];
-        Object.keys(groups).forEach((parent_id) => {
-          const g = groups[parent_id]!;
-          const is_root = parent_id === "<root>";
-
-          let delta: cmath.Vector2;
-          if (is_root) {
-            delta = [0, 0];
-          } else {
-            const parent_rect =
-              context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
-            delta = [-parent_rect.x, -parent_rect.y];
-          }
-
-          const rects = g
-            .map(
-              (node_id) =>
-                context.geometry.getNodeAbsoluteBoundingRect(node_id)!
-            )
-            // make the rects relative to the parent
-            .map((rect) => cmath.rect.translate(rect, delta))
-            .map((rect) => cmath.rect.quantize(rect, 1));
-
-          const union = cmath.rect.union(rects);
-
-          const container_prototype: grida.program.nodes.NodePrototype = {
-            type: "container",
-            // layout
-            top: cmath.quantize(union.y, 1),
-            left: cmath.quantize(union.x, 1),
-            width: union.width,
-            height: union.height,
-            // children (empty when init)
-            children: [],
-            // position
-            position: "absolute",
-          };
-
-          const container_id = self_insertSubDocument(
-            draft,
-            is_root ? null : parent_id,
-            grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-              container_prototype,
-              nid
-            )
-          )[0];
-
-          // [move children to container]
-          g.forEach((id) => {
-            self_moveNode(draft, id, container_id);
-          });
-
-          // [adjust children position]
-          g.forEach((id) => {
-            const child = dq.__getNodeById(draft, id);
-            if ("left" in child && typeof child.left === "number")
-              child.left -= union.x;
-            if ("top" in child && typeof child.top === "number")
-              child.top -= union.y;
-          });
-
-          insertions.push(container_id);
-        });
-
+        const insertions = self_wrapNodes(
+          draft,
+          target_node_ids,
+          "container",
+          context.geometry
+        );
         self_selectNode(draft, "reset", ...insertions);
       });
       break;
@@ -1071,77 +1005,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      // group by parent, considering root nodes when scene allows
-      const groups = Object.groupBy(
-        target_node_ids.filter((id) => {
-          const is_root = scene.children.includes(id);
-          return scene.constraints.children !== "single" || !is_root;
-        }),
-        (node_id) => dq.getParentId(state.document_ctx, node_id) ?? "<root>"
-      );
-
       return produce(state, (draft) => {
-        const insertions: grida.program.nodes.NodeID[] = [];
-        Object.keys(groups).forEach((parent_id) => {
-          const g = groups[parent_id]!;
-          const is_root = parent_id === "<root>";
-
-          let delta: cmath.Vector2;
-          if (is_root) {
-            delta = [0, 0];
-          } else {
-            const parent_rect =
-              context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
-            delta = [-parent_rect.x, -parent_rect.y];
-          }
-
-          const rects = g
-            .map(
-              (node_id) =>
-                context.geometry.getNodeAbsoluteBoundingRect(node_id)!
-            )
-            // make the rects relative to the parent
-            .map((rect) => cmath.rect.translate(rect, delta))
-            .map((rect) => cmath.rect.quantize(rect, 1));
-
-          const union = cmath.rect.union(rects);
-
-          const group_prototype: grida.program.nodes.NodePrototype = {
-            type: "group",
-            top: cmath.quantize(union.y, 1),
-            left: cmath.quantize(union.x, 1),
-            // children (empty when init)
-            children: [],
-            // position
-            position: "absolute",
-          };
-
-          const group_id = self_insertSubDocument(
-            draft,
-            is_root ? null : parent_id,
-            grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-              group_prototype,
-              nid
-            )
-          )[0];
-
-          // [move children to group]
-          g.forEach((id) => {
-            self_moveNode(draft, id, group_id);
-          });
-
-          // [adjust children position]
-          g.forEach((id) => {
-            const child = dq.__getNodeById(draft, id);
-            if ("left" in child && typeof child.left === "number")
-              child.left -= union.x;
-            if ("top" in child && typeof child.top === "number")
-              child.top -= union.y;
-          });
-
-          insertions.push(group_id);
-        });
-
+        const insertions = self_wrapNodes(
+          draft,
+          target_node_ids,
+          "group",
+          context.geometry
+        );
         self_selectNode(draft, "reset", ...insertions);
       });
       break;
