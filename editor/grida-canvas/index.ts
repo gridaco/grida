@@ -1910,6 +1910,7 @@ export namespace editor.api {
     distributeEvenly(target: "selection" | NodeID[], axis: "x" | "y"): void;
     autoLayout(target: "selection" | NodeID[]): void;
     contain(target: "selection" | NodeID[]): void;
+    group(target: "selection" | NodeID[]): void;
     configureSurfaceRaycastTargeting(
       config: Partial<state.HitTestingConfig>
     ): void;

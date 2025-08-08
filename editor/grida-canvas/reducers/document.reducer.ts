@@ -1067,6 +1067,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
       break;
     }
+    case "group": {
+      // TODO: support grouping
+      break;
+    }
     //
     case "select-vertex":
     case "delete-vertex":

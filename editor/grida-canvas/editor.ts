@@ -697,11 +697,8 @@ export class Editor
 
   public a11yCopy() {
     if (this.mstate.content_edit_mode?.type === "vector") {
-      const {
-        selected_vertices,
-        selected_segments,
-        selected_tangents,
-      } = this.mstate.content_edit_mode;
+      const { selected_vertices, selected_segments, selected_tangents } =
+        this.mstate.content_edit_mode;
       const hasSelection =
         selected_vertices.length > 0 ||
         selected_segments.length > 0 ||
@@ -1060,6 +1057,16 @@ export class Editor
   public contain(target: "selection" | editor.NodeID[]) {
     this.dispatch({
       type: "contain",
+      target,
+    });
+  }
+
+  public group(target: "selection" | editor.NodeID[]) {
+    if (this.backend === "dom") {
+      throw new Error("Grouping is not supported in DOM backend");
+    }
+    this.dispatch({
+      type: "group",
       target,
     });
   }

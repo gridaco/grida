@@ -42,6 +42,7 @@ export type DocumentAction =
   | EditorDistributeEvenlyAction
   | EditorAutoLayoutAction
   | EditorContainAction
+  | EditorGroupAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -446,6 +447,11 @@ export interface EditorAutoLayoutAction {
 
 export interface EditorContainAction {
   type: "contain";
+  target: NodeID[] | "selection";
+}
+
+export interface EditorGroupAction {
+  type: "group";
   target: NodeID[] | "selection";
 }
 
