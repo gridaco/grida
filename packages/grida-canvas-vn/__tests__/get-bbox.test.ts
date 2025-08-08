@@ -4,10 +4,10 @@ describe("getBBox", () => {
   it("computes bounds from vertices when no segments exist", () => {
     const net: vn.VectorNetwork = {
       vertices: [
-        { p: [0, 0] },
-        { p: [10, 0] },
-        { p: [10, 10] },
-        { p: [0, 10] },
+        [0, 0],
+        [10, 0],
+        [10, 10],
+        [0, 10],
       ],
       segments: [],
     };

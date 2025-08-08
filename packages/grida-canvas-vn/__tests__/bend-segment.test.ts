@@ -29,10 +29,10 @@ describe("bendSegment", () => {
     const cb: cmath.Vector2 = [50, 50];
     const seg0 = editor.segments[0];
     const frozen = {
-      a: [...editor.vertices[seg0.a].p] as cmath.Vector2,
-      b: [...editor.vertices[seg0.b].p] as cmath.Vector2,
-      ta: [...seg0.ta] as cmath.Vector2,
-      tb: [...seg0.tb] as cmath.Vector2,
+      a: editor.vertices[seg0.a] as cmath.Vector2,
+      b: editor.vertices[seg0.b] as cmath.Vector2,
+      ta: seg0.ta as cmath.Vector2,
+      tb: seg0.tb as cmath.Vector2,
     };
     const t0 = 0.5;
 
@@ -56,8 +56,8 @@ describe("bendSegment", () => {
     editor.bendSegment(0, t0, cb, frozen);
 
     const seg = editor.segments[0];
-    const p0 = editor.vertices[seg.a].p;
-    const p3 = editor.vertices[seg.b].p;
+    const p0 = editor.vertices[seg.a];
+    const p3 = editor.vertices[seg.b];
     const p1 = cmath.vector2.add(p0, seg.ta);
     const p2 = cmath.vector2.add(p3, seg.tb);
 
@@ -79,10 +79,10 @@ describe("bendSegment", () => {
     const cb: cmath.Vector2 = [40, 30];
     const seg0 = editor.segments[0];
     const frozen = {
-      a: [...editor.vertices[seg0.a].p] as cmath.Vector2,
-      b: [...editor.vertices[seg0.b].p] as cmath.Vector2,
-      ta: [...seg0.ta] as cmath.Vector2,
-      tb: [...seg0.tb] as cmath.Vector2,
+      a: editor.vertices[seg0.a] as cmath.Vector2,
+      b: editor.vertices[seg0.b] as cmath.Vector2,
+      ta: seg0.ta as cmath.Vector2,
+      tb: seg0.tb as cmath.Vector2,
     };
     const t0 = 0.25;
 
@@ -106,8 +106,8 @@ describe("bendSegment", () => {
     editor.bendSegment(0, t0, cb, frozen);
 
     const seg = editor.segments[0];
-    const p0 = editor.vertices[seg.a].p;
-    const p3 = editor.vertices[seg.b].p;
+    const p0 = editor.vertices[seg.a];
+    const p3 = editor.vertices[seg.b];
     const p1 = cmath.vector2.add(p0, seg.ta);
     const p2 = cmath.vector2.add(p3, seg.tb);
 
@@ -131,18 +131,18 @@ describe("bendSegment", () => {
     const cb: cmath.Vector2 = [50, 50];
     const seg0 = editor.segments[0];
     const frozen = {
-      a: [...editor.vertices[seg0.a].p] as cmath.Vector2,
-      b: [...editor.vertices[seg0.b].p] as cmath.Vector2,
-      ta: [...seg0.ta] as cmath.Vector2,
-      tb: [...seg0.tb] as cmath.Vector2,
+      a: editor.vertices[seg0.a] as cmath.Vector2,
+      b: editor.vertices[seg0.b] as cmath.Vector2,
+      ta: seg0.ta as cmath.Vector2,
+      tb: seg0.tb as cmath.Vector2,
     };
     const t0 = 0.5;
 
     editor.bendSegment(0, t0, cb, frozen);
 
     const seg = editor.segments[0];
-    const p0 = editor.vertices[seg.a].p;
-    const p3 = editor.vertices[seg.b].p;
+    const p0 = editor.vertices[seg.a];
+    const p3 = editor.vertices[seg.b];
     const p1 = cmath.vector2.add(p0, seg.ta);
     const p2 = cmath.vector2.add(p3, seg.tb);
 
@@ -163,18 +163,18 @@ describe("bendSegment", () => {
     const cb: cmath.Vector2 = [40, 30];
     const seg0 = editor.segments[0];
     const frozen = {
-      a: [...editor.vertices[seg0.a].p] as cmath.Vector2,
-      b: [...editor.vertices[seg0.b].p] as cmath.Vector2,
-      ta: [...seg0.ta] as cmath.Vector2,
-      tb: [...seg0.tb] as cmath.Vector2,
+      a: editor.vertices[seg0.a] as cmath.Vector2,
+      b: editor.vertices[seg0.b] as cmath.Vector2,
+      ta: seg0.ta as cmath.Vector2,
+      tb: seg0.tb as cmath.Vector2,
     };
     const t0 = 0.25;
 
     editor.bendSegment(0, t0, cb, frozen);
 
     const seg = editor.segments[0];
-    const p0 = editor.vertices[seg.a].p;
-    const p3 = editor.vertices[seg.b].p;
+    const p0 = editor.vertices[seg.a];
+    const p3 = editor.vertices[seg.b];
     const p1 = cmath.vector2.add(p0, seg.ta);
     const p2 = cmath.vector2.add(p3, seg.tb);
 
@@ -194,10 +194,10 @@ describe("bendSegment", () => {
     const editor = new vn.VectorNetworkEditor(net);
     const seg0 = editor.segments[0];
     const frozen = {
-      a: [...editor.vertices[seg0.a].p] as cmath.Vector2,
-      b: [...editor.vertices[seg0.b].p] as cmath.Vector2,
-      ta: [...seg0.ta] as cmath.Vector2,
-      tb: [...seg0.tb] as cmath.Vector2,
+      a: editor.vertices[seg0.a] as cmath.Vector2,
+      b: editor.vertices[seg0.b] as cmath.Vector2,
+      ta: seg0.ta as cmath.Vector2,
+      tb: seg0.tb as cmath.Vector2,
     };
     const t0 = 0.5;
 
@@ -233,10 +233,10 @@ describe("bendSegment", () => {
     const editor = new vn.VectorNetworkEditor(net);
     const seg0 = editor.segments[0];
     const frozen = {
-      a: [...editor.vertices[seg0.a].p] as cmath.Vector2,
-      b: [...editor.vertices[seg0.b].p] as cmath.Vector2,
-      ta: [...seg0.ta] as cmath.Vector2,
-      tb: [...seg0.tb] as cmath.Vector2,
+      a: editor.vertices[seg0.a] as cmath.Vector2,
+      b: editor.vertices[seg0.b] as cmath.Vector2,
+      ta: seg0.ta as cmath.Vector2,
+      tb: seg0.tb as cmath.Vector2,
     };
 
     // Simulate user starting drag at parametric position 0.3
@@ -252,16 +252,16 @@ describe("bendSegment", () => {
 
     for (const targetPosition of targetPositions) {
       // Reset to original state
-      seg0.ta = [...frozen.ta];
-      seg0.tb = [...frozen.tb];
+      seg0.ta = frozen.ta;
+      seg0.tb = frozen.tb;
 
       // Apply bend
       editor.bendSegment(0, startParametricPosition, targetPosition, frozen);
 
       // Verify that the curve passes through the target point at the specified parametric position
       const seg = editor.segments[0];
-      const p0 = editor.vertices[seg.a].p;
-      const p3 = editor.vertices[seg.b].p;
+      const p0 = editor.vertices[seg.a];
+      const p3 = editor.vertices[seg.b];
       const p1 = cmath.vector2.add(p0, seg.ta);
       const p2 = cmath.vector2.add(p3, seg.tb);
 

@@ -273,8 +273,8 @@ function Segment({
           const point = cmath.vector2.sub(canvasPoint, ve.offset);
           const seg = ve.segments[segmentIndex];
           // Store frozen state in local coordinates (relative to vector network origin)
-          const a0 = ve.vertices[seg.a].p;
-          const b0 = ve.vertices[seg.b].p;
+          const a0 = ve.vertices[seg.a];
+          const b0 = ve.vertices[seg.b];
           const ta0 = seg.ta;
           const tb0 = seg.tb;
           frozenRef.current = { a: a0, b: b0, ta: ta0, tb: tb0 };

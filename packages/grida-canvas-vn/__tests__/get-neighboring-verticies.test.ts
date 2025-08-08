@@ -3,7 +3,12 @@ import { vn } from "../vn";
 describe("VectorNetworkEditor.getNeighboringVerticies", () => {
   it("returns vertices connected by segments", () => {
     const network: vn.VectorNetwork = {
-      vertices: [{ p: [0, 0] }, { p: [10, 0] }, { p: [20, 0] }, { p: [30, 0] }],
+      vertices: [
+        [0, 0],
+        [10, 0],
+        [20, 0],
+        [30, 0],
+      ],
       segments: [
         { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
         { a: 1, b: 2, ta: [0, 0], tb: [0, 0] },
@@ -18,7 +23,11 @@ describe("VectorNetworkEditor.getNeighboringVerticies", () => {
 
   it("returns empty array for isolated vertex", () => {
     const network: vn.VectorNetwork = {
-      vertices: [{ p: [0, 0] }, { p: [10, 0] }, { p: [20, 0] }],
+      vertices: [
+        [0, 0],
+        [10, 0],
+        [20, 0],
+      ],
       segments: [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }],
     };
     const editor = new vn.VectorNetworkEditor(network);
@@ -27,7 +36,10 @@ describe("VectorNetworkEditor.getNeighboringVerticies", () => {
 
   it("deduplicates neighbours from directed segments", () => {
     const network: vn.VectorNetwork = {
-      vertices: [{ p: [0, 0] }, { p: [10, 0] }],
+      vertices: [
+        [0, 0],
+        [10, 0],
+      ],
       segments: [
         { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
         { a: 1, b: 0, ta: [0, 0], tb: [0, 0] },

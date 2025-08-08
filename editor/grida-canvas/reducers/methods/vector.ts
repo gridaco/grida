@@ -218,11 +218,11 @@ export function self_updateVectorAreaSelection<
     selected_segments = node.vectorNetwork.segments
       .map((seg, i) => {
         const va = cmath.vector2.add(
-          node.vectorNetwork.vertices[seg.a].p,
+          node.vectorNetwork.vertices[seg.a],
           offset
         );
         const vb = cmath.vector2.add(
-          node.vectorNetwork.vertices[seg.b].p,
+          node.vectorNetwork.vertices[seg.b],
           offset
         );
         return cmath.bezier.intersectsRect(va, vb, seg.ta, seg.tb, rect)
@@ -248,14 +248,8 @@ export function self_updateVectorAreaSelection<
   // from the selection unless the segment is fully contained by the marquee.
   selected_segments = selected_segments.filter((i) => {
     const seg = node.vectorNetwork.segments[i];
-    const va = cmath.vector2.add(
-      node.vectorNetwork.vertices[seg.a].p,
-      offset
-    );
-    const vb = cmath.vector2.add(
-      node.vectorNetwork.vertices[seg.b].p,
-      offset
-    );
+    const va = cmath.vector2.add(node.vectorNetwork.vertices[seg.a], offset);
+    const vb = cmath.vector2.add(node.vectorNetwork.vertices[seg.b], offset);
     const contained = rect
       ? cmath.bezier.containedByRect(va, vb, seg.ta, seg.tb, rect)
       : false;

@@ -4,58 +4,9 @@ import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 type Vector2 = [number, number];
 export namespace vn {
   /**
-   * tangent mirroring mode
-   *
-   * **description based on moving ta (applies the same vice versa for tb)**
-   * - `none` - no mirroring
-   *   - moving ta will not affect tb at all.
-   * - `angle` - mirror the angle of the tangent, but keep the length
-   *   - moving ta will affect tb, but only the **exact (inverted)** angle will be mirrored.
-   * - `all` - mirror the angle and length of the tangent
-   *   - moving ta will affect tb, and mirror the **exact (inverted)** value of ta, not by the delta of angle/length.
-   * - `auto` - automatically decide whether to mirror based on the current
-   *   relationship of the tangents. If they are already mirrored, behaves like
-   *   `all`, if only the angle is mirrored behaves like `angle`, otherwise acts as `none`.
-   */
-  export type StrictTangentMirroringMode = "none" | "angle" | "all";
-  export type TangentMirroringMode = StrictTangentMirroringMode | "auto";
-
-  /**
-   * infer the mirroring mode from two tangents
-   *
-   * @param ta tangent a
-   * @param tb tangent b
-   *
-   * @remarks
-   * When either tangent is the zero vector, there is no meaningful direction
-   * or length to mirror, so this returns `"none"`.
-   */
-  export function inferMirroringMode(
-    ta: Vector2,
-    tb: Vector2
-  ): StrictTangentMirroringMode {
-    if (cmath.vector2.isZero(ta) || cmath.vector2.isZero(tb)) {
-      return "none";
-    }
-    const [ax, ay] = ta;
-    const [bx, by] = tb;
-    const la = Math.hypot(ax, ay);
-    const lb = Math.hypot(bx, by);
-    // cross product for 2D vectors
-    const cross = ax * by - ay * bx;
-    const crossNorm = cross / (la * lb);
-    const ANGLE_EPSILON = 1e-3;
-    if (Math.abs(crossNorm) > ANGLE_EPSILON) return "none";
-    // dot product to determine direction
-    const dot = ax * bx + ay * by;
-    if (dot >= 0) return "none";
-    return Math.abs(la - lb) < Number.EPSILON ? "all" : "angle";
-  }
-
-  /**
    * Represents a vertex in the vector network.
    */
-  export type VectorNetworkVertex = { p: Vector2 };
+  export type VectorNetworkVertex = Vector2;
 
   /**
    * Represents a segment in the vector network, connecting two vertices.
@@ -147,6 +98,55 @@ export namespace vn {
     segments: VectorNetworkSegment[];
   }
 
+  /**
+   * tangent mirroring mode
+   *
+   * **description based on moving ta (applies the same vice versa for tb)**
+   * - `none` - no mirroring
+   *   - moving ta will not affect tb at all.
+   * - `angle` - mirror the angle of the tangent, but keep the length
+   *   - moving ta will affect tb, but only the **exact (inverted)** angle will be mirrored.
+   * - `all` - mirror the angle and length of the tangent
+   *   - moving ta will affect tb, and mirror the **exact (inverted)** value of ta, not by the delta of angle/length.
+   * - `auto` - automatically decide whether to mirror based on the current
+   *   relationship of the tangents. If they are already mirrored, behaves like
+   *   `all`, if only the angle is mirrored behaves like `angle`, otherwise acts as `none`.
+   */
+  export type StrictTangentMirroringMode = "none" | "angle" | "all";
+  export type TangentMirroringMode = StrictTangentMirroringMode | "auto";
+
+  /**
+   * infer the mirroring mode from two tangents
+   *
+   * @param ta tangent a
+   * @param tb tangent b
+   *
+   * @remarks
+   * When either tangent is the zero vector, there is no meaningful direction
+   * or length to mirror, so this returns `"none"`.
+   */
+  export function inferMirroringMode(
+    ta: Vector2,
+    tb: Vector2
+  ): StrictTangentMirroringMode {
+    if (cmath.vector2.isZero(ta) || cmath.vector2.isZero(tb)) {
+      return "none";
+    }
+    const [ax, ay] = ta;
+    const [bx, by] = tb;
+    const la = Math.hypot(ax, ay);
+    const lb = Math.hypot(bx, by);
+    // cross product for 2D vectors
+    const cross = ax * by - ay * bx;
+    const crossNorm = cross / (la * lb);
+    const ANGLE_EPSILON = 1e-3;
+    if (Math.abs(crossNorm) > ANGLE_EPSILON) return "none";
+    // dot product to determine direction
+    const dot = ax * bx + ay * by;
+    if (dot >= 0) return "none";
+    return Math.abs(la - lb) < Number.EPSILON ? "all" : "angle";
+  }
+
   export interface OptimizationConfig {
     /**
      * Maximum distance between two vertices for them to be considered identical.
@@ -170,7 +170,7 @@ export namespace vn {
    */
   export function polyline(points: Vector2[]): VectorNetwork {
     // TODO: this does not validate the duplicate points
-    const vertices = points.map((p) => ({ p }));
+    const vertices = points.map((p) => p);
     const segments = vertices.slice(0, -1).map((_, i) => ({
       a: i,
       b: i + 1,
@@ -235,15 +235,15 @@ export namespace vn {
       const indexMap = new Map<number, number>();
 
       for (let i = 0; i < net.vertices.length; i++) {
-        const { p } = net.vertices[i];
+        const p = net.vertices[i];
         let existing = vertices.findIndex(
           (v) =>
-            Math.abs(v.p[0] - p[0]) <= vertex_tolerance &&
-            Math.abs(v.p[1] - p[1]) <= vertex_tolerance
+            Math.abs(v[0] - p[0]) <= vertex_tolerance &&
+            Math.abs(v[1] - p[1]) <= vertex_tolerance
         );
         if (existing === -1) {
           existing = vertices.length;
-          vertices.push({ p: [p[0], p[1]] as Vector2 });
+          vertices.push([p[0], p[1]] as Vector2);
         }
         indexMap.set(i, existing);
       }
@@ -312,12 +312,8 @@ export namespace vn {
       config?: OptimizationConfig | null
     ): VectorNetwork {
       const vertices: VectorNetworkVertex[] = [
-        ...a.vertices.map(
-          (v): VectorNetworkVertex => ({ p: [v.p[0], v.p[1]] as Vector2 })
-        ),
-        ...b.vertices.map(
-          (v): VectorNetworkVertex => ({ p: [v.p[0], v.p[1]] as Vector2 })
-        ),
+        ...a.vertices.map((v): VectorNetworkVertex => [v[0], v[1]] as Vector2),
+        ...b.vertices.map((v): VectorNetworkVertex => [v[0], v[1]] as Vector2),
       ];
 
       const offset = a.vertices.length;
@@ -360,9 +356,7 @@ export namespace vn {
       const [dx, dy] = delta;
       return {
         vertices: net.vertices.map(
-          (v): VectorNetworkVertex => ({
-            p: [v.p[0] + dx, v.p[1] + dy] as Vector2,
-          })
+          (v): VectorNetworkVertex => [v[0] + dx, v[1] + dy] as Vector2
         ),
         segments: net.segments.map((s) => ({ ...s })),
       };
@@ -392,10 +386,7 @@ export namespace vn {
 
     findVertex(p: Vector2): number | null {
       for (let i = 0; i < this._vertices.length; i++) {
-        if (
-          this._vertices[i].p[0] === p[0] &&
-          this._vertices[i].p[1] === p[1]
-        ) {
+        if (this._vertices[i][0] === p[0] && this._vertices[i][1] === p[1]) {
           return i;
         }
       }
@@ -475,7 +466,7 @@ export namespace vn {
       const vertices: VectorNetworkVertex[] = vertexIndices.map((vi, idx) => {
         indexMap.set(vi, idx);
         const v = this._vertices[vi];
-        return { p: [v.p[0], v.p[1]] as Vector2 };
+        return [v[0], v[1]] as Vector2;
       });
 
       const packedSegments = segments.map((seg) => ({
@@ -537,8 +528,8 @@ export namespace vn {
      */
     segmentLength(segmentIndex: number): number {
       const seg = this._segments[segmentIndex];
-      const a = this._vertices[seg.a].p;
-      const b = this._vertices[seg.b].p;
+      const a = this._vertices[seg.a];
+      const b = this._vertices[seg.b];
       return Math.hypot(b[0] - a[0], b[1] - a[1]);
     }
 
@@ -602,7 +593,7 @@ export namespace vn {
 
         if (closed) {
           loop.pop();
-          regions.push(loop.map((vi) => this._vertices[vi].p));
+          regions.push(loop.map((vi) => this._vertices[vi]));
         }
       }
 
@@ -674,8 +665,8 @@ export namespace vn {
         const seg = this._segments[si];
         const control = seg.a === vertex ? "ta" : "tb";
         const other = seg.a === vertex ? seg.b : seg.a;
-        const p = this._vertices[vertex].p;
-        const op = this._vertices[other].p;
+        const p = this._vertices[vertex];
+        const op = this._vertices[other];
         const vx = op[0] - p[0];
         const vy = op[1] - p[1];
         const len = Math.hypot(vx, vy);
@@ -742,7 +733,7 @@ export namespace vn {
       if (!seg) return;
 
       // Calculate the offset from frozen state to current state
-      const currentA = this._vertices[seg.a].p;
+      const currentA = this._vertices[seg.a];
       const offsetA: Vector2 = [
         currentA[0] - frozen.a[0],
         currentA[1] - frozen.a[1],
@@ -784,7 +775,7 @@ export namespace vn {
       let vertex_idx: number;
       const existing = this.findVertex(p);
       if (existing === null) {
-        vertex_idx = this._vertices.push({ p }) - 1;
+        vertex_idx = this._vertices.push(p) - 1;
       } else {
         vertex_idx = existing;
       }
@@ -883,15 +874,15 @@ export namespace vn {
       if (i < 0 || i >= this._vertices.length) {
         throw new Error(`Invalid vertex index: ${i}`);
       }
-      this._vertices[i].p = p;
+      this._vertices[i] = p;
     }
 
     translateVertex(i: number, delta: Vector2) {
       if (i < 0 || i >= this._vertices.length) {
         throw new Error(`Invalid vertex index: ${i}`);
       }
-      const p = this._vertices[i].p;
-      this._vertices[i].p = [p[0] + delta[0], p[1] + delta[1]];
+      const p = this._vertices[i];
+      this._vertices[i] = [p[0] + delta[0], p[1] + delta[1]];
     }
 
     translateSegment(i: number, delta: Vector2) {
@@ -904,15 +895,16 @@ export namespace vn {
     }
 
     translate(delta: Vector2) {
-      this._vertices = this._vertices.map((v) => ({
-        p: [v.p[0] + delta[0], v.p[1] + delta[1]],
-      }));
+      this._vertices = this._vertices.map((v) => [
+        v[0] + delta[0],
+        v[1] + delta[1],
+      ]);
     }
 
     scale(factor: Vector2) {
-      this._vertices = this._vertices.map((v) => ({
-        p: cmath.vector2.multiply(v.p, factor),
-      }));
+      this._vertices = this._vertices.map((v) =>
+        cmath.vector2.multiply(v, factor)
+      );
       this._segments = this._segments.map((s) => ({
         a: s.a,
         b: s.b,
@@ -987,11 +979,11 @@ export namespace vn {
         throw new Error("only straight segments can be split");
       }
 
-      const a = this._vertices[seg.a].p;
-      const b = this._vertices[seg.b].p;
+      const a = this._vertices[seg.a];
+      const b = this._vertices[seg.b];
       const mid: Vector2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 
-      const vertexIndex = this._vertices.push({ p: mid }) - 1;
+      const vertexIndex = this._vertices.push(mid) - 1;
 
       const s1: VectorNetworkSegment = {
         a: seg.a,
@@ -1090,7 +1082,7 @@ export namespace vn {
      */
     extendPolyline(p: Vector2) {
       // TODO: this does not validate the duplicate points
-      const pl = polyline([...this._vertices.map((v) => v.p), p]);
+      const pl = polyline([...this._vertices.map((v) => v), p]);
       this._vertices = pl.vertices;
       this._segments = pl.segments;
     }
@@ -1106,7 +1098,7 @@ export namespace vn {
       // TODO: this does not validate the duplicate points
       const a = this._vertices[0];
       const b = p;
-      this._vertices = [a, { p: b }];
+      this._vertices = [a, b];
       this._segments = [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }];
     }
 
@@ -1133,7 +1125,7 @@ export namespace vn {
     ): Vector2[] {
       const idx = indices ?? this._vertices.map((_, i) => i);
       return idx.map((i) => {
-        const p = this._vertices[i].p;
+        const p = this._vertices[i];
         return [p[0] + offset[0], p[1] + offset[1]] as Vector2;
       });
     }
@@ -1160,7 +1152,7 @@ export namespace vn {
 
       for (const { segment, control } of source) {
         const seg = this._segments[segment];
-        const vertex = this._vertices[control === "ta" ? seg.a : seg.b].p;
+        const vertex = this._vertices[control === "ta" ? seg.a : seg.b];
         const tangent = seg[control];
         result.push({
           segment,
@@ -1184,13 +1176,13 @@ export namespace vn {
 
     // 1. collect all vertex positions
     for (const v of vn.vertices) {
-      pts.push(v.p);
+      pts.push(v);
     }
 
     // 2. collect tangent endpoints (a + ta, b + tb)
     for (const seg of vn.segments) {
-      const a = vn.vertices[seg.a].p;
-      const b = vn.vertices[seg.b].p;
+      const a = vn.vertices[seg.a];
+      const b = vn.vertices[seg.b];
       pts.push([a[0] + seg.ta[0], a[1] + seg.ta[1]]);
       pts.push([b[0] + seg.tb[0], b[1] + seg.tb[1]]);
     }
@@ -1208,14 +1200,14 @@ export namespace vn {
     }
     if (vn.segments.length === 0) {
       // fallback to a simple point-based bounding box when no segments exist
-      return cmath.rect.fromPoints(vn.vertices.map((v) => v.p));
+      return cmath.rect.fromPoints(vn.vertices.map((v) => v));
     }
 
     let box = { x: Infinity, y: Infinity, width: 0, height: 0 };
     for (const seg of vn.segments) {
       const { a: _a, b: _b, ta, tb } = seg;
-      const a = vn.vertices[_a].p;
-      const b = vn.vertices[_b].p;
+      const a = vn.vertices[_a];
+      const b = vn.vertices[_b];
       const sb = cmath.bezier.getBBox({ a, b, ta, tb });
       if (box.x === Infinity) {
         box = sb;
@@ -1248,8 +1240,8 @@ export namespace vn {
 
     for (const segment of segments) {
       const { a, b, ta, tb } = segment;
-      const start = vertices[a].p;
-      const end = vertices[b].p;
+      const start = vertices[a];
+      const end = vertices[b];
 
       // Start a new subpath if this segment does not connect
       if (previous_end !== a) {
@@ -1471,10 +1463,10 @@ export namespace vn {
 
     // Create 4 vertices for the rectangle corners
     const vertices: vn.VectorNetworkVertex[] = [
-      { p: [x, y] }, // Top-left
-      { p: [x + width, y] }, // Top-right
-      { p: [x + width, y + height] }, // Bottom-right
-      { p: [x, y + height] }, // Bottom-left
+      [x, y], // Top-left
+      [x + width, y], // Top-right
+      [x + width, y + height], // Bottom-right
+      [x, y + height], // Bottom-left
     ];
 
     // Create 4 segments connecting the vertices in order
@@ -1506,10 +1498,10 @@ export namespace vn {
     const ky = ry * cmath.KAPPA;
 
     const vertices: vn.VectorNetworkVertex[] = [
-      { p: [cx, cy - ry] }, // Top
-      { p: [cx + rx, cy] }, // Right
-      { p: [cx, cy + ry] }, // Bottom
-      { p: [cx - rx, cy] }, // Left
+      [cx, cy - ry], // Top
+      [cx + rx, cy], // Right
+      [cx, cy + ry], // Bottom
+      [cx - rx, cy], // Left
     ];
 
     const segments: vn.VectorNetworkSegment[] = [

@@ -29,7 +29,7 @@ describe("splitSegment", () => {
     expect(newIndex).toBe(3);
     expect(editor.vertices.length).toBe(4);
     expect(editor.segments.length).toBe(3);
-    expect(editor.vertices[newIndex].p).toEqual([5, 0]);
+    expect(editor.vertices[newIndex]).toEqual([5, 0]);
     expect(editor.segments[0]).toEqual({
       a: 0,
       b: newIndex,

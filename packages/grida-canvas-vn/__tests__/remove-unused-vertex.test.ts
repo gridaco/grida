@@ -4,10 +4,10 @@ describe("removeUnusedVertex", () => {
   it("removes vertex without dependents and reindexes segments", () => {
     const net: vn.VectorNetwork = {
       vertices: [
-        { p: [0, 0] },
-        { p: [1, 0] },
-        { p: [2, 0] },
-        { p: [3, 0] },
+        [0, 0],
+        [1, 0],
+        [2, 0],
+        [3, 0],
       ],
       segments: [{ a: 0, b: 2, ta: [0, 0], tb: [0, 0] }],
     };
@@ -17,7 +17,7 @@ describe("removeUnusedVertex", () => {
 
     expect(removed).toBe(true);
     expect(editor.vertices.length).toBe(3);
-    expect(editor.vertices[1].p).toEqual([2, 0]);
+    expect(editor.vertices[1]).toEqual([2, 0]);
     expect(editor.segments[0]).toEqual({ a: 0, b: 1, ta: [0, 0], tb: [0, 0] });
   });
 
@@ -35,4 +35,3 @@ describe("removeUnusedVertex", () => {
     expect(editor.segments.length).toBe(2);
   });
 });
-

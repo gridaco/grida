@@ -13,7 +13,7 @@ describe("VectorNetworkEditor.union", () => {
 
     const result = vn.VectorNetworkEditor.union(netA, netB);
 
-    expect(result.vertices.map((v) => v.p)).toEqual([
+    expect(result.vertices.map((v) => v)).toEqual([
       [0, 0],
       [10, 0],
       [20, 0],
@@ -36,12 +36,10 @@ describe("VectorNetworkEditor.union", () => {
 
     const result = vn.VectorNetworkEditor.union(netA, netB);
 
-    expect(result.vertices.map((v) => v.p)).toEqual([
+    expect(result.vertices.map((v) => v)).toEqual([
       [0, 0],
       [10, 0],
     ]);
-    expect(result.segments).toEqual([
-      { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
-    ]);
+    expect(result.segments).toEqual([{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }]);
   });
 });

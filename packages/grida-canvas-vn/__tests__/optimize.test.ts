@@ -2,7 +2,12 @@ import { vn } from "../vn";
 
 describe("VectorNetworkEditor.optimize", () => {
   const raw: vn.VectorNetwork = {
-    vertices: [{ p: [0, 0] }, { p: [10, 0] }, { p: [10, 0] }, { p: [20, 0] }],
+    vertices: [
+      [0, 0],
+      [10, 0],
+      [10, 0],
+      [20, 0],
+    ],
     segments: [
       { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
       { a: 0, b: 2, ta: [0, 0], tb: [0, 0] },
@@ -12,7 +17,11 @@ describe("VectorNetworkEditor.optimize", () => {
   };
 
   const expected: vn.VectorNetwork = {
-    vertices: [{ p: [0, 0] }, { p: [10, 0] }, { p: [20, 0] }],
+    vertices: [
+      [0, 0],
+      [10, 0],
+      [20, 0],
+    ],
     segments: [
       { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
       { a: 1, b: 2, ta: [0, 0], tb: [0, 0] },
@@ -33,7 +42,11 @@ describe("VectorNetworkEditor.optimize", () => {
 
   it("deduplicates vertices within tolerance (static)", () => {
     const nearly: vn.VectorNetwork = {
-      vertices: [{ p: [0, 0] }, { p: [10, 0] }, { p: [10.25, 0] }],
+      vertices: [
+        [0, 0],
+        [10, 0],
+        [10.25, 0],
+      ],
       segments: [
         { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
         { a: 0, b: 2, ta: [0, 0], tb: [0, 0] },
@@ -45,14 +58,21 @@ describe("VectorNetworkEditor.optimize", () => {
       remove_unused_verticies: true,
     });
     expect(optimized).toEqual({
-      vertices: [{ p: [0, 0] }, { p: [10, 0] }],
+      vertices: [
+        [0, 0],
+        [10, 0],
+      ],
       segments: [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }],
     });
   });
 
   it("deduplicates vertices within tolerance (instance)", () => {
     const nearly: vn.VectorNetwork = {
-      vertices: [{ p: [0, 0] }, { p: [10, 0] }, { p: [10.25, 0] }],
+      vertices: [
+        [0, 0],
+        [10, 0],
+        [10.25, 0],
+      ],
       segments: [
         { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
         { a: 0, b: 2, ta: [0, 0], tb: [0, 0] },
@@ -64,7 +84,10 @@ describe("VectorNetworkEditor.optimize", () => {
       remove_unused_verticies: true,
     });
     expect(optimized).toEqual({
-      vertices: [{ p: [0, 0] }, { p: [10, 0] }],
+      vertices: [
+        [0, 0],
+        [10, 0],
+      ],
       segments: [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }],
     });
     expect(editor.value).toEqual(optimized);
@@ -72,7 +95,11 @@ describe("VectorNetworkEditor.optimize", () => {
 
   it("removes unused vertices when configured", () => {
     const net: vn.VectorNetwork = {
-      vertices: [{ p: [0, 0] }, { p: [10, 0] }, { p: [20, 0] }],
+      vertices: [
+        [0, 0],
+        [10, 0],
+        [20, 0],
+      ],
       segments: [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }],
     };
 
@@ -81,7 +108,10 @@ describe("VectorNetworkEditor.optimize", () => {
       remove_unused_verticies: true,
     });
 
-    expect(optimized.vertices).toEqual([{ p: [0, 0] }, { p: [10, 0] }]);
+    expect(optimized.vertices).toEqual([
+      [0, 0],
+      [10, 0],
+    ]);
     expect(optimized.segments).toEqual([
       { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
     ]);

@@ -90,13 +90,13 @@ function __self_evt_on_pointer_move(
 
       const movement = cmath.vector2.sub(
         draft.pointer.position,
-        cmath.vector2.add(n_offset, a.p)
+        cmath.vector2.add(n_offset, a)
       );
 
       const adj_movement = cmath.ext.movement.axisLockedByDominance(movement);
 
       logical_pos = cmath.vector2.add(
-        a.p,
+        a,
         cmath.ext.movement.normalize(adj_movement),
         n_offset
       );
@@ -110,7 +110,7 @@ function __self_evt_on_pointer_move(
     ) as grida.program.nodes.VectorNode;
     const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
     const anchor_points = node.vectorNetwork.vertices.map((v) =>
-      cmath.vector2.add(v.p, [rect.x, rect.y])
+      cmath.vector2.add(v, [rect.x, rect.y])
     );
 
     const should_snap =
@@ -338,7 +338,7 @@ function __self_evt_on_pointer_down(
 
         const position =
           typeof snapped_point === "number"
-            ? node.vectorNetwork.vertices[snapped_point].p
+            ? node.vectorNetwork.vertices[snapped_point]
             : // relative position (absolute -> local)
               (() => {
                 const rect =
@@ -417,7 +417,7 @@ function __self_evt_on_pointer_down(
           strokeCap: "butt",
           strokeWidth: 1,
           vectorNetwork: {
-            vertices: [{ p: cmath.vector2.zero }],
+            vertices: [cmath.vector2.zero],
             segments: [],
           },
         } satisfies grida.program.nodes.VectorNode;
@@ -926,7 +926,7 @@ function __self_evt_on_drag(
         ) as grida.program.nodes.VectorNode;
 
         const vne = new vn.VectorNetworkEditor({
-          vertices: points.map((p) => ({ p })),
+          vertices: points.map((p) => p),
           segments: node.vectorNetwork.segments,
         });
 
@@ -939,7 +939,7 @@ function __self_evt_on_drag(
             break;
         }
 
-        draft.gesture.points = vne.value.vertices.map((v) => v.p);
+        draft.gesture.points = vne.value.vertices.map((v) => v);
 
         // get the box of the points
         const bb = vne.getBBox();
@@ -977,20 +977,18 @@ function __self_evt_on_drag(
 
         const vertex_index =
           vne.segments[segment][control === "ta" ? "a" : "b"];
-        const vertex_local = vne.vertices[vertex_index].p;
+        const vertex_local = vne.vertices[vertex_index];
         const node_pos: cmath.Vector2 = [node.left!, node.top!];
         const vertex_abs = cmath.vector2.add(vertex_local, node_pos);
         const agent_initial = cmath.vector2.add(vertex_abs, initial);
 
         const anchor_points = vne.vertices.map((v) =>
-          cmath.vector2.add(v.p, node_pos)
+          cmath.vector2.add(v, node_pos)
         );
         const scene = draft.document.scenes[draft.scene_id!];
 
-        const {
-          tarnslate_with_axis_lock,
-          translate_with_force_disable_snap,
-        } = draft.gesture_modifiers;
+        const { tarnslate_with_axis_lock, translate_with_force_disable_snap } =
+          draft.gesture_modifiers;
 
         const adj_movement =
           tarnslate_with_axis_lock === "on"
@@ -1120,7 +1118,7 @@ function __self_evt_on_drag(
         draft.surface_snapping = snapping;
 
         const vne = new vn.VectorNetworkEditor({
-          vertices: initial_verticies.map((p) => ({ p })),
+          vertices: initial_verticies.map((p) => p),
           segments: initial_segments.map((s) => ({ ...s })),
         });
 

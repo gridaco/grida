@@ -33,7 +33,7 @@ export function RegularStarPolygonWidget({
       innerRadius,
     });
 
-    return v.vertices.map((v) => `${v.p[0]},${v.p[1]}`).join(" ");
+    return v.vertices.map((v) => `${v[0]},${v[1]}`).join(" ");
   }, [width, height, pointCount, innerRadius]);
 
   return (

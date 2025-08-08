@@ -434,7 +434,7 @@ function __self_start_gesture(
         node_id
       ) as grida.program.nodes.VectorNode;
 
-      const verticies = node.vectorNetwork.vertices.map((v) => v.p);
+      const verticies = node.vectorNetwork.vertices.map((v) => v);
       const segments = node.vectorNetwork.segments.map((s) => ({ ...s }));
 
       const { vertices, tangents } = encodeTranslateVectorCommand(

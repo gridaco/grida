@@ -11,10 +11,10 @@ describe("fromEllipse", () => {
     const ky = ry * cmath.KAPPA;
 
     expect(result.vertices).toEqual([
-      { p: [50, 0] },
-      { p: [100, 100] },
-      { p: [50, 200] },
-      { p: [0, 100] },
+      [50, 0],
+      [100, 100],
+      [50, 200],
+      [0, 100],
     ]);
 
     expect(result.segments).toHaveLength(4);

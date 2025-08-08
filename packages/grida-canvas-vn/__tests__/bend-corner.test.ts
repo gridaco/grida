@@ -50,9 +50,9 @@ describe("bendCorner", () => {
   it("derives distance from referenced segment", () => {
     const editor = new vn.VectorNetworkEditor({
       vertices: [
-        { p: [0, 0] },
-        { p: [100, 0] },
-        { p: [0, 200] },
+        [0, 0],
+        [100, 0],
+        [0, 200],
       ],
       segments: [
         { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },

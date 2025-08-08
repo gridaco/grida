@@ -664,13 +664,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
               const scene = draft.document.scenes[draft.scene_id!];
               const agent_points = vertices.map((i) =>
-                cmath.vector2.add(node.vectorNetwork.vertices[i].p, [
+                cmath.vector2.add(node.vectorNetwork.vertices[i], [
                   node.left!,
                   node.top!,
                 ])
               );
               const anchor_points = node.vectorNetwork.vertices
-                .map((v, i) => ({ p: v.p, i }))
+                .map((v, i) => ({ p: v, i }))
                 .filter(({ i }) => !vertices.includes(i))
                 .map(({ p }) => cmath.vector2.add(p, [node.left!, node.top!]));
 
