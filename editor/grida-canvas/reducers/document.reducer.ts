@@ -1194,7 +1194,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "bend-segment": {
             assert(node.type === "vector");
             self_updateVectorNodeVectorNetwork(node, (vne) => {
-              vne.bendSegment(segment, action.ca, action.cb);
+              vne.bendSegment(segment, action.ca, action.cb, action.frozen);
             });
             break;
           }

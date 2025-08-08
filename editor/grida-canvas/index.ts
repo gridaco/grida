@@ -1853,8 +1853,14 @@ export namespace editor.api {
     bendSegment(
       node_id: NodeID,
       segment: number,
-      ca: cmath.Vector2,
-      cb: cmath.Vector2
+      ca: number,
+      cb: cmath.Vector2,
+      frozen: {
+        a: cmath.Vector2;
+        b: cmath.Vector2;
+        ta: cmath.Vector2;
+        tb: cmath.Vector2;
+      }
     ): void;
 
     //

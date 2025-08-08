@@ -728,55 +728,46 @@ export namespace vn {
      * @param ca canvas-space point where the bending started
      * @param cb canvas-space point the segment should pass through
      */
-    bendSegment(segment: number, ca: Vector2, cb: Vector2) {
+    bendSegment(
+      segment: number,
+      ca: number,
+      cb: Vector2,
+      frozen: { a: Vector2; b: Vector2; ta: Vector2; tb: Vector2 }
+    ) {
       const seg = this._segments[segment];
       if (!seg) return;
 
-      const p0 = this._vertices[seg.a].p;
-      const p3 = this._vertices[seg.b].p;
+      const { a, b, ta, tb } = frozen;
 
-      const vx = p3[0] - p0[0];
-      const vy = p3[1] - p0[1];
-      const len2 = vx * vx + vy * vy;
-      if (len2 === 0) return;
+      // Compute absolute control points from the original curve
+      const p1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const p2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
 
-      // Parametric position along the straight segment where the gesture
-      // started. Clamp to avoid degenerate cases at the ends.
-      let t =
-        ((ca[0] - p0[0]) * vx + (ca[1] - p0[1]) * vy) / len2;
-      if (t <= 0 || t >= 1) return;
-      const s = 1 - t;
+      // Evaluate B(t0) on the original curve
+      const t0 = ca;
+      const mt = 1 - t0;
+      const mt2 = mt * mt;
+      const t2 = t0 * t0;
 
-      const v0: Vector2 = [cb[0] - p0[0], cb[1] - p0[1]];
-      const v3: Vector2 = [cb[0] - p3[0], cb[1] - p3[1]];
+      const p0: Vector2 = [
+        mt2 * mt * a[0] +
+          3 * mt2 * t0 * p1[0] +
+          3 * mt * t2 * p2[0] +
+          t2 * t0 * b[0],
+        mt2 * mt * a[1] +
+          3 * mt2 * t0 * p1[1] +
+          3 * mt * t2 * p2[1] +
+          t2 * t0 * b[1],
+      ];
 
-      const coeff0 = s * s * s + 3 * s * s * t;
-      const coeff3 = 3 * s * t * t + t * t * t;
-      const qx = cb[0] - coeff0 * p0[0] - coeff3 * p3[0];
-      const qy = cb[1] - coeff0 * p0[1] - coeff3 * p3[1];
-      const denom = 3 * s * t;
-      if (denom === 0) return;
-      const qdx = qx / denom;
-      const qdy = qy / denom;
+      // Compute the delta to move p0 toward cb
+      const delta: Vector2 = [cb[0] - p0[0], cb[1] - p0[1]];
 
-      const m00 = s * v0[0];
-      const m01 = t * v3[0];
-      const m10 = s * v0[1];
-      const m11 = t * v3[1];
-      const det = m00 * m11 - m01 * m10;
-      if (Math.abs(det) < 1e-8) {
-        seg.ta = [0, 0];
-        seg.tb = [0, 0];
-        return;
-      }
-      const u = (qdx * m11 - qdy * m01) / det;
-      const v = (m00 * qdy - m10 * qdx) / det;
+      const s = 1 - t0;
 
-      const p1: Vector2 = [p0[0] + u * v0[0], p0[1] + u * v0[1]];
-      const p2: Vector2 = [p3[0] + v * v3[0], p3[1] + v * v3[1]];
-
-      seg.ta = [p1[0] - p0[0], p1[1] - p0[1]];
-      seg.tb = [p2[0] - p3[0], p2[1] - p3[1]];
+      // Apply weighted delta to tangents based on the frozen state
+      seg.ta = [ta[0] + delta[0] * s, ta[1] + delta[1] * s];
+      seg.tb = [tb[0] + delta[0] * t0, tb[1] + delta[1] * t0];
     }
 
     /**

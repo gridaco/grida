@@ -350,10 +350,17 @@ export interface EditorVectorTranslateSegmentAction {
 export interface EditorVectorBendSegmentAction {
   type: "bend-segment";
   target: SegmentQuery;
-  /** starting point of the bend gesture in node space */
-  ca: cmath.Vector2;
+  /** parametric position (0-1) where the bend gesture started */
+  ca: number;
   /** current cursor position in node space */
   cb: cmath.Vector2;
+  /** frozen original segment state */
+  frozen: {
+    a: cmath.Vector2;
+    b: cmath.Vector2;
+    ta: cmath.Vector2;
+    tb: cmath.Vector2;
+  };
 }
 
 export interface EditorVectorBendOrClearCornerAction {

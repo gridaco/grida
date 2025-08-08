@@ -231,7 +231,13 @@ function Segment({
   const active = selected;
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
-  const startRef = React.useRef<cmath.Vector2 | null>(null);
+  const t0Ref = React.useRef<number | null>(null);
+  const frozenRef = React.useRef<{
+    a: cmath.Vector2;
+    b: cmath.Vector2;
+    ta: cmath.Vector2;
+    tb: cmath.Vector2;
+  } | null>(null);
   const showMiddle =
     hovered && cmath.vector2.isZero(ta) && cmath.vector2.isZero(tb);
   const middle = useMemo(() => {
@@ -264,20 +270,33 @@ function Segment({
             (event as MouseEvent).clientX,
             (event as MouseEvent).clientY,
           ]);
-          startRef.current = cmath.vector2.sub(canvasPoint, ve.offset);
+          const point = cmath.vector2.sub(canvasPoint, ve.offset);
+          const seg = ve.segments[segmentIndex];
+          const a0 = [...ve.vertices[seg.a].p] as cmath.Vector2;
+          const b0 = [...ve.vertices[seg.b].p] as cmath.Vector2;
+          const ta0 = [...seg.ta] as cmath.Vector2;
+          const tb0 = [...seg.tb] as cmath.Vector2;
+          frozenRef.current = { a: a0, b: b0, ta: ta0, tb: tb0 };
+          t0Ref.current = cmath.bezier.projectParametric(
+            a0,
+            b0,
+            ta0,
+            tb0,
+            point
+          );
         } else {
           ve.onDragStart();
         }
       },
       onDrag: ({ event }) => {
-        if (tool.type === "bend" && startRef.current) {
+        if (tool.type === "bend" && t0Ref.current !== null && frozenRef.current) {
           event.preventDefault();
           const canvasPoint = instance.clientPointToCanvasPoint([
             (event as MouseEvent).clientX,
             (event as MouseEvent).clientY,
           ]);
           const cb = cmath.vector2.sub(canvasPoint, ve.offset);
-          ve.bendSegment(segmentIndex, startRef.current, cb);
+          ve.bendSegment(segmentIndex, t0Ref.current, cb, frozenRef.current);
         }
       },
       onPointerUp: ({ event }) => {

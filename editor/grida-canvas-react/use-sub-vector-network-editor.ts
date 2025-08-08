@@ -158,8 +158,18 @@ export default function useSurfaceVectorEditor() {
   );
 
   const bendSegment = useCallback(
-    (segment: number, ca: cmath.Vector2, cb: cmath.Vector2) => {
-      instance.bendSegment(node_id, segment, ca, cb);
+    (
+      segment: number,
+      ca: number,
+      cb: cmath.Vector2,
+      frozen: {
+        a: cmath.Vector2;
+        b: cmath.Vector2;
+        ta: cmath.Vector2;
+        tb: cmath.Vector2;
+      }
+    ) => {
+      instance.bendSegment(node_id, segment, ca, cb, frozen);
     },
     [instance, node_id]
   );

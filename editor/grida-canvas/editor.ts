@@ -842,14 +842,21 @@ export class Editor
   public bendSegment(
     node_id: editor.NodeID,
     segment: number,
-    ca: cmath.Vector2,
-    cb: cmath.Vector2
+    ca: number,
+    cb: cmath.Vector2,
+    frozen: {
+      a: cmath.Vector2;
+      b: cmath.Vector2;
+      ta: cmath.Vector2;
+      tb: cmath.Vector2;
+    }
   ) {
     this.dispatch({
       type: "bend-segment",
       target: { node_id, segment },
       ca,
       cb,
+      frozen,
     });
   }
 
