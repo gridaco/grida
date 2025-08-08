@@ -114,6 +114,7 @@ export type EnumItem<T extends string> =
       label?: string;
       value: T;
       disabled?: boolean;
+      title?: string;
     };
 
 export function enumLabel<T extends string>(e: EnumItem<T>) {
@@ -246,18 +247,18 @@ export function PropertyEnumTabs<T extends string>({
           const value = typeof e === "string" ? e : e.value;
           const label = typeof e === "string" ? e : e.label;
           const icon = typeof e === "string" ? undefined : e.icon;
+          const title = typeof e === "string" ? undefined : e.title;
           const hasIcon = typeof e === "string" ? false : !!e.icon;
           const disabled = typeof e === "string" ? false : e.disabled;
           return (
             <TabsTrigger
               key={value}
               value={value}
-              title={label}
+              title={title}
               disabled={disabled}
               className="text-xs p-0.5"
             >
-              {hasIcon && icon && <>{icon}</>}
-              {label ?? value}
+              {hasIcon && icon ? <>{icon}</> : (label ?? value)}
             </TabsTrigger>
           );
         })}

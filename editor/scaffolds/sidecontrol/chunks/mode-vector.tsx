@@ -22,7 +22,11 @@ import {
 } from "@/grida-canvas-react/provider";
 import { encodeTranslateVectorCommand } from "@/grida-canvas/reducers/methods";
 import { FillControl } from "../controls/fill";
-import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
+import {
+  MirroringAll,
+  MirroringAngle,
+  MirroringNone,
+} from "@/grida-canvas-react-starter-kit/starterkit-icons/tangent-mirroring-mode";
 
 export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
   return (
@@ -135,9 +139,21 @@ function SectionGeometry({ node_id }: { node_id: string }) {
           <PropertyLineLabel>Mirroring</PropertyLineLabel>
           <PropertyEnumTabs
             enum={[
-              { label: "No", value: "none" },
-              { label: "All", value: "all" },
-              { label: "Ang", value: "angle" },
+              {
+                value: "none",
+                icon: <MirroringNone className="size-5" />,
+                title: "No mirroring",
+              },
+              {
+                value: "all",
+                icon: <MirroringAll className="size-5" />,
+                title: "Perfect mirroring",
+              },
+              {
+                value: "angle",
+                icon: <MirroringAngle className="size-5" />,
+                title: "Only angle is mirrored, length can vary",
+              },
             ]}
             value={mirroring}
             onValueChange={(v) =>
