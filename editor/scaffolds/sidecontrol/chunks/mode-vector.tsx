@@ -8,16 +8,9 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { PropertyLine, PropertyLineLabel } from "../ui";
+import { PropertyEnumTabs, PropertyLine, PropertyLineLabel } from "../ui";
 import InputPropertyNumber from "../ui/number";
 import useSurfaceVectorEditor from "@/grida-canvas-react/use-sub-vector-network-editor";
-import {
-  Select,
-  SelectItem,
-  SelectContent,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui-editor/select";
 import useTangentMirroring from "./use-tangent-mirroring";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
@@ -32,6 +25,15 @@ import { FillControl } from "../controls/fill";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 
 export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
+  return (
+    <div key={node_id} className="mt-4 mb-10">
+      <SectionGeometry node_id={node_id} />
+      <SectionFills node_id={node_id} />
+    </div>
+  );
+}
+
+function SectionGeometry({ node_id }: { node_id: string }) {
   const {
     selected_vertices,
     selected_segments,
@@ -112,64 +114,47 @@ export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
   );
 
   return (
-    <div key={node_id} className="mt-4 mb-10">
-      <SidebarSection className="border-b pb-4">
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine className="items-center gap-1">
-            <PropertyLineLabel>Position</PropertyLineLabel>
-            <InputPropertyNumber
-              mode="auto"
-              value={x}
-              onValueChange={handleDelta("x")}
-              icon={<span className="text-[9px] text-muted-foreground">X</span>}
-            />
-            <InputPropertyNumber
-              mode="auto"
-              value={y}
-              onValueChange={handleDelta("y")}
-              icon={<span className="text-[9px] text-muted-foreground">Y</span>}
-            />
-          </PropertyLine>
-          <PropertyLine className="items-center gap-1">
-            <PropertyLineLabel>Mirroring</PropertyLineLabel>
-            <Select
-              value={mirroring}
-              onValueChange={(v) =>
-                setMirroring(v as vn.StrictTangentMirroringMode)
-              }
-              disabled={mirroringDisabled}
-            >
-              <SelectTrigger size="xs">
-                <SelectValue placeholder="Select a mirroring mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="angle">Angle</SelectItem>
-              </SelectContent>
-            </Select>
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SectionFills node_id={node_id} />
-    </div>
+    <SidebarSection className="border-b pb-4">
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine className="items-center gap-1">
+          <PropertyLineLabel>Position</PropertyLineLabel>
+          <InputPropertyNumber
+            mode="auto"
+            value={x}
+            onValueChange={handleDelta("x")}
+            icon={<span className="text-[9px] text-muted-foreground">X</span>}
+          />
+          <InputPropertyNumber
+            mode="auto"
+            value={y}
+            onValueChange={handleDelta("y")}
+            icon={<span className="text-[9px] text-muted-foreground">Y</span>}
+          />
+        </PropertyLine>
+        <PropertyLine className="items-center gap-1">
+          <PropertyLineLabel>Mirroring</PropertyLineLabel>
+          <PropertyEnumTabs
+            enum={[
+              { label: "No", value: "none" },
+              { label: "All", value: "all" },
+              { label: "Ang", value: "angle" },
+            ]}
+            value={mirroring}
+            onValueChange={(v) =>
+              setMirroring(v as vn.StrictTangentMirroringMode)
+            }
+          />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
   );
+  //
 }
 
 function SectionFills({ node_id }: { node_id: string }) {
-  const instance = useCurrentEditor();
-  const { content_edit_mode } = useEditorState(instance, (state) => ({
-    content_edit_mode: state.content_edit_mode,
-  }));
-
   const { fill } = useNodeState(node_id, (node) => ({
     fill: node.fill,
   }));
-
-  const selectedGradientStop =
-    content_edit_mode?.type === "fill/gradient"
-      ? content_edit_mode.selected_stop
-      : undefined;
 
   const actions = useNodeActions(node_id)!;
 
@@ -181,23 +166,7 @@ function SectionFills({ node_id }: { node_id: string }) {
       <SidebarMenuSectionContent className="space-y-2">
         <PropertyLine>
           <PropertyLineLabel>Fill</PropertyLineLabel>
-          <FillControl
-            value={fill}
-            onValueChange={actions.fill}
-            removable
-            selectedGradientStop={selectedGradientStop}
-            onSelectedGradientStopChange={(stop) => {
-              instance.selectGradientStop(node_id, stop);
-            }}
-            // onOpenChange={(open) => {
-            //   if (open) {
-            //     instance.tryEnterContentEditMode(node_id, "fill/gradient");
-            //   } else {
-            //     instance.tryExitContentEditMode();
-            //   }
-            //   //
-            // }}
-          />
+          <FillControl value={fill} onValueChange={actions.fill} removable />
         </PropertyLine>
       </SidebarMenuSectionContent>
     </SidebarSection>
