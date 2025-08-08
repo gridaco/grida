@@ -676,7 +676,6 @@ export namespace vn {
 
       // determine the reference segment for length calculation
       const refData = (ref && data.find((d) => d.control === ref)) || data[0];
-      const radius = (refData.len / 2) * cmath.KAPPA;
 
       // compute the angle bisector
       const bx = data[0].dir[0] + data[1].dir[0];
@@ -685,19 +684,42 @@ export namespace vn {
       const bisector: Vector2 = [bx, by];
 
       // base tangent direction: bisector rotated 90° counter-clockwise
-      const tangent: Vector2 = [-bisector[1] * radius, bisector[0] * radius];
+      const baseTangent: Vector2 = [-bisector[1], bisector[0]];
 
-      // determine orientation using cross product
+      // determine orientation using cross product between the bisector and the first segment direction
+      // This determines the correct orientation for the tangents
       const cross = bisector[0] * data[0].dir[1] - bisector[1] * data[0].dir[0];
       const segA = this._segments[data[0].si];
       const segB = this._segments[data[1].si];
 
+      // Scale each tangent based on its segment length
+      // If reference is specified, both tangents use the reference segment's length
+      // Otherwise, each tangent uses its own segment's length
+      const scaleA = ref
+        ? (refData.len / 2) * cmath.KAPPA
+        : (data[0].len / 2) * cmath.KAPPA;
+      const scaleB = ref
+        ? (refData.len / 2) * cmath.KAPPA
+        : (data[1].len / 2) * cmath.KAPPA;
+
       if (cross < 0) {
-        segA[data[0].control] = [-tangent[0], -tangent[1]];
-        segB[data[1].control] = tangent;
+        segA[data[0].control] = [
+          -baseTangent[0] * scaleA,
+          -baseTangent[1] * scaleA,
+        ];
+        segB[data[1].control] = [
+          baseTangent[0] * scaleB,
+          baseTangent[1] * scaleB,
+        ];
       } else {
-        segA[data[0].control] = tangent;
-        segB[data[1].control] = [-tangent[0], -tangent[1]];
+        segA[data[0].control] = [
+          baseTangent[0] * scaleA,
+          baseTangent[1] * scaleA,
+        ];
+        segB[data[1].control] = [
+          -baseTangent[0] * scaleB,
+          -baseTangent[1] * scaleB,
+        ];
       }
     }
 
@@ -1287,8 +1309,6 @@ export namespace vn {
     }
 
     return encodeSVGPath(commands);
-
-    //
   }
 
   export function fromSVGPathData(d: string): vn.VectorNetwork {
