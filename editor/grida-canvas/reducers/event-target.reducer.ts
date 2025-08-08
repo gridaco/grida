@@ -380,17 +380,19 @@ function __self_evt_on_pointer_down(
         const isClosingExisting =
           typeof snapped_point === "number" && new_vertex_idx === snapped_point;
 
+        // when connecting to an existing vertex, keep the new segment
+        // selected so dragging starts a "curve-b" gesture. conclude
+        // projection by clearing `a_point` unless the user keeps
+        // projecting with the `p` modifier.
+        draft.content_edit_mode.selected_segments =
+          new_segment_idx !== null ? [new_segment_idx] : [];
+
         if (
           isClosingExisting &&
           draft.gesture_modifiers.path_keep_projecting !== "on"
         ) {
-          // Close the path and conclude the gesture when connecting to an
-          // existing vertex, unless the user holds `p` to keep projecting.
-          draft.content_edit_mode.selected_segments = [];
           draft.content_edit_mode.a_point = null;
         } else {
-          draft.content_edit_mode.selected_segments =
-            new_segment_idx !== null ? [new_segment_idx] : [];
           draft.content_edit_mode.a_point = new_vertex_idx;
         }
 
