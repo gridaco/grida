@@ -9,9 +9,7 @@ const VECTOR_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "path",
   "lasso",
 ];
-const TEXT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
-  "cursor",
-];
+const TEXT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = ["cursor"];
 const BITMAP_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "brush",
   "eraser",
@@ -26,16 +24,11 @@ const NO_CONTENT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "path",
 ];
 // when reverting a tool while no content edit mode is active, path is invalid
-const NO_CONTENT_EDIT_MODE_VALID_REVERT_TOOL_MODES: editor.state.ToolModeType[] = [
-  "cursor",
-  "hand",
-  "zoom",
-  "insert",
-  "draw",
-];
+const NO_CONTENT_EDIT_MODE_VALID_REVERT_TOOL_MODES: editor.state.ToolModeType[] =
+  ["cursor", "hand", "zoom", "insert", "draw"];
 
 function validToolModesForContentEditMode(
-  mode: editor.state.ContentEditMode | undefined,
+  mode: editor.state.ContentEditModeState | undefined,
   opts: { for: "select" | "revert" } = { for: "select" }
 ): editor.state.ToolModeType[] {
   switch (mode?.type) {
