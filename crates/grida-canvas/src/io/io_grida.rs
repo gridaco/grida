@@ -391,10 +391,7 @@ pub struct JSONSVGPathNode {
     pub paths: Option<Vec<JSONSVGPath>>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct JSONVectorNetworkVertex {
-    pub p: [f32; 2],
-}
+pub type JSONVectorNetworkVertex = (f32, f32);
 
 #[derive(Debug, Deserialize)]
 pub struct JSONVectorNetworkSegment {
@@ -415,11 +412,7 @@ pub struct JSONVectorNetwork {
 impl From<JSONVectorNetwork> for VectorNetwork {
     fn from(network: JSONVectorNetwork) -> Self {
         VectorNetwork {
-            vertices: network
-                .vertices
-                .into_iter()
-                .map(|v| (v.p[0], v.p[1]))
-                .collect(),
+            vertices: network.vertices.into_iter().map(|v| (v.0, v.1)).collect(),
             segments: network
                 .segments
                 .into_iter()
@@ -992,10 +985,10 @@ mod tests {
         // Test with a simple vector network
         let json = r#"{
             "vertices": [
-                {"p": [0.0, 0.0]},
-                {"p": [100.0, 0.0]},
-                {"p": [100.0, 100.0]},
-                {"p": [0.0, 100.0]}
+                [0.0, 0.0],
+                [100.0, 0.0],
+                [100.0, 100.0],
+                [0.0, 100.0]
             ],
             "segments": [
                 {"a": 0, "b": 1},
@@ -1012,10 +1005,10 @@ mod tests {
         assert_eq!(network.segments.len(), 4);
 
         // Check vertices
-        assert_eq!(network.vertices[0].p, [0.0, 0.0]);
-        assert_eq!(network.vertices[1].p, [100.0, 0.0]);
-        assert_eq!(network.vertices[2].p, [100.0, 100.0]);
-        assert_eq!(network.vertices[3].p, [0.0, 100.0]);
+        assert_eq!(network.vertices[0], (0.0, 0.0));
+        assert_eq!(network.vertices[1], (100.0, 0.0));
+        assert_eq!(network.vertices[2], (100.0, 100.0));
+        assert_eq!(network.vertices[3], (0.0, 100.0));
 
         // Check segments
         assert_eq!(network.segments[0].a, 0);
@@ -1033,8 +1026,8 @@ mod tests {
         // Test with segments that have tangent handles
         let json = r#"{
             "vertices": [
-                {"p": [0.0, 0.0]},
-                {"p": [100.0, 100.0]}
+                [0.0, 0.0],
+                [100.0, 100.0]
             ],
             "segments": [
                 {"a": 0, "b": 1, "ta": [10.0, -10.0], "tb": [-10.0, 10.0]}
@@ -1069,8 +1062,8 @@ mod tests {
         // Test with only vertices, no segments
         let json = r#"{
             "vertices": [
-                {"p": [0.0, 0.0]},
-                {"p": [50.0, 50.0]}
+                [0.0, 0.0],
+                [50.0, 50.0]
             ]
         }"#;
 
@@ -1079,7 +1072,7 @@ mod tests {
 
         assert_eq!(network.vertices.len(), 2);
         assert_eq!(network.segments.len(), 0);
-        assert_eq!(network.vertices[0].p, [0.0, 0.0]);
-        assert_eq!(network.vertices[1].p, [50.0, 50.0]);
+        assert_eq!(network.vertices[0], (0.0, 0.0));
+        assert_eq!(network.vertices[1], (50.0, 50.0));
     }
 }
