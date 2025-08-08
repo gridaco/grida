@@ -78,17 +78,20 @@ export function SurfaceVectorEditor({
             }}
           >
             {/* // debug */}
-            {absolute_vertices.map((v, i) => (
-              <text
-                key={i}
-                x={v[0] - 8}
-                y={v[1] - 8}
-                fontSize={8}
-                fill="fuchsia"
-              >
-                p{i} ({Math.round(v[0])}, {Math.round(v[1])})
-              </text>
-            ))}
+            {absolute_vertices.map((v, i) => {
+              const tv = cmath.vector2.transform(v, transform);
+              return (
+                <text
+                  key={i}
+                  x={tv[0] - 8}
+                  y={tv[1] - 8}
+                  fontSize={8}
+                  fill="fuchsia"
+                >
+                  p{i} ({Math.round(v[0])}, {Math.round(v[1])})
+                </text>
+              );
+            })}
           </svg>
         )}
       </div>
