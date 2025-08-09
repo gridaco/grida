@@ -28,33 +28,6 @@ const getBezierPoints = (
   a2cResult: number[]
 ): number[] => [x1, y1, ...a2cResult];
 
-/**
- * Evaluates a cubic Bézier curve at parameter t
- */
-function evalBezier(
-  a: cmath.Vector2,
-  b: cmath.Vector2,
-  ta: cmath.Vector2,
-  tb: cmath.Vector2,
-  t: number
-): cmath.Vector2 {
-  const s = 1 - t;
-  const s2 = s * s;
-  const t2 = t * t;
-  const s3 = s2 * s;
-  const t3 = t2 * t;
-
-  const p0 = a;
-  const p1: cmath.Vector2 = [a[0] + ta[0], a[1] + ta[1]];
-  const p2: cmath.Vector2 = [b[0] + tb[0], b[1] + tb[1]];
-  const p3 = b;
-
-  return [
-    s3 * p0[0] + 3 * s2 * t * p1[0] + 3 * s * t2 * p2[0] + t3 * p3[0],
-    s3 * p0[1] + 3 * s2 * t * p1[1] + 3 * s * t2 * p2[1] + t3 * p3[1],
-  ];
-}
-
 describe("cmath.bezier.a2c", () => {
   test("should convert a simple arc to a single cubic Bézier curve (with svg path)", () => {
     // SVG:
@@ -263,36 +236,6 @@ describe("cmath.bezier.containedByRect", () => {
 
 describe("cmath.bezier.projectParametric", () => {
   /**
-   * Evaluates a cubic Bézier segment defined by endpoints `a`, `b` and tangents `ta`, `tb`.
-   */
-  function evalBezier(
-    a: cmath.Vector2,
-    b: cmath.Vector2,
-    ta: cmath.Vector2,
-    tb: cmath.Vector2,
-    t: number
-  ): cmath.Vector2 {
-    const p0 = a;
-    const p1: cmath.Vector2 = [a[0] + ta[0], a[1] + ta[1]];
-    const p2: cmath.Vector2 = [b[0] + tb[0], b[1] + tb[1]];
-    const p3 = b;
-    const mt = 1 - t;
-    const mt2 = mt * mt;
-    const t2 = t * t;
-    const x =
-      mt2 * mt * p0[0] +
-      3 * mt2 * t * p1[0] +
-      3 * mt * t2 * p2[0] +
-      t2 * t * p3[0];
-    const y =
-      mt2 * mt * p0[1] +
-      3 * mt2 * t * p1[1] +
-      3 * mt * t2 * p2[1] +
-      t2 * t * p3[1];
-    return [x, y];
-  }
-
-  /**
    * Evaluates derivative of cubic Bézier for computing normals in tests.
    */
   function evalDerivative(
@@ -350,7 +293,7 @@ describe("cmath.bezier.projectParametric", () => {
     const tb: cmath.Vector2 = [0, -10];
 
     const t = 0.3;
-    const p = evalBezier(a, b, ta, tb, t);
+    const p = cmath.bezier.evaluate(a, b, ta, tb, t);
     expect(cmath.bezier.projectParametric(a, b, ta, tb, p)).toBeCloseTo(t, 6);
   });
 
@@ -360,7 +303,7 @@ describe("cmath.bezier.projectParametric", () => {
     const ta: cmath.Vector2 = [0, 10];
     const tb: cmath.Vector2 = [0, -10];
     const t = 0.4;
-    const point = evalBezier(a, b, ta, tb, t);
+    const point = cmath.bezier.evaluate(a, b, ta, tb, t);
     const tangent = evalDerivative(a, b, ta, tb, t);
     const normal: cmath.Vector2 = [-tangent[1], tangent[0]];
     const len = Math.hypot(normal[0], normal[1]);
@@ -392,7 +335,7 @@ describe("cmath.bezier.solveTangentsForPoint", () => {
     );
 
     // Verify that the curve passes through the target point
-    const point = evalBezier(a, b, newTa, newTb, t);
+    const point = cmath.bezier.evaluate(a, b, newTa, newTb, t);
     const distance = Math.hypot(
       targetPoint[0] - point[0],
       targetPoint[1] - point[1]
@@ -421,7 +364,7 @@ describe("cmath.bezier.solveTangentsForPoint", () => {
         targetPoint
       );
 
-      const point = evalBezier(a, b, newTa, newTb, t);
+      const point = cmath.bezier.evaluate(a, b, newTa, newTb, t);
       const distance = Math.hypot(
         targetPoint[0] - point[0],
         targetPoint[1] - point[1]
@@ -481,7 +424,7 @@ describe("cmath.bezier.solveTangentsForPoint", () => {
     );
 
     // Verify that the curve passes through the target point
-    const point = evalBezier(a, b, newTa, newTb, t);
+    const point = cmath.bezier.evaluate(a, b, newTa, newTb, t);
     const distance = Math.hypot(
       targetPoint[0] - point[0],
       targetPoint[1] - point[1]
@@ -514,7 +457,7 @@ describe("cmath.bezier.solveTangentsForPoint", () => {
       targetAtStart
     );
 
-    const pointAtStart = evalBezier(a, b, newTa1, newTb1, 0);
+    const pointAtStart = cmath.bezier.evaluate(a, b, newTa1, newTb1, 0);
     const distanceAtStart = Math.hypot(
       targetAtStart[0] - pointAtStart[0],
       targetAtStart[1] - pointAtStart[1]
@@ -532,11 +475,193 @@ describe("cmath.bezier.solveTangentsForPoint", () => {
       targetAtEnd
     );
 
-    const pointAtEnd = evalBezier(a, b, newTa2, newTb2, 1);
+    const pointAtEnd = cmath.bezier.evaluate(a, b, newTa2, newTb2, 1);
     const distanceAtEnd = Math.hypot(
       targetAtEnd[0] - pointAtEnd[0],
       targetAtEnd[1] - pointAtEnd[1]
     );
     expect(distanceAtEnd).toBeLessThan(0.1);
+  });
+});
+
+describe("cmath.bezier.evaluate", () => {
+  describe("Basic functionality", () => {
+    test("should evaluate straight line segment at t=0", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 100];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, 0);
+      expect(result).toEqual([0, 0]);
+    });
+
+    test("should evaluate straight line segment at t=1", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 100];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, 1);
+      expect(result).toEqual([100, 100]);
+    });
+
+    test("should evaluate straight line segment at t=0.5", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 100];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, 0.5);
+      expect(result).toEqual([50, 50]);
+    });
+
+    test("should handle zero length curve", () => {
+      const a: cmath.Vector2 = [50, 50];
+      const b: cmath.Vector2 = [50, 50];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, 0.5);
+      expect(result).toEqual([50, 50]);
+    });
+  });
+
+  describe("Curved segments", () => {
+    test("should evaluate curved segment with tangents", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 0];
+      const ta: cmath.Vector2 = [50, 50];
+      const tb: cmath.Vector2 = [-50, 50];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, 0.5);
+
+      // The curve should be higher at the middle due to the upward tangents
+      expect(result[0]).toBeCloseTo(50, 1); // x should be 50
+      expect(result[1]).toBeGreaterThan(0); // y should be positive
+    });
+
+    test("should evaluate at t=0.25", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 0];
+      const ta: cmath.Vector2 = [50, 50];
+      const tb: cmath.Vector2 = [-50, 50];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, 0.25);
+
+      // With curved Bézier, x-coordinate is not linear
+      expect(result[0]).toBeGreaterThan(0); // x should be positive
+      expect(result[0]).toBeLessThan(100); // x should be less than end point
+      expect(result[1]).toBeGreaterThan(0); // y should be positive
+    });
+
+    test("should evaluate at t=0.75", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 0];
+      const ta: cmath.Vector2 = [50, 50];
+      const tb: cmath.Vector2 = [-50, 50];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, 0.75);
+
+      // With curved Bézier, x-coordinate is not linear
+      expect(result[0]).toBeGreaterThan(0); // x should be positive
+      expect(result[0]).toBeLessThan(100); // x should be less than end point
+      expect(result[1]).toBeGreaterThan(0); // y should be positive
+    });
+
+    test("should handle negative tangent values", () => {
+      const a: cmath.Vector2 = [50, 50];
+      const b: cmath.Vector2 = [150, 50];
+      const ta: cmath.Vector2 = [-25, -25];
+      const tb: cmath.Vector2 = [25, -25];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, 0.5);
+
+      expect(result[0]).toBeCloseTo(100, 1); // x should be 100
+      expect(result[1]).toBeLessThan(50); // y should be less than 50 due to negative tangents
+    });
+  });
+
+  describe("Edge cases and robustness", () => {
+    test("should clamp t values below 0", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 100];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, -0.5);
+      expect(result).toEqual([0, 0]); // Should clamp to t=0
+    });
+
+    test("should clamp t values above 1", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 100];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, 1.5);
+      expect(result).toEqual([100, 100]); // Should clamp to t=1
+    });
+
+    test("should handle NaN t values", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 100];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, NaN);
+      expect(result).toEqual([0, 0]); // Should clamp NaN to 0
+    });
+
+    test("should handle Infinity t values", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 100];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, Infinity);
+      expect(result).toEqual([100, 100]); // Should clamp Infinity to 1
+    });
+
+    test("should handle -Infinity t values", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 100];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      const result = cmath.bezier.evaluate(a, b, ta, tb, -Infinity);
+      expect(result).toEqual([0, 0]); // Should clamp -Infinity to 0
+    });
+  });
+
+  describe("Mathematical correctness", () => {
+    test("should maintain mathematical properties", () => {
+      const a: cmath.Vector2 = [10, 20];
+      const b: cmath.Vector2 = [90, 80];
+      const ta: cmath.Vector2 = [30, 10];
+      const tb: cmath.Vector2 = [-20, 15];
+
+      // Test that B(0) = a and B(1) = b
+      const result0 = cmath.bezier.evaluate(a, b, ta, tb, 0);
+      const result1 = cmath.bezier.evaluate(a, b, ta, tb, 1);
+
+      expect(result0).toEqual(a);
+      expect(result1).toEqual(b);
+    });
+
+    test("should be symmetric for t and 1-t", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 0];
+      const ta: cmath.Vector2 = [50, 50];
+      const tb: cmath.Vector2 = [-50, 50];
+
+      const t = 0.3;
+      const result1 = cmath.bezier.evaluate(a, b, ta, tb, t);
+      const result2 = cmath.bezier.evaluate(b, a, tb, ta, 1 - t);
+
+      // The results should be the same point on the curve
+      expect(result1[0]).toBeCloseTo(result2[0], 10);
+      expect(result1[1]).toBeCloseTo(result2[1], 10);
+    });
   });
 });

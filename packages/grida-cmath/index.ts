@@ -2792,6 +2792,95 @@ namespace cmath {
     }
 
     /**
+     * Evaluates a cubic Bézier curve at a given parametric position.
+     *
+     * The curve is defined by two endpoints and their tangent vectors.
+     * The parametric equation for a cubic Bézier curve is:
+     * \[
+     * B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad \text{where } t \in [0, 1]
+     * \]
+     *
+     * Where:
+     * - \( P_0 \): Start point (a)
+     * - \( P_1 \): First control point (a + ta)
+     * - \( P_2 \): Second control point (b + tb)
+     * - \( P_3 \): End point (b)
+     *
+     * @param a - Start point of the curve \([x, y]\)
+     * @param b - End point of the curve \([x, y]\)
+     * @param ta - Tangent vector at start point (relative to a) \([x, y]\)
+     * @param tb - Tangent vector at end point (relative to b) \([x, y]\)
+     * @param t - Parametric position along the curve (0 ≤ t ≤ 1)
+     * @returns The point on the curve at parametric position t \([x, y]\)
+     *
+     * @example
+     * ```typescript
+     * // Evaluate a straight line segment
+     * const start: cmath.Vector2 = [0, 0];
+     * const end: cmath.Vector2 = [100, 100];
+     * const startTangent: cmath.Vector2 = [0, 0];
+     * const endTangent: cmath.Vector2 = [0, 0];
+     * const point = cmath.bezier.evaluate(start, end, startTangent, endTangent, 0.5);
+     * console.log(point); // [50, 50]
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Evaluate a curved segment
+     * const start: cmath.Vector2 = [0, 0];
+     * const end: cmath.Vector2 = [100, 0];
+     * const startTangent: cmath.Vector2 = [50, 50];
+     * const endTangent: cmath.Vector2 = [-50, 50];
+     * const point = cmath.bezier.evaluate(start, end, startTangent, endTangent, 0.5);
+     * // Returns a point above the line due to upward tangents
+     * ```
+     *
+     * @remarks
+     * - The function clamps the parameter t to the range [0, 1] for robustness.
+     * - For t = 0, the function returns the start point a.
+     * - For t = 1, the function returns the end point b.
+     * - The function is mathematically equivalent to the standard cubic Bézier formula.
+     * - Performance is O(1) with constant memory usage.
+     * - Input validation ensures the function handles edge cases gracefully.
+     */
+    export function evaluate(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      t: number
+    ): Vector2 {
+      // Clamp t to [0, 1] for robustness, handling NaN and Infinity
+      let clampedT = t;
+      if (!Number.isFinite(t)) {
+        clampedT = Number.isNaN(t) ? 0 : t < 0 ? 0 : 1;
+      } else {
+        clampedT = Math.max(0, Math.min(1, t));
+      }
+
+      const t2 = clampedT * clampedT;
+      const t3 = t2 * clampedT;
+      const mt = 1 - clampedT;
+      const mt2 = mt * mt;
+      const mt3 = mt2 * mt;
+
+      // Control points
+      const c1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const c2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+
+      return [
+        mt3 * a[0] +
+          3 * mt2 * clampedT * c1[0] +
+          3 * mt * t2 * c2[0] +
+          t3 * b[0],
+        mt3 * a[1] +
+          3 * mt2 * clampedT * c1[1] +
+          3 * mt * t2 * c2[1] +
+          t3 * b[1],
+      ];
+    }
+
+    /**
      * Calculates the exact bounding box of a single cubic Bézier segment by finding all extrema.
      * @param a - The start vertex \([x, y]\).
      * @param ta - The start tangent (relative to `a`).
