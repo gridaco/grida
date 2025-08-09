@@ -723,6 +723,33 @@ namespace cmath {
     }
 
     /**
+     * Performs linear interpolation between two 2D vectors.
+     *
+     * This function calculates a point that lies on the straight line between two given vectors,
+     * at a specified interpolation factor. When t = 0, the result is equal to vector a.
+     * When t = 1, the result is equal to vector b.
+     *
+     * @param a - The starting vector [x, y].
+     * @param b - The ending vector [x, y].
+     * @param t - The interpolation factor, typically in the range [0, 1].
+     * @returns A new vector representing the interpolated point.
+     *
+     * @example
+     * const start: cmath.Vector2 = [0, 0];
+     * const end: cmath.Vector2 = [10, 20];
+     * const mid = cmath.vector2.lerp(start, end, 0.5);
+     * console.log(mid); // [5, 10]
+     *
+     * @example
+     * // Interpolate at 25% from start to end
+     * const quarter = cmath.vector2.lerp([0, 0], [100, 50], 0.25);
+     * console.log(quarter); // [25, 12.5]
+     */
+    export function lerp(a: Vector2, b: Vector2, t: number): Vector2 {
+      return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    }
+
+    /**
      * Checks if two 1D segments intersect or overlap.
      *
      * @param segmentA - The first segment [startA, endA].
