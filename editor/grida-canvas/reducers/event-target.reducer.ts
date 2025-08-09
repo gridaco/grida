@@ -324,7 +324,7 @@ function __self_evt_on_pointer_down(
           draft.content_edit_mode.selected_vertices = [snapped_point];
           draft.content_edit_mode.selected_segments = [];
           draft.content_edit_mode.selected_tangents = [];
-          draft.content_edit_mode.neighbouring_vertices =
+          draft.content_edit_mode.selection_neighbouring_vertices =
             getUXNeighbouringVertices(node.vectorNetwork, {
               selected_vertices: [snapped_point],
               selected_segments: [],
@@ -451,10 +451,11 @@ function __self_evt_on_pointer_down(
           next_ta: null,
           initial_vector_network: vector.vectorNetwork,
           original: null,
-          neighbouring_vertices: [0],
+          selection_neighbouring_vertices: [0],
           path_cursor_position: pos,
           clipboard: null,
           clipboard_node_position: null,
+          hovered_segment_index: null,
         };
       }
 

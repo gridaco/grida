@@ -664,4 +664,136 @@ describe("cmath.bezier.evaluate", () => {
       expect(result1[1]).toBeCloseTo(result2[1], 10);
     });
   });
+
+  describe("Zero tangent curves (not straight lines)", () => {
+    test("should match lerp behavior at endpoints (t=0 and t=1)", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 50];
+      const ta: cmath.Vector2 = [0, 0]; // Zero tangent
+      const tb: cmath.Vector2 = [0, 0]; // Zero tangent
+
+      // At endpoints, cubic Bézier with zero tangents should match lerp
+      const bezierResult0 = cmath.bezier.evaluate(a, b, ta, tb, 0);
+      const lerpResult0 = cmath.vector2.lerp(a, b, 0);
+      expect(bezierResult0).toEqual(lerpResult0);
+      expect(bezierResult0).toEqual([0, 0]);
+
+      const bezierResult1 = cmath.bezier.evaluate(a, b, ta, tb, 1);
+      const lerpResult1 = cmath.vector2.lerp(a, b, 1);
+      expect(bezierResult1).toEqual(lerpResult1);
+      expect(bezierResult1).toEqual([100, 50]);
+    });
+
+    test("should match lerp behavior at t=0.5 (special case)", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 50];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+      const t = 0.5;
+
+      const bezierResult = cmath.bezier.evaluate(a, b, ta, tb, t);
+      const lerpResult = cmath.vector2.lerp(a, b, t);
+
+      // At t=0.5, cubic Bézier with zero tangents IS linear interpolation
+      expect(bezierResult).toEqual(lerpResult);
+      expect(lerpResult).toEqual([50, 25]); // Linear interpolation
+      expect(bezierResult).toEqual([50, 25]); // Same result!
+    });
+
+    test("should demonstrate cubic behavior at t=0.25", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 50];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+      const t = 0.25;
+
+      const bezierResult = cmath.bezier.evaluate(a, b, ta, tb, t);
+      const lerpResult = cmath.vector2.lerp(a, b, t);
+
+      // Cubic Bézier with zero tangents produces a slight curve
+      expect(bezierResult).not.toEqual(lerpResult);
+      expect(lerpResult).toEqual([25, 12.5]); // Linear interpolation
+      expect(bezierResult).toEqual([15.625, 7.8125]); // Cubic Bézier result
+    });
+
+    test("should match lerp behavior at t=0.5 for negative coordinates", () => {
+      const a: cmath.Vector2 = [-10, -20];
+      const b: cmath.Vector2 = [10, 20];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+      const t = 0.5;
+
+      const bezierResult = cmath.bezier.evaluate(a, b, ta, tb, t);
+      const lerpResult = cmath.vector2.lerp(a, b, t);
+
+      // At t=0.5, cubic Bézier with zero tangents IS linear interpolation
+      expect(bezierResult).toEqual(lerpResult);
+      expect(lerpResult).toEqual([0, 0]); // Linear interpolation
+      expect(bezierResult).toEqual([0, 0]); // Same result!
+    });
+
+    test("should clamp t values outside [0,1] range", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 50];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+
+      // Test t < 0 (should clamp to 0)
+      const bezierResult1 = cmath.bezier.evaluate(a, b, ta, tb, -0.5);
+      expect(bezierResult1).toEqual([0, 0]); // Clamped
+
+      // Test t > 1 (should clamp to 1)
+      const bezierResult2 = cmath.bezier.evaluate(a, b, ta, tb, 1.5);
+      expect(bezierResult2).toEqual([100, 50]); // Clamped
+    });
+
+    test("should handle zero-length curve correctly", () => {
+      const a: cmath.Vector2 = [50, 50];
+      const b: cmath.Vector2 = [50, 50]; // Same as a
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+      const t = 0.7;
+
+      const bezierResult = cmath.bezier.evaluate(a, b, ta, tb, t);
+      const lerpResult = cmath.vector2.lerp(a, b, t);
+
+      // For zero-length curve, both should return the same point
+      expect(bezierResult).toEqual(lerpResult);
+      expect(bezierResult).toEqual([50, 50]);
+    });
+
+    test("should demonstrate cubic behavior for horizontal line at t=0.3", () => {
+      const a: cmath.Vector2 = [0, 10];
+      const b: cmath.Vector2 = [100, 10];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+      const t = 0.3;
+
+      const bezierResult = cmath.bezier.evaluate(a, b, ta, tb, t);
+      const lerpResult = cmath.vector2.lerp(a, b, t);
+
+      // At t=0.3, cubic Bézier is NOT linear interpolation
+      expect(bezierResult).not.toEqual(lerpResult);
+      expect(lerpResult).toEqual([30, 10]); // Linear interpolation
+      expect(bezierResult[0]).toBeCloseTo(21.6, 1); // Cubic Bézier result
+      expect(bezierResult[1]).toBeCloseTo(10, 1);
+    });
+
+    test("should demonstrate cubic behavior for vertical line at t=0.6", () => {
+      const a: cmath.Vector2 = [10, 0];
+      const b: cmath.Vector2 = [10, 100];
+      const ta: cmath.Vector2 = [0, 0];
+      const tb: cmath.Vector2 = [0, 0];
+      const t = 0.6;
+
+      const bezierResult = cmath.bezier.evaluate(a, b, ta, tb, t);
+      const lerpResult = cmath.vector2.lerp(a, b, t);
+
+      // At t=0.6, cubic Bézier is NOT linear interpolation
+      expect(bezierResult).not.toEqual(lerpResult);
+      expect(lerpResult).toEqual([10, 60]); // Linear interpolation
+      expect(bezierResult[0]).toBeCloseTo(10, 1);
+      expect(bezierResult[1]).toBeCloseTo(64.8, 1); // Cubic Bézier result
+    });
+  });
 });

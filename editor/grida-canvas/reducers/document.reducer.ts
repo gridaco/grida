@@ -201,7 +201,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             mode.selected_vertices = new_vertices;
             mode.selected_segments = new_segments;
             mode.selected_tangents = [];
-            mode.neighbouring_vertices = getUXNeighbouringVertices(
+            mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
               node.vectorNetwork,
               {
                 selected_vertices: new_vertices,
@@ -296,7 +296,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           mode.selected_vertices = new_vertices;
           mode.selected_segments = new_segments;
           mode.selected_tangents = [];
-          mode.neighbouring_vertices = getUXNeighbouringVertices(
+          mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
             node.vectorNetwork,
             {
               selected_vertices: new_vertices,
@@ -1048,7 +1048,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.content_edit_mode.selected_vertices = next.selected_vertices;
             draft.content_edit_mode.selected_segments = next.selected_segments;
             draft.content_edit_mode.selected_tangents = next.selected_tangents;
-            draft.content_edit_mode.neighbouring_vertices =
+            draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
                 (node as grida.program.nodes.VectorNode).vectorNetwork,
                 {
@@ -1098,7 +1098,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.content_edit_mode.selected_vertices = next.selected_vertices;
             draft.content_edit_mode.selected_segments = next.selected_segments;
             draft.content_edit_mode.selected_tangents = next.selected_tangents;
-            draft.content_edit_mode.neighbouring_vertices =
+            draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
                 (node as grida.program.nodes.VectorNode).vectorNetwork,
                 {
@@ -1129,7 +1129,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.content_edit_mode.selected_vertices = next.selected_vertices;
             draft.content_edit_mode.selected_segments = next.selected_segments;
             draft.content_edit_mode.selected_tangents = next.selected_tangents;
-            draft.content_edit_mode.neighbouring_vertices =
+            draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
                 (node as grida.program.nodes.VectorNode).vectorNetwork,
                 {

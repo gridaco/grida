@@ -129,10 +129,11 @@ function __self_try_enter_content_edit_mode_auto(
         next_ta: null,
         initial_vector_network: node.vectorNetwork,
         original: nodeSnapshot,
-        neighbouring_vertices: [],
+        selection_neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
         clipboard: null,
         clipboard_node_position: null,
+        hovered_segment_index: null,
       };
       break;
     }
@@ -155,10 +156,11 @@ function __self_try_enter_content_edit_mode_auto(
         next_ta: null,
         initial_vector_network: vectornode.vectorNetwork,
         original: nodeSnapshot,
-        neighbouring_vertices: [],
+        selection_neighbouring_vertices: [],
         path_cursor_position: draft.pointer.position,
         clipboard: null,
         clipboard_node_position: null,
+        hovered_segment_index: null,
       };
 
       break;

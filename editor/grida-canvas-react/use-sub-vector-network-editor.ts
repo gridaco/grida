@@ -3,21 +3,27 @@ import { useCallback, useMemo } from "react";
 import cmath from "@grida/cmath";
 import assert from "assert";
 import type grida from "@grida/schema";
-import { getUXNeighbouringVertices } from "@/grida-canvas/reducers/methods";
 import vn from "@grida/vn";
 
 export default function useSurfaceVectorEditor() {
   const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    content_edit_mode: state.content_edit_mode,
-    document: state.document,
-    snapped_vertex_idx: state.snapped_vertex_idx,
-    tool: state.tool,
-  }));
+  const state = useEditorState(instance, (state) => {
+    const content_edit_mode = state.content_edit_mode;
+    assert(content_edit_mode && content_edit_mode.type === "vector");
+    const node_id = content_edit_mode.node_id;
+    return {
+      node_id: content_edit_mode.node_id,
+      content_edit_mode: content_edit_mode,
+      document: state.document,
+      vector_node: state.document.nodes[
+        node_id
+      ] as grida.program.nodes.VectorNode,
+      snapped_vertex_idx: state.snapped_vertex_idx,
+      tool: state.tool,
+    };
+  });
 
-  assert(state.content_edit_mode && state.content_edit_mode.type === "vector");
-
-  const { snapped_vertex_idx: snapped_point, tool } = state;
+  const { snapped_vertex_idx: snapped_point, tool, vector_node: node } = state;
   const {
     node_id,
     selected_vertices,
@@ -28,11 +34,11 @@ export default function useSurfaceVectorEditor() {
     next_ta,
     hovered_segment_index,
   } = state.content_edit_mode;
-  const node = state.document.nodes[node_id] as grida.program.nodes.VectorNode;
 
   const vertices = node.vectorNetwork.vertices;
   const segments = node.vectorNetwork.segments;
-  const { neighbouring_vertices } = state.content_edit_mode;
+  const { selection_neighbouring_vertices: neighbouring_vertices } =
+    state.content_edit_mode;
 
   // offset of the points (node absolute position)
   const absolute = instance.getNodeAbsoluteBoundingRect(node_id);

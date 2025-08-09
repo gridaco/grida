@@ -38,6 +38,7 @@ import {
   useSingleSelection,
 } from "./surface-hooks";
 import { MeasurementGuide } from "./ui/measurement";
+import { VectorMeasurementGuide } from "./ui/vector-measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
@@ -361,6 +362,7 @@ export function EditorSurface() {
           ref={portalRef}
         >
           <MeasurementGuide />
+          {content_edit_mode?.type === "vector" && <VectorMeasurementGuide />}
           <SnapGuide />
 
           <SurfaceGroup
@@ -581,7 +583,9 @@ function RootFramesBarOverlay() {
         sideOffset={8}
       >
         <FloatingBarContent>
-          <NodeTitleBarTitle node={rootframe}>{" (single mode)"}</NodeTitleBarTitle>
+          <NodeTitleBarTitle node={rootframe}>
+            {" (single mode)"}
+          </NodeTitleBarTitle>
         </FloatingBarContent>
       </NodeTitleBar>
     );

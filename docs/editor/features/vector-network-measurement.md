@@ -31,5 +31,7 @@ It uses the same visual system as regular measurements: guide lines, auxiliary l
 
 - **Vector2 points** are treated as zero-size rectangles for consistency with the existing measurement system
 - **Curve evaluation** uses `cmath.bezier.evaluate` to calculate dynamic points on Bézier curves
+- **Mouse projection** uses `cmath.bezier.projectParametric` to find the closest point on the curve to the mouse cursor
 - **Same visual output** as regular measurements: red guide lines with distance labels
 - **Same axis-aligned calculation** showing top, right, bottom, left distances independently
+- **Integration** with existing Alt key binding and measurement system

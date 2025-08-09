@@ -64,7 +64,7 @@ export function self_clearSelection<S extends editor.state.IEditorState>(
         draft.content_edit_mode.selected_vertices = [];
         draft.content_edit_mode.selected_segments = [];
         draft.content_edit_mode.selected_tangents = [];
-        draft.content_edit_mode.neighbouring_vertices = [];
+        draft.content_edit_mode.selection_neighbouring_vertices = [];
         draft.content_edit_mode.a_point = null;
         draft.content_edit_mode.next_ta = null;
         break;

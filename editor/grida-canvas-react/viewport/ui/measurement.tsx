@@ -10,9 +10,58 @@ import { useEditorState, useCurrentEditor } from "@/grida-canvas-react";
 import { useEffect, useState } from "react";
 import { measure, Measurement } from "@grida/cmath/_measurement";
 
+/**
+ * Pure function to calculate regular measurement.
+ *
+ * This function contains the core logic for calculating measurements between
+ * selected nodes and hovered nodes.
+ *
+ * @param params - Parameters for measurement calculation
+ * @returns Measurement result or null if conditions not met
+ */
+function calculateMeasurement(params: {
+  selection: string[];
+  surface_measurement_target: string[] | undefined;
+  getNodeAbsoluteBoundingRect: (id: string) => cmath.Rectangle | null;
+}): Measurement | null {
+  const { selection, surface_measurement_target, getNodeAbsoluteBoundingRect } =
+    params;
+
+  if (!(selection.length > 0) || !surface_measurement_target) {
+    return null;
+  }
+
+  const a_rect = cmath.rect.quantize(
+    cmath.rect.union(
+      selection.map((id) => getNodeAbsoluteBoundingRect(id)!).filter(Boolean)
+    ),
+    0.01
+  );
+
+  const b_rect = cmath.rect.quantize(
+    cmath.rect.union(
+      surface_measurement_target
+        .map((id) => getNodeAbsoluteBoundingRect(id)!)
+        .filter(Boolean)
+    ),
+    0.01
+  );
+
+  const measurement = measure(a_rect, b_rect);
+  if (measurement) {
+    return {
+      a: a_rect,
+      b: b_rect,
+      distance: measurement.distance,
+      box: measurement.box,
+    };
+  }
+
+  return null;
+}
+
 function useMeasurement() {
   const editor = useCurrentEditor();
-  const transform = useEditorState(editor, (state) => state.transform);
   const selection = useEditorState(editor, (state) => state.selection);
   const document = useEditorState(editor, (state) => state.document);
   const surface_measurement_target = useEditorState(
@@ -24,53 +73,44 @@ function useMeasurement() {
 
   useEffect(() => {
     try {
-      const b = surface_measurement_target;
+      const result = calculateMeasurement({
+        selection,
+        surface_measurement_target,
+        getNodeAbsoluteBoundingRect: (id: string) =>
+          editor.geometry.getNodeAbsoluteBoundingRect(id),
+      });
 
-      if (!(selection.length > 0) || !b) {
-        setMeasurement(undefined);
-        return;
-      }
-
-      const a_rect = cmath.rect.quantize(
-        cmath.rect.union(
-          selection.map(
-            (id) => editor.geometry.getNodeAbsoluteBoundingRect(id)!
-          )
-        ),
-        0.01
-      );
-
-      const b_rect = cmath.rect.quantize(
-        cmath.rect.union(
-          surface_measurement_target.map(
-            (id) => editor.geometry.getNodeAbsoluteBoundingRect(id)!
-          )
-        ),
-        0.01
-      );
-
-      const measurement = measure(a_rect, b_rect);
-      if (measurement)
-        setMeasurement({
-          a: a_rect,
-          b: b_rect,
-          distance: measurement.distance,
-          box: measurement.box,
-        });
+      setMeasurement(result || undefined);
     } catch (e) {
       console.error("useMeasurement", e);
+      setMeasurement(undefined);
     }
-  }, [document, selection, surface_measurement_target, transform]);
+  }, [document, selection, surface_measurement_target, editor.geometry]);
 
   return measurement;
 }
 
-export function MeasurementGuide() {
-  const measurement = useMeasurement();
-  const { transform } = useTransformState();
-
-  if (!measurement) return <></>;
-
+/**
+ * Stateless measurement guide component.
+ *
+ * Renders measurement guides based on the provided measurement data.
+ * This component is pure and can be reused by different measurement systems.
+ */
+export function MeasurementGuideRenderer({
+  measurement,
+  transform,
+  aClassName,
+  bClassName,
+  labelClassName,
+  lineClassName,
+}: {
+  measurement: Measurement;
+  transform: cmath.Transform;
+  aClassName?: string;
+  bClassName?: string;
+  labelClassName?: string;
+  lineClassName?: string;
+}) {
   const { distance, box: _box, a: _a, b: _b } = measurement;
 
   const [_st, _sr, _sb, _sl] = distance;
@@ -111,38 +151,131 @@ export function MeasurementGuide() {
     >
       {/* box */}
       <>
-        <Rectangle rect={a} className="border-workbench-accent-red" />
-        <Rectangle rect={b} className="border-workbench-accent-red" />
+        <Rectangle
+          rect={a}
+          className={cn("border-workbench-accent-red", aClassName)}
+        />
+        <Rectangle
+          rect={b}
+          className={cn("border-workbench-accent-red", bClassName)}
+        />
       </>
       <Conditional length={st}>
-        <SpacingGuideLine point={[tx, ty]} length={tl} rotation={tr} />
+        <SpacingGuideLine
+          point={[tx, ty]}
+          length={tl}
+          rotation={tr}
+          className={cn("border-workbench-accent-red", lineClassName)}
+        />
         <Conditional length={tal}>
-          <AuxiliaryLine point={[tax, tay]} length={tal} rotation={tar} />
+          <AuxiliaryLine
+            point={[tax, tay]}
+            length={tal}
+            rotation={tar}
+            className={cn("border-workbench-accent-red", lineClassName)}
+          />
         </Conditional>
-        <SpacingMeterLabel length={st} value={label_st} side="t" rect={box} />
+        <SpacingMeterLabel
+          length={st}
+          value={label_st}
+          side="t"
+          rect={box}
+          className={cn(
+            "bg-workbench-accent-red text-white z-10",
+            labelClassName
+          )}
+        />
       </Conditional>
       <Conditional length={sr}>
-        <SpacingGuideLine point={[rx, ry]} length={rl} rotation={rr} />
+        <SpacingGuideLine
+          point={[rx, ry]}
+          length={rl}
+          rotation={rr}
+          className={cn("border-workbench-accent-red", lineClassName)}
+        />
         <Conditional length={ral}>
-          <AuxiliaryLine point={[rax, ray]} length={ral} rotation={rar} />
+          <AuxiliaryLine
+            point={[rax, ray]}
+            length={ral}
+            rotation={rar}
+            className={cn("border-workbench-accent-red", lineClassName)}
+          />
         </Conditional>
-        <SpacingMeterLabel length={sr} value={label_sr} side="r" rect={box} />
+        <SpacingMeterLabel
+          length={sr}
+          value={label_sr}
+          side="r"
+          rect={box}
+          className={cn(
+            "bg-workbench-accent-red text-white z-10",
+            labelClassName
+          )}
+        />
       </Conditional>
       <Conditional length={sb}>
-        <SpacingGuideLine point={[bx, by]} length={bl} rotation={br} />
+        <SpacingGuideLine
+          point={[bx, by]}
+          length={bl}
+          rotation={br}
+          className={cn("border-workbench-accent-red", lineClassName)}
+        />
         <Conditional length={bal}>
-          <AuxiliaryLine point={[bax, bay]} length={bal} rotation={bar} />
+          <AuxiliaryLine
+            point={[bax, bay]}
+            length={bal}
+            rotation={bar}
+            className={cn("border-workbench-accent-red", lineClassName)}
+          />
         </Conditional>
-        <SpacingMeterLabel length={sb} value={label_sb} side="b" rect={box} />
+        <SpacingMeterLabel
+          length={sb}
+          value={label_sb}
+          side="b"
+          rect={box}
+          className={cn(
+            "bg-workbench-accent-red text-white z-10",
+            labelClassName
+          )}
+        />
       </Conditional>
       <Conditional length={sl}>
-        <SpacingGuideLine point={[lx, ly]} length={ll} rotation={lr} />
+        <SpacingGuideLine
+          point={[lx, ly]}
+          length={ll}
+          rotation={lr}
+          className={cn("border-workbench-accent-red", lineClassName)}
+        />
         <Conditional length={lal}>
-          <AuxiliaryLine point={[lax, lay]} length={lal} rotation={lar} />
+          <AuxiliaryLine
+            point={[lax, lay]}
+            length={lal}
+            rotation={lar}
+            className={cn("border-workbench-accent-red", lineClassName)}
+          />
         </Conditional>
-        <SpacingMeterLabel length={sl} value={label_sl} side="l" rect={box} />
+        <SpacingMeterLabel
+          length={sl}
+          value={label_sl}
+          side="l"
+          rect={box}
+          className={cn(
+            "bg-workbench-accent-red text-white z-10",
+            labelClassName
+          )}
+        />
       </Conditional>
     </div>
+  );
+}
+
+export function MeasurementGuide() {
+  const measurement = useMeasurement();
+  const { transform } = useTransformState();
+
+  if (!measurement) return <></>;
+
+  return (
+    <MeasurementGuideRenderer measurement={measurement} transform={transform} />
   );
 }
 
@@ -194,11 +327,13 @@ function SpacingMeterLabel({
   length,
   value,
   rect,
+  className,
 }: {
   side: Side;
   length: number;
   value?: string | number;
   rect: { x: number; y: number; width: number; height: number };
+  className?: string;
 }) {
   value = value || Math.round(length * 10) / 10;
 
@@ -224,7 +359,7 @@ function SpacingMeterLabel({
   return (
     <MeterLabel
       label={value.toString()}
-      className="bg-workbench-accent-red text-white z-10"
+      className={cn("bg-workbench-accent-red text-white z-10", className)}
       x={tx}
       y={ty}
       sideOffset={16}
@@ -303,11 +438,13 @@ function SpacingGuideLine({
   point,
   rotation,
   zoom = 1,
+  className,
 }: {
   point: cmath.Vector2;
   length: number;
   rotation: number;
   zoom?: number;
+  className?: string;
 }) {
   return (
     <GuideLine
@@ -316,7 +453,7 @@ function SpacingGuideLine({
       length={length}
       direction={rotation}
       width={1}
-      className="border-workbench-accent-red"
+      className={cn("border-workbench-accent-red", className)}
     />
   );
 }
@@ -326,11 +463,13 @@ function AuxiliaryLine({
   point,
   rotation,
   zoom = 1,
+  className,
 }: {
   point: cmath.Vector2;
   length: number;
   rotation: number;
   zoom?: number;
+  className?: string;
 }) {
   return (
     <GuideLine
@@ -340,7 +479,7 @@ function AuxiliaryLine({
       direction={rotation}
       width={1}
       dashed
-      className="border-workbench-accent-red"
+      className={cn("border-workbench-accent-red", className)}
     />
   );
 }

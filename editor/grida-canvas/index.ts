@@ -658,6 +658,11 @@ export namespace editor.state {
     selected_tangents: [number, 0 | 1][];
 
     /**
+     * vertices considered active for showing tangent handles
+     */
+    selection_neighbouring_vertices: number[];
+
+    /**
      * origin point - the new point will be connected to this point
      * also `selected_vertices[0]`
      */
@@ -671,21 +676,6 @@ export namespace editor.state {
      * @default zero
      */
     next_ta: cmath.Vector2 | null;
-
-    /**
-     * vertices considered active for showing tangent handles
-     */
-    neighbouring_vertices: number[];
-
-    /**
-     * hovered segment index for measurement feature
-     *
-     * This is a UI-triggered hover state based on surface interaction, not mathematically resolved.
-     * Used for measurement calculations when alt key is pressed.
-     *
-     * @default null
-     */
-    hovered_segment_index: number | null;
 
     /**
      * initial vector network data
@@ -721,6 +711,16 @@ export namespace editor.state {
      * @deprecated - remove me - use global sanp pointer
      */
     path_cursor_position: cmath.Vector2;
+
+    /**
+     * hovered segment index for measurement feature
+     *
+     * This is a UI-triggered hover state based on surface interaction, not mathematically resolved.
+     * Used for measurement calculations when alt key is pressed.
+     *
+     * @default null
+     */
+    hovered_segment_index: number | null;
   };
 
   type BitmapContentEditMode = {

@@ -173,7 +173,8 @@ export function self_updateVectorAreaSelection<
   rect?: cmath.Rectangle
 ): void {
   assert(draft.content_edit_mode?.type === "vector");
-  const { node_id, neighbouring_vertices } = draft.content_edit_mode;
+  const { node_id, selection_neighbouring_vertices: neighbouring_vertices } =
+    draft.content_edit_mode;
   const node = dq.__getNodeById(
     draft,
     node_id
@@ -272,14 +273,12 @@ export function self_updateVectorAreaSelection<
   draft.content_edit_mode.selected_vertices = selected_vertices;
   draft.content_edit_mode.selected_segments = selected_segments;
   draft.content_edit_mode.selected_tangents = selected_tangents;
-  draft.content_edit_mode.neighbouring_vertices = getUXNeighbouringVertices(
-    node.vectorNetwork,
-    {
+  draft.content_edit_mode.selection_neighbouring_vertices =
+    getUXNeighbouringVertices(node.vectorNetwork, {
       selected_vertices,
       selected_segments,
       selected_tangents,
-    }
-  );
+    });
   draft.content_edit_mode.a_point =
     selected_vertices.length > 0
       ? selected_vertices[0]
