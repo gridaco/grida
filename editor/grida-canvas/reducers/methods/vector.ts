@@ -308,3 +308,22 @@ export function self_optimizeVectorNetwork(
     editor.config.DEFAULT_VECTOR_OPTIMIZATION_CONFIG
   );
 }
+
+/**
+ * Updates the hovered segment index in vector content edit mode.
+ *
+ * This method manages the UI-triggered hover state for segments in vector edit mode.
+ * The hover state is used for measurement calculations when the alt key is pressed.
+ *
+ * @param draft - The editor state draft to modify
+ * @param segmentIndex - The index of the hovered segment, or null if no segment is hovered
+ */
+export function self_updateVectorHoveredSegment<
+  S extends editor.state.IEditorState,
+>(draft: Draft<S>, segmentIndex: number | null) {
+  if (draft.content_edit_mode?.type !== "vector") {
+    return;
+  }
+
+  draft.content_edit_mode.hovered_segment_index = segmentIndex;
+}

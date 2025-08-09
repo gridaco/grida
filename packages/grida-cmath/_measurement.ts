@@ -11,6 +11,36 @@ export interface Measurement {
 }
 
 /**
+ * Converts a Vector2 point to a zero-size Rectangle for measurement purposes.
+ * This allows Vector2 points to be treated consistently with rectangles in the measurement system.
+ *
+ * @param point - The Vector2 point to convert
+ * @returns A zero-size Rectangle at the point's coordinates
+ */
+function vector2ToRectangle(point: cmath.Vector2): cmath.Rectangle {
+  return {
+    x: point[0],
+    y: point[1],
+    width: 0,
+    height: 0,
+  };
+}
+
+/**
+ * Normalizes input to Rectangle format for measurement calculations.
+ * Vector2 points are converted to zero-size rectangles.
+ * Rectangles are passed through unchanged.
+ *
+ * @param input - Either a Vector2 point or Rectangle
+ * @returns A Rectangle representation suitable for measurement
+ */
+function normalizeToRectangle(
+  input: cmath.Rectangle | cmath.Vector2
+): cmath.Rectangle {
+  return Array.isArray(input) ? vector2ToRectangle(input) : input;
+}
+
+/**
  * Calculates the base rectangle and the spacing of the nearest top, right, bottom, and left with given rectangles `a` and `b`.
  *
  * - If the two rectangles do not intersect, the base rectangle will be `a`.
@@ -19,49 +49,57 @@ export interface Measurement {
  *
  * The top, right, bottom, and left spacing is relative to the base rectangle.
  *
- * @param a - The first rectangle.
- * @param b - The second rectangle.
+ * @param a - The first rectangle or Vector2 point.
+ * @param b - The second rectangle or Vector2 point.
  * @returns The spacing guide with base rectangle and spacing values.
  */
 export function measure(
-  a: cmath.Rectangle,
-  b: cmath.Rectangle
+  a: cmath.Rectangle | cmath.Vector2,
+  b: cmath.Rectangle | cmath.Vector2
 ): Measurement | null {
-  if (cmath.rect.isIdentical(a, b)) return null;
-  const intersection = cmath.rect.intersection(a, b)!;
+  const rectA = normalizeToRectangle(a);
+  const rectB = normalizeToRectangle(b);
+
+  if (cmath.rect.isIdentical(rectA, rectB)) return null;
+  const intersection = cmath.rect.intersection(rectA, rectB)!;
 
   // If no intersection
   if (!intersection) {
-    const spacing = calculateNonIntersectingSpacing(a, b);
+    const spacing = calculateNonIntersectingSpacing(rectA, rectB);
     return {
-      a,
-      b,
-      box: a,
+      a: rectA,
+      b: rectB,
+      box: rectA,
       distance: spacing,
     };
   }
 
   // If `a` contains `b`
-  if (cmath.rect.contains(b, a)) {
-    return { a, b, box: b, distance: calculateContainerSpacing(a, b) };
+  if (cmath.rect.contains(rectB, rectA)) {
+    return {
+      a: rectA,
+      b: rectB,
+      box: rectB,
+      distance: calculateContainerSpacing(rectA, rectB),
+    };
   }
 
   // If `b` contains `a`
-  if (cmath.rect.contains(a, b)) {
+  if (cmath.rect.contains(rectA, rectB)) {
     return {
-      a,
-      b,
-      box: a,
-      distance: calculateContainerSpacing(b, a),
+      a: rectA,
+      b: rectB,
+      box: rectA,
+      distance: calculateContainerSpacing(rectB, rectA),
     };
   }
 
   // Intersection case (no containment)
-  const spacing = calculateIntersectingSpacing(a, b, intersection);
+  const spacing = calculateIntersectingSpacing(rectA, rectB, intersection);
 
   return {
-    a,
-    b,
+    a: rectA,
+    b: rectB,
     box: intersection,
     distance: spacing,
   };

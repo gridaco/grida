@@ -345,4 +345,33 @@ describe("cmath.vector2", () => {
       expect(result).toEqual([3, 7]); // Expected: [3, 7]
     });
   });
+
+  describe("distance", () => {
+    it("should calculate Euclidean distance between two points", () => {
+      const a: cmath.Vector2 = [3, 4];
+      const b: cmath.Vector2 = [6, 8];
+
+      const result = cmath.vector2.distance(a, b);
+
+      expect(result).toBe(5); // Expected: 5 (3-4-5 triangle)
+    });
+
+    it("should calculate distance for points with negative coordinates", () => {
+      const a: cmath.Vector2 = [-1, -2];
+      const b: cmath.Vector2 = [2, 1];
+
+      const result = cmath.vector2.distance(a, b);
+
+      expect(result).toBeCloseTo(4.2426, 4); // Expected: sqrt(18) ≈ 4.2426
+    });
+
+    it("should return 0 for identical points", () => {
+      const a: cmath.Vector2 = [5, 5];
+      const b: cmath.Vector2 = [5, 5];
+
+      const result = cmath.vector2.distance(a, b);
+
+      expect(result).toBe(0); // Expected: 0
+    });
+  });
 });

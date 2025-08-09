@@ -1,0 +1,35 @@
+# Vector Measurement Feature
+
+## Overview
+
+The vector measurement feature extends the existing measurement system to work with vector networks. It provides the same axis-aligned distance measurements (X/Y independently) but adds support for:
+
+- **Vector2 points** (treated as zero-size rectangles)
+- **Curve evaluation** (dynamic points on Bézier curves)
+- **Vector-specific geometry** (vertices, segments, regions)
+
+## How It Works
+
+The feature activates when you:
+
+1. **Hover over a curve segment** in vector edit mode
+2. **Hold the Alt key** while hovering
+
+It uses the same visual system as regular measurements: guide lines, auxiliary lines, and distance labels showing top/right/bottom/left spacing.
+
+## Measurement Types
+
+| A               | A Type    | B                | B Type    | Description                                                                                                |
+| --------------- | --------- | ---------------- | --------- | ---------------------------------------------------------------------------------------------------------- |
+| Vertex          | Vector2   | Parametric Point | Vector2   | Measures axis-aligned distances from a selected vertex to a point on the hovered curve                     |
+| Vertices (BBox) | Rectangle | Parametric Point | Vector2   | Measures axis-aligned distances from the bounding box of selected vertices to a point on the hovered curve |
+| Region (BBox)   | Rectangle | Region (BBox)    | Rectangle | Measures axis-aligned distances between two selected regions                                               |
+| Vertex          | Vector2   | Region (BBox)    | Rectangle | Measures axis-aligned distances from a selected vertex to a region's boundary                              |
+| Vertices (BBox) | Rectangle | Region (BBox)    | Rectangle | Measures axis-aligned distances from the bounding box of selected vertices to a region's boundary          |
+
+## Implementation Notes
+
+- **Vector2 points** are treated as zero-size rectangles for consistency with the existing measurement system
+- **Curve evaluation** uses `cmath.bezier.evaluate` to calculate dynamic points on Bézier curves
+- **Same visual output** as regular measurements: red guide lines with distance labels
+- **Same axis-aligned calculation** showing top, right, bottom, left distances independently
