@@ -860,6 +860,13 @@ export class Editor
     });
   }
 
+  public updateVectorHoveredSegment(segmentIndex: number | null) {
+    this.dispatch({
+      type: "vector/update-hovered-segment",
+      segmentIndex,
+    });
+  }
+
   public bendOrClearCorner(
     node_id: editor.NodeID,
     vertex: number,

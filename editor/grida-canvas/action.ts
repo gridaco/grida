@@ -289,7 +289,8 @@ export type EditorVectorEditorAction =
   | EditorVectorTranslateVertexAction
   | EditorVectorTranslateSegmentAction
   | EditorVectorBendSegmentAction
-  | EditorVectorBendOrClearCornerAction;
+  | EditorVectorBendOrClearCornerAction
+  | EditorVectorUpdateHoveredSegmentAction;
 
 export interface EditorVectorSelectVertexAction {
   type: "select-vertex";
@@ -371,6 +372,11 @@ export interface EditorVectorBendOrClearCornerAction {
    * When omitted, the corner is bent or cleared based on existing tangents.
    */
   tangent?: Vector2 | 0;
+}
+
+export interface EditorVectorUpdateHoveredSegmentAction {
+  type: "vector/update-hovered-segment";
+  segmentIndex: number | null;
 }
 // #endregion
 

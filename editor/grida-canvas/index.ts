@@ -678,6 +678,16 @@ export namespace editor.state {
     neighbouring_vertices: number[];
 
     /**
+     * hovered segment index for measurement feature
+     *
+     * This is a UI-triggered hover state based on surface interaction, not mathematically resolved.
+     * Used for measurement calculations when alt key is pressed.
+     *
+     * @default null
+     */
+    hovered_segment_index: number | null;
+
+    /**
      * initial vector network data
      *
      * The VectorNetwork data as entering the vector edit mode
@@ -1862,6 +1872,13 @@ export namespace editor.api {
         tb: cmath.Vector2;
       }
     ): void;
+
+    /**
+     * Updates the hovered segment index in vector content edit mode.
+     *
+     * @param segmentIndex - The index of the hovered segment, or null if no segment is hovered
+     */
+    updateVectorHoveredSegment(segmentIndex: number | null): void;
 
     //
 

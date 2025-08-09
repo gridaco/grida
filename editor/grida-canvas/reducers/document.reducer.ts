@@ -1232,6 +1232,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       });
     }
+    case "vector/update-hovered-segment": {
+      return produce(state, (draft) => {
+        if (draft.content_edit_mode?.type === "vector") {
+          draft.content_edit_mode.hovered_segment_index = action.segmentIndex;
+        }
+      });
+    }
     //
     case "bend-or-clear-corner": {
       const { target, tangent } = <EditorVectorBendOrClearCornerAction>action;

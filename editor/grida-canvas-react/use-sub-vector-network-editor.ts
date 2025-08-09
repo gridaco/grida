@@ -26,6 +26,7 @@ export default function useSurfaceVectorEditor() {
     a_point,
     path_cursor_position,
     next_ta,
+    hovered_segment_index,
   } = state.content_edit_mode;
   const node = state.document.nodes[node_id] as grida.program.nodes.VectorNode;
 
@@ -174,6 +175,13 @@ export default function useSurfaceVectorEditor() {
     [instance, node_id]
   );
 
+  const updateHoveredSegment = useCallback(
+    (segmentIndex: number | null) => {
+      instance.updateVectorHoveredSegment(segmentIndex);
+    },
+    [instance]
+  );
+
   return useMemo(
     () => ({
       node_id,
@@ -191,6 +199,7 @@ export default function useSurfaceVectorEditor() {
       snapped_point,
       a_point,
       next_ta,
+      hovered_segment_index,
       selectVertex,
       deleteVertex,
       selectSegment,
@@ -200,6 +209,7 @@ export default function useSurfaceVectorEditor() {
       onDragStart,
       onSegmentInsertMiddle,
       bendSegment,
+      updateHoveredSegment,
       loops,
     }),
     [
@@ -219,6 +229,7 @@ export default function useSurfaceVectorEditor() {
       snapped_point,
       a_point,
       next_ta,
+      hovered_segment_index,
       selectVertex,
       deleteVertex,
       selectSegment,
@@ -228,6 +239,7 @@ export default function useSurfaceVectorEditor() {
       onDragStart,
       onSegmentInsertMiddle,
       bendSegment,
+      updateHoveredSegment,
       loops,
     ]
   );

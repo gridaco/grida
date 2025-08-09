@@ -29,7 +29,7 @@ export function SurfaceVectorEditor({
   const tool = useToolState();
   const { debug } = useEditorFlagsState();
   const { transform } = useTransformState();
-  const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
+  const ve = useSurfaceVectorEditor();
   const {
     node_id,
     absolute_vertices,
@@ -40,7 +40,8 @@ export function SurfaceVectorEditor({
     path_cursor_position,
     a_point,
     next_ta,
-  } = useSurfaceVectorEditor();
+    hovered_segment_index,
+  } = ve;
 
   assert(node_id === _node_id);
 
@@ -135,8 +136,8 @@ export function SurfaceVectorEditor({
             b={cmath.vector2.transform(b, transform)}
             ta={transformDelta(ta, transform)}
             tb={transformDelta(tb, transform)}
-            hovered={hoveredSegment === i}
-            onHover={setHoveredSegment}
+            hovered={hovered_segment_index === i}
+            onHover={ve.updateHoveredSegment}
           />
         );
       })}
