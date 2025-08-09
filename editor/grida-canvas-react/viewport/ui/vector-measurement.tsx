@@ -89,22 +89,45 @@ function calculateVectorMeasurement(params: {
   }
 
   // Project the mouse point onto the curve to get the parametric value
-  const t = cmath.bezier.projectParametric(
-    vertices[segment.a],
-    vertices[segment.b],
-    segment.ta,
-    segment.tb,
-    local_point
-  );
+  // For zero-tangent segments, use linear projection since that's what users expect
+  const t =
+    cmath.vector2.isZero(segment.ta) && cmath.vector2.isZero(segment.tb)
+      ? (() => {
+          // Linear projection for zero-tangent segments (user expectation)
+          const dx = vertices[segment.b][0] - vertices[segment.a][0];
+          const dy = vertices[segment.b][1] - vertices[segment.a][1];
+          const lenSq = dx * dx + dy * dy;
+          if (lenSq === 0) return 0;
+          const tLine =
+            ((local_point[0] - vertices[segment.a][0]) * dx +
+              (local_point[1] - vertices[segment.a][1]) * dy) /
+            lenSq;
+          return Math.max(0, Math.min(1, tLine));
+        })()
+      : cmath.bezier.projectParametric(
+          vertices[segment.a],
+          vertices[segment.b],
+          segment.ta,
+          segment.tb,
+          local_point
+        );
 
   // Evaluate the curve at the projected parametric value
-  const parametricPoint = cmath.bezier.evaluate(
-    absolute_vertices[segment.a],
-    absolute_vertices[segment.b],
-    segment.ta,
-    segment.tb,
-    t
-  );
+  // For zero-tangent segments, use linear interpolation to match the projection
+  const parametricPoint =
+    cmath.vector2.isZero(segment.ta) && cmath.vector2.isZero(segment.tb)
+      ? cmath.vector2.lerp(
+          absolute_vertices[segment.a],
+          absolute_vertices[segment.b],
+          t
+        )
+      : cmath.bezier.evaluate(
+          absolute_vertices[segment.a],
+          absolute_vertices[segment.b],
+          segment.ta,
+          segment.tb,
+          t
+        );
 
   // Calculate measurement A (selection)
   const a_rect = getSourceRect({

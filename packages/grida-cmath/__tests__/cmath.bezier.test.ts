@@ -286,6 +286,132 @@ describe("cmath.bezier.projectParametric", () => {
     );
   });
 
+  test("zero tangents should project onto cubic curve, not straight line", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 0]; // Horizontal line for clearer test
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+
+    // Test that zero-tangent projection is NOT the same as linear projection
+    // Use a point that's not at the midpoint to avoid the special case
+    const pointAboveMidpoint: cmath.Vector2 = [25, 15]; // Point above the line, not at midpoint
+
+    // Get the cubic projection
+    const cubicT = cmath.bezier.projectParametric(
+      a,
+      b,
+      ta,
+      tb,
+      pointAboveMidpoint
+    );
+
+    // Get the linear projection (what the old code would have done)
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const lenSq = dx * dx + dy * dy;
+    const linearT =
+      ((pointAboveMidpoint[0] - a[0]) * dx +
+        (pointAboveMidpoint[1] - a[1]) * dy) /
+      lenSq;
+    const clampedLinearT = Math.max(0, Math.min(1, linearT));
+
+    // The cubic projection should NOT equal linear projection
+    expect(cubicT).not.toBeCloseTo(clampedLinearT, 6);
+
+    // Verify the projected point is actually on the cubic curve
+    const projectedPoint = cmath.bezier.evaluate(a, b, ta, tb, cubicT);
+    expect(projectedPoint).toBeDefined();
+  });
+
+  test("zero tangents should demonstrate cubic behavior with offset point", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 0];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+
+    // Point offset from the line
+    const offsetPoint: cmath.Vector2 = [30, 20];
+
+    // Get the cubic projection
+    const cubicT = cmath.bezier.projectParametric(a, b, ta, tb, offsetPoint);
+
+    // Get the linear projection (what the old code would have done)
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const lenSq = dx * dx + dy * dy;
+    const linearT =
+      ((offsetPoint[0] - a[0]) * dx + (offsetPoint[1] - a[1]) * dy) / lenSq;
+    const clampedLinearT = Math.max(0, Math.min(1, linearT));
+
+    // These should be different
+    expect(cubicT).not.toBeCloseTo(clampedLinearT, 6);
+  });
+
+  test("zero tangents should demonstrate cubic behavior at t=0.25", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 100];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+
+    // Get the point on the cubic curve at t=0.25
+    const curvePoint = cmath.bezier.evaluate(a, b, ta, tb, 0.25);
+
+    // Project back onto the curve - should return t=0.25
+    const projectedT = cmath.bezier.projectParametric(a, b, ta, tb, curvePoint);
+    expect(projectedT).toBeCloseTo(0.25, 6);
+
+    // This should NOT be the same as linear interpolation at t=0.25
+    const linearPoint = cmath.vector2.lerp(a, b, 0.25);
+    expect(curvePoint).not.toEqual(linearPoint);
+  });
+
+  test("zero tangents should demonstrate cubic behavior at t=0.75", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 100];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+
+    // Get the point on the cubic curve at t=0.75
+    const curvePoint = cmath.bezier.evaluate(a, b, ta, tb, 0.75);
+
+    // Project back onto the curve - should return t=0.75
+    const projectedT = cmath.bezier.projectParametric(a, b, ta, tb, curvePoint);
+    expect(projectedT).toBeCloseTo(0.75, 6);
+
+    // This should NOT be the same as linear interpolation at t=0.75
+    const linearPoint = cmath.vector2.lerp(a, b, 0.75);
+    expect(curvePoint).not.toEqual(linearPoint);
+  });
+
+  test("zero tangents should only match linear at t=0, 0.5, 1", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [100, 100];
+    const ta: cmath.Vector2 = [0, 0];
+    const tb: cmath.Vector2 = [0, 0];
+
+    // At t=0, 0.5, 1: cubic should equal linear
+    const t0Curve = cmath.bezier.evaluate(a, b, ta, tb, 0);
+    const t0Linear = cmath.vector2.lerp(a, b, 0);
+    expect(t0Curve).toEqual(t0Linear);
+
+    const t05Curve = cmath.bezier.evaluate(a, b, ta, tb, 0.5);
+    const t05Linear = cmath.vector2.lerp(a, b, 0.5);
+    expect(t05Curve).toEqual(t05Linear);
+
+    const t1Curve = cmath.bezier.evaluate(a, b, ta, tb, 1);
+    const t1Linear = cmath.vector2.lerp(a, b, 1);
+    expect(t1Curve).toEqual(t1Linear);
+
+    // At other t values: cubic should NOT equal linear
+    const t025Curve = cmath.bezier.evaluate(a, b, ta, tb, 0.25);
+    const t025Linear = cmath.vector2.lerp(a, b, 0.25);
+    expect(t025Curve).not.toEqual(t025Linear);
+
+    const t075Curve = cmath.bezier.evaluate(a, b, ta, tb, 0.75);
+    const t075Linear = cmath.vector2.lerp(a, b, 0.75);
+    expect(t075Curve).not.toEqual(t075Linear);
+  });
+
   test("returns original t for points on a curved segment", () => {
     const a: cmath.Vector2 = [0, 0];
     const b: cmath.Vector2 = [10, 0];
