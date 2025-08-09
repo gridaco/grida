@@ -1459,6 +1459,54 @@ namespace cmath {
       };
     }
 
+    /**
+     * Computes the minimum bounding rectangle that encloses all the input points.
+     * This is a safe version of `fromPoints` that returns a zero rectangle instead of throwing
+     * when the input array is empty.
+     *
+     * This function computes the minimum bounding rectangle that encloses all the input points.
+     * If no points are provided, returns a zero rectangle at origin (0, 0).
+     *
+     * @param points - An array of points to calculate the bounding rectangle from.
+     * @returns A rectangle with `x`, `y`, `width`, and `height`. Returns zero rectangle if no points.
+     *
+     * @example
+     * const rect = cmath.rect.fromPointsOrZero([[10, 20], [30, 40], [15, 25]]);
+     * console.log(rect); // { x: 10, y: 20, width: 20, height: 20 }
+     *
+     * const emptyRect = cmath.rect.fromPointsOrZero([]);
+     * console.log(emptyRect); // { x: 0, y: 0, width: 0, height: 0 }
+     *
+     * const pointRect = cmath.rect.fromPointsOrZero([[10, 20]]);
+     * console.log(pointRect); // { x: 10, y: 20, width: 0, height: 0 }
+     */
+    export function fromPointsOrZero(points: cmath.Vector2[]): cmath.Rectangle {
+      if (points.length <= 0) {
+        return { x: 0, y: 0, width: 0, height: 0 };
+      }
+
+      // Calculate min and max for x and y
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      for (const [x, y] of points) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+
+      // Return normalized rectangle
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      };
+    }
+
     export type Rectangle9Points = {
       topLeft: Vector2;
       topRight: Vector2;

@@ -38,6 +38,61 @@ describe("cmath.rect", () => {
     });
   });
 
+  describe("fromPointsOrZero", () => {
+    it("should create a rectangle that bounds more than two points", () => {
+      const points: cmath.Vector2[] = [
+        [10, 20],
+        [30, 40],
+        [15, 25],
+        [5, 35],
+      ];
+      const rect = cmath.rect.fromPointsOrZero(points);
+      expect(rect).toEqual({ x: 5, y: 20, width: 25, height: 20 });
+    });
+
+    it("should return zero rectangle if no points are provided", () => {
+      const rect = cmath.rect.fromPointsOrZero([]);
+      expect(rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    });
+
+    it("should handle single point (zero width and height)", () => {
+      const points: cmath.Vector2[] = [[10, 20]];
+      const rect = cmath.rect.fromPointsOrZero(points);
+      expect(rect).toEqual({ x: 10, y: 20, width: 0, height: 0 });
+    });
+
+    it("should handle points with negative coordinates", () => {
+      const points: cmath.Vector2[] = [
+        [-10, -20],
+        [30, 40],
+        [0, -5],
+      ];
+      const rect = cmath.rect.fromPointsOrZero(points);
+      expect(rect).toEqual({ x: -10, y: -20, width: 40, height: 60 });
+    });
+
+    it("should handle points forming a line (zero width or height)", () => {
+      const points: cmath.Vector2[] = [
+        [10, 20],
+        [10, 30],
+        [10, 25],
+      ];
+      const rect = cmath.rect.fromPointsOrZero(points);
+      expect(rect).toEqual({ x: 10, y: 20, width: 0, height: 10 });
+    });
+
+    it("should be identical to fromPoints for non-empty arrays", () => {
+      const points: cmath.Vector2[] = [
+        [10, 20],
+        [30, 40],
+        [15, 25],
+      ];
+      const rect1 = cmath.rect.fromPoints(points);
+      const rect2 = cmath.rect.fromPointsOrZero(points);
+      expect(rect1).toEqual(rect2);
+    });
+  });
+
   describe("toPoints", () => {
     it("[chunk] should return an 9-length array with 9 points with the exact index", () => {
       const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
