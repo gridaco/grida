@@ -32,6 +32,7 @@ function CanvasContent({
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const rendererRef = React.useRef<Grida2D | null>(null);
+  const [ready, setReady] = React.useState(false);
 
   useLayoutEffect(() => {
     if (canvasRef.current && !rendererRef.current) {
@@ -46,6 +47,7 @@ function CanvasContent({
         // grida.setVerbose(true);
 
         rendererRef.current = grida;
+        setReady(true);
 
         onMount?.(grida);
       });
@@ -53,10 +55,10 @@ function CanvasContent({
   }, []);
 
   useLayoutEffect(() => {
-    if (rendererRef.current) {
+    if (ready && rendererRef.current) {
       rendererRef.current.setDebug(debug ?? false);
     }
-  }, [rendererRef.current, debug]);
+  }, [ready, debug]);
 
   const syncTransform = (
     surface: Grida2D,
@@ -82,20 +84,20 @@ function CanvasContent({
   };
 
   useLayoutEffect(() => {
-    if (rendererRef.current) {
+    if (ready && rendererRef.current) {
       syncTransform(rendererRef.current, transform, width, height);
     }
-  }, [transform, width, height]);
+  }, [ready, transform, width, height]);
 
   useLayoutEffect(() => {
-    if (rendererRef.current) {
+    if (ready && rendererRef.current) {
       rendererRef.current.resize(width * dpr, height * dpr);
       syncTransform(rendererRef.current, transform, width, height);
     }
-  }, [width, height, dpr]);
+  }, [ready, width, height, dpr]);
 
   useLayoutEffect(() => {
-    if (rendererRef.current && data) {
+    if (ready && rendererRef.current && data) {
       rendererRef.current.loadScene(
         JSON.stringify({
           version: "0.0.1-beta.1+20250728",
@@ -104,14 +106,14 @@ function CanvasContent({
       );
       rendererRef.current.redraw();
     }
-  }, [data]);
+  }, [ready, data]);
 
   useLayoutEffect(() => {
-    if (rendererRef.current) {
+    if (ready && rendererRef.current) {
       rendererRef.current.highlightStrokes(highlightStrokes);
       rendererRef.current.redraw();
     }
-  }, [highlightStrokes]);
+  }, [ready, highlightStrokes]);
 
   return (
     <canvas
