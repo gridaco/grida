@@ -216,6 +216,25 @@ export namespace vn {
   export type TangentMirroringMode = StrictTangentMirroringMode | "auto";
 
   /**
+   * Configuration options for segment splitting operations.
+   */
+  export interface SplitSegmentConfig {
+    /**
+     * Whether to preserve zero tangents when possible.
+     *
+     * When `true`, if the original segment has zero tangents, the split segments
+     * will also have zero tangents, avoiding the introduction of unnecessary
+     * tangent controls that might confuse users.
+     *
+     * When `false`, the mathematically accurate de Casteljau's algorithm is used,
+     * which may introduce non-zero tangents even for originally straight segments.
+     *
+     * @defaultValue true
+     */
+    preserveZero?: boolean;
+  }
+
+  /**
    * infer the mirroring mode from two tangents
    *
    * @param ta tangent a
@@ -1082,45 +1101,114 @@ export namespace vn {
     }
 
     /**
-     * Inserts a new vertex at the middle of the given segment and splits the
-     * segment into two consecutive segments.
+     * Splits a segment at a given parametric position and inserts a new vertex.
      *
-     * Only straight segments (no tangents) are supported.
+     * This function works with both straight and curved segments. When splitting,
+     * it maintains visual continuity by calculating appropriate tangent values
+     * for the new segments that preserve the original curve shape.
+     *
+     * The splitting process uses Bézier curve subdivision to ensure the composite
+     * curve is mathematically identical to the original:
+     * 1. Evaluates the curve at the given parametric position to get the split point
+     * 2. Uses Bézier subdivision to calculate the correct tangent values for both segments
+     * 3. Creates two new segments that maintain the original curve shape exactly
+     * 4. Inserts a new vertex at the split point
+     *
+     * When `preserveZero` is enabled in the config (default: true), segments with zero tangents
+     * will maintain zero tangents after splitting, avoiding the introduction of
+     * unnecessary tangent controls that might confuse users. This is particularly
+     * useful for straight line segments where the mathematical accuracy of de
+     * Casteljau's algorithm would introduce non-zero tangents.
      *
      * @param si index of the segment to split
+     * @param p parametric position on the segment (0 ≤ t ≤ 1)
+     * @param config optional configuration for the split operation
      * @returns index of the newly inserted vertex
      */
-    splitSegment(si: number): number {
+    splitSegment(
+      si: number,
+      p: PointOnSegment,
+      config: SplitSegmentConfig = { preserveZero: true }
+    ): number {
       if (si < 0 || si >= this._segments.length) {
         throw new Error(`Invalid segment index: ${si}`);
       }
 
-      const seg = this._segments[si];
-
-      if (!cmath.vector2.isZero(seg.ta) || !cmath.vector2.isZero(seg.tb)) {
-        throw new Error("only straight segments can be split");
+      if (p.segment !== si) {
+        throw new Error(
+          `PointOnSegment segment index (${p.segment}) does not match segment index (${si})`
+        );
       }
 
+      const seg = this._segments[si];
       const a = this._vertices[seg.a];
       const b = this._vertices[seg.b];
-      const mid: Vector2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const ta = seg.ta;
+      const tb = seg.tb;
+      const t = p.t;
 
-      const vertexIndex = this._vertices.push(mid) - 1;
+      // Clamp t to [0, 1] for robustness
+      const clampedT = Math.max(0, Math.min(1, t));
 
-      const s1: VectorNetworkSegment = {
-        a: seg.a,
-        b: vertexIndex,
-        ta: [0, 0],
-        tb: [0, 0],
-      };
-      const s2: VectorNetworkSegment = {
-        a: vertexIndex,
-        b: seg.b,
-        ta: [0, 0],
-        tb: [0, 0],
-      };
+      // Check if we should preserve zero tangents for UX purposes
+      const preserveZero = config.preserveZero ?? false;
+      const hasZeroTangents =
+        ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0;
 
-      this._segments.splice(si, 1, s1, s2);
+      let segment1: VectorNetworkSegment;
+      let segment2: VectorNetworkSegment;
+      let vertexIndex: number;
+
+      if (preserveZero && hasZeroTangents) {
+        // For UX: Keep zero tangents to avoid confusing tangent controls
+        // But still use Bézier evaluation to get the correct cursor position
+        const splitPoint = cmath.bezier.evaluate(a, b, ta, tb, clampedT);
+
+        // Insert the new vertex at the split point
+        vertexIndex = this._vertices.push(splitPoint) - 1;
+
+        // Create segments with zero tangents
+        segment1 = {
+          a: seg.a,
+          b: vertexIndex,
+          ta: [0, 0],
+          tb: [0, 0],
+        };
+
+        segment2 = {
+          a: vertexIndex,
+          b: seg.b,
+          ta: [0, 0],
+          tb: [0, 0],
+        };
+      } else {
+        // Use Bézier curve subdivision to get the correct tangent values
+        // This ensures the composite curve is mathematically identical to the original
+        const subdivision = cmath.bezier.subdivide({ a, b, ta, tb }, clampedT);
+        const splitPoint = subdivision.s;
+
+        // Insert the new vertex at the split point
+        vertexIndex = this._vertices.push(splitPoint) - 1;
+
+        // Create the first segment: from original start to split point
+        segment1 = {
+          a: seg.a,
+          b: vertexIndex,
+          ta: subdivision.l.ta,
+          tb: subdivision.l.tb,
+        };
+
+        // Create the second segment: from split point to original end
+        segment2 = {
+          a: vertexIndex,
+          b: seg.b,
+          ta: subdivision.r.ta,
+          tb: subdivision.r.tb,
+        };
+      }
+
+      // Replace the original segment with the two new segments
+      this._segments.splice(si, 1, segment1, segment2);
 
       return vertexIndex;
     }

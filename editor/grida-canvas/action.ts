@@ -320,7 +320,7 @@ export interface EditorVectorSplitSegmentAction {
   type: "split-segment";
   target: {
     node_id: string;
-    segment: number;
+    point: vn.PointOnSegment;
   };
 }
 

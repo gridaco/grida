@@ -605,13 +605,12 @@ export class Editor
   ): editor.a11y.EscapeStep[] {
     const steps: editor.a11y.EscapeStep[] = [];
 
-    // p1. if the tool is selected, escape the tool
-    if (state.tool.type !== "cursor") {
-      steps.push("escape-tool");
-    }
-
-    // p2. if the selection is not empty, escape the selection
     if (!state.content_edit_mode) {
+      // p1. if the tool is selected, escape the tool
+      if (state.tool.type !== "cursor") {
+        steps.push("escape-tool");
+      }
+      // p2. if the selection is not empty, escape the selection
       if (state.selection.length > 0) {
         steps.push("escape-selection");
       }
@@ -624,8 +623,15 @@ export class Editor
             selected_vertices.length > 0 ||
             selected_segments.length > 0 ||
             selected_tangents.length > 0;
+
+          // p1. if the selection is not empty, escape the selection
           if (hasSelection) {
             steps.push("escape-selection");
+          }
+
+          // p2. if the tool is selected, escape the tool
+          if (state.tool.type !== "cursor") {
+            steps.push("escape-tool");
           }
           break;
         }
@@ -805,12 +811,12 @@ export class Editor
     });
   }
 
-  public splitSegment(node_id: editor.NodeID, segment: number) {
+  public splitSegment(node_id: editor.NodeID, point: vn.PointOnSegment) {
     this.dispatch({
       type: "split-segment",
       target: {
         node_id,
-        segment,
+        point,
       },
     });
   }

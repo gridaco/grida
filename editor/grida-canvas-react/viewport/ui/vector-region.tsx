@@ -26,9 +26,11 @@ interface RegionSegment {
 export function VectorRegion({
   vertices,
   segments,
+  disabled = false,
 }: {
   vertices: cmath.Vector2[];
   segments: RegionSegment[];
+  disabled?: boolean;
 }) {
   const ve = useSurfaceVectorEditor();
   const [hovered, setHovered] = useState(false);
@@ -76,7 +78,7 @@ export function VectorRegion({
         setActive(false);
       },
     },
-    { drag: { threshold: 1 } }
+    { drag: { threshold: 1 }, enabled: !disabled }
   );
 
   const offset = vertices[0];
@@ -92,12 +94,19 @@ export function VectorRegion({
         height: 1,
         overflow: "visible",
         cursor: active ? "grabbing" : "grab",
+        pointerEvents: disabled ? "none" : "auto",
       }}
     >
       <DiagonalStripe />
       <path
         d={path}
-        fill={hovered ? "url(#diagonalStripes)" : "transparent"}
+        fill={
+          disabled
+            ? "transparent"
+            : hovered
+              ? "url(#diagonalStripes)"
+              : "transparent"
+        }
         stroke="transparent"
       />
     </svg>

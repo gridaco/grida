@@ -1867,7 +1867,7 @@ export namespace editor.api {
     deleteVertex(node_id: NodeID, vertex: number): void;
     selectSegment(node_id: NodeID, segment: number): void;
     deleteSegment(node_id: NodeID, segment: number): void;
-    splitSegment(node_id: NodeID, segment: number): void;
+    splitSegment(node_id: NodeID, point: vn.PointOnSegment): void;
     translateVertex(
       node_id: NodeID,
       vertex: number,

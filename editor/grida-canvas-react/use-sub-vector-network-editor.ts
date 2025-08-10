@@ -157,9 +157,9 @@ export default function useSurfaceVectorEditor() {
     [instance, node_id]
   );
 
-  const onSegmentInsertMiddle = useCallback(
+  const onSplitSegmentT05 = useCallback(
     (segment: number) => {
-      instance.splitSegment(node_id, segment);
+      instance.splitSegment(node_id, { segment, t: 0.5 });
       instance.startTranslateVectorNetwork(node_id);
     },
     [instance, node_id, vertices.length]
@@ -215,7 +215,7 @@ export default function useSurfaceVectorEditor() {
       deleteSegment,
       onCurveControlPointDragStart,
       onDragStart,
-      onSegmentInsertMiddle,
+      onSegmentInsertMiddle: onSplitSegmentT05,
       bendSegment,
       updateHoveredControl,
       loops,
@@ -246,7 +246,7 @@ export default function useSurfaceVectorEditor() {
       deleteSegment,
       onCurveControlPointDragStart,
       onDragStart,
-      onSegmentInsertMiddle,
+      onSplitSegmentT05,
       bendSegment,
       updateHoveredControl,
       loops,

@@ -1216,7 +1216,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "split-segment": {
             if (node.type === "vector") {
               const newIndex = self_updateVectorNodeVectorNetwork(node, (vne) =>
-                vne.splitSegment(segment)
+                vne.splitSegment(segment, action.target.point)
               );
 
               if (draft.content_edit_mode?.type === "vector") {

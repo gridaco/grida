@@ -123,7 +123,7 @@ export function SurfaceVectorEditor({
       </div>
 
       {/* Display snapped segment point */}
-      {snappedSegmentPoint && (
+      {tool.type === "path" && snappedSegmentPoint && (
         <div style={{ pointerEvents: "none" }}>
           <Point
             point={snappedSegmentPoint}
@@ -158,6 +158,7 @@ export function SurfaceVectorEditor({
             key={`region-${i}`}
             vertices={vertexPositions}
             segments={loopSegments}
+            disabled={tool.type === "path"}
           />
         );
       })}
@@ -296,6 +297,7 @@ function Segment({
     if (!showMiddle) return null;
     return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] as cmath.Vector2;
   }, [showMiddle, a, b]);
+
   const bind = useGesture(
     {
       onHover: (s) => {
@@ -307,6 +309,7 @@ function Segment({
         }
       },
       onPointerDown: ({ event }) => {
+        if (tool.type === "path") return;
         event.preventDefault();
         selectedRef.current = ve.selected_segments.includes(segmentIndex);
         draggedRef.current = false;
@@ -315,6 +318,7 @@ function Segment({
         }
       },
       onDragStart: ({ event }) => {
+        if (tool.type === "path") return;
         event.preventDefault();
         draggedRef.current = true;
         if (tool.type === "bend") {
@@ -342,6 +346,7 @@ function Segment({
         }
       },
       onDrag: ({ event }) => {
+        if (tool.type === "path") return;
         if (
           tool.type === "bend" &&
           t0Ref.current !== null &&
@@ -357,6 +362,7 @@ function Segment({
         }
       },
       onPointerUp: ({ event }) => {
+        if (tool.type === "path") return;
         if (tool.type === "bend") {
           if (selectedRef.current && !draggedRef.current) {
             ve.selectSegment(segmentIndex, event.shiftKey);
@@ -504,13 +510,14 @@ function Extension({
   return (
     <>
       {/* cursor point */}
-      <Point point={b} style={{ cursor: "crosshair" }} />
+      <Point point={b} style={{ cursor: "crosshair", pointerEvents: "none" }} />
       <Curve
         a={a}
         b={b}
         ta={ta}
         tb={tb}
-        className="stroke-workbench-accent-sky"
+        className="stroke-workbench-accent-sky pointer-events-none"
+        style={{ pointerEvents: "none" }}
       />
     </>
   );
@@ -524,14 +531,24 @@ function MiddlePoint({
   segmentIndex: number;
 }) {
   const editor = useSurfaceVectorEditor();
+  const tool = useToolState();
+
   const bind = useGesture({
     onPointerDown: ({ event }) => {
+      if (tool.type === "path") return;
       event.preventDefault();
       editor.onSegmentInsertMiddle(segmentIndex);
     },
   });
 
-  return <Point {...bind()} point={point} size={6} />;
+  return (
+    <Point
+      {...bind()}
+      point={point}
+      size={6}
+      style={tool.type === "path" ? { pointerEvents: "none" } : undefined}
+    />
+  );
 }
 
 function VertexPoint({
@@ -631,6 +648,7 @@ function Curve({
   className,
   strokeWidth = 2,
   stroke,
+  style,
   ...props
 }: React.HtmlHTMLAttributes<HTMLOrSVGElement> & {
   a: cmath.Vector2;
@@ -659,6 +677,7 @@ function Curve({
         left: offset[0],
         top: offset[1],
         overflow: "visible",
+        ...style,
       }}
     >
       <path d={path} stroke={stroke} fill="none" strokeWidth={strokeWidth} />

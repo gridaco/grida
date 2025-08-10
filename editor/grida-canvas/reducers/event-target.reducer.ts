@@ -384,7 +384,8 @@ function __self_evt_on_pointer_down(
       break;
     case "path": {
       if (draft.content_edit_mode?.type === "vector") {
-        const { snapped_vertex_idx: snapped_point } = draft.content_edit_mode;
+        const { snapped_vertex_idx: snapped_point, snapped_segment_p } =
+          draft.content_edit_mode;
         const { node_id, path_cursor_position, a_point, next_ta } =
           draft.content_edit_mode;
 
@@ -395,6 +396,89 @@ function __self_evt_on_pointer_down(
 
         const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
 
+        // Handle snapped segment point - split the segment and start/finish at the split point
+        if (snapped_segment_p) {
+          const split_vertex_idx = vne.splitSegment(
+            snapped_segment_p.segment,
+            snapped_segment_p
+          );
+
+          // Update node bounds after splitting
+          const bb_b = vne.getBBox();
+          const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
+          vne.translate(cmath.vector2.invert(delta));
+          const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
+          node.left = new_pos[0];
+          node.top = new_pos[1];
+          node.width = bb_b.width;
+          node.height = bb_b.height;
+          node.vectorNetwork = vne.value;
+
+          if (typeof a_point !== "number") {
+            // Starting a new path at the split point
+            draft.content_edit_mode.selected_vertices = [split_vertex_idx];
+            draft.content_edit_mode.selected_segments = [];
+            draft.content_edit_mode.selected_tangents = [];
+            draft.content_edit_mode.selection_neighbouring_vertices =
+              getUXNeighbouringVertices(node.vectorNetwork, {
+                selected_vertices: [split_vertex_idx],
+                selected_segments: [],
+                selected_tangents: [],
+              });
+            draft.content_edit_mode.a_point = split_vertex_idx;
+            draft.content_edit_mode.next_ta =
+              vne.getNextMirroredTangent(split_vertex_idx);
+          } else {
+            // Finishing the path at the split point
+            const new_vertex_idx = vne.addVertex(
+              snapped_segment_p.point,
+              a_point,
+              next_ta ?? undefined
+            );
+
+            const new_segment_idx = vne.segments.length - 1;
+
+            // clear the next ta as it's used
+            draft.content_edit_mode.next_ta = null;
+
+            // Update bounds again after adding vertex
+            const bb_b2 = vne.getBBox();
+            const delta2: cmath.Vector2 = [bb_b2.x, bb_b2.y];
+            vne.translate(cmath.vector2.invert(delta2));
+            const new_pos2 = cmath.vector2.add([node.left!, node.top!], delta2);
+            node.left = new_pos2[0];
+            node.top = new_pos2[1];
+            node.width = bb_b2.width;
+            node.height = bb_b2.height;
+            node.vectorNetwork = vne.value;
+
+            draft.content_edit_mode.selected_vertices = [new_vertex_idx];
+            draft.content_edit_mode.selected_tangents = [];
+
+            const isClosingExisting = new_vertex_idx === split_vertex_idx;
+
+            // when connecting to an existing vertex, keep the new segment
+            // selected so dragging starts a "curve-b" gesture. conclude
+            // projection by clearing `a_point` unless the user keeps
+            // projecting with the `p` modifier.
+            draft.content_edit_mode.selected_segments =
+              new_segment_idx !== null ? [new_segment_idx] : [];
+
+            if (
+              isClosingExisting &&
+              draft.gesture_modifiers.path_keep_projecting !== "on"
+            ) {
+              draft.content_edit_mode.a_point = null;
+            } else {
+              draft.content_edit_mode.a_point = new_vertex_idx;
+            }
+          }
+          // Clear the snapped segment point after using it
+          draft.content_edit_mode.snapped_segment_p = null;
+          break;
+        }
+
+        // Handle snapped vertex (existing logic)
         if (typeof a_point !== "number" && typeof snapped_point === "number") {
           draft.content_edit_mode.selected_vertices = [snapped_point];
           draft.content_edit_mode.selected_segments = [];
