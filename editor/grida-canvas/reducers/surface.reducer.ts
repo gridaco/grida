@@ -134,6 +134,7 @@ function __self_try_enter_content_edit_mode_auto(
         clipboard: null,
         clipboard_node_position: null,
         hovered_segment_index: null,
+        snapped_vertex_idx: null,
       };
       break;
     }
@@ -161,6 +162,7 @@ function __self_try_enter_content_edit_mode_auto(
         clipboard: null,
         clipboard_node_position: null,
         hovered_segment_index: null,
+        snapped_vertex_idx: null,
       };
 
       break;

@@ -131,14 +131,20 @@ function __self_evt_on_pointer_move(
         const idx = res.by_points.hit_points.anchors.findIndex(
           ([xhit, yhit]) => xhit && yhit
         );
-        draft.snapped_vertex_idx = idx !== -1 ? idx : null;
+        if (draft.content_edit_mode?.type === "vector") {
+          draft.content_edit_mode.snapped_vertex_idx = idx !== -1 ? idx : null;
+        }
       } else {
-        draft.snapped_vertex_idx = null;
+        if (draft.content_edit_mode?.type === "vector") {
+          draft.content_edit_mode.snapped_vertex_idx = null;
+        }
       }
     } else {
       draft.content_edit_mode.path_cursor_position = logical_pos;
       draft.surface_snapping = undefined;
-      draft.snapped_vertex_idx = null;
+      if (draft.content_edit_mode?.type === "vector") {
+        draft.content_edit_mode.snapped_vertex_idx = null;
+      }
     }
   }
 }
@@ -281,7 +287,7 @@ function __self_evt_on_pointer_down(
       const { hovered_node_id } = self_updateSurfaceHoverState(draft);
 
       if (draft.content_edit_mode?.type === "vector") {
-        if (!shiftKey && draft.snapped_vertex_idx === null) {
+        if (!shiftKey && draft.content_edit_mode.snapped_vertex_idx === null) {
           // clear the selection for vector content edit mode
           self_clearSelection(draft);
         }
@@ -309,7 +315,7 @@ function __self_evt_on_pointer_down(
       break;
     case "path": {
       if (draft.content_edit_mode?.type === "vector") {
-        const { snapped_vertex_idx: snapped_point } = draft;
+        const { snapped_vertex_idx: snapped_point } = draft.content_edit_mode;
         const { node_id, path_cursor_position, a_point, next_ta } =
           draft.content_edit_mode;
 
@@ -456,6 +462,7 @@ function __self_evt_on_pointer_down(
           clipboard: null,
           clipboard_node_position: null,
           hovered_segment_index: null,
+          snapped_vertex_idx: null,
         };
       }
 

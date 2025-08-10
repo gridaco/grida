@@ -544,13 +544,6 @@ export namespace editor.state {
     hovered_node_id: string | null;
 
     /**
-     * snapped vertex index (of a selected path node)
-     *
-     * @default null
-     */
-    snapped_vertex_idx: number | null;
-
-    /**
      * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
      *
      * @default undefined
@@ -721,6 +714,13 @@ export namespace editor.state {
      * @default null
      */
     hovered_segment_index: number | null;
+
+    /**
+     * snapped vertex index (of a selected path node)
+     *
+     * @default null
+     */
+    snapped_vertex_idx: number | null;
   };
 
   type BitmapContentEditMode = {
@@ -845,7 +845,6 @@ export namespace editor.state {
     dropzone: undefined,
     gesture: { type: "idle" },
     hovered_node_id: null,
-    snapped_vertex_idx: null,
     marquee: undefined,
     selection: [],
     hits: [],
@@ -1327,7 +1326,6 @@ export namespace editor.history {
 
     // hover state should be cleared to prevent errors
     draft.hovered_node_id = null;
-    draft.snapped_vertex_idx = null;
     return;
   }
 

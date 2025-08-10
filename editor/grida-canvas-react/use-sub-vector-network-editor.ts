@@ -18,7 +18,7 @@ export default function useSurfaceVectorEditor() {
       vector_node: state.document.nodes[
         node_id
       ] as grida.program.nodes.VectorNode,
-      snapped_vertex_idx: state.snapped_vertex_idx,
+      snapped_vertex_idx: content_edit_mode.snapped_vertex_idx,
       tool: state.tool,
     };
   });

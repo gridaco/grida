@@ -58,7 +58,6 @@ export function self_try_remove_node<S extends editor.state.IEditorState>(
     : null;
 
   // clear state (not all state needs to be cleared. this can be safely removed or optimzied after testing)
-  draft.snapped_vertex_idx = null;
   draft.content_edit_mode = undefined;
   self_select_tool(draft, { type: "cursor" });
 
