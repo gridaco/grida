@@ -1,10 +1,52 @@
-import cmath from "@grida/cmath";
+import { useMemo } from "react";
 import { useTransformState } from "@/grida-canvas-react/provider";
 import { useEditorState, useCurrentEditor } from "@/grida-canvas-react";
-import { useEffect, useState, useMemo } from "react";
 import { measure, Measurement } from "@grida/cmath/_measurement";
-import useSurfaceVectorEditor from "../../use-sub-vector-network-editor";
 import { MeasurementGuideRenderer } from "./measurement";
+import vn from "@grida/vn";
+import cmath from "@grida/cmath";
+import useSurfaceVectorEditor from "../../use-sub-vector-network-editor";
+
+/**
+ * Pure function to check if a target vertex is part of the current selection.
+ *
+ * This function determines if the target vertex (B) is already included in
+ * the source selection (A), which would make the measurement redundant.
+ *
+ * @param params - Parameters for equality check
+ * @returns True if the target vertex is part of the selection
+ */
+function isTargetInSelection(params: {
+  targetVertexIndex: number | null;
+  selected_vertices: number[];
+  selected_segments: number[];
+  segments: vn.VectorNetworkSegment[];
+}): boolean {
+  const { targetVertexIndex, selected_vertices, selected_segments, segments } =
+    params;
+
+  if (targetVertexIndex === null) {
+    return false;
+  }
+
+  // Check if the target vertex is directly selected
+  if (selected_vertices.includes(targetVertexIndex)) {
+    return true;
+  }
+
+  // Check if the target vertex is part of any selected segment
+  for (const segmentIndex of selected_segments) {
+    const segment = segments[segmentIndex];
+    if (
+      segment &&
+      (segment.a === targetVertexIndex || segment.b === targetVertexIndex)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /**
  * Pure function to calculate the source rectangle from vector selections.
@@ -18,7 +60,7 @@ import { MeasurementGuideRenderer } from "./measurement";
 function getSourceRect(params: {
   selected_vertices: number[];
   selected_segments: number[];
-  segments: any[];
+  segments: vn.VectorNetworkSegment[];
   absolute_vertices: cmath.Vector2[];
 }): cmath.Rectangle | null {
   const { selected_vertices, selected_segments, segments, absolute_vertices } =
@@ -56,9 +98,10 @@ function getSourceRect(params: {
 function calculateVectorMeasurement(params: {
   hovered_segment_index: number | null;
   snapped_vertex_idx: number | null;
+  hovered_vertex_index: number | null;
   selected_vertices: number[];
   selected_segments: number[];
-  segments: any[];
+  segments: vn.VectorNetworkSegment[];
   absolute_vertices: cmath.Vector2[];
   vertices: cmath.Vector2[];
   local_point: cmath.Vector2;
@@ -66,6 +109,7 @@ function calculateVectorMeasurement(params: {
   const {
     hovered_segment_index,
     snapped_vertex_idx,
+    hovered_vertex_index,
     selected_vertices,
     selected_segments,
     segments,
@@ -75,11 +119,26 @@ function calculateVectorMeasurement(params: {
   } = params;
 
   // Only measure when:
-  // 1. A segment is hovered OR a vertex is hovered
+  // 1. A segment is hovered OR a vertex is hovered (snapped or UI hovered)
   // 2. There are selected vertices or segments
+  // 3. The target is not part of the current selection (A !== B)
+  const targetVertexIndex = snapped_vertex_idx ?? hovered_vertex_index;
   if (
-    (hovered_segment_index === null && snapped_vertex_idx === null) ||
+    (hovered_segment_index === null && targetVertexIndex === null) ||
     (selected_vertices.length === 0 && selected_segments.length === 0)
+  ) {
+    return null;
+  }
+
+  // Skip measurement if the target vertex is part of the current selection
+  if (
+    targetVertexIndex !== null &&
+    isTargetInSelection({
+      targetVertexIndex,
+      selected_vertices,
+      selected_segments,
+      segments,
+    })
   ) {
     return null;
   }
@@ -99,8 +158,8 @@ function calculateVectorMeasurement(params: {
   let b_rect: cmath.Rectangle;
 
   // Case 1: Vertex-to-vertex measurement (when hovering over a vertex)
-  if (snapped_vertex_idx !== null) {
-    const targetVertex = absolute_vertices[snapped_vertex_idx];
+  if (targetVertexIndex !== null) {
+    const targetVertex = absolute_vertices[targetVertexIndex];
     b_rect = cmath.rect.quantize(
       { x: targetVertex[0], y: targetVertex[1], width: 0, height: 0 },
       0.01
@@ -207,6 +266,7 @@ function useVectorMeasurement() {
       const result = calculateVectorMeasurement({
         hovered_segment_index: ve.hovered_segment_index,
         snapped_vertex_idx: ve.snapped_point,
+        hovered_vertex_index: ve.hovered_vertex_index,
         selected_vertices: ve.selected_vertices,
         selected_segments: ve.selected_segments,
         segments: ve.segments,
@@ -223,6 +283,7 @@ function useVectorMeasurement() {
   }, [
     surface_measurement_targeting,
     ve.hovered_segment_index,
+    ve.hovered_vertex_index,
     ve.snapped_point,
     ve.selected_vertices,
     ve.selected_segments,

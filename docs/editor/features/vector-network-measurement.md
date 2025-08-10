@@ -33,6 +33,29 @@ It uses the same visual system as regular measurements: guide lines, auxiliary l
 | Vertex          | Vector2   | Region (BBox)    | Rectangle | Measures axis-aligned distances from a selected vertex to a region's boundary                              |
 | Vertices (BBox) | Rectangle | Region (BBox)    | Rectangle | Measures axis-aligned distances from the bounding box of selected vertices to a region's boundary          |
 
+## A-B De-duplication
+
+The measurement system prevents redundant measurements by detecting when the target (B) is already part of the source selection (A). This ensures that measurements are meaningful and avoids measuring a selection against itself.
+
+### De-duplication Rules
+
+| Source Selection (A) | Target (B)                     | Measurement | Reason                                         |
+| -------------------- | ------------------------------ | ----------- | ---------------------------------------------- |
+| Selected Vertex      | Same Vertex                    | ❌ Skipped  | Cannot measure vertex to itself                |
+| Selected Segment     | Vertex of that Segment         | ❌ Skipped  | Target is part of the selected segment         |
+| Multiple Vertices    | Any Selected Vertex            | ❌ Skipped  | Target is already in the selection             |
+| Multiple Segments    | Vertex of any Selected Segment | ❌ Skipped  | Target is part of one of the selected segments |
+| Selected Vertex      | Different Vertex               | ✅ Measured | Valid measurement between distinct points      |
+| Selected Segment     | Vertex of Different Segment    | ✅ Measured | Valid measurement between distinct elements    |
+| Selected Vertex      | Parametric Point on Curve      | ✅ Measured | Valid measurement to dynamic curve point       |
+
+### Implementation Details
+
+- **Direct Vertex Check**: If the target vertex is directly selected, measurement is skipped
+- **Segment Vertex Check**: If the target vertex is an endpoint of any selected segment, measurement is skipped
+- **Priority**: Mathematical snapping (`snapped_vertex_idx`) takes precedence over UI hovering (`hovered_vertex_index`)
+- **Performance**: Early detection prevents unnecessary calculation of source rectangles and measurements
+
 ## Implementation Notes
 
 - **Vector2 points** are treated as zero-size rectangles for consistency with the existing measurement system
