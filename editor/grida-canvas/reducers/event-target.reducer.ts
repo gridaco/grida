@@ -38,6 +38,7 @@ import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { snapGuideTranslation, threshold, snapMovement } from "./tools/snap";
 import { BitmapLayerEditor } from "@grida/bitmap";
+import { snapToCanvasGeometry } from "@grida/cmath/_snap";
 import nid from "./tools/id";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
@@ -45,8 +46,6 @@ import cg from "@grida/cg";
 import type { ReducerContext } from ".";
 
 const black = { r: 0, g: 0, b: 0, a: 1 };
-
-import { snapToCanvasGeometry } from "@grida/cmath/_snap";
 
 function __self_evt_on_pointer_move(
   draft: editor.state.IEditorState,
@@ -73,95 +72,102 @@ function __self_evt_on_pointer_move(
   };
 
   if (draft.content_edit_mode?.type === "vector") {
-    const { a_point, node_id } = draft.content_edit_mode;
-    const { tarnslate_with_axis_lock, translate_with_force_disable_snap } =
-      draft.gesture_modifiers;
+    __self_evt_on_pointer_move__vector_edit_mode(
+      draft,
+      canvas_space_pointer_position,
+      context
+    );
+  }
+}
 
-    let logical_pos = canvas_space_pointer_position;
+function __self_evt_on_pointer_move__vector_edit_mode(
+  draft: editor.state.IEditorState,
+  canvas_space_pointer_position: cmath.Vector2,
+  context: ReducerContext
+) {
+  assert(draft.content_edit_mode?.type === "vector");
+  const { a_point, node_id } = draft.content_edit_mode;
+  const { tarnslate_with_axis_lock, translate_with_force_disable_snap } =
+    draft.gesture_modifiers;
 
-    if (typeof a_point === "number" && tarnslate_with_axis_lock === "on") {
-      const node = dq.__getNodeById(
-        draft,
-        node_id
-      ) as grida.program.nodes.VectorNode;
-      const { left: nx, top: ny } = node;
-      const n_offset: cmath.Vector2 = [nx!, ny!];
-      const { vertices } = node.vectorNetwork;
-      const a = vertices[a_point];
+  let logical_pos = canvas_space_pointer_position;
 
-      const movement = cmath.vector2.sub(
-        draft.pointer.position,
-        cmath.vector2.add(n_offset, a)
-      );
-
-      const adj_movement = cmath.ext.movement.axisLockedByDominance(movement);
-
-      logical_pos = cmath.vector2.add(
-        a,
-        cmath.ext.movement.normalize(adj_movement),
-        n_offset
-      );
-    }
-
-    draft.pointer.logical = logical_pos;
-
+  if (typeof a_point === "number" && tarnslate_with_axis_lock === "on") {
     const node = dq.__getNodeById(
       draft,
       node_id
     ) as grida.program.nodes.VectorNode;
-    const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
-    const anchor_points = node.vectorNetwork.vertices.map((v) =>
-      cmath.vector2.add(v, [rect.x, rect.y])
+    const { left: nx, top: ny } = node;
+    const n_offset: cmath.Vector2 = [nx!, ny!];
+    const { vertices } = node.vectorNetwork;
+    const a = vertices[a_point];
+
+    const movement = cmath.vector2.sub(
+      draft.pointer.position,
+      cmath.vector2.add(n_offset, a)
     );
 
-    const should_snap =
-      translate_with_force_disable_snap !== "on" && anchor_points.length > 0;
+    const adj_movement = cmath.ext.movement.axisLockedByDominance(movement);
 
-    if (should_snap) {
-      const t = threshold(5, draft.transform);
-      const res = snapToCanvasGeometry(
-        [logical_pos],
-        { points: anchor_points },
-        { x: t, y: t }
+    logical_pos = cmath.vector2.add(
+      a,
+      cmath.ext.movement.normalize(adj_movement),
+      n_offset
+    );
+  }
+
+  draft.pointer.logical = logical_pos;
+
+  const node = dq.__getNodeById(
+    draft,
+    node_id
+  ) as grida.program.nodes.VectorNode;
+  const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+  const anchor_points = node.vectorNetwork.vertices.map((v) =>
+    cmath.vector2.add(v, [rect.x, rect.y])
+  );
+
+  const should_snap =
+    translate_with_force_disable_snap !== "on" && anchor_points.length > 0;
+
+  if (should_snap) {
+    const t = threshold(5, draft.transform);
+    const res = snapToCanvasGeometry(
+      [logical_pos],
+      { points: anchor_points },
+      { x: t, y: t }
+    );
+    draft.content_edit_mode.cursor = res.by_points
+      ? res.by_points.translated[0]
+      : logical_pos;
+    draft.surface_snapping = res;
+    if (res.by_points) {
+      const idx = res.by_points.hit_points.anchors.findIndex(
+        ([xhit, yhit]) => xhit && yhit
       );
-      draft.content_edit_mode.path_cursor_position = res.by_points
-        ? res.by_points.translated[0]
-        : logical_pos;
-      draft.surface_snapping = res;
-      if (res.by_points) {
-        const idx = res.by_points.hit_points.anchors.findIndex(
-          ([xhit, yhit]) => xhit && yhit
-        );
-        if (draft.content_edit_mode?.type === "vector") {
-          draft.content_edit_mode.snapped_vertex_idx = idx !== -1 ? idx : null;
-        }
-      } else {
-        if (draft.content_edit_mode?.type === "vector") {
-          draft.content_edit_mode.snapped_vertex_idx = null;
-        }
-      }
+      draft.content_edit_mode.snapped_vertex_idx = idx !== -1 ? idx : null;
     } else {
-      draft.content_edit_mode.path_cursor_position = logical_pos;
-      draft.surface_snapping = undefined;
-      if (draft.content_edit_mode?.type === "vector") {
-        draft.content_edit_mode.snapped_vertex_idx = null;
-      }
+      draft.content_edit_mode.snapped_vertex_idx = null;
     }
 
     // Compute segment snapping if no vertex is snapped and there's a hovered segment
-    if (draft.content_edit_mode?.type === "vector") {
+    if (draft.content_edit_mode.snapped_vertex_idx === null) {
       __self_compute_vector_segment_snapping(draft, logical_pos, rect, node);
+      // Update path cursor position to use snapped segment point if available
+      if (draft.content_edit_mode.snapped_segment_p) {
+        const snapped_point = draft.content_edit_mode.snapped_segment_p.point;
+        // Convert local point to absolute coordinates
+        draft.content_edit_mode.cursor = cmath.vector2.add(snapped_point, [
+          rect.x,
+          rect.y,
+        ]);
+      }
     }
+  } else {
+    draft.content_edit_mode.cursor = logical_pos;
+    draft.surface_snapping = undefined;
+    draft.content_edit_mode.snapped_vertex_idx = null;
   }
-}
-
-function __self_evt_on_pointer_move_raycast(
-  draft: editor.state.IEditorState,
-  action: EditorEventTarget_PointerMoveRaycast
-) {
-  const { node_ids_from_point } = <EditorEventTarget_PointerMoveRaycast>action;
-  draft.hits = node_ids_from_point;
-  self_updateSurfaceHoverState(draft);
 }
 
 /**
@@ -184,11 +190,11 @@ function __self_compute_vector_segment_snapping<
   rect: cmath.Rectangle,
   node: grida.program.nodes.VectorNode
 ) {
-  if (
-    draft.content_edit_mode?.type === "vector" &&
-    draft.content_edit_mode.snapped_vertex_idx === null &&
-    draft.content_edit_mode.hovered_control?.type === "segment"
-  ) {
+  assert(draft.content_edit_mode?.type === "vector");
+
+  // we rely on ui's hover state for early exit and to save computation
+  // if this is still expensive, we can block it by tool.type === "path" (since its only used when path tool is active)
+  if (draft.content_edit_mode.hovered_control?.type === "segment") {
     // Calculate local point (relative to vector network origin)
     const local_point = cmath.vector2.sub(logical_pos, [rect.x, rect.y]);
 
@@ -225,6 +231,15 @@ function __self_compute_vector_segment_snapping<
       draft.content_edit_mode.snapped_segment_p = null;
     }
   }
+}
+
+function __self_evt_on_pointer_move_raycast(
+  draft: editor.state.IEditorState,
+  action: EditorEventTarget_PointerMoveRaycast
+) {
+  const { node_ids_from_point } = <EditorEventTarget_PointerMoveRaycast>action;
+  draft.hits = node_ids_from_point;
+  self_updateSurfaceHoverState(draft);
 }
 
 function __self_evt_on_click(
@@ -386,8 +401,7 @@ function __self_evt_on_pointer_down(
       if (draft.content_edit_mode?.type === "vector") {
         const { snapped_vertex_idx: snapped_point, snapped_segment_p } =
           draft.content_edit_mode;
-        const { node_id, path_cursor_position, a_point, next_ta } =
-          draft.content_edit_mode;
+        const { node_id, cursor, a_point, next_ta } = draft.content_edit_mode;
 
         const node = dq.__getNodeById(
           draft,
@@ -502,10 +516,7 @@ function __self_evt_on_pointer_down(
               (() => {
                 const rect =
                   context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
-                return cmath.vector2.sub(path_cursor_position, [
-                  rect.x,
-                  rect.y,
-                ]);
+                return cmath.vector2.sub(cursor, [rect.x, rect.y]);
               })();
 
         const new_vertex_idx = vne.addVertex(
@@ -611,7 +622,7 @@ function __self_evt_on_pointer_down(
           initial_vector_network: vector.vectorNetwork,
           original: null,
           selection_neighbouring_vertices: [0],
-          path_cursor_position: pos,
+          cursor: pos,
           clipboard: null,
           clipboard_node_position: null,
           hovered_control: null,

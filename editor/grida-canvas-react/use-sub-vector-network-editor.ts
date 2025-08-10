@@ -30,7 +30,7 @@ export default function useSurfaceVectorEditor() {
     selected_segments,
     selected_tangents,
     a_point,
-    path_cursor_position,
+    cursor: path_cursor_position,
     next_ta,
     hovered_control: hovered_controls,
     snapped_segment_p,

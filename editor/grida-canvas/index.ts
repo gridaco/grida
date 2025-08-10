@@ -629,6 +629,9 @@ export namespace editor.state {
   };
 
   export type VectorContentEditModeHoverableType = "vertex" | "segment";
+  // export type VectorContentEditModeCursorTarget =
+  //   | { type: "vertex"; vertex: number }
+  //   | { type: "segment"; segment: vn.PointOnSegment };
 
   export type VectorContentEditMode = {
     type: "vector";
@@ -701,11 +704,9 @@ export namespace editor.state {
     clipboard_node_position: cmath.Vector2 | null;
 
     /**
-     * next points position
-     *
-     * @deprecated - remove me - use global sanp pointer
+     * next point position, snapped, in vector network space
      */
-    path_cursor_position: cmath.Vector2;
+    cursor: cmath.Vector2;
 
     /**
      * snapped vertex index (of a selected path node)
