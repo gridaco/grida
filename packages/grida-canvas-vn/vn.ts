@@ -1,12 +1,79 @@
 import cmath from "@grida/cmath";
 import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 
-type Vector2 = [number, number];
+type Vector2 = cmath.Vector2;
 export namespace vn {
   /**
    * Represents a vertex in the vector network.
    */
   export type VectorNetworkVertex = Vector2;
+
+  /**
+   * Represents a point on a specific segment of the vector network.
+   *
+   * This type provides a minimal representation of a location on a curve segment,
+   * using parametric coordinates that can be evaluated to get the actual position
+   * on the Bézier curve.
+   *
+   * @example
+   * ```ts
+   * const pointOnSegment: PointOnSegment = {
+   *   segment: 0,  // Index of the segment in the vector network
+   *   t: 0.5       // Parametric value: 0 = start, 1 = end, 0.5 = middle
+   * };
+   *
+   * // Evaluate to get the actual position
+   * const position = cmath.bezier.evaluate(
+   *   vertices[segments[0].a],
+   *   vertices[segments[0].b],
+   *   segments[0].ta,
+   *   segments[0].tb,
+   *   pointOnSegment.t
+   * );
+   * ```
+   *
+   * @see {@link cmath.bezier.evaluate} - For evaluating the point to get its position
+   * @see {@link cmath.bezier.projectParametric} - For projecting a point onto a segment
+   */
+  export type PointOnSegment = {
+    /**
+     * Index of the segment in the vector network's segments array.
+     *
+     * This references a specific segment within the vector network,
+     * allowing the point to be located on a particular curve.
+     *
+     * @example
+     * ```ts
+     * const segment = vectorNetwork.segments[pointOnSegment.segment];
+     * ```
+     */
+    segment: number;
+
+    /**
+     * Parametric value along the segment, ranging from 0 to 1.
+     *
+     * - `0` represents the start of the segment (vertex `a`)
+     * - `1` represents the end of the segment (vertex `b`)
+     * - `0.5` represents the middle of the segment
+     * - Values outside [0, 1] are valid but represent points beyond the segment
+     *
+     * This value is used with Bézier curve evaluation functions to determine
+     * the exact position on the curve.
+     *
+     * @example
+     * ```ts
+     * // Get the position at 25% along the segment
+     * const position = cmath.bezier.evaluate(
+     *   vertices[segment.a],
+     *   vertices[segment.b],
+     *   segment.ta,
+     *   segment.tb,
+     *   0.25
+     * );
+     * ```
+     */
+    t: number;
+  };
 
   /**
    * Represents a segment in the vector network, connecting two vertices.

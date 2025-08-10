@@ -345,3 +345,23 @@ export function self_updateVectorHoveredVertex<
 
   draft.content_edit_mode.hovered_vertex_index = vertexIndex;
 }
+
+/**
+ * Updates the snapped segment with parametric position in vector content edit mode.
+ *
+ * This method manages the mathematically resolved snap state for segments in vector edit mode.
+ * The snap state contains both the segment index and parametric position (t) for precise targeting.
+ * Used for measurement calculations and precise segment targeting.
+ *
+ * @param draft - The editor state draft to modify
+ * @param snappedSegmentP - The snapped segment with parametric position, or null if no segment is snapped
+ */
+export function self_updateVectorSnappedSegmentP<
+  S extends editor.state.IEditorState,
+>(draft: Draft<S>, snappedSegmentP: vn.PointOnSegment | null) {
+  if (draft.content_edit_mode?.type !== "vector") {
+    return;
+  }
+
+  draft.content_edit_mode.snapped_segment_p = snappedSegmentP;
+}

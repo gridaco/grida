@@ -464,6 +464,7 @@ function __self_evt_on_pointer_down(
           hovered_segment_index: null,
           hovered_vertex_index: null,
           snapped_vertex_idx: null,
+          snapped_segment_p: null,
         };
       }
 

@@ -34,6 +34,7 @@ export default function useSurfaceVectorEditor() {
     next_ta,
     hovered_segment_index,
     hovered_vertex_index,
+    snapped_segment_p,
   } = state.content_edit_mode;
 
   const vertices = node.vectorNetwork.vertices;
@@ -215,6 +216,7 @@ export default function useSurfaceVectorEditor() {
       next_ta,
       hovered_segment_index,
       hovered_vertex_index,
+      snapped_segment_p,
       selectVertex,
       deleteVertex,
       selectSegment,
@@ -247,6 +249,7 @@ export default function useSurfaceVectorEditor() {
       next_ta,
       hovered_segment_index,
       hovered_vertex_index,
+      snapped_segment_p,
       selectVertex,
       deleteVertex,
       selectSegment,
