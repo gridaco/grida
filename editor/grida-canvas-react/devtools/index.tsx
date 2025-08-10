@@ -106,6 +106,9 @@ export function DevtoolsPanel() {
                 <TabsTrigger value="selection" className="text-xs uppercase">
                   Selection
                 </TabsTrigger>
+                <TabsTrigger value="edit-mode" className="text-xs uppercase">
+                  Edit Mode
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="hierarchy" className="h-full">
                 <HierarchyPanel />
@@ -121,6 +124,9 @@ export function DevtoolsPanel() {
               </TabsContent>
               <TabsContent value="selection" className="h-full">
                 <SelectionPanel />
+              </TabsContent>
+              <TabsContent value="edit-mode" className="h-full">
+                <EditModePanel />
               </TabsContent>
               <TabsContent value="fonts" className="h-full">
                 <FontsPanel />
@@ -200,6 +206,15 @@ function SelectionPanel() {
   );
   const value = nodes.length === 1 ? nodes[0] : nodes;
   return <JSONContent value={value} />;
+}
+
+function EditModePanel() {
+  const editor = useCurrentEditor();
+  const content_edit_mode = useEditorState(
+    editor,
+    (state) => state.content_edit_mode
+  );
+  return <JSONContent value={content_edit_mode} />;
 }
 
 function FontsPanel() {
