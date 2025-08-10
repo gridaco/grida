@@ -309,41 +309,29 @@ export function self_optimizeVectorNetwork(
 }
 
 /**
- * Updates the hovered segment index in vector content edit mode.
+ * Updates the hovered control in vector content edit mode.
  *
- * This method manages the UI-triggered hover state for segments in vector edit mode.
- * The hover state is used for measurement calculations when the alt key is pressed.
+ * This method manages the UI-triggered hover state for controls in vector edit mode.
+ * The hover state is used for visual feedback and measurement calculations.
+ * Cannot have multiple mixed hover states - only one control can be hovered at a time.
  *
  * @param draft - The editor state draft to modify
- * @param segmentIndex - The index of the hovered segment, or null if no segment is hovered
+ * @param hoveredControl - The hovered control with type and index, or null if no control is hovered
  */
-export function self_updateVectorHoveredSegment<
+export function self_updateVectorHoveredControl<
   S extends editor.state.IEditorState,
->(draft: Draft<S>, segmentIndex: number | null) {
+>(
+  draft: Draft<S>,
+  hoveredControl: {
+    type: editor.state.VectorContentEditModeHoverableType;
+    index: number;
+  } | null
+) {
   if (draft.content_edit_mode?.type !== "vector") {
     return;
   }
 
-  draft.content_edit_mode.hovered_segment_index = segmentIndex;
-}
-
-/**
- * Updates the hovered vertex index in vector content edit mode.
- *
- * This method manages the UI-triggered hover state for vertices in vector edit mode.
- * The hover state is used for visual feedback when hovering over vertices.
- *
- * @param draft - The editor state draft to modify
- * @param vertexIndex - The index of the hovered vertex, or null if no vertex is hovered
- */
-export function self_updateVectorHoveredVertex<
-  S extends editor.state.IEditorState,
->(draft: Draft<S>, vertexIndex: number | null) {
-  if (draft.content_edit_mode?.type !== "vector") {
-    return;
-  }
-
-  draft.content_edit_mode.hovered_vertex_index = vertexIndex;
+  draft.content_edit_mode.hovered_control = hoveredControl;
 }
 
 /**

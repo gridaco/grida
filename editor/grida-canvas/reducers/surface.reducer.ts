@@ -133,8 +133,7 @@ function __self_try_enter_content_edit_mode_auto(
         path_cursor_position: draft.pointer.position,
         clipboard: null,
         clipboard_node_position: null,
-        hovered_segment_index: null,
-        hovered_vertex_index: null,
+        hovered_control: null,
         snapped_vertex_idx: null,
         snapped_segment_p: null,
       };
@@ -163,8 +162,7 @@ function __self_try_enter_content_edit_mode_auto(
         path_cursor_position: draft.pointer.position,
         clipboard: null,
         clipboard_node_position: null,
-        hovered_segment_index: null,
-        hovered_vertex_index: null,
+        hovered_control: null,
         snapped_vertex_idx: null,
         snapped_segment_p: null,
       };

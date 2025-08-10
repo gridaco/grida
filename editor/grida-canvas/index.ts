@@ -628,6 +628,8 @@ export namespace editor.state {
     // selectedTextRange;
   };
 
+  export type VectorContentEditModeHoverableType = "vertex" | "segment";
+
   export type VectorContentEditMode = {
     type: "vector";
     node_id: string;
@@ -727,24 +729,18 @@ export namespace editor.state {
     snapped_segment_p: vn.EvaluatedPointOnSegment | null;
 
     /**
-     * hovered segment index for measurement feature
+     * hovered control for UI feedback and measurement
      *
      * This is a UI-triggered hover state based on surface interaction, not mathematically resolved.
-     * Used for measurement calculations when alt key is pressed.
+     * Used for visual feedback and measurement calculations when alt key is pressed.
+     * Cannot have multiple mixed hover states - only one control can be hovered at a time.
      *
      * @default null
      */
-    hovered_segment_index: number | null;
-
-    /**
-     * hovered vertex index for UI feedback
-     *
-     * This is a UI-triggered hover state based on surface interaction, not mathematically resolved.
-     * Used for visual feedback when hovering over vertices in vector edit mode.
-     *
-     * @default null
-     */
-    hovered_vertex_index: number | null;
+    hovered_control: {
+      type: VectorContentEditModeHoverableType;
+      index: number;
+    } | null;
   };
 
   type BitmapContentEditMode = {
@@ -1896,18 +1892,16 @@ export namespace editor.api {
     ): void;
 
     /**
-     * Updates the hovered segment index in vector content edit mode.
+     * Updates the hovered control in vector content edit mode.
      *
-     * @param segmentIndex - The index of the hovered segment, or null if no segment is hovered
+     * @param hoveredControl - The hovered control with type and index, or null if no control is hovered
      */
-    updateVectorHoveredSegment(segmentIndex: number | null): void;
-
-    /**
-     * Updates the hovered vertex index in vector content edit mode.
-     *
-     * @param vertexIndex - The index of the hovered vertex, or null if no vertex is hovered
-     */
-    updateVectorHoveredVertex(vertexIndex: number | null): void;
+    updateVectorHoveredControl(
+      hoveredControl: {
+        type: editor.state.VectorContentEditModeHoverableType;
+        index: number;
+      } | null
+    ): void;
 
     //
 

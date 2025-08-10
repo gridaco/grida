@@ -1232,17 +1232,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       });
     }
-    case "vector/update-hovered-segment": {
+    case "vector/update-hovered-control": {
       return produce(state, (draft) => {
         if (draft.content_edit_mode?.type === "vector") {
-          draft.content_edit_mode.hovered_segment_index = action.segmentIndex;
-        }
-      });
-    }
-    case "vector/update-hovered-vertex": {
-      return produce(state, (draft) => {
-        if (draft.content_edit_mode?.type === "vector") {
-          draft.content_edit_mode.hovered_vertex_index = action.vertexIndex;
+          draft.content_edit_mode.hovered_control = action.hoveredControl;
         }
       });
     }

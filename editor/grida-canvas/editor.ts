@@ -860,17 +860,15 @@ export class Editor
     });
   }
 
-  public updateVectorHoveredSegment(segmentIndex: number | null) {
+  public updateVectorHoveredControl(
+    hoveredControl: {
+      type: editor.state.VectorContentEditModeHoverableType;
+      index: number;
+    } | null
+  ) {
     this.dispatch({
-      type: "vector/update-hovered-segment",
-      segmentIndex,
-    });
-  }
-
-  public updateVectorHoveredVertex(vertexIndex: number | null) {
-    this.dispatch({
-      type: "vector/update-hovered-vertex",
-      vertexIndex,
+      type: "vector/update-hovered-control",
+      hoveredControl,
     });
   }
 

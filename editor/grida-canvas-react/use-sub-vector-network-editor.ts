@@ -32,8 +32,7 @@ export default function useSurfaceVectorEditor() {
     a_point,
     path_cursor_position,
     next_ta,
-    hovered_segment_index,
-    hovered_vertex_index,
+    hovered_control: hovered_controls,
     snapped_segment_p,
   } = state.content_edit_mode;
 
@@ -183,16 +182,9 @@ export default function useSurfaceVectorEditor() {
     [instance, node_id]
   );
 
-  const updateHoveredSegment = useCallback(
-    (segmentIndex: number | null) => {
-      instance.updateVectorHoveredSegment(segmentIndex);
-    },
-    [instance]
-  );
-
-  const updateHoveredVertex = useCallback(
-    (vertexIndex: number | null) => {
-      instance.updateVectorHoveredVertex(vertexIndex);
+  const updateHoveredControl = useCallback(
+    (hoveredControl: { type: "vertex" | "segment"; index: number } | null) => {
+      instance.updateVectorHoveredControl(hoveredControl);
     },
     [instance]
   );
@@ -214,8 +206,7 @@ export default function useSurfaceVectorEditor() {
       snapped_point,
       a_point,
       next_ta,
-      hovered_segment_index,
-      hovered_vertex_index,
+      hovered_controls,
       snapped_segment_p,
       selectVertex,
       deleteVertex,
@@ -226,8 +217,7 @@ export default function useSurfaceVectorEditor() {
       onDragStart,
       onSegmentInsertMiddle,
       bendSegment,
-      updateHoveredSegment,
-      updateHoveredVertex,
+      updateHoveredControl,
       loops,
     }),
     [
@@ -247,8 +237,7 @@ export default function useSurfaceVectorEditor() {
       snapped_point,
       a_point,
       next_ta,
-      hovered_segment_index,
-      hovered_vertex_index,
+      hovered_controls,
       snapped_segment_p,
       selectVertex,
       deleteVertex,
@@ -259,8 +248,7 @@ export default function useSurfaceVectorEditor() {
       onDragStart,
       onSegmentInsertMiddle,
       bendSegment,
-      updateHoveredSegment,
-      updateHoveredVertex,
+      updateHoveredControl,
       loops,
     ]
   );

@@ -40,8 +40,7 @@ export function SurfaceVectorEditor({
     path_cursor_position,
     a_point,
     next_ta,
-    hovered_segment_index,
-    hovered_vertex_index,
+    hovered_controls,
     snapped_segment_p,
   } = ve;
 
@@ -178,8 +177,15 @@ export function SurfaceVectorEditor({
             b={cmath.vector2.transform(b, transform)}
             ta={transformDelta(ta, transform)}
             tb={transformDelta(tb, transform)}
-            hovered={hovered_segment_index === i}
-            onHover={ve.updateHoveredSegment}
+            hovered={
+              hovered_controls?.type === "segment" &&
+              hovered_controls.index === i
+            }
+            onHover={(index) =>
+              ve.updateHoveredControl(
+                index !== null ? { type: "segment", index } : null
+              )
+            }
           />
         );
       })}
@@ -540,17 +546,19 @@ function VertexPoint({
   const tool = useToolState();
   const selected = ve.selected_vertices.includes(index);
   const hovered =
-    ve.snapped_point === index || ve.hovered_vertex_index === index;
+    ve.snapped_point === index ||
+    (ve.hovered_controls?.type === "vertex" &&
+      ve.hovered_controls.index === index);
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const bind = useGesture(
     {
       onHover: (s) => {
         if (s.first) {
-          ve.updateHoveredVertex(index);
+          ve.updateHoveredControl({ type: "vertex", index });
         }
         if (s.last) {
-          ve.updateHoveredVertex(null);
+          ve.updateHoveredControl(null);
         }
       },
       onPointerDown: ({ event }) => {

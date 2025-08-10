@@ -187,12 +187,12 @@ function __self_compute_vector_segment_snapping<
   if (
     draft.content_edit_mode?.type === "vector" &&
     draft.content_edit_mode.snapped_vertex_idx === null &&
-    draft.content_edit_mode.hovered_segment_index !== null
+    draft.content_edit_mode.hovered_control?.type === "segment"
   ) {
     // Calculate local point (relative to vector network origin)
     const local_point = cmath.vector2.sub(logical_pos, [rect.x, rect.y]);
 
-    const segment_index = draft.content_edit_mode.hovered_segment_index;
+    const segment_index = draft.content_edit_mode.hovered_control.index;
     const segment = node.vectorNetwork.segments[segment_index];
     const a = node.vectorNetwork.vertices[segment.a];
     const b = node.vectorNetwork.vertices[segment.b];
@@ -530,8 +530,7 @@ function __self_evt_on_pointer_down(
           path_cursor_position: pos,
           clipboard: null,
           clipboard_node_position: null,
-          hovered_segment_index: null,
-          hovered_vertex_index: null,
+          hovered_control: null,
           snapped_vertex_idx: null,
           snapped_segment_p: null,
         };
