@@ -48,13 +48,14 @@ function getSourceRect(params: {
  * Pure function to calculate vector measurement.
  *
  * This function contains the core logic for calculating measurements between
- * vector selections and parametric points on curves.
+ * vector selections and parametric points on curves or vertices.
  *
  * @param params - Parameters for vector measurement calculation
  * @returns Measurement result or null if conditions not met
  */
 function calculateVectorMeasurement(params: {
   hovered_segment_index: number | null;
+  snapped_vertex_idx: number | null;
   selected_vertices: number[];
   selected_segments: number[];
   segments: any[];
@@ -64,6 +65,7 @@ function calculateVectorMeasurement(params: {
 }): Measurement | null {
   const {
     hovered_segment_index,
+    snapped_vertex_idx,
     selected_vertices,
     selected_segments,
     segments,
@@ -73,61 +75,14 @@ function calculateVectorMeasurement(params: {
   } = params;
 
   // Only measure when:
-  // 1. A segment is hovered
+  // 1. A segment is hovered OR a vertex is hovered
   // 2. There are selected vertices or segments
   if (
-    hovered_segment_index === null ||
+    (hovered_segment_index === null && snapped_vertex_idx === null) ||
     (selected_vertices.length === 0 && selected_segments.length === 0)
   ) {
     return null;
   }
-
-  const segment = segments[hovered_segment_index];
-
-  if (!segment) {
-    return null;
-  }
-
-  // Project the mouse point onto the curve to get the parametric value
-  // For zero-tangent segments, use linear projection since that's what users expect
-  const t =
-    cmath.vector2.isZero(segment.ta) && cmath.vector2.isZero(segment.tb)
-      ? (() => {
-          // Linear projection for zero-tangent segments (user expectation)
-          const dx = vertices[segment.b][0] - vertices[segment.a][0];
-          const dy = vertices[segment.b][1] - vertices[segment.a][1];
-          const lenSq = dx * dx + dy * dy;
-          if (lenSq === 0) return 0;
-          const tLine =
-            ((local_point[0] - vertices[segment.a][0]) * dx +
-              (local_point[1] - vertices[segment.a][1]) * dy) /
-            lenSq;
-          return Math.max(0, Math.min(1, tLine));
-        })()
-      : cmath.bezier.projectParametric(
-          vertices[segment.a],
-          vertices[segment.b],
-          segment.ta,
-          segment.tb,
-          local_point
-        );
-
-  // Evaluate the curve at the projected parametric value
-  // For zero-tangent segments, use linear interpolation to match the projection
-  const parametricPoint =
-    cmath.vector2.isZero(segment.ta) && cmath.vector2.isZero(segment.tb)
-      ? cmath.vector2.lerp(
-          absolute_vertices[segment.a],
-          absolute_vertices[segment.b],
-          t
-        )
-      : cmath.bezier.evaluate(
-          absolute_vertices[segment.a],
-          absolute_vertices[segment.b],
-          segment.ta,
-          segment.tb,
-          t
-        );
 
   // Calculate measurement A (selection)
   const a_rect = getSourceRect({
@@ -141,11 +96,72 @@ function calculateVectorMeasurement(params: {
     return null;
   }
 
-  // Calculate measurement B (parametric point)
-  const b_rect = cmath.rect.quantize(
-    { x: parametricPoint[0], y: parametricPoint[1], width: 0, height: 0 },
-    0.01
-  );
+  let b_rect: cmath.Rectangle;
+
+  // Case 1: Vertex-to-vertex measurement (when hovering over a vertex)
+  if (snapped_vertex_idx !== null) {
+    const targetVertex = absolute_vertices[snapped_vertex_idx];
+    b_rect = cmath.rect.quantize(
+      { x: targetVertex[0], y: targetVertex[1], width: 0, height: 0 },
+      0.01
+    );
+  }
+  // Case 2: Selection-to-parametric-point measurement (when hovering over a segment)
+  else if (hovered_segment_index !== null) {
+    const segment = segments[hovered_segment_index];
+
+    if (!segment) {
+      return null;
+    }
+
+    // Project the mouse point onto the curve to get the parametric value
+    // For zero-tangent segments, use linear projection since that's what users expect
+    const t =
+      cmath.vector2.isZero(segment.ta) && cmath.vector2.isZero(segment.tb)
+        ? (() => {
+            // Linear projection for zero-tangent segments (user expectation)
+            const dx = vertices[segment.b][0] - vertices[segment.a][0];
+            const dy = vertices[segment.b][1] - vertices[segment.a][1];
+            const lenSq = dx * dx + dy * dy;
+            if (lenSq === 0) return 0;
+            const tLine =
+              ((local_point[0] - vertices[segment.a][0]) * dx +
+                (local_point[1] - vertices[segment.a][1]) * dy) /
+              lenSq;
+            return Math.max(0, Math.min(1, tLine));
+          })()
+        : cmath.bezier.projectParametric(
+            vertices[segment.a],
+            vertices[segment.b],
+            segment.ta,
+            segment.tb,
+            local_point
+          );
+
+    // Evaluate the curve at the projected parametric value
+    // For zero-tangent segments, use linear interpolation to match the projection
+    const parametricPoint =
+      cmath.vector2.isZero(segment.ta) && cmath.vector2.isZero(segment.tb)
+        ? cmath.vector2.lerp(
+            absolute_vertices[segment.a],
+            absolute_vertices[segment.b],
+            t
+          )
+        : cmath.bezier.evaluate(
+            absolute_vertices[segment.a],
+            absolute_vertices[segment.b],
+            segment.ta,
+            segment.tb,
+            t
+          );
+
+    b_rect = cmath.rect.quantize(
+      { x: parametricPoint[0], y: parametricPoint[1], width: 0, height: 0 },
+      0.01
+    );
+  } else {
+    return null;
+  }
 
   // Use the existing measure function
   const measurementResult = measure(a_rect, b_rect);
@@ -190,6 +206,7 @@ function useVectorMeasurement() {
 
       const result = calculateVectorMeasurement({
         hovered_segment_index: ve.hovered_segment_index,
+        snapped_vertex_idx: ve.snapped_point,
         selected_vertices: ve.selected_vertices,
         selected_segments: ve.selected_segments,
         segments: ve.segments,
@@ -206,6 +223,7 @@ function useVectorMeasurement() {
   }, [
     surface_measurement_targeting,
     ve.hovered_segment_index,
+    ve.snapped_point,
     ve.selected_vertices,
     ve.selected_segments,
     ve.segments,
