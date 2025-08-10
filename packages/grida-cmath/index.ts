@@ -3635,6 +3635,128 @@ namespace cmath {
 
       return [dx, dy];
     }
+
+    /**
+     * Subdivides a cubic Bézier curve at a given parametric position using de Casteljau's algorithm.
+     *
+     * This function splits a cubic Bézier curve into two sub-curves at parameter t.
+     * The algorithm uses de Casteljau's method, which is numerically stable and geometrically intuitive.
+     *
+     * The result contains:
+     * - `l`: The left sub-curve (segment over [0, t])
+     * - `r`: The right sub-curve (segment over [t, 1])
+     * - `s`: The split point B(t) on the original curve
+     * - `t`: The clamped parameter value actually used
+     *
+     * @param c - The cubic Bézier curve to subdivide
+     * @param t - The parametric position where to split (0 ≤ t ≤ 1)
+     * @returns Object containing the two sub-curves, split point, and used parameter
+     *
+     * @example
+     * ```typescript
+     * const curve: cmath.bezier.CubicBezierWithTangents = {
+     *   a: [0, 0],
+     *   b: [100, 0],
+     *   ta: [50, 50],
+     *   tb: [-50, 50]
+     * };
+     *
+     * const result = cmath.bezier.subdivide(curve, 0.5);
+     * // result.l is the curve from t=0 to t=0.5
+     * // result.r is the curve from t=0.5 to t=1
+     * // result.s is the point at t=0.5 on the original curve
+     * ```
+     *
+     * @remarks
+     * - The parameter t is clamped to [0, 1] for robustness
+     * - For t = 0, the left curve is degenerate (zero length) and the right curve equals the original
+     * - For t = 1, the right curve is degenerate (zero length) and the left curve equals the original
+     * - The split point s is always a point on the original curve
+     * - Both sub-curves maintain the same geometric properties as the original curve
+     */
+    export function subdivide(
+      c: CubicBezierWithTangents,
+      t: number
+    ): {
+      l: CubicBezierWithTangents; // segment over [0, t]
+      r: CubicBezierWithTangents; // segment over [t, 1]
+      s: Vector2; // split point B(t)
+      t: number; // clamped t actually used
+    } {
+      // Handle NaN and Infinity values
+      let clampedT = t;
+      if (!Number.isFinite(t)) {
+        clampedT = Number.isNaN(t) ? 0 : t < 0 ? 0 : 1;
+      } else {
+        clampedT = Math.max(0, Math.min(1, t));
+      }
+
+      const { a, b, ta, tb } = c;
+
+      // Convert to standard cubic Bézier control points
+      const p0 = a;
+      const p1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const p2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+      const p3 = b;
+
+      // Apply de Casteljau's algorithm
+      const mt = 1 - clampedT;
+
+      // First level of interpolation
+      const q0: Vector2 = [
+        mt * p0[0] + clampedT * p1[0],
+        mt * p0[1] + clampedT * p1[1],
+      ];
+      const q1: Vector2 = [
+        mt * p1[0] + clampedT * p2[0],
+        mt * p1[1] + clampedT * p2[1],
+      ];
+      const q2: Vector2 = [
+        mt * p2[0] + clampedT * p3[0],
+        mt * p2[1] + clampedT * p3[1],
+      ];
+
+      // Second level of interpolation
+      const r0: Vector2 = [
+        mt * q0[0] + clampedT * q1[0],
+        mt * q0[1] + clampedT * q1[1],
+      ];
+      const r1: Vector2 = [
+        mt * q1[0] + clampedT * q2[0],
+        mt * q1[1] + clampedT * q2[1],
+      ];
+
+      // Third level of interpolation (split point)
+      const s: Vector2 = [
+        mt * r0[0] + clampedT * r1[0],
+        mt * r0[1] + clampedT * r1[1],
+      ];
+
+      // Construct left sub-curve (from p0 to s)
+      const leftTa: Vector2 = [q0[0] - p0[0], q0[1] - p0[1]];
+      const leftTb: Vector2 = [r0[0] - s[0], r0[1] - s[1]];
+
+      // Construct right sub-curve (from s to p3)
+      const rightTa: Vector2 = [r1[0] - s[0], r1[1] - s[1]];
+      const rightTb: Vector2 = [q2[0] - p3[0], q2[1] - p3[1]];
+
+      return {
+        l: {
+          a: p0,
+          b: s,
+          ta: leftTa,
+          tb: leftTb,
+        },
+        r: {
+          a: s,
+          b: p3,
+          ta: rightTa,
+          tb: rightTb,
+        },
+        s,
+        t: clampedT,
+      };
+    }
   }
 
   export namespace transform {

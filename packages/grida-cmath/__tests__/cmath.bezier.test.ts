@@ -1148,3 +1148,598 @@ describe("cmath.bezier.tangentAt", () => {
     expect(optimizedTangent[1]).toBeCloseTo(originalY, 10);
   });
 });
+
+describe("cmath.bezier.subdivide", () => {
+  describe("Basic functionality", () => {
+    test("should subdivide a straight line segment at t=0.5", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.5);
+
+      // Split point should be at the midpoint (for zero tangents at t=0.5, it IS linear)
+      expect(result.s).toEqual([50, 0]);
+      expect(result.t).toBe(0.5);
+
+      // Left curve should go from [0,0] to [50,0]
+      expect(result.l.a).toEqual([0, 0]);
+      expect(result.l.b).toEqual([50, 0]);
+
+      // Right curve should go from [50,0] to [100,0]
+      expect(result.r.a).toEqual([50, 0]);
+      expect(result.r.b).toEqual([100, 0]);
+
+      // For zero tangents, the sub-curves will have calculated tangents from de Casteljau's algorithm
+      // The tangents should be calculated correctly by de Casteljau's algorithm
+      // For a straight line with zero tangents, the sub-curve tangents will be non-zero
+      // but the curves will still evaluate to the same points
+
+      // Verify that the sub-curves evaluate correctly
+      const leftPoint = cmath.bezier.evaluate(
+        result.l.a,
+        result.l.b,
+        result.l.ta,
+        result.l.tb,
+        0.5
+      );
+      const rightPoint = cmath.bezier.evaluate(
+        result.r.a,
+        result.r.b,
+        result.r.ta,
+        result.r.tb,
+        0.5
+      );
+
+      // For cubic Bézier curves, even with zero tangents, evaluation is not linear
+      // The expected values are calculated from the cubic Bézier formula
+      expect(leftPoint[0]).toBeCloseTo(15.625, 6); // Cubic Bézier evaluation at t=0.5
+      expect(leftPoint[1]).toBeCloseTo(0, 6);
+      expect(rightPoint[0]).toBeCloseTo(84.375, 6); // Cubic Bézier evaluation at t=0.5
+      expect(rightPoint[1]).toBeCloseTo(0, 6);
+    });
+
+    test("should subdivide a curved segment at t=0.5", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.5);
+
+      // Split point should be on the curve
+      expect(result.s[0]).toBeCloseTo(50, 6);
+      expect(result.s[1]).toBeGreaterThan(0); // Should be above the line due to tangents
+      expect(result.t).toBe(0.5);
+
+      // Left curve should go from [0,0] to split point
+      expect(result.l.a).toEqual([0, 0]);
+      expect(result.l.b).toEqual(result.s);
+
+      // Right curve should go from split point to [100,0]
+      expect(result.r.a).toEqual(result.s);
+      expect(result.r.b).toEqual([100, 0]);
+
+      // Tangents should be properly calculated
+      expect(result.l.ta).not.toEqual([0, 0]);
+      expect(result.l.tb).not.toEqual([0, 0]);
+      expect(result.r.ta).not.toEqual([0, 0]);
+      expect(result.r.tb).not.toEqual([0, 0]);
+    });
+
+    test("should handle t=0 (degenerate left curve)", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0);
+
+      // Split point should be at the start
+      expect(result.s).toEqual([0, 0]);
+      expect(result.t).toBe(0);
+
+      // Left curve should be degenerate (same start and end)
+      expect(result.l.a).toEqual([0, 0]);
+      expect(result.l.b).toEqual([0, 0]);
+
+      // Right curve should be identical to original
+      expect(result.r.a).toEqual([0, 0]);
+      expect(result.r.b).toEqual([100, 0]);
+      expect(result.r.ta).toEqual([50, 50]);
+      expect(result.r.tb).toEqual([-50, 50]);
+    });
+
+    test("should handle t=1 (degenerate right curve)", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 1);
+
+      // Split point should be at the end
+      expect(result.s).toEqual([100, 0]);
+      expect(result.t).toBe(1);
+
+      // Left curve should be identical to original
+      expect(result.l.a).toEqual([0, 0]);
+      expect(result.l.b).toEqual([100, 0]);
+      expect(result.l.ta).toEqual([50, 50]);
+      expect(result.l.tb).toEqual([-50, 50]);
+
+      // Right curve should be degenerate (same start and end)
+      expect(result.r.a).toEqual([100, 0]);
+      expect(result.r.b).toEqual([100, 0]);
+    });
+  });
+
+  describe("Edge cases and robustness", () => {
+    test("should clamp t values below 0", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+
+      const result = cmath.bezier.subdivide(curve, -0.5);
+
+      expect(result.t).toBe(0);
+      expect(result.s).toEqual([0, 0]);
+    });
+
+    test("should clamp t values above 1", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 1.5);
+
+      expect(result.t).toBe(1);
+      expect(result.s).toEqual([100, 0]);
+    });
+
+    test("should handle NaN t values", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+
+      const result = cmath.bezier.subdivide(curve, NaN);
+
+      expect(result.t).toBe(0);
+      expect(result.s).toEqual([0, 0]);
+    });
+
+    test("should handle Infinity t values", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+
+      const result = cmath.bezier.subdivide(curve, Infinity);
+
+      expect(result.t).toBe(1);
+      expect(result.s).toEqual([100, 0]);
+    });
+
+    test("should handle -Infinity t values", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+
+      const result = cmath.bezier.subdivide(curve, -Infinity);
+
+      expect(result.t).toBe(0);
+      expect(result.s).toEqual([0, 0]);
+    });
+
+    test("should handle zero-length curve", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [50, 50],
+        b: [50, 50],
+        ta: [0, 0],
+        tb: [0, 0],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.5);
+
+      expect(result.s).toEqual([50, 50]);
+      expect(result.t).toBe(0.5);
+
+      // Both sub-curves should be degenerate
+      expect(result.l.a).toEqual([50, 50]);
+      expect(result.l.b).toEqual([50, 50]);
+      expect(result.r.a).toEqual([50, 50]);
+      expect(result.r.b).toEqual([50, 50]);
+    });
+  });
+
+  describe("Mathematical correctness", () => {
+    test("should maintain curve continuity at split point", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.3);
+
+      // The split point should be the same when evaluated on both sub-curves
+      const leftEnd = cmath.bezier.evaluate(
+        result.l.a,
+        result.l.b,
+        result.l.ta,
+        result.l.tb,
+        1
+      );
+      const rightStart = cmath.bezier.evaluate(
+        result.r.a,
+        result.r.b,
+        result.r.ta,
+        result.r.tb,
+        0
+      );
+
+      expect(leftEnd[0]).toBeCloseTo(rightStart[0], 10);
+      expect(leftEnd[1]).toBeCloseTo(rightStart[1], 10);
+      expect(leftEnd[0]).toBeCloseTo(result.s[0], 10);
+      expect(leftEnd[1]).toBeCloseTo(result.s[1], 10);
+    });
+
+    test("should preserve original curve evaluation", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const t = 0.7;
+      const result = cmath.bezier.subdivide(curve, t);
+
+      // The split point should match the original curve evaluation at t
+      const originalPoint = cmath.bezier.evaluate(
+        curve.a,
+        curve.b,
+        curve.ta,
+        curve.tb,
+        t
+      );
+      expect(result.s[0]).toBeCloseTo(originalPoint[0], 10);
+      expect(result.s[1]).toBeCloseTo(originalPoint[1], 10);
+    });
+
+    test("should maintain geometric properties", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [10, 20],
+        b: [90, 80],
+        ta: [30, 10],
+        tb: [-20, 15],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.4);
+
+      // Test that the left sub-curve evaluates correctly
+      const leftPoint = cmath.bezier.evaluate(
+        result.l.a,
+        result.l.b,
+        result.l.ta,
+        result.l.tb,
+        0.5
+      );
+      const expectedLeftPoint = cmath.bezier.evaluate(
+        curve.a,
+        curve.b,
+        curve.ta,
+        curve.tb,
+        0.2
+      ); // 0.5 * 0.4 = 0.2
+      expect(leftPoint[0]).toBeCloseTo(expectedLeftPoint[0], 6);
+      expect(leftPoint[1]).toBeCloseTo(expectedLeftPoint[1], 6);
+
+      // Test that the right sub-curve evaluates correctly
+      const rightPoint = cmath.bezier.evaluate(
+        result.r.a,
+        result.r.b,
+        result.r.ta,
+        result.r.tb,
+        0.5
+      );
+      const expectedRightPoint = cmath.bezier.evaluate(
+        curve.a,
+        curve.b,
+        curve.ta,
+        curve.tb,
+        0.7
+      ); // 0.4 + 0.5 * 0.6 = 0.7
+      expect(rightPoint[0]).toBeCloseTo(expectedRightPoint[0], 6);
+      expect(rightPoint[1]).toBeCloseTo(expectedRightPoint[1], 6);
+    });
+
+    test("should handle symmetric subdivision", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.5);
+
+      // The left and right curves should be symmetric when evaluated at corresponding points
+      const leftPoint = cmath.bezier.evaluate(
+        result.l.a,
+        result.l.b,
+        result.l.ta,
+        result.l.tb,
+        0.3
+      );
+      const rightPoint = cmath.bezier.evaluate(
+        result.r.a,
+        result.r.b,
+        result.r.ta,
+        result.r.tb,
+        0.7
+      );
+
+      // The x-coordinates should be symmetric around the split point
+      const splitX = result.s[0];
+      const leftX = leftPoint[0];
+      const rightX = rightPoint[0];
+      expect(leftX + rightX).toBeCloseTo(2 * splitX, 6);
+    });
+  });
+
+  describe("de Casteljau's algorithm properties", () => {
+    test("should produce identical results for multiple subdivisions", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      // Subdivide at t=0.5, then subdivide the left part at t=0.5 again
+      const result1 = cmath.bezier.subdivide(curve, 0.5);
+      const result2 = cmath.bezier.subdivide(result1.l, 0.5);
+
+      // This should be equivalent to subdividing the original at t=0.25
+      const result3 = cmath.bezier.subdivide(curve, 0.25);
+
+      expect(result2.s[0]).toBeCloseTo(result3.s[0], 6);
+      expect(result2.s[1]).toBeCloseTo(result3.s[1], 6);
+    });
+
+    test("should maintain tangent continuity", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.6);
+
+      // The tangent at the end of the left curve should match the tangent at the start of the right curve
+      const leftTangent = cmath.bezier.tangentAt(
+        result.l.a,
+        result.l.b,
+        result.l.ta,
+        result.l.tb,
+        1
+      );
+      const rightTangent = cmath.bezier.tangentAt(
+        result.r.a,
+        result.r.b,
+        result.r.ta,
+        result.r.tb,
+        0
+      );
+
+      // The tangents should be proportional (same direction)
+      const leftMagnitude = Math.hypot(leftTangent[0], leftTangent[1]);
+      const rightMagnitude = Math.hypot(rightTangent[0], rightTangent[1]);
+
+      if (leftMagnitude > 0 && rightMagnitude > 0) {
+        const leftNormalized = [
+          leftTangent[0] / leftMagnitude,
+          leftTangent[1] / leftMagnitude,
+        ];
+        const rightNormalized = [
+          rightTangent[0] / rightMagnitude,
+          rightTangent[1] / rightMagnitude,
+        ];
+
+        expect(leftNormalized[0]).toBeCloseTo(rightNormalized[0], 6);
+        expect(leftNormalized[1]).toBeCloseTo(rightNormalized[1], 6);
+      }
+    });
+
+    test("should handle complex curves with large tangents", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [100, 100],
+        tb: [-100, 100],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.3);
+
+      // The split point should be reasonable
+      expect(result.s[0]).toBeGreaterThan(0);
+      expect(result.s[0]).toBeLessThan(100);
+      expect(result.t).toBe(0.3);
+
+      // Both sub-curves should be valid
+      expect(result.l.a).toEqual([0, 0]);
+      expect(result.l.b).toEqual(result.s);
+      expect(result.r.a).toEqual(result.s);
+      expect(result.r.b).toEqual([100, 0]);
+    });
+
+    test("should handle negative coordinates", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [-50, -50],
+        b: [50, 50],
+        ta: [25, 25],
+        tb: [-25, -25],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.4);
+
+      // For cubic Bézier curves, the result is not linear interpolation
+      // The split point should match the curve evaluation at t=0.4
+      const expectedPoint = cmath.bezier.evaluate(
+        curve.a,
+        curve.b,
+        curve.ta,
+        curve.tb,
+        0.4
+      );
+      expect(result.s[0]).toBeCloseTo(expectedPoint[0], 6);
+      expect(result.s[1]).toBeCloseTo(expectedPoint[1], 6);
+      expect(result.t).toBe(0.4);
+    });
+
+    test("should handle vertical segments", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [50, 0],
+        b: [50, 100],
+        ta: [0, 25],
+        tb: [0, -25],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.6);
+
+      // For cubic Bézier curves, the result is not linear interpolation
+      // The split point should match the curve evaluation at t=0.6
+      const expectedPoint = cmath.bezier.evaluate(
+        curve.a,
+        curve.b,
+        curve.ta,
+        curve.tb,
+        0.6
+      );
+      expect(result.s[0]).toBeCloseTo(expectedPoint[0], 6);
+      expect(result.s[1]).toBeCloseTo(expectedPoint[1], 6);
+      expect(result.t).toBe(0.6);
+    });
+  });
+
+  describe("Integration with other bezier functions", () => {
+    test("should work with projectParametric", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.7);
+
+      // Project the split point back onto the original curve
+      const projectedT = cmath.bezier.projectParametric(
+        curve.a,
+        curve.b,
+        curve.ta,
+        curve.tb,
+        result.s
+      );
+      expect(projectedT).toBeCloseTo(0.7, 6);
+    });
+
+    test("should work with evaluate", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.5);
+
+      // Evaluate the original curve at t=0.5
+      const originalPoint = cmath.bezier.evaluate(
+        curve.a,
+        curve.b,
+        curve.ta,
+        curve.tb,
+        0.5
+      );
+
+      // The split point should match
+      expect(result.s[0]).toBeCloseTo(originalPoint[0], 10);
+      expect(result.s[1]).toBeCloseTo(originalPoint[1], 10);
+    });
+
+    test("should work with tangentAt", () => {
+      const curve: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, 0],
+        b: [100, 0],
+        ta: [50, 50],
+        tb: [-50, 50],
+      };
+
+      const result = cmath.bezier.subdivide(curve, 0.4);
+
+      // The tangent at the end of the left curve should match the tangent at t=0.4 on the original
+      const leftEndTangent = cmath.bezier.tangentAt(
+        result.l.a,
+        result.l.b,
+        result.l.ta,
+        result.l.tb,
+        1
+      );
+      const originalTangent = cmath.bezier.tangentAt(
+        curve.a,
+        curve.b,
+        curve.ta,
+        curve.tb,
+        0.4
+      );
+
+      // They should be proportional
+      const leftMagnitude = Math.hypot(leftEndTangent[0], leftEndTangent[1]);
+      const originalMagnitude = Math.hypot(
+        originalTangent[0],
+        originalTangent[1]
+      );
+
+      if (leftMagnitude > 0 && originalMagnitude > 0) {
+        const leftNormalized = [
+          leftEndTangent[0] / leftMagnitude,
+          leftEndTangent[1] / leftMagnitude,
+        ];
+        const originalNormalized = [
+          originalTangent[0] / originalMagnitude,
+          originalTangent[1] / originalMagnitude,
+        ];
+
+        expect(leftNormalized[0]).toBeCloseTo(originalNormalized[0], 6);
+        expect(leftNormalized[1]).toBeCloseTo(originalNormalized[1], 6);
+      }
+    });
+  });
+});
