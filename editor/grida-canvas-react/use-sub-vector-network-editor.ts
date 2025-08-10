@@ -33,6 +33,7 @@ export default function useSurfaceVectorEditor() {
     path_cursor_position,
     next_ta,
     hovered_segment_index,
+    hovered_vertex_index,
   } = state.content_edit_mode;
 
   const vertices = node.vectorNetwork.vertices;
@@ -188,6 +189,13 @@ export default function useSurfaceVectorEditor() {
     [instance]
   );
 
+  const updateHoveredVertex = useCallback(
+    (vertexIndex: number | null) => {
+      instance.updateVectorHoveredVertex(vertexIndex);
+    },
+    [instance]
+  );
+
   return useMemo(
     () => ({
       node_id,
@@ -206,6 +214,7 @@ export default function useSurfaceVectorEditor() {
       a_point,
       next_ta,
       hovered_segment_index,
+      hovered_vertex_index,
       selectVertex,
       deleteVertex,
       selectSegment,
@@ -216,6 +225,7 @@ export default function useSurfaceVectorEditor() {
       onSegmentInsertMiddle,
       bendSegment,
       updateHoveredSegment,
+      updateHoveredVertex,
       loops,
     }),
     [
@@ -236,6 +246,7 @@ export default function useSurfaceVectorEditor() {
       a_point,
       next_ta,
       hovered_segment_index,
+      hovered_vertex_index,
       selectVertex,
       deleteVertex,
       selectSegment,
@@ -246,6 +257,7 @@ export default function useSurfaceVectorEditor() {
       onSegmentInsertMiddle,
       bendSegment,
       updateHoveredSegment,
+      updateHoveredVertex,
       loops,
     ]
   );

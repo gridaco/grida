@@ -326,3 +326,22 @@ export function self_updateVectorHoveredSegment<
 
   draft.content_edit_mode.hovered_segment_index = segmentIndex;
 }
+
+/**
+ * Updates the hovered vertex index in vector content edit mode.
+ *
+ * This method manages the UI-triggered hover state for vertices in vector edit mode.
+ * The hover state is used for visual feedback when hovering over vertices.
+ *
+ * @param draft - The editor state draft to modify
+ * @param vertexIndex - The index of the hovered vertex, or null if no vertex is hovered
+ */
+export function self_updateVectorHoveredVertex<
+  S extends editor.state.IEditorState,
+>(draft: Draft<S>, vertexIndex: number | null) {
+  if (draft.content_edit_mode?.type !== "vector") {
+    return;
+  }
+
+  draft.content_edit_mode.hovered_vertex_index = vertexIndex;
+}

@@ -462,6 +462,7 @@ function __self_evt_on_pointer_down(
           clipboard: null,
           clipboard_node_position: null,
           hovered_segment_index: null,
+          hovered_vertex_index: null,
           snapped_vertex_idx: null,
         };
       }

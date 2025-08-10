@@ -706,6 +706,16 @@ export namespace editor.state {
     path_cursor_position: cmath.Vector2;
 
     /**
+     * snapped vertex index (of a selected path node)
+     *
+     * This is mathematically resolved based on proximity calculations and snap guides.
+     * Used for measurement calculations and precise vertex targeting.
+     *
+     * @default null
+     */
+    snapped_vertex_idx: number | null;
+
+    /**
      * hovered segment index for measurement feature
      *
      * This is a UI-triggered hover state based on surface interaction, not mathematically resolved.
@@ -716,11 +726,14 @@ export namespace editor.state {
     hovered_segment_index: number | null;
 
     /**
-     * snapped vertex index (of a selected path node)
+     * hovered vertex index for UI feedback
+     *
+     * This is a UI-triggered hover state based on surface interaction, not mathematically resolved.
+     * Used for visual feedback when hovering over vertices in vector edit mode.
      *
      * @default null
      */
-    snapped_vertex_idx: number | null;
+    hovered_vertex_index: number | null;
   };
 
   type BitmapContentEditMode = {
@@ -1877,6 +1890,13 @@ export namespace editor.api {
      * @param segmentIndex - The index of the hovered segment, or null if no segment is hovered
      */
     updateVectorHoveredSegment(segmentIndex: number | null): void;
+
+    /**
+     * Updates the hovered vertex index in vector content edit mode.
+     *
+     * @param vertexIndex - The index of the hovered vertex, or null if no vertex is hovered
+     */
+    updateVectorHoveredVertex(vertexIndex: number | null): void;
 
     //
 

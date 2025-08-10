@@ -290,7 +290,8 @@ export type EditorVectorEditorAction =
   | EditorVectorTranslateSegmentAction
   | EditorVectorBendSegmentAction
   | EditorVectorBendOrClearCornerAction
-  | EditorVectorUpdateHoveredSegmentAction;
+  | EditorVectorUpdateHoveredSegmentAction
+  | EditorVectorUpdateHoveredVertexAction;
 
 export interface EditorVectorSelectVertexAction {
   type: "select-vertex";
@@ -377,6 +378,11 @@ export interface EditorVectorBendOrClearCornerAction {
 export interface EditorVectorUpdateHoveredSegmentAction {
   type: "vector/update-hovered-segment";
   segmentIndex: number | null;
+}
+
+export interface EditorVectorUpdateHoveredVertexAction {
+  type: "vector/update-hovered-vertex";
+  vertexIndex: number | null;
 }
 // #endregion
 

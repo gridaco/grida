@@ -41,6 +41,7 @@ export function SurfaceVectorEditor({
     a_point,
     next_ta,
     hovered_segment_index,
+    hovered_vertex_index,
   } = ve;
 
   assert(node_id === _node_id);
@@ -497,18 +498,18 @@ function VertexPoint({
   const instance = useCurrentEditor();
   const tool = useToolState();
   const selected = ve.selected_vertices.includes(index);
-  const [internalHovered, setInternalHovered] = React.useState(false);
-  const hovered = internalHovered || ve.snapped_point === index;
+  const hovered =
+    ve.snapped_point === index || ve.hovered_vertex_index === index;
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const bind = useGesture(
     {
       onHover: (s) => {
         if (s.first) {
-          setInternalHovered(true);
+          ve.updateHoveredVertex(index);
         }
         if (s.last) {
-          setInternalHovered(false);
+          ve.updateHoveredVertex(null);
         }
       },
       onPointerDown: ({ event }) => {

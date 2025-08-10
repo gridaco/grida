@@ -867,6 +867,13 @@ export class Editor
     });
   }
 
+  public updateVectorHoveredVertex(vertexIndex: number | null) {
+    this.dispatch({
+      type: "vector/update-hovered-vertex",
+      vertexIndex,
+    });
+  }
+
   public bendOrClearCorner(
     node_id: editor.NodeID,
     vertex: number,
