@@ -10,7 +10,7 @@ import {
 } from "@/components/sidebar";
 import { PropertyEnumTabs, PropertyLine, PropertyLineLabel } from "../ui";
 import InputPropertyNumber from "../ui/number";
-import useSurfaceVectorEditor from "@/grida-canvas-react/use-sub-vector-network-editor";
+import useVectorContentEditMode from "@/grida-canvas-react/use-sub-vector-network-editor";
 import useTangentMirroring from "./use-tangent-mirroring";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
@@ -45,7 +45,7 @@ function SectionGeometry({ node_id }: { node_id: string }) {
     absolute_vertices,
     segments,
     vectorNetwork,
-  } = useSurfaceVectorEditor();
+  } = useVectorContentEditMode();
   const {
     value: mirroring,
     setValue: setMirroring,

@@ -5,7 +5,7 @@ import assert from "assert";
 import type grida from "@grida/schema";
 import vn from "@grida/vn";
 
-export default function useSurfaceVectorEditor() {
+export default function useVectorContentEditMode() {
   const instance = useCurrentEditor();
   const state = useEditorState(instance, (state) => {
     const content_edit_mode = state.content_edit_mode;

@@ -5,7 +5,7 @@ import { measure, Measurement } from "@grida/cmath/_measurement";
 import { MeasurementGuideRenderer } from "./measurement";
 import vn from "@grida/vn";
 import cmath from "@grida/cmath";
-import useSurfaceVectorEditor from "../../use-sub-vector-network-editor";
+import useVectorContentEditMode from "../../use-sub-vector-network-editor";
 
 /**
  * Pure function to check if a target vertex is part of the current selection.
@@ -224,7 +224,7 @@ function useVectorMeasurement() {
     (state) => state.surface_measurement_targeting
   );
   const pointer = useEditorState(editor, (state) => state.pointer);
-  const ve = useSurfaceVectorEditor();
+  const ve = useVectorContentEditMode();
 
   // Memoize the measurement calculation to avoid infinite re-renders
   const measurement = useMemo(() => {

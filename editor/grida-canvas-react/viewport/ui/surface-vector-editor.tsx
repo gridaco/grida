@@ -10,7 +10,7 @@ import { cn } from "@/components/lib/utils";
 import { svg } from "@/grida-canvas-utils/svg";
 import { Point } from "./point";
 import assert from "assert";
-import useSurfaceVectorEditor from "@/grida-canvas-react/use-sub-vector-network-editor";
+import useVectorContentEditMode from "@/grida-canvas-react/use-sub-vector-network-editor";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { VectorRegion } from "./vector-region";
 
@@ -29,7 +29,7 @@ export function SurfaceVectorEditor({
   const tool = useToolState();
   const { debug } = useEditorFlagsState();
   const { transform } = useTransformState();
-  const ve = useSurfaceVectorEditor();
+  const ve = useVectorContentEditMode();
   const {
     node_id,
     absolute_vertices,
@@ -155,7 +155,7 @@ export function SurfaceVectorEditor({
           {/* next segment */}
           <Extension
             a={
-              a_point
+              a_point != null
                 ? cmath.vector2.transform(absolute_vertices[a_point], transform)
                 : undefined
             }
@@ -239,7 +239,7 @@ function Segment({
   hovered: boolean;
   onHover: (segmentIndex: number | null) => void;
 }) {
-  const ve = useSurfaceVectorEditor();
+  const ve = useVectorContentEditMode();
   const instance = useCurrentEditor();
   const tool = useToolState();
   const segment = ve.segments[segmentIndex];
@@ -397,7 +397,7 @@ function CurveControlExtension({
   tb?: cmath.Vector2;
   selected?: boolean;
 }) {
-  const editor = useSurfaceVectorEditor();
+  const editor = useVectorContentEditMode();
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const bind = useGesture(
@@ -496,7 +496,7 @@ function MiddlePoint({
   point: cmath.Vector2;
   segmentIndex: number;
 }) {
-  const editor = useSurfaceVectorEditor();
+  const editor = useVectorContentEditMode();
   const tool = useToolState();
 
   const bind = useGesture({
@@ -524,7 +524,7 @@ function VertexPoint({
   point: cmath.Vector2;
   index: number;
 }) {
-  const ve = useSurfaceVectorEditor();
+  const ve = useVectorContentEditMode();
   const instance = useCurrentEditor();
   const tool = useToolState();
   const selected = ve.selected_vertices.includes(index);
