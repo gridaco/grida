@@ -34,23 +34,33 @@ function CanvasContent({
   const rendererRef = React.useRef<Grida2D | null>(null);
 
   useLayoutEffect(() => {
-    if (canvasRef.current && !rendererRef.current) {
-      const canvasel = canvasRef.current;
-      init({
-        locateFile: locateFile,
-      }).then((factory) => {
-        console.log("grida wasm initialized");
-        const grida = factory.createWebGLCanvasSurface(canvasel);
-        grida.runtime_renderer_set_cache_tile(false);
-        // grida.setDebug(true);
-        // grida.setVerbose(true);
+    if (!canvasRef.current || rendererRef.current) return;
+    if (width <= 0 || height <= 0) return;
 
-        rendererRef.current = grida;
+    const canvasel = canvasRef.current;
+    canvasel.width = width * dpr;
+    canvasel.height = height * dpr;
+    let cancelled = false;
 
-        onMount?.(grida);
-      });
-    }
-  }, []);
+    init({
+      locateFile: locateFile,
+    }).then((factory) => {
+      if (cancelled) return;
+      console.log("grida wasm initialized");
+      const grida = factory.createWebGLCanvasSurface(canvasel);
+      grida.runtime_renderer_set_cache_tile(false);
+      // grida.setDebug(true);
+      // grida.setVerbose(true);
+
+      rendererRef.current = grida;
+
+      onMount?.(grida);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [width, height, dpr]);
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
@@ -121,6 +131,7 @@ function CanvasContent({
       style={{
         width: `${width}px`,
         height: `${height}px`,
+        display: "block",
       }}
       className={className}
     />

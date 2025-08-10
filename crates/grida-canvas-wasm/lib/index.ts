@@ -70,6 +70,10 @@ class ApplicationFactory {
     canvas: HTMLCanvasElement,
     options: CreateWebGLCanvasSurfaceOptions = { fontFallback: true }
   ) {
+    if (canvas.width === 0 || canvas.height === 0) {
+      throw new Error("Canvas size is zero. Set width/height before creating WebGL surface.");
+    }
+
     const context = canvas.getContext("webgl2", {
       antialias: true,
       depth: true,
@@ -91,7 +95,8 @@ class ApplicationFactory {
       options.fontFallback
     );
     const _ = new Grida2D(this.module, ptr);
-    _.resize(canvas.width, canvas.height);
+    // initial size passed to _init already; avoid redundant resize here
+    // _.resize(canvas.width, canvas.height);
 
     return _;
   }

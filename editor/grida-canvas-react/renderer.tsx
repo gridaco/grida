@@ -76,7 +76,7 @@ export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
   });
 
   return (
-    <SizeProvider className="w-full h-full">
+    <SizeProvider className="w-full h-full relative flex">
       <Canvas
         width={100}
         height={100}
