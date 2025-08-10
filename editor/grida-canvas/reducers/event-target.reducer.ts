@@ -32,6 +32,7 @@ import { self_moveNode } from "./methods/move";
 import {
   self_updateVectorAreaSelection,
   getUXNeighbouringVertices,
+  self_updateVectorSnappedSegmentP,
 } from "./methods/vector";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import { getInitialCurveGesture } from "./tools/gesture";
@@ -146,6 +147,11 @@ function __self_evt_on_pointer_move(
         draft.content_edit_mode.snapped_vertex_idx = null;
       }
     }
+
+    // Compute segment snapping if no vertex is snapped and there's a hovered segment
+    if (draft.content_edit_mode?.type === "vector") {
+      __self_compute_vector_segment_snapping(draft, logical_pos, rect, node);
+    }
   }
 }
 
@@ -156,6 +162,69 @@ function __self_evt_on_pointer_move_raycast(
   const { node_ids_from_point } = <EditorEventTarget_PointerMoveRaycast>action;
   draft.hits = node_ids_from_point;
   self_updateSurfaceHoverState(draft);
+}
+
+/**
+ * Computes segment snapping for vector content edit mode.
+ *
+ * This function calculates the parametric position on a hovered segment
+ * when the pointer is close enough to snap to it. Only computes when
+ * no vertex is snapped and there's a hovered segment for performance.
+ *
+ * @param draft - The editor state draft to modify
+ * @param logical_pos - The logical pointer position in canvas space
+ * @param rect - The node's absolute bounding rectangle
+ * @param node - The vector node being edited
+ */
+function __self_compute_vector_segment_snapping<
+  S extends editor.state.IEditorState,
+>(
+  draft: Draft<S>,
+  logical_pos: cmath.Vector2,
+  rect: cmath.Rectangle,
+  node: grida.program.nodes.VectorNode
+) {
+  if (
+    draft.content_edit_mode?.type === "vector" &&
+    draft.content_edit_mode.snapped_vertex_idx === null &&
+    draft.content_edit_mode.hovered_segment_index !== null
+  ) {
+    // Calculate local point (relative to vector network origin)
+    const local_point = cmath.vector2.sub(logical_pos, [rect.x, rect.y]);
+
+    const segment_index = draft.content_edit_mode.hovered_segment_index;
+    const segment = node.vectorNetwork.segments[segment_index];
+    const a = node.vectorNetwork.vertices[segment.a];
+    const b = node.vectorNetwork.vertices[segment.b];
+    const ta = segment.ta;
+    const tb = segment.tb;
+
+    // Project the point onto the segment
+    const t = cmath.bezier.projectParametric(a, b, ta, tb, local_point);
+
+    // Evaluate the curve at the projected parametric value
+    const parametricPoint = cmath.bezier.evaluate(a, b, ta, tb, t);
+
+    // Calculate distance to the projected point
+    const distance = cmath.vector2.distance(local_point, parametricPoint);
+
+    // Check if within threshold
+    const segment_snap_threshold = threshold(10, draft.transform);
+    if (distance <= segment_snap_threshold) {
+      self_updateVectorSnappedSegmentP(draft, {
+        segment: segment_index,
+        t,
+        point: parametricPoint,
+      });
+    } else {
+      self_updateVectorSnappedSegmentP(draft, null);
+    }
+  } else {
+    // Clear segment snapping when vertex is snapped or no hovered segment
+    if (draft.content_edit_mode?.type === "vector") {
+      draft.content_edit_mode.snapped_segment_p = null;
+    }
+  }
 }
 
 function __self_evt_on_click(

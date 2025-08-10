@@ -358,7 +358,7 @@ export function self_updateVectorHoveredVertex<
  */
 export function self_updateVectorSnappedSegmentP<
   S extends editor.state.IEditorState,
->(draft: Draft<S>, snappedSegmentP: vn.PointOnSegment | null) {
+>(draft: Draft<S>, snappedSegmentP: vn.EvaluatedPointOnSegment | null) {
   if (draft.content_edit_mode?.type !== "vector") {
     return;
   }

@@ -716,6 +716,17 @@ export namespace editor.state {
     snapped_vertex_idx: number | null;
 
     /**
+     * snapped segment with parametric position and evaluated point
+     *
+     * This is mathematically resolved based on proximity calculations and snap guides.
+     * Contains the segment index, parametric position (t), and evaluated point for precise targeting.
+     * Used for measurement calculations and precise segment targeting.
+     *
+     * @default null
+     */
+    snapped_segment_p: vn.EvaluatedPointOnSegment | null;
+
+    /**
      * hovered segment index for measurement feature
      *
      * This is a UI-triggered hover state based on surface interaction, not mathematically resolved.
@@ -734,17 +745,6 @@ export namespace editor.state {
      * @default null
      */
     hovered_vertex_index: number | null;
-
-    /**
-     * snapped segment with parametric position
-     *
-     * This is mathematically resolved based on proximity calculations and snap guides.
-     * Contains both the segment index and parametric position (t) for precise targeting.
-     * Used for measurement calculations and precise segment targeting.
-     *
-     * @default null
-     */
-    snapped_segment_p: vn.PointOnSegment | null;
   };
 
   type BitmapContentEditMode = {

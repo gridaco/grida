@@ -42,6 +42,7 @@ export function SurfaceVectorEditor({
     next_ta,
     hovered_segment_index,
     hovered_vertex_index,
+    snapped_segment_p,
   } = ve;
 
   assert(node_id === _node_id);
@@ -50,6 +51,30 @@ export function SurfaceVectorEditor({
     () => new Set(neighbouring_vertices),
     [neighbouring_vertices]
   );
+
+  // Calculate the snapped segment point position if it exists
+  const snappedSegmentPoint = useMemo(() => {
+    if (!snapped_segment_p) return null;
+
+    const segment = segments[snapped_segment_p.segment];
+    if (!segment) return null;
+
+    const a = absolute_vertices[segment.a];
+    const b = absolute_vertices[segment.b];
+    const ta = segment.ta;
+    const tb = segment.tb;
+
+    // Evaluate the curve at the parametric value
+    const parametricPoint = cmath.bezier.evaluate(
+      a,
+      b,
+      ta,
+      tb,
+      snapped_segment_p.t
+    );
+
+    return cmath.vector2.transform(parametricPoint, transform);
+  }, [snapped_segment_p, segments, absolute_vertices, transform]);
 
   return (
     <div id="path-editor-surface" className="fixed left-0 top-0 w-0 h-0 z-10">
@@ -97,6 +122,22 @@ export function SurfaceVectorEditor({
           </svg>
         )}
       </div>
+
+      {/* Display snapped segment point */}
+      {snappedSegmentPoint && (
+        <div style={{ pointerEvents: "none" }}>
+          <Point
+            point={snappedSegmentPoint}
+            style={{
+              cursor: "crosshair",
+              zIndex: 100,
+            }}
+            shape="circle"
+            size={8}
+            className="stroke-workbench-accent-sky stroke-2 fill-white"
+          />
+        </div>
+      )}
 
       {loops.map((loop, i) => {
         const vertexPositions = loop.vertices.map((v) =>

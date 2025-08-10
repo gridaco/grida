@@ -99,23 +99,27 @@ function calculateVectorMeasurement(params: {
   hovered_segment_index: number | null;
   snapped_vertex_idx: number | null;
   hovered_vertex_index: number | null;
+  snapped_segment_p: vn.EvaluatedPointOnSegment | null;
   selected_vertices: number[];
   selected_segments: number[];
   segments: vn.VectorNetworkSegment[];
   absolute_vertices: cmath.Vector2[];
   vertices: cmath.Vector2[];
   local_point: cmath.Vector2;
+  offset: cmath.Vector2;
 }): Measurement | null {
   const {
     hovered_segment_index,
     snapped_vertex_idx,
     hovered_vertex_index,
+    snapped_segment_p,
     selected_vertices,
     selected_segments,
     segments,
     absolute_vertices,
     vertices,
     local_point,
+    offset,
   } = params;
 
   // Only measure when:
@@ -173,46 +177,16 @@ function calculateVectorMeasurement(params: {
       return null;
     }
 
-    // Project the mouse point onto the curve to get the parametric value
-    // For zero-tangent segments, use linear projection since that's what users expect
-    const t =
-      cmath.vector2.isZero(segment.ta) && cmath.vector2.isZero(segment.tb)
-        ? (() => {
-            // Linear projection for zero-tangent segments (user expectation)
-            const dx = vertices[segment.b][0] - vertices[segment.a][0];
-            const dy = vertices[segment.b][1] - vertices[segment.a][1];
-            const lenSq = dx * dx + dy * dy;
-            if (lenSq === 0) return 0;
-            const tLine =
-              ((local_point[0] - vertices[segment.a][0]) * dx +
-                (local_point[1] - vertices[segment.a][1]) * dy) /
-              lenSq;
-            return Math.max(0, Math.min(1, tLine));
-          })()
-        : cmath.bezier.projectParametric(
-            vertices[segment.a],
-            vertices[segment.b],
-            segment.ta,
-            segment.tb,
-            local_point
-          );
+    // Use pre-computed snapped segment point
+    if (
+      !snapped_segment_p ||
+      snapped_segment_p.segment !== hovered_segment_index
+    ) {
+      return null;
+    }
 
-    // Evaluate the curve at the projected parametric value
-    // For zero-tangent segments, use linear interpolation to match the projection
-    const parametricPoint =
-      cmath.vector2.isZero(segment.ta) && cmath.vector2.isZero(segment.tb)
-        ? cmath.vector2.lerp(
-            absolute_vertices[segment.a],
-            absolute_vertices[segment.b],
-            t
-          )
-        : cmath.bezier.evaluate(
-            absolute_vertices[segment.a],
-            absolute_vertices[segment.b],
-            segment.ta,
-            segment.tb,
-            t
-          );
+    // Use the pre-computed point directly (convert from local to absolute coordinates)
+    const parametricPoint = cmath.vector2.add(snapped_segment_p.point, offset);
 
     b_rect = cmath.rect.quantize(
       { x: parametricPoint[0], y: parametricPoint[1], width: 0, height: 0 },
@@ -267,12 +241,14 @@ function useVectorMeasurement() {
         hovered_segment_index: ve.hovered_segment_index,
         snapped_vertex_idx: ve.snapped_point,
         hovered_vertex_index: ve.hovered_vertex_index,
+        snapped_segment_p: ve.snapped_segment_p,
         selected_vertices: ve.selected_vertices,
         selected_segments: ve.selected_segments,
         segments: ve.segments,
         absolute_vertices: ve.absolute_vertices,
         vertices: ve.vertices,
         local_point,
+        offset: ve.offset,
       });
 
       return result || undefined;
@@ -285,6 +261,7 @@ function useVectorMeasurement() {
     ve.hovered_segment_index,
     ve.hovered_vertex_index,
     ve.snapped_point,
+    ve.snapped_segment_p,
     ve.selected_vertices,
     ve.selected_segments,
     ve.segments,

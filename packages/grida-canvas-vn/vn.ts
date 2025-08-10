@@ -76,6 +76,39 @@ export namespace vn {
   };
 
   /**
+   * Represents a point on a segment with its evaluated position.
+   *
+   * This type extends `PointOnSegment` to include the computed position
+   * on the curve, eliminating the need to re-evaluate the curve when
+   * the point is needed for measurements or display.
+   *
+   * @example
+   * ```ts
+   * const evaluatedPoint: EvaluatedPointOnSegment = {
+   *   segment: 0,  // Index of the segment
+   *   t: 0.5,      // Parametric value (middle of segment)
+   *   point: [10, 20]  // Evaluated position in local coordinates
+   * };
+   * ```
+   */
+  export type EvaluatedPointOnSegment = PointOnSegment & {
+    /**
+     * Resolved point on the curve in local coordinates (relative to vector network origin).
+     *
+     * This is the actual position on the curve at the parametric value `t`.
+     * Storing this eliminates the need to re-evaluate the curve when the point
+     * is needed for measurements or display.
+     *
+     * @example
+     * ```ts
+     * // Use the pre-computed position directly
+     * const position = evaluatedPoint.point;
+     * ```
+     */
+    point: Vector2;
+  };
+
+  /**
    * Represents a segment in the vector network, connecting two vertices.
    *
    * @property a - Index of the starting vertex.
