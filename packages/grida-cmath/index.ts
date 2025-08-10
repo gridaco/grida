@@ -3584,6 +3584,57 @@ namespace cmath {
         return [ta, tb];
       }
     }
+
+    /**
+     * Cubic Bézier tangent (derivative) at parametric t ∈ [0,1].
+     *
+     * Points are given as:
+     *  P0 = a
+     *  P1 = a + ta
+     *  P2 = b + tb
+     *  P3 = b
+     *
+     * Uses the standard cubic Bézier derivative formula:
+     * B'(t) = 3(1-t)²(P1-P0) + 6(1-t)t(P2-P1) + 3t²(P3-P2)
+     *
+     * Where:
+     * - P1-P0 = ta
+     * - P2-P1 = (b+tb) - (a+ta) = b-a+tb-ta
+     * - P3-P2 = b - (b+tb) = -tb
+     *
+     * @param a - Start point
+     * @param b - End point
+     * @param ta - Tangent at start point
+     * @param tb - Tangent at end point
+     * @param t - Parametric position ∈ [0,1]
+     * @returns Tangent vector [dx, dy]
+     */
+    export function tangentAt(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      t: number
+    ): Vector2 {
+      // Clamp t to [0, 1] for robustness
+      const u = Math.max(0, Math.min(1, t));
+      const mt = 1 - u;
+
+      // Standard cubic Bézier derivative formula using control point differences:
+      // B'(t) = 3(1-t)²(P1-P0) + 6(1-t)t(P2-P1) + 3t²(P3-P2)
+      // Where: P1-P0 = ta, P2-P1 = b-a+tb-ta, P3-P2 = -tb
+
+      const dx =
+        3 * (mt * mt) * ta[0] +
+        6 * mt * u * (b[0] - a[0] + tb[0] - ta[0]) +
+        3 * (u * u) * -tb[0];
+      const dy =
+        3 * (mt * mt) * ta[1] +
+        6 * mt * u * (b[1] - a[1] + tb[1] - ta[1]) +
+        3 * (u * u) * -tb[1];
+
+      return [dx, dy];
+    }
   }
 
   export namespace transform {
