@@ -1,10 +1,10 @@
 "use client";
 import React, { useEffect, useLayoutEffect, useState } from "react";
-import init, { Grida2D } from "@grida/canvas-wasm";
+import { Grida2D } from "@grida/canvas-wasm";
 import { useSize } from "@/grida-canvas-react/viewport/size";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
-import locateFile from "./locate-file";
+import { useGrida2D } from "./use-grida2d";
 
 function CanvasContent({
   width,
@@ -31,26 +31,13 @@ function CanvasContent({
   className?: string;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const rendererRef = React.useRef<Grida2D | null>(null);
+  const rendererRef = useGrida2D(canvasRef);
 
   useLayoutEffect(() => {
-    if (canvasRef.current && !rendererRef.current) {
-      const canvasel = canvasRef.current;
-      init({
-        locateFile: locateFile,
-      }).then((factory) => {
-        console.log("grida wasm initialized");
-        const grida = factory.createWebGLCanvasSurface(canvasel);
-        grida.runtime_renderer_set_cache_tile(false);
-        // grida.setDebug(true);
-        // grida.setVerbose(true);
-
-        rendererRef.current = grida;
-
-        onMount?.(grida);
-      });
+    if (rendererRef.current) {
+      onMount?.(rendererRef.current);
     }
-  }, []);
+  }, [rendererRef.current, onMount]);
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
