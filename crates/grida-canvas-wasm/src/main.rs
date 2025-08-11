@@ -34,13 +34,13 @@ pub extern "C" fn init(
     height: i32,
     cfg_font_fallback: bool,
 ) -> Box<EmscriptenApplication> {
-    Box::new(EmscriptenApplication::new(
+    EmscriptenApplication::new(
         width,
         height,
         cg::runtime::scene::RendererOptions {
             font_fallback: cfg_font_fallback,
         },
-    ))
+    )
 }
 
 #[no_mangle]
