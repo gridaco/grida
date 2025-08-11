@@ -31,19 +31,21 @@ function CanvasContent({
   className?: string;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const rendererRef = useGrida2D(canvasRef);
+  const { surface, ready } = useGrida2D(canvasRef);
 
+  // onMount once surface is ready
   useLayoutEffect(() => {
-    if (rendererRef.current) {
-      onMount?.(rendererRef.current);
+    if (ready && surface) {
+      onMount?.(surface);
     }
-  }, [rendererRef.current, onMount]);
+  }, [ready, surface, onMount]);
 
+  // debug toggle
   useLayoutEffect(() => {
-    if (rendererRef.current) {
-      rendererRef.current.setDebug(debug ?? false);
+    if (ready && surface) {
+      surface.setDebug(debug ?? false);
     }
-  }, [rendererRef.current, debug]);
+  }, [ready, surface, debug]);
 
   const syncTransform = (
     surface: Grida2D,
@@ -68,37 +70,41 @@ function CanvasContent({
     surface.redraw();
   };
 
+  // sync transform when ready or dependencies change
   useLayoutEffect(() => {
-    if (rendererRef.current) {
-      syncTransform(rendererRef.current, transform, width, height);
+    if (ready && surface) {
+      syncTransform(surface, transform, width, height);
     }
-  }, [transform, width, height]);
+  }, [ready, surface, transform, width, height]);
 
+  // resize when ready or size/dpr change
   useLayoutEffect(() => {
-    if (rendererRef.current) {
-      rendererRef.current.resize(width * dpr, height * dpr);
-      syncTransform(rendererRef.current, transform, width, height);
+    if (ready && surface) {
+      surface.resize(width * dpr, height * dpr);
+      syncTransform(surface, transform, width, height);
     }
-  }, [width, height, dpr]);
+  }, [ready, surface, width, height, dpr]);
 
+  // load data once ready or when data changes
   useLayoutEffect(() => {
-    if (rendererRef.current && data) {
-      rendererRef.current.loadScene(
+    if (ready && surface && data) {
+      surface.loadScene(
         JSON.stringify({
           version: "0.0.1-beta.1+20250728",
           document: data,
         })
       );
-      rendererRef.current.redraw();
+      surface.redraw();
     }
-  }, [data]);
+  }, [ready, surface, data]);
 
+  // highlight strokes update
   useLayoutEffect(() => {
-    if (rendererRef.current) {
-      rendererRef.current.highlightStrokes(highlightStrokes);
-      rendererRef.current.redraw();
+    if (ready && surface) {
+      surface.highlightStrokes(highlightStrokes);
+      surface.redraw();
     }
-  }, [highlightStrokes]);
+  }, [ready, surface, highlightStrokes]);
 
   return (
     <canvas

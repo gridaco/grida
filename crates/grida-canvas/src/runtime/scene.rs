@@ -286,15 +286,17 @@ impl Renderer {
         // let deps_camera_changed = self.camera.changed();
         // TODO: check for dependencies
 
+        // Always compute the latest frame plan so that a subsequent flush uses up-to-date state,
+        // even if a previous frame is already pending.
+        let rect = Some(self.camera.rect());
+        self.plan = Some(self.frame(
+            rect.unwrap_or(rect::Rectangle::empty()),
+            self.camera.get_zoom(),
+            stable,
+        ));
+
+        // Only request a redraw if there isn't already one pending.
         if !self.fc.has_pending() {
-            let rect = Some(self.camera.rect());
-
-            self.plan = Some(self.frame(
-                rect.unwrap_or(rect::Rectangle::empty()),
-                self.camera.get_zoom(),
-                stable,
-            ));
-
             self.fc.queue();
             self.request_redraw();
         }

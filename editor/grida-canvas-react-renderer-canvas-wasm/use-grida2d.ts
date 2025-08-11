@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import init, { Grida2D } from "@grida/canvas-wasm";
 import locateFile from "./locate-file";
 
@@ -7,6 +7,7 @@ export function useGrida2D(
 ) {
   const rendererRef = useRef<Grida2D | null>(null);
   const isInitializedRef = useRef(false);
+  const [ready, setReady] = useState(false);
 
   useLayoutEffect(() => {
     if (canvasRef.current && !isInitializedRef.current) {
@@ -22,10 +23,11 @@ export function useGrida2D(
         // grida.setVerbose(true);
 
         rendererRef.current = grida;
+        setReady(true);
         console.log("grida wasm initialized");
       });
     }
   }, [canvasRef]);
 
-  return rendererRef;
+  return { surface: rendererRef.current, ready } as const;
 }
