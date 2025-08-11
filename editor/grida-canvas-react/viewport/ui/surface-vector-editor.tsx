@@ -347,7 +347,7 @@ function Segment({
   return (
     <>
       {/* Invisible hit area curve */}
-      <div {...bind()}>
+      <div {...bind()} style={{ touchAction: "none" }}>
         <Curve
           a={a}
           b={b}

@@ -168,11 +168,7 @@ export function PlaygroundToolbar() {
         <ToggleGroupPrimitive.Root
           data-slot="toggle-group"
           onValueChange={(v) => {
-            editor.setTool(
-              v
-                ? toolbar_value_to_cursormode(v as ToolbarToolType)
-                : { type: "cursor" }
-            );
+            editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
           value={value}
           defaultValue="cursor"

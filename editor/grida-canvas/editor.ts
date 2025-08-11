@@ -208,6 +208,12 @@ export class Editor
     return this.debug;
   }
 
+  private log(...args: any[]) {
+    if (this.debug || process.env.NODE_ENV === "development") {
+      console.log(...args);
+    }
+  }
+
   public reset(
     state: editor.state.IEditorState,
     key: string | undefined = undefined,
@@ -528,7 +534,9 @@ export class Editor
     return ref;
   }
 
-  setTool(tool: editor.state.ToolMode) {
+  setTool(tool: editor.state.ToolMode, debug_label?: string) {
+    if (debug_label) this.log("debug:setTool", tool, debug_label);
+
     this.dispatch({
       type: "surface/tool",
       tool: tool,
@@ -646,13 +654,14 @@ export class Editor
 
   public a11yEscape() {
     const step = this._stackEscapeSteps(this.mstate)[0];
+
     switch (step) {
       case "escape-tool": {
-        this.setTool({ type: "cursor" });
+        this.setTool({ type: "cursor" }, "a11yEscape");
         break;
       }
       case "escape-selection": {
-        this.blur();
+        this.blur("a11yEscape");
         break;
       }
       case "escape-content-edit-mode":
@@ -663,7 +672,9 @@ export class Editor
     }
   }
 
-  public blur() {
+  public blur(debug_label?: string) {
+    if (debug_label) this.log("debug:blur", debug_label);
+
     this.dispatch({
       type: "blur",
     });

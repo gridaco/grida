@@ -346,7 +346,8 @@ export function useEditorHotKeys() {
   const [altKey, setAltKey] = useState(false);
 
   useEffect(() => {
-    const cb = (e: any) => {
+    const cb = (e: FocusEvent) => {
+      if (e.defaultPrevented) return;
       editor.configureSurfaceRaycastTargeting({ target: "auto" });
       editor.configureMeasurement("off");
       editor.configureTranslateWithCloneModifier("off");
@@ -355,7 +356,7 @@ export function useEditorHotKeys() {
       editor.configureTransformWithPreserveAspectRatioModifier("off");
       editor.configureRotateWithQuantizeModifier("off");
       setAltKey(false);
-      editor.setTool({ type: "cursor" });
+      editor.setTool({ type: "cursor" }, "window blur");
     };
     window.addEventListener("blur", cb);
     return () => {
@@ -455,7 +456,7 @@ export function useEditorHotKeys() {
           __hand_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          editor.setTool({ type: "cursor" });
+          editor.setTool({ type: "cursor" }, "hand tool keyup");
           __hand_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -510,7 +511,7 @@ export function useEditorHotKeys() {
           __bend_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          editor.setTool({ type: "cursor" });
+          editor.setTool({ type: "cursor" }, "bend tool keyup");
           __bend_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -815,7 +816,7 @@ export function useEditorHotKeys() {
 
   // keyup
 
-  useHotkeys("v, escape", () => {
+  useHotkeys("v", () => {
     editor.setTool({ type: "cursor" });
   });
 
@@ -876,22 +877,16 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("b", () => {
-    editor.setTool({
-      type: "brush",
-    });
+    editor.setTool({ type: "brush" });
   });
 
   useHotkeys("e", () => {
-    editor.setTool({
-      type: "eraser",
-    });
+    editor.setTool({ type: "eraser" });
   });
 
   useHotkeys("g", () => {
     if (content_edit_mode?.type === "bitmap") {
-      editor.setTool({
-        type: "flood-fill",
-      });
+      editor.setTool({ type: "flood-fill" });
     }
   });
 
