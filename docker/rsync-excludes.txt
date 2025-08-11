@@ -1,0 +1,28 @@
+.git/
+.gitignore
+**/*.log
+**/*.tmp
+**/*.swp
+
+# Node
+node_modules/
+**/node_modules/
+.pnpm-store/
+.turbo/
+**/.next/
+**/.cache/
+
+# Rust
+/target/
+**/target/
+
+# Editor/desktop build outputs
+/apps/**/.next/
+/desktop/out/
+/desktop/dist/
+
+# IDE/editor noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

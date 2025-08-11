@@ -12,7 +12,11 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
-    "publish-packages": "turbo run build lint test && changeset version && changeset publish"
+    "publish-packages": "turbo run build lint test && changeset version && changeset publish",
+    "wasm:up": "./scripts/grida-wasm.sh up",
+    "wasm:build": "./scripts/grida-wasm.sh build && pnpm --filter @grida/canvas-wasm build",
+    "wasm:clean": "./scripts/grida-wasm.sh clean",
+    "wasm:shell": "./scripts/grida-wasm.sh shell"
   },
   "packageManager": "pnpm@10.10.0",
   "resolutions": {},

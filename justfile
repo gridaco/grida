@@ -48,3 +48,17 @@ grida-canvas-wasm-package:
 
 grida-canvas-wasm-serve:
     pnpm --filter @grida/canvas-wasm serve
+
+# Persistent local build server for wasm (emscripten)
+canvas-wasm-up:
+    ./scripts/grida-wasm.sh up
+
+canvas-wasm-build:
+    ./scripts/grida-wasm.sh build
+    pnpm --filter @grida/canvas-wasm build
+
+canvas-wasm-clean:
+    ./scripts/grida-wasm.sh clean
+
+canvas-wasm-shell:
+    ./scripts/grida-wasm.sh shell
