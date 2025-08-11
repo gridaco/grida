@@ -1,6 +1,32 @@
+import cmath from "..";
+import { snapToCanvasGeometry } from "../_snap";
+
 describe("snap", () => {
   it("noop", () => {
     expect(true).toBe(true);
+  });
+});
+
+describe("snap2DAxisAligned", () => {
+  it("returns null result when agents are empty", () => {
+    const res = cmath.ext.snap.snap2DAxisAligned(
+      [],
+      [[0, 0]],
+      { x: 1, y: 1 }
+    );
+    expect(res).toEqual({ x: null, y: null });
+  });
+});
+
+describe("snapToCanvasGeometry", () => {
+  it("handles empty agent points", () => {
+    const res = snapToCanvasGeometry(
+      [],
+      { points: [[0, 0]] },
+      { x: 1, y: 1 }
+    );
+    expect(res.by_points).toBe(false);
+    expect(res.delta).toEqual([0, 0]);
   });
 });
 

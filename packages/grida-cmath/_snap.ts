@@ -206,8 +206,9 @@ export type SnapResult<TAnchors extends SnapAnchors = SnapAnchors> = {
   /**
    * Snap results from point anchors.
    *
-   * **Smart typing**: This is never `false` when `anchors.points` is provided.
-   * When `false`, it means no point snapping occurred.
+   * **Smart typing**: This is never `false` when `anchors.points` is provided
+   * and the agent contains at least one point. When `false`, it means no point
+   * snapping occurred.
    */
   by_points: TAnchors extends { points: cmath.Vector2[] }
     ? ByPointsResult
@@ -304,7 +305,7 @@ export function snapToCanvasGeometry<
     );
   }
 
-  if (anchorPoints && Array.isArray(agent)) {
+  if (anchorPoints && Array.isArray(agent) && agent.length > 0) {
     snap_points = snapToPoints(agent, anchorPoints, config, tolerance);
   }
 
