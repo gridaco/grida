@@ -504,15 +504,18 @@ export namespace vn {
      *
      * ## How Planarization Works
      *
-     * 1. **Intersection Detection**: Finds all pairwise intersections between segments
-     *    using the {@link cmath.bezier.intersections} algorithm
-     * 2. **Segment Splitting**: At each intersection point, splits the crossing segments
+     * 1. **Self-Intersection Detection**: Finds self-intersections within individual segments
+     *    using the {@link cmath.bezier.intersection.single.intersection} algorithm
+     * 2. **Cross-Intersection Detection**: Finds all pairwise intersections between segments
+     *    using the {@link cmath.bezier.intersection.intersections} algorithm
+     * 3. **Segment Splitting**: At each intersection point, splits the crossing segments
      *    into multiple sub-segments
-     * 3. **Vertex Creation**: Creates new vertices at intersection points
-     * 4. **Topology Update**: Updates segment connectivity to maintain the network structure
+     * 4. **Vertex Creation**: Creates new vertices at intersection points
+     * 5. **Topology Update**: Updates segment connectivity to maintain the network structure
      *
      * ## Intersection Types Handled
      *
+     * - **Self-Intersections**: A single curve intersects itself (figure-8 curves, loops)
      * - **Transverse**: Segments cross at a single point (most common)
      * - **Tangent**: Segments touch without crossing (may be preserved or split)
      * - **Endpoint**: Segments meet at a shared vertex (no action needed)
@@ -553,7 +556,7 @@ export namespace vn {
      *
      * - {@link VectorNetworkEditor.optimize} - Removes duplicates after planarization
      * - {@link VectorNetworkEditor.union} - Boolean operations on planar networks
-     * - {@link cmath.bezier.intersections} - Core intersection detection algorithm
+     * - {@link cmath.bezier.intersection.intersections} - Core intersection detection algorithm
      *
      * @remarks
      * This method modifies the vector network in-place. If you need to preserve
@@ -563,11 +566,292 @@ export namespace vn {
      * and segments, especially for networks with many crossings. Consider the
      * memory and performance implications for large networks.
      *
-     * @see {@link cmath.bezier.intersections} - For details on intersection detection
+     * @see {@link cmath.bezier.intersection.single.intersection} - For self-intersection detection
+     * @see {@link cmath.bezier.intersection.intersections} - For cross-intersection detection
      * @see {@link VectorNetworkEditor.optimize} - For post-planarization cleanup
      */
-    planarize() {
-      throw new Error("Not implemented");
+    static planarize(net: VectorNetwork): VectorNetwork {
+      // Early exit if no segments to process
+      if (net.segments.length === 0) {
+        return { vertices: [...net.vertices], segments: [...net.segments] };
+      }
+
+      // Create a deep copy of the input network
+      const result: VectorNetwork = {
+        vertices: net.vertices.map((v) => [v[0], v[1]] as Vector2),
+        segments: net.segments.map((s) => ({
+          a: s.a,
+          b: s.b,
+          ta: [s.ta[0], s.ta[1]] as Vector2,
+          tb: [s.tb[0], s.tb[1]] as Vector2,
+        })),
+      };
+
+      // Track intersections to process
+      const intersections: Array<{
+        segmentA: number;
+        segmentB: number;
+        point: cmath.bezier.intersection.BezierIntersectionPoint;
+      }> = [];
+
+      // First, check for self-intersections in individual segments
+      for (let i = 0; i < result.segments.length; i++) {
+        const seg = result.segments[i];
+
+        // Convert segment to bezier format for self-intersection detection
+        const bezier: cmath.bezier.CubicBezierWithTangents = {
+          a: result.vertices[seg.a],
+          b: result.vertices[seg.b],
+          ta: seg.ta,
+          tb: seg.tb,
+        };
+
+        // Check for self-intersection
+        const selfIntersection =
+          cmath.bezier.intersection.single.intersection(bezier);
+
+        if (selfIntersection) {
+          // Create intersection points for both parameter values
+          const point1: cmath.bezier.intersection.BezierIntersectionPoint = {
+            a_t: selfIntersection.t1,
+            b_t: selfIntersection.t2,
+            p: selfIntersection.point,
+            kind: cmath.bezier.intersection.IntersectionKind.Transverse,
+            residual: 0,
+          };
+
+          const point2: cmath.bezier.intersection.BezierIntersectionPoint = {
+            a_t: selfIntersection.t2,
+            b_t: selfIntersection.t1,
+            p: selfIntersection.point,
+            kind: cmath.bezier.intersection.IntersectionKind.Transverse,
+            residual: 0,
+          };
+
+          // Add both intersection points (segment intersects with itself)
+          intersections.push({
+            segmentA: i,
+            segmentB: i,
+            point: point1,
+          });
+
+          intersections.push({
+            segmentA: i,
+            segmentB: i,
+            point: point2,
+          });
+        }
+      }
+
+      // Find all intersections between different segments
+      for (let i = 0; i < result.segments.length; i++) {
+        for (let j = i + 1; j < result.segments.length; j++) {
+          const segA = result.segments[i];
+          const segB = result.segments[j];
+
+          // Convert segments to bezier format for intersection detection
+          const bezierA: cmath.bezier.CubicBezierWithTangents = {
+            a: result.vertices[segA.a],
+            b: result.vertices[segA.b],
+            ta: segA.ta,
+            tb: segA.tb,
+          };
+
+          const bezierB: cmath.bezier.CubicBezierWithTangents = {
+            a: result.vertices[segB.a],
+            b: result.vertices[segB.b],
+            ta: segB.ta,
+            tb: segB.tb,
+          };
+
+          // Find intersections between these two segments
+          const intersectionResult = cmath.bezier.intersection.intersections(
+            bezierA,
+            bezierB,
+            {
+              eps: 1e-6,
+              paramEps: 1e-6,
+              refine: true,
+            }
+          );
+
+          // Process intersection points (ignore overlaps for now)
+          for (const point of intersectionResult.points) {
+            // Skip endpoint intersections as they don't require splitting
+            if (
+              point.kind === cmath.bezier.intersection.IntersectionKind.Endpoint
+            ) {
+              continue;
+            }
+
+            // Skip if intersection is at the very beginning or end of either segment
+            if (
+              point.a_t <= 1e-6 ||
+              point.a_t >= 1 - 1e-6 ||
+              point.b_t <= 1e-6 ||
+              point.b_t >= 1 - 1e-6
+            ) {
+              continue;
+            }
+
+            intersections.push({
+              segmentA: i,
+              segmentB: j,
+              point,
+            });
+          }
+        }
+      }
+
+      // Sort intersections by parameter values to process them in order
+      intersections.sort((a, b) => {
+        // Sort by segment index first, then by parameter value
+        if (a.segmentA !== b.segmentA) return a.segmentA - b.segmentA;
+        return a.point.a_t - b.point.a_t;
+      });
+
+      // Process intersections and split segments
+      const segmentsToSplit = new Map<
+        number,
+        Array<{
+          t: number;
+          point: Vector2;
+          otherSegment: number;
+        }>
+      >();
+
+      // Group intersections by segment
+      for (const intersection of intersections) {
+        if (!segmentsToSplit.has(intersection.segmentA)) {
+          segmentsToSplit.set(intersection.segmentA, []);
+        }
+
+        // Handle self-intersections (segmentA === segmentB)
+        if (intersection.segmentA === intersection.segmentB) {
+          // For self-intersections, we need to add both parameter values to the same segment
+          segmentsToSplit.get(intersection.segmentA)!.push({
+            t: intersection.point.a_t,
+            point: intersection.point.p,
+            otherSegment: intersection.segmentA, // Same segment
+          });
+
+          // Also add the second parameter value for self-intersections
+          segmentsToSplit.get(intersection.segmentA)!.push({
+            t: intersection.point.b_t,
+            point: intersection.point.p,
+            otherSegment: intersection.segmentA, // Same segment
+          });
+        } else {
+          // Handle cross-segment intersections
+          if (!segmentsToSplit.has(intersection.segmentB)) {
+            segmentsToSplit.set(intersection.segmentB, []);
+          }
+
+          segmentsToSplit.get(intersection.segmentA)!.push({
+            t: intersection.point.a_t,
+            point: intersection.point.p,
+            otherSegment: intersection.segmentB,
+          });
+
+          segmentsToSplit.get(intersection.segmentB)!.push({
+            t: intersection.point.b_t,
+            point: intersection.point.p,
+            otherSegment: intersection.segmentA,
+          });
+        }
+      }
+
+      // Split segments at intersection points
+      const newSegments: VectorNetworkSegment[] = [];
+      const processedSegments = new Set<number>();
+
+      for (const [segmentIndex, splits] of Array.from(
+        segmentsToSplit.entries()
+      )) {
+        if (processedSegments.has(segmentIndex)) continue;
+
+        const segment = result.segments[segmentIndex];
+
+        // Sort splits by parameter value and remove duplicates
+        const uniqueSplits = splits
+          .sort((a, b) => a.t - b.t)
+          .filter((split, index, array) => {
+            // Remove splits that are too close to each other (numerical precision)
+            if (index === 0) return true;
+            return Math.abs(split.t - array[index - 1].t) > 1e-6;
+          });
+
+        // Create new vertices for intersection points
+        const newVertices: number[] = [];
+        for (const split of uniqueSplits) {
+          // Check if we already have a vertex at this point
+          let vertexIndex = result.vertices.findIndex(
+            (v) =>
+              Math.abs(v[0] - split.point[0]) < 1e-6 &&
+              Math.abs(v[1] - split.point[1]) < 1e-6
+          );
+
+          if (vertexIndex === -1) {
+            vertexIndex = result.vertices.length;
+            result.vertices.push([split.point[0], split.point[1]] as Vector2);
+          }
+
+          newVertices.push(vertexIndex);
+        }
+
+        // Split the segment into multiple sub-segments
+        const bezierCurve: cmath.bezier.CubicBezierWithTangents = {
+          a: result.vertices[segment.a],
+          b: result.vertices[segment.b],
+          ta: segment.ta,
+          tb: segment.tb,
+        };
+
+        let currentSegment = bezierCurve;
+        let currentStartVertex = segment.a;
+
+        for (let i = 0; i < uniqueSplits.length; i++) {
+          const split = uniqueSplits[i];
+          const subdivision = cmath.bezier.subdivide(currentSegment, split.t);
+
+          // Add the left sub-segment
+          newSegments.push({
+            a: currentStartVertex,
+            b: newVertices[i],
+            ta: subdivision.l.ta,
+            tb: subdivision.l.tb,
+          });
+
+          // Update for next iteration
+          currentSegment = subdivision.r;
+          currentStartVertex = newVertices[i];
+        }
+
+        // Add the final sub-segment
+        newSegments.push({
+          a: currentStartVertex,
+          b: segment.b,
+          ta: currentSegment.ta,
+          tb: currentSegment.tb,
+        });
+
+        processedSegments.add(segmentIndex);
+      }
+
+      // Add segments that weren't split
+      for (let i = 0; i < result.segments.length; i++) {
+        if (!segmentsToSplit.has(i)) {
+          newSegments.push(result.segments[i]);
+        }
+      }
+
+      result.segments = newSegments;
+
+      // Optimize the result to remove any duplicate vertices or segments
+      return VectorNetworkEditor.optimize(result, {
+        vertex_tolerance: 0.5,
+        remove_unused_verticies: true,
+      });
     }
 
     private _vertices: VectorNetworkVertex[] = [];
@@ -622,6 +906,64 @@ export namespace vn {
       this._vertices = optimized.vertices;
       this._segments = optimized.segments;
       return optimized;
+    }
+
+    /**
+     * Converts the current vector network into a planar network by detecting and resolving
+     * segment intersections in-place.
+     *
+     * This is the instance counterpart to
+     * {@link VectorNetworkEditor.planarize | VectorNetworkEditor.planarize()}.
+     * Unlike the static method, this modifies the current network instance directly.
+     *
+     * **Planarization** transforms a network with crossing segments into one where
+     * all segments only intersect at their endpoints (vertices). This is essential
+     * for proper rendering, boolean operations, and fill rule calculations.
+     *
+     * ## What Happens During Planarization
+     *
+     * 1. **Self-Intersection Detection**: Finds self-intersections within individual segments
+     *    using the {@link cmath.bezier.intersection.single.intersection} algorithm
+     * 2. **Cross-Intersection Detection**: Finds all pairwise intersections between segments
+     *    using the {@link cmath.bezier.intersections} algorithm
+     * 3. **Segment Splitting**: At each intersection point, splits the crossing segments
+     *    into multiple sub-segments
+     * 4. **Vertex Creation**: Creates new vertices at intersection points
+     * 5. **Topology Update**: Updates segment connectivity to maintain the network structure
+     * 6. **Optimization**: Automatically optimizes the result to remove duplicates
+     *
+     * ## Example
+     *
+     * ```ts
+     * const editor = new VectorNetworkEditor(network);
+     *
+     * // Before: network has crossing segments and self-intersecting curves
+     * console.log(editor.segments.length); // 2 segments
+     *
+     * // After: segments split at intersections (including self-intersections)
+     * editor.planarize();
+     * console.log(editor.segments.length); // 4+ segments (split at crossings)
+     * ```
+     *
+     * @returns The planarized {@link VectorNetwork} (same as the modified instance)
+     *
+     * @remarks
+     * This method modifies the current network instance in-place. If you need to
+     * preserve the original network, create a copy before calling this method.
+     *
+     * The planarization process may significantly increase the number of vertices
+     * and segments, especially for networks with many crossings or self-intersections.
+     * Consider the memory and performance implications for large networks.
+     *
+     * @see {@link VectorNetworkEditor.planarize} - Static version that returns a new network
+     * @see {@link cmath.bezier.intersection.single.intersection} - For self-intersection detection
+     * @see {@link cmath.bezier.intersections} - For cross-intersection detection
+     */
+    planarize(): VectorNetwork {
+      const planarized = VectorNetworkEditor.planarize(this.value);
+      this._vertices = planarized.vertices;
+      this._segments = planarized.segments;
+      return planarized;
     }
 
     /**
