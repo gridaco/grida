@@ -209,6 +209,16 @@ namespace cmath {
   }
 
   /**
+   * Clamps a value between 0 and 1.
+   *
+   * @param t - The value to clamp.
+   * @returns The clamped value.
+   */
+  export function clamp01(t: number): number {
+    return t <= 0 ? 0 : t >= 1 ? 1 : t;
+  }
+
+  /**
    * Finds the nearest value to a given number from a list of target numbers.
    *
    * This function calculates the absolute difference between the given value and each target,
@@ -2997,6 +3007,64 @@ namespace cmath {
       }
 
       return t;
+    }
+
+    /**
+     * Evaluates a cubic Bézier curve at a given parametric position `t` ∈ [0,1].
+     *
+     * The curve is defined by four absolute control points:
+     * - `P0`: Start point
+     * - `P1`: First control point
+     * - `P2`: Second control point
+     * - `P3`: End point
+     *
+     * Uses the Bernstein polynomial form of the cubic Bézier equation:
+     * ```
+     * B(t) = (1−t)³ * P0
+     *      + 3(1−t)² t * P1
+     *      + 3(1−t) t² * P2
+     *      + t³ * P3
+     * ```
+     *
+     * @param P0 - Start point of the curve.
+     * @param P1 - First control point.
+     * @param P2 - Second control point.
+     * @param P3 - End point of the curve.
+     * @param t  - Parametric value in the range [0, 1] where 0 is `P0` and 1 is `P3`.
+     * @returns A 2D vector `[x, y]` representing the point on the cubic Bézier at parameter `t`.
+     *
+     * @example
+     * ```ts
+     * const p0: Vector2 = [0, 0];
+     * const p1: Vector2 = [50, 100];
+     * const p2: Vector2 = [150, 100];
+     * const p3: Vector2 = [200, 0];
+     *
+     * // Get the midpoint of the curve
+     * const midpoint = evalC(p0, p1, p2, p3, 0.5);
+     * console.log(midpoint); // → e.g., [100, 75]
+     * ```
+     */
+    export function evalC(
+      P0: Vector2,
+      P1: Vector2,
+      P2: Vector2,
+      P3: Vector2,
+      t: number
+    ): Vector2 {
+      const mt = 1 - t,
+        mt2 = mt * mt,
+        t2 = t * t;
+      return [
+        P0[0] * (mt2 * mt) +
+          3 * P1[0] * (mt2 * t) +
+          3 * P2[0] * (mt * t2) +
+          P3[0] * (t2 * t),
+        P0[1] * (mt2 * mt) +
+          3 * P1[1] * (mt2 * t) +
+          3 * P2[1] * (mt * t2) +
+          P3[1] * (t2 * t),
+      ];
     }
 
     /**

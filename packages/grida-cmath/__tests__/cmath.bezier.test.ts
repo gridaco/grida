@@ -610,6 +610,240 @@ describe("cmath.bezier.solveTangentsForPoint", () => {
   });
 });
 
+describe("cmath.bezier.evalC", () => {
+  describe("Basic functionality", () => {
+    test("should evaluate at t=0 (start point)", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, 0);
+      expect(result).toEqual([0, 0]);
+    });
+
+    test("should evaluate at t=1 (end point)", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, 1);
+      expect(result).toEqual([200, 0]);
+    });
+
+    test("should evaluate at t=0.5 (midpoint)", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, 0.5);
+
+      // For a cubic Bézier curve, the midpoint is not linear interpolation
+      // The expected values are calculated from the cubic Bézier formula
+      expect(result[0]).toBeCloseTo(100, 6); // x = 0*(0.125) + 3*50*(0.125) + 3*150*(0.125) + 200*(0.125) = 100
+      expect(result[1]).toBeCloseTo(75, 6); // y = 0*(0.125) + 3*100*(0.125) + 3*100*(0.125) + 0*(0.125) = 75
+    });
+
+    test("should evaluate straight line (control points on line)", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 50];
+      const P2: cmath.Vector2 = [100, 100];
+      const P3: cmath.Vector2 = [150, 150];
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, 0.5);
+
+      // For control points on a straight line, the curve should follow the line
+      expect(result[0]).toBeCloseTo(75, 6);
+      expect(result[1]).toBeCloseTo(75, 6);
+    });
+  });
+
+  describe("Edge cases", () => {
+    test("should handle zero-length curve", () => {
+      const P0: cmath.Vector2 = [50, 50];
+      const P1: cmath.Vector2 = [50, 50];
+      const P2: cmath.Vector2 = [50, 50];
+      const P3: cmath.Vector2 = [50, 50];
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, 0.5);
+      expect(result).toEqual([50, 50]);
+    });
+
+    test("should handle t values outside [0,1] range", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      // Note: evalC doesn't clamp t values, so we test the mathematical behavior
+      const result1 = cmath.bezier.evalC(P0, P1, P2, P3, -0.5);
+      const result2 = cmath.bezier.evalC(P0, P1, P2, P3, 1.5);
+
+      // For t < 0, the curve extends beyond P0
+      expect(result1[0]).toBeLessThan(0);
+      expect(result1[1]).toBeLessThan(0);
+
+      // For t > 1, the curve extends beyond P3
+      expect(result2[0]).toBeGreaterThan(200);
+      expect(result2[1]).toBeLessThan(0);
+    });
+
+    test("should handle negative coordinates", () => {
+      const P0: cmath.Vector2 = [-100, -100];
+      const P1: cmath.Vector2 = [-50, 0];
+      const P2: cmath.Vector2 = [50, 0];
+      const P3: cmath.Vector2 = [100, -100];
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, 0.5);
+
+      // The curve should be symmetric around the y-axis
+      expect(result[0]).toBeCloseTo(0, 6);
+      expect(result[1]).toBeCloseTo(-25, 6);
+    });
+  });
+
+  describe("Mathematical correctness", () => {
+    test("should follow cubic Bézier formula", () => {
+      const P0: cmath.Vector2 = [10, 20];
+      const P1: cmath.Vector2 = [30, 40];
+      const P2: cmath.Vector2 = [70, 80];
+      const P3: cmath.Vector2 = [90, 100];
+      const t = 0.3;
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, t);
+
+      // Manual calculation using cubic Bézier formula
+      const mt = 1 - t;
+      const mt2 = mt * mt;
+      const mt3 = mt2 * mt;
+      const t2 = t * t;
+      const t3 = t2 * t;
+
+      const expectedX =
+        P0[0] * mt3 +
+        3 * P1[0] * (mt2 * t) +
+        3 * P2[0] * (mt * t2) +
+        P3[0] * t3;
+      const expectedY =
+        P0[1] * mt3 +
+        3 * P1[1] * (mt2 * t) +
+        3 * P2[1] * (mt * t2) +
+        P3[1] * t3;
+
+      expect(result[0]).toBeCloseTo(expectedX, 10);
+      expect(result[1]).toBeCloseTo(expectedY, 10);
+    });
+
+    test("should be symmetric for t and 1-t", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const t = 0.3;
+      const result1 = cmath.bezier.evalC(P0, P1, P2, P3, t);
+      const result2 = cmath.bezier.evalC(P3, P2, P1, P0, 1 - t);
+
+      // The results should be the same point on the curve
+      expect(result1[0]).toBeCloseTo(result2[0], 10);
+      expect(result1[1]).toBeCloseTo(result2[1], 10);
+    });
+
+    test("should handle different t values", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const tValues = [0.1, 0.25, 0.75, 0.9];
+
+      for (const t of tValues) {
+        const result = cmath.bezier.evalC(P0, P1, P2, P3, t);
+
+        // Basic sanity checks
+        expect(result[0]).toBeGreaterThanOrEqual(0);
+        expect(result[0]).toBeLessThanOrEqual(200);
+        expect(result[1]).toBeGreaterThanOrEqual(0);
+        expect(result[1]).toBeLessThanOrEqual(100);
+
+        // The curve should be continuous
+        expect(Number.isFinite(result[0])).toBe(true);
+        expect(Number.isFinite(result[1])).toBe(true);
+      }
+    });
+  });
+
+  describe("Special curves", () => {
+    test("should handle horizontal line", () => {
+      const P0: cmath.Vector2 = [0, 10];
+      const P1: cmath.Vector2 = [50, 10];
+      const P2: cmath.Vector2 = [100, 10];
+      const P3: cmath.Vector2 = [150, 10];
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, 0.5);
+
+      // For control points on a horizontal line, y should remain constant
+      expect(result[1]).toBeCloseTo(10, 6);
+      expect(result[0]).toBeCloseTo(75, 6);
+    });
+
+    test("should handle vertical line", () => {
+      const P0: cmath.Vector2 = [10, 0];
+      const P1: cmath.Vector2 = [10, 50];
+      const P2: cmath.Vector2 = [10, 100];
+      const P3: cmath.Vector2 = [10, 150];
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, 0.5);
+
+      // For control points on a vertical line, x should remain constant
+      expect(result[0]).toBeCloseTo(10, 6);
+      expect(result[1]).toBeCloseTo(75, 6);
+    });
+
+    test("should handle S-curve", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [100, 100];
+      const P2: cmath.Vector2 = [0, 100];
+      const P3: cmath.Vector2 = [100, 0];
+
+      const result = cmath.bezier.evalC(P0, P1, P2, P3, 0.5);
+
+      // For an S-curve at t=0.5, calculate the expected values:
+      // B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
+      // At t=0.5: B(0.5) = 0.125*P₀ + 0.375*P₁ + 0.375*P₂ + 0.125*P₃
+      // x = 0.125*0 + 0.375*100 + 0.375*0 + 0.125*100 = 37.5 + 12.5 = 50
+      // y = 0.125*0 + 0.375*100 + 0.375*100 + 0.125*0 = 37.5 + 37.5 = 75
+      expect(result[0]).toBeCloseTo(50, 6);
+      expect(result[1]).toBeCloseTo(75, 6);
+    });
+  });
+
+  describe("Comparison with evaluate function", () => {
+    test("should match evaluate function for equivalent curves", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      // Convert to tangent-based representation
+      const a = P0;
+      const b = P3;
+      const ta: cmath.Vector2 = [P1[0] - P0[0], P1[1] - P0[1]];
+      const tb: cmath.Vector2 = [P2[0] - P3[0], P2[1] - P3[1]];
+
+      const t = 0.4;
+      const result1 = cmath.bezier.evalC(P0, P1, P2, P3, t);
+      const result2 = cmath.bezier.evaluate(a, b, ta, tb, t);
+
+      // The results should be identical
+      expect(result1[0]).toBeCloseTo(result2[0], 10);
+      expect(result1[1]).toBeCloseTo(result2[1], 10);
+    });
+  });
+});
+
 describe("cmath.bezier.evaluate", () => {
   describe("Basic functionality", () => {
     test("should evaluate straight line segment at t=0", () => {
