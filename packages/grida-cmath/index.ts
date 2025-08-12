@@ -3879,6 +3879,115 @@ namespace cmath {
         t: clampedT,
       };
     }
+
+    /**
+     * Refines an approximate intersection between two cubic Bézier curves using Newton's method.
+     *
+     * This function implements Newton's method to find the precise intersection point between
+     * two cubic Bézier curves given an initial approximation. The method solves the system
+     * of equations F(t,u) = A(t) - B(u) = 0 using iterative refinement.
+     *
+     * **Mathematical Background:**
+     *
+     * The Newton iteration solves the linear system:
+     * ```
+     * J * [dt, du]^T = -F
+     * ```
+     * Where:
+     * - F(t,u) = A(t) - B(u) is the residual vector
+     * - J = [∂A/∂t, -∂B/∂u] is the Jacobian matrix
+     * - [dt, du]^T is the parameter update
+     *
+     * The solution is computed using Cramer's rule:
+     * ```
+     * dt = (-Fₓ * (-∂B/∂u)ᵧ - (-Fᵧ) * (-∂B/∂u)ₓ) / det(J)
+     * du = (∂A/∂t)ₓ * (-Fᵧ) - (∂A/∂t)ᵧ * (-Fₓ) / det(J)
+     * ```
+     *
+     * **Convergence Properties:**
+     * - Quadratic convergence when the initial guess is sufficiently close
+     * - Typically converges in 2-4 iterations for well-conditioned problems
+     * - Automatic termination if the Jacobian becomes singular (det < 1e-18)
+     * - Parameters are clamped to [0,1] to ensure validity
+     *
+     * @param A0 - Start point of the first cubic Bézier curve
+     * @param A1 - First control point of the first curve
+     * @param A2 - Second control point of the first curve
+     * @param A3 - End point of the first curve
+     * @param B0 - Start point of the second cubic Bézier curve
+     * @param B1 - First control point of the second curve
+     * @param B2 - Second control point of the second curve
+     * @param B3 - End point of the second curve
+     * @param t0 - Initial parameter guess for the first curve (∈ [0,1])
+     * @param u0 - Initial parameter guess for the second curve (∈ [0,1])
+     * @param iters - Maximum number of Newton iterations (typically 3-10)
+     *
+     * @returns An object containing:
+     * - `t`: Refined parameter for the first curve (∈ [0,1])
+     * - `u`: Refined parameter for the second curve (∈ [0,1])
+     * - `p`: Intersection point in ℝ² (A(t) ≈ B(u))
+     *
+     * @example
+     * ```ts
+     * // Two curves that intersect near their midpoints
+     * const A0: Vector2 = [0, 0];
+     * const A1: Vector2 = [1, 0];
+     * const A2: Vector2 = [1, 1];
+     * const A3: Vector2 = [2, 1];
+     *
+     * const B0: Vector2 = [0, 1];
+     * const B1: Vector2 = [1, 1];
+     * const B2: Vector2 = [1, 0];
+     * const B3: Vector2 = [2, 0];
+     *
+     * // Initial guess at midpoints
+     * const result = newtonRefine(A0, A1, A2, A3, B0, B1, B2, B3, 0.5, 0.5, 5);
+     * console.log(result);
+     * // → { t: 0.5, u: 0.5, p: [1, 0.5] }
+     *
+     * // Verify the intersection
+     * const pointA = bezier.evalC(A0, A1, A2, A3, result.t);
+     * const pointB = bezier.evalC(B0, B1, B2, B3, result.u);
+     * const distance = Math.sqrt((pointA[0] - pointB[0])**2 + (pointA[1] - pointB[1])**2);
+     * console.log('Intersection accuracy:', distance); // → ~1e-15
+     * ```
+     *
+     * @see {@link bezier.evalC} - For evaluating Bézier curves
+     * @see {@link bezier.derivC} - For computing curve derivatives
+     * @see {@link cmath.clamp01} - For parameter clamping
+     */
+    export function newtonRefine(
+      A0: Vector2,
+      A1: Vector2,
+      A2: Vector2,
+      A3: Vector2,
+      B0: Vector2,
+      B1: Vector2,
+      B2: Vector2,
+      B3: Vector2,
+      t0: number,
+      u0: number,
+      iters: number
+    ): { t: number; u: number; p: Vector2 } {
+      let t = cmath.clamp01(t0),
+        u = cmath.clamp01(u0);
+      for (let i = 0; i < iters; i++) {
+        const Pa = bezier.evalC(A0, A1, A2, A3, t);
+        const Pb = bezier.evalC(B0, B1, B2, B3, u);
+        const F: Vector2 = [Pa[0] - Pb[0], Pa[1] - Pb[1]];
+        const Ad = bezier.derivC(A0, A1, A2, A3, t);
+        const Bd = bezier.derivC(B0, B1, B2, B3, u);
+        // Solve J * [dt, du]^T = -F, where J = [Ad, -Bd]
+        const det = Ad[0] * -Bd[1] - Ad[1] * -Bd[0];
+        if (Math.abs(det) < 1e-18) break;
+        const dt = (-F[0] * -Bd[1] - -F[1] * -Bd[0]) / det;
+        const du = (Ad[0] * -F[1] - Ad[1] * -F[0]) / det;
+        t = cmath.clamp01(t + dt);
+        u = cmath.clamp01(u + du);
+      }
+      return { t, u, p: bezier.evalC(A0, A1, A2, A3, t) };
+    }
+
   }
 
   export namespace transform {

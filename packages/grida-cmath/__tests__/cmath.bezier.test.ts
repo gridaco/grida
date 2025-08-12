@@ -2432,3 +2432,479 @@ describe("cmath.bezier.subdivide", () => {
     });
   });
 });
+
+describe("cmath.bezier.newtonRefine", () => {
+  test("should refine intersection at exact midpoint", () => {
+    // Two curves that intersect exactly at their midpoints
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [0.5, 0.5];
+    const A2: cmath.Vector2 = [1.5, 1.5];
+    const A3: cmath.Vector2 = [2, 2];
+
+    const B0: cmath.Vector2 = [0, 2];
+    const B1: cmath.Vector2 = [0.5, 1.5];
+    const B2: cmath.Vector2 = [1.5, 0.5];
+    const B3: cmath.Vector2 = [2, 0];
+
+    const result = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.5,
+      0.5,
+      5
+    );
+
+    expect(result.t).toBeCloseTo(0.5, 10);
+    expect(result.u).toBeCloseTo(0.5, 10);
+    expect(result.p[0]).toBeCloseTo(1, 10);
+    expect(result.p[1]).toBeCloseTo(1, 10);
+
+    // Verify the intersection accuracy
+    const pointA = cmath.bezier.evalC(A0, A1, A2, A3, result.t);
+    const pointB = cmath.bezier.evalC(B0, B1, B2, B3, result.u);
+    const distance = Math.sqrt(
+      (pointA[0] - pointB[0]) ** 2 + (pointA[1] - pointB[1]) ** 2
+    );
+    expect(distance).toBeLessThan(1e-12);
+  });
+
+  test("should converge from poor initial guess", () => {
+    // Two curves with intersection not at midpoint
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [1, 0];
+    const A2: cmath.Vector2 = [1, 1];
+    const A3: cmath.Vector2 = [2, 1];
+
+    const B0: cmath.Vector2 = [0, 1];
+    const B1: cmath.Vector2 = [1, 1];
+    const B2: cmath.Vector2 = [1, 0];
+    const B3: cmath.Vector2 = [2, 0];
+
+    // Poor initial guess
+    const result = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.3,
+      0.7,
+      10
+    );
+
+    // Should converge to the intersection
+    expect(result.t).toBeCloseTo(0.5, 6);
+    expect(result.u).toBeCloseTo(0.5, 6);
+
+    // Verify intersection accuracy
+    const pointA = cmath.bezier.evalC(A0, A1, A2, A3, result.t);
+    const pointB = cmath.bezier.evalC(B0, B1, B2, B3, result.u);
+    const distance = Math.sqrt(
+      (pointA[0] - pointB[0]) ** 2 + (pointA[1] - pointB[1]) ** 2
+    );
+    expect(distance).toBeLessThan(1e-10);
+  });
+
+  test("should handle curves with different intersection points", () => {
+    // Two curves that intersect at different points
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [1, 1];
+    const A2: cmath.Vector2 = [1, 0];
+    const A3: cmath.Vector2 = [2, 1];
+
+    const B0: cmath.Vector2 = [0, 1];
+    const B1: cmath.Vector2 = [1, 0];
+    const B2: cmath.Vector2 = [1, 1];
+    const B3: cmath.Vector2 = [2, 0];
+
+    // Test convergence to different intersection points
+    const result1 = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.3,
+      0.7,
+      5
+    );
+    const result2 = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.7,
+      0.3,
+      5
+    );
+
+    // Both should converge to valid intersections (may not be the same point)
+    const pointA1 = cmath.bezier.evalC(A0, A1, A2, A3, result1.t);
+    const pointB1 = cmath.bezier.evalC(B0, B1, B2, B3, result1.u);
+    const distance1 = Math.sqrt(
+      (pointA1[0] - pointB1[0]) ** 2 + (pointA1[1] - pointB1[1]) ** 2
+    );
+    expect(distance1).toBeLessThan(1e-3);
+
+    const pointA2 = cmath.bezier.evalC(A0, A1, A2, A3, result2.t);
+    const pointB2 = cmath.bezier.evalC(B0, B1, B2, B3, result2.u);
+    const distance2 = Math.sqrt(
+      (pointA2[0] - pointB2[0]) ** 2 + (pointA2[1] - pointB2[1]) ** 2
+    );
+    expect(distance2).toBeLessThan(1e-3);
+
+    // Parameters should be in valid range
+    expect(result1.t).toBeGreaterThanOrEqual(0);
+    expect(result1.t).toBeLessThanOrEqual(1);
+    expect(result1.u).toBeGreaterThanOrEqual(0);
+    expect(result1.u).toBeLessThanOrEqual(1);
+    expect(result2.t).toBeGreaterThanOrEqual(0);
+    expect(result2.t).toBeLessThanOrEqual(1);
+    expect(result2.u).toBeGreaterThanOrEqual(0);
+    expect(result2.u).toBeLessThanOrEqual(1);
+  });
+
+  test("should clamp parameters to valid range", () => {
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [1, 0];
+    const A2: cmath.Vector2 = [1, 1];
+    const A3: cmath.Vector2 = [2, 1];
+
+    const B0: cmath.Vector2 = [0, 1];
+    const B1: cmath.Vector2 = [1, 1];
+    const B2: cmath.Vector2 = [1, 0];
+    const B3: cmath.Vector2 = [2, 0];
+
+    // Test with parameters outside [0,1] range
+    const result1 = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      -0.5,
+      0.5,
+      5
+    );
+    const result2 = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.5,
+      1.5,
+      5
+    );
+
+    expect(result1.t).toBeGreaterThanOrEqual(0);
+    expect(result1.t).toBeLessThanOrEqual(1);
+    expect(result1.u).toBeGreaterThanOrEqual(0);
+    expect(result1.u).toBeLessThanOrEqual(1);
+
+    expect(result2.t).toBeGreaterThanOrEqual(0);
+    expect(result2.t).toBeLessThanOrEqual(1);
+    expect(result2.u).toBeGreaterThanOrEqual(0);
+    expect(result2.u).toBeLessThanOrEqual(1);
+  });
+
+  test("should handle singular Jacobian gracefully", () => {
+    // Two parallel curves (tangent vectors are parallel)
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [1, 0];
+    const A2: cmath.Vector2 = [2, 0];
+    const A3: cmath.Vector2 = [3, 0];
+
+    const B0: cmath.Vector2 = [0, 1];
+    const B1: cmath.Vector2 = [1, 1];
+    const B2: cmath.Vector2 = [2, 1];
+    const B3: cmath.Vector2 = [3, 1];
+
+    // This should not crash even with singular Jacobian
+    const result = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.5,
+      0.5,
+      5
+    );
+
+    expect(result.t).toBeGreaterThanOrEqual(0);
+    expect(result.t).toBeLessThanOrEqual(1);
+    expect(result.u).toBeGreaterThanOrEqual(0);
+    expect(result.u).toBeLessThanOrEqual(1);
+    expect(result.p).toHaveLength(2);
+  });
+
+  test("should respect iteration limit", () => {
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [1, 0];
+    const A2: cmath.Vector2 = [1, 1];
+    const A3: cmath.Vector2 = [2, 1];
+
+    const B0: cmath.Vector2 = [0, 1];
+    const B1: cmath.Vector2 = [1, 1];
+    const B2: cmath.Vector2 = [1, 0];
+    const B3: cmath.Vector2 = [2, 0];
+
+    // Test with different iteration counts
+    const result1 = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.3,
+      0.7,
+      1
+    );
+    const result2 = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.3,
+      0.7,
+      10
+    );
+
+    // Both should return valid results
+    expect(result1.t).toBeGreaterThanOrEqual(0);
+    expect(result1.t).toBeLessThanOrEqual(1);
+    expect(result1.u).toBeGreaterThanOrEqual(0);
+    expect(result1.u).toBeLessThanOrEqual(1);
+    expect(result1.p).toHaveLength(2);
+
+    expect(result2.t).toBeGreaterThanOrEqual(0);
+    expect(result2.t).toBeLessThanOrEqual(1);
+    expect(result2.u).toBeGreaterThanOrEqual(0);
+    expect(result2.u).toBeLessThanOrEqual(1);
+    expect(result2.p).toHaveLength(2);
+
+    // More iterations should generally give better results
+    const pointA1 = cmath.bezier.evalC(A0, A1, A2, A3, result1.t);
+    const pointB1 = cmath.bezier.evalC(B0, B1, B2, B3, result1.u);
+    const distance1 = Math.sqrt(
+      (pointA1[0] - pointB1[0]) ** 2 + (pointA1[1] - pointB1[1]) ** 2
+    );
+
+    const pointA2 = cmath.bezier.evalC(A0, A1, A2, A3, result2.t);
+    const pointB2 = cmath.bezier.evalC(B0, B1, B2, B3, result2.u);
+    const distance2 = Math.sqrt(
+      (pointA2[0] - pointB2[0]) ** 2 + (pointA2[1] - pointB2[1]) ** 2
+    );
+
+    expect(distance2).toBeLessThanOrEqual(distance1);
+  });
+
+  test("should handle degenerate curves", () => {
+    // Degenerate curve (all points the same)
+    const A0: cmath.Vector2 = [1, 1];
+    const A1: cmath.Vector2 = [1, 1];
+    const A2: cmath.Vector2 = [1, 1];
+    const A3: cmath.Vector2 = [1, 1];
+
+    const B0: cmath.Vector2 = [0, 0];
+    const B1: cmath.Vector2 = [1, 0];
+    const B2: cmath.Vector2 = [1, 1];
+    const B3: cmath.Vector2 = [2, 1];
+
+    // Should not crash
+    const result = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.5,
+      0.5,
+      5
+    );
+
+    expect(result.t).toBeGreaterThanOrEqual(0);
+    expect(result.t).toBeLessThanOrEqual(1);
+    expect(result.u).toBeGreaterThanOrEqual(0);
+    expect(result.u).toBeLessThanOrEqual(1);
+    expect(result.p).toHaveLength(2);
+  });
+
+  test("should handle very small curves", () => {
+    // Very small curves
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [1e-6, 0];
+    const A2: cmath.Vector2 = [1e-6, 1e-6];
+    const A3: cmath.Vector2 = [0, 1e-6];
+
+    const B0: cmath.Vector2 = [0, 0];
+    const B1: cmath.Vector2 = [1e-6, 1e-6];
+    const B2: cmath.Vector2 = [0, 1e-6];
+    const B3: cmath.Vector2 = [0, 0];
+
+    const result = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.5,
+      0.5,
+      5
+    );
+
+    expect(result.t).toBeGreaterThanOrEqual(0);
+    expect(result.t).toBeLessThanOrEqual(1);
+    expect(result.u).toBeGreaterThanOrEqual(0);
+    expect(result.u).toBeLessThanOrEqual(1);
+    expect(result.p).toHaveLength(2);
+  });
+
+  test("should handle very large curves", () => {
+    // Very large curves
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [1e6, 0];
+    const A2: cmath.Vector2 = [1e6, 1e6];
+    const A3: cmath.Vector2 = [0, 1e6];
+
+    const B0: cmath.Vector2 = [0, 0];
+    const B1: cmath.Vector2 = [1e6, 1e6];
+    const B2: cmath.Vector2 = [0, 1e6];
+    const B3: cmath.Vector2 = [0, 0];
+
+    const result = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.5,
+      0.5,
+      5
+    );
+
+    expect(result.t).toBeGreaterThanOrEqual(0);
+    expect(result.t).toBeLessThanOrEqual(1);
+    expect(result.u).toBeGreaterThanOrEqual(0);
+    expect(result.u).toBeLessThanOrEqual(1);
+    expect(result.p).toHaveLength(2);
+  });
+
+  test("should demonstrate quadratic convergence", () => {
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [1, 0];
+    const A2: cmath.Vector2 = [1, 1];
+    const A3: cmath.Vector2 = [2, 1];
+
+    const B0: cmath.Vector2 = [0, 1];
+    const B1: cmath.Vector2 = [1, 1];
+    const B2: cmath.Vector2 = [1, 0];
+    const B3: cmath.Vector2 = [2, 0];
+
+    // Track convergence over iterations
+    const distances: number[] = [];
+    for (let iters = 1; iters <= 5; iters++) {
+      const result = cmath.bezier.newtonRefine(
+        A0,
+        A1,
+        A2,
+        A3,
+        B0,
+        B1,
+        B2,
+        B3,
+        0.3,
+        0.7,
+        iters
+      );
+      const pointA = cmath.bezier.evalC(A0, A1, A2, A3, result.t);
+      const pointB = cmath.bezier.evalC(B0, B1, B2, B3, result.u);
+      const distance = Math.sqrt(
+        (pointA[0] - pointB[0]) ** 2 + (pointA[1] - pointB[1]) ** 2
+      );
+      distances.push(distance);
+    }
+
+    // Check that convergence is rapid (quadratic convergence)
+    expect(distances[1]).toBeLessThan(distances[0]);
+    expect(distances[2]).toBeLessThan(distances[1]);
+    expect(distances[3]).toBeLessThan(distances[2]);
+    expect(distances[4]).toBeLessThan(distances[3]);
+
+    // Final result should be very accurate
+    expect(distances[4]).toBeLessThan(1e-10);
+  });
+
+  test("should return point on first curve", () => {
+    const A0: cmath.Vector2 = [0, 0];
+    const A1: cmath.Vector2 = [1, 0];
+    const A2: cmath.Vector2 = [1, 1];
+    const A3: cmath.Vector2 = [2, 1];
+
+    const B0: cmath.Vector2 = [0, 1];
+    const B1: cmath.Vector2 = [1, 1];
+    const B2: cmath.Vector2 = [1, 0];
+    const B3: cmath.Vector2 = [2, 0];
+
+    const result = cmath.bezier.newtonRefine(
+      A0,
+      A1,
+      A2,
+      A3,
+      B0,
+      B1,
+      B2,
+      B3,
+      0.5,
+      0.5,
+      5
+    );
+
+    // The returned point should be on the first curve
+    const pointOnCurve = cmath.bezier.evalC(A0, A1, A2, A3, result.t);
+    expect(result.p[0]).toBeCloseTo(pointOnCurve[0], 10);
+    expect(result.p[1]).toBeCloseTo(pointOnCurve[1], 10);
+  });
+});
