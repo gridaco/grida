@@ -3068,6 +3068,60 @@ namespace cmath {
     }
 
     /**
+     * Computes the first derivative (tangent vector) of a cubic Bézier curve
+     * at a given parametric position `t` ∈ [0, 1].
+     *
+     * The cubic Bézier is defined by four absolute control points:
+     * - `P0`: Start point
+     * - `P1`: First control point
+     * - `P2`: Second control point
+     * - `P3`: End point
+     *
+     * Uses the standard derivative of the cubic Bézier equation:
+     * ```
+     * B'(t) = 3(1−t)² (P1 − P0)
+     *       + 6(1−t)t (P2 − P1)
+     *       + 3t² (P3 − P2)
+     * ```
+     *
+     * @param P0 - Start point of the cubic Bézier curve.
+     * @param P1 - First control point of the curve.
+     * @param P2 - Second control point of the curve.
+     * @param P3 - End point of the curve.
+     * @param t  - Parametric value in the range [0, 1] where 0 is `P0` and 1 is `P3`.
+     * @returns A 2D vector `[dx, dy]` representing the tangent vector at parameter `t`.
+     *
+     * @example
+     * ```ts
+     * const p0: Vector2 = [0, 0];
+     * const p1: Vector2 = [50, 100];
+     * const p2: Vector2 = [150, 100];
+     * const p3: Vector2 = [200, 0];
+     *
+     * // Tangent at the midpoint (t = 0.5)
+     * const tangent = derivC(p0, p1, p2, p3, 0.5);
+     * console.log(tangent); // → e.g., [150, 0]
+     * ```
+     */
+    export function derivC(
+      P0: Vector2,
+      P1: Vector2,
+      P2: Vector2,
+      P3: Vector2,
+      t: number
+    ): Vector2 {
+      const mt = 1 - t;
+      return [
+        3 * mt * mt * (P1[0] - P0[0]) +
+          6 * mt * t * (P2[0] - P1[0]) +
+          3 * t * t * (P3[0] - P2[0]),
+        3 * mt * mt * (P1[1] - P0[1]) +
+          6 * mt * t * (P2[1] - P1[1]) +
+          3 * t * t * (P3[1] - P2[1]),
+      ];
+    }
+
+    /**
      * Evaluates a cubic Bézier curve at a given parametric position.
      *
      * The curve is defined by two endpoints and their tangent vectors.

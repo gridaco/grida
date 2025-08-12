@@ -844,6 +844,461 @@ describe("cmath.bezier.evalC", () => {
   });
 });
 
+describe("cmath.bezier.derivC", () => {
+  describe("Basic functionality", () => {
+    test("should calculate derivative at t=0 (start point)", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0);
+
+      // At t=0, B'(t) = 3(P₁-P₀) = 3*[50,100] = [150,300]
+      expect(result[0]).toBeCloseTo(150, 6);
+      expect(result[1]).toBeCloseTo(300, 6);
+    });
+
+    test("should calculate derivative at t=1 (end point)", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 1);
+
+      // At t=1, B'(t) = 3(P₃-P₂) = 3*[50,-100] = [150,-300]
+      expect(result[0]).toBeCloseTo(150, 6);
+      expect(result[1]).toBeCloseTo(-300, 6);
+    });
+
+    test("should calculate derivative at t=0.5 (midpoint)", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // At t=0.5: B'(t) = 3*0.25*(P₁-P₀) + 6*0.25*(P₂-P₁) + 3*0.25*(P₃-P₂)
+      // = 0.75*[50,100] + 1.5*[100,0] + 0.75*[50,-100]
+      // = [37.5,75] + [150,0] + [37.5,-75] = [225,0]
+      expect(result[0]).toBeCloseTo(225, 6);
+      expect(result[1]).toBeCloseTo(0, 6);
+    });
+
+    test("should handle straight line (control points on line)", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 50];
+      const P2: cmath.Vector2 = [100, 100];
+      const P3: cmath.Vector2 = [150, 150];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // For control points on a straight line, the derivative should be constant
+      // B'(t) = 3*0.25*[50,50] + 6*0.25*[50,50] + 3*0.25*[50,50]
+      // = [37.5,37.5] + [75,75] + [37.5,37.5] = [150,150]
+      expect(result[0]).toBeCloseTo(150, 6);
+      expect(result[1]).toBeCloseTo(150, 6);
+    });
+  });
+
+  describe("Edge cases", () => {
+    test("should handle zero-length curve", () => {
+      const P0: cmath.Vector2 = [50, 50];
+      const P1: cmath.Vector2 = [50, 50];
+      const P2: cmath.Vector2 = [50, 50];
+      const P3: cmath.Vector2 = [50, 50];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // For zero-length curve, all control points are the same, so derivative is zero
+      expect(result[0]).toBeCloseTo(0, 6);
+      expect(result[1]).toBeCloseTo(0, 6);
+    });
+
+    test("should handle t values outside [0,1] range", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      // Note: derivC doesn't clamp t values, so we test the mathematical behavior
+      const result1 = cmath.bezier.derivC(P0, P1, P2, P3, -0.5);
+      const result2 = cmath.bezier.derivC(P0, P1, P2, P3, 1.5);
+
+      // For t < 0, the derivative can be negative (curve extends beyond P0)
+      // B'(-0.5) = 3*(1.5)²*[50,100] + 6*(1.5)*(-0.5)*[100,0] + 3*(-0.5)²*[50,-100]
+      // = 3*2.25*[50,100] + 6*1.5*(-0.5)*[100,0] + 3*0.25*[50,-100]
+      // = [337.5,675] + [-450,0] + [37.5,-75] = [-75,600]
+      expect(result1[0]).toBeCloseTo(-75, 6);
+      expect(result1[1]).toBeCloseTo(600, 6);
+
+      // For t > 1, the derivative can be negative (curve extends beyond P3)
+      // B'(1.5) = 3*(1-1.5)²*[50,100] + 6*(1-1.5)*1.5*[100,0] + 3*1.5²*[50,-100]
+      // = 3*0.25*[50,100] + 6*(-0.5)*1.5*[100,0] + 3*2.25*[50,-100]
+      // = [37.5,75] + [-450,0] + [337.5,-675] = [-75,-600]
+      expect(result2[0]).toBeCloseTo(-75, 6);
+      expect(result2[1]).toBeCloseTo(-600, 6);
+    });
+
+    test("should handle negative coordinates", () => {
+      const P0: cmath.Vector2 = [-100, -100];
+      const P1: cmath.Vector2 = [-50, 0];
+      const P2: cmath.Vector2 = [50, 0];
+      const P3: cmath.Vector2 = [100, -100];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // The curve should be symmetric around the y-axis
+      // B'(0.5) = 3*0.25*[50,100] + 6*0.25*[100,0] + 3*0.25*[50,-100]
+      // = [37.5,75] + [150,0] + [37.5,-75] = [225,0]
+      expect(result[0]).toBeCloseTo(225, 6); // Positive x derivative
+      expect(result[1]).toBeCloseTo(0, 6); // Zero y derivative at midpoint
+    });
+
+    test("should handle very small coordinates", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [1e-6, 1e-6];
+      const P2: cmath.Vector2 = [2e-6, 2e-6];
+      const P3: cmath.Vector2 = [3e-6, 3e-6];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // Should handle very small values without numerical issues
+      // B'(0.5) = 3*0.25*[1e-6,1e-6] + 6*0.25*[1e-6,1e-6] + 3*0.25*[1e-6,1e-6]
+      // = [0.75e-6,0.75e-6] + [1.5e-6,1.5e-6] + [0.75e-6,0.75e-6] = [3e-6,3e-6]
+      expect(result[0]).toBeCloseTo(3e-6, 10);
+      expect(result[1]).toBeCloseTo(3e-6, 10);
+    });
+
+    test("should handle very large coordinates", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [1e6, 1e6];
+      const P2: cmath.Vector2 = [2e6, 2e6];
+      const P3: cmath.Vector2 = [3e6, 3e6];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // Should handle very large values without numerical issues
+      // B'(0.5) = 3*0.25*[1e6,1e6] + 6*0.25*[1e6,1e6] + 3*0.25*[1e6,1e6]
+      // = [0.75e6,0.75e6] + [1.5e6,1.5e6] + [0.75e6,0.75e6] = [3e6,3e6]
+      expect(result[0]).toBeCloseTo(3e6, 6);
+      expect(result[1]).toBeCloseTo(3e6, 6);
+    });
+  });
+
+  describe("Mathematical correctness", () => {
+    test("should follow cubic Bézier derivative formula", () => {
+      const P0: cmath.Vector2 = [10, 20];
+      const P1: cmath.Vector2 = [30, 40];
+      const P2: cmath.Vector2 = [70, 80];
+      const P3: cmath.Vector2 = [90, 100];
+      const t = 0.3;
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, t);
+
+      // Manual calculation using cubic Bézier derivative formula
+      const mt = 1 - t;
+      const mt2 = mt * mt;
+      const t2 = t * t;
+
+      const expectedX =
+        3 * mt2 * (P1[0] - P0[0]) +
+        6 * mt * t * (P2[0] - P1[0]) +
+        3 * t2 * (P3[0] - P2[0]);
+      const expectedY =
+        3 * mt2 * (P1[1] - P0[1]) +
+        6 * mt * t * (P2[1] - P1[1]) +
+        3 * t2 * (P3[1] - P2[1]);
+
+      expect(result[0]).toBeCloseTo(expectedX, 10);
+      expect(result[1]).toBeCloseTo(expectedY, 10);
+    });
+
+    test("should be symmetric for t and 1-t", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const t = 0.3;
+      const result1 = cmath.bezier.derivC(P0, P1, P2, P3, t);
+      const result2 = cmath.bezier.derivC(P3, P2, P1, P0, 1 - t);
+
+      // The derivatives should be opposite (same magnitude, opposite direction)
+      expect(result1[0]).toBeCloseTo(-result2[0], 10);
+      expect(result1[1]).toBeCloseTo(-result2[1], 10);
+    });
+
+    test("should handle different t values", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const tValues = [0.1, 0.25, 0.75, 0.9];
+
+      for (const t of tValues) {
+        const result = cmath.bezier.derivC(P0, P1, P2, P3, t);
+
+        // Basic sanity checks
+        expect(Number.isFinite(result[0])).toBe(true);
+        expect(Number.isFinite(result[1])).toBe(true);
+
+        // The derivative should be reasonable in magnitude
+        const magnitude = Math.hypot(result[0], result[1]);
+        expect(magnitude).toBeGreaterThan(0);
+        expect(magnitude).toBeLessThan(1000); // Reasonable upper bound
+      }
+    });
+
+    test("should handle horizontal line", () => {
+      const P0: cmath.Vector2 = [0, 10];
+      const P1: cmath.Vector2 = [50, 10];
+      const P2: cmath.Vector2 = [100, 10];
+      const P3: cmath.Vector2 = [150, 10];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // For control points on a horizontal line, y derivative should be zero
+      expect(result[1]).toBeCloseTo(0, 6);
+      expect(result[0]).toBeCloseTo(150, 6); // x derivative should be positive
+    });
+
+    test("should handle vertical line", () => {
+      const P0: cmath.Vector2 = [10, 0];
+      const P1: cmath.Vector2 = [10, 50];
+      const P2: cmath.Vector2 = [10, 100];
+      const P3: cmath.Vector2 = [10, 150];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // For control points on a vertical line, x derivative should be zero
+      expect(result[0]).toBeCloseTo(0, 6);
+      expect(result[1]).toBeCloseTo(150, 6); // y derivative should be positive
+    });
+
+    test("should handle S-curve", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [100, 100];
+      const P2: cmath.Vector2 = [0, 100];
+      const P3: cmath.Vector2 = [100, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // For an S-curve at t=0.5, calculate the expected values:
+      // B'(t) = 3(1-t)²(P₁-P₀) + 6(1-t)t(P₂-P₁) + 3t²(P₃-P₂)
+      // At t=0.5: B'(0.5) = 3*0.25*[100,100] + 6*0.25*[-100,0] + 3*0.25*[100,-100]
+      // = [75,75] + [-150,0] + [75,-75] = [0,0]
+      expect(result[0]).toBeCloseTo(0, 6);
+      expect(result[1]).toBeCloseTo(0, 6);
+    });
+  });
+
+  describe("Comparison with other functions", () => {
+    test("should match tangentAt function for equivalent curves", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      // Convert to tangent-based representation
+      const a = P0;
+      const b = P3;
+      const ta: cmath.Vector2 = [P1[0] - P0[0], P1[1] - P0[1]];
+      const tb: cmath.Vector2 = [P2[0] - P3[0], P2[1] - P3[1]];
+
+      const t = 0.4;
+      const result1 = cmath.bezier.derivC(P0, P1, P2, P3, t);
+      const result2 = cmath.bezier.tangentAt(a, b, ta, tb, t);
+
+      // The results should be identical
+      expect(result1[0]).toBeCloseTo(result2[0], 10);
+      expect(result1[1]).toBeCloseTo(result2[1], 10);
+    });
+
+    test("should match evalDerivative function from tests", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      // Convert to tangent-based representation for evalDerivative
+      const a = P0;
+      const b = P3;
+      const ta: cmath.Vector2 = [P1[0] - P0[0], P1[1] - P0[1]];
+      const tb: cmath.Vector2 = [P2[0] - P3[0], P2[1] - P3[1]];
+
+      const t = 0.6;
+
+      // Use the evalDerivative function from the test file
+      const p0 = a;
+      const p1: cmath.Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const p2: cmath.Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+      const p3 = b;
+      const mt = 1 - t;
+      const expectedX =
+        3 * mt * mt * (p1[0] - p0[0]) +
+        6 * mt * t * (p2[0] - p1[0]) +
+        3 * t * t * (p3[0] - p2[0]);
+      const expectedY =
+        3 * mt * mt * (p1[1] - p0[1]) +
+        6 * mt * t * (p2[1] - p1[1]) +
+        3 * t * t * (p3[1] - p2[1]);
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, t);
+
+      // The results should be identical
+      expect(result[0]).toBeCloseTo(expectedX, 10);
+      expect(result[1]).toBeCloseTo(expectedY, 10);
+    });
+  });
+
+  describe("Special curves", () => {
+    test("should handle circular approximation", () => {
+      // Control points approximating a quarter circle
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [0, 50];
+      const P2: cmath.Vector2 = [50, 100];
+      const P3: cmath.Vector2 = [100, 100];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // At t=0.5, the derivative should point roughly upward and right
+      expect(result[0]).toBeGreaterThan(0); // Positive x derivative
+      expect(result[1]).toBeGreaterThan(0); // Positive y derivative
+
+      // The magnitude should be reasonable
+      const magnitude = Math.hypot(result[0], result[1]);
+      expect(magnitude).toBeGreaterThan(0);
+      expect(magnitude).toBeLessThan(500);
+    });
+
+    test("should handle cusp curve", () => {
+      // Control points creating a cusp (sharp turn)
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [100, 100];
+      const P2: cmath.Vector2 = [100, -100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // At the cusp point, calculate the expected values:
+      // B'(0.5) = 3*0.25*[100,100] + 6*0.25*[0,-200] + 3*0.25*[100,100]
+      // = [75,75] + [0,-300] + [75,75] = [150,-150]
+      expect(result[0]).toBeCloseTo(150, 6);
+      expect(result[1]).toBeCloseTo(-150, 6);
+    });
+
+    test("should handle loop curve", () => {
+      // Control points creating a loop
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [100, 100];
+      const P2: cmath.Vector2 = [0, 100];
+      const P3: cmath.Vector2 = [100, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 0.5);
+
+      // At the loop point, the derivative should be zero
+      expect(result[0]).toBeCloseTo(0, 6);
+      expect(result[1]).toBeCloseTo(0, 6);
+    });
+  });
+
+  describe("Numerical stability", () => {
+    test("should handle very small t values", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 1e-10);
+
+      // Should not produce NaN or Infinity
+      expect(Number.isFinite(result[0])).toBe(true);
+      expect(Number.isFinite(result[1])).toBe(true);
+
+      // Should be close to the derivative at t=0
+      expect(result[0]).toBeCloseTo(150, 6); // 3*(P1[0] - P0[0])
+      expect(result[1]).toBeCloseTo(300, 6); // 3*(P1[1] - P0[1])
+    });
+
+    test("should handle very large t values", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, 1e10);
+
+      // Should not produce NaN or Infinity
+      expect(Number.isFinite(result[0])).toBe(true);
+      expect(Number.isFinite(result[1])).toBe(true);
+
+      // Should be very large but finite
+      expect(Math.abs(result[0])).toBeGreaterThan(1e6);
+      expect(Math.abs(result[1])).toBeGreaterThan(1e6);
+    });
+
+    test("should handle NaN input", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, NaN);
+
+      // Should handle NaN gracefully
+      expect(Number.isNaN(result[0])).toBe(true);
+      expect(Number.isNaN(result[1])).toBe(true);
+    });
+
+    test("should handle Infinity input", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const result = cmath.bezier.derivC(P0, P1, P2, P3, Infinity);
+
+      // Should handle Infinity gracefully
+      expect(Number.isFinite(result[0])).toBe(false);
+      expect(Number.isFinite(result[1])).toBe(false);
+    });
+  });
+
+  describe("Integration with curve evaluation", () => {
+    test("should provide tangent direction for curve evaluation", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const t = 0.3;
+      const derivative = cmath.bezier.derivC(P0, P1, P2, P3, t);
+
+      // The derivative should point in the direction of the curve
+      expect(derivative[0]).toBeGreaterThan(0); // Curve goes right
+      expect(derivative[1]).toBeGreaterThan(0); // Curve goes up initially
+    });
+
+    test("should provide normal direction for curve evaluation", () => {
+      const P0: cmath.Vector2 = [0, 0];
+      const P1: cmath.Vector2 = [50, 100];
+      const P2: cmath.Vector2 = [150, 100];
+      const P3: cmath.Vector2 = [200, 0];
+
+      const t = 0.5;
+      const derivative = cmath.bezier.derivC(P0, P1, P2, P3, t);
+
+      // At t=0.5, the derivative should be horizontal (normal points up/down)
+      expect(derivative[1]).toBeCloseTo(0, 6);
+      expect(derivative[0]).toBeGreaterThan(0);
+    });
+  });
+});
+
 describe("cmath.bezier.evaluate", () => {
   describe("Basic functionality", () => {
     test("should evaluate straight line segment at t=0", () => {
