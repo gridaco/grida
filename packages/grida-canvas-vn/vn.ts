@@ -4,6 +4,10 @@ import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 type Vector2 = cmath.Vector2;
 export namespace vn {
   /**
+   * Represents a loop as an array of segment indices.
+   */
+  export type Loop = number[];
+  /**
    * Represents a vertex in the vector network.
    */
   export type VectorNetworkVertex = Vector2;
@@ -1084,7 +1088,7 @@ export namespace vn {
     }
 
     /**
-     * Determines whether the specified segments form a closed loop.
+     * Determines whether the specified segments form a closed (valid) loop.
      *
      * The segments must be provided in order such that each segment's
      * ending vertex (`b`) matches the starting vertex (`a`) of the next
@@ -1094,13 +1098,12 @@ export namespace vn {
      * @param segmentIndices - indices of segments to check
      * @returns `true` if the segments form a closed loop, otherwise `false`
      */
-    isLoopClosed(segmentIndices: number[]): boolean {
-      if (segmentIndices.length === 0) return false;
+    isLoopClosed(loop: Loop): boolean {
+      if (loop.length === 0) return false;
 
-      for (let i = 0; i < segmentIndices.length; i++) {
-        const current = this._segments[segmentIndices[i]];
-        const next =
-          this._segments[segmentIndices[(i + 1) % segmentIndices.length]];
+      for (let i = 0; i < loop.length; i++) {
+        const current = this._segments[loop[i]];
+        const next = this._segments[loop[(i + 1) % loop.length]];
 
         if (!current || !next) return false;
         if (current.b !== next.a) return false;
@@ -1112,24 +1115,23 @@ export namespace vn {
     /**
      * Returns all closed regions in the network.
      *
-     * Each region is represented as an array of absolute points forming a
+     * Each region is represented as an array of segment indices forming a
      * closed loop. Segments that do not form a closed loop are ignored.
      */
-    getLoops(): Vector2[][] {
-      const regions: Vector2[][] = [];
+    getLoops(): Loop[] {
+      const regions: Loop[] = [];
       const visited = new Set<number>();
 
       for (let si = 0; si < this._segments.length; si++) {
         if (visited.has(si)) continue;
         const seg = this._segments[si];
-        const loop: number[] = [seg.a];
+        const loop: number[] = [si]; // Start with segment index instead of vertex
         let currentVertex = seg.b;
         visited.add(si);
         let closed = false;
 
         while (true) {
-          loop.push(currentVertex);
-          if (currentVertex === loop[0]) {
+          if (currentVertex === seg.a) {
             closed = true;
             break;
           }
@@ -1138,27 +1140,16 @@ export namespace vn {
           );
           if (nextIndex === -1) break;
           visited.add(nextIndex);
+          loop.push(nextIndex);
           currentVertex = this._segments[nextIndex].b;
         }
 
         if (closed) {
-          loop.pop();
-          regions.push(loop.map((vi) => this._vertices[vi]));
+          regions.push(loop);
         }
       }
 
       return regions;
-    }
-
-    /**
-     * Checks if the given point lies inside any region of the network.
-     */
-    isPointInRegion(point: Vector2): boolean {
-      const regions = this.getLoops();
-      for (const region of regions) {
-        if (cmath.polygon.pointInPolygon(point, region)) return true;
-      }
-      return false;
     }
 
     /**
