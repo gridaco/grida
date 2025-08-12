@@ -799,28 +799,44 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const target_node_ids =
         target === "selection" ? state.selection : [target];
 
-      // clone the target_node_ids
-      const bounding_node_ids = Array.from(target_node_ids);
-
       if (target_node_ids.length === 1) {
         // if a single node is selected, align it with its container. (if not root)
-        // TODO: Knwon issue: this does not work accurately if the node overflows the container
         const node_id = target_node_ids[0];
         const top_id = dq.getTopId(state.document_ctx, node_id);
         if (node_id !== top_id) {
-          // get container (parent)
           const parent_node_id = dq.getParentId(state.document_ctx, node_id);
           assert(parent_node_id, "parent node not found");
-          bounding_node_ids.push(parent_node_id);
+
+          const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+          const parent_rect =
+            context.geometry.getNodeAbsoluteBoundingRect(parent_node_id)!;
+
+          const aligned = cmath.rect.alignA(rect, parent_rect, {
+            horizontal,
+            vertical,
+          });
+
+          const dx = aligned.x - rect.x;
+          const dy = aligned.y - rect.y;
+
+          return produce(state, (draft) => {
+            const node = dq.__getNodeById(state, node_id);
+            const moved = nodeTransformReducer(node, {
+              type: "translate",
+              dx,
+              dy,
+            });
+            draft.document.nodes[node_id] = moved;
+          });
         }
-        //
+
+        return state;
       }
 
-      const rects = bounding_node_ids.map(
+      const rects = target_node_ids.map(
         (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
       );
 
-      //
       const transformed = cmath.rect.align(rects, { horizontal, vertical });
       const deltas = transformed.map((rect, i) => {
         const target_rect = rects[i];
@@ -832,7 +848,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return produce(state, (draft) => {
         let i = 0;
-        for (const node_id of bounding_node_ids) {
+        for (const node_id of target_node_ids) {
           const node = dq.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
             type: "translate",
