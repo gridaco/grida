@@ -7,7 +7,12 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
+import {
+  useCurrentEditor,
+  useEditorState,
+  useContextMenuActions,
+  ContextMenuAction,
+} from "@/grida-canvas-react";
 import {
   Tree,
   TreeDragLine,
@@ -46,7 +51,6 @@ import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/node-type-icon";
 import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
-import { supportsFlatten } from "@/grida-canvas/reducers/methods/flatten";
 
 function SceneItemContextMenuWrapper({
   scene_id,
@@ -202,91 +206,48 @@ function NodeHierarchyItemContextMenuWrapper({
   node_id: string;
   onStartRenaming?: () => void;
 }>) {
-  const editor = useCurrentEditor();
-  const node = useEditorState(editor, (s) => s.document.nodes[node_id]);
-  const canFlatten = supportsFlatten(node);
+  const actions = useContextMenuActions([node_id]);
+
+  const ActionItem = ({ action }: { action: ContextMenuAction }) => (
+    <ContextMenuItem
+      onSelect={action.onSelect}
+      disabled={action.disabled}
+      className="text-xs"
+    >
+      {action.label}
+      {action.shortcut && (
+        <ContextMenuShortcut>{action.shortcut}</ContextMenuShortcut>
+      )}
+    </ContextMenuItem>
+  );
 
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-52">
-        <ContextMenuItem
-          onSelect={() => {
-            editor.copy(node_id);
+        <ActionItem action={actions.copy} />
+        <ActionItem
+          action={{
+            label: "Rename",
+            onSelect: onStartRenaming || (() => {}),
+            disabled: !onStartRenaming,
           }}
-          className="text-xs"
-        >
-          Copy
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={!onStartRenaming}
-          onSelect={() => {
-            onStartRenaming?.();
-          }}
-          className="text-xs"
-        >
-          Rename
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={!canFlatten}
-          onSelect={() => editor.flatten(node_id)}
-          className="text-xs"
-        >
-          Flatten
-          <ContextMenuShortcut>{"⌘E"}</ContextMenuShortcut>
-        </ContextMenuItem>
+        />
+        <ActionItem action={actions.flatten} />
         <ContextMenuSeparator />
-        {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
-        {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
-        <ContextMenuItem
-          onSelect={() => editor.order(node_id, "front")}
-          className="text-xs"
-        >
-          Bring to front
-          <ContextMenuShortcut>{"]"}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => editor.order(node_id, "back")}
-          className="text-xs"
-        >
-          Send to back
-          <ContextMenuShortcut>{"["}</ContextMenuShortcut>
-        </ContextMenuItem>
+        <ActionItem action={actions.bringToFront} />
+        <ActionItem action={actions.sendToBack} />
         <ContextMenuSeparator />
-        {/* <ContextMenuItem>Add Container</ContextMenuItem> */}
-        <ContextMenuItem
-          onSelect={() => editor.toggleNodeActive(node_id)}
-          className="text-xs"
-        >
-          Set Active/Inactive
-          <ContextMenuShortcut>{"⌘⇧H"}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => {
-            editor.fit([node_id], { margin: 64, animate: true });
-          }}
-          className="text-xs"
-        >
-          Zoom to fit
-          <ContextMenuShortcut>{"⇧1"}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => editor.toggleNodeLocked(node_id)}
-          className="text-xs"
-        >
-          Lock/Unlock
-          <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
-        </ContextMenuItem>
+        <ActionItem action={actions.groupWithContainer} />
+        <ActionItem action={actions.group} />
+        <ActionItem action={actions.autoLayout} />
         <ContextMenuSeparator />
-        <ContextMenuItem
-          onSelect={() => {
-            editor.deleteNode(node_id);
-          }}
-          className="text-xs"
-        >
-          Delete
-          <ContextMenuShortcut>{"⌫"}</ContextMenuShortcut>
-        </ContextMenuItem>
+        <ActionItem action={actions.zoomToFit} />
+        <ContextMenuSeparator />
+        <ActionItem action={actions.toggleActive} />
+        <ActionItem action={actions.toggleLocked} />
+        <ContextMenuSeparator />
+        <ActionItem action={actions.delete} />
       </ContextMenuContent>
     </ContextMenu>
   );
