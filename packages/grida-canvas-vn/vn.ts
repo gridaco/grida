@@ -481,6 +481,95 @@ export namespace vn {
       };
     }
 
+    /**
+     * Converts a non-planar vector network into a planar network by detecting and resolving
+     * segment intersections.
+     *
+     * **Planarization** is the process of transforming a vector network that contains
+     * crossing segments into one where all segments only intersect at their endpoints
+     * (vertices). This is essential for proper rendering, boolean operations, and
+     * fill rule calculations.
+     *
+     * ## What is Planarization?
+     *
+     * A **planar network** is one where:
+     * - All segments lie in a single 2D plane
+     * - Segments only intersect at shared vertices
+     * - No segments cross in the middle (transverse intersections)
+     *
+     * A **non-planar network** may have:
+     * - Segments that cross each other at non-vertex points
+     * - Ambiguous fill regions due to overlapping segments
+     * - Inconsistent rendering behavior
+     *
+     * ## How Planarization Works
+     *
+     * 1. **Intersection Detection**: Finds all pairwise intersections between segments
+     *    using the {@link cmath.bezier.intersections} algorithm
+     * 2. **Segment Splitting**: At each intersection point, splits the crossing segments
+     *    into multiple sub-segments
+     * 3. **Vertex Creation**: Creates new vertices at intersection points
+     * 4. **Topology Update**: Updates segment connectivity to maintain the network structure
+     *
+     * ## Intersection Types Handled
+     *
+     * - **Transverse**: Segments cross at a single point (most common)
+     * - **Tangent**: Segments touch without crossing (may be preserved or split)
+     * - **Endpoint**: Segments meet at a shared vertex (no action needed)
+     * - **Overlap**: Segments share a common portion (creates multiple intersection points)
+     *
+     * ## Use Cases
+     *
+     * - **Boolean Operations**: Union, intersection, difference operations require planar networks
+     * - **Fill Rendering**: Ensures consistent fill behavior with even-odd or non-zero rules
+     * - **Path Simplification**: Removes redundant crossings for cleaner geometry
+     * - **SVG Export**: Many SVG renderers expect planar paths
+     *
+     * ## Performance Considerations
+     *
+     * - Time complexity: O(n²) where n is the number of segments
+     * - Uses spatial indexing for efficiency when possible
+     * - Intersection detection is the most computationally expensive step
+     * - Consider using {@link VectorNetworkEditor.optimize} after planarization
+     *
+     * ## Example
+     *
+     * ```ts
+     * // Create a network with crossing segments
+     * const network = new VectorNetworkEditor([
+     *   [0, 0], [100, 100],  // diagonal segment
+     *   [0, 100], [100, 0]   // crossing diagonal
+     * ]);
+     *
+     * // Before planarization: segments cross in the middle
+     * console.log(network.segments.length); // 2 segments
+     *
+     * // After planarization: segments split at intersection
+     * network.planarize();
+     * console.log(network.segments.length); // 4 segments (split at crossing)
+     * ```
+     *
+     * ## Related Methods
+     *
+     * - {@link VectorNetworkEditor.optimize} - Removes duplicates after planarization
+     * - {@link VectorNetworkEditor.union} - Boolean operations on planar networks
+     * - {@link cmath.bezier.intersections} - Core intersection detection algorithm
+     *
+     * @remarks
+     * This method modifies the vector network in-place. If you need to preserve
+     * the original network, create a copy before calling this method.
+     *
+     * The planarization process may significantly increase the number of vertices
+     * and segments, especially for networks with many crossings. Consider the
+     * memory and performance implications for large networks.
+     *
+     * @see {@link cmath.bezier.intersections} - For details on intersection detection
+     * @see {@link VectorNetworkEditor.optimize} - For post-planarization cleanup
+     */
+    planarize() {
+      throw new Error("Not implemented");
+    }
+
     private _vertices: VectorNetworkVertex[] = [];
     private _segments: VectorNetworkSegment[] = [];
 

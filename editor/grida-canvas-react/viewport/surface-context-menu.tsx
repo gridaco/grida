@@ -4,6 +4,9 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { useSelectionState, useEditorFlagsState } from "../provider";
@@ -49,6 +52,14 @@ export function EditorSurfaceContextMenu({
         <ActionItem action={actions.sendToBack} />
         <ContextMenuSeparator />
         <ActionItem action={actions.flatten} />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="text-xs">
+            Edit Vector...
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ActionItem action={actions.planarize} />
+          </ContextMenuSubContent>
+        </ContextMenuSub>
         <ContextMenuSeparator />
         <ActionItem action={actions.groupWithContainer} />
         <ActionItem action={actions.group} />

@@ -19,6 +19,7 @@ type ContextMenuActionType =
   | "group"
   | "autoLayout"
   | "flatten"
+  | "planarize"
   | "toggleActive"
   | "zoomToFit"
   | "toggleLocked"
@@ -44,6 +45,9 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
   const hasSelection = ids.length > 0;
   const canFlatten =
     hasSelection && ids.every((id) => supportsFlatten(nodes[id]));
+
+  const canPlanarize =
+    hasSelection && ids.every((id) => nodes[id].type === "vector");
 
   const targetSingleOrSelection =
     ids.length === 1 ? (ids[0] as string) : "selection";
@@ -120,6 +124,11 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
           editor.flatten(
             hasSelection && ids.length === 1 ? (ids[0] as string) : "selection"
           ),
+      },
+      planarize: {
+        label: "Planarize",
+        disabled: !canPlanarize,
+        onSelect: () => editor.planarize(ids),
       },
       toggleActive: {
         label: "Set Active/Inactive",

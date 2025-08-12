@@ -289,6 +289,7 @@ export type EditorVectorEditorAction =
   | EditorVectorTranslateVertexAction
   | EditorVectorTranslateSegmentAction
   | EditorVectorBendSegmentAction
+  | EditorVectorPlanarizeAction
   | EditorVectorBendOrClearCornerAction
   | EditorVectorUpdateHoveredControlAction;
 
@@ -372,6 +373,11 @@ export interface EditorVectorBendOrClearCornerAction {
    * When omitted, the corner is bent or cleared based on existing tangents.
    */
   tangent?: Vector2 | 0;
+}
+
+export interface EditorVectorPlanarizeAction {
+  type: "vector/planarize";
+  target: NodeID | NodeID[];
 }
 
 export interface EditorVectorUpdateHoveredControlAction {

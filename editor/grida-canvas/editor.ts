@@ -877,6 +877,13 @@ export class Editor
     });
   }
 
+  public planarize(ids: editor.NodeID | editor.NodeID[]): void {
+    this.dispatch({
+      type: "vector/planarize",
+      target: ids,
+    });
+  }
+
   public updateVectorHoveredControl(
     hoveredControl: {
       type: editor.state.VectorContentEditModeHoverableType;

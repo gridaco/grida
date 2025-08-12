@@ -1248,6 +1248,27 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       });
     }
+    case "vector/planarize": {
+      const { target } = action;
+      const target_node_ids =
+        target === "selection"
+          ? state.selection
+          : Array.isArray(target)
+            ? target
+            : [target];
+
+      return produce(state, (draft) => {
+        for (const node_id of target_node_ids) {
+          const node = dq.__getNodeById(draft, node_id);
+
+          if (node.type === "vector") {
+            self_updateVectorNodeVectorNetwork(node, (vne) => {
+              vne.planarize();
+            });
+          }
+        }
+      });
+    }
     case "vector/update-hovered-control": {
       return produce(state, (draft) => {
         if (draft.content_edit_mode?.type === "vector") {

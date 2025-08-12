@@ -1891,6 +1891,7 @@ export namespace editor.api {
         tb: cmath.Vector2;
       }
     ): void;
+    planarize(node_id: NodeID): void;
 
     /**
      * Updates the hovered control in vector content edit mode.
