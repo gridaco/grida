@@ -4564,12 +4564,31 @@ namespace cmath {
 
             // If boxes almost coincident and directions nearly parallel -> record minimal overlap
             if (flatA && flatB && boxSize <= eps * 2) {
-              // store as tiny overlap interval (can be merged by caller if needed)
-              ovlps.push({
-                a_range: [Math.min(it.a0, it.a1), Math.max(it.a0, it.a1)],
-                b_range: [Math.min(it.b0, it.b1), Math.max(it.b0, it.b1)],
-              });
-              continue;
+              // For flat curves, check if they're parallel before treating as overlap
+              const dirA = sub(PA3, PA0); // direction of curve A
+              const dirB = sub(PB3, PB0); // direction of curve B
+              const crossProduct = cross(dirA, dirB);
+              const lenA = Math.sqrt(len2(dirA));
+              const lenB = Math.sqrt(len2(dirB));
+
+              // Check if curves start at the same point (within tolerance)
+              const startDist = Math.sqrt(len2(sub(PA0, PB0)));
+              const endDist = Math.sqrt(len2(sub(PA3, PB3)));
+
+              // If curves are nearly parallel OR they share endpoints, treat as overlap
+              if (
+                Math.abs(crossProduct) <= eps * lenA * lenB ||
+                startDist <= eps * 2 ||
+                endDist <= eps * 2
+              ) {
+                // store as tiny overlap interval (can be merged by caller if needed)
+                ovlps.push({
+                  a_range: [Math.min(it.a0, it.a1), Math.max(it.a0, it.a1)],
+                  b_range: [Math.min(it.b0, it.b1), Math.max(it.b0, it.b1)],
+                });
+                continue;
+              }
+              // If not parallel and don't share endpoints, fall through to point intersection logic
             }
 
             let a = a_t,

@@ -508,6 +508,36 @@ describe("cmath.bezier.intersection.intersections", () => {
         expect(point.p[1]).toBeCloseTo(0, 1);
       }
     });
+
+    test("should find intersection of two perpendicular straight lines at center", () => {
+      // Two visually straight lines (0-tangent curves) that are perpendicular
+      // Line A: horizontal line from -50,0 to 50,0
+      const A: cmath.bezier.CubicBezierWithTangents = {
+        a: [-50, 0],
+        b: [50, 0],
+        ta: [0, 0], // 0-tangent = straight line
+        tb: [0, 0], // 0-tangent = straight line
+      };
+      // Line B: vertical line from 0,-50 to 0,50
+      const B: cmath.bezier.CubicBezierWithTangents = {
+        a: [0, -50],
+        b: [0, 50],
+        ta: [0, 0], // 0-tangent = straight line
+        tb: [0, 0], // 0-tangent = straight line
+      };
+
+      const result = cmath.bezier.intersection.intersections(A, B);
+
+      // The algorithm should now correctly find a point intersection
+      expect(result.points).toHaveLength(1);
+      expect(result.points[0].kind).toBe(
+        cmath.bezier.intersection.IntersectionKind.Transverse
+      );
+      expect(result.points[0].a_t).toBeCloseTo(0.5, 2); // Middle of horizontal line
+      expect(result.points[0].b_t).toBeCloseTo(0.5, 2); // Middle of vertical line
+      expect(result.points[0].p[0]).toBeCloseTo(0, 1); // x-coordinate should be 0
+      expect(result.points[0].p[1]).toBeCloseTo(0, 1); // y-coordinate should be 0
+    });
   });
 
   describe("Multiple intersections", () => {
