@@ -1113,43 +1113,183 @@ export namespace vn {
     }
 
     /**
-     * Returns all closed regions in the network.
+     * Enumerates all bounded, minimal, non-overlapping loops (faces) in a planar {@link VectorNetwork}.
      *
-     * Each region is represented as an array of segment indices forming a
-     * closed loop. Segments that do not form a closed loop are ignored.
+     * ## Overview
+     * This function takes a vector network (vertices + segments), treats it as a
+     * planar straight-line graph, and returns an array of loops. Each loop is an
+     * array of segment indices that form a closed, counter-clockwise cycle
+     * representing a bounded face in the network.
+     *
+     * The unbounded (outer) face is detected and excluded from the results.
+     * The algorithm respects Euler's characteristic for planar graphs:
+     *
+     * ```
+     * loops.length = E - V + C
+     * ```
+     *
+     * where:
+     * - `E` = number of segments
+     * - `V` = number of vertices
+     * - `C` = number of connected components in the graph
+     *
+     * ## Algorithm
+     * 1. Builds **half-edges** (two directed edges per segment) with twin pointers.
+     * 2. Groups outgoing half-edges per vertex and sorts them in **clockwise** order
+     *    using the geometric ray angle `atan2(P[v] - P[u])`. This avoids reliance on
+     *    curve tangents, so it works for straight-line segments and zero tangents.
+     * 3. Uses the **left-hand rule**: from a half-edge, go to its twin, then to the
+     *    previous half-edge in the CW rotation around that vertex — this walks the
+     *    boundary of the face to the left of the original half-edge.
+     * 4. Marks visited half-edges so each bounded face is traversed exactly once.
+     * 5. Computes the signed area of each face to:
+     *    - Ensure counter-clockwise orientation for bounded faces.
+     *    - Identify and remove the outer face (largest absolute area).
+     *
+     * ## Notes
+     * - Assumes the input is already **planarized**: all intersections occur at vertices,
+     *   and segment endpoints reference valid vertex indices.
+     * - Degree-1 vertices (bridges or dangling edges) do not contribute to bounded faces.
+     * - Works for multiple connected components.
+     * - Robust for parallel or collinear edges — tie-broken by edge length and index.
+     *
+     * ## Complexity
+     * - Time: `O(E log d_max)` from sorting edges at each vertex (`d_max` = max degree).
+     * - Space: `O(E)` for half-edge structures and auxiliary arrays.
+     *
+     * @returns An array of loops, where each loop is an array of segment indices forming a bounded face in CCW order.
+     *
+     * @example
+     * ```ts
+     * const loops = getLoops.call({ value: vectorNetwork });
+     * // loops might be:
+     * // [
+     * //   [0, 1, 2], // triangle
+     * //   [3, 4, 5, 6] // rectangle
+     * // ]
+     * ```
      */
     getLoops(): Loop[] {
-      const regions: Loop[] = [];
-      const visited = new Set<number>();
+      const { vertices: P, segments: S } = this.value;
+      const E = S.length;
+      if (!E) return [];
 
-      for (let si = 0; si < this._segments.length; si++) {
-        if (visited.has(si)) continue;
-        const seg = this._segments[si];
-        const loop: number[] = [si]; // Start with segment index instead of vertex
-        let currentVertex = seg.b;
-        visited.add(si);
-        let closed = false;
+      // ---- half-edges ----
+      const U = new Int32Array(2 * E);
+      const V = new Int32Array(2 * E);
+      const SEG = new Int32Array(2 * E);
+      for (let e = 0; e < E; e++) {
+        const s = S[e],
+          h0 = 2 * e,
+          h1 = h0 + 1;
+        U[h0] = s.a;
+        V[h0] = s.b;
+        SEG[h0] = e;
+        U[h1] = s.b;
+        V[h1] = s.a;
+        SEG[h1] = e;
+      }
+      const twin = (h: number) => h ^ 1;
 
-        while (true) {
-          if (currentVertex === seg.a) {
-            closed = true;
-            break;
-          }
-          const nextIndex = this._segments.findIndex(
-            (s, idx) => !visited.has(idx) && s.a === currentVertex
-          );
-          if (nextIndex === -1) break;
-          visited.add(nextIndex);
-          loop.push(nextIndex);
-          currentVertex = this._segments[nextIndex].b;
+      // ---- per-vertex rotation by geometric ray angle u->v (robust for ta/tb=0) ----
+      const OUT: number[][] = Array.from({ length: P.length }, () => []);
+      for (let h = 0; h < 2 * E; h++) OUT[U[h]].push(h);
+
+      const ang = (u: number, v: number) => {
+        const a = P[u],
+          b = P[v];
+        return Math.atan2(b[1] - a[1], b[0] - a[0]);
+      };
+
+      for (let u = 0; u < P.length; u++) {
+        const arr = OUT[u];
+        arr.sort((i, j) => {
+          const ai = ang(U[i], V[i]);
+          const aj = ang(U[j], V[j]);
+          if (aj !== ai) return aj - ai; // CW order
+          // tie-break: farther edge first to stabilize collinear multi-edges
+          const di =
+            (P[V[i]][0] - P[U[i]][0]) ** 2 + (P[V[i]][1] - P[U[i]][1]) ** 2;
+          const dj =
+            (P[V[j]][0] - P[U[j]][0]) ** 2 + (P[V[j]][1] - P[U[j]][1]) ** 2;
+          return dj - di || SEG[i] - SEG[j] || i - j;
+        });
+      }
+
+      // position of half-edge within the rotation
+      const POS = new Int32Array(2 * E).fill(-1);
+      for (let u = 0; u < P.length; u++) {
+        const r = OUT[u];
+        for (let k = 0; k < r.length; k++) POS[r[k]] = k;
+      }
+
+      // next-around-face (left of edge): prev in CW from the twin
+      const next = (h: number) => {
+        const t = twin(h);
+        const v = U[t];
+        const r = OUT[v];
+        if (r.length < 2) return -1; // degree-0/1 => cannot bound a face
+        const k = POS[t];
+        const kPrev = (k - 1 + r.length) % r.length;
+        return r[kPrev];
+      };
+
+      // ---- face walk ----
+      const seen = new Uint8Array(2 * E);
+      const facesHE: number[][] = [];
+      for (let h0 = 0; h0 < 2 * E; h0++) {
+        if (seen[h0]) continue;
+        // skip bridges/leaf edges early
+        if (OUT[U[h0]].length < 2 || OUT[V[h0]].length < 2) {
+          seen[h0] = 1;
+          seen[twin(h0)] = 1;
+          continue;
         }
+        let h = h0;
+        const cyc: number[] = [];
+        while (h !== -1 && !seen[h]) {
+          seen[h] = 1;
+          cyc.push(h);
+          h = next(h);
+        }
+        if (h === h0 && cyc.length >= 3) facesHE.push(cyc);
+      }
 
-        if (closed) {
-          regions.push(loop);
+      // ---- area / orientation; drop outer ----
+      const areaOfHE = (loop: number[]) => {
+        let s = 0;
+        for (let i = 0; i < loop.length; i++) {
+          const a = P[U[loop[i]]],
+            b = P[V[loop[i]]];
+          s += a[0] * b[1] - a[1] * b[0];
+        }
+        return 0.5 * s; // >0 CCW
+      };
+      const areas = facesHE.map(areaOfHE);
+      let outer = -1,
+        outerAbs = -1;
+      for (let i = 0; i < areas.length; i++) {
+        const A = Math.abs(areas[i]);
+        if (A > outerAbs) {
+          outerAbs = A;
+          outer = i;
         }
       }
 
-      return regions;
+      const loops: Loop[] = [];
+      for (let i = 0; i < facesHE.length; i++) {
+        if (i === outer) continue;
+        const he =
+          areas[i] > 0 ? facesHE[i] : facesHE[i].slice().reverse().map(twin);
+        const segLoop: number[] = [];
+        for (const h of he) {
+          const e = SEG[h];
+          if (!segLoop.length || segLoop[segLoop.length - 1] !== e)
+            segLoop.push(e);
+        }
+        if (segLoop.length >= 3) loops.push(segLoop);
+      }
+      return loops;
     }
 
     /**

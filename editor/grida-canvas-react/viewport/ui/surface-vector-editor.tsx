@@ -98,25 +98,42 @@ export function SurfaceVectorEditor({
       </div>
 
       {loops.map((loop, i) => {
-        const vertexPositions = loop.vertices.map((v) =>
-          cmath.vector2.transform(absolute_vertices[v], transform)
-        );
-        const indexMap = new Map(loop.vertices.map((v, idx) => [v, idx]));
-        const loopSegments = loop.segments.map((si) => {
+        // TODO: can be cheaper.
+        // Derive vertices from segments since getLoops() only returns segment indices
+        const loopVertices = new Set<number>();
+        const loopSegments = loop.map((si) => {
           const s = segments[si];
+          loopVertices.add(s.a);
+          loopVertices.add(s.b);
           return {
             idx: si,
-            a: indexMap.get(s.a)!,
-            b: indexMap.get(s.b)!,
+            a: s.a,
+            b: s.b,
             ta: transformDelta(s.ta, transform),
             tb: transformDelta(s.tb, transform),
           };
         });
+
+        const vertexPositions = Array.from(loopVertices).map((v) =>
+          cmath.vector2.transform(absolute_vertices[v], transform)
+        );
+
+        const indexMap = new Map(
+          Array.from(loopVertices).map((v, idx) => [v, idx])
+        );
+
+        // Update segment indices to use the new vertex mapping
+        const mappedSegments = loopSegments.map((seg) => ({
+          ...seg,
+          a: indexMap.get(seg.a)!,
+          b: indexMap.get(seg.b)!,
+        }));
+
         return (
           <VectorRegion
             key={`region-${i}`}
             vertices={vertexPositions}
-            segments={loopSegments}
+            segments={mappedSegments}
             disabled={tool.type === "path"}
           />
         );
