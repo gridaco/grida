@@ -112,6 +112,12 @@ export namespace vn {
     point: Vector2;
   };
 
+  export type AbsoluteTangentControlOnSegment = {
+    segment: number;
+    control: "ta" | "tb";
+    point: Vector2;
+  };
+
   /**
    * Represents a segment in the vector network, connecting two vertices.
    *
@@ -570,11 +576,18 @@ export namespace vn {
      * and segments, especially for networks with many crossings. Consider the
      * memory and performance implications for large networks.
      *
+     * @param net - The vector network to planarize
+     * @param config - Configuration options for segment splitting operations
+     * @returns A new planarized {@link VectorNetwork}
+     *
      * @see {@link cmath.bezier.intersection.single.intersection} - For self-intersection detection
      * @see {@link cmath.bezier.intersection.intersections} - For cross-intersection detection
      * @see {@link VectorNetworkEditor.optimize} - For post-planarization cleanup
      */
-    static planarize(net: VectorNetwork): VectorNetwork {
+    static planarize(
+      net: VectorNetwork,
+      config: SplitSegmentConfig = { preserveZero: true }
+    ): VectorNetwork {
       // Early exit if no segments to process
       if (net.segments.length === 0) {
         return { vertices: [...net.vertices], segments: [...net.segments] };
@@ -811,24 +824,64 @@ export namespace vn {
           tb: segment.tb,
         };
 
+        // Check if we should preserve zero tangents for UX purposes
+        const preserveZero = config.preserveZero ?? true;
+        const hasZeroTangents =
+          segment.ta[0] === 0 &&
+          segment.ta[1] === 0 &&
+          segment.tb[0] === 0 &&
+          segment.tb[1] === 0;
+
         let currentSegment = bezierCurve;
         let currentStartVertex = segment.a;
 
         for (let i = 0; i < uniqueSplits.length; i++) {
           const split = uniqueSplits[i];
-          const subdivision = cmath.bezier.subdivide(currentSegment, split.t);
 
-          // Add the left sub-segment
-          newSegments.push({
-            a: currentStartVertex,
-            b: newVertices[i],
-            ta: subdivision.l.ta,
-            tb: subdivision.l.tb,
-          });
+          if (preserveZero && hasZeroTangents) {
+            // For UX: Keep zero tangents to avoid confusing tangent controls
+            // But still use Bézier evaluation to get the correct cursor position
+            const splitPoint = cmath.bezier.evaluate(
+              currentSegment.a,
+              currentSegment.b,
+              currentSegment.ta,
+              currentSegment.tb,
+              split.t
+            );
 
-          // Update for next iteration
-          currentSegment = subdivision.r;
-          currentStartVertex = newVertices[i];
+            // Add the left sub-segment with zero tangents
+            newSegments.push({
+              a: currentStartVertex,
+              b: newVertices[i],
+              ta: [0, 0],
+              tb: [0, 0],
+            });
+
+            // Update for next iteration
+            currentSegment = {
+              a: splitPoint,
+              b: currentSegment.b,
+              ta: [0, 0],
+              tb: [0, 0],
+            };
+            currentStartVertex = newVertices[i];
+          } else {
+            // Use Bézier curve subdivision to get the correct tangent values
+            // This ensures the composite curve is mathematically identical to the original
+            const subdivision = cmath.bezier.subdivide(currentSegment, split.t);
+
+            // Add the left sub-segment
+            newSegments.push({
+              a: currentStartVertex,
+              b: newVertices[i],
+              ta: subdivision.l.ta,
+              tb: subdivision.l.tb,
+            });
+
+            // Update for next iteration
+            currentSegment = subdivision.r;
+            currentStartVertex = newVertices[i];
+          }
         }
 
         // Add the final sub-segment
@@ -949,6 +1002,7 @@ export namespace vn {
      * console.log(editor.segments.length); // 4+ segments (split at crossings)
      * ```
      *
+     * @param config - Configuration options for segment splitting operations
      * @returns The planarized {@link VectorNetwork} (same as the modified instance)
      *
      * @remarks
@@ -963,8 +1017,10 @@ export namespace vn {
      * @see {@link cmath.bezier.intersection.single.intersection} - For self-intersection detection
      * @see {@link cmath.bezier.intersections} - For cross-intersection detection
      */
-    planarize(): VectorNetwork {
-      const planarized = VectorNetworkEditor.planarize(this.value);
+    planarize(
+      config: SplitSegmentConfig = { preserveZero: true }
+    ): VectorNetwork {
+      const planarized = VectorNetworkEditor.planarize(this.value, config);
       this._vertices = planarized.vertices;
       this._segments = planarized.segments;
       return planarized;
@@ -1290,6 +1346,93 @@ export namespace vn {
         if (segLoop.length >= 3) loops.push(segLoop);
       }
       return loops;
+    }
+
+    getLoopPathData(loop: Loop): string {
+      const { vertices, segments } = this.value;
+      const commands: SVGCommand[] = [];
+
+      // No segments in loop means nothing to draw
+      if (loop.length === 0) {
+        return "";
+      }
+
+      let current_start: number | null = null;
+      let previous_end: number | null = null;
+
+      // Process each segment in the loop
+      for (const segmentIndex of loop) {
+        const segment = segments[segmentIndex];
+        const { a, b, ta, tb } = segment;
+        const start = vertices[a];
+        const end = vertices[b];
+
+        // Start a new subpath if this segment does not connect to the previous one
+        if (previous_end !== a) {
+          commands.push({
+            type: SVGPathData.MOVE_TO,
+            x: start[0],
+            y: start[1],
+            relative: false,
+          });
+          current_start = a;
+        }
+
+        // Straight line when both tangents are zero
+        if (ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0) {
+          commands.push({
+            type: SVGPathData.LINE_TO,
+            x: end[0],
+            y: end[1],
+            relative: false,
+          });
+        } else {
+          const c1 = [start[0] + ta[0], start[1] + ta[1]];
+          const c2 = [end[0] + tb[0], end[1] + tb[1]];
+          commands.push({
+            type: SVGPathData.CURVE_TO,
+            x1: c1[0],
+            y1: c1[1],
+            x2: c2[0],
+            y2: c2[1],
+            x: end[0],
+            y: end[1],
+            relative: false,
+          });
+        }
+
+        previous_end = b;
+
+        // Close the path if we've reached the starting point
+        if (current_start !== null && b === current_start) {
+          commands.push({ type: SVGPathData.CLOSE_PATH });
+          previous_end = null;
+          current_start = null;
+        }
+      }
+
+      // If the loop doesn't automatically close (e.g., if the last segment doesn't connect to the first),
+      // we need to close it manually
+      if (current_start !== null && previous_end !== null) {
+        const firstSegment = segments[loop[0]];
+        const lastSegment = segments[loop[loop.length - 1]];
+
+        // Check if the loop is actually closed by comparing the last vertex with the first vertex
+        if (lastSegment.b !== firstSegment.a) {
+          // Add a line to close the path
+          const firstVertex = vertices[firstSegment.a];
+          commands.push({
+            type: SVGPathData.LINE_TO,
+            x: firstVertex[0],
+            y: firstVertex[1],
+            relative: false,
+          });
+        }
+
+        commands.push({ type: SVGPathData.CLOSE_PATH });
+      }
+
+      return encodeSVGPath(commands);
     }
 
     /**
@@ -1909,7 +2052,7 @@ export namespace vn {
     getControlPointsAbsolute(
       offset: Vector2 = [0, 0],
       targets?: [number, "ta" | "tb"][]
-    ): { segment: number; control: "ta" | "tb"; point: Vector2 }[] {
+    ): AbsoluteTangentControlOnSegment[] {
       const result: {
         segment: number;
         control: "ta" | "tb";

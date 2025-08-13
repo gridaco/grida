@@ -96,27 +96,23 @@ function getSourceRect(params: {
  * @returns Measurement result or null if conditions not met
  */
 function calculateVectorMeasurement(params: {
-  hovered_controls: { type: "vertex" | "segment"; index: number } | null;
+  hovered_control: { type: "vertex" | "segment"; index: number } | null;
   snapped_vertex_idx: number | null;
   snapped_segment_p: vn.EvaluatedPointOnSegment | null;
   selected_vertices: number[];
   selected_segments: number[];
   segments: vn.VectorNetworkSegment[];
   absolute_vertices: cmath.Vector2[];
-  vertices: cmath.Vector2[];
-  local_point: cmath.Vector2;
   offset: cmath.Vector2;
 }): Measurement | null {
   const {
-    hovered_controls,
+    hovered_control,
     snapped_vertex_idx,
     snapped_segment_p,
     selected_vertices,
     selected_segments,
     segments,
     absolute_vertices,
-    vertices,
-    local_point,
     offset,
   } = params;
 
@@ -126,9 +122,9 @@ function calculateVectorMeasurement(params: {
   // 3. The target is not part of the current selection (A !== B)
   const targetVertexIndex =
     snapped_vertex_idx ??
-    (hovered_controls?.type === "vertex" ? hovered_controls.index : null);
+    (hovered_control?.type === "vertex" ? hovered_control.index : null);
   if (
-    (hovered_controls?.type !== "segment" && targetVertexIndex === null) ||
+    (hovered_control?.type !== "segment" && targetVertexIndex === null) ||
     (selected_vertices.length === 0 && selected_segments.length === 0)
   ) {
     return null;
@@ -170,8 +166,8 @@ function calculateVectorMeasurement(params: {
     );
   }
   // Case 2: Selection-to-parametric-point measurement (when hovering over a segment)
-  else if (hovered_controls?.type === "segment") {
-    const segment = segments[hovered_controls.index];
+  else if (hovered_control?.type === "segment") {
+    const segment = segments[hovered_control.index];
 
     if (!segment) {
       return null;
@@ -180,7 +176,7 @@ function calculateVectorMeasurement(params: {
     // Use pre-computed snapped segment point
     if (
       !snapped_segment_p ||
-      snapped_segment_p.segment !== hovered_controls.index
+      snapped_segment_p.segment !== hovered_control.index
     ) {
       return null;
     }
@@ -223,7 +219,6 @@ function useVectorMeasurement() {
     editor,
     (state) => state.surface_measurement_targeting
   );
-  const pointer = useEditorState(editor, (state) => state.pointer);
   const ve = useVectorContentEditMode();
 
   // Memoize the measurement calculation to avoid infinite re-renders
@@ -234,19 +229,14 @@ function useVectorMeasurement() {
         return undefined;
       }
 
-      // Calculate local point (relative to vector network origin)
-      const local_point = cmath.vector2.sub(pointer.position, ve.offset);
-
       const result = calculateVectorMeasurement({
-        hovered_controls: ve.hovered_controls,
+        hovered_control: ve.hovered_control,
         snapped_vertex_idx: ve.snapped_point,
         snapped_segment_p: ve.snapped_segment_p,
         selected_vertices: ve.selected_vertices,
         selected_segments: ve.selected_segments,
         segments: ve.segments,
         absolute_vertices: ve.absolute_vertices,
-        vertices: ve.vertices,
-        local_point,
         offset: ve.offset,
       });
 
@@ -257,16 +247,14 @@ function useVectorMeasurement() {
     }
   }, [
     surface_measurement_targeting,
-    ve.hovered_controls,
+    ve.hovered_control,
     ve.snapped_point,
     ve.snapped_segment_p,
     ve.selected_vertices,
     ve.selected_segments,
     ve.segments,
     ve.absolute_vertices,
-    ve.vertices,
     ve.offset,
-    pointer.position,
   ]);
 
   return measurement;

@@ -529,3 +529,83 @@ describe("splitSegment", () => {
     });
   });
 });
+
+describe("getLoopPathData", () => {
+  it("should generate path data for a simple triangle loop", () => {
+    const net = vn.polygon([
+      [0, 0],
+      [10, 0],
+      [5, 10],
+    ]);
+    const editor = new vn.VectorNetworkEditor(net);
+    const loops = editor.getLoops();
+
+    expect(loops).toHaveLength(1);
+    const pathData = editor.getLoopPathData(loops[0]);
+
+    // The path should start with M (move to), have L (line to) commands, and end with Z (close path)
+    expect(pathData).toMatch(
+      /^M\d+\.?\d*\s+\d+\.?\d*\s+L\d+\.?\d*\s+\d+\.?\d*\s+L\d+\.?\d*\s+\d+\.?\d*\s+L\d+\.?\d*\s+\d+\.?\d*\s+Z$/
+    );
+
+    // Verify the actual path data format
+    expect(pathData).toBe("M10 0 L5 10 L0 0 L10 0 Z");
+  });
+
+  it("should generate path data for a rectangle loop", () => {
+    const net = vn.polygon([
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [0, 10],
+    ]);
+    const editor = new vn.VectorNetworkEditor(net);
+    const loops = editor.getLoops();
+
+    expect(loops).toHaveLength(1);
+    const pathData = editor.getLoopPathData(loops[0]);
+
+    // Should generate a closed rectangular path
+    expect(pathData).toMatch(
+      /^M\d+\.?\d*\s+\d+\.?\d*\s+L\d+\.?\d*\s+\d+\.?\d*\s+L\d+\.?\d*\s+\d+\.?\d*\s+L\d+\.?\d*\s+\d+\.?\d*\s+L\d+\.?\d*\s+\d+\.?\d*\s+Z$/
+    );
+  });
+
+  it("should handle empty loop", () => {
+    const net = vn.polygon([
+      [0, 0],
+      [10, 0],
+      [5, 10],
+    ]);
+    const editor = new vn.VectorNetworkEditor(net);
+    const pathData = editor.getLoopPathData([]);
+
+    expect(pathData).toBe("");
+  });
+
+  it("should handle curved segments in loop", () => {
+    const net = vn.polygon([
+      [0, 0],
+      [10, 0],
+      [5, 10],
+    ]);
+    const editor = new vn.VectorNetworkEditor(net);
+
+    // Add some curvature to the segments
+    editor.updateTangent(0, "ta", [2, 0]);
+    editor.updateTangent(0, "tb", [-2, 0]);
+
+    const loops = editor.getLoops();
+    expect(loops).toHaveLength(1);
+    const pathData = editor.getLoopPathData(loops[0]);
+
+    // Should contain curve commands (C) for the curved segment
+    expect(pathData).toMatch(
+      /C\d+\.?\d*\s+\d+\.?\d*\s+\d+\.?\d*\s+\d+\.?\d*\s+\d+\.?\d*\s+\d+\.?\d*/
+    );
+
+    // Verify the actual path data format includes a curve
+    expect(pathData).toContain("C");
+    expect(pathData).toContain("Z");
+  });
+});

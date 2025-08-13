@@ -69,7 +69,7 @@ const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
   ],
   border: ["container", "component", "instance", "image", "video"],
   children: ["container", "component", "instance"],
-  stroke: ["vector", "line", "rectangle", "ellipse"],
+  stroke: ["vector", "line", "rectangle", "ellipse", "polygon", "star"],
   feDropShadow: ["container", "component", "instance"],
   /**
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)

@@ -4,7 +4,7 @@ import cmath from "@grida/cmath";
 import { svg } from "@/grida-canvas-utils/svg";
 import { SVGPathData, SVGCommand } from "svg-pathdata";
 import { DiagonalStripe } from "./svg-fill-patterns";
-import useVectorContentEditMode from "@/grida-canvas-react/use-sub-vector-network-editor";
+import type { VectorContentEditor } from "@/grida-canvas-react/use-sub-vector-network-editor";
 
 interface RegionSegment {
   /**
@@ -27,12 +27,15 @@ export function VectorRegion({
   vertices,
   segments,
   disabled = false,
+  ve,
+  onSelect,
 }: {
   vertices: cmath.Vector2[];
   segments: RegionSegment[];
   disabled?: boolean;
+  ve: VectorContentEditor;
+  onSelect: () => void;
 }) {
-  const ve = useVectorContentEditMode();
   const [hovered, setHovered] = useState(false);
   const [active, setActive] = useState(false);
 
@@ -60,12 +63,7 @@ export function VectorRegion({
       onPointerDown: ({ event }) => {
         event.preventDefault();
         setActive(true);
-        if (segments.length > 0) {
-          ve.selectSegment(segments[0].idx, false);
-          for (let i = 1; i < segments.length; i++) {
-            ve.selectSegment(segments[i].idx, true);
-          }
-        }
+        onSelect();
       },
       onDragStart: ({ event }) => {
         event.preventDefault();

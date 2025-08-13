@@ -4,8 +4,58 @@ import cmath from "@grida/cmath";
 import assert from "assert";
 import type grida from "@grida/schema";
 import vn from "@grida/vn";
+import { editor } from "@/grida-canvas";
 
-export default function useVectorContentEditMode() {
+export interface VectorContentEditor {
+  node_id: string;
+  vectorNetwork: vn.VectorNetwork;
+  path_cursor_position: cmath.Vector2;
+  absolute_vertices: cmath.Vector2[];
+  absolute_tangents: vn.AbsoluteTangentControlOnSegment[];
+  vertices: cmath.Vector2[];
+  segments: vn.VectorNetworkSegment[];
+  offset: cmath.Vector2;
+  neighbouring_vertices: editor.state.VectorContentEditMode["selection_neighbouring_vertices"];
+  selected_vertices: editor.state.VectorContentEditMode["selected_vertices"];
+  selected_segments: editor.state.VectorContentEditMode["selected_segments"];
+  selected_tangents: editor.state.VectorContentEditMode["selected_tangents"];
+  snapped_point: editor.state.VectorContentEditMode["snapped_vertex_idx"];
+  a_point: editor.state.VectorContentEditMode["a_point"];
+  next_ta: editor.state.VectorContentEditMode["next_ta"];
+  hovered_control: editor.state.VectorContentEditMode["hovered_control"];
+  snapped_segment_p: editor.state.VectorContentEditMode["snapped_segment_p"];
+  loops: vn.Loop[];
+  selectVertex: (vertex: number, additive?: boolean) => void;
+  deleteVertex: (vertex: number) => void;
+  selectSegment: (segment: number, additive?: boolean) => void;
+  selectTangent: (
+    segment: number,
+    control: "ta" | "tb",
+    additive?: boolean
+  ) => void;
+  deleteSegment: (segment: number) => void;
+  onCurveControlPointDragStart: (segment: number, control: "ta" | "tb") => void;
+  onDragStart: () => void;
+  onSegmentInsertMiddle: (segment: number) => void;
+  bendSegment: (
+    segment: number,
+    ca: number,
+    cb: cmath.Vector2,
+    frozen: {
+      a: cmath.Vector2;
+      b: cmath.Vector2;
+      ta: cmath.Vector2;
+      tb: cmath.Vector2;
+    }
+  ) => void;
+  updateHoveredControl: (
+    hoveredControl: { type: "vertex" | "segment"; index: number } | null
+  ) => void;
+  getLoopPathData: (loop: vn.Loop) => string;
+  selectLoop: (loop: vn.Loop) => void;
+}
+
+export default function useVectorContentEditMode(): VectorContentEditor {
   const instance = useCurrentEditor();
   const state = useEditorState(instance, (state) => {
     const content_edit_mode = state.content_edit_mode;
@@ -32,7 +82,7 @@ export default function useVectorContentEditMode() {
     a_point,
     cursor: path_cursor_position,
     next_ta,
-    hovered_control: hovered_controls,
+    hovered_control,
     snapped_segment_p,
   } = state.content_edit_mode;
 
@@ -160,6 +210,24 @@ export default function useVectorContentEditMode() {
     [instance]
   );
 
+  const getLoopPathData = useCallback(
+    (loop: vn.Loop) => {
+      return vne.getLoopPathData(loop);
+    },
+    [vne]
+  );
+
+  const selectLoop = useCallback(
+    (loop: vn.Loop) => {
+      if (loop.length === 0) return;
+      instance.selectSegment(node_id, loop[0], { additive: false });
+      for (let i = 1; i < loop.length; i++) {
+        instance.selectSegment(node_id, loop[i], { additive: true });
+      }
+    },
+    [instance, node_id]
+  );
+
   return useMemo(
     () => ({
       node_id,
@@ -177,8 +245,9 @@ export default function useVectorContentEditMode() {
       snapped_point,
       a_point,
       next_ta,
-      hovered_controls,
+      hovered_control,
       snapped_segment_p,
+      loops,
       selectVertex,
       deleteVertex,
       selectSegment,
@@ -189,7 +258,8 @@ export default function useVectorContentEditMode() {
       onSegmentInsertMiddle: onSplitSegmentT05,
       bendSegment,
       updateHoveredControl,
-      loops,
+      getLoopPathData,
+      selectLoop,
     }),
     [
       //
@@ -208,8 +278,9 @@ export default function useVectorContentEditMode() {
       snapped_point,
       a_point,
       next_ta,
-      hovered_controls,
+      hovered_control,
       snapped_segment_p,
+      loops,
       selectVertex,
       deleteVertex,
       selectSegment,
@@ -220,7 +291,8 @@ export default function useVectorContentEditMode() {
       onSplitSegmentT05,
       bendSegment,
       updateHoveredControl,
-      loops,
+      getLoopPathData,
+      selectLoop,
     ]
   );
 }

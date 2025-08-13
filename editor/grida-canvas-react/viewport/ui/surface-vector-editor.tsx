@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   useEditorFlagsState,
   useToolState,
@@ -10,7 +10,9 @@ import { cn } from "@/components/lib/utils";
 import { svg } from "@/grida-canvas-utils/svg";
 import { Point } from "./point";
 import assert from "assert";
-import useVectorContentEditMode from "@/grida-canvas-react/use-sub-vector-network-editor";
+import useVectorContentEditMode, {
+  VectorContentEditor,
+} from "@/grida-canvas-react/use-sub-vector-network-editor";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { VectorRegion } from "./vector-region";
 
@@ -40,7 +42,7 @@ export function SurfaceVectorEditor({
     path_cursor_position,
     a_point,
     next_ta,
-    hovered_controls,
+    hovered_control,
   } = ve;
 
   assert(node_id === _node_id);
@@ -68,6 +70,8 @@ export function SurfaceVectorEditor({
             key={i}
             point={cmath.vector2.transform(p, transform)}
             index={i}
+            ve={ve}
+            tool={tool}
           />
         ))}
         {debug && (
@@ -135,6 +139,10 @@ export function SurfaceVectorEditor({
             vertices={vertexPositions}
             segments={mappedSegments}
             disabled={tool.type === "path"}
+            ve={ve}
+            onSelect={() => {
+              ve.selectLoop(loop);
+            }}
           />
         );
       })}
@@ -155,14 +163,10 @@ export function SurfaceVectorEditor({
             ta={transformDelta(ta, transform)}
             tb={transformDelta(tb, transform)}
             hovered={
-              hovered_controls?.type === "segment" &&
-              hovered_controls.index === i
+              hovered_control?.type === "segment" && hovered_control.index === i
             }
-            onHover={(index) =>
-              ve.updateHoveredControl(
-                index !== null ? { type: "segment", index } : null
-              )
-            }
+            ve={ve}
+            tool={tool}
           />
         );
       })}
@@ -216,6 +220,7 @@ export function SurfaceVectorEditor({
                   )}
                   ta={ta_scaled}
                   selected={tangent_a_selected}
+                  ve={ve}
                 />
               )}
               {show_tb && !cmath.vector2.isZero(tb) && (
@@ -229,6 +234,7 @@ export function SurfaceVectorEditor({
                   )}
                   ta={tb_scaled}
                   selected={tangent_b_selected}
+                  ve={ve}
                 />
               )}
             </div>
@@ -246,7 +252,8 @@ function Segment({
   ta,
   tb,
   hovered,
-  onHover,
+  ve,
+  tool,
 }: {
   segmentIndex: number;
   a: cmath.Vector2;
@@ -254,11 +261,10 @@ function Segment({
   ta: cmath.Vector2;
   tb: cmath.Vector2;
   hovered: boolean;
-  onHover: (segmentIndex: number | null) => void;
+  ve: VectorContentEditor;
+  tool: any;
 }) {
-  const ve = useVectorContentEditMode();
   const instance = useCurrentEditor();
-  const tool = useToolState();
   const segment = ve.segments[segmentIndex];
   const selected = ve.selected_segments.includes(segmentIndex);
   const active = selected;
@@ -282,10 +288,10 @@ function Segment({
     {
       onHover: (s) => {
         if (s.first) {
-          onHover(segmentIndex);
+          ve.updateHoveredControl({ type: "segment", index: segmentIndex });
         }
         if (s.last) {
-          onHover(null);
+          ve.updateHoveredControl(null);
         }
       },
       onPointerDown: ({ event }) => {
@@ -374,7 +380,12 @@ function Segment({
           className="stroke-transparent"
         />
         {showMiddle && middle && (
-          <MiddlePoint segmentIndex={segmentIndex} point={middle} />
+          <MiddlePoint
+            segmentIndex={segmentIndex}
+            point={middle}
+            ve={ve}
+            tool={tool}
+          />
         )}
       </div>
       {/* Visible curve */}
@@ -404,6 +415,7 @@ function CurveControlExtension({
   ta,
   tb,
   selected,
+  ve,
 }: {
   segment: number;
   control: "ta" | "tb";
@@ -413,35 +425,34 @@ function CurveControlExtension({
   ta?: cmath.Vector2;
   tb?: cmath.Vector2;
   selected?: boolean;
+  ve: VectorContentEditor;
 }) {
-  const editor = useVectorContentEditMode();
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const bind = useGesture(
     {
       onPointerDown: ({ event }) => {
         event.preventDefault();
-        selectedRef.current = editor.selected_tangents.some(
+        selectedRef.current = ve.selected_tangents.some(
           ([v, t]) =>
             v ===
               (control === "ta"
-                ? editor.segments[segment].a
-                : editor.segments[segment].b) &&
-            t === (control === "ta" ? 0 : 1)
+                ? ve.segments[segment].a
+                : ve.segments[segment].b) && t === (control === "ta" ? 0 : 1)
         );
         draggedRef.current = false;
         if (!selectedRef.current) {
-          editor.selectTangent(segment, control, event.shiftKey);
+          ve.selectTangent(segment, control, event.shiftKey);
         }
       },
       onDragStart: ({ event }) => {
         event.preventDefault();
         draggedRef.current = true;
-        editor.onCurveControlPointDragStart(segment, control);
+        ve.onCurveControlPointDragStart(segment, control);
       },
       onPointerUp: ({ event }) => {
         if (selectedRef.current && !draggedRef.current) {
-          editor.selectTangent(segment, control, event.shiftKey);
+          ve.selectTangent(segment, control, event.shiftKey);
         }
       },
     },
@@ -509,18 +520,19 @@ function Extension({
 function MiddlePoint({
   point,
   segmentIndex,
+  ve,
+  tool,
 }: {
   point: cmath.Vector2;
   segmentIndex: number;
+  ve: VectorContentEditor;
+  tool: any;
 }) {
-  const editor = useVectorContentEditMode();
-  const tool = useToolState();
-
   const bind = useGesture({
     onPointerDown: ({ event }) => {
       if (tool.type === "path") return;
       event.preventDefault();
-      editor.onSegmentInsertMiddle(segmentIndex);
+      ve.onSegmentInsertMiddle(segmentIndex);
     },
   });
 
@@ -537,18 +549,20 @@ function MiddlePoint({
 function VertexPoint({
   point,
   index,
+  ve,
+  tool,
 }: {
   point: cmath.Vector2;
   index: number;
+  ve: VectorContentEditor;
+  tool: any;
 }) {
-  const ve = useVectorContentEditMode();
   const instance = useCurrentEditor();
-  const tool = useToolState();
   const selected = ve.selected_vertices.includes(index);
   const hovered =
     ve.snapped_point === index ||
-    (ve.hovered_controls?.type === "vertex" &&
-      ve.hovered_controls.index === index);
+    (ve.hovered_control?.type === "vertex" &&
+      ve.hovered_control.index === index);
   const selectedRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const bind = useGesture(
