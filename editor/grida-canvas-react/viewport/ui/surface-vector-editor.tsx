@@ -15,13 +15,14 @@ import useVectorContentEditMode, {
 } from "@/grida-canvas-react/use-sub-vector-network-editor";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { VectorRegion } from "./vector-region";
+import { Curve } from "./vector-cubic-curve";
 
-function transformDelta(v: cmath.Vector2, t: cmath.Transform): cmath.Vector2 {
+const t = (v: cmath.Vector2, t: cmath.Transform): cmath.Vector2 => {
   return cmath.vector2.transform(v, [
     [t[0][0], t[0][1], 0],
     [t[1][0], t[1][1], 0],
   ]);
-}
+};
 
 export function SurfaceVectorEditor({
   node_id: _node_id,
@@ -36,7 +37,6 @@ export function SurfaceVectorEditor({
     node_id,
     absolute_vertices,
     segments,
-    loops,
     selected_tangents,
     neighbouring_vertices,
     path_cursor_position,
@@ -101,51 +101,7 @@ export function SurfaceVectorEditor({
         )}
       </div>
 
-      {loops.map((loop, i) => {
-        // TODO: can be cheaper.
-        // Derive vertices from segments since getLoops() only returns segment indices
-        const loopVertices = new Set<number>();
-        const loopSegments = loop.map((si) => {
-          const s = segments[si];
-          loopVertices.add(s.a);
-          loopVertices.add(s.b);
-          return {
-            idx: si,
-            a: s.a,
-            b: s.b,
-            ta: transformDelta(s.ta, transform),
-            tb: transformDelta(s.tb, transform),
-          };
-        });
-
-        const vertexPositions = Array.from(loopVertices).map((v) =>
-          cmath.vector2.transform(absolute_vertices[v], transform)
-        );
-
-        const indexMap = new Map(
-          Array.from(loopVertices).map((v, idx) => [v, idx])
-        );
-
-        // Update segment indices to use the new vertex mapping
-        const mappedSegments = loopSegments.map((seg) => ({
-          ...seg,
-          a: indexMap.get(seg.a)!,
-          b: indexMap.get(seg.b)!,
-        }));
-
-        return (
-          <VectorRegion
-            key={`region-${i}`}
-            vertices={vertexPositions}
-            segments={mappedSegments}
-            disabled={tool.type === "path"}
-            ve={ve}
-            onSelect={() => {
-              ve.selectLoop(loop);
-            }}
-          />
-        );
-      })}
+      {tool.type === "cursor" && <Loops ve={ve} transform={transform} />}
 
       {/* Render all segments */}
       {segments.map((s, i) => {
@@ -160,8 +116,8 @@ export function SurfaceVectorEditor({
             segmentIndex={i}
             a={cmath.vector2.transform(a, transform)}
             b={cmath.vector2.transform(b, transform)}
-            ta={transformDelta(ta, transform)}
-            tb={transformDelta(tb, transform)}
+            ta={t(ta, transform)}
+            tb={t(tb, transform)}
             hovered={
               hovered_control?.type === "segment" && hovered_control.index === i
             }
@@ -172,26 +128,24 @@ export function SurfaceVectorEditor({
       })}
 
       {tool.type === "path" && (
-        <>
-          {/* next segment */}
-          <Extension
-            a={
-              a_point != null
-                ? cmath.vector2.transform(absolute_vertices[a_point], transform)
-                : undefined
-            }
-            b={cmath.vector2.transform(path_cursor_position, transform)}
-            ta={next_ta ? transformDelta(next_ta, transform) : undefined}
-          />
-        </>
+        <NextExtension
+          a={
+            a_point != null
+              ? cmath.vector2.transform(absolute_vertices[a_point], transform)
+              : undefined
+          }
+          b={cmath.vector2.transform(path_cursor_position, transform)}
+          ta={next_ta ? t(next_ta, transform) : undefined}
+        />
       )}
+
       {segments.map((s, i) => {
         const a = absolute_vertices[s.a];
         const b = absolute_vertices[s.b];
         const ta = s.ta;
         const tb = s.tb;
-        const ta_scaled = transformDelta(ta, transform);
-        const tb_scaled = transformDelta(tb, transform);
+        const ta_scaled = t(ta, transform);
+        const tb_scaled = t(tb, transform);
         const tangent_a_selected = selected_tangents.some(
           ([v, t]) => v === s.a && t === 0
         );
@@ -245,6 +199,65 @@ export function SurfaceVectorEditor({
   );
 }
 
+function Loops({
+  ve,
+  transform,
+}: {
+  ve: VectorContentEditor;
+  transform: cmath.Transform;
+}) {
+  const { segments, absolute_vertices, loops } = ve;
+  //
+  return (
+    <>
+      {loops.map((loop, i) => {
+        // TODO: can be cheaper.
+        // Derive vertices from segments since getLoops() only returns segment indices
+        const loopVertices = new Set<number>();
+        const loopSegments = loop.map((si) => {
+          const s = segments[si];
+          loopVertices.add(s.a);
+          loopVertices.add(s.b);
+          return {
+            idx: si,
+            a: s.a,
+            b: s.b,
+            ta: t(s.ta, transform),
+            tb: t(s.tb, transform),
+          };
+        });
+
+        const vertexPositions = Array.from(loopVertices).map((v) =>
+          cmath.vector2.transform(absolute_vertices[v], transform)
+        );
+
+        const indexMap = new Map(
+          Array.from(loopVertices).map((v, idx) => [v, idx])
+        );
+
+        // Update segment indices to use the new vertex mapping
+        const mappedSegments = loopSegments.map((seg) => ({
+          ...seg,
+          a: indexMap.get(seg.a)!,
+          b: indexMap.get(seg.b)!,
+        }));
+
+        return (
+          <VectorRegion
+            key={`region-${i}`}
+            vertices={vertexPositions}
+            segments={mappedSegments}
+            ve={ve}
+            onSelect={() => {
+              ve.selectLoop(loop);
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 function Segment({
   segmentIndex,
   a,
@@ -265,7 +278,6 @@ function Segment({
   tool: any;
 }) {
   const instance = useCurrentEditor();
-  const segment = ve.segments[segmentIndex];
   const selected = ve.selected_segments.includes(segmentIndex);
   const active = selected;
   const selectedRef = React.useRef(false);
@@ -487,7 +499,7 @@ function CurveControlExtension({
   );
 }
 
-function Extension({
+function NextExtension({
   a,
   b,
   ta,
@@ -634,50 +646,5 @@ function VertexPoint({
       hovered={hovered}
       point={point}
     />
-  );
-}
-
-function Curve({
-  a,
-  b,
-  ta = [0, 0],
-  tb = [0, 0],
-  className,
-  strokeWidth = 2,
-  stroke,
-  style,
-  ...props
-}: React.HtmlHTMLAttributes<HTMLOrSVGElement> & {
-  a: cmath.Vector2;
-  b: cmath.Vector2;
-  ta?: cmath.Vector2;
-  tb?: cmath.Vector2;
-  className?: string;
-  strokeWidth?: number;
-  stroke?: string;
-}) {
-  //
-  const offset = a;
-  const _a = cmath.vector2.sub(a, offset);
-  const _b = cmath.vector2.sub(b, offset);
-  const path = svg.d.encode(svg.d.curve(_a, ta, tb, _b));
-
-  return (
-    <svg
-      {...props}
-      id="curve"
-      className={className}
-      style={{
-        position: "absolute",
-        width: 1,
-        height: 1,
-        left: offset[0],
-        top: offset[1],
-        overflow: "visible",
-        ...style,
-      }}
-    >
-      <path d={path} stroke={stroke} fill="none" strokeWidth={strokeWidth} />
-    </svg>
   );
 }

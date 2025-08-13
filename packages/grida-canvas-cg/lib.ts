@@ -564,4 +564,21 @@ export namespace cg {
       value[0] === value[1] && value[1] === value[2] && value[2] === value[3]
     );
   }
+
+  export type VariableWidthStop = {
+    /**
+     * u(t)
+     * 0-1
+     * 0 - start (0%)
+     * 1 - end (100%)
+     */
+    u: number;
+    /**
+     * r px
+     */
+    r: number;
+  };
+  export type VariableWidthProfile = {
+    stops: VariableWidthStop[];
+  };
 }

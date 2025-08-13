@@ -625,6 +625,7 @@ export namespace editor.state {
 
   export type ContentEditModeState =
     | TextContentEditMode
+    | VariableWidthContentEditMode
     | VectorContentEditMode
     | BitmapContentEditMode
     | FillGradientContentEditMode;
@@ -752,6 +753,13 @@ export namespace editor.state {
       type: VectorContentEditModeHoverableType;
       index: number;
     } | null;
+  };
+
+  export type VariableWidthContentEditMode = {
+    type: "width";
+    node_id: string;
+    selected_stop: number;
+    profile: cg.VariableWidthProfile;
   };
 
   type BitmapContentEditMode = {

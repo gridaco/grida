@@ -35,18 +35,20 @@ export const Point = React.forwardRef(
         {...props}
         data-selected={selected}
         data-hovered={hovered}
-        style={{
-          position: "absolute",
-          left: point[0],
-          top: point[1],
-          width: hitSize,
-          height: hitSize,
-          cursor: "pointer",
-          outline: "none",
-          touchAction: "none",
-          transform: `translate(-50%, -50%)${styleTransform ? ` ${styleTransform}` : ""}`,
-          ...restStyle,
-        }}
+        style={
+          {
+            position: "absolute",
+            left: point[0],
+            top: point[1],
+            width: hitSize,
+            height: hitSize,
+            cursor: "pointer",
+            outline: "none",
+            touchAction: "none",
+            transform: `translate(-50%, -50%)${styleTransform ? ` ${styleTransform}` : ""}`,
+            ...restStyle,
+          } as React.CSSProperties
+        }
       >
         <div
           data-selected={selected}
@@ -55,7 +57,7 @@ export const Point = React.forwardRef(
             "border border-workbench-accent-sky bg-background",
             shape === "circle" ? "rounded-full" : undefined,
             "data-[selected='true']:shadow-sm data-[selected='true']:bg-workbench-accent-sky data-[selected='true']:border-spacing-1.5 data-[selected='true']:border-background",
-            "data-[hovered='true']:opacity-50",
+            "data-[hovered='true']:border-workbench-accent-sky/50",
             className
           )}
           style={{

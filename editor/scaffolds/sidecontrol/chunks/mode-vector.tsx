@@ -44,7 +44,7 @@ function SectionGeometry({ node_id }: { node_id: string }) {
     selected_tangents,
     absolute_vertices,
     segments,
-    vectorNetwork,
+    network: vectorNetwork,
   } = useVectorContentEditMode();
   const {
     value: mirroring,

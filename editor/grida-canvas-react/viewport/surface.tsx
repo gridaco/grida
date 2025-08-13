@@ -65,6 +65,7 @@ import { EdgeScrollingEffect } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
 import { useFollowPlugin } from "../plugins/use-follow";
+import { SurfaceVariableWidthEditor } from "./ui/surface-varwidth-editor";
 
 const DRAG_THRESHOLD = 2;
 
@@ -383,6 +384,12 @@ export function EditorSurface() {
             {content_edit_mode?.type === "vector" && (
               <SurfaceVectorEditor
                 key="path-editor"
+                node_id={content_edit_mode.node_id}
+              />
+            )}
+            {content_edit_mode?.type === "width" && (
+              <SurfaceVariableWidthEditor
+                key="varwidth-editor"
                 node_id={content_edit_mode.node_id}
               />
             )}

@@ -6,14 +6,17 @@ import type grida from "@grida/schema";
 import vn from "@grida/vn";
 import { editor } from "@/grida-canvas";
 
-export interface VectorContentEditor {
-  node_id: string;
-  vectorNetwork: vn.VectorNetwork;
-  path_cursor_position: cmath.Vector2;
-  absolute_vertices: cmath.Vector2[];
-  absolute_tangents: vn.AbsoluteTangentControlOnSegment[];
+export interface AbsoluteVectorNetworkGeometry {
+  network: vn.VectorNetwork;
   vertices: cmath.Vector2[];
   segments: vn.VectorNetworkSegment[];
+  absolute_vertices: cmath.Vector2[];
+  absolute_tangents: vn.AbsoluteTangentControlOnSegment[];
+}
+
+export interface VectorContentEditor extends AbsoluteVectorNetworkGeometry {
+  node_id: string;
+  path_cursor_position: cmath.Vector2;
   offset: cmath.Vector2;
   neighbouring_vertices: editor.state.VectorContentEditMode["selection_neighbouring_vertices"];
   selected_vertices: editor.state.VectorContentEditMode["selected_vertices"];
@@ -64,7 +67,6 @@ export default function useVectorContentEditMode(): VectorContentEditor {
     return {
       node_id: content_edit_mode.node_id,
       content_edit_mode: content_edit_mode,
-      document: state.document,
       vector_node: state.document.nodes[
         node_id
       ] as grida.program.nodes.VectorNode,
@@ -231,7 +233,7 @@ export default function useVectorContentEditMode(): VectorContentEditor {
   return useMemo(
     () => ({
       node_id,
-      vectorNetwork: node.vectorNetwork,
+      network: node.vectorNetwork,
       path_cursor_position,
       absolute_vertices,
       absolute_tangents,
