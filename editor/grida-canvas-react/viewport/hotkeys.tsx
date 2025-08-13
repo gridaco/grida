@@ -283,6 +283,11 @@ export const keybindings_sheet = [
     keys: ["g"],
   },
   {
+    name: "variable width",
+    description: "Variable width tool",
+    keys: ["shif+w"],
+  },
+  {
     name: "increase brush size",
     description: "Increase brush size",
     keys: ["]"],
@@ -887,6 +892,12 @@ export function useEditorHotKeys() {
   useHotkeys("g", () => {
     if (content_edit_mode?.type === "bitmap") {
       editor.setTool({ type: "flood-fill" });
+    }
+  });
+
+  useHotkeys("shift+w", () => {
+    if (content_edit_mode?.type === "vector") {
+      editor.setTool({ type: "width" });
     }
   });
 

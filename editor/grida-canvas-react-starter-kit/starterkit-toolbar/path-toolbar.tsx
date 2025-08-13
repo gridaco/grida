@@ -3,7 +3,7 @@ import { ToolIcon } from ".";
 import { useCurrentEditor, useToolState } from "@/grida-canvas-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { SplineIcon, SplinePointerIcon } from "lucide-react";
+import { RadiusIcon, SplineIcon, SplinePointerIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -66,6 +66,19 @@ export function PathToolbar() {
             </span>
           </TooltipTrigger>
           <TooltipContent>Bend tool (⌘)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <ToggleGroupItem
+                value="width"
+                className="rounded-sm aspect-square"
+              >
+                <RadiusIcon className="size-4" />
+              </ToggleGroupItem>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Variable Width (⇧ + W)</TooltipContent>
         </Tooltip>
       </ToggleGroup>
 

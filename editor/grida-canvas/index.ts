@@ -260,6 +260,19 @@ export namespace editor.state {
   export type CurrentBrush = BitmapEditorBrush & { opacity: number };
 
   export type ToolModeType = ToolMode["type"];
+
+  export type VariableWidthTool = {
+    type: "width";
+  };
+
+  export type BendTool = {
+    type: "bend";
+  };
+
+  export type PenPathTool = {
+    type: "path";
+  };
+
   export type ToolMode =
     | {
         type: "cursor";
@@ -270,9 +283,9 @@ export namespace editor.state {
     | {
         type: "lasso";
       }
-    | {
-        type: "bend";
-      }
+    | BendTool
+    | VariableWidthTool
+    | PenPathTool
     | {
         type: "zoom";
       }
@@ -293,9 +306,6 @@ export namespace editor.state {
       }
     | {
         type: "brush" | "eraser" | "flood-fill";
-      }
-    | {
-        type: "path";
       };
 
   /**

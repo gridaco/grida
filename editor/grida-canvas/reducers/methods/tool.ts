@@ -8,6 +8,7 @@ const VECTOR_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "bend",
   "path",
   "lasso",
+  "width",
 ];
 const TEXT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = ["cursor"];
 const BITMAP_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [

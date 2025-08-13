@@ -17,6 +17,7 @@ export type ToolbarToolType =
   | "flood-fill"
   | "path"
   | "bend"
+  | "width"
   | "lasso";
 
 export function toolmode_to_toolbar_value(
@@ -44,6 +45,8 @@ export function toolmode_to_toolbar_value(
       return "lasso";
     case "bend":
       return "bend";
+    case "width":
+      return "width";
   }
 }
 
@@ -78,6 +81,8 @@ export function toolbar_value_to_cursormode(
       return { type: "lasso" };
     case "bend":
       return { type: "bend" };
+    case "width":
+      return { type: "width" };
     default:
       return { type: "cursor" };
   }
