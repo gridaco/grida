@@ -81,16 +81,13 @@ impl<'a> HitTester<'a> {
             let layer = &self.cache.layers.layers[idx];
             if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
                 if rect::contains_point(&bounds, point) {
-                    let base = match layer {
-                        crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
-                        crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
-                    };
+                    let transform = layer.transform();
                     let mut path = if let Some(entry) = self.cache.path.borrow().get(layer.id()) {
                         (*entry.path).clone()
                     } else {
-                        base.shape.to_path()
+                        layer.shape().to_path()
                     };
-                    path.transform(&sk::sk_matrix(base.transform.matrix));
+                    path.transform(&sk::sk_matrix(transform.matrix));
                     if path.contains((point[0], point[1])) {
                         return Some(layer.id().clone());
                     }
@@ -112,16 +109,14 @@ impl<'a> HitTester<'a> {
             let layer = &self.cache.layers.layers[idx];
             if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
                 if rect::contains_point(&bounds, point) {
-                    let base = match layer {
-                        crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
-                        crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
-                    };
+                    let shape = layer.shape();
+                    let transform = layer.transform();
                     let mut path = if let Some(entry) = self.cache.path.borrow().get(layer.id()) {
                         (*entry.path).clone()
                     } else {
-                        base.shape.to_path()
+                        shape.to_path()
                     };
-                    path.transform(&sk::sk_matrix(base.transform.matrix));
+                    path.transform(&sk::sk_matrix(transform.matrix));
                     if path.contains((point[0], point[1])) {
                         out.push(layer.id().clone());
                     }
@@ -135,16 +130,14 @@ impl<'a> HitTester<'a> {
     /// render bounds.
     pub fn contains(&self, id: &NodeId, point: Vector2) -> bool {
         if let Some(layer) = self.cache.layers.layers.iter().find(|l| l.id() == id) {
-            let base = match layer {
-                crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
-                crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
-            };
+            let shape = layer.shape();
+            let transform = layer.transform();
             let mut path = if let Some(entry) = self.cache.path.borrow().get(id) {
                 (*entry.path).clone()
             } else {
-                base.shape.to_path()
+                shape.to_path()
             };
-            path.transform(&sk::sk_matrix(base.transform.matrix));
+            path.transform(&sk::sk_matrix(transform.matrix));
             path.contains((point[0], point[1]))
         } else {
             false

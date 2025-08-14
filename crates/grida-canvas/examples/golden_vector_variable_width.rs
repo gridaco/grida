@@ -1,7 +1,8 @@
+use cg::cg::types::{CGColor, StrokeAlign};
 use cg::cg::varwidth::*;
-use cg::shape::stroke_varwidth::*;
-use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
-use skia_safe::{surfaces, Color, Paint, PaintStyle};
+use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetwork, VectorNetworkSegment};
+use cg::vectornetwork::vn_painter::{StrokeOptions, VNPainter};
+use skia_safe::{surfaces, Color};
 
 fn main() {
     let samples = 40;
@@ -37,21 +38,28 @@ fn main() {
     )
     .expect("Valid geometry");
 
-    // Create the variable width stroke along the single curve
-    let stroke_path = create_variable_width_stroke_from_geometry(geometry, width_profile, samples);
+    // Create a VectorNetwork from the geometry
+    let vn = VectorNetwork {
+        vertices: geometry.vertices,
+        segments: geometry.segments,
+        regions: vec![], // No fill regions, just stroke
+    };
 
-    // Render the stroke
+    // Create stroke options with variable width
+    let stroke_options = StrokeOptions {
+        width: 1.0, // Not used for variable width
+        align: StrokeAlign::Center,
+        color: CGColor(0, 0, 0, 255),
+        width_profile: Some(width_profile),
+    };
+
+    // Render using VNPainter
     let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    let mut paint = Paint::default();
-    paint.set_anti_alias(true);
-    paint.set_color(Color::BLACK);
-    paint.set_style(PaintStyle::Fill);
-
-    // Draw the single stroke
-    canvas.draw_path(&stroke_path, &paint);
+    let painter = VNPainter::new(canvas);
+    painter.draw(&vn, Some(&stroke_options));
 
     let image = surface.image_snapshot();
     let data = image

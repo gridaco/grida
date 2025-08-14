@@ -108,6 +108,7 @@ fn main() {
             width: stroke_width,
             align: *align,
             color: stroke_color,
+            width_profile: None,
         };
         painter.draw(&network, Some(&options));
         canvas.restore();

@@ -55,10 +55,9 @@ impl StrokeOverlay {
         for id in nodes {
             if let Some(layer) = cache.layers.layers.iter().find(|l| l.id() == id) {
                 if cache.geometry.get_render_bounds(id).is_some() {
-                    let base = match layer {
-                        crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
-                        crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
-                    };
+                    let shape = layer.shape();
+                    let transform = layer.transform();
+
                     let mut path = if let Some(entry) = cache.path.borrow().get(id) {
                         (*entry.path).clone()
                     } else {
@@ -66,10 +65,10 @@ impl StrokeOverlay {
                             crate::painter::layer::PainterPictureLayer::Text(t) => {
                                 Self::text_layer_path(&fonts.borrow(), t)
                             }
-                            _ => base.shape.to_path(),
+                            _ => shape.to_path(),
                         }
                     };
-                    path.transform(&sk::sk_matrix(base.transform.matrix));
+                    path.transform(&sk::sk_matrix(transform.matrix));
                     path.transform(&sk::sk_matrix(camera.view_matrix().matrix));
 
                     canvas.draw_path(&path, &paint);
@@ -80,11 +79,10 @@ impl StrokeOverlay {
 
     fn text_layer_path(fonts: &FontRepository, layer: &PainterPictureTextLayer) -> Path {
         let size = crate::node::schema::Size {
-            width: layer.base.shape.rect.width(),
-            height: layer.base.shape.rect.height(),
+            width: layer.shape.rect.width(),
+            height: layer.shape.rect.height(),
         };
         let fill = layer
-            .base
             .fills
             .first()
             .cloned()
