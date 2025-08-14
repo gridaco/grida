@@ -1,16 +1,32 @@
 import cmath from "@grida/cmath";
+import { useGesture } from "@use-gesture/react";
 import { Point } from "./point";
+import type cg from "@grida/cg";
 
 export function VariableWidthStop({
   u,
   p,
   angle,
   r,
+  index,
+  selected,
+  onSelect,
+  onDelete,
+  onUDragStart,
+  onRDragStart,
+  onUpdate,
 }: {
   u: number;
   p: cmath.Vector2;
   angle: number;
   r: number;
+  index: number;
+  selected: boolean;
+  onSelect: (stop: number, additive?: boolean) => void;
+  onDelete: (stop: number) => void;
+  onUDragStart: (stop: number) => void;
+  onRDragStart: (stop: number) => void;
+  onUpdate: (stop: number, value: cg.VariableWidthStop) => void;
 }) {
   // 1. point at p
   // 2. 2 mirrored points with p - r / p + r (and line between them)
@@ -31,14 +47,23 @@ export function VariableWidthStop({
     p[1] + perpVector[1] * r,
   ];
 
+  const bind = useGesture({
+    onPointerDown: ({ event }) => {
+      event.preventDefault();
+      onSelect(index, event.shiftKey);
+    },
+  });
+
   return (
     <>
       {/* Center point */}
       <Point
+        {...bind()}
         point={p}
         size={8}
         shape="circle"
         style={{ zIndex: 10 }}
+        selected={selected}
         className="border-workbench-accent-pink data-[selected='true']:bg-workbench-accent-pink data-[hovered='true']:border-workbench-accent-pink/50"
       />
 

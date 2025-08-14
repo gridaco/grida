@@ -8,6 +8,9 @@ import type {
   NodeToggleBoldAction,
   EditorSelectGradientStopAction,
   EditorVectorBendOrClearCornerAction,
+  EditorVariableWidthSelectStopAction,
+  EditorVariableWidthDeleteStopAction,
+  EditorVariableWidthUpdateStopAction,
 } from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
@@ -1313,6 +1316,54 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         if (draft.content_edit_mode?.type === "fill/gradient") {
           draft.content_edit_mode.node_id = node_id;
           draft.content_edit_mode.selected_stop = stop;
+        }
+      });
+    }
+    //
+    case "variable-width/select-stop": {
+      return produce(state, (draft) => {
+        const { target } = <EditorVariableWidthSelectStopAction>action;
+        const { node_id, stop } = target;
+        const node = dq.__getNodeById(draft, node_id);
+        assert(node);
+        if (draft.content_edit_mode?.type === "width") {
+          draft.content_edit_mode.variable_width_selected_stop = stop;
+        }
+      });
+    }
+    case "variable-width/delete-stop": {
+      return produce(state, (draft) => {
+        const { target } = <EditorVariableWidthDeleteStopAction>action;
+        const { node_id, stop } = target;
+        const node = dq.__getNodeById(draft, node_id);
+        assert(node);
+        if (draft.content_edit_mode?.type === "width") {
+          // Remove the stop from the profile
+          const profile = draft.content_edit_mode.variable_width_profile;
+          profile.stops.splice(stop, 1);
+
+          // Clear selection if the deleted stop was selected
+          if (draft.content_edit_mode.variable_width_selected_stop === stop) {
+            draft.content_edit_mode.variable_width_selected_stop = null;
+          } else if (
+            draft.content_edit_mode.variable_width_selected_stop !== null &&
+            draft.content_edit_mode.variable_width_selected_stop > stop
+          ) {
+            // Adjust selection index if it was after the deleted stop
+            draft.content_edit_mode.variable_width_selected_stop--;
+          }
+        }
+      });
+    }
+    case "variable-width/update-stop": {
+      return produce(state, (draft) => {
+        const { target, value } = <EditorVariableWidthUpdateStopAction>action;
+        const { node_id, stop } = target;
+        const node = dq.__getNodeById(draft, node_id);
+        assert(node);
+        if (draft.content_edit_mode?.type === "width") {
+          const profile = draft.content_edit_mode.variable_width_profile;
+          profile.stops[stop] = value;
         }
       });
     }

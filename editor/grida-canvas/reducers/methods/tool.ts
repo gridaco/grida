@@ -1,6 +1,7 @@
 import type { Draft } from "immer";
 import { editor } from "@/grida-canvas";
 import { getVectorSelectionStartPoint } from "./selection";
+import type cg from "@grida/cg";
 
 const VECTOR_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "cursor",
@@ -8,7 +9,6 @@ const VECTOR_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "bend",
   "path",
   "lasso",
-  "width",
 ];
 const TEXT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = ["cursor"];
 const BITMAP_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
@@ -46,6 +46,14 @@ function validToolModesForContentEditMode(
   }
 }
 
+const DUMMY_VAR_WIDTH_PROFILE: cg.VariableWidthProfile = {
+  stops: [
+    { u: 0, r: 10 },
+    { u: 0.5, r: 40 },
+    { u: 0.95, r: 10 },
+  ],
+};
+
 /**
  * Selects the given tool and stores the previous tool type.
  */
@@ -59,6 +67,25 @@ export function self_select_tool<S extends editor.state.IEditorState>(
   ) {
     console.warn("unstable brush tool is not enabled");
     return;
+  }
+
+  // width tool can only be selected when in vector edit mode, and when selected, it sets the mode to width
+  if (tool.type === "width") {
+    if (
+      draft.content_edit_mode?.type === "vector" ||
+      draft.content_edit_mode?.type === "width"
+    ) {
+      // TODO: additional validation required - check if the network has 0 or exactly 1 loop.
+      draft.tool = { type: "width" };
+      draft.content_edit_mode = {
+        type: "width",
+        node_id: draft.content_edit_mode.node_id,
+        initial_vector_network: draft.content_edit_mode.initial_vector_network,
+        variable_width_selected_stop: null,
+        variable_width_profile: DUMMY_VAR_WIDTH_PROFILE,
+      };
+      return;
+    }
   }
 
   const valid_tool_modes = validToolModesForContentEditMode(

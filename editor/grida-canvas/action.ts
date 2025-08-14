@@ -33,6 +33,7 @@ export type DocumentAction =
   | EditorA11yDeleteAction
   | EditorHierarchyAction
   | EditorVectorEditorAction
+  | EditorVariableWidthAction
   | EditorGradientAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
@@ -98,6 +99,20 @@ interface TangentQuery extends IVertexIdx {
    * tangent index (0 for `a`, 1 for `b`)
    */
   tangent: 0 | 1;
+}
+
+interface IVariableWidthStopIdx {
+  /**
+   * index of the variable width stop
+   */
+  stop: number;
+}
+
+interface VariableWidthStopQuery extends IVariableWidthStopIdx {
+  /**
+   * node id (must be a variable width node)
+   */
+  node_id: NodeID;
 }
 
 interface IGradientStopIdx {
@@ -379,6 +394,30 @@ export interface EditorVectorPlanarizeAction {
   type: "vector/planarize";
   target: NodeID | NodeID[];
 }
+
+// #region [variable width]
+export type EditorVariableWidthAction =
+  | EditorVariableWidthSelectStopAction
+  | EditorVariableWidthDeleteStopAction
+  | EditorVariableWidthUpdateStopAction;
+
+export interface EditorVariableWidthSelectStopAction {
+  type: "variable-width/select-stop";
+  target: VariableWidthStopQuery;
+}
+
+export interface EditorVariableWidthDeleteStopAction {
+  type: "variable-width/delete-stop";
+  target: VariableWidthStopQuery;
+}
+
+export interface EditorVariableWidthUpdateStopAction {
+  type: "variable-width/update-stop";
+  target: VariableWidthStopQuery;
+  value: cg.VariableWidthStop;
+}
+
+// #endregion [variable width]
 
 export interface EditorVectorUpdateHoveredControlAction {
   type: "vector/update-hovered-control";

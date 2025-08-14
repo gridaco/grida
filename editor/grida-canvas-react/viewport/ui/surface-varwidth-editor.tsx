@@ -7,19 +7,18 @@ import {
   useTransformState,
 } from "@/grida-canvas-react";
 import { VariableWidthStop } from "./vector-varwidth-stop";
-import cg from "@grida/cg";
 import assert from "assert";
 import grida from "@grida/schema";
 import vn from "@grida/vn";
+import type cg from "@grida/cg";
 import { Curve } from "./vector-cubic-curve";
 import { Point } from "./point";
 
-const DUMMY_VAR_WIDTH_PROFILE: cg.VariableWidthProfile = {
-  stops: [
-    { u: 0, r: 10 },
-    { u: 0.5, r: 40 },
-    { u: 0.95, r: 10 },
-  ],
+const t = (v: cmath.Vector2, t: cmath.Transform): cmath.Vector2 => {
+  return cmath.vector2.transform(v, [
+    [t[0][0], t[0][1], 0],
+    [t[1][0], t[1][1], 0],
+  ]);
 };
 
 function useVariableWithEditor() {
@@ -69,30 +68,39 @@ function useVariableWithEditor() {
 
   const selectStop = useCallback(
     (stop: number) => {
-      // TODO:
+      instance.selectVariableWidthStop(node_id, stop);
     },
-    [instance]
+    [instance, node_id]
   );
 
   const deleteStop = useCallback(
     (stop: number) => {
-      // TODO:
+      instance.deleteVariableWidthStop(node_id, stop);
     },
-    [instance]
+    [instance, node_id]
   );
 
   const onUDragStart = useCallback(
     (stop: number) => {
-      // TODO:
+      // TODO: Implement U parameter drag start
+      console.log("U drag start:", stop);
     },
-    [instance]
+    [instance, node_id]
   );
 
   const onRDragStart = useCallback(
     (stop: number) => {
-      // TODO:
+      // TODO: Implement radius drag start
+      console.log("R drag start:", stop);
     },
-    [instance]
+    [instance, node_id]
+  );
+
+  const updateStop = useCallback(
+    (stop: number, value: cg.VariableWidthStop) => {
+      instance.updateVariableWidthStop(node_id, stop, value);
+    },
+    [instance, node_id]
   );
 
   return useMemo(() => {
@@ -102,13 +110,39 @@ function useVariableWithEditor() {
       vertices,
       segments,
       absolute_vertices,
+      selectStop,
+      deleteStop,
+      onUDragStart,
+      onRDragStart,
+      updateStop,
     };
-  }, [profile, selected_stop, vertices, segments, absolute_vertices]);
+  }, [
+    profile,
+    selected_stop,
+    vertices,
+    segments,
+    absolute_vertices,
+    selectStop,
+    deleteStop,
+    onUDragStart,
+    onRDragStart,
+    updateStop,
+  ]);
 }
 
 export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
   const { transform } = useTransformState();
-  const { profile, segments, absolute_vertices } = useVariableWithEditor();
+  const {
+    profile,
+    selected_stop,
+    segments,
+    absolute_vertices,
+    selectStop,
+    deleteStop,
+    onUDragStart,
+    onRDragStart,
+    updateStop,
+  } = useVariableWithEditor();
   //
 
   return (
@@ -123,10 +157,10 @@ export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
           return (
             <Curve
               key={i}
-              a={a}
-              b={b}
-              ta={ta}
-              tb={tb}
+              a={cmath.vector2.transform(a, transform)}
+              b={cmath.vector2.transform(b, transform)}
+              ta={t(ta, transform)}
+              tb={t(tb, transform)}
               strokeWidth={1}
               className={"stroke-gray-400"}
             />
@@ -135,7 +169,13 @@ export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
 
         {absolute_vertices.map((p, i) => {
           return (
-            <Point key={i} tabIndex={0} point={p} shape="circle" size={6} />
+            <Point
+              key={i}
+              tabIndex={0}
+              point={cmath.vector2.transform(p, transform)}
+              shape="circle"
+              size={6}
+            />
           );
         })}
       </div>
@@ -177,6 +217,13 @@ export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
             p={screen_p}
             angle={angle}
             r={stop.r}
+            index={i}
+            selected={selected_stop === i}
+            onSelect={selectStop}
+            onDelete={deleteStop}
+            onUDragStart={onUDragStart}
+            onRDragStart={onRDragStart}
+            onUpdate={updateStop}
           />
         );
       })}

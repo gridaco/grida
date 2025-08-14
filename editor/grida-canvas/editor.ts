@@ -919,6 +919,41 @@ export class Editor
     });
   }
 
+  public selectVariableWidthStop(node_id: editor.NodeID, stop: number): void {
+    this.dispatch({
+      type: "variable-width/select-stop",
+      target: {
+        node_id,
+        stop,
+      },
+    });
+  }
+
+  public deleteVariableWidthStop(node_id: editor.NodeID, stop: number): void {
+    this.dispatch({
+      type: "variable-width/delete-stop",
+      target: {
+        node_id,
+        stop,
+      },
+    });
+  }
+
+  public updateVariableWidthStop(
+    node_id: editor.NodeID,
+    stop: number,
+    value: cg.VariableWidthStop
+  ): void {
+    this.dispatch({
+      type: "variable-width/update-stop",
+      target: {
+        node_id,
+        stop,
+      },
+      value,
+    });
+  }
+
   public getNodeSnapshotById(
     node_id: editor.NodeID
   ): Readonly<grida.program.nodes.Node> {

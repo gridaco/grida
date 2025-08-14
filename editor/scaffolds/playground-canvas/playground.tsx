@@ -500,7 +500,7 @@ function SidebarRight() {
 function PathToolbarPosition({ children }: React.PropsWithChildren<{}>) {
   const cem = useContentEditModeMinimalState();
 
-  if (cem?.type !== "vector") return null;
+  if (cem?.type !== "vector" && cem?.type !== "width") return null;
 
   return (
     <div className="absolute bottom-24 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
