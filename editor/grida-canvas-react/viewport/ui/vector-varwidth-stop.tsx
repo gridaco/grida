@@ -13,6 +13,7 @@ export function VariableWidthStop({
   onSelect,
   onUDragStart,
   onRDragStart,
+  transform,
 }: {
   u: number;
   p: cmath.Vector2;
@@ -23,6 +24,7 @@ export function VariableWidthStop({
   onSelect: (stop: number, additive?: boolean) => void;
   onUDragStart: (stop: number) => void;
   onRDragStart: (stop: number, side: "left" | "right") => void;
+  transform: cmath.Transform;
 }) {
   const [uHovered, setUHovered] = useState(false);
   const [rHovered, setRHovered] = useState(false);
@@ -34,16 +36,21 @@ export function VariableWidthStop({
   const perpAngle = angle + Math.PI / 2; // Perpendicular to the curve
   const perpVector: cmath.Vector2 = [Math.cos(perpAngle), Math.sin(perpAngle)];
 
-  // Calculate the two points on either side of the curve
-  const pl: cmath.Vector2 = [
+  // Calculate the two points on either side of the curve in original coordinate space
+  const pl_original: cmath.Vector2 = [
     p[0] - perpVector[0] * r,
     p[1] - perpVector[1] * r,
   ];
 
-  const pr: cmath.Vector2 = [
+  const pr_original: cmath.Vector2 = [
     p[0] + perpVector[0] * r,
     p[1] + perpVector[1] * r,
   ];
+
+  // Transform all points to screen coordinates
+  const p_screen = cmath.vector2.transform(p, transform);
+  const pl_screen = cmath.vector2.transform(pl_original, transform);
+  const pr_screen = cmath.vector2.transform(pr_original, transform);
 
   const bindU = useGesture(
     {
@@ -113,7 +120,7 @@ export function VariableWidthStop({
       {/* Center point */}
       <Point
         {...bindU()}
-        point={p}
+        point={p_screen}
         size={8}
         shape="circle"
         style={{ zIndex: 10 }}
@@ -124,7 +131,7 @@ export function VariableWidthStop({
       {/* Left width point */}
       <Point
         {...bindLeft()}
-        point={pl}
+        point={pl_screen}
         size={6}
         shape="diamond"
         style={{ zIndex: 9 }}
@@ -134,7 +141,7 @@ export function VariableWidthStop({
       {/* Right width point */}
       <Point
         {...bindRight()}
-        point={pr}
+        point={pr_screen}
         size={6}
         shape="diamond"
         style={{ zIndex: 9 }}
@@ -155,10 +162,10 @@ export function VariableWidthStop({
         }}
       >
         <line
-          x1={pl[0]}
-          y1={pl[1]}
-          x2={pr[0]}
-          y2={pr[1]}
+          x1={pl_screen[0]}
+          y1={pl_screen[1]}
+          x2={pr_screen[0]}
+          y2={pr_screen[1]}
           stroke="currentColor"
           strokeWidth={1}
           className="stroke-gray-400"

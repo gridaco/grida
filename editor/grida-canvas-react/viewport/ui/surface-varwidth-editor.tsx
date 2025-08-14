@@ -215,14 +215,11 @@ export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
         // Calculate the angle from the tangent
         const angle = Math.atan2(tangent[1], tangent[0]);
 
-        // Transform the position to screen coordinates
-        const screen_p = cmath.vector2.transform(position, transform);
-
         return (
           <VariableWidthStop
             key={`var-width-stop-${i}`}
             u={stop.u}
-            p={screen_p}
+            p={position}
             angle={angle}
             r={stop.r}
             index={i}
@@ -230,6 +227,7 @@ export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
             onSelect={selectStop}
             onUDragStart={onUDragStart}
             onRDragStart={onRDragStart}
+            transform={transform}
           />
         );
       })}
