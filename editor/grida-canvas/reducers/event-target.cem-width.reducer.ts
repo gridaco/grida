@@ -41,42 +41,37 @@ function __self_compute_variable_width_segment_snapping<
   // Calculate local point (relative to vector network origin)
   const local_point = cmath.vector2.sub(logical_pos, [rect.x, rect.y]);
 
-  const { segments, vertices } = node.vectorNetwork;
-  let closest_segment: vn.EvaluatedPointOnSegment | null = null;
-  let closest_distance = Infinity;
+  // Use piecewise projection to find the closest point on the entire network
+  const globalT = cmath.bezier.piecewise.project(
+    node.vectorNetwork,
+    local_point
+  );
 
-  // Check all segments to find the closest one within threshold
-  for (
-    let segment_index = 0;
-    segment_index < segments.length;
-    segment_index++
-  ) {
-    const segment = segments[segment_index];
-    const a = vertices[segment.a];
-    const b = vertices[segment.b];
-    const ta = segment.ta;
-    const tb = segment.tb;
+  // Resolve global t to segment index and local t
+  const { segmentIndex, localT } = cmath.bezier.piecewise.resolveGlobalT(
+    node.vectorNetwork,
+    globalT
+  );
 
-    // Project the point onto the segment
-    const t = cmath.bezier.project(a, b, ta, tb, local_point);
+  // Evaluate the point on the network
+  const parametricPoint = cmath.bezier.piecewise.evaluate(
+    node.vectorNetwork,
+    globalT
+  );
 
-    // Evaluate the curve at the projected parametric value
-    const parametricPoint = cmath.bezier.evaluate(a, b, ta, tb, t);
+  // Calculate distance to the projected point
+  const distance = cmath.vector2.distance(local_point, parametricPoint);
 
-    // Calculate distance to the projected point
-    const distance = cmath.vector2.distance(local_point, parametricPoint);
-
-    // Check if within threshold and closer than previous closest
-    const segment_snap_threshold = threshold(10, draft.transform);
-    if (distance <= segment_snap_threshold && distance < closest_distance) {
-      closest_distance = distance;
-      closest_segment = {
-        segment: segment_index,
-        t,
-        point: parametricPoint,
-      };
-    }
-  }
+  // Check if within threshold
+  const segment_snap_threshold = threshold(10, draft.transform);
+  const closest_segment =
+    distance <= segment_snap_threshold
+      ? {
+          segment: segmentIndex,
+          t: localT,
+          point: parametricPoint,
+        }
+      : null;
 
   // Update the snapped segment point
   self_updateVariableWidthSnappedP(draft, closest_segment);

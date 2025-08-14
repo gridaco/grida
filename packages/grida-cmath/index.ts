@@ -4943,7 +4943,185 @@ namespace cmath {
         }[];
       };
 
-      //
+      /**
+       * Resolves a global parameter `t` to the corresponding segment index and local parameter `t`.
+       *
+       * This function maps a global parameter `t` ∈ [0, 1] representing position along the entire
+       * network to the specific segment that contains that position and the local parameter `t`
+       * within that segment.
+       *
+       * The mapping is based on uniform distribution across segments, where each segment
+       * contributes equally to the global parameter space regardless of its actual length.
+       * This is different from arc length parameterization where segments contribute based on their actual arc length.
+       *
+       * @param network - The piecewise Bézier network
+       * @param t - Global parameter in range [0, 1] representing position along the entire network
+       * @returns Object containing the segment index and local parameter `t` ∈ [0, 1]
+       *
+       * @example
+       * ```typescript
+       * const network: cmath.bezier.piecewise.Network = {
+       *   vertices: [[0, 0], [100, 0], [200, 100]],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 50], tb: [-50, 50] },
+       *     { a: 1, b: 2, ta: [50, 50], tb: [-50, 50] }
+       *   ]
+       * };
+       *
+       * const result = cmath.bezier.piecewise.resolveGlobalT(network, 0.6);
+       * // result = { segmentIndex: 1, localT: 0.2 }
+       * // This means 60% along the network is 20% into the second segment
+       * ```
+       */
+      export function resolveGlobalT(
+        network: Network,
+        t: number
+      ): { segmentIndex: number; localT: number } {
+        const clampedT = Math.max(0, Math.min(1, t));
+        const segmentCount = network.segments.length;
+
+        if (segmentCount === 0) {
+          return { segmentIndex: 0, localT: 0 };
+        }
+
+        const segmentIndex = Math.floor(clampedT * segmentCount);
+        const localT = (clampedT * segmentCount) % 1;
+
+        return {
+          segmentIndex: Math.min(segmentIndex, segmentCount - 1),
+          localT: segmentIndex >= segmentCount ? 1 : localT,
+        };
+      }
+
+      /**
+       * Evaluates a point on the piecewise Bézier network at global parameter `t`.
+       *
+       * This function computes the point on the network at the specified global parameter `t` ∈ [0, 1].
+       * It internally resolves the global parameter to the appropriate segment and local parameter,
+       * then evaluates that segment using the standard cubic Bézier formula.
+       *
+       * The global parameter `t` represents uniform distribution across segments, where each segment
+       * contributes equally to the parameter space. This is different from arc length-based evaluation
+       * where segments contribute based on their actual arc length.
+       *
+       * @param network - The piecewise Bézier network
+       * @param t - Global parameter in range [0, 1] representing position along the entire network
+       * @returns The point on the network at parameter `t` [x, y]
+       *
+       * @example
+       * ```typescript
+       * const network: cmath.bezier.piecewise.Network = {
+       *   vertices: [[0, 0], [100, 0], [200, 100]],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 50], tb: [-50, 50] },
+       *     { a: 1, b: 2, ta: [50, 50], tb: [-50, 50] }
+       *   ]
+       * };
+       *
+       * const point = cmath.bezier.piecewise.evaluate(network, 0.5);
+       * console.log(point); // [x, y] coordinates at 50% along the network
+       * ```
+       *
+       * @remarks
+       * - Performance is O(1) after resolving the segment
+       * - Global parameter `t` is automatically clamped to [0, 1]
+       * - Reuses the single-segment `evaluate` function for consistency
+       * - Handles edge cases like empty networks gracefully
+       */
+      export function evaluate(network: Network, t: number): Vector2 {
+        if (network.segments.length === 0) {
+          return [0, 0];
+        }
+
+        const { segmentIndex, localT } = resolveGlobalT(network, t);
+        const segment = network.segments[segmentIndex];
+        const a = network.vertices[segment.a];
+        const b = network.vertices[segment.b];
+
+        return cmath.bezier.evaluate(a, b, segment.ta, segment.tb, localT);
+      }
+
+      /**
+       * Projects a point onto the piecewise Bézier network and returns the global parameter `t`.
+       *
+       * This function finds the closest point on the network to the given input point and returns
+       * the global parameter `t` that corresponds to that location. It performs projection on each
+       * segment and selects the result with the minimum distance.
+       *
+       * The algorithm:
+       * 1. Projects the point onto each segment using the single-segment `project` function
+       * 2. Evaluates the projected point on each segment
+       * 3. Computes distances to find the closest segment
+       * 4. Converts the local parameter to global parameter `t`
+       *
+       * @param network - The piecewise Bézier network
+       * @param point - The point to project onto the network [x, y]
+       * @returns Global parameter `t` ∈ [0, 1] representing the closest point on the network
+       *
+       * @example
+       * ```typescript
+       * const network: cmath.bezier.piecewise.Network = {
+       *   vertices: [[0, 0], [100, 0], [200, 100]],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 50], tb: [-50, 50] },
+       *     { a: 1, b: 2, ta: [50, 50], tb: [-50, 50] }
+       *   ]
+       * };
+       *
+       * const t = cmath.bezier.piecewise.project(network, [150, 50]);
+       * console.log(t); // Global parameter of the closest point on the network
+       * ```
+       *
+       * @remarks
+       * - Performance is O(n) where n is the number of segments
+       * - Reuses the single-segment `project` function for consistency
+       * - Returns the global parameter that minimizes distance across all segments
+       * - Handles edge cases like empty networks gracefully
+       */
+      export function project(network: Network, point: Vector2): number {
+        if (network.segments.length === 0) {
+          return 0;
+        }
+
+        let bestT = 0;
+        let bestDistance = Infinity;
+        const segmentCount = network.segments.length;
+
+        for (let i = 0; i < segmentCount; i++) {
+          const segment = network.segments[i];
+          const a = network.vertices[segment.a];
+          const b = network.vertices[segment.b];
+
+          // Project onto this segment
+          const localT = cmath.bezier.project(
+            a,
+            b,
+            segment.ta,
+            segment.tb,
+            point
+          );
+
+          // Evaluate the projected point
+          const projectedPoint = cmath.bezier.evaluate(
+            a,
+            b,
+            segment.ta,
+            segment.tb,
+            localT
+          );
+
+          // Compute distance
+          const distance = cmath.vector2.distance(point, projectedPoint);
+
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            // Convert local parameter to global parameter
+            bestT = (i + localT) / segmentCount;
+          }
+        }
+
+        return Math.max(0, Math.min(1, bestT));
+      }
     }
   }
 
