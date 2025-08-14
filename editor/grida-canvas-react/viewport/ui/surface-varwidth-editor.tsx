@@ -46,7 +46,10 @@ function useVariableWithEditor() {
 
   const vertices = node.vectorNetwork.vertices;
   const segments = node.vectorNetwork.segments;
-  const { selected_stop, profile } = state.content_edit_mode;
+  const {
+    variable_width_selected_stop: selected_stop,
+    variable_width_profile: profile,
+  } = state.content_edit_mode;
 
   // offset of the points (node absolute position)
   const absolute = instance.getNodeAbsoluteBoundingRect(node_id);

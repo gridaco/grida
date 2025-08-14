@@ -110,9 +110,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         if (action.type === "cut") break; // not supported yet
         const {
           node_id,
-          selected_vertices,
-          selected_segments,
-          selected_tangents,
+          selection: {
+            selected_vertices,
+            selected_segments,
+            selected_tangents,
+          },
         } = state.content_edit_mode;
         const node = dq.__getNodeById(
           state,
@@ -198,9 +200,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               { length: net.segments.length },
               (_, i) => i + segment_offset
             );
-            mode.selected_vertices = new_vertices;
-            mode.selected_segments = new_segments;
-            mode.selected_tangents = [];
+            mode.selection = {
+              selected_vertices: new_vertices,
+              selected_segments: new_segments,
+              selected_tangents: [],
+            };
             mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
               node.vectorNetwork,
               {
@@ -293,9 +297,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             { length: net.segments.length },
             (_, i) => i + segment_offset
           );
-          mode.selected_vertices = new_vertices;
-          mode.selected_segments = new_segments;
-          mode.selected_tangents = [];
+          mode.selection = {
+            selected_vertices: new_vertices,
+            selected_segments: new_segments,
+            selected_tangents: [],
+          };
           mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
             node.vectorNetwork,
             {
@@ -641,12 +647,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1],
             ];
             return produce(state, (draft) => {
-              const {
-                node_id,
-                selected_vertices,
-                selected_segments,
-                selected_tangents,
-              } = draft.content_edit_mode as editor.state.VectorContentEditMode;
+              const { node_id, selection } =
+                draft.content_edit_mode as editor.state.VectorContentEditMode;
 
               const node = dq.__getNodeById(
                 draft,
@@ -655,11 +657,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
               const { vertices, tangents } = encodeTranslateVectorCommand(
                 node.vectorNetwork,
-                {
-                  selected_vertices,
-                  selected_segments,
-                  selected_tangents,
-                }
+                selection
               );
 
               const scene = draft.document.scenes[draft.scene_id!];
@@ -1054,16 +1052,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             assert(draft.content_edit_mode?.type === "vector");
             draft.selection = [node_id];
             const next = reduceVectorContentSelection(
-              {
-                selected_vertices: draft.content_edit_mode.selected_vertices,
-                selected_segments: draft.content_edit_mode.selected_segments,
-                selected_tangents: draft.content_edit_mode.selected_tangents,
-              },
+              draft.content_edit_mode.selection,
               { type: "vertex", index: vertex, additive: action.additive }
             );
-            draft.content_edit_mode.selected_vertices = next.selected_vertices;
-            draft.content_edit_mode.selected_segments = next.selected_segments;
-            draft.content_edit_mode.selected_tangents = next.selected_tangents;
+            draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
                 (node as grida.program.nodes.VectorNode).vectorNetwork,
@@ -1086,15 +1078,19 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
             if (draft.content_edit_mode?.type === "vector") {
               if (
-                draft.content_edit_mode.selected_vertices.includes(vertex) ||
-                draft.content_edit_mode.selected_tangents.some(
+                draft.content_edit_mode.selection.selected_vertices.includes(
+                  vertex
+                ) ||
+                draft.content_edit_mode.selection.selected_tangents.some(
                   ([v]) => v === vertex
                 )
               ) {
                 // clear the selection as deleted
-                draft.content_edit_mode.selected_vertices = [];
-                draft.content_edit_mode.selected_segments = [];
-                draft.content_edit_mode.selected_tangents = [];
+                draft.content_edit_mode.selection = {
+                  selected_vertices: [],
+                  selected_segments: [],
+                  selected_tangents: [],
+                };
                 draft.content_edit_mode.a_point = null;
               }
             }
@@ -1104,16 +1100,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             assert(draft.content_edit_mode?.type === "vector");
             draft.selection = [node_id];
             const next = reduceVectorContentSelection(
-              {
-                selected_vertices: draft.content_edit_mode.selected_vertices,
-                selected_segments: draft.content_edit_mode.selected_segments,
-                selected_tangents: draft.content_edit_mode.selected_tangents,
-              },
+              draft.content_edit_mode.selection,
               { type: "segment", index: segment, additive: action.additive }
             );
-            draft.content_edit_mode.selected_vertices = next.selected_vertices;
-            draft.content_edit_mode.selected_segments = next.selected_segments;
-            draft.content_edit_mode.selected_tangents = next.selected_tangents;
+            draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
                 (node as grida.program.nodes.VectorNode).vectorNetwork,
@@ -1131,28 +1121,18 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             assert(draft.content_edit_mode?.type === "vector");
             draft.selection = [node_id];
             const next = reduceVectorContentSelection(
-              {
-                selected_vertices: draft.content_edit_mode.selected_vertices,
-                selected_segments: draft.content_edit_mode.selected_segments,
-                selected_tangents: draft.content_edit_mode.selected_tangents,
-              },
+              draft.content_edit_mode.selection,
               {
                 type: "tangent",
                 index: [vertex, action.target.tangent],
                 additive: action.additive,
               }
             );
-            draft.content_edit_mode.selected_vertices = next.selected_vertices;
-            draft.content_edit_mode.selected_segments = next.selected_segments;
-            draft.content_edit_mode.selected_tangents = next.selected_tangents;
+            draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
                 (node as grida.program.nodes.VectorNode).vectorNetwork,
-                {
-                  selected_vertices: next.selected_vertices,
-                  selected_segments: next.selected_segments,
-                  selected_tangents: next.selected_tangents,
-                }
+                next
               );
             draft.content_edit_mode.a_point =
               getVectorSelectionStartPoint(next);
@@ -1170,8 +1150,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             });
 
             if (draft.content_edit_mode?.type === "vector") {
-              draft.content_edit_mode.selected_tangents =
-                draft.content_edit_mode.selected_tangents.filter(
+              draft.content_edit_mode.selection.selected_tangents =
+                draft.content_edit_mode.selection.selected_tangents.filter(
                   ([v, t]) => !(v === vertex && t === action.target.tangent)
                 );
               draft.content_edit_mode.a_point = null;
@@ -1223,8 +1203,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
             if (draft.content_edit_mode?.type === "vector") {
               // Clear segment selection since the segment was deleted
-              draft.content_edit_mode.selected_segments = [];
-              draft.content_edit_mode.selected_tangents = [];
+              draft.content_edit_mode.selection = {
+                selected_vertices: [],
+                selected_segments: [],
+                selected_tangents: [],
+              };
               draft.content_edit_mode.a_point = null;
             }
             break;
@@ -1236,9 +1219,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               );
 
               if (draft.content_edit_mode?.type === "vector") {
-                draft.content_edit_mode.selected_vertices = [newIndex];
-                draft.content_edit_mode.selected_segments = [];
-                draft.content_edit_mode.selected_tangents = [];
+                draft.content_edit_mode.selection = {
+                  selected_vertices: [newIndex],
+                  selected_segments: [],
+                  selected_tangents: [],
+                };
                 draft.content_edit_mode.a_point = newIndex;
               }
               break;
@@ -1582,8 +1567,10 @@ function __self_delete_vector_network_selection(
   ved: editor.state.VectorContentEditMode
 ) {
   assert(draft.content_edit_mode?.type === "vector");
-  const { node_id, selected_vertices, selected_segments, selected_tangents } =
-    ved;
+  const {
+    node_id,
+    selection: { selected_vertices, selected_segments, selected_tangents },
+  } = ved;
 
   const node = dq.__getNodeById(
     draft,
@@ -1613,9 +1600,11 @@ function __self_delete_vector_network_selection(
     }
   });
 
-  draft.content_edit_mode.selected_vertices = [];
-  draft.content_edit_mode.selected_segments = [];
-  draft.content_edit_mode.selected_tangents = [];
+  draft.content_edit_mode.selection = {
+    selected_vertices: [],
+    selected_segments: [],
+    selected_tangents: [],
+  };
   draft.content_edit_mode.a_point = null;
 }
 

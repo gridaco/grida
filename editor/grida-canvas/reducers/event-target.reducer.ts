@@ -430,15 +430,16 @@ function __self_evt_on_pointer_down(
 
           if (typeof a_point !== "number") {
             // Starting a new path at the split point
-            draft.content_edit_mode.selected_vertices = [split_vertex_idx];
-            draft.content_edit_mode.selected_segments = [];
-            draft.content_edit_mode.selected_tangents = [];
+            draft.content_edit_mode.selection = {
+              selected_vertices: [split_vertex_idx],
+              selected_segments: [],
+              selected_tangents: [],
+            };
             draft.content_edit_mode.selection_neighbouring_vertices =
-              getUXNeighbouringVertices(node.vectorNetwork, {
-                selected_vertices: [split_vertex_idx],
-                selected_segments: [],
-                selected_tangents: [],
-              });
+              getUXNeighbouringVertices(
+                node.vectorNetwork,
+                draft.content_edit_mode.selection
+              );
             draft.content_edit_mode.a_point = split_vertex_idx;
             draft.content_edit_mode.next_ta =
               vne.getNextMirroredTangent(split_vertex_idx);
@@ -466,8 +467,10 @@ function __self_evt_on_pointer_down(
             node.height = bb_b2.height;
             node.vectorNetwork = vne.value;
 
-            draft.content_edit_mode.selected_vertices = [new_vertex_idx];
-            draft.content_edit_mode.selected_tangents = [];
+            draft.content_edit_mode.selection.selected_vertices = [
+              new_vertex_idx,
+            ];
+            draft.content_edit_mode.selection.selected_tangents = [];
 
             const isClosingExisting = new_vertex_idx === split_vertex_idx;
 
@@ -475,7 +478,7 @@ function __self_evt_on_pointer_down(
             // selected so dragging starts a "curve-b" gesture. conclude
             // projection by clearing `a_point` unless the user keeps
             // projecting with the `p` modifier.
-            draft.content_edit_mode.selected_segments =
+            draft.content_edit_mode.selection.selected_segments =
               new_segment_idx !== null ? [new_segment_idx] : [];
 
             if (
@@ -494,9 +497,11 @@ function __self_evt_on_pointer_down(
 
         // Handle snapped vertex (existing logic)
         if (typeof a_point !== "number" && typeof snapped_point === "number") {
-          draft.content_edit_mode.selected_vertices = [snapped_point];
-          draft.content_edit_mode.selected_segments = [];
-          draft.content_edit_mode.selected_tangents = [];
+          draft.content_edit_mode.selection = {
+            selected_vertices: [snapped_point],
+            selected_segments: [],
+            selected_tangents: [],
+          };
           draft.content_edit_mode.selection_neighbouring_vertices =
             getUXNeighbouringVertices(node.vectorNetwork, {
               selected_vertices: [snapped_point],
@@ -544,8 +549,8 @@ function __self_evt_on_pointer_down(
         node.height = bb_b.height;
 
         node.vectorNetwork = vne.value;
-        draft.content_edit_mode.selected_vertices = [new_vertex_idx];
-        draft.content_edit_mode.selected_tangents = [];
+        draft.content_edit_mode.selection.selected_vertices = [new_vertex_idx];
+        draft.content_edit_mode.selection.selected_tangents = [];
 
         const isClosingExisting =
           typeof snapped_point === "number" && new_vertex_idx === snapped_point;
@@ -554,7 +559,7 @@ function __self_evt_on_pointer_down(
         // selected so dragging starts a "curve-b" gesture. conclude
         // projection by clearing `a_point` unless the user keeps
         // projecting with the `p` modifier.
-        draft.content_edit_mode.selected_segments =
+        draft.content_edit_mode.selection.selected_segments =
           new_segment_idx !== null ? [new_segment_idx] : [];
 
         if (
@@ -614,9 +619,11 @@ function __self_evt_on_pointer_down(
         draft.content_edit_mode = {
           type: "vector",
           node_id: new_node_id,
-          selected_vertices: [0], // select the first point
-          selected_segments: [],
-          selected_tangents: [],
+          selection: {
+            selected_vertices: [0], // select the first point
+            selected_segments: [],
+            selected_tangents: [],
+          },
           a_point: 0,
           next_ta: null,
           initial_vector_network: vector.vectorNetwork,
@@ -865,14 +872,16 @@ function __self_evt_on_drag_start(
     case "path": {
       // [path tool, drag start]
       assert(draft.content_edit_mode?.type === "vector");
-      const { node_id, selected_vertices, selected_segments } =
-        draft.content_edit_mode;
+      const {
+        node_id,
+        selection: { selected_vertices, selected_segments },
+      } = draft.content_edit_mode;
       assert(selected_vertices.length === 1);
       const vertex = selected_vertices[0];
 
       if (selected_segments.length === 1) {
         const segment_idx = selected_segments[0];
-        draft.content_edit_mode.selected_segments = [];
+        draft.content_edit_mode.selection.selected_segments = [];
 
         const gesture = getInitialCurveGesture(draft, {
           node_id,

@@ -61,9 +61,11 @@ export function self_clearSelection<S extends editor.state.IEditorState>(
   if (draft.content_edit_mode) {
     switch (draft.content_edit_mode.type) {
       case "vector": {
-        draft.content_edit_mode.selected_vertices = [];
-        draft.content_edit_mode.selected_segments = [];
-        draft.content_edit_mode.selected_tangents = [];
+        draft.content_edit_mode.selection = {
+          selected_vertices: [],
+          selected_segments: [],
+          selected_tangents: [],
+        };
         draft.content_edit_mode.selection_neighbouring_vertices = [];
         draft.content_edit_mode.a_point = null;
         draft.content_edit_mode.next_ta = null;
@@ -76,11 +78,6 @@ export function self_clearSelection<S extends editor.state.IEditorState>(
 
   return draft;
 }
-
-export type VectorContentSelectionState = Pick<
-  editor.state.VectorContentEditMode,
-  "selected_vertices" | "selected_segments" | "selected_tangents"
->;
 
 export type VectorContentSelectionAction =
   | { type: "vertex"; index: number; additive?: boolean }
@@ -99,9 +96,9 @@ export type VectorContentSelectionAction =
  * @returns Updated selection state with modified selected_vertices and selected_segments
  */
 export function reduceVectorContentSelection(
-  state: VectorContentSelectionState,
+  state: editor.state.VectorContentEditModeGeometryControlsSelection,
   action: VectorContentSelectionAction
-): VectorContentSelectionState {
+): editor.state.VectorContentEditModeGeometryControlsSelection {
   let { selected_vertices, selected_segments, selected_tangents } = state;
   const additive = action.additive ?? false;
 
@@ -158,9 +155,9 @@ export function reduceVectorContentSelection(
 }
 
 export function getVectorSelectionStartPoint(
-  selection: Pick<
-    editor.state.VectorContentEditMode,
-    "selected_vertices" | "selected_tangents"
+  selection: Omit<
+    editor.state.VectorContentEditModeGeometryControlsSelection,
+    "selected_segments"
   >
 ): number | null {
   if (selection.selected_vertices.length === 1) {

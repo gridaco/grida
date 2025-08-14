@@ -122,9 +122,11 @@ function __self_try_enter_content_edit_mode_auto(
       draft.content_edit_mode = {
         type: "vector",
         node_id: node_id,
-        selected_vertices: [],
-        selected_segments: [],
-        selected_tangents: [],
+        selection: {
+          selected_vertices: [],
+          selected_segments: [],
+          selected_tangents: [],
+        },
         a_point: null,
         next_ta: null,
         initial_vector_network: node.vectorNetwork,
@@ -151,9 +153,11 @@ function __self_try_enter_content_edit_mode_auto(
       draft.content_edit_mode = {
         type: "vector",
         node_id: node_id,
-        selected_vertices: [],
-        selected_segments: [],
-        selected_tangents: [],
+        selection: {
+          selected_vertices: [],
+          selected_segments: [],
+          selected_tangents: [],
+        },
         a_point: null,
         next_ta: null,
         initial_vector_network: vectornode.vectorNetwork,
@@ -446,9 +450,9 @@ function __self_start_gesture(
       const { vertices, tangents } = encodeTranslateVectorCommand(
         node.vectorNetwork,
         {
-          selected_vertices: content_edit_mode.selected_vertices,
-          selected_segments: content_edit_mode.selected_segments,
-          selected_tangents: content_edit_mode.selected_tangents,
+          selected_vertices: content_edit_mode.selection.selected_vertices,
+          selected_segments: content_edit_mode.selection.selected_segments,
+          selected_tangents: content_edit_mode.selection.selected_tangents,
         }
       );
 

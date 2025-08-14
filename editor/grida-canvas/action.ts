@@ -383,7 +383,7 @@ export interface EditorVectorPlanarizeAction {
 export interface EditorVectorUpdateHoveredControlAction {
   type: "vector/update-hovered-control";
   hoveredControl: {
-    type: editor.state.VectorContentEditModeHoverableType;
+    type: editor.state.VectorContentEditModeHoverableGeometryControlType;
     index: number;
   } | null;
 }

@@ -1,11 +1,11 @@
 import type { Draft } from "immer";
-import vn from "@grida/vn";
-import { editor } from "@/grida-canvas";
-import cmath from "@grida/cmath";
 import type grida from "@grida/schema";
-import { dq } from "@/grida-canvas/query";
-import assert from "assert";
 import type { ReducerContext } from "..";
+import { editor } from "@/grida-canvas";
+import { dq } from "@/grida-canvas/query";
+import vn from "@grida/vn";
+import cmath from "@grida/cmath";
+import assert from "assert";
 
 /**
  * Collects the vertices and tangents that need translation for the provided
@@ -20,10 +20,7 @@ import type { ReducerContext } from "..";
  */
 export function encodeTranslateVectorCommand(
   network: vn.VectorNetwork,
-  selection: Pick<
-    editor.state.VectorContentEditMode,
-    "selected_vertices" | "selected_segments" | "selected_tangents"
-  >
+  selection: editor.state.VectorContentEditModeGeometryControlsSelection
 ): { vertices: number[]; tangents: [number, 0 | 1][] } {
   const vertexSet = new Set<number>();
   const tangentSet = new Set<string>();
@@ -67,10 +64,7 @@ export function encodeTranslateVectorCommand(
  */
 export function getUXNeighbouringVertices(
   network: vn.VectorNetwork,
-  selection: Pick<
-    editor.state.VectorContentEditMode,
-    "selected_vertices" | "selected_segments" | "selected_tangents"
-  >
+  selection: editor.state.VectorContentEditModeGeometryControlsSelection
 ): number[] {
   const active = new Set<number>();
 
@@ -188,7 +182,7 @@ export function self_updateVectorAreaSelection<
     .filter((i) => i !== -1);
   if (additive) {
     const vset = new Set([
-      ...draft.content_edit_mode.selected_vertices,
+      ...draft.content_edit_mode.selection.selected_vertices,
       ...selected_vertices,
     ]);
     selected_vertices = Array.from(vset);
@@ -233,14 +227,14 @@ export function self_updateVectorAreaSelection<
       .filter((i) => i !== -1);
     if (additive) {
       const sset = new Set([
-        ...draft.content_edit_mode.selected_segments,
+        ...draft.content_edit_mode.selection.selected_segments,
         ...selected_segments,
       ]);
       selected_segments = Array.from(sset);
     }
   } else {
     selected_segments = additive
-      ? draft.content_edit_mode.selected_segments
+      ? draft.content_edit_mode.selection.selected_segments
       : [];
   }
 
@@ -262,7 +256,9 @@ export function self_updateVectorAreaSelection<
 
   if (additive) {
     const key = (t: [number, 0 | 1]) => `${t[0]}:${t[1]}`;
-    const tset = new Set(draft.content_edit_mode.selected_tangents.map(key));
+    const tset = new Set(
+      draft.content_edit_mode.selection.selected_tangents.map(key)
+    );
     for (const t of selected_tangents) tset.add(key(t));
     selected_tangents = Array.from(tset).map((s) => {
       const [v, t] = s.split(":");
@@ -270,9 +266,11 @@ export function self_updateVectorAreaSelection<
     });
   }
 
-  draft.content_edit_mode.selected_vertices = selected_vertices;
-  draft.content_edit_mode.selected_segments = selected_segments;
-  draft.content_edit_mode.selected_tangents = selected_tangents;
+  draft.content_edit_mode.selection = {
+    selected_vertices,
+    selected_segments,
+    selected_tangents,
+  };
   draft.content_edit_mode.selection_neighbouring_vertices =
     getUXNeighbouringVertices(node.vectorNetwork, {
       selected_vertices,
@@ -323,7 +321,7 @@ export function self_updateVectorHoveredControl<
 >(
   draft: Draft<S>,
   hoveredControl: {
-    type: editor.state.VectorContentEditModeHoverableType;
+    type: editor.state.VectorContentEditModeHoverableGeometryControlType;
     index: number;
   } | null
 ) {

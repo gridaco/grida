@@ -19,9 +19,9 @@ export interface VectorContentEditor extends AbsoluteVectorNetworkGeometry {
   path_cursor_position: cmath.Vector2;
   offset: cmath.Vector2;
   neighbouring_vertices: editor.state.VectorContentEditMode["selection_neighbouring_vertices"];
-  selected_vertices: editor.state.VectorContentEditMode["selected_vertices"];
-  selected_segments: editor.state.VectorContentEditMode["selected_segments"];
-  selected_tangents: editor.state.VectorContentEditMode["selected_tangents"];
+  selected_vertices: editor.state.VectorContentEditMode["selection"]["selected_vertices"];
+  selected_segments: editor.state.VectorContentEditMode["selection"]["selected_segments"];
+  selected_tangents: editor.state.VectorContentEditMode["selection"]["selected_tangents"];
   snapped_point: editor.state.VectorContentEditMode["snapped_vertex_idx"];
   a_point: editor.state.VectorContentEditMode["a_point"];
   next_ta: editor.state.VectorContentEditMode["next_ta"];
@@ -78,9 +78,7 @@ export default function useVectorContentEditMode(): VectorContentEditor {
   const { snapped_vertex_idx: snapped_point, tool, vector_node: node } = state;
   const {
     node_id,
-    selected_vertices,
-    selected_segments,
-    selected_tangents,
+    selection: { selected_vertices, selected_segments, selected_tangents },
     a_point,
     cursor: path_cursor_position,
     next_ta,

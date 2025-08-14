@@ -639,15 +639,11 @@ export namespace editor.state {
     // selectedTextRange;
   };
 
-  export type VectorContentEditModeHoverableType = "vertex" | "segment";
-  // export type VectorContentEditModeCursorTarget =
-  //   | { type: "vertex"; vertex: number }
-  //   | { type: "segment"; segment: vn.PointOnSegment };
+  export type VectorContentEditModeHoverableGeometryControlType =
+    | "vertex"
+    | "segment";
 
-  export type VectorContentEditMode = {
-    type: "vector";
-    node_id: string;
-
+  export type VectorContentEditModeGeometryControlsSelection = {
     /**
      * selected vertex indices
      */
@@ -665,7 +661,17 @@ export namespace editor.state {
      * where a_or_b is 0 for `a` and 1 for `b`
      */
     selected_tangents: [number, 0 | 1][];
+  };
 
+  // export type VectorContentEditModeCursorTarget =
+  //   | { type: "vertex"; vertex: number }
+  //   | { type: "segment"; segment: vn.PointOnSegment };
+
+  export type VectorContentEditMode = {
+    type: "vector";
+    node_id: string;
+
+    selection: VectorContentEditModeGeometryControlsSelection;
     /**
      * vertices considered active for showing tangent handles
      */
@@ -750,7 +756,7 @@ export namespace editor.state {
      * @default null
      */
     hovered_control: {
-      type: VectorContentEditModeHoverableType;
+      type: VectorContentEditModeHoverableGeometryControlType;
       index: number;
     } | null;
   };
@@ -758,8 +764,8 @@ export namespace editor.state {
   export type VariableWidthContentEditMode = {
     type: "width";
     node_id: string;
-    selected_stop: number;
-    profile: cg.VariableWidthProfile;
+    variable_width_selected_stop: number;
+    variable_width_profile: cg.VariableWidthProfile;
   };
 
   type BitmapContentEditMode = {
@@ -1918,7 +1924,7 @@ export namespace editor.api {
      */
     updateVectorHoveredControl(
       hoveredControl: {
-        type: editor.state.VectorContentEditModeHoverableType;
+        type: editor.state.VectorContentEditModeHoverableGeometryControlType;
         index: number;
       } | null
     ): void;
