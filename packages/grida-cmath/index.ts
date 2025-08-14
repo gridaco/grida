@@ -4804,6 +4804,147 @@ namespace cmath {
         }
       }
     }
+
+    /**
+     * Piecewise Bézier curve operations for chains of cubic Bézier segments.
+     *
+     * The `piecewise` namespace provides optimized mathematical operations for working with
+     * sequences of connected cubic Bézier curves (piecewise curves). These operations treat
+     * the entire chain as a single mathematical entity while providing efficient algorithms
+     * for common operations like arc length parameterization, point evaluation, and projection.
+     *
+     * A piecewise curve is defined as an ordered sequence of cubic Bézier segments where
+     * each segment's end point connects to the next segment's start point, forming a
+     * continuous curve. The global parameter `u` ∈ [0, 1] represents the normalized position
+     * along the entire curve chain, while local parameters `t` ∈ [0, 1] represent positions
+     * within individual segments.
+     *
+     * Key concepts:
+     * - **Global parameter `u`**: Normalized position along the entire curve chain (0 = start, 1 = end)
+     * - **Local parameter `t`**: Parameter within a specific segment (0 = segment start, 1 = segment end)
+     * - **Segment index**: Zero-based index identifying which segment contains a given global parameter
+     * - **Arc length parameterization**: Uniform motion along the curve chain regardless of segment curvature
+     *
+     * Common use cases:
+     * - Path following with uniform speed
+     * - Animation along complex multi-segment curves
+     * - Interactive curve editing and manipulation
+     * - Geometric operations on complex shapes
+     *
+     * @example
+     * ```typescript
+     * // Define a piecewise curve with multiple segments
+     * const segments: cmath.bezier.CubicBezierWithTangents[] = [
+     *   { a: [0, 0], b: [100, 0], ta: [50, 50], tb: [-50, 50] },
+     *   { a: [100, 0], b: [200, 100], ta: [50, 50], tb: [50, -50] },
+     *   { a: [200, 100], b: [300, 100], ta: [50, -50], tb: [-50, -50] }
+     * ];
+     *
+     * // Evaluate point at 60% along the entire curve chain
+     * const point = cmath.bezier.piecewise.evaluate(segments, 0.6);
+     *
+     * // Get the segment index and local parameter for a global position
+     * const { segmentIndex, localT } = cmath.bezier.piecewise.resolveGlobalU(segments, 0.6);
+     *
+     * // Project a point onto the entire curve chain
+     * const globalU = cmath.bezier.piecewise.project(segments, [150, 50]);
+     * ```
+     *
+     * @remarks
+     * - All operations assume segments are properly connected (end point of segment i = start point of segment i+1)
+     * - Global parameter `u` is automatically clamped to [0, 1] for robustness
+     * - Arc length parameterization provides uniform motion along the curve chain
+     * - Operations are optimized for chains with many segments
+     * - Caching mechanisms are used internally for performance-critical operations
+     */
+    export namespace piecewise {
+      /**
+       * Compact representation of a piecewise Bézier curve network.
+       *
+       * The `Network` type provides a memory-efficient structure for representing chains of
+       * connected cubic Bézier segments. It separates vertex positions from segment connectivity
+       * and tangent information, allowing for efficient storage and manipulation of complex
+       * curve networks.
+       *
+       * Structure:
+       * - `vertices`: Array of unique vertex positions in 2D space
+       * - `segments`: Array of segment definitions, each referencing vertices by index
+       *
+       * Each segment is defined by:
+       * - `a`: Index of the start vertex in the `vertices` array
+       * - `b`: Index of the end vertex in the `vertices` array
+       * - `ta`: Tangent vector at the start vertex (relative to vertex position)
+       * - `tb`: Tangent vector at the end vertex (relative to vertex position)
+       *
+       * This structure enables:
+       * - Memory efficiency through vertex sharing
+       * - Fast vertex position updates (change once, affects all connected segments)
+       * - Efficient serialization and network transmission
+       * - Support for complex topologies (branches, loops, etc.)
+       *
+       * @property vertices - Array of unique vertex positions in 2D space
+       * @property segments - Array of segment definitions referencing vertices by index
+       *
+       * @example
+       * ```typescript
+       * // Define a simple curve with 3 segments forming a path
+       * const network: cmath.bezier.piecewise.Network = {
+       *   vertices: [
+       *     [0, 0],    // vertex 0
+       *     [100, 0],  // vertex 1
+       *     [200, 100], // vertex 2
+       *     [300, 100]  // vertex 3
+       *   ],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 50], tb: [-50, 50] },   // segment 0: vertex 0 → 1
+       *     { a: 1, b: 2, ta: [50, 50], tb: [50, -50] },   // segment 1: vertex 1 → 2
+       *     { a: 2, b: 3, ta: [50, -50], tb: [-50, -50] }  // segment 2: vertex 2 → 3
+       *   ]
+       * };
+       *
+       * // Evaluate point at 60% along the entire network
+       * const point = cmath.bezier.piecewise.evaluate(network, 0.6);
+       * ```
+       *
+       * @example
+       * ```typescript
+       * // Network with branching structure
+       * const branchedNetwork: cmath.bezier.piecewise.Network = {
+       *   vertices: [
+       *     [0, 0],     // root vertex
+       *     [100, 0],   // branch point
+       *     [200, 50],  // left branch end
+       *     [200, -50]  // right branch end
+       *   ],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 0], tb: [-50, 0] },     // main path
+       *     { a: 1, b: 2, ta: [50, 50], tb: [-50, 50] },   // left branch
+       *     { a: 1, b: 3, ta: [50, -50], tb: [-50, -50] }  // right branch
+       *   ]
+       * };
+       * ```
+       *
+       * @remarks
+       * - **No validation**: This structure does not ensure data validity or connectivity
+       * - **Index bounds**: Segment indices must be valid within the vertices array
+       * - **Vertex sharing**: Multiple segments can reference the same vertex
+       * - **Memory efficiency**: Vertex positions are stored once and shared
+       * - **Topology flexibility**: Supports complex networks with branches and loops
+       * - **Performance**: Optimized for operations on large networks
+       * - **Serialization**: Compact representation suitable for storage/transmission
+       */
+      export type Network = {
+        vertices: Vector2[];
+        segments: {
+          a: number;
+          b: number;
+          ta: Vector2;
+          tb: Vector2;
+        }[];
+      };
+
+      //
+    }
   }
 
   export namespace transform {
