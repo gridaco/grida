@@ -2,6 +2,9 @@ import type { Draft } from "immer";
 import { editor } from "@/grida-canvas";
 import { getVectorSelectionStartPoint } from "./selection";
 import type cg from "@grida/cg";
+import assert from "assert";
+import type { ReducerContext } from "..";
+import { __self_try_enter_content_edit_mode_vector } from "../surface.reducer";
 
 const VECTOR_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "cursor",
@@ -28,11 +31,11 @@ const NO_CONTENT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
 const NO_CONTENT_EDIT_MODE_VALID_REVERT_TOOL_MODES: editor.state.ToolModeType[] =
   ["cursor", "hand", "zoom", "insert", "draw"];
 
-function validToolModesForContentEditMode(
-  mode: editor.state.ContentEditModeState | undefined,
+function validToolsForContentEditMode(
+  mode: editor.state.ContentEditModeState["type"] | undefined,
   opts: { for: "select" | "revert" } = { for: "select" }
 ): editor.state.ToolModeType[] {
-  switch (mode?.type) {
+  switch (mode) {
     case "vector":
       return VECTOR_EDIT_MODE_VALID_TOOL_MODES;
     case "text":
@@ -46,6 +49,14 @@ function validToolModesForContentEditMode(
   }
 }
 
+function isValidToolForContentEditMode(
+  mode: editor.state.ContentEditModeState["type"] | undefined,
+  tool: editor.state.ToolModeType
+) {
+  const valid_tool_modes = validToolsForContentEditMode(mode);
+  return valid_tool_modes.includes(tool);
+}
+
 const DUMMY_VAR_WIDTH_PROFILE: cg.VariableWidthProfile = {
   stops: [
     { u: 0, r: 10 },
@@ -54,13 +65,21 @@ const DUMMY_VAR_WIDTH_PROFILE: cg.VariableWidthProfile = {
   ],
 };
 
+export function self_select_cursor_tool<S extends editor.state.IEditorState>(
+  draft: Draft<S>
+) {
+  draft.tool = { type: "cursor" };
+}
+
 /**
  * Selects the given tool and stores the previous tool type.
  */
 export function self_select_tool<S extends editor.state.IEditorState>(
   draft: Draft<S>,
-  tool: editor.state.ToolMode
+  tool: editor.state.ToolMode,
+  context: ReducerContext
 ) {
+  const current_tool = draft.tool.type;
   if (
     draft.flags.__unstable_brush_tool !== "on" &&
     (tool.type === "brush" || tool.type === "eraser")
@@ -88,9 +107,31 @@ export function self_select_tool<S extends editor.state.IEditorState>(
       return;
     }
   }
+  // exiting the width tool automatically goes back to the vector edit mode
+  else if (current_tool === "width") {
+    assert(
+      draft.content_edit_mode?.type === "width",
+      "must be in width edit mode - logical error"
+    );
 
-  const valid_tool_modes = validToolModesForContentEditMode(
-    draft.content_edit_mode
+    let next_tool: editor.state.ToolMode = tool;
+    if (!isValidToolForContentEditMode("vector", tool.type)) {
+      // fallback to cursor
+      next_tool = { type: "cursor" };
+    }
+
+    draft.tool = next_tool;
+    __self_try_enter_content_edit_mode_vector(
+      draft,
+      draft.content_edit_mode.node_id,
+      context
+    );
+    return;
+    //
+  }
+
+  const valid_tool_modes = validToolsForContentEditMode(
+    draft.content_edit_mode?.type
   );
   if (!valid_tool_modes.includes(tool.type)) {
     if (draft.content_edit_mode?.type === "bitmap") {
@@ -119,8 +160,8 @@ export function self_revert_tool<S extends editor.state.IEditorState>(
   const next_tool = draft.__tool_previous;
   draft.__tool_previous = null;
 
-  const valid_tool_modes = validToolModesForContentEditMode(
-    draft.content_edit_mode,
+  const valid_tool_modes = validToolsForContentEditMode(
+    draft.content_edit_mode?.type,
     { for: "revert" }
   );
   if (valid_tool_modes.includes(next_tool.type)) {

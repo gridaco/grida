@@ -97,7 +97,7 @@ function __self_try_content_edit_mode_fill_gradient(
   };
 }
 
-function __self_try_enter_content_edit_mode_auto(
+export function __self_try_enter_content_edit_mode_vector(
   draft: editor.state.IEditorState,
   node_id: string,
   context: ReducerContext
@@ -108,17 +108,6 @@ function __self_try_enter_content_edit_mode_auto(
   );
 
   switch (node.type) {
-    case "text": {
-      // the text node should have a string literal value assigned (we don't support props editing via surface)
-      if (typeof node.text !== "string") return;
-
-      draft.content_edit_mode = {
-        type: "text",
-        node_id: node_id,
-      };
-      break;
-    }
-    // case "svgpath":
     case "vector": {
       draft.content_edit_mode = {
         type: "vector",
@@ -174,6 +163,37 @@ function __self_try_enter_content_edit_mode_auto(
 
       break;
     }
+  }
+}
+
+function __self_try_enter_content_edit_mode_auto(
+  draft: editor.state.IEditorState,
+  node_id: string,
+  context: ReducerContext
+) {
+  const node = dq.__getNodeById(draft, node_id);
+
+  switch (node.type) {
+    case "text": {
+      // the text node should have a string literal value assigned (we don't support props editing via surface)
+      if (typeof node.text !== "string") return;
+
+      draft.content_edit_mode = {
+        type: "text",
+        node_id: node_id,
+      };
+      break;
+    }
+    // case "svgpath":
+    case "vector":
+    // primitive shapes
+    case "rectangle":
+    case "star":
+    case "polygon":
+    case "ellipse":
+    case "line": {
+      return __self_try_enter_content_edit_mode_vector(draft, node_id, context);
+    }
     case "bitmap": {
       const node = dq.__getNodeById(
         draft,
@@ -184,9 +204,13 @@ function __self_try_enter_content_edit_mode_auto(
         node_id: node.id,
         imageRef: node.imageRef,
       };
-      self_select_tool(draft, {
-        type: "brush",
-      });
+      self_select_tool(
+        draft,
+        {
+          type: "brush",
+        },
+        context
+      );
       self_clearSelection(draft);
       break;
     }
@@ -840,7 +864,7 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       }
       case "surface/tool": {
         const { tool } = action;
-        self_select_tool(draft, tool);
+        self_select_tool(draft, tool, context);
         break;
       }
       case "surface/brush": {

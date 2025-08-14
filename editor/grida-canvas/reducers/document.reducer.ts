@@ -260,7 +260,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           self_try_insert_node(draft, target, node);
 
-          self_select_tool(draft, { type: "cursor" });
+          self_select_tool(draft, { type: "cursor" }, context);
           self_selectNode(draft, "reset", node.id);
         });
       }
@@ -358,7 +358,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
 
         // after
-        self_select_tool(draft, { type: "cursor" });
+        self_select_tool(draft, { type: "cursor" }, context);
         self_selectNode(draft, "reset", ...new_top_ids);
       });
     }
@@ -573,7 +573,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         );
 
         // after
-        self_select_tool(draft, { type: "cursor" });
+        self_select_tool(draft, { type: "cursor" }, context);
         self_selectNode(draft, "reset", ...new_top_ids);
       });
     }

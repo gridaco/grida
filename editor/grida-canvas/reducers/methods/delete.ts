@@ -3,7 +3,7 @@ import type grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import { rm } from "@grida/tree";
 import { dq } from "@/grida-canvas/query";
-import { self_select_tool } from "./tool";
+import { self_select_cursor_tool } from "./tool";
 import assert from "assert";
 
 /**
@@ -59,7 +59,7 @@ export function self_try_remove_node<S extends editor.state.IEditorState>(
 
   // clear state (not all state needs to be cleared. this can be safely removed or optimzied after testing)
   draft.content_edit_mode = undefined;
-  self_select_tool(draft, { type: "cursor" });
+  self_select_cursor_tool(draft);
 
   return true;
 }
