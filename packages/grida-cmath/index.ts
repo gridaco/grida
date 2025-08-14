@@ -2952,7 +2952,7 @@ namespace cmath {
      * @param p - The canvas-space point to project onto the curve.
      * @returns The normalized parametric scalar `t \in [0, 1]` along the Bézier segment.
      */
-    export function projectParametric(
+    export function project(
       a: Vector2,
       b: Vector2,
       ta: Vector2,

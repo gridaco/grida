@@ -58,7 +58,7 @@ function __self_compute_variable_width_segment_snapping<
     const tb = segment.tb;
 
     // Project the point onto the segment
-    const t = cmath.bezier.projectParametric(a, b, ta, tb, local_point);
+    const t = cmath.bezier.project(a, b, ta, tb, local_point);
 
     // Evaluate the curve at the projected parametric value
     const parametricPoint = cmath.bezier.evaluate(a, b, ta, tb, t);

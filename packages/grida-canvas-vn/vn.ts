@@ -37,7 +37,7 @@ export namespace vn {
    * ```
    *
    * @see {@link cmath.bezier.evaluate} - For evaluating the point to get its position
-   * @see {@link cmath.bezier.projectParametric} - For projecting a point onto a segment
+   * @see {@link cmath.bezier.project} - For projecting a point onto a segment
    */
   export type PointOnSegment = {
     /**

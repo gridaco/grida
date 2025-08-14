@@ -332,13 +332,7 @@ function Segment({
           const ta0 = seg.ta;
           const tb0 = seg.tb;
           frozenRef.current = { a: a0, b: b0, ta: ta0, tb: tb0 };
-          t0Ref.current = cmath.bezier.projectParametric(
-            a0,
-            b0,
-            ta0,
-            tb0,
-            point
-          );
+          t0Ref.current = cmath.bezier.project(a0, b0, ta0, tb0, point);
         } else {
           ve.onDragStart();
         }

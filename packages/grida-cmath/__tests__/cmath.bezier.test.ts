@@ -234,7 +234,7 @@ describe("cmath.bezier.containedByRect", () => {
   });
 });
 
-describe("cmath.bezier.projectParametric", () => {
+describe("cmath.bezier.project", () => {
   /**
    * Evaluates derivative of cubic Bézier for computing normals in tests.
    */
@@ -268,22 +268,13 @@ describe("cmath.bezier.projectParametric", () => {
     const tb: cmath.Vector2 = [0, 0];
 
     // point above the midpoint of the segment
-    expect(cmath.bezier.projectParametric(a, b, ta, tb, [5, 5])).toBeCloseTo(
-      0.5,
-      6
-    );
+    expect(cmath.bezier.project(a, b, ta, tb, [5, 5])).toBeCloseTo(0.5, 6);
 
     // point before the start should clamp to 0
-    expect(cmath.bezier.projectParametric(a, b, ta, tb, [-5, 0])).toBeCloseTo(
-      0,
-      6
-    );
+    expect(cmath.bezier.project(a, b, ta, tb, [-5, 0])).toBeCloseTo(0, 6);
 
     // point after the end should clamp to 1
-    expect(cmath.bezier.projectParametric(a, b, ta, tb, [15, 0])).toBeCloseTo(
-      1,
-      6
-    );
+    expect(cmath.bezier.project(a, b, ta, tb, [15, 0])).toBeCloseTo(1, 6);
   });
 
   test("zero tangents should project onto cubic curve, not straight line", () => {
@@ -297,13 +288,7 @@ describe("cmath.bezier.projectParametric", () => {
     const pointAboveMidpoint: cmath.Vector2 = [25, 15]; // Point above the line, not at midpoint
 
     // Get the cubic projection
-    const cubicT = cmath.bezier.projectParametric(
-      a,
-      b,
-      ta,
-      tb,
-      pointAboveMidpoint
-    );
+    const cubicT = cmath.bezier.project(a, b, ta, tb, pointAboveMidpoint);
 
     // Get the linear projection (what the old code would have done)
     const dx = b[0] - a[0];
@@ -333,7 +318,7 @@ describe("cmath.bezier.projectParametric", () => {
     const offsetPoint: cmath.Vector2 = [30, 20];
 
     // Get the cubic projection
-    const cubicT = cmath.bezier.projectParametric(a, b, ta, tb, offsetPoint);
+    const cubicT = cmath.bezier.project(a, b, ta, tb, offsetPoint);
 
     // Get the linear projection (what the old code would have done)
     const dx = b[0] - a[0];
@@ -357,7 +342,7 @@ describe("cmath.bezier.projectParametric", () => {
     const curvePoint = cmath.bezier.evaluate(a, b, ta, tb, 0.25);
 
     // Project back onto the curve - should return t=0.25
-    const projectedT = cmath.bezier.projectParametric(a, b, ta, tb, curvePoint);
+    const projectedT = cmath.bezier.project(a, b, ta, tb, curvePoint);
     expect(projectedT).toBeCloseTo(0.25, 6);
 
     // This should NOT be the same as linear interpolation at t=0.25
@@ -375,7 +360,7 @@ describe("cmath.bezier.projectParametric", () => {
     const curvePoint = cmath.bezier.evaluate(a, b, ta, tb, 0.75);
 
     // Project back onto the curve - should return t=0.75
-    const projectedT = cmath.bezier.projectParametric(a, b, ta, tb, curvePoint);
+    const projectedT = cmath.bezier.project(a, b, ta, tb, curvePoint);
     expect(projectedT).toBeCloseTo(0.75, 6);
 
     // This should NOT be the same as linear interpolation at t=0.75
@@ -420,7 +405,7 @@ describe("cmath.bezier.projectParametric", () => {
 
     const t = 0.3;
     const p = cmath.bezier.evaluate(a, b, ta, tb, t);
-    expect(cmath.bezier.projectParametric(a, b, ta, tb, p)).toBeCloseTo(t, 6);
+    expect(cmath.bezier.project(a, b, ta, tb, p)).toBeCloseTo(t, 6);
   });
 
   test("handles points offset from the curve", () => {
@@ -437,7 +422,7 @@ describe("cmath.bezier.projectParametric", () => {
       point[0] + (normal[0] / len) * 1,
       point[1] + (normal[1] / len) * 1,
     ];
-    const projected = cmath.bezier.projectParametric(a, b, ta, tb, offset);
+    const projected = cmath.bezier.project(a, b, ta, tb, offset);
     expect(projected).toBeCloseTo(t, 2); // allow some tolerance
   });
 });
@@ -2338,7 +2323,7 @@ describe("cmath.bezier.subdivide", () => {
   });
 
   describe("Integration with other bezier functions", () => {
-    test("should work with projectParametric", () => {
+    test("should work with project", () => {
       const curve: cmath.bezier.CubicBezierWithTangents = {
         a: [0, 0],
         b: [100, 0],
@@ -2349,7 +2334,7 @@ describe("cmath.bezier.subdivide", () => {
       const result = cmath.bezier.subdivide(curve, 0.7);
 
       // Project the split point back onto the original curve
-      const projectedT = cmath.bezier.projectParametric(
+      const projectedT = cmath.bezier.project(
         curve.a,
         curve.b,
         curve.ta,
