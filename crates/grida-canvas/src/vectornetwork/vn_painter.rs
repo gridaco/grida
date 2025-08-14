@@ -50,27 +50,68 @@ impl<'a> VNPainter<'a> {
         if let Some(stroke_opts) = stroke {
             if let Some(var_width_profile) = &stroke_opts.width_profile {
                 // Handle variable width stroke using the dedicated method
-                let geometry = PiecewiseVectorNetworkGeometry {
-                    vertices: vn.vertices.clone(),
-                    segments: vn.segments.clone(),
-                };
-                self.draw_stroke_variable_width(&geometry, stroke_opts.color, var_width_profile);
+                // Use PiecewiseVectorNetworkGeometry::new for validation
+                match PiecewiseVectorNetworkGeometry::new(vn.vertices.clone(), vn.segments.clone())
+                {
+                    Ok(geometry) => {
+                        self.draw_stroke_variable_width(
+                            &geometry,
+                            stroke_opts.color,
+                            var_width_profile,
+                        );
+                    }
+                    Err(_) => {
+                        // Fall back to regular stroke if geometry is not valid
+                        self.draw_stroke_regular(vn, stroke_opts);
+                    }
+                }
             } else {
-                // Handle regular stroke
+                // Handle regular stroke with vector network-specific alignment logic
+                self.draw_stroke_regular(vn, stroke_opts);
+            }
+        }
+    }
+
+    /// Draw a regular stroke with vector network-specific alignment behavior.
+    ///
+    /// For vector networks, the stroke alignment affects both the stroke geometry
+    /// and the base path used for rendering:
+    /// - `Outside`: Uses the unioned path as the base
+    /// - `Center` and `Inside`: Uses individual paths as the base
+    fn draw_stroke_regular(&self, vn: &VectorNetwork, stroke_opts: &StrokeOptions) {
+        use StrokeAlign::*;
+
+        match stroke_opts.align {
+            Outside => {
+                // For outside alignment, use the unioned path as the base
                 let merged = vn.to_union_path();
                 let stroke_path =
                     stroke_geometry(&merged, stroke_opts.width, stroke_opts.align, None);
-                let bounds = stroke_path.compute_tight_bounds();
-                let size = (bounds.width(), bounds.height());
-                let paint = Paint::Solid(SolidPaint {
-                    color: stroke_opts.color,
-                    opacity: 1.0,
-                });
-                let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
-                sk_paint.set_style(PaintStyle::Fill);
-                self.canvas.draw_path(&stroke_path, &sk_paint);
+                self.draw_stroke_path(&stroke_path, stroke_opts.color);
+            }
+            Center | Inside => {
+                // For center and inside alignments, stroke each individual path
+                let paths = vn.to_paths();
+                for path in paths {
+                    let stroke_path =
+                        stroke_geometry(&path, stroke_opts.width, stroke_opts.align, None);
+                    self.draw_stroke_path(&stroke_path, stroke_opts.color);
+                }
             }
         }
+    }
+
+    /// Helper method to draw a stroke path with the given color.
+    fn draw_stroke_path(&self, stroke_path: &skia_safe::Path, color: CGColor) {
+        let bounds = stroke_path.compute_tight_bounds();
+        let size = (bounds.width(), bounds.height());
+        let paint = Paint::Solid(SolidPaint {
+            color,
+            opacity: 1.0,
+        });
+        let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
+        sk_paint.set_style(PaintStyle::Fill);
+        self.canvas.draw_path(stroke_path, &sk_paint);
     }
 
     /// Draw a variable width stroke along a piecewise vector network geometry.
