@@ -224,6 +224,9 @@ export function on_drag_gesture_translate_variable_width_stop(
       ...initial_stop,
       u: clamped_u,
     };
+
+    // Also update the node's strokeWidthProfile property
+    node.strokeWidthProfile = content_edit_mode.variable_width_profile;
   }
 }
 
@@ -271,4 +274,11 @@ export function on_drag_resize_variable_width_stop(
     ...initial_stop,
     r: clamped_r,
   };
+
+  // Also update the node's strokeWidthProfile property
+  const node = dq.__getNodeById(
+    draft,
+    draft.gesture.node_id
+  ) as grida.program.nodes.VectorNode;
+  node.strokeWidthProfile = content_edit_mode.variable_width_profile;
 }

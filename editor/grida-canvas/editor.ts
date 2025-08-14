@@ -943,21 +943,6 @@ export class Editor
     });
   }
 
-  public updateVariableWidthStop(
-    node_id: editor.NodeID,
-    stop: number,
-    value: cg.VariableWidthStop
-  ): void {
-    this.dispatch({
-      type: "variable-width/update-stop",
-      target: {
-        node_id,
-        stop,
-      },
-      value,
-    });
-  }
-
   public addVariableWidthStop(
     node_id: editor.NodeID,
     u: number,

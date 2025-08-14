@@ -544,7 +544,7 @@ function __self_start_gesture(
       const abs = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
       const absolute_position: cmath.Vector2 = [abs.x, abs.y];
 
-      // Calculate the initial angle from the curve at the stop position
+      // Calculate the initial angle from the curve at the curve position
       // This matches the calculation in SurfaceVariableWidthEditor
       const t_param = initial_stop.u;
       const segments = node.vectorNetwork.segments;

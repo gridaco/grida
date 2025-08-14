@@ -1,10 +1,10 @@
 import type { Draft } from "immer";
 import { editor } from "@/grida-canvas";
 import { getVectorSelectionStartPoint } from "./selection";
-import type cg from "@grida/cg";
-import assert from "assert";
 import type { ReducerContext } from "..";
 import { __self_try_enter_content_edit_mode_vector } from "../surface.reducer";
+import { dq } from "@/grida-canvas/query";
+import grida from "@grida/schema";
 
 const VECTOR_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "cursor",
@@ -88,38 +88,44 @@ export function self_select_tool<S extends editor.state.IEditorState>(
     ) {
       // TODO: additional validation required - check if the network has 0 or exactly 1 loop.
       draft.tool = { type: "width" };
+      // Get the current node to initialize the width profile
+      const node = dq.__getNodeById(
+        draft,
+        draft.content_edit_mode.node_id
+      ) as grida.program.nodes.VectorNode;
+
+      const currentProfile = node.strokeWidthProfile || { stops: [] };
       draft.content_edit_mode = {
         type: "width",
         node_id: draft.content_edit_mode.node_id,
         snapped_p: null,
         initial_vector_network: draft.content_edit_mode.initial_vector_network,
         variable_width_selected_stop: null,
-        variable_width_profile: { stops: [] },
+        initial_variable_width_profile: currentProfile,
+        variable_width_profile: { ...currentProfile },
       };
       return;
     }
   }
   // exiting the width tool automatically goes back to the vector edit mode
   else if (current_tool === "width") {
-    assert(
-      draft.content_edit_mode?.type === "width",
-      "must be in width edit mode - logical error"
-    );
+    if (draft.content_edit_mode?.type !== "width") {
+      reportError("must be in width edit mode - logical error");
+    } else {
+      let next_tool: editor.state.ToolMode = tool;
+      if (!isValidToolForContentEditMode("vector", tool.type)) {
+        // fallback to cursor
+        next_tool = { type: "cursor" };
+      }
 
-    let next_tool: editor.state.ToolMode = tool;
-    if (!isValidToolForContentEditMode("vector", tool.type)) {
-      // fallback to cursor
-      next_tool = { type: "cursor" };
+      draft.tool = next_tool;
+      __self_try_enter_content_edit_mode_vector(
+        draft,
+        draft.content_edit_mode.node_id,
+        context
+      );
+      return;
     }
-
-    draft.tool = next_tool;
-    __self_try_enter_content_edit_mode_vector(
-      draft,
-      draft.content_edit_mode.node_id,
-      context
-    );
-    return;
-    //
   }
 
   const valid_tool_modes = validToolsForContentEditMode(

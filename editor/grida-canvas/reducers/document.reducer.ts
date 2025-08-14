@@ -10,7 +10,6 @@ import type {
   EditorVectorBendOrClearCornerAction,
   EditorVariableWidthSelectStopAction,
   EditorVariableWidthDeleteStopAction,
-  EditorVariableWidthUpdateStopAction,
   EditorVariableWidthAddStopAction,
 } from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
@@ -1378,18 +1377,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             // Adjust selection index if it was after the deleted stop
             draft.content_edit_mode.variable_width_selected_stop--;
           }
-        }
-      });
-    }
-    case "variable-width/update-stop": {
-      return produce(state, (draft) => {
-        const { target, value } = <EditorVariableWidthUpdateStopAction>action;
-        const { node_id, stop } = target;
-        const node = dq.__getNodeById(draft, node_id);
-        assert(node);
-        if (draft.content_edit_mode?.type === "width") {
-          const profile = draft.content_edit_mode.variable_width_profile;
-          profile.stops[stop] = value;
+
+          // Also update the node's strokeWidthProfile property
+          if (node.type === "vector") {
+            node.strokeWidthProfile = profile;
+          }
         }
       });
     }
@@ -1415,6 +1407,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           // Select the newly added stop
           draft.content_edit_mode.variable_width_selected_stop = newStopIndex;
+
+          // Also update the node's strokeWidthProfile property
+          if (node.type === "vector") {
+            node.strokeWidthProfile = profile;
+          }
         }
       });
     }

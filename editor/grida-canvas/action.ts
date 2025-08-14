@@ -399,7 +399,6 @@ export interface EditorVectorPlanarizeAction {
 export type EditorVariableWidthAction =
   | EditorVariableWidthSelectStopAction
   | EditorVariableWidthDeleteStopAction
-  | EditorVariableWidthUpdateStopAction
   | EditorVariableWidthAddStopAction;
 
 export interface EditorVariableWidthSelectStopAction {
@@ -410,12 +409,6 @@ export interface EditorVariableWidthSelectStopAction {
 export interface EditorVariableWidthDeleteStopAction {
   type: "variable-width/delete-stop";
   target: VariableWidthStopQuery;
-}
-
-export interface EditorVariableWidthUpdateStopAction {
-  type: "variable-width/update-stop";
-  target: VariableWidthStopQuery;
-  value: cg.VariableWidthStop;
 }
 
 export interface EditorVariableWidthAddStopAction {

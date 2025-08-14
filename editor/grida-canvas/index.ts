@@ -767,6 +767,7 @@ export namespace editor.state {
     snapped_p: vn.EvaluatedPointOnSegment | null;
     initial_vector_network: vn.VectorNetwork;
     variable_width_selected_stop: number | null;
+    initial_variable_width_profile: cg.VariableWidthProfile;
     variable_width_profile: cg.VariableWidthProfile;
   };
 
