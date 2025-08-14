@@ -1,4 +1,5 @@
 use crate::cg::types::*;
+use crate::cg::varwidth::{VarWidthProfile, WidthStop};
 use crate::node::schema::*;
 use crate::vectornetwork::*;
 use math2::transform::AffineTransform;
@@ -93,6 +94,17 @@ pub struct JSONRGBA {
     pub a: f32,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct JSONVarWidthStop {
+    pub u: f32,
+    pub r: f32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct JSONVariableWidthProfile {
+    pub stops: Vec<JSONVarWidthStop>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct JSONFeShadow {
     pub color: JSONRGBA,
@@ -183,6 +195,24 @@ impl From<Option<JSONPaint>> for Paint {
                 color: CGColor(0, 0, 0, 0),
                 opacity: 1.0,
             }),
+        }
+    }
+}
+
+impl From<JSONVariableWidthProfile> for VarWidthProfile {
+    fn from(profile: JSONVariableWidthProfile) -> Self {
+        VarWidthProfile {
+            base: 1.0, // TODO: need to use node's stroke width as base
+            stops: profile.stops.into_iter().map(|s| s.into()).collect(),
+        }
+    }
+}
+
+impl From<JSONVarWidthStop> for WidthStop {
+    fn from(stop: JSONVarWidthStop) -> Self {
+        WidthStop {
+            u: stop.u,
+            r: stop.r,
         }
     }
 }
@@ -280,6 +310,8 @@ pub struct JSONUnknownNodeProperties {
     // stroke
     #[serde(rename = "strokeWidth", default = "default_stroke_width")]
     pub stroke_width: f32,
+    #[serde(rename = "strokeWidthProfile")]
+    pub stroke_width_profile: Option<JSONVariableWidthProfile>,
     #[serde(rename = "strokeAlign")]
     pub stroke_align: Option<StrokeAlign>,
     #[serde(rename = "strokeCap")]
@@ -832,6 +864,7 @@ impl From<JSONVectorNode> for Node {
             fill: Some(node.base.fill.into()),
             strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
+            stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             blend_mode: node.base.blend_mode,

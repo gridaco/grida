@@ -1,3 +1,4 @@
+use crate::cg;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::shape::*;
@@ -748,6 +749,7 @@ pub struct VectorNode {
     pub fill: Option<Paint>,
     pub strokes: Vec<Paint>,
     pub stroke_width: f32,
+    pub stroke_width_profile: Option<cg::varwidth::VarWidthProfile>,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,

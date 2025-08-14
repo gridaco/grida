@@ -8,6 +8,7 @@ pub mod regular_polygon;
 pub mod regular_star;
 pub mod rrect;
 pub mod stroke;
+pub mod stroke_varwidth;
 
 pub use corner::*;
 pub use ellipse::*;
@@ -19,6 +20,7 @@ pub use regular_polygon::*;
 pub use regular_star::*;
 pub use rrect::*;
 pub use stroke::*;
+pub use stroke_varwidth::*;
 
 use crate::vectornetwork::*;
 

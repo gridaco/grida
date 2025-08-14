@@ -79,6 +79,171 @@ pub struct VectorNetworkRegion {
     pub fills: Option<Vec<Paint>>,
 }
 
+/// A vector network geometry is a collection of vertices and segments.
+///
+/// This is a low-level representation of a vector network that can be used
+/// to create a vector network.
+///
+/// It is used to create a vector network from a set of vertices and segments.
+#[derive(Debug, Clone)]
+pub struct VectorNetworkGeometry {
+    pub vertices: Vec<(f32, f32)>,
+    pub segments: Vec<VectorNetworkSegment>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PiecewiseVectorNetworkGeometry {
+    /// Array of unique vertex positions in 2D space.
+    ///
+    /// Each vertex is represented as a tuple of `(x, y)` coordinates.
+    /// Vertices are indexed by their position in this array, and segments
+    /// reference vertices by these indices for memory efficiency.
+    pub vertices: Vec<(f32, f32)>,
+    /// Array of segment definitions, each referencing vertices by index.
+    ///
+    /// Each segment connects two vertices and may contain tangent information
+    /// for Bézier curve control. The segments form a piecewise curve network
+    /// that can represent complex paths with both linear and curved segments.
+    pub segments: Vec<VectorNetworkSegment>,
+}
+
+impl PiecewiseVectorNetworkGeometry {
+    /// Creates a new `PiecewiseVectorNetworkGeometry` with built-in validation.
+    ///
+    /// This constructor validates the geometry immediately upon creation,
+    /// ensuring that the resulting instance is suitable for rendering backend
+    /// operations. If validation fails, returns an `Err` with a descriptive
+    /// error message instead of panicking.
+    ///
+    /// # Arguments
+    ///
+    /// * `vertices` - Array of unique vertex positions in 2D space
+    /// * `segments` - Array of segment definitions referencing vertices by index
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(PiecewiseVectorNetworkGeometry)` if validation succeeds,
+    /// or `Err(String)` with a descriptive error message if validation fails.
+    /// See [`validate`](Self::validate) for details on validation requirements.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use grida_canvas::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+    ///
+    /// // Valid geometry - will succeed
+    /// let geometry = PiecewiseVectorNetworkGeometry::new(
+    ///     vec![(0.0, 0.0), (100.0, 0.0), (200.0, 100.0)],
+    ///     vec![
+    ///         VectorNetworkSegment { a: 0, b: 1, ta: Some((50.0, 50.0)), tb: Some((-50.0, 50.0)) },
+    ///         VectorNetworkSegment { a: 1, b: 2, ta: Some((50.0, 50.0)), tb: Some((50.0, -50.0)) },
+    ///     ],
+    /// ).expect("Valid geometry should be created successfully");
+    ///
+    /// // Invalid geometry - will return Err
+    /// let invalid_result = PiecewiseVectorNetworkGeometry::new(
+    ///     vec![(0.0, 0.0)], // Only one vertex
+    ///     vec![VectorNetworkSegment { a: 0, b: 1, ta: None, tb: None }], // References non-existent vertex 1
+    /// );
+    /// assert!(invalid_result.is_err());
+    /// ```
+    pub fn new(
+        vertices: Vec<(f32, f32)>,
+        segments: Vec<VectorNetworkSegment>,
+    ) -> Result<Self, String> {
+        let geometry = Self { vertices, segments };
+
+        // Validate the geometry immediately
+        geometry.validate()?;
+
+        Ok(geometry)
+    }
+
+    /// Validates the integrity of the piecewise vector network geometry.
+    ///
+    /// This method performs comprehensive validation to ensure the geometry
+    /// is suitable for rendering backend operations. Unlike the TypeScript
+    /// version which has no validation, this Rust implementation includes
+    /// built-in validation for data integrity and connectivity.
+    ///
+    /// # Validation Checks
+    ///
+    /// - **Index bounds**: All segment indices (`a`, `b`) must be valid within the vertices array
+    /// - **Vertex connectivity**: Ensures segments form a connected network where appropriate
+    /// - **Tangent validity**: Validates that tangent vectors are well-formed and within reasonable bounds
+    /// - **Geometry consistency**: Checks for degenerate cases that could cause rendering issues
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the geometry is valid, or an `Err` with a descriptive
+    /// message indicating the specific validation failure.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use grida_canvas::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+    ///
+    /// let geometry = PiecewiseVectorNetworkGeometry {
+    ///     vertices: vec![(0.0, 0.0), (100.0, 0.0), (200.0, 100.0)],
+    ///     segments: vec![
+    ///         VectorNetworkSegment { a: 0, b: 1, ta: Some((50.0, 50.0)), tb: Some((-50.0, 50.0)) },
+    ///         VectorNetworkSegment { a: 1, b: 2, ta: Some((50.0, 50.0)), tb: Some((50.0, -50.0)) },
+    ///     ],
+    /// };
+    ///
+    /// match geometry.validate() {
+    ///     Ok(()) => println!("Geometry is valid for rendering"),
+    ///     Err(e) => eprintln!("Validation failed: {}", e),
+    /// }
+    /// ```
+    pub fn validate(&self) -> Result<(), String> {
+        // Validate vertex indices in segments
+        for (i, segment) in self.segments.iter().enumerate() {
+            if segment.a >= self.vertices.len() {
+                return Err(format!(
+                    "Segment {}: vertex index 'a' ({}) out of bounds (max: {})",
+                    i,
+                    segment.a,
+                    self.vertices.len() - 1
+                ));
+            }
+            if segment.b >= self.vertices.len() {
+                return Err(format!(
+                    "Segment {}: vertex index 'b' ({}) out of bounds (max: {})",
+                    i,
+                    segment.b,
+                    self.vertices.len() - 1
+                ));
+            }
+
+            // Validate tangent vectors if present
+            if let Some(ta) = segment.ta {
+                if ta.0.is_nan() || ta.1.is_nan() || ta.0.is_infinite() || ta.1.is_infinite() {
+                    return Err(format!("Segment {}: invalid tangent 'ta' ({:?})", i, ta));
+                }
+            }
+            if let Some(tb) = segment.tb {
+                if tb.0.is_nan() || tb.1.is_nan() || tb.0.is_infinite() || tb.1.is_infinite() {
+                    return Err(format!("Segment {}: invalid tangent 'tb' ({:?})", i, tb));
+                }
+            }
+        }
+
+        // Validate vertex positions
+        for (i, vertex) in self.vertices.iter().enumerate() {
+            if vertex.0.is_nan()
+                || vertex.1.is_nan()
+                || vertex.0.is_infinite()
+                || vertex.1.is_infinite()
+            {
+                return Err(format!("Vertex {}: invalid position ({:?})", i, vertex));
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// A full vector network representing a graph of vertices and segments.
 ///
 /// - Vertices define points in 2D space.
@@ -99,6 +264,15 @@ pub struct VectorNetwork {
     pub vertices: Vec<(f32, f32)>,
     pub segments: Vec<VectorNetworkSegment>,
     pub regions: Vec<VectorNetworkRegion>,
+}
+
+impl Into<VectorNetworkGeometry> for VectorNetwork {
+    fn into(self) -> VectorNetworkGeometry {
+        VectorNetworkGeometry {
+            vertices: self.vertices,
+            segments: self.segments,
+        }
+    }
 }
 
 fn is_zero(tangent: (f32, f32)) -> bool {

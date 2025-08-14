@@ -1245,6 +1245,11 @@ export namespace grida.program.nodes {
       strokeWidth: number;
 
       /**
+       * variable width stroke width profile
+       */
+      strokeWidthProfile?: cg.VariableWidthProfile;
+
+      /**
        * stroke alignment - takes effect when stroke is set
        */
       strokeAlign?: cg.StrokeAlign;
