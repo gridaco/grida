@@ -12,7 +12,6 @@ import type {
   EditorEventTarget_DragStart,
   EditorEventTarget_DragEnd,
   EditorEventTarget_MultipleSelectionLayer_Click,
-  EditorVariableWidthAddStopAction,
 } from "../action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
@@ -36,10 +35,9 @@ import * as cem_varwidth from "./event-target.cem-width.reducer";
 import * as cem_vector from "./event-target.cem-vector.reducer";
 import * as cem_bitmap from "./event-target.cem-bitmap.reducer";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
-import { snapGuideTranslation, threshold, snapMovement } from "./tools/snap";
+import { snapGuideTranslation, threshold } from "./tools/snap";
 import nid from "./tools/id";
 import cmath from "@grida/cmath";
-import vn from "@grida/vn";
 import type { ReducerContext } from ".";
 
 const black = { r: 0, g: 0, b: 0, a: 1 };
@@ -396,96 +394,7 @@ function __self_evt_on_drag_start(
       break;
     }
     case "draw": {
-      const tool = draft.tool.tool;
-
-      let vector: grida.program.nodes.VectorNode | grida.program.nodes.LineNode;
-
-      const new_node_id = nid();
-      const __base = {
-        id: new_node_id,
-        active: true,
-        locked: false,
-        position: "absolute",
-        left: 0,
-        top: 0,
-        opacity: 1,
-        width: 0,
-        height: 0,
-        rotation: 0,
-        zIndex: 0,
-        stroke: { type: "solid", color: black },
-        strokeCap: "butt",
-      } as const;
-
-      switch (tool) {
-        case "pencil": {
-          vector = {
-            ...__base,
-            type: "vector",
-            name: "vector",
-            strokeWidth: 3,
-            vectorNetwork: vn.polyline([cmath.vector2.zero]),
-          } satisfies grida.program.nodes.VectorNode;
-          break;
-        }
-        case "line": {
-          // vector = {
-          //   ...__base,
-          //   type: "line",
-          //   name: "line",
-          // } satisfies grida.program.nodes.LineNode;
-
-          vector = {
-            ...__base,
-            type: "vector",
-            name: "line",
-            strokeWidth: 1,
-            vectorNetwork: vn.polyline([cmath.vector2.zero]),
-          } satisfies grida.program.nodes.VectorNode;
-          break;
-        }
-      }
-
-      // insert a new vector node
-      const parent = __get_insertion_target(draft);
-      self_try_insert_node(draft, parent, vector);
-
-      // position relative to the parent
-      let node_relative_pos = draft.pointer.position;
-      if (parent) {
-        const parent_rect =
-          context.geometry.getNodeAbsoluteBoundingRect(parent)!;
-        node_relative_pos = cmath.vector2.sub(draft.pointer.position, [
-          parent_rect.x,
-          parent_rect.y,
-        ]);
-      }
-
-      vector.left = node_relative_pos[0];
-      vector.top = node_relative_pos[1];
-
-      draft.gesture = {
-        type: "draw",
-        mode: tool,
-        origin: node_relative_pos,
-        movement: cmath.vector2.zero,
-        first: cmath.vector2.zero,
-        last: cmath.vector2.zero,
-        points: [cmath.vector2.zero],
-        node_id: vector.id,
-      };
-
-      // selection & hover state
-      switch (tool) {
-        case "line":
-          // self_selectNode(draft, "reset", vector.id);
-          self_clearSelection(draft);
-          break;
-        case "pencil":
-          // clear selection for pencil mode
-          self_clearSelection(draft);
-          break;
-      }
+      cem_vector.on_draw_pointer_down(draft, context);
       break;
     }
     case "path": {
@@ -510,8 +419,8 @@ function __self_evt_on_drag_end(
 
   switch (draft.tool.type) {
     case "draw":
-      // keep if pencil mode
-      if (draft.tool.tool === "pencil") break;
+      cem_vector.on_draw_drag_end(draft, context);
+      break;
     case "brush":
     case "eraser":
     case "flood-fill":
@@ -674,58 +583,7 @@ function __self_evt_on_drag(
         break;
       }
       case "draw": {
-        const {
-          gesture_modifiers: { tarnslate_with_axis_lock },
-        } = draft;
-
-        const adj_movement =
-          tarnslate_with_axis_lock === "on"
-            ? cmath.ext.movement.axisLockedByDominance(movement)
-            : movement;
-
-        const point = cmath.ext.movement.normalize(adj_movement);
-
-        const mode = draft.gesture.mode;
-
-        const { origin, points, node_id } =
-          draft.gesture as editor.gesture.GestureDraw;
-
-        const node = dq.__getNodeById(
-          draft,
-          node_id
-        ) as grida.program.nodes.VectorNode;
-
-        const vne = new vn.VectorNetworkEditor({
-          vertices: points.map((p) => p),
-          segments: node.vectorNetwork.segments,
-        });
-
-        switch (mode) {
-          case "line":
-            vne.extendLine(point);
-            break;
-          case "pencil":
-            vne.extendPolyline(point);
-            break;
-        }
-
-        draft.gesture.points = vne.value.vertices.map((v) => v);
-
-        // get the box of the points
-        const bb = vne.getBBox();
-        const raw_offset: cmath.Vector2 = [bb.x, bb.y];
-        // snap/round the offset so it doesn't keep producing sub-pixel re-centers
-        const snapped_offset = cmath.vector2.quantize(raw_offset, 1);
-
-        vne.translate(cmath.vector2.invert(snapped_offset));
-
-        const new_pos = cmath.vector2.add(origin, snapped_offset);
-        node.left = new_pos[0];
-        node.top = new_pos[1];
-        node.width = bb.width;
-        node.height = bb.height;
-        node.vectorNetwork = vne.value;
-
+        cem_vector.on_drag_gesture_draw(draft, movement);
         break;
       }
 
