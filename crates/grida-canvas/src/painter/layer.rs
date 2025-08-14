@@ -7,6 +7,7 @@ use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::shape::*;
 use crate::sk;
+use crate::vectornetwork::VectorNetwork;
 use math2::transform::AffineTransform;
 use skia_safe::Path;
 
@@ -72,7 +73,7 @@ use skia_safe::Path;
 pub enum PainterPictureLayer {
     Shape(PainterPictureShapeLayer),
     Text(PainterPictureTextLayer),
-    // Vector(PainterPictureVectorLayer),
+    Vector(PainterPictureVectorLayer),
 }
 
 pub trait Layer {
@@ -87,6 +88,7 @@ impl Layer for PainterPictureLayer {
         match self {
             PainterPictureLayer::Shape(layer) => &layer.base.id,
             PainterPictureLayer::Text(layer) => &layer.base.id,
+            PainterPictureLayer::Vector(layer) => &layer.base.id,
         }
     }
 
@@ -94,6 +96,7 @@ impl Layer for PainterPictureLayer {
         match self {
             PainterPictureLayer::Shape(layer) => layer.base.z_index,
             PainterPictureLayer::Text(layer) => layer.base.z_index,
+            PainterPictureLayer::Vector(layer) => layer.base.z_index,
         }
     }
 
@@ -101,6 +104,7 @@ impl Layer for PainterPictureLayer {
         match self {
             PainterPictureLayer::Shape(layer) => layer.base.transform,
             PainterPictureLayer::Text(layer) => layer.base.transform,
+            PainterPictureLayer::Vector(layer) => layer.base.transform,
         }
     }
 
@@ -108,6 +112,7 @@ impl Layer for PainterPictureLayer {
         match self {
             PainterPictureLayer::Shape(layer) => &layer.shape,
             PainterPictureLayer::Text(layer) => &layer.shape,
+            PainterPictureLayer::Vector(layer) => &layer.shape,
         }
     }
 }
@@ -146,14 +151,18 @@ pub struct PainterPictureTextLayer {
     pub text_align_vertical: TextAlignVertical,
 }
 
-// #[derive(Debug, Clone)]
-// pub struct PainterPictureVectorLayer {
-//     pub id: NodeId,
-//     pub z_index: usize,
-//     pub opacity: f32,
-//     pub blend_mode: BlendMode,
-//     pub transform: AffineTransform,
-// }
+#[derive(Debug, Clone)]
+pub struct PainterPictureVectorLayer {
+    pub base: PainterPictureLayerBase,
+    pub effects: LayerEffects,
+    pub strokes: Vec<Paint>,
+    pub fills: Vec<Paint>,
+    pub shape: PainterShape,
+    pub vector: VectorNetwork,
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
+}
 
 /// Flat list of [`PainterPictureLayer`] entries.
 #[derive(Debug, Default, Clone)]
@@ -491,17 +500,7 @@ impl LayerList {
                 }
                 Node::Vector(n) => {
                     let shape = build_shape(&IntrinsicSizeNode::Vector(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    out.push(PainterPictureLayer::Vector(PainterPictureVectorLayer {
                         base: PainterPictureLayerBase {
                             id: n.id.clone(),
                             z_index: out.len(),
@@ -514,7 +513,10 @@ impl LayerList {
                         effects: n.effects.clone(),
                         strokes: n.strokes.clone(),
                         fills: n.fill.clone().into_iter().collect(),
-                        stroke_path,
+                        vector: n.network.clone(),
+                        stroke_width: n.stroke_width,
+                        stroke_align: n.stroke_align,
+                        stroke_width_profile: n.stroke_width_profile.clone(),
                     }))
                 }
                 Node::Image(n) => {

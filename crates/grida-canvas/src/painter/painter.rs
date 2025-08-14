@@ -10,6 +10,7 @@ use crate::node::schema::*;
 use crate::runtime::repository::{FontRepository, ImageRepository};
 use crate::shape::*;
 use crate::sk;
+use crate::vectornetwork::vn_painter::StrokeOptions;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
 use std::cell::RefCell;
@@ -474,6 +475,49 @@ impl<'a> Painter<'a> {
                     } else {
                         self.draw_shape_with_effects(effect_ref, shape, draw_content);
                     }
+                });
+            }
+            PainterPictureLayer::Vector(vector_layer) => {
+                self.with_blendmode(vector_layer.base.blend_mode, || {
+                    self.with_transform(&vector_layer.base.transform.matrix, || {
+                        let shape = &vector_layer.shape;
+                        let effect_ref = &vector_layer.effects;
+                        let clip_path = &vector_layer.base.clip_path;
+                        let draw_content = || {
+                            self.with_opacity(vector_layer.base.opacity, || {
+                                // Use VNPainter for vector network rendering
+                                let vn_painter =
+                                    crate::vectornetwork::vn_painter::VNPainter::new(self.canvas);
+
+                                // Convert strokes to StrokeOptions for VNPainter
+                                let stroke_options = if !vector_layer.strokes.is_empty() {
+                                    let first_stroke = &vector_layer.strokes[0];
+                                    let stroke_color = match first_stroke {
+                                        Paint::Solid(solid) => solid.color,
+                                        _ => CGColor(0, 0, 0, 255), // Default black
+                                    };
+                                    Some(StrokeOptions {
+                                        width: vector_layer.stroke_width,
+                                        align: vector_layer.stroke_align,
+                                        color: stroke_color,
+                                        width_profile: vector_layer.stroke_width_profile.clone(),
+                                    })
+                                } else {
+                                    None
+                                };
+
+                                vn_painter.draw(&vector_layer.vector, stroke_options.as_ref());
+                            });
+                        };
+                        if let Some(clip) = clip_path {
+                            self.canvas.save();
+                            self.canvas.clip_path(clip, None, true);
+                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
+                            self.canvas.restore();
+                        } else {
+                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
+                        }
+                    });
                 });
             }
         }
