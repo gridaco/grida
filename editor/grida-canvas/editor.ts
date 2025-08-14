@@ -958,6 +958,21 @@ export class Editor
     });
   }
 
+  public addVariableWidthStop(
+    node_id: editor.NodeID,
+    u: number,
+    r: number
+  ): void {
+    this.dispatch({
+      type: "variable-width/add-stop",
+      target: {
+        node_id,
+        u,
+        r,
+      },
+    });
+  }
+
   public getNodeSnapshotById(
     node_id: editor.NodeID
   ): Readonly<grida.program.nodes.Node> {

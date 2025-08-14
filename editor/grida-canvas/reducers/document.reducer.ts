@@ -11,6 +11,7 @@ import type {
   EditorVariableWidthSelectStopAction,
   EditorVariableWidthDeleteStopAction,
   EditorVariableWidthUpdateStopAction,
+  EditorVariableWidthAddStopAction,
 } from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
@@ -1389,6 +1390,31 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         if (draft.content_edit_mode?.type === "width") {
           const profile = draft.content_edit_mode.variable_width_profile;
           profile.stops[stop] = value;
+        }
+      });
+    }
+    case "variable-width/add-stop": {
+      return produce(state, (draft) => {
+        const { target } = <EditorVariableWidthAddStopAction>action;
+        const { node_id, u, r } = target;
+        const node = dq.__getNodeById(draft, node_id);
+        assert(node);
+        if (draft.content_edit_mode?.type === "width") {
+          const profile = draft.content_edit_mode.variable_width_profile;
+
+          // TODO: need to compute the correct initial r at the point, based on its neighbors
+          // For now, we will simply be using the middle value of the neighbor, not caring the position diff of them
+
+          // Find the correct position to insert the new stop (maintain sorted order by u)
+          const insertIndex = profile.stops.findIndex((stop) => stop.u > u);
+          const newStopIndex =
+            insertIndex === -1 ? profile.stops.length : insertIndex;
+
+          // Insert the new stop
+          profile.stops.splice(newStopIndex, 0, { u, r });
+
+          // Select the newly added stop
+          draft.content_edit_mode.variable_width_selected_stop = newStopIndex;
         }
       });
     }

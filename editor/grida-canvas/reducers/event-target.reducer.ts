@@ -12,6 +12,7 @@ import type {
   EditorEventTarget_DragStart,
   EditorEventTarget_DragEnd,
   EditorEventTarget_MultipleSelectionLayer_Click,
+  EditorVariableWidthAddStopAction,
 } from "../action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
@@ -33,6 +34,7 @@ import {
   self_updateVectorAreaSelection,
   getUXNeighbouringVertices,
   self_updateVectorSnappedSegmentP,
+  self_updateVariableWidthSnappedP,
 } from "./methods/vector";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import { getInitialCurveGesture } from "./tools/gesture";
@@ -73,6 +75,12 @@ function __self_evt_on_pointer_move(
 
   if (draft.content_edit_mode?.type === "vector") {
     __self_evt_on_pointer_move__vector_edit_mode(
+      draft,
+      canvas_space_pointer_position,
+      context
+    );
+  } else if (draft.content_edit_mode?.type === "width") {
+    __self_evt_on_pointer_move__variable_width_edit_mode(
       draft,
       canvas_space_pointer_position,
       context
@@ -230,6 +238,182 @@ function __self_compute_vector_segment_snapping<
     if (draft.content_edit_mode?.type === "vector") {
       draft.content_edit_mode.snapped_segment_p = null;
     }
+  }
+}
+
+/**
+ * Computes segment snapping for variable width content edit mode.
+ *
+ * This function calculates the parametric position on the closest segment
+ * when the pointer is close enough to snap to it. Unlike vector edit mode,
+ * this doesn't rely on UI hover state and computes snapping for all segments.
+ *
+ * @param draft - The editor state draft to modify
+ * @param logical_pos - The logical pointer position in canvas space
+ * @param rect - The node's absolute bounding rectangle
+ * @param node - The vector node being edited
+ */
+function __self_compute_variable_width_segment_snapping<
+  S extends editor.state.IEditorState,
+>(
+  draft: Draft<S>,
+  logical_pos: cmath.Vector2,
+  rect: cmath.Rectangle,
+  node: grida.program.nodes.VectorNode
+) {
+  assert(draft.content_edit_mode?.type === "width");
+
+  // Calculate local point (relative to vector network origin)
+  const local_point = cmath.vector2.sub(logical_pos, [rect.x, rect.y]);
+
+  const { segments, vertices } = node.vectorNetwork;
+  let closest_segment: vn.EvaluatedPointOnSegment | null = null;
+  let closest_distance = Infinity;
+
+  // Check all segments to find the closest one within threshold
+  for (
+    let segment_index = 0;
+    segment_index < segments.length;
+    segment_index++
+  ) {
+    const segment = segments[segment_index];
+    const a = vertices[segment.a];
+    const b = vertices[segment.b];
+    const ta = segment.ta;
+    const tb = segment.tb;
+
+    // Project the point onto the segment
+    const t = cmath.bezier.projectParametric(a, b, ta, tb, local_point);
+
+    // Evaluate the curve at the projected parametric value
+    const parametricPoint = cmath.bezier.evaluate(a, b, ta, tb, t);
+
+    // Calculate distance to the projected point
+    const distance = cmath.vector2.distance(local_point, parametricPoint);
+
+    // Check if within threshold and closer than previous closest
+    const segment_snap_threshold = threshold(10, draft.transform);
+    if (distance <= segment_snap_threshold && distance < closest_distance) {
+      closest_distance = distance;
+      closest_segment = {
+        segment: segment_index,
+        t,
+        point: parametricPoint,
+      };
+    }
+  }
+
+  // Update the snapped segment point
+  self_updateVariableWidthSnappedP(draft, closest_segment);
+}
+
+function __self_evt_on_pointer_move__variable_width_edit_mode(
+  draft: editor.state.IEditorState,
+  canvas_space_pointer_position: cmath.Vector2,
+  context: ReducerContext
+) {
+  assert(draft.content_edit_mode?.type === "width");
+  const { node_id } = draft.content_edit_mode;
+
+  const logical_pos = canvas_space_pointer_position;
+  draft.pointer.logical = logical_pos;
+
+  const node = dq.__getNodeById(
+    draft,
+    node_id
+  ) as grida.program.nodes.VectorNode;
+  const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+
+  // Compute segment snapping for variable width content edit mode
+  // This is purely mathematical and doesn't rely on UI hover state
+  __self_compute_variable_width_segment_snapping(
+    draft,
+    logical_pos,
+    rect,
+    node
+  );
+}
+
+function __self_evt_on_pointer_down__variable_width_edit_mode(
+  draft: editor.state.IEditorState,
+  action: EditorEventTarget_PointerDown,
+  context: ReducerContext
+) {
+  assert(draft.content_edit_mode?.type === "width");
+  const { node_id, snapped_p } = draft.content_edit_mode;
+
+  // If we have a snapped point, add a new stop at that position
+  if (snapped_p) {
+    // Calculate the parametric position u (0-1) based on the segment and t value
+    const node = dq.__getNodeById(
+      draft,
+      node_id
+    ) as grida.program.nodes.VectorNode;
+
+    const { segments } = node.vectorNetwork;
+    const totalSegments = segments.length;
+
+    // Convert segment index and t to global u parameter
+    const u = (snapped_p.segment + snapped_p.t) / totalSegments;
+
+    // TODO: need to compute the correct initial r at the point, based on its neighbors
+    // For now, we will simply be using the middle value of the neighbor, not caring the position diff of them
+    const profile = draft.content_edit_mode.variable_width_profile;
+
+    // Find neighboring stops to interpolate radius
+    let r = 10; // default radius
+    if (profile.stops.length > 0) {
+      const insertIndex = profile.stops.findIndex((stop) => stop.u > u);
+      const prevIndex =
+        insertIndex === -1 ? profile.stops.length - 1 : insertIndex - 1;
+      const nextIndex = insertIndex === -1 ? -1 : insertIndex;
+
+      if (
+        prevIndex >= 0 &&
+        nextIndex >= 0 &&
+        nextIndex < profile.stops.length
+      ) {
+        // Interpolate between two neighbors
+        const prevStop = profile.stops[prevIndex];
+        const nextStop = profile.stops[nextIndex];
+        const t_interp = (u - prevStop.u) / (nextStop.u - prevStop.u);
+        r = prevStop.r + t_interp * (nextStop.r - prevStop.r);
+      } else if (prevIndex >= 0) {
+        // Use previous stop's radius
+        r = profile.stops[prevIndex].r;
+      } else if (nextIndex >= 0 && nextIndex < profile.stops.length) {
+        // Use next stop's radius
+        r = profile.stops[nextIndex].r;
+      }
+    }
+
+    // Dispatch the add-stop action
+    const addStopAction: EditorVariableWidthAddStopAction = {
+      type: "variable-width/add-stop",
+      target: {
+        node_id,
+        u,
+        r,
+      },
+    };
+
+    // Apply the action directly to the draft
+    const { target } = addStopAction;
+    const { u: newU, r: newR } = target;
+
+    // Find the correct position to insert the new stop (maintain sorted order by u)
+    const insertIndex = profile.stops.findIndex((stop) => stop.u > newU);
+    const newStopIndex =
+      insertIndex === -1 ? profile.stops.length : insertIndex;
+
+    // Insert the new stop
+    profile.stops.splice(newStopIndex, 0, { u: newU, r: newR });
+
+    // Select the newly added stop
+    draft.content_edit_mode.variable_width_selected_stop = newStopIndex;
+
+    // Clear the snapped point after using it
+    draft.content_edit_mode.snapped_p = null;
   }
 }
 
@@ -394,9 +578,19 @@ function __self_evt_on_pointer_down(
 
       break;
     }
-    case "insert":
+    case "insert": {
       // ignore - insert mode will be handled via click or drag
       break;
+    }
+    case "width": {
+      // Handle variable width tool pointer down
+      __self_evt_on_pointer_down__variable_width_edit_mode(
+        draft,
+        action,
+        context
+      );
+      break;
+    }
     case "path": {
       if (draft.content_edit_mode?.type === "vector") {
         const { snapped_vertex_idx: snapped_point, snapped_segment_p } =
@@ -935,6 +1129,7 @@ function __self_evt_on_drag_end(
     case "path":
     case "hand":
     case "lasso":
+    case "width":
       // keep
       break;
     case "zoom": {

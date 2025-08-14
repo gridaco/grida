@@ -764,6 +764,7 @@ export namespace editor.state {
   export type VariableWidthContentEditMode = {
     type: "width";
     node_id: string;
+    snapped_p: vn.EvaluatedPointOnSegment | null;
     initial_vector_network: vn.VectorNetwork;
     variable_width_selected_stop: number | null;
     variable_width_profile: cg.VariableWidthProfile;

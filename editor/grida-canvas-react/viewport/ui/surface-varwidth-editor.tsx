@@ -25,9 +25,11 @@ function useVariableWithEditor() {
     const content_edit_mode = state.content_edit_mode;
     assert(content_edit_mode && content_edit_mode.type === "width");
     const node_id = content_edit_mode.node_id;
+
     return {
       node_id: content_edit_mode.node_id,
       content_edit_mode: content_edit_mode,
+      gesture: state.gesture.type,
       document: state.document,
       vector_node: state.document.nodes[
         node_id
@@ -35,7 +37,7 @@ function useVariableWithEditor() {
     };
   });
 
-  const { vector_node: node } = state;
+  const { gesture, vector_node: node } = state;
   const {
     node_id,
     // cursor: path_cursor_position
@@ -44,6 +46,7 @@ function useVariableWithEditor() {
   const vertices = node.vectorNetwork.vertices;
   const segments = node.vectorNetwork.segments;
   const {
+    snapped_p,
     variable_width_selected_stop: selected_stop,
     variable_width_profile: profile,
   } = state.content_edit_mode;
@@ -95,10 +98,13 @@ function useVariableWithEditor() {
   return useMemo(() => {
     return {
       profile,
+      gesture,
       selected_stop,
+      snapped_p,
       vertices,
       segments,
       absolute_vertices,
+      offset,
       selectStop,
       deleteStop,
       onUDragStart,
@@ -106,10 +112,13 @@ function useVariableWithEditor() {
     };
   }, [
     profile,
+    gesture,
     selected_stop,
+    snapped_p,
     vertices,
     segments,
     absolute_vertices,
+    offset,
     selectStop,
     deleteStop,
     onUDragStart,
@@ -122,8 +131,11 @@ export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
   const {
     profile,
     selected_stop,
+    snapped_p,
+    gesture,
     segments,
     absolute_vertices,
+    offset,
     selectStop,
     onUDragStart,
     onRDragStart,
@@ -165,7 +177,18 @@ export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
         })}
       </div>
 
-      {/* DUMMY_VAR_WIDTH_PROFILE surface control */}
+      {snapped_p && gesture === "idle" && (
+        <Point
+          point={cmath.vector2.transform(
+            cmath.vector2.add(snapped_p.point, offset),
+            transform
+          )}
+          shape="circle"
+          size={8}
+          className="border-workbench-accent-pink data-[selected='true']:bg-workbench-accent-pink data-[hovered='true']:border-workbench-accent-pink/50"
+        />
+      )}
+
       {profile.stops.map((stop, i) => {
         // For now, treat u as t and assume we have a continuous curve
         // We'll need to map u to the actual curve parameter later

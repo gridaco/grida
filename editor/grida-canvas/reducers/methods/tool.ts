@@ -80,6 +80,7 @@ export function self_select_tool<S extends editor.state.IEditorState>(
       draft.content_edit_mode = {
         type: "width",
         node_id: draft.content_edit_mode.node_id,
+        snapped_p: null,
         initial_vector_network: draft.content_edit_mode.initial_vector_network,
         variable_width_selected_stop: null,
         variable_width_profile: DUMMY_VAR_WIDTH_PROFILE,

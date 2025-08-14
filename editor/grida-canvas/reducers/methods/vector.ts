@@ -351,3 +351,23 @@ export function self_updateVectorSnappedSegmentP<
 
   draft.content_edit_mode.snapped_segment_p = snappedSegmentP;
 }
+
+/**
+ * Updates the snapped point with parametric position in variable width content edit mode.
+ *
+ * This method manages the mathematically resolved snap state for segments in variable width edit mode.
+ * The snap state contains both the segment index and parametric position (t) for precise targeting.
+ * Used for measurement calculations and precise segment targeting.
+ *
+ * @param draft - The editor state draft to modify
+ * @param snappedP - The snapped segment with parametric position, or null if no segment is snapped
+ */
+export function self_updateVariableWidthSnappedP<
+  S extends editor.state.IEditorState,
+>(draft: Draft<S>, snappedP: vn.EvaluatedPointOnSegment | null) {
+  if (draft.content_edit_mode?.type !== "width") {
+    return;
+  }
+
+  draft.content_edit_mode.snapped_p = snappedP;
+}

@@ -399,7 +399,8 @@ export interface EditorVectorPlanarizeAction {
 export type EditorVariableWidthAction =
   | EditorVariableWidthSelectStopAction
   | EditorVariableWidthDeleteStopAction
-  | EditorVariableWidthUpdateStopAction;
+  | EditorVariableWidthUpdateStopAction
+  | EditorVariableWidthAddStopAction;
 
 export interface EditorVariableWidthSelectStopAction {
   type: "variable-width/select-stop";
@@ -415,6 +416,15 @@ export interface EditorVariableWidthUpdateStopAction {
   type: "variable-width/update-stop";
   target: VariableWidthStopQuery;
   value: cg.VariableWidthStop;
+}
+
+export interface EditorVariableWidthAddStopAction {
+  type: "variable-width/add-stop";
+  target: {
+    node_id: string;
+    u: number; // parametric position 0-1
+    r: number; // radius
+  };
 }
 
 // #endregion [variable width]
