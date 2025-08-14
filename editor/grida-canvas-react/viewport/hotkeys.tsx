@@ -345,7 +345,7 @@ export function useEditorHotKeys() {
   const editor = useCurrentEditor();
   const tool = useToolState();
   const content_edit_mode = useContentEditModeMinimalState();
-  const { a11yarrow, a11ydelete, a11yalign } = useA11yActions();
+  const { a11yarrow, a11yalign } = useA11yActions();
 
   const { selection, actions } = useCurrentSelection();
   const [altKey, setAltKey] = useState(false);
@@ -752,7 +752,7 @@ export function useEditorHotKeys() {
   //   enableOnFormTags: false,
   // });
 
-  useHotkeys("backspace, delete", () => a11ydelete(), {
+  useHotkeys("backspace, delete", () => editor.a11yDelete(), {
     preventDefault: true,
     enableOnContentEditable: false,
     enableOnFormTags: false,

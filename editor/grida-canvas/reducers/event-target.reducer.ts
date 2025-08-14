@@ -1339,6 +1339,67 @@ function __self_evt_on_drag(
 
         break;
       }
+      case "translate-variable-width-stop": {
+        assert(draft.content_edit_mode?.type === "width");
+        const { content_edit_mode } = draft;
+        const { movement } = draft.gesture;
+        const { initial_stop, stop } = draft.gesture;
+
+        // Simple U parameter update based on horizontal movement
+        // Later: this will be replaced with cursor-to-curve projection
+        const delta_u = movement[0] / 200; // Scale factor for movement sensitivity
+        const new_u = cmath.clamp(initial_stop.u + delta_u, 0, 1);
+
+        // Update the stop
+        content_edit_mode.variable_width_profile.stops[stop] = {
+          ...initial_stop,
+          u: new_u,
+        };
+
+        break;
+      }
+      case "resize-variable-width-stop": {
+        assert(draft.content_edit_mode?.type === "width");
+        const { content_edit_mode } = draft;
+        const { movement, initial_curve_position, initial_angle } =
+          draft.gesture;
+        const { initial_stop, stop, side } = draft.gesture;
+
+        // Get the current cursor position in screen coordinates
+        const current_cursor: cmath.Vector2 = [
+          initial_curve_position[0] + movement[0],
+          initial_curve_position[1] + movement[1],
+        ];
+
+        // Calculate the perpendicular direction to the curve
+        const perp_angle = initial_angle + Math.PI / 2; // Perpendicular to curve
+        const perp_vector: cmath.Vector2 = [
+          Math.cos(perp_angle),
+          Math.sin(perp_angle),
+        ];
+
+        // Calculate the vector from curve position to cursor position
+        const to_cursor: cmath.Vector2 = [
+          current_cursor[0] - initial_curve_position[0],
+          current_cursor[1] - initial_curve_position[1],
+        ];
+
+        // Project the to_cursor vector onto the perpendicular direction
+        const dot_product =
+          to_cursor[0] * perp_vector[0] + to_cursor[1] * perp_vector[1];
+
+        // Apply side-specific direction (left side should be negative projection)
+        const signed_r = side === "left" ? -dot_product : dot_product;
+        const clamped_r = cmath.clamp(signed_r, 0, 1000); // Min 0, max 1000
+
+        // Update the stop
+        content_edit_mode.variable_width_profile.stops[stop] = {
+          ...initial_stop,
+          r: clamped_r,
+        };
+
+        break;
+      }
       case "corner-radius": {
         const { node_id } = draft.gesture;
         const [dx, dy] = delta;

@@ -427,6 +427,31 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         });
       }
 
+      if (state.content_edit_mode?.type === "width") {
+        const { node_id } = state.content_edit_mode;
+        const mode =
+          state.content_edit_mode as editor.state.VariableWidthContentEditMode;
+
+        // Only delete if there's a selected stop and more than 2 stops
+        if (
+          mode.variable_width_selected_stop !== null &&
+          mode.variable_width_profile.stops.length > 2
+        ) {
+          // Dispatch the existing variable-width/delete-stop action
+          return documentReducer(
+            state,
+            {
+              type: "variable-width/delete-stop",
+              target: {
+                node_id,
+                stop: mode.variable_width_selected_stop,
+              },
+            },
+            context
+          );
+        }
+      }
+
       if (state.content_edit_mode?.type === "vector") {
         return produce(state, (draft) => {
           __self_delete_vector_network_selection(

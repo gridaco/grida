@@ -1,7 +1,7 @@
 import cmath from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
 import { Point } from "./point";
-import type cg from "@grida/cg";
+import { useState } from "react";
 
 export function VariableWidthStop({
   u,
@@ -11,10 +11,8 @@ export function VariableWidthStop({
   index,
   selected,
   onSelect,
-  onDelete,
   onUDragStart,
   onRDragStart,
-  onUpdate,
 }: {
   u: number;
   p: cmath.Vector2;
@@ -23,11 +21,11 @@ export function VariableWidthStop({
   index: number;
   selected: boolean;
   onSelect: (stop: number, additive?: boolean) => void;
-  onDelete: (stop: number) => void;
   onUDragStart: (stop: number) => void;
-  onRDragStart: (stop: number) => void;
-  onUpdate: (stop: number, value: cg.VariableWidthStop) => void;
+  onRDragStart: (stop: number, side: "left" | "right") => void;
 }) {
+  const [uHovered, setUHovered] = useState(false);
+  const [rHovered, setRHovered] = useState(false);
   // 1. point at p
   // 2. 2 mirrored points with p - r / p + r (and line between them)
   // 3. apply angle (angle on a curve at u)
@@ -47,28 +45,85 @@ export function VariableWidthStop({
     p[1] + perpVector[1] * r,
   ];
 
-  const bind = useGesture({
-    onPointerDown: ({ event }) => {
-      event.preventDefault();
-      onSelect(index, event.shiftKey);
+  const bindU = useGesture(
+    {
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+        onSelect(index, event.shiftKey);
+      },
+      onDragStart: ({ event }) => {
+        event.preventDefault();
+        onUDragStart(index);
+      },
+      onHover: ({ hovering }) => {
+        setUHovered(hovering ?? false);
+      },
     },
-  });
+    {
+      drag: {
+        threshold: 1,
+      },
+    }
+  );
+
+  const bindLeft = useGesture(
+    {
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+        onSelect(index, event.shiftKey);
+      },
+      onDragStart: ({ event }) => {
+        event.preventDefault();
+        onRDragStart(index, "left");
+      },
+      onHover: ({ hovering }) => {
+        setRHovered(hovering ?? false);
+      },
+    },
+    {
+      drag: {
+        threshold: 1,
+      },
+    }
+  );
+
+  const bindRight = useGesture(
+    {
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+        onSelect(index, event.shiftKey);
+      },
+      onDragStart: ({ event }) => {
+        event.preventDefault();
+        onRDragStart(index, "right");
+      },
+      onHover: ({ hovering }) => {
+        setRHovered(hovering ?? false);
+      },
+    },
+    {
+      drag: {
+        threshold: 1,
+      },
+    }
+  );
 
   return (
     <>
       {/* Center point */}
       <Point
-        {...bind()}
+        {...bindU()}
         point={p}
         size={8}
         shape="circle"
         style={{ zIndex: 10 }}
-        selected={selected}
+        selected={selected || rHovered || uHovered}
         className="border-workbench-accent-pink data-[selected='true']:bg-workbench-accent-pink data-[hovered='true']:border-workbench-accent-pink/50"
       />
 
       {/* Left width point */}
       <Point
+        {...bindLeft()}
         point={pl}
         size={6}
         shape="diamond"
@@ -78,6 +133,7 @@ export function VariableWidthStop({
 
       {/* Right width point */}
       <Point
+        {...bindRight()}
         point={pr}
         size={6}
         shape="diamond"

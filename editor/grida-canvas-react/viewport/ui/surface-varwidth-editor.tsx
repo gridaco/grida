@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo } from "react";
 import cmath from "@grida/cmath";
-import { useGesture } from "@use-gesture/react";
 import {
   useCurrentEditor,
   useEditorState,
@@ -10,7 +9,6 @@ import { VariableWidthStop } from "./vector-varwidth-stop";
 import assert from "assert";
 import grida from "@grida/schema";
 import vn from "@grida/vn";
-import type cg from "@grida/cg";
 import { Curve } from "./vector-cubic-curve";
 import { Point } from "./point";
 
@@ -82,23 +80,14 @@ function useVariableWithEditor() {
 
   const onUDragStart = useCallback(
     (stop: number) => {
-      // TODO: Implement U parameter drag start
-      console.log("U drag start:", stop);
+      instance.startTranslateVariableWidthStop(node_id, stop);
     },
     [instance, node_id]
   );
 
   const onRDragStart = useCallback(
-    (stop: number) => {
-      // TODO: Implement radius drag start
-      console.log("R drag start:", stop);
-    },
-    [instance, node_id]
-  );
-
-  const updateStop = useCallback(
-    (stop: number, value: cg.VariableWidthStop) => {
-      instance.updateVariableWidthStop(node_id, stop, value);
+    (stop: number, side: "left" | "right") => {
+      instance.startResizeVariableWidthStop(node_id, stop, side);
     },
     [instance, node_id]
   );
@@ -114,7 +103,6 @@ function useVariableWithEditor() {
       deleteStop,
       onUDragStart,
       onRDragStart,
-      updateStop,
     };
   }, [
     profile,
@@ -126,7 +114,6 @@ function useVariableWithEditor() {
     deleteStop,
     onUDragStart,
     onRDragStart,
-    updateStop,
   ]);
 }
 
@@ -138,10 +125,8 @@ export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
     segments,
     absolute_vertices,
     selectStop,
-    deleteStop,
     onUDragStart,
     onRDragStart,
-    updateStop,
   } = useVariableWithEditor();
   //
 
@@ -220,10 +205,8 @@ export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
             index={i}
             selected={selected_stop === i}
             onSelect={selectStop}
-            onDelete={deleteStop}
             onUDragStart={onUDragStart}
             onRDragStart={onRDragStart}
-            onUpdate={updateStop}
           />
         );
       })}

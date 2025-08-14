@@ -383,13 +383,7 @@ export function EditorSurface() {
             )}
             {content_edit_mode?.type === "vector" && (
               <SurfaceVectorEditor
-                key="path-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-            {content_edit_mode?.type === "width" && (
-              <SurfaceVariableWidthEditor
-                key="varwidth-editor"
+                key="vector-geometry-editor"
                 node_id={content_edit_mode.node_id}
               />
             )}
@@ -400,6 +394,16 @@ export function EditorSurface() {
               />
             )}
           </SurfaceGroup>
+
+          <SurfaceGroup hidden={is_window_resizing}>
+            {content_edit_mode?.type === "width" && (
+              <SurfaceVariableWidthEditor
+                key="varwidth-editor"
+                node_id={content_edit_mode.node_id}
+              />
+            )}
+          </SurfaceGroup>
+
           <SurfaceGroup
             hidden={
               is_transforming ||

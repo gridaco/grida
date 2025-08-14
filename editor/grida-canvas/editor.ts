@@ -733,6 +733,10 @@ export class Editor
     this.paste();
   }
 
+  public a11yDelete() {
+    this.dispatch({ type: "a11y/delete" });
+  }
+
   public duplicate(target: "selection" | editor.NodeID) {
     this.dispatch({
       type: "duplicate",
@@ -2350,6 +2354,33 @@ export class Editor
       gesture: {
         type: "translate-vector-controls",
         node_id,
+      },
+    });
+  }
+
+  startTranslateVariableWidthStop(node_id: string, stop: number) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "translate-variable-width-stop",
+        node_id,
+        stop,
+      },
+    });
+  }
+
+  startResizeVariableWidthStop(
+    node_id: string,
+    stop: number,
+    side: "left" | "right"
+  ) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "resize-variable-width-stop",
+        node_id,
+        stop,
+        side,
       },
     });
   }

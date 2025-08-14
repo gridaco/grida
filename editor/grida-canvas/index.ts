@@ -1027,6 +1027,8 @@ export namespace editor.gesture {
     | GestureDraw
     | GestureBrush
     | GestureTranslateVectorControls
+    | GestureTranslateVariableWidthStop
+    | GestureResizeVariableWidthStop
     | GestureCurve
     | GestureCurveA;
 
@@ -1278,6 +1280,59 @@ export namespace editor.gesture {
      * position does not reflect the node's location on the canvas.
      */
     readonly initial_absolute_position: cmath.Vector2;
+  };
+
+  /**
+   * Translate variable width stop
+   *
+   * @remarks
+   * This is only valid with content edit mode is "width"
+   */
+  export type GestureTranslateVariableWidthStop = IGesture & {
+    type: "translate-variable-width-stop";
+    readonly node_id: string;
+    readonly stop: number;
+    readonly initial_stop: cg.VariableWidthStop;
+    readonly initial_position: cmath.Vector2;
+    /**
+     * Absolute position of the node when the gesture started.
+     *
+     * Used for snap guide rendering inside nested containers where the local
+     * position does not reflect the node's location on the canvas.
+     */
+    readonly initial_absolute_position: cmath.Vector2;
+  };
+
+  /**
+   * Resize variable width stop radius
+   *
+   * @remarks
+   * This is only valid with content edit mode is "width"
+   */
+  export type GestureResizeVariableWidthStop = IGesture & {
+    type: "resize-variable-width-stop";
+    readonly node_id: string;
+    readonly stop: number;
+    readonly side: "left" | "right";
+    readonly initial_stop: cg.VariableWidthStop;
+    readonly initial_position: cmath.Vector2;
+    /**
+     * Absolute position of the node when the gesture started.
+     *
+     * Used for snap guide rendering inside nested containers where the local
+     * position does not reflect the node's location on the canvas.
+     */
+    readonly initial_absolute_position: cmath.Vector2;
+    /**
+     * Initial angle of the curve at the stop position.
+     * Used to transform movement perpendicular to the curve direction.
+     */
+    readonly initial_angle: number;
+    /**
+     * Initial curve position at the stop.
+     * Used to calculate the radius based on cursor distance from curve.
+     */
+    readonly initial_curve_position: cmath.Vector2;
   };
 
   /**
@@ -1877,6 +1932,7 @@ export namespace editor.api {
      * currently proxies to the standard paste behavior.
      */
     a11yPaste(): void;
+    a11yDelete(): void;
     blur(): void;
     undo(): void;
     redo(): void;

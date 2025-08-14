@@ -780,7 +780,15 @@ export type EditorSurface_StartGesture = {
         editor.gesture.GestureCurve,
         "type" | "control" | "node_id" | "segment"
       >
-    | Pick<editor.gesture.GestureTranslateVectorControls, "type" | "node_id">;
+    | Pick<editor.gesture.GestureTranslateVectorControls, "type" | "node_id">
+    | Pick<
+        editor.gesture.GestureTranslateVariableWidthStop,
+        "type" | "node_id" | "stop"
+      >
+    | Pick<
+        editor.gesture.GestureResizeVariableWidthStop,
+        "type" | "node_id" | "stop" | "side"
+      >;
 };
 
 // #endregion surface action

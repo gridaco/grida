@@ -7,6 +7,7 @@ import assert from "assert";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
+import vn from "@grida/vn";
 import {
   self_clearSelection,
   self_selectNode,
@@ -471,6 +472,99 @@ function __self_start_gesture(
         last: cmath.vector2.zero,
         initial_position: [node.left!, node.top!],
         initial_absolute_position: absolute_position,
+      };
+      break;
+      //
+    }
+    case "translate-variable-width-stop": {
+      const { content_edit_mode } = draft;
+      assert(content_edit_mode && content_edit_mode.type === "width");
+      const { node_id, stop } = gesture;
+      const node = dq.__getNodeById(
+        draft,
+        node_id
+      ) as grida.program.nodes.VectorNode;
+
+      const profile = content_edit_mode.variable_width_profile;
+      const initial_stop = profile.stops[stop];
+
+      const abs = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+      const absolute_position: cmath.Vector2 = [abs.x, abs.y];
+
+      draft.gesture = {
+        type: "translate-variable-width-stop",
+        node_id: node_id,
+        stop: stop,
+        initial_stop: { ...initial_stop },
+        movement: cmath.vector2.zero,
+        first: cmath.vector2.zero,
+        last: cmath.vector2.zero,
+        initial_position: [node.left!, node.top!],
+        initial_absolute_position: absolute_position,
+      };
+      break;
+      //
+    }
+    case "resize-variable-width-stop": {
+      const { content_edit_mode } = draft;
+      assert(content_edit_mode && content_edit_mode.type === "width");
+      const { node_id, stop, side } = gesture;
+      const node = dq.__getNodeById(
+        draft,
+        node_id
+      ) as grida.program.nodes.VectorNode;
+
+      const profile = content_edit_mode.variable_width_profile;
+      const initial_stop = profile.stops[stop];
+
+      const abs = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+      const absolute_position: cmath.Vector2 = [abs.x, abs.y];
+
+      // Calculate the initial angle from the curve at the stop position
+      // This matches the calculation in SurfaceVariableWidthEditor
+      const t_param = initial_stop.u;
+      const segments = node.vectorNetwork.segments;
+      const totalSegments = segments.length;
+      const segmentIndex = Math.floor(t_param * totalSegments);
+      const ct = (t_param * totalSegments) % 1;
+
+      let initial_angle = 0;
+      let curve_position: cmath.Vector2 = [0, 0];
+
+      if (segmentIndex < totalSegments) {
+        const segment = segments[segmentIndex];
+
+        // Get absolute vertices (similar to useVariableWithEditor)
+        const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+        const absolute_vertices = vne.getVerticesAbsolute([
+          node.left!,
+          node.top!,
+        ]);
+
+        const a = absolute_vertices[segment.a];
+        const b = absolute_vertices[segment.b];
+        const ta = segment.ta;
+        const tb = segment.tb;
+
+        // Evaluate the curve position and tangent at the given parameter
+        curve_position = cmath.bezier.evaluate(a, b, ta, tb, ct);
+        const tangent = cmath.bezier.tangentAt(a, b, ta, tb, ct);
+        initial_angle = Math.atan2(tangent[1], tangent[0]);
+      }
+
+      draft.gesture = {
+        type: "resize-variable-width-stop",
+        node_id: node_id,
+        stop: stop,
+        side: side,
+        initial_stop: { ...initial_stop },
+        movement: cmath.vector2.zero,
+        first: cmath.vector2.zero,
+        last: cmath.vector2.zero,
+        initial_position: [node.left!, node.top!],
+        initial_absolute_position: absolute_position,
+        initial_angle: initial_angle,
+        initial_curve_position: curve_position,
       };
       break;
       //

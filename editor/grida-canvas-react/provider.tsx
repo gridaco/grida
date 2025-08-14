@@ -953,7 +953,6 @@ interface UseA11yActions {
     shiftKey: boolean,
     config?: editor.api.NudgeUXConfig
   ) => void;
-  a11ydelete: () => void;
   a11yalign: (alignment: {
     horizontal?: "min" | "max" | "center";
     vertical?: "min" | "max" | "center";
@@ -1046,10 +1045,6 @@ export function useA11yActions(): UseA11yActions {
     [dispatch]
   );
 
-  const a11ydelete = useCallback(() => {
-    dispatch({ type: "a11y/delete" });
-  }, [dispatch]);
-
   const a11yalign = useCallback(
     (alignment: {
       horizontal?: "min" | "max" | "center";
@@ -1063,7 +1058,6 @@ export function useA11yActions(): UseA11yActions {
   return {
     nudge,
     a11yarrow,
-    a11ydelete,
     a11yalign,
   };
 }
