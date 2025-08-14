@@ -41,6 +41,14 @@ impl Into<skia_safe::Point> for CGPoint {
 #[derive(Debug, Clone, Copy)]
 pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
+impl CGColor {
+    pub const BLACK: Self = Self(0, 0, 0, 255);
+    pub const WHITE: Self = Self(255, 255, 255, 255);
+    pub const RED: Self = Self(255, 0, 0, 255);
+    pub const GREEN: Self = Self(0, 255, 0, 255);
+    pub const BLUE: Self = Self(0, 0, 255, 255);
+}
+
 /// Boolean path operation.
 #[derive(Debug, Clone, Copy)]
 pub enum BooleanPathOperation {

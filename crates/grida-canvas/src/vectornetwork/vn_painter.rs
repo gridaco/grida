@@ -49,25 +49,12 @@ impl<'a> VNPainter<'a> {
 
         if let Some(stroke_opts) = stroke {
             if let Some(var_width_profile) = &stroke_opts.width_profile {
-                // Handle variable width stroke
+                // Handle variable width stroke using the dedicated method
                 let geometry = PiecewiseVectorNetworkGeometry {
                     vertices: vn.vertices.clone(),
                     segments: vn.segments.clone(),
                 };
-                let stroke_path = create_variable_width_stroke_from_geometry(
-                    geometry,
-                    var_width_profile.clone(),
-                    40, // Default samples per segment
-                );
-                let bounds = stroke_path.compute_tight_bounds();
-                let size = (bounds.width(), bounds.height());
-                let paint = Paint::Solid(SolidPaint {
-                    color: stroke_opts.color,
-                    opacity: 1.0,
-                });
-                let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
-                sk_paint.set_style(PaintStyle::Fill);
-                self.canvas.draw_path(&stroke_path, &sk_paint);
+                self.draw_stroke_variable_width(&geometry, stroke_opts.color, var_width_profile);
             } else {
                 // Handle regular stroke
                 let merged = vn.to_union_path();
@@ -84,5 +71,44 @@ impl<'a> VNPainter<'a> {
                 self.canvas.draw_path(&stroke_path, &sk_paint);
             }
         }
+    }
+
+    /// Draw a variable width stroke along a piecewise vector network geometry.
+    ///
+    /// This method creates and renders a variable width stroke along the provided geometry
+    /// using the specified color and width profile.
+    ///
+    /// # Arguments
+    ///
+    /// * `geometry` - The piecewise vector network geometry to stroke along
+    /// * `stroke_color` - The color of the stroke
+    /// * `stroke_profile` - The variable width profile defining how the stroke width varies
+    pub fn draw_stroke_variable_width(
+        &self,
+        geometry: &PiecewiseVectorNetworkGeometry,
+        stroke_color: CGColor,
+        stroke_profile: &VarWidthProfile,
+    ) {
+        // Create the variable width stroke path
+        let stroke_path = create_variable_width_stroke_from_geometry(
+            geometry.clone(),
+            stroke_profile.clone(),
+            40, // Default samples per segment
+        );
+
+        // Calculate bounds for the stroke path
+        let bounds = stroke_path.compute_tight_bounds();
+        let size = (bounds.width(), bounds.height());
+
+        // Create paint for the stroke
+        let paint = Paint::Solid(SolidPaint {
+            color: stroke_color,
+            opacity: 1.0,
+        });
+
+        // Convert to Skia paint and draw
+        let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
+        sk_paint.set_style(PaintStyle::Fill);
+        self.canvas.draw_path(&stroke_path, &sk_paint);
     }
 }

@@ -1,14 +1,12 @@
-use cg::cg::types::{CGColor, StrokeAlign};
+use cg::cg::types::CGColor;
 use cg::cg::varwidth::*;
-use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetwork, VectorNetworkSegment};
-use cg::vectornetwork::vn_painter::{StrokeOptions, VNPainter};
+use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+use cg::vectornetwork::vn_painter::VNPainter;
 use skia_safe::{surfaces, Color};
 
 fn main() {
-    let samples = 40;
-
     // Define the variable width profile
-    let width_profile = VarWidthProfile {
+    let width_profile_1 = VarWidthProfile {
         base: 2.0,
         stops: vec![
             WidthStop { u: 0.00, r: 0.0 },
@@ -21,10 +19,10 @@ fn main() {
 
     // Create a piecewise geometry with a single cubic Bezier curve segment
     // This represents the original single smooth curve
-    let geometry = PiecewiseVectorNetworkGeometry::new(
+    let curve_1 = PiecewiseVectorNetworkGeometry::new(
         vec![
-            (50.0, 200.0),  // p0 (start point)
-            (350.0, 200.0), // p3 (end point)
+            (50.0, 200.0),   // p0 (start point)
+            (2500.0, 200.0), // p3 (end point)
         ],
         vec![
             // Single cubic Bezier curve segment
@@ -38,28 +36,83 @@ fn main() {
     )
     .expect("Valid geometry");
 
-    // Create a VectorNetwork from the geometry
-    let vn = VectorNetwork {
-        vertices: geometry.vertices,
-        segments: geometry.segments,
-        regions: vec![], // No fill regions, just stroke
-    };
+    // Create a straight line geometry (zero tangent values)
+    let curve_2 = PiecewiseVectorNetworkGeometry::new(
+        vec![
+            (50.0, 500.0),   // p0 (start point)
+            (2500.0, 500.0), // p3 (end point)
+        ],
+        vec![
+            // Single straight line segment (zero tangent values)
+            VectorNetworkSegment {
+                a: 0,
+                b: 1,
+                ta: None, // Zero tangent = straight line
+                tb: None, // Zero tangent = straight line
+            },
+        ],
+    )
+    .expect("Valid geometry");
 
-    // Create stroke options with variable width
-    let stroke_options = StrokeOptions {
-        width: 1.0, // Not used for variable width
-        align: StrokeAlign::Center,
-        color: CGColor(0, 0, 0, 255),
-        width_profile: Some(width_profile),
-    };
+    // Create a zig-zag line geometry with 6 vertices and 5 segments
+    let curve_3 = PiecewiseVectorNetworkGeometry::new(
+        vec![
+            (50.0, 800.0),   // p0 (start point)
+            (450.0, 700.0),  // p1 (first zig)
+            (850.0, 900.0),  // p2 (second zag)
+            (1250.0, 700.0), // p3 (third zig)
+            (1650.0, 900.0), // p4 (fourth zag)
+            (2500.0, 800.0), // p5 (end point)
+        ],
+        vec![
+            // First segment: straight line
+            VectorNetworkSegment {
+                a: 0,
+                b: 1,
+                ta: None,
+                tb: None,
+            },
+            // Second segment: straight line
+            VectorNetworkSegment {
+                a: 1,
+                b: 2,
+                ta: None,
+                tb: None,
+            },
+            // Third segment: straight line
+            VectorNetworkSegment {
+                a: 2,
+                b: 3,
+                ta: None,
+                tb: None,
+            },
+            // Fourth segment: straight line
+            VectorNetworkSegment {
+                a: 3,
+                b: 4,
+                ta: None,
+                tb: None,
+            },
+            // Fifth segment: straight line
+            VectorNetworkSegment {
+                a: 4,
+                b: 5,
+                ta: None,
+                tb: None,
+            },
+        ],
+    )
+    .expect("Valid geometry");
 
-    // Render using VNPainter
-    let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");
+    // Render using VNPainter with direct variable width stroke
+    let mut surface = surfaces::raster_n32_premul((2550, 3300)).expect("surface");
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
     let painter = VNPainter::new(canvas);
-    painter.draw(&vn, Some(&stroke_options));
+    painter.draw_stroke_variable_width(&curve_1, CGColor::BLACK, &width_profile_1);
+    painter.draw_stroke_variable_width(&curve_2, CGColor::BLACK, &width_profile_1);
+    painter.draw_stroke_variable_width(&curve_3, CGColor::BLACK, &width_profile_1);
 
     let image = surface.image_snapshot();
     let data = image
