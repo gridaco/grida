@@ -27,6 +27,7 @@ import type { ReducerContext } from ".";
  * @param logical_pos - The logical pointer position in canvas space
  * @param rect - The node's absolute bounding rectangle
  * @param node - The vector node being edited
+ * @param snap_threshold - The threshold distance for snapping (use Infinity to disable)
  */
 function __self_compute_variable_width_segment_snapping<
   S extends editor.state.IEditorState,
@@ -34,7 +35,8 @@ function __self_compute_variable_width_segment_snapping<
   draft: Draft<S>,
   logical_pos: cmath.Vector2,
   rect: cmath.Rectangle,
-  node: grida.program.nodes.VectorNode
+  network: vn.VectorNetwork,
+  snap_threshold: number
 ) {
   assert(draft.content_edit_mode?.type === "width");
 
@@ -42,30 +44,23 @@ function __self_compute_variable_width_segment_snapping<
   const local_point = cmath.vector2.sub(logical_pos, [rect.x, rect.y]);
 
   // Use piecewise projection to find the closest point on the entire network
-  const globalT = cmath.bezier.piecewise.project(
-    node.vectorNetwork,
-    local_point
-  );
+  const globalT = cmath.bezier.piecewise.project(network, local_point);
 
   // Resolve global t to segment index and local t
   const { segmentIndex, localT } = cmath.bezier.piecewise.resolveGlobalT(
-    node.vectorNetwork,
+    network,
     globalT
   );
 
   // Evaluate the point on the network
-  const parametricPoint = cmath.bezier.piecewise.evaluate(
-    node.vectorNetwork,
-    globalT
-  );
+  const parametricPoint = cmath.bezier.piecewise.evaluate(network, globalT);
 
   // Calculate distance to the projected point
   const distance = cmath.vector2.distance(local_point, parametricPoint);
 
   // Check if within threshold
-  const segment_snap_threshold = threshold(10, draft.transform);
   const closest_segment =
-    distance <= segment_snap_threshold
+    distance <= snap_threshold
       ? {
           segment: segmentIndex,
           t: localT,
@@ -96,11 +91,18 @@ export function on_pointer_move(
 
   // Compute segment snapping for variable width content edit mode
   // This is purely mathematical and doesn't rely on UI hover state
+  // Use disabled threshold (Infinity) during translation to ensure snapped_p is always available
+  const segment_snap_threshold =
+    draft.gesture.type === "translate-variable-width-stop"
+      ? Infinity
+      : threshold(10, draft.transform);
+
   __self_compute_variable_width_segment_snapping(
     draft,
     logical_pos,
     rect,
-    node
+    node.vectorNetwork,
+    segment_snap_threshold
   );
 }
 
@@ -199,19 +201,30 @@ export function on_drag_gesture_translate_variable_width_stop(
   assert(draft.content_edit_mode?.type === "width");
   assert(draft.gesture.type === "translate-variable-width-stop");
   const { content_edit_mode } = draft;
-  const { movement } = draft.gesture;
-  const { initial_stop, stop } = draft.gesture;
+  const { initial_stop, stop, node_id } = draft.gesture;
 
-  // Simple U parameter update based on horizontal movement
-  // Later: this will be replaced with cursor-to-curve projection
-  const delta_u = movement[0] / 200; // Scale factor for movement sensitivity
-  const new_u = cmath.clamp(initial_stop.u + delta_u, 0, 1);
+  // Use snapped_p to update the u parameter (computed in on_pointer_move with disabled threshold)
+  if (content_edit_mode.snapped_p) {
+    const node = dq.__getNodeById(
+      draft,
+      node_id
+    ) as grida.program.nodes.VectorNode;
 
-  // Update the stop
-  content_edit_mode.variable_width_profile.stops[stop] = {
-    ...initial_stop,
-    u: new_u,
-  };
+    const { segments } = node.vectorNetwork;
+    const totalSegments = segments.length;
+
+    // Convert segment index and t to global u parameter
+    const new_u =
+      (content_edit_mode.snapped_p.segment + content_edit_mode.snapped_p.t) /
+      totalSegments;
+    const clamped_u = cmath.clamp(new_u, 0, 1);
+
+    // Update the stop
+    content_edit_mode.variable_width_profile.stops[stop] = {
+      ...initial_stop,
+      u: clamped_u,
+    };
+  }
 }
 
 /**

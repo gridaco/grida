@@ -57,14 +57,6 @@ function isValidToolForContentEditMode(
   return valid_tool_modes.includes(tool);
 }
 
-const DUMMY_VAR_WIDTH_PROFILE: cg.VariableWidthProfile = {
-  stops: [
-    { u: 0, r: 10 },
-    { u: 0.5, r: 40 },
-    { u: 0.95, r: 10 },
-  ],
-};
-
 export function self_select_cursor_tool<S extends editor.state.IEditorState>(
   draft: Draft<S>
 ) {
@@ -102,7 +94,7 @@ export function self_select_tool<S extends editor.state.IEditorState>(
         snapped_p: null,
         initial_vector_network: draft.content_edit_mode.initial_vector_network,
         variable_width_selected_stop: null,
-        variable_width_profile: DUMMY_VAR_WIDTH_PROFILE,
+        variable_width_profile: { stops: [] },
       };
       return;
     }
