@@ -2816,6 +2816,39 @@ namespace cmath {
     };
 
     /**
+     * Arc Length Lookup Table (ArcLUT) for efficient arc length parameterization of cubic Bézier curves.
+     *
+     * An ArcLUT pre-computes and stores the relationship between curve parameter `t` and arc length `s`
+     * to enable fast conversion between normalized arc length parameter `u` and curve parameter `t`.
+     * This is essential for operations requiring uniform motion along the curve, such as animation
+     * and path following.
+     *
+     * The lookup table contains:
+     * - `t`: Array of curve parameters sampled at regular intervals ∈ [0, 1]
+     * - `s`: Corresponding cumulative arc lengths from the start of the curve
+     * - `total`: The total arc length of the curve
+     *
+     * Mathematical relationship:
+     * - `t[i]` represents the i-th sample point on the curve (0 ≤ i ≤ sampleCount)
+     * - `s[i]` represents the arc length from curve start to point `t[i]`
+     * - `s[0] = 0` and `s[sampleCount] = total`
+     * - For any `u` ∈ [0, 1], the corresponding `t` can be found by interpolating between
+     *   the nearest samples where `s[i] / total ≈ u`
+     *
+     * @property t - Array of curve parameters `t` ∈ [0, 1] sampled at regular intervals
+     * @property s - Array of cumulative arc lengths corresponding to each `t` value
+     * @property total - Total arc length of the curve
+     *
+     * @remarks
+     * - The lookup table enables O(log n) conversion from arc length to curve parameter
+     * - Precision depends on the number of samples used to create the LUT
+     * - For curves with high curvature, more samples may be needed for accuracy
+     * - The LUT can be cached and reused for multiple operations on the same curve
+     * - Float32Array is used for memory efficiency and performance
+     */
+    export type ArcLUT = { t: Float32Array; s: Float32Array; total: number };
+
+    /**
      * Solves a quadratic equation \( a x^2 + b x + c = 0 \).
      * @param a - Quadratic coefficient \( a \).
      * @param b - Linear coefficient \( b \).
