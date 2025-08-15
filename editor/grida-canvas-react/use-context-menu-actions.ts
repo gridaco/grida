@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useCurrentEditor, useEditorState } from "./use-editor";
 import { useDataTransferEventTarget } from "./provider";
 import { supportsFlatten } from "@/grida-canvas/reducers/methods/flatten";
+import grida from "@grida/schema";
 
 export interface ContextMenuAction {
   label: string;
@@ -36,9 +37,9 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
   const { insertText } = useDataTransferEventTarget();
 
   const nodes = useEditorState(editor, (s) => {
-    const map: Record<string, any> = {};
+    const map: Record<string, { type: grida.program.nodes.NodeType }> = {};
     ids.forEach((id) => {
-      map[id] = s.document.nodes[id];
+      map[id] = { type: s.document.nodes[id].type };
     });
     return map;
   });

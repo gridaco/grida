@@ -347,43 +347,6 @@ function ModeMixedNodeProperties({
         </SidebarMenuSectionContent>
       </SidebarSection>
       {config.position !== "off" && <SectionMixedPosition mp={mp} />}
-      <SidebarSection
-        hidden={config.position === "off"}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PositioningConstraintsControl
-              // TODO:
-              value={{
-                position: "relative",
-                top: undefined,
-                left: undefined,
-                right: undefined,
-                bottom: undefined,
-              }}
-              // onValueChange={actions.positioning}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Mode</PropertyLineLabel>
-            <PositioningModeControl
-              value={position!.value}
-              onValueChange={change.positioningMode}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Rotate</PropertyLineLabel>
-            <RotateControl
-              value={rotation?.value}
-              onValueCommit={change.rotation}
-            />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
       <SidebarSection hidden={config.size === "off"} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>

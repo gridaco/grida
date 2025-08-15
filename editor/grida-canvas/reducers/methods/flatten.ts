@@ -20,7 +20,9 @@ export const FLATTENABLE_NODE_TYPES = new Set<grida.program.nodes.NodeType>([
   "vector",
 ]);
 
-export function supportsFlatten(node: grida.program.nodes.Node): boolean {
+export function supportsFlatten(node: {
+  type: grida.program.nodes.NodeType;
+}): boolean {
   return FLATTENABLE_NODE_TYPES.has(node.type as grida.program.nodes.NodeType);
 }
 

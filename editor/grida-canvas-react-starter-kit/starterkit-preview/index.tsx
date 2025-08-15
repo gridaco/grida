@@ -44,6 +44,7 @@ const Context = React.createContext<{
 export function PreviewProvider({
   children,
 }: React.PropsWithChildren<StandaloneDocumentContentProps>) {
+  // FIXME: use selector state - very expensive
   const { document, document_ctx } = useDocumentState();
   const scene = useCurrentSceneState();
   const [mode, setMode] = useState<"framed" | "fullscreen">("framed");

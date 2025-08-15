@@ -1,6 +1,6 @@
 import {
   ContextMenu,
-  ContextMenuContent,
+  ContextMenuContent as _ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
@@ -21,6 +21,18 @@ export function EditorSurfaceContextMenu({
   children,
   className,
 }: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger className={cn("w-full h-full", className)}>
+        {children}
+      </ContextMenuTrigger>
+      {/* TODO: disable events via portal, so the canvas won't be pannable while context menu is open */}
+      <ContextMenuContent />
+    </ContextMenu>
+  );
+}
+
+function ContextMenuContent() {
   const { selection } = useSelectionState();
   const { debug } = useEditorFlagsState();
   const actions = useContextMenuActions(selection);
@@ -39,59 +51,53 @@ export function EditorSurfaceContextMenu({
   );
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger className={cn("w-full h-full", className)}>
-        {children}
-      </ContextMenuTrigger>
-      {/* TODO: disable events via portal, so the canvas won't be pannable while context menu is open */}
-      <ContextMenuContent className="w-52">
-        <ActionItem action={actions.copy} />
-        <ActionItem action={actions.paste} />
-        <ContextMenuSeparator />
-        <ActionItem action={actions.bringToFront} />
-        <ActionItem action={actions.sendToBack} />
-        <ContextMenuSeparator />
-        <ActionItem action={actions.flatten} />
-        <ContextMenuSub>
-          <ContextMenuSubTrigger className="text-xs">
-            Edit Vector...
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent>
-            <ActionItem action={actions.planarize} />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
-        <ActionItem action={actions.group} />
-        <ActionItem action={actions.ungroup} />
-        <ActionItem action={actions.groupWithContainer} />
-        <ActionItem action={actions.autoLayout} />
-        <ContextMenuSeparator />
-        <ActionItem action={actions.zoomToFit} />
-        <ContextMenuSeparator />
-        <ActionItem action={actions.toggleActive} />
-        <ActionItem action={actions.toggleLocked} />
-        <ContextMenuSeparator />
-        <ActionItem action={actions.delete} />
+    <_ContextMenuContent className="w-52">
+      <ActionItem action={actions.copy} />
+      <ActionItem action={actions.paste} />
+      <ContextMenuSeparator />
+      <ActionItem action={actions.bringToFront} />
+      <ActionItem action={actions.sendToBack} />
+      <ContextMenuSeparator />
+      <ActionItem action={actions.flatten} />
+      <ContextMenuSub>
+        <ContextMenuSubTrigger className="text-xs">
+          Edit Vector...
+        </ContextMenuSubTrigger>
+        <ContextMenuSubContent>
+          <ActionItem action={actions.planarize} />
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+      <ContextMenuSeparator />
+      <ActionItem action={actions.group} />
+      <ActionItem action={actions.ungroup} />
+      <ActionItem action={actions.groupWithContainer} />
+      <ActionItem action={actions.autoLayout} />
+      <ContextMenuSeparator />
+      <ActionItem action={actions.zoomToFit} />
+      <ContextMenuSeparator />
+      <ActionItem action={actions.toggleActive} />
+      <ActionItem action={actions.toggleLocked} />
+      <ContextMenuSeparator />
+      <ActionItem action={actions.delete} />
 
-        {debug && (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              className="py-1"
-              onSelect={() => {
-                // copy id
-                navigator.clipboard.writeText(selection.join(", ")).then(() => {
-                  toast.success("Copied ID to clipboard");
-                });
-              }}
-            >
-              <span className="font-mono text-[9px] text-muted-foreground truncate">
-                ID: {selection.join(", ")}
-              </span>
-            </ContextMenuItem>
-          </>
-        )}
-      </ContextMenuContent>
-    </ContextMenu>
+      {debug && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="py-1"
+            onSelect={() => {
+              // copy id
+              navigator.clipboard.writeText(selection.join(", ")).then(() => {
+                toast.success("Copied ID to clipboard");
+              });
+            }}
+          >
+            <span className="font-mono text-[9px] text-muted-foreground truncate">
+              ID: {selection.join(", ")}
+            </span>
+          </ContextMenuItem>
+        </>
+      )}
+    </_ContextMenuContent>
   );
 }
