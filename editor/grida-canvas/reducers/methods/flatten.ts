@@ -6,6 +6,7 @@ import vn from "@grida/vn";
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 import { normalizeVectorNodeBBox } from "./vector";
+import * as modeProperties from "@/grida-canvas/utils/properties";
 
 /**
  * Node types that can be flattened into vector paths.
@@ -61,7 +62,7 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
     type: "vector",
     id: node.id,
     active: node.active,
-    cornerRadius: modeCornerRadius(node),
+    cornerRadius: modeProperties.cornerRadius(node),
     fillRule: (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
     vectorNetwork: v,
     width: rect.width,

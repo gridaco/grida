@@ -7,6 +7,7 @@ import { self_moveNode } from "./move";
 import { self_insertSubDocument } from "./insert";
 import nid from "../tools/id";
 import { self_selectNode } from "./selection";
+import * as modeProperties from "@/grida-canvas/utils/properties";
 import cg from "@grida/cg";
 
 /**
@@ -258,6 +259,9 @@ export function self_wrapNodesAsBooleanOperation<
 
     const union = cmath.rect.union(rects);
 
+    // Get the nodes to calculate mode values
+    const nodes = g.map((id) => dq.__getNodeById(draft, id));
+
     const prototype: grida.program.nodes.BooleanPathOperationNodePrototype = {
       type: "boolean",
       top: cmath.quantize(union.y, 1),
@@ -265,6 +269,10 @@ export function self_wrapNodesAsBooleanOperation<
       children: [],
       position: "absolute",
       op: op,
+      cornerRadius: modeProperties.cornerRadius(...nodes),
+      fill: modeProperties.fill(...nodes),
+      stroke: modeProperties.stroke(...nodes),
+      strokeWidth: modeProperties.strokeWidth(...nodes),
     } as grida.program.nodes.BooleanPathOperationNodePrototype;
 
     const wrapperId = self_insertSubDocument(
