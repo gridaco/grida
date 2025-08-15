@@ -48,6 +48,53 @@ impl AffineTransform {
         t
     }
 
+    /// Creates a transform from CSS-like box properties with proper transform origin handling.
+    ///
+    /// This creates a transform that:
+    /// - Places the box at (x, y)
+    /// - Rotates around the specified origin point within the box
+    /// - Uses the full box dimensions for proper transform origin calculation
+    ///
+    /// # Arguments
+    /// - `x`, `y`: top-left placement of the box
+    /// - `w`, `h`: size of the box (used to resolve transform-origin)
+    /// - `deg`: rotation in degrees
+    /// - `origin_x`, `origin_y`: pivot as fractions of size (0..1), like CSS `transform-origin`
+    ///   - (0.0, 0.0) = top-left
+    ///   - (0.5, 0.5) = center (default)
+    ///   - (1.0, 1.0) = bottom-right
+    pub fn from_box(
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        deg: f32,
+        origin_x: f32,
+        origin_y: f32,
+    ) -> Self {
+        let rad = deg.to_radians();
+        let c = rad.cos();
+        let s = rad.sin();
+
+        // pivot in local coords (from top-left)
+        let ox = w * origin_x;
+        let oy = h * origin_y;
+
+        // final translation that rotates around the pivot at (x+ox, y+oy)
+        // M = T(x+ox, y+oy) · R(rad) · T(-ox, -oy)
+        let tx = x + ox * (1.0 - c) + s * oy;
+        let ty = y + oy * (1.0 - c) - s * ox;
+
+        Self {
+            matrix: [[c, -s, tx], [s, c, ty]],
+        }
+    }
+
+    /// Creates a transform from box properties with center origin (CSS default).
+    pub fn from_box_center(x: f32, y: f32, w: f32, h: f32, deg: f32) -> Self {
+        Self::from_box(x, y, w, h, deg, 0.5, 0.5)
+    }
+
     pub fn x(&self) -> f32 {
         self.matrix[0][2]
     }

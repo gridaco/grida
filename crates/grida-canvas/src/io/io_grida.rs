@@ -568,7 +568,13 @@ impl From<JSONGroupNode> for GroupNode {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
+            transform: AffineTransform::from_box_center(
+                node.base.left,
+                node.base.top,
+                node.base.width,
+                node.base.height,
+                node.base.rotation,
+            ),
             children: node.children.unwrap_or_default(),
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode,
@@ -582,7 +588,13 @@ impl From<JSONContainerNode> for ContainerNode {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
+            transform: AffineTransform::from_box_center(
+                node.base.left,
+                node.base.top,
+                node.base.width,
+                node.base.height,
+                node.base.rotation,
+            ),
             size: Size {
                 width: node.base.width,
                 height: node.base.height,
@@ -620,7 +632,13 @@ impl From<JSONTextNode> for TextSpanNode {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
+            transform: AffineTransform::from_box_center(
+                node.base.left,
+                node.base.top,
+                node.base.width,
+                node.base.height,
+                node.base.rotation,
+            ),
             size: Size { width, height },
             text: node.text,
             text_style: TextStyle {
@@ -652,7 +670,13 @@ impl From<JSONTextNode> for TextSpanNode {
 
 impl From<JSONEllipseNode> for Node {
     fn from(node: JSONEllipseNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::Ellipse(EllipseNode {
             id: node.base.id,
@@ -686,7 +710,13 @@ impl From<JSONEllipseNode> for Node {
 
 impl From<JSONRectangleNode> for Node {
     fn from(node: JSONRectangleNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::Rectangle(RectangleNode {
             id: node.base.id,
@@ -722,7 +752,13 @@ impl From<JSONRectangleNode> for Node {
 
 impl From<JSONRegularPolygonNode> for Node {
     fn from(node: JSONRegularPolygonNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::RegularPolygon(RegularPolygonNode {
             id: node.base.id,
@@ -753,7 +789,13 @@ impl From<JSONRegularPolygonNode> for Node {
 
 impl From<JSONRegularStarPolygonNode> for Node {
     fn from(node: JSONRegularStarPolygonNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::RegularStarPolygon(RegularStarPolygonNode {
             id: node.base.id,
@@ -785,7 +827,13 @@ impl From<JSONRegularStarPolygonNode> for Node {
 
 impl From<JSONSVGPathNode> for Node {
     fn from(node: JSONSVGPathNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         // For vector nodes, we'll create a path node with the path data
         Node::SVGPath(SVGPathNode {
@@ -818,7 +866,13 @@ impl From<JSONSVGPathNode> for Node {
 
 impl From<JSONLineNode> for Node {
     fn from(node: JSONLineNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::Line(LineNode {
             id: node.base.id,
@@ -846,7 +900,13 @@ impl From<JSONLineNode> for Node {
 
 impl From<JSONVectorNode> for Node {
     fn from(node: JSONVectorNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         let network = node
             .vector_network
