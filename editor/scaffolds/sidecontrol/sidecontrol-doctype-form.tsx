@@ -21,7 +21,7 @@ import { FormExpression } from "@/grida-forms/lib/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
-import { Align, Selection } from "./sidecontrol-node-selection";
+import { Selection } from "./sidecontrol-node-selection";
 import { useSelectionState } from "@/grida-canvas-react/provider";
 
 export function SideControlDoctypeForm() {
@@ -57,13 +57,7 @@ function SelectedPageFormStart() {
   if (selection.length === 0) {
     return <SideControlGlobal />;
   } else {
-    return (
-      <>
-        <Align />
-        <hr />
-        <Selection />
-      </>
-    );
+    return <Selection />;
   }
 }
 

@@ -3,7 +3,6 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { SidebarRoot } from "@/components/sidebar";
 import {
-  Align,
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
@@ -481,8 +480,6 @@ function SidebarRight() {
           </>
         ) : (
           <SidebarContent className="gap-0">
-            <Align />
-            <hr />
             <Selection
               empty={
                 <div className="mt-4 mb-10">

@@ -1,9 +1,9 @@
 import { useHotkeys } from "react-hotkeys-hook";
 import {
-  useCurrentSelection,
   useToolState,
   useA11yActions,
   useContentEditModeMinimalState,
+  useCurrentSelectionIds,
 } from "../provider";
 import { toast } from "sonner";
 import type cg from "@grida/cg";
@@ -347,7 +347,7 @@ export function useEditorHotKeys() {
   const content_edit_mode = useContentEditModeMinimalState();
   const { a11yarrow, a11yalign } = useA11yActions();
 
-  const { selection, actions } = useCurrentSelection();
+  const selection = useCurrentSelectionIds();
   const [altKey, setAltKey] = useState(false);
 
   useEffect(() => {
@@ -562,8 +562,7 @@ export function useEditorHotKeys() {
               const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
               // set fill if selection
               if (selection.length > 0) {
-                //
-                actions.fill({
+                editor.changeNodeFill(selection, {
                   type: "solid",
                   color: rgba,
                 } satisfies cg.SolidPaint);

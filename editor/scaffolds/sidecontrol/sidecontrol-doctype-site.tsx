@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Align, Selection, Zoom } from "./sidecontrol-node-selection";
+import { Selection, Zoom } from "./sidecontrol-node-selection";
 import { DocumentProperties } from "./sidecontrol-document-properties";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,7 @@ import parsecolor from "color-parse";
 import { PreviewButton } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
+
 export function SideControlDoctypeSite() {
   const [open, setOpen] = React.useState(false);
 
@@ -33,10 +34,6 @@ export function SideControlDoctypeSite() {
         />
         <PreviewButton />
       </header>
-      {/* <SidebarSection className="mb-4 px-2 flex justify-end">
-      </SidebarSection> */}
-      <Align />
-      <hr />
       <Selection
         empty={
           <div className="mt-4 mb-10">

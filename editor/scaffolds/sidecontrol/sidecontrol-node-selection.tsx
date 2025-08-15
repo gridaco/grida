@@ -70,8 +70,6 @@ import {
   useEditorFlagsState,
   useNodeActions,
   useNodeState,
-  useCurrentSelection,
-  useSelectionPaints,
   useSelectionState,
   useBackendState,
   useContentEditModeMinimalState,
@@ -103,24 +101,60 @@ import { FeControl } from "./controls/fe";
 import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
 import { ModeVectorEditModeProperties } from "./chunks/mode-vector";
+import { OpsControl } from "./controls/ext-ops";
+import { MaskControl } from "./controls/ext-mask";
+import {
+  useMixedProperties,
+  useMixedPaints,
+  MixedPropertiesEditor,
+} from "@/grida-canvas-react/use-mixed-properties";
 
-export function Align() {
+function Align() {
+  const editor = useCurrentEditor();
+  const { selection } = useSelectionState();
+  const has_selection = selection.length >= 1;
+
+  return (
+    <_AlignControl
+      disabled={!has_selection}
+      onAlign={(alignment) => {
+        editor.align("selection", alignment);
+      }}
+      onDistributeEvenly={(axis) => {
+        editor.distributeEvenly("selection", axis);
+      }}
+      className="justify-between"
+    />
+  );
+}
+
+function BooleanOperations() {
   const editor = useCurrentEditor();
   const { selection } = useSelectionState();
   const has_selection = selection.length >= 1;
 
   return (
     <SidebarSection className="mt-2 flex justify-center">
-      <_AlignControl
-        disabled={!has_selection}
-        onAlign={(alignment) => {
-          editor.align("selection", alignment);
-        }}
-        onDistributeEvenly={(axis) => {
-          editor.distributeEvenly("selection", axis);
-        }}
-      />
+      <OpsControl disabled={!has_selection} />
     </SidebarSection>
+  );
+}
+
+function Header() {
+  const editor = useCurrentEditor();
+
+  const { selection } = useEditorState(editor, (state) => ({
+    selection: state.selection,
+  }));
+
+  return (
+    <>
+      <div className="w-full flex items-center justify-end gap-1">
+        <MaskControl />
+        <BooleanOperations />
+      </div>
+      <hr />
+    </>
   );
 }
 
@@ -143,6 +177,11 @@ export function Selection({
 
   const is_vector_edit_mode = cem?.type === "vector";
   const selection_length = selection.length;
+  const is_empty = selection_length === 0 && !is_vector_edit_mode;
+
+  if (is_empty) {
+    return empty;
+  }
 
   return (
     <SchemaProvider
@@ -150,6 +189,7 @@ export function Selection({
         properties: documentProperties,
       }}
     >
+      <Header />
       {is_vector_edit_mode ? (
         <ModeVectorEditModeProperties node_id={cem.node_id} />
       ) : (
@@ -158,7 +198,9 @@ export function Selection({
           {selection_length === 1 && (
             <ModeNodeProperties config={config} node_id={selection[0]} />
           )}
-          {selection_length > 1 && <ModeMixedNodeProperties config={config} />}
+          {selection_length > 1 && (
+            <ModeMixedNodeProperties ids={selection} config={config} />
+          )}
         </>
       )}
     </SchemaProvider>
@@ -193,20 +235,17 @@ const __default_controls_config: ControlsConfig = {
 };
 
 function ModeMixedNodeProperties({
+  ids,
   config = __default_controls_config,
 }: {
+  ids: string[];
   config?: ControlsConfig;
 }) {
   const scene = useCurrentSceneState();
   const backend = useBackendState();
+  const mp = useMixedProperties(ids);
+  const { nodes, properties, actions: change } = mp;
   const {
-    selection: ids,
-    nodes,
-    properties,
-    actions: change,
-  } = useCurrentSelection();
-  const {
-    id,
     name,
     active,
     locked,
@@ -307,6 +346,7 @@ function ModeMixedNodeProperties({
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
+      {config.position !== "off" && <SectionMixedPosition mp={mp} />}
       <SidebarSection
         hidden={config.position === "off"}
         className="border-b pb-4"
@@ -1281,6 +1321,9 @@ function SectionPosition({ node_id }: { node_id: string }) {
         <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
       </SidebarSectionHeaderItem>
       <SidebarMenuSectionContent className="space-y-2">
+        <div className="pb-2 border-b">
+          <Align />
+        </div>
         <PropertyLine>
           <PositioningConstraintsControl
             value={{
@@ -1303,6 +1346,48 @@ function SectionPosition({ node_id }: { node_id: string }) {
         <PropertyLine>
           <PropertyLineLabel>Rotate</PropertyLineLabel>
           <RotateControl value={rotation} onValueCommit={actions.rotation} />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <div className="pb-2 border-b">
+          <Align />
+        </div>
+        <PropertyLine>
+          <PositioningConstraintsControl
+            // TODO:
+            value={{
+              position: "relative",
+              top: undefined,
+              left: undefined,
+              right: undefined,
+              bottom: undefined,
+            }}
+            // onValueChange={actions.positioning}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Mode</PropertyLineLabel>
+          <PositioningModeControl
+            value={mp.properties.position!.value}
+            onValueChange={mp.actions.positioningMode}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Rotate</PropertyLineLabel>
+          <RotateControl
+            value={mp.properties.rotation?.value}
+            onValueCommit={mp.actions.rotation}
+          />
         </PropertyLine>
       </SidebarMenuSectionContent>
     </SidebarSection>
@@ -1547,7 +1632,7 @@ function SectionEffects({ node_id }: { node_id: string }) {
 
 function SelectionColors() {
   const editor = useCurrentEditor();
-  const { ids, paints, setPaint } = useSelectionPaints();
+  const { ids, paints, setPaint } = useMixedPaints();
 
   // this should show when,
   // 1. paints are more than 1

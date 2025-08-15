@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Align, Selection, Zoom } from "./sidecontrol-node-selection";
+import { Selection, Zoom } from "./sidecontrol-node-selection";
 import { SidebarSection } from "@/components/sidebar";
 import { DocumentProperties } from "./sidecontrol-document-properties";
 
@@ -11,7 +11,6 @@ export function SideControlDoctypeCanvas() {
       <SidebarSection className="mb-4 px-2 flex justify-end">
         <Zoom />
       </SidebarSection>
-      <Align />
       <hr />
       <Selection
         empty={

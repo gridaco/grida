@@ -8,7 +8,6 @@ import {
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
 import {
-  Align,
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
@@ -152,8 +151,6 @@ export function GridaCanvasFormField() {
               </div>
               <hr />
               <FontFamilyListProvider fonts={fonts}>
-                <Align />
-                <hr />
                 <Selection />
               </FontFamilyListProvider>
             </SidebarRoot>
