@@ -1153,6 +1153,16 @@ export class Editor
     });
   }
 
+  public ungroup(target: "selection" | editor.NodeID[]) {
+    if (this.backend === "dom") {
+      throw new Error("Grouping is not supported in DOM backend");
+    }
+    this.dispatch({
+      type: "ungroup",
+      target,
+    });
+  }
+
   public configureSurfaceRaycastTargeting(
     config: Partial<editor.state.HitTestingConfig>
   ) {

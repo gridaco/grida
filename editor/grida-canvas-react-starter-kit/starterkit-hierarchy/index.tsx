@@ -238,8 +238,9 @@ function NodeHierarchyItemContextMenuWrapper({
         <ActionItem action={actions.bringToFront} />
         <ActionItem action={actions.sendToBack} />
         <ContextMenuSeparator />
-        <ActionItem action={actions.groupWithContainer} />
         <ActionItem action={actions.group} />
+        <ActionItem action={actions.ungroup} />
+        <ActionItem action={actions.groupWithContainer} />
         <ActionItem action={actions.autoLayout} />
         <ContextMenuSeparator />
         <ActionItem action={actions.zoomToFit} />

@@ -44,6 +44,7 @@ export type DocumentAction =
   | EditorAutoLayoutAction
   | EditorContainAction
   | EditorGroupAction
+  | EditorUngroupAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -516,6 +517,11 @@ export interface EditorContainAction {
 
 export interface EditorGroupAction {
   type: "group";
+  target: NodeID[] | "selection";
+}
+
+export interface EditorUngroupAction {
+  type: "ungroup";
   target: NodeID[] | "selection";
 }
 

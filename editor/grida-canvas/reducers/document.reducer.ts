@@ -1058,6 +1058,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
       break;
     }
+    case "ungroup": {
+      // TODO:
+      break;
+    }
     //
     case "select-vertex":
     case "delete-vertex":

@@ -2042,6 +2042,7 @@ export namespace editor.api {
     autoLayout(target: "selection" | NodeID[]): void;
     contain(target: "selection" | NodeID[]): void;
     group(target: "selection" | NodeID[]): void;
+    ungroup(target: "selection" | NodeID[]): void;
     configureSurfaceRaycastTargeting(
       config: Partial<state.HitTestingConfig>
     ): void;

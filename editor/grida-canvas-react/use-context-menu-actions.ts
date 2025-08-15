@@ -17,6 +17,7 @@ type ContextMenuActionType =
   | "sendToBack"
   | "groupWithContainer"
   | "group"
+  | "ungroup"
   | "autoLayout"
   | "flatten"
   | "planarize"
@@ -45,6 +46,9 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
   const hasSelection = ids.length > 0;
   const canFlatten =
     hasSelection && ids.every((id) => supportsFlatten(nodes[id]));
+
+  const canUngroup =
+    hasSelection && ids.some((id) => nodes[id].type === "group");
 
   const canPlanarize =
     hasSelection && ids.every((id) => nodes[id].type === "vector");
@@ -109,6 +113,12 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         shortcut: "⌘G",
         disabled: !hasSelection,
         onSelect: () => editor.group(ids),
+      },
+      ungroup: {
+        label: "Ungroup",
+        shortcut: "⌘⇧G",
+        disabled: !canUngroup,
+        onSelect: () => editor.ungroup(ids),
       },
       autoLayout: {
         label: "Auto-Layout",

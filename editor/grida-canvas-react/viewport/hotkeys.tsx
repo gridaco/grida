@@ -1014,6 +1014,18 @@ export function useEditorHotKeys() {
     }
   );
 
+  useHotkeys(
+    "ctrl+shift+g, meta+shift+g",
+    () => {
+      try {
+        editor.ungroup("selection");
+      } catch {}
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
   useHotkeys("ctrl+alt+g, meta+alt+g", () => {
     editor.contain("selection");
   });

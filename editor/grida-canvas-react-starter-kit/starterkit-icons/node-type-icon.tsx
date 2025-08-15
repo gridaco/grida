@@ -14,6 +14,7 @@ import {
   MixIcon,
   VideoIcon,
   GlobeIcon,
+  GroupIcon,
 } from "@radix-ui/react-icons";
 
 export function NodeTypeIcon({
@@ -60,6 +61,8 @@ export function NodeTypeIcon({
       return <TransformIcon className={className} />;
     case "bitmap":
       return <TransparencyGridIcon className={className} />;
+    case "group":
+      return <GroupIcon className={className} />;
   }
   return <BoxIcon className={className} />;
 }
