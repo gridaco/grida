@@ -36,7 +36,7 @@ import {
   self_select_tool,
   getVectorSelectionStartPoint,
 } from "./methods";
-import { self_wrapNodes } from "./methods/wrap";
+import { self_wrapNodes, self_ungroup } from "./methods/wrap";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
 import {
@@ -1059,7 +1059,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       break;
     }
     case "ungroup": {
-      // TODO:
+      const { target } = action;
+      const target_node_ids = target === "selection" ? state.selection : target;
+
+      return produce(state, (draft) => {
+        self_ungroup(draft, target_node_ids, context.geometry);
+      });
       break;
     }
     //

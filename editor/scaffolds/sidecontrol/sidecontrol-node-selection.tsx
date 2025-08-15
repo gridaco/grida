@@ -352,14 +352,14 @@ function ModeMixedNodeProperties({
           <PropertyLine>
             <PropertyLineLabel>Width</PropertyLineLabel>
             <LengthPercentageControl
-              value={width!.value}
+              value={width?.value}
               onValueCommit={change.width}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Height</PropertyLineLabel>
             <LengthPercentageControl
-              value={height!.value}
+              value={height?.value}
               onValueCommit={change.height}
             />
           </PropertyLine>
