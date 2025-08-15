@@ -135,7 +135,12 @@ function BooleanOperations() {
 
   return (
     <SidebarSection className="mt-2 flex justify-center">
-      <OpsControl disabled={!has_selection} />
+      <OpsControl
+        disabled={!has_selection}
+        onOp={(op) => {
+          editor.op(selection, op);
+        }}
+      />
     </SidebarSection>
   );
 }

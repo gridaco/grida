@@ -168,6 +168,16 @@ export namespace cg {
   export type FillRule = "nonzero" | "evenodd";
 
   /**
+   * @see https://skia.org/docs/dev/present/pathops/
+   * @see https://www.figma.com/plugin-docs/api/BooleanOperationNode/
+   */
+  export type BooleanOperation =
+    | "difference"
+    | "intersection"
+    | "union"
+    | "xor";
+
+  /**
    *
    * Supported fit modes
    *

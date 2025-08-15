@@ -968,6 +968,7 @@ impl From<JSONBooleanOperationNode> for Node {
             active: node.base.active,
             transform,
             op: node.op,
+            corner_radius: node.base.corner_radius,
             children: node.children,
             fill: node.base.fill.into(),
             stroke: node.base.stroke.map(|s| Paint::from(Some(s))),

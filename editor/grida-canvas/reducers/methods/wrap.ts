@@ -7,6 +7,7 @@ import { self_moveNode } from "./move";
 import { self_insertSubDocument } from "./insert";
 import nid from "../tools/id";
 import { self_selectNode } from "./selection";
+import cg from "@grida/cg";
 
 /**
  * Wraps the provided nodes with a newly created container or group node.
@@ -206,4 +207,91 @@ export function self_ungroup<S extends editor.state.IEditorState>(
 
   // Select the ungrouped children
   self_selectNode(draft, "reset", ...ungroupedChildren);
+}
+
+/**
+ * Wraps the provided nodes into a BooleanPathOperationNode with the specified operation.
+ * Similar to self_wrapNodes but creates a BooleanPathOperationNode instead of a group.
+ *
+ * @param draft - Mutable editor state draft
+ * @param nodeIds - Node ids to wrap
+ * @param op - Boolean operation type
+ * @param geometry - Geometry query used to compute bounding rectangles
+ * @returns Array of newly inserted wrapper node ids
+ */
+export function self_wrapNodesAsBooleanOperation<
+  S extends editor.state.IEditorState,
+>(
+  draft: Draft<S>,
+  nodeIds: string[],
+  op: cg.BooleanOperation,
+  geometry: editor.api.IDocumentGeometryQuery
+): grida.program.nodes.NodeID[] {
+  const scene = draft.document.scenes[draft.scene_id!];
+
+  const groups = Object.groupBy(
+    nodeIds.filter((id) => {
+      const isRoot = scene.children.includes(id);
+      return scene.constraints.children !== "single" || !isRoot;
+    }),
+    (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? "<root>"
+  );
+
+  const inserted: grida.program.nodes.NodeID[] = [];
+
+  Object.keys(groups).forEach((parentId) => {
+    const g = groups[parentId]!;
+    const isRoot = parentId === "<root>";
+
+    let delta: cmath.Vector2;
+    if (isRoot) {
+      delta = [0, 0];
+    } else {
+      const parentRect = geometry.getNodeAbsoluteBoundingRect(parentId)!;
+      delta = [-parentRect.x, -parentRect.y];
+    }
+
+    const rects = g
+      .map((nodeId) => geometry.getNodeAbsoluteBoundingRect(nodeId)!)
+      .map((rect) => cmath.rect.translate(rect, delta))
+      .map((rect) => cmath.rect.quantize(rect, 1));
+
+    const union = cmath.rect.union(rects);
+
+    const prototype: grida.program.nodes.BooleanPathOperationNodePrototype = {
+      type: "boolean",
+      top: cmath.quantize(union.y, 1),
+      left: cmath.quantize(union.x, 1),
+      children: [],
+      position: "absolute",
+      op: op,
+    } as grida.program.nodes.BooleanPathOperationNodePrototype;
+
+    const wrapperId = self_insertSubDocument(
+      draft,
+      isRoot ? null : (parentId as string),
+      grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+        prototype,
+        nid
+      )
+    )[0];
+
+    g.forEach((id) => {
+      self_moveNode(draft, id, wrapperId);
+    });
+
+    g.forEach((id) => {
+      const child = dq.__getNodeById(draft, id);
+      if ("left" in child && typeof child.left === "number") {
+        child.left -= union.x;
+      }
+      if ("top" in child && typeof child.top === "number") {
+        child.top -= union.y;
+      }
+    });
+
+    inserted.push(wrapperId);
+  });
+
+  return inserted;
 }

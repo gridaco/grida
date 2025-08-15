@@ -90,6 +90,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "container",
     "component",
     "instance",
+    "boolean",
   ],
   cornerRadius4: [
     "rectangle",
@@ -100,7 +101,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "instance",
   ],
   border: [],
-  children: ["container", "component", "instance"],
+  children: ["container", "component", "instance", "boolean"],
   stroke: [
     "container",
     "rectangle",
@@ -115,6 +116,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "star",
     "component",
     "instance",
+    "boolean",
   ],
   feDropShadow: [
     "container",
@@ -130,6 +132,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "star",
     "container",
     "component",
+    "boolean",
   ],
   strokeCap: ["vector", "line"],
   pointCount: ["polygon", "star"],

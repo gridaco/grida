@@ -36,7 +36,11 @@ import {
   self_select_tool,
   getVectorSelectionStartPoint,
 } from "./methods";
-import { self_wrapNodes, self_ungroup } from "./methods/wrap";
+import {
+  self_wrapNodes,
+  self_ungroup,
+  self_wrapNodesAsBooleanOperation,
+} from "./methods/wrap";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
 import {
@@ -1064,6 +1068,37 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return produce(state, (draft) => {
         self_ungroup(draft, target_node_ids, context.geometry);
+      });
+      break;
+    }
+    case "boolean-operation": {
+      const { target, op } = action;
+      const target_node_ids = target;
+
+      const flattenable: string[] = [];
+      const ignored: string[] = [];
+      for (const node_id of target_node_ids) {
+        const node = dq.__getNodeById(state, node_id);
+        if (node && supportsFlatten(node)) {
+          flattenable.push(node_id);
+        } else {
+          ignored.push(node_id);
+        }
+      }
+
+      if (flattenable.length < 2) {
+        // Need at least 2 nodes for boolean operations
+        return state;
+      }
+
+      return produce(state, (draft) => {
+        const insertions = self_wrapNodesAsBooleanOperation(
+          draft,
+          flattenable,
+          op,
+          context.geometry
+        );
+        self_selectNode(draft, "reset", ...insertions);
       });
       break;
     }

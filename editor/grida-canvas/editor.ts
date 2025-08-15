@@ -751,6 +751,14 @@ export class Editor
     });
   }
 
+  public op(target: ReadonlyArray<editor.NodeID>, op: cg.BooleanOperation) {
+    this.dispatch({
+      type: "boolean-operation",
+      target: target,
+      op: op,
+    });
+  }
+
   public union(target: ReadonlyArray<editor.NodeID>) {
     this.dispatch({
       type: "boolean-operation",
@@ -763,7 +771,7 @@ export class Editor
     this.dispatch({
       type: "boolean-operation",
       target: target,
-      op: "intersect",
+      op: "intersection",
     });
   }
 
@@ -771,7 +779,7 @@ export class Editor
     this.dispatch({
       type: "boolean-operation",
       target: target,
-      op: "subtract",
+      op: "difference",
     });
   }
 
@@ -779,7 +787,7 @@ export class Editor
     this.dispatch({
       type: "boolean-operation",
       target: target,
-      op: "exclude",
+      op: "xor",
     });
   }
 

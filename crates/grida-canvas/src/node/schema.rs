@@ -722,6 +722,8 @@ pub struct BooleanPathOperationNode {
     pub active: bool,
     pub transform: AffineTransform,
     pub op: BooleanPathOperation,
+    // TODO: not supported yet
+    pub corner_radius: Option<f32>,
     pub children: Vec<NodeId>,
     pub fill: Paint,
     pub stroke: Option<Paint>,

@@ -1943,6 +1943,7 @@ export namespace editor.api {
     paste(): void;
     duplicate(target: "selection" | NodeID): void;
     flatten(target: "selection" | NodeID): void;
+    op(target: ReadonlyArray<NodeID>, op: cg.BooleanOperation): void;
     union(target: ReadonlyArray<NodeID>): void;
     subtract(target: ReadonlyArray<NodeID>): void;
     intersect(target: ReadonlyArray<NodeID>): void;

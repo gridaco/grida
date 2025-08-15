@@ -1,16 +1,12 @@
 import { cn } from "@/components/lib/utils";
-import { Button, buttonVariants } from "@/components/ui-editor/button";
+import { buttonVariants } from "@/components/ui-editor/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import cg from "@grida/cg";
 import { CaretDownIcon } from "@radix-ui/react-icons";
 import {
   SquaresExcludeIcon,
@@ -19,14 +15,17 @@ import {
   SquaresUniteIcon,
 } from "lucide-react";
 
-export function OpsControl({ disabled }: { disabled?: boolean }) {
+export function OpsControl({
+  disabled,
+  onOp,
+}: {
+  disabled?: boolean;
+  onOp?: (op: cg.BooleanOperation) => void;
+}) {
   return (
     <div
       aria-disabled={disabled}
-      className={cn(
-        "group/ops flex items-center justify-center gap-0"
-        // buttonVariants({ variant: "ghost", size: "sm" })
-      )}
+      className={cn("group/ops flex items-center justify-center gap-0")}
     >
       <button
         disabled={disabled}
@@ -34,6 +33,7 @@ export function OpsControl({ disabled }: { disabled?: boolean }) {
           buttonVariants({ variant: "ghost", size: "icon" }),
           "rounded-r-none"
         )}
+        onClick={() => onOp?.("union")}
       >
         <SquaresUniteIcon />
       </button>
@@ -43,19 +43,35 @@ export function OpsControl({ disabled }: { disabled?: boolean }) {
           <CaretDownIcon className="size-3" />
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="end">
-          <DropdownMenuItem className="text-xs" disabled={disabled}>
+          <DropdownMenuItem
+            className="text-xs"
+            disabled={disabled}
+            onSelect={() => onOp?.("union")}
+          >
             <SquaresUniteIcon className="size-4" />
             Union
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-xs" disabled={disabled}>
+          <DropdownMenuItem
+            className="text-xs"
+            disabled={disabled}
+            onSelect={() => onOp?.("difference")}
+          >
             <SquaresSubtractIcon className="size-4" />
             Subtract
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-xs" disabled={disabled}>
+          <DropdownMenuItem
+            className="text-xs"
+            disabled={disabled}
+            onSelect={() => onOp?.("intersection")}
+          >
             <SquaresIntersectIcon className="size-4" />
             Intersect
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-xs" disabled={disabled}>
+          <DropdownMenuItem
+            className="text-xs"
+            disabled={disabled}
+            onSelect={() => onOp?.("xor")}
+          >
             <SquaresExcludeIcon className="size-4" />
             Exclude
           </DropdownMenuItem>

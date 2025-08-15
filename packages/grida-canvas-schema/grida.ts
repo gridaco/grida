@@ -1496,7 +1496,7 @@ export namespace grida.program.nodes {
       i.IStroke,
       i.IPositioning {
     type: "boolean";
-    op: "difference" | "intersect" | "union" | "xor";
+    op: cg.BooleanOperation;
   }
 
   export interface TextNode
@@ -2016,6 +2016,7 @@ export namespace grida.program.nodes {
           } satisfies RectangleNode;
         }
         // TODO:
+        case "boolean":
         case "group":
         case "container":
         case "component":

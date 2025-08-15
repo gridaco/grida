@@ -1043,7 +1043,8 @@ impl FigmaConverter {
             transform,
             op: op,
             children,
-            // corner_radius: RectangularCornerRadius::zero(),
+            // map this
+            corner_radius: None,
             fill: self
                 .convert_fills(Some(&origin.fills))
                 .first()

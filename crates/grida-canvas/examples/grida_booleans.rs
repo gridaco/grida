@@ -73,6 +73,7 @@ async fn demo_booleans() -> Scene {
             active: true,
             transform: AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0),
             op: BooleanPathOperation::Union,
+            corner_radius: None,
             children: vec![rect.id.clone(), circle.id.clone()],
             fill: Paint::Solid(SolidPaint {
                 color: CGColor(100, 100, 200, 255),
@@ -155,6 +156,7 @@ async fn demo_booleans() -> Scene {
             transform: AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0),
             op: BooleanPathOperation::Intersection,
             children: vec![circle1.id.clone(), circle2.id.clone()],
+            corner_radius: None,
             fill: Paint::Solid(SolidPaint {
                 color: CGColor(100, 100, 200, 255),
                 opacity: 1.0,
@@ -235,6 +237,7 @@ async fn demo_booleans() -> Scene {
             active: true,
             transform: AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0),
             op: BooleanPathOperation::Difference,
+            corner_radius: None,
             children: vec![star.id.clone(), rect.id.clone()],
             fill: Paint::Solid(SolidPaint {
                 color: CGColor(100, 100, 200, 255),
@@ -316,6 +319,7 @@ async fn demo_booleans() -> Scene {
             active: true,
             transform: AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0),
             op: BooleanPathOperation::Xor,
+            corner_radius: None,
             children: vec![square1.id.clone(), square2.id.clone()],
             fill: Paint::Solid(SolidPaint {
                 color: CGColor(100, 100, 200, 255),

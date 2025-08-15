@@ -529,7 +529,7 @@ export interface EditorUngroupAction {
 export interface EditorBooleanOperationAction {
   type: "boolean-operation";
   target: ReadonlyArray<NodeID>;
-  op: "union" | "intersect" | "subtract" | "exclude";
+  op: cg.BooleanOperation;
 }
 
 export type EditorConfigAction =
