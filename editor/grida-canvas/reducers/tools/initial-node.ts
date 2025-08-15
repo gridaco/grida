@@ -18,7 +18,18 @@ export const black: cg.Paint = {
 };
 
 export default function initialNode(
-  type: grida.program.nodes.Node["type"],
+  type:
+    | "text"
+    | "container"
+    | "iframe"
+    | "richtext"
+    | "image"
+    | "video"
+    | "ellipse"
+    | "rectangle"
+    | "polygon"
+    | "star"
+    | "line",
   seed: Partial<Omit<grida.program.nodes.UnknwonNode, "type">> = {}
 ): grida.program.nodes.Node {
   const id = nid();
@@ -234,15 +245,6 @@ export default function initialNode(
         height: 0,
         ...seed,
       } satisfies grida.program.nodes.LineNode;
-    }
-    case "group":
-    case "svgpath":
-    case "vector":
-    case "bitmap":
-    case "component":
-    case "instance":
-    case "template_instance": {
-      throw new Error(`${type} insertion not supported`);
     }
   }
 }

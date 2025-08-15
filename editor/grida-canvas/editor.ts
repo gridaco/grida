@@ -751,6 +751,38 @@ export class Editor
     });
   }
 
+  public union(target: ReadonlyArray<editor.NodeID>) {
+    this.dispatch({
+      type: "boolean-operation",
+      target: target,
+      op: "union",
+    });
+  }
+
+  public intersect(target: ReadonlyArray<editor.NodeID>) {
+    this.dispatch({
+      type: "boolean-operation",
+      target: target,
+      op: "intersect",
+    });
+  }
+
+  public subtract(target: ReadonlyArray<editor.NodeID>) {
+    this.dispatch({
+      type: "boolean-operation",
+      target: target,
+      op: "subtract",
+    });
+  }
+
+  public exclude(target: ReadonlyArray<editor.NodeID>) {
+    this.dispatch({
+      type: "boolean-operation",
+      target: target,
+      op: "exclude",
+    });
+  }
+
   public setClipboardColor(color: cg.RGBA8888) {
     this.dispatch({
       type: "clip/color",

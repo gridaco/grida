@@ -759,6 +759,7 @@ export namespace grida.program.nodes {
   export type NodeType = Node["type"];
 
   export type Node =
+    | BooleanPathOperationNode
     | GroupNode
     | TextNode
     | ImageNode
@@ -824,7 +825,8 @@ export namespace grida.program.nodes {
    * Unknwon node utility type - use within the correct context
    */
   export type UnknwonNode = Omit<
-    Partial<GroupNode> &
+    Partial<BooleanPathOperationNode> &
+      Partial<GroupNode> &
       Partial<TextNode> &
       Partial<BitmapNode> &
       Partial<ImageNode> &
@@ -851,6 +853,15 @@ export namespace grida.program.nodes {
   export type UnknownNodeProperties<T = unknown> = Record<keyof UnknwonNode, T>;
 
   // #region node prototypes
+
+  export type BooleanPathOperationNodePrototype = __TPrototypeNode<
+    Omit<
+      Partial<BooleanPathOperationNode>,
+      __base_scene_node_properties | "children"
+    > &
+      __IPrototypeNodeChildren
+  >;
+
   export type GroupNodePrototype = __TPrototypeNode<
     Omit<Partial<GroupNode>, __base_scene_node_properties | "children"> &
       __IPrototypeNodeChildren
@@ -893,6 +904,7 @@ export namespace grida.program.nodes {
    * Main difference between an actual node or node data is, a prototype is only required to have a partial node data, and it has its own hierarchy of children.
    */
   export type NodePrototype =
+    | BooleanPathOperationNodePrototype
     | GroupNodePrototype
     | TextNodePrototype
     | ImageNodePrototype
@@ -1467,6 +1479,24 @@ export namespace grida.program.nodes {
       i.IPositioning {
     type: "group";
     //
+  }
+
+  /**
+   * Boolean Path Operation Node
+   *
+   * [BooleanPathOperationNode] is not supported in the html/svg backend.
+   */
+  export interface BooleanPathOperationNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IChildrenReference,
+      i.IExpandable,
+      i.IRotation,
+      i.IFill<cg.Paint>,
+      i.IStroke,
+      i.IPositioning {
+    type: "boolean";
+    op: "difference" | "intersect" | "union" | "xor";
   }
 
   export interface TextNode

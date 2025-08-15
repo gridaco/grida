@@ -45,6 +45,7 @@ export type DocumentAction =
   | EditorContainAction
   | EditorGroupAction
   | EditorUngroupAction
+  | EditorBooleanOperationAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -523,6 +524,12 @@ export interface EditorGroupAction {
 export interface EditorUngroupAction {
   type: "ungroup";
   target: NodeID[] | "selection";
+}
+
+export interface EditorBooleanOperationAction {
+  type: "boolean-operation";
+  target: ReadonlyArray<NodeID>;
+  op: "union" | "intersect" | "subtract" | "exclude";
 }
 
 export type EditorConfigAction =

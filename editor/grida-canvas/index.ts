@@ -1943,6 +1943,10 @@ export namespace editor.api {
     paste(): void;
     duplicate(target: "selection" | NodeID): void;
     flatten(target: "selection" | NodeID): void;
+    union(target: ReadonlyArray<NodeID>): void;
+    subtract(target: ReadonlyArray<NodeID>): void;
+    intersect(target: ReadonlyArray<NodeID>): void;
+    exclude(target: ReadonlyArray<NodeID>): void;
 
     setClipboardColor(color: cg.RGBA8888): void;
 

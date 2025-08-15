@@ -50,11 +50,15 @@ impl CGColor {
 }
 
 /// Boolean path operation.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum BooleanPathOperation {
+    #[serde(rename = "union")]
     Union,        // A ∪ B
+    #[serde(rename = "intersection")]
     Intersection, // A ∩ B
+    #[serde(rename = "difference")]
     Difference,   // A - B
+    #[serde(rename = "xor")]
     Xor,          // A ⊕ B
 }
 

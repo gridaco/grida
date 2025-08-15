@@ -353,6 +353,8 @@ pub enum JSONNode {
     Line(JSONLineNode),
     #[serde(rename = "text")]
     Text(JSONTextNode),
+    #[serde(rename = "boolean")]
+    BooleanOperation(JSONBooleanOperationNode),
     Unknown(JSONUnknownNodeProperties),
 }
 
@@ -518,6 +520,18 @@ pub struct JSONRegularStarPolygonNode {
 
     #[serde(rename = "innerRadius")]
     pub inner_radius: f32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONBooleanOperationNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "op")]
+    pub op: BooleanPathOperation,
+
+    #[serde(rename = "children")]
+    pub children: Vec<String>,
 }
 
 // Default value functions
@@ -938,6 +952,39 @@ impl From<JSONVectorNode> for Node {
     }
 }
 
+impl From<JSONBooleanOperationNode> for Node {
+    fn from(node: JSONBooleanOperationNode) -> Self {
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
+
+        Node::BooleanOperation(BooleanPathOperationNode {
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
+            transform,
+            op: node.op,
+            children: node.children,
+            fill: node.base.fill.into(),
+            stroke: node.base.stroke.map(|s| Paint::from(Some(s))),
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+        })
+    }
+}
+
 impl From<JSONNode> for Node {
     fn from(node: JSONNode) -> Self {
         match node {
@@ -951,6 +998,7 @@ impl From<JSONNode> for Node {
             JSONNode::RegularPolygon(rpolygon) => rpolygon.into(),
             JSONNode::RegularStarPolygon(rsp) => rsp.into(),
             JSONNode::Line(line) => line.into(),
+            JSONNode::BooleanOperation(boolean) => boolean.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNode {
                 id: unknown.id,
                 name: unknown.name,
@@ -1071,6 +1119,42 @@ mod tests {
             !parsed.document.nodes.is_empty(),
             "nodes should not be empty"
         );
+    }
+
+    #[test]
+    fn deserialize_boolean_operation_node() {
+        let json = r#"{
+            "id": "boolean-1",
+            "name": "Boolean Operation",
+            "type": "boolean",
+            "operation": "union",
+            "children": ["child-1", "child-2"],
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": 200.0,
+            "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("failed to deserialize BooleanOperationNode");
+
+        match node {
+            JSONNode::BooleanOperation(boolean_node) => {
+                assert_eq!(boolean_node.base.id, "boolean-1");
+                assert_eq!(
+                    boolean_node.base.name,
+                    Some("Boolean Operation".to_string())
+                );
+                assert_eq!(boolean_node.op, BooleanPathOperation::Union);
+                assert_eq!(boolean_node.children, vec!["child-1", "child-2"]);
+                assert_eq!(boolean_node.base.left, 100.0);
+                assert_eq!(boolean_node.base.top, 100.0);
+                assert_eq!(boolean_node.base.width, 200.0);
+                assert_eq!(boolean_node.base.height, 200.0);
+            }
+            _ => panic!("Expected BooleanOperation node"),
+        }
     }
 
     #[test]
