@@ -527,7 +527,7 @@ export interface EditorUngroupAction {
 }
 
 export interface EditorBooleanOperationAction {
-  type: "boolean-operation";
+  type: "op";
   target: ReadonlyArray<NodeID>;
   op: cg.BooleanOperation;
 }

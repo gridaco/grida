@@ -19,6 +19,7 @@ export const FLATTENABLE_NODE_TYPES = new Set<grida.program.nodes.NodeType>([
   "ellipse",
   "line",
   "vector",
+  "boolean",
 ]);
 
 export function supportsFlatten(node: {
@@ -143,6 +144,8 @@ function toVectorNetwork(
       //   y2: size.height,
       // });
     }
+    // TODO:
+    case "boolean":
     default: {
       return null;
     }

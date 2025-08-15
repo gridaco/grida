@@ -753,7 +753,7 @@ export class Editor
 
   public op(target: ReadonlyArray<editor.NodeID>, op: cg.BooleanOperation) {
     this.dispatch({
-      type: "boolean-operation",
+      type: "op",
       target: target,
       op: op,
     });
@@ -761,7 +761,7 @@ export class Editor
 
   public union(target: ReadonlyArray<editor.NodeID>) {
     this.dispatch({
-      type: "boolean-operation",
+      type: "op",
       target: target,
       op: "union",
     });
@@ -769,7 +769,7 @@ export class Editor
 
   public intersect(target: ReadonlyArray<editor.NodeID>) {
     this.dispatch({
-      type: "boolean-operation",
+      type: "op",
       target: target,
       op: "intersection",
     });
@@ -777,7 +777,7 @@ export class Editor
 
   public subtract(target: ReadonlyArray<editor.NodeID>) {
     this.dispatch({
-      type: "boolean-operation",
+      type: "op",
       target: target,
       op: "difference",
     });
@@ -785,7 +785,7 @@ export class Editor
 
   public exclude(target: ReadonlyArray<editor.NodeID>) {
     this.dispatch({
-      type: "boolean-operation",
+      type: "op",
       target: target,
       op: "xor",
     });
