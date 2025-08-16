@@ -16,6 +16,7 @@ import {
   GlobeIcon,
   GroupIcon,
 } from "@radix-ui/react-icons";
+import { SquaresUniteIcon } from "lucide-react";
 
 export function NodeTypeIcon({
   className,
@@ -63,6 +64,8 @@ export function NodeTypeIcon({
       return <TransparencyGridIcon className={className} />;
     case "group":
       return <GroupIcon className={className} />;
+    case "boolean":
+      return <SquaresUniteIcon className={className} />;
   }
   return <BoxIcon className={className} />;
 }
