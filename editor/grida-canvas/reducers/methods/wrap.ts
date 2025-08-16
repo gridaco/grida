@@ -9,6 +9,57 @@ import nid from "../tools/id";
 import { self_selectNode } from "./selection";
 import * as modeProperties from "@/grida-canvas/utils/properties";
 import cg from "@grida/cg";
+import "core-js/features/object/group-by";
+
+/**
+ * Preserves the original order of nodes in their parent's children array.
+ * This ensures that when nodes are grouped, their visual stacking order is maintained.
+ *
+ * @param draft - Mutable editor state draft
+ * @param nodeIds - Node ids to sort by their original order
+ * @returns Array of node ids sorted by their original index in parent's children array
+ */
+function preserveOriginalOrder<S extends editor.state.IEditorState>(
+  draft: Draft<S>,
+  nodeIds: string[]
+): string[] {
+  // Group nodes by their parent
+  const groups = Object.groupBy(
+    nodeIds,
+    (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? "<root>"
+  );
+
+  const result: string[] = [];
+
+  Object.keys(groups).forEach((parentId) => {
+    const nodesInParent = groups[parentId]!;
+
+    if (parentId === "<root>") {
+      // For root nodes, sort by their index in scene.children
+      const scene = draft.document.scenes[draft.scene_id!];
+      const sorted = nodesInParent.sort((a, b) => {
+        const indexA = scene.children.indexOf(a);
+        const indexB = scene.children.indexOf(b);
+        return indexA - indexB;
+      });
+      result.push(...sorted);
+    } else {
+      // For child nodes, sort by their index in parent's children array
+      const parent = dq.__getNodeById(
+        draft,
+        parentId
+      ) as grida.program.nodes.i.IChildrenReference;
+      const sorted = nodesInParent.sort((a, b) => {
+        const indexA = parent.children.indexOf(a);
+        const indexB = parent.children.indexOf(b);
+        return indexA - indexB;
+      });
+      result.push(...sorted);
+    }
+  });
+
+  return result;
+}
 
 /**
  * Wraps the provided nodes with a newly created container or group node.
@@ -32,11 +83,17 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
 ): grida.program.nodes.NodeID[] {
   const scene = draft.document.scenes[draft.scene_id!];
 
+  // Filter nodes and preserve their original order
+  const filteredNodeIds = nodeIds.filter((id) => {
+    const isRoot = scene.children.includes(id);
+    return scene.constraints.children !== "single" || !isRoot;
+  });
+
+  // Preserve the original order of nodes in their parent's children array
+  const orderedNodeIds = preserveOriginalOrder(draft, filteredNodeIds);
+
   const groups = Object.groupBy(
-    nodeIds.filter((id) => {
-      const isRoot = scene.children.includes(id);
-      return scene.constraints.children !== "single" || !isRoot;
-    }),
+    orderedNodeIds,
     (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? "<root>"
   );
 
@@ -83,6 +140,7 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
       )
     )[0];
 
+    // Move nodes in their preserved order
     g.forEach((id) => {
       self_moveNode(draft, id, wrapperId);
     });
@@ -160,7 +218,7 @@ export function self_ungroup<S extends editor.state.IEditorState>(
       }
     }
 
-    // Move all children to the parent of the group
+    // Move all children to the parent of the group, preserving their order
     const children_to_move = [...group_node.children];
     children_to_move.forEach((child_id) => {
       // Move the child to the group's parent
@@ -230,11 +288,17 @@ export function self_wrapNodesAsBooleanOperation<
 ): grida.program.nodes.NodeID[] {
   const scene = draft.document.scenes[draft.scene_id!];
 
+  // Filter nodes and preserve their original order
+  const filteredNodeIds = nodeIds.filter((id) => {
+    const isRoot = scene.children.includes(id);
+    return scene.constraints.children !== "single" || !isRoot;
+  });
+
+  // Preserve the original order of nodes in their parent's children array
+  const orderedNodeIds = preserveOriginalOrder(draft, filteredNodeIds);
+
   const groups = Object.groupBy(
-    nodeIds.filter((id) => {
-      const isRoot = scene.children.includes(id);
-      return scene.constraints.children !== "single" || !isRoot;
-    }),
+    orderedNodeIds,
     (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? "<root>"
   );
 
@@ -284,6 +348,7 @@ export function self_wrapNodesAsBooleanOperation<
       )
     )[0];
 
+    // Move nodes in their preserved order
     g.forEach((id) => {
       self_moveNode(draft, id, wrapperId);
     });
