@@ -22,10 +22,10 @@ export type MixedPropertiesEditor = ReturnType<typeof useMixedProperties>;
 /**
  * @deprecated expensive
  */
-export function useMixedProperties(selection: string[]) {
+export function useMixedProperties(ids: string[]) {
   const instance = useCurrentEditor();
   const nodes = useEditorState(instance, (state) =>
-    selection.map((id) => state.document.nodes[id])
+    ids.map((id) => state.document.nodes[id])
   );
 
   const mixedProperties = useMemo(
@@ -43,11 +43,11 @@ export function useMixedProperties(selection: string[]) {
 
   const name = useCallback(
     (value: string) => {
-      selection.forEach((id) => {
+      ids.forEach((id) => {
         instance.changeNodeName(id, value);
       });
     },
-    [selection, instance.changeNodeName]
+    [ids, instance.changeNodeName]
   );
 
   const copy = useCallback(() => {
@@ -56,20 +56,20 @@ export function useMixedProperties(selection: string[]) {
 
   const active = useCallback(
     (value: boolean) => {
-      selection.forEach((id) => {
+      ids.forEach((id) => {
         instance.changeNodeActive(id, value);
       });
     },
-    [selection, instance.changeNodeActive]
+    [ids, instance.changeNodeActive]
   );
 
   const locked = useCallback(
     (value: boolean) => {
-      selection.forEach((id) => {
+      ids.forEach((id) => {
         instance.changeNodeLocked(id, value);
       });
     },
-    [selection, instance.changeNodeLocked]
+    [ids, instance.changeNodeLocked]
   );
 
   const rotation = useCallback(
@@ -196,20 +196,18 @@ export function useMixedProperties(selection: string[]) {
 
   const fill = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      const ids = mixedProperties.fill?.ids;
-      if (!ids) return;
+      // Apply fill to all selected nodes, not just ones that already have fill
       instance.changeNodeFill(ids, value);
     },
-    [mixedProperties.fill?.ids, instance]
+    [ids, instance]
   );
 
   const stroke = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      const ids = mixedProperties.stroke?.ids;
-      if (!ids) return;
+      // Apply stroke to all selected nodes, not just ones that already have stroke
       instance.changeNodeStroke(ids, value);
     },
-    [mixedProperties.stroke?.ids, instance]
+    [ids, instance]
   );
 
   const strokeWidth = useCallback(
@@ -353,12 +351,12 @@ export function useMixedProperties(selection: string[]) {
 
   return useMemo(() => {
     return {
-      selection,
+      selection: ids,
       nodes,
       properties: mixedProperties,
       actions,
     };
-  }, [selection, nodes, mixedProperties, actions]);
+  }, [ids, nodes, mixedProperties, actions]);
   //
 }
 

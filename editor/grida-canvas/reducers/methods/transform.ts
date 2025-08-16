@@ -38,6 +38,25 @@ const cardinal_direction_vector = {
   w: [-1, 0] as cmath.Vector2,
 } as const;
 
+/**
+ * Determines if a node type allows hierarchy changes during translation.
+ * Container nodes allow children to escape/enter during translation.
+ * Group and boolean nodes do not allow hierarchy changes - children must stay within their parent.
+ */
+function allows_hierarchy_change(
+  node_type: grida.program.nodes.NodeType
+): boolean {
+  switch (node_type) {
+    case "container":
+      return true;
+    case "group":
+    case "boolean":
+      return false;
+    default:
+      return false;
+  }
+}
+
 export function self_update_gesture_transform<
   S extends editor.state.IEditorState,
 >(draft: Draft<S>, context: ReducerContext) {
@@ -222,7 +241,7 @@ function __self_update_gesture_transform_translate(
 
         const node = dq.__getNodeById(draft, node_id);
         // [2]
-        if (node.type !== "container") return false;
+        if (!allows_hierarchy_change(node.type)) return false;
 
         return true;
       });
@@ -236,6 +255,15 @@ function __self_update_gesture_transform_translate(
         //
         const prev_parent_id = dq.getParentId(draft.document_ctx, node_id);
         if (prev_parent_id === new_parent_id) return;
+
+        // Check if the current parent allows hierarchy changes
+        if (prev_parent_id) {
+          const current_parent = dq.__getNodeById(draft, prev_parent_id);
+          if (!allows_hierarchy_change(current_parent.type)) {
+            // Current parent doesn't allow hierarchy changes, so prevent escaping
+            return;
+          }
+        }
 
         is_parent_changed = true;
 

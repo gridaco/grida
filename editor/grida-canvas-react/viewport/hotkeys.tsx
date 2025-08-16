@@ -597,10 +597,11 @@ export function useEditorHotKeys() {
   useHotkeys(
     "enter",
     () => {
-      editor.select(">");
-
-      // TODO: check if select(">") is possible first, then toggle when not possible
-      editor.tryToggleContentEditMode();
+      const maybe_selected = editor.select(">");
+      if (!maybe_selected) {
+        // check if select(">") is possible first, then toggle when not possible
+        editor.tryToggleContentEditMode();
+      }
     },
     {
       preventDefault: true,

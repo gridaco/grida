@@ -1075,6 +1075,22 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target, op } = action;
       const target_node_ids = target;
 
+      // Check if we have exactly one target and it's already a boolean operation node
+      if (target_node_ids.length === 1) {
+        const node = dq.__getNodeById(state, target_node_ids[0]);
+        if (node && node.type === "boolean") {
+          // Simply change the op value of the existing boolean operation node
+          return produce(state, (draft) => {
+            const booleanNode = dq.__getNodeById(
+              draft,
+              target_node_ids[0]
+            ) as grida.program.nodes.BooleanPathOperationNode;
+            booleanNode.op = op;
+          });
+        }
+      }
+
+      // Original behavior: wrap multiple nodes in a new boolean operation
       const flattenable: string[] = [];
       const ignored: string[] = [];
       for (const node_id of target_node_ids) {
