@@ -275,7 +275,18 @@ pub fn boolean_operation_path(
         return None;
     }
 
-    Some(merge_shapes(&shapes_with_ops))
+    let path = merge_shapes(&shapes_with_ops);
+    let path = if let Some(r) = node.corner_radius {
+        if r > 0.0 {
+            build_corner_radius_path(&path, r)
+        } else {
+            path
+        }
+    } else {
+        path
+    };
+
+    Some(path)
 }
 
 /// Convenience wrapper around [`boolean_operation_path`] returning a [`PainterShape`].
