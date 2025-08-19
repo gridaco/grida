@@ -75,7 +75,7 @@ export function measure(
   }
 
   // If `a` contains `b`
-  if (cmath.rect.contains(rectB, rectA)) {
+  if (cmath.rect.contains(rectA, rectB)) {
     return {
       a: rectA,
       b: rectB,
@@ -85,7 +85,7 @@ export function measure(
   }
 
   // If `b` contains `a`
-  if (cmath.rect.contains(rectA, rectB)) {
+  if (cmath.rect.contains(rectB, rectA)) {
     return {
       a: rectA,
       b: rectB,

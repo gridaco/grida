@@ -834,7 +834,7 @@ function __before_end_insert_and_resize(
   siblings.forEach((id) => {
     if (id === pending.node_id) return;
     const rect = context.geometry.getNodeAbsoluteBoundingRect(id)!;
-    if (cmath.rect.contains(rect, container_rect)) {
+    if (cmath.rect.contains(container_rect, rect)) {
       self_moveNode(draft, id, pending.node_id);
       const child = dq.__getNodeById(
         draft,

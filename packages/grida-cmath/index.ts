@@ -1695,28 +1695,28 @@ namespace cmath {
     }
 
     /**
-     * Checks if rectangle `a` is fully contained within rectangle `b`.
+     * Checks if rectangle `a` fully contains rectangle `b`.
      *
-     * A rectangle `a` is considered contained within rectangle `b` if:
-     * - The top-left corner of `a` lies within `b`.
-     * - The bottom-right corner of `a` lies within `b`.
+     * A rectangle `target` is considered contained within rectangle `container` if:
+     * - The top-left corner of `target` lies within `container`.
+     * - The bottom-right corner of `target` lies within `container`.
      *
-     * @param a - The rectangle to test for containment.
-     * @param b - The containing rectangle.
-     * @returns `true` if rectangle `a` is fully contained within rectangle `b`, otherwise `false`.
+     * @param a - The containing rectangle.
+     * @param b - The rectangle to test for containment.
+     * @returns `true` if rectangle `target` is fully contained within rectangle `container`, otherwise `false`.
      *
      * @example
-     * const a = { x: 20, y: 20, width: 30, height: 30 };
-     * const b = { x: 10, y: 10, width: 100, height: 100 };
-     * cmath.rect.contains(a, b); // Returns true.
+     * const container = { x: 10, y: 10, width: 100, height: 100 };
+     * const target = { x: 20, y: 20, width: 30, height: 30 };
+     * cmath.rect.contains(container, target); // Returns true.
      */
     export function contains(a: Rectangle, b: Rectangle): boolean {
-      const aRight = a.x + a.width;
-      const aBottom = a.y + a.height;
-      const bRight = b.x + b.width;
-      const bBottom = b.y + b.height;
+      const ax_max = a.x + a.width;
+      const ay_max = a.y + a.height;
+      const bx_max = b.x + b.width;
+      const by_max = b.y + b.height;
 
-      return a.x >= b.x && a.y >= b.y && aRight <= bRight && aBottom <= bBottom;
+      return b.x >= a.x && b.y >= a.y && bx_max <= ax_max && by_max <= ay_max;
     }
 
     /**
@@ -3427,7 +3427,7 @@ namespace cmath {
       rect: Rectangle
     ): boolean {
       const bbox = getBBox({ a, b, ta, tb });
-      return cmath.rect.contains(bbox, rect);
+      return cmath.rect.contains(rect, bbox);
     }
 
     /**
