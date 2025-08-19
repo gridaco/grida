@@ -939,6 +939,26 @@ namespace cmath {
 
   export namespace compass {
     /**
+     * Cardinal direction vector
+     *
+     * - `n -> [0, -1]`
+     * - `e -> [1, 0]`
+     * - `s -> [0, 1]`
+     * - `w -> [-1, 0]`
+     * - ... and so on
+     */
+    export const cardinal_direction_vector = {
+      nw: [-1, -1] as cmath.Vector2,
+      ne: [1, -1] as cmath.Vector2,
+      sw: [-1, 1] as cmath.Vector2,
+      se: [1, 1] as cmath.Vector2,
+      n: [0, -1] as cmath.Vector2,
+      e: [1, 0] as cmath.Vector2,
+      s: [0, 1] as cmath.Vector2,
+      w: [-1, 0] as cmath.Vector2,
+    } as const;
+
+    /**
      * Inverted cardinal directions `nw -> se, ne -> sw` and so on
      *
      * @internal

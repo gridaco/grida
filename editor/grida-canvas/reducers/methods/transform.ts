@@ -19,26 +19,6 @@ import nid from "../tools/id";
 import type { ReducerContext } from "..";
 
 /**
- * Cardinal direction vector
- *
- * - `n -> [0, -1]`
- * - `e -> [1, 0]`
- * - `s -> [0, 1]`
- * - `w -> [-1, 0]`
- * - ... and so on
- */
-const cardinal_direction_vector = {
-  nw: [-1, -1] as cmath.Vector2,
-  ne: [1, -1] as cmath.Vector2,
-  sw: [-1, 1] as cmath.Vector2,
-  se: [1, 1] as cmath.Vector2,
-  n: [0, -1] as cmath.Vector2,
-  e: [1, 0] as cmath.Vector2,
-  s: [0, 1] as cmath.Vector2,
-  w: [-1, 0] as cmath.Vector2,
-} as const;
-
-/**
  * Determines if a node type allows hierarchy changes during translation.
  * Container nodes allow children to escape/enter during translation.
  * Group and boolean nodes do not allow hierarchy changes - children must stay within their parent.
@@ -576,7 +556,7 @@ function __self_update_gesture_transform_scale(
 
   // inverse the delta based on handle
   const movement = cmath.vector2.multiply(
-    cardinal_direction_vector[direction],
+    cmath.compass.cardinal_direction_vector[direction],
     rawMovement,
     transform_with_center_origin === "on" ? [2, 2] : [1, 1]
   );
