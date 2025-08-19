@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useCurrentEditor, useEditorState } from "./use-editor";
-import { useDataTransferEventTarget } from "./provider";
+import { useBackendState, useDataTransferEventTarget } from "./provider";
 import { supportsFlatten } from "@/grida-canvas/reducers/methods/flatten";
 import grida from "@grida/schema";
 
@@ -34,6 +34,7 @@ export type ContextMenuActions = Record<
 
 export function useContextMenuActions(ids: string[]): ContextMenuActions {
   const editor = useCurrentEditor();
+  const backend = useBackendState();
   const { insertText } = useDataTransferEventTarget();
 
   const nodes = useEditorState(editor, (s) => {
@@ -45,17 +46,25 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
   });
 
   const hasSelection = ids.length > 0;
+
+  const canGroup = backend === "canvas" && hasSelection;
+
   const canFlatten =
-    hasSelection && ids.every((id) => supportsFlatten(nodes[id]));
+    backend === "canvas" &&
+    hasSelection &&
+    ids.every((id) => supportsFlatten(nodes[id]));
 
   const canUngroup =
+    backend === "canvas" &&
     hasSelection &&
     ids.some(
       (id) => nodes[id].type === "group" || nodes[id].type === "boolean"
     );
 
   const canPlanarize =
-    hasSelection && ids.every((id) => nodes[id].type === "vector");
+    backend === "canvas" &&
+    hasSelection &&
+    ids.every((id) => nodes[id].type === "vector");
 
   const targetSingleOrSelection =
     ids.length === 1 ? (ids[0] as string) : "selection";
@@ -115,7 +124,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       group: {
         label: "Group",
         shortcut: "⌘G",
-        disabled: !hasSelection,
+        disabled: !canGroup,
         onSelect: () => editor.group(ids),
       },
       ungroup: {

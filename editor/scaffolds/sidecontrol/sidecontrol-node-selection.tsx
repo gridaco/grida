@@ -131,12 +131,14 @@ function Align() {
 function BooleanOperations() {
   const editor = useCurrentEditor();
   const { selection } = useSelectionState();
+  const backend = useBackendState();
   const has_selection = selection.length >= 1;
+  const supports_boolean = backend === "canvas";
 
   return (
     <SidebarSection className="mt-2 flex justify-center">
       <OpsControl
-        disabled={!has_selection}
+        disabled={!has_selection || !supports_boolean}
         onOp={(op) => {
           editor.op(selection, op);
         }}
@@ -146,12 +148,6 @@ function BooleanOperations() {
 }
 
 function Header() {
-  const editor = useCurrentEditor();
-
-  const { selection } = useEditorState(editor, (state) => ({
-    selection: state.selection,
-  }));
-
   return (
     <>
       <div className="w-full flex items-center justify-end gap-1">
