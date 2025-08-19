@@ -13,13 +13,13 @@ fn geometry_cache_builds_recursively() {
     repo.insert(Node::Rectangle(rect));
 
     let mut group2 = nf.create_group_node();
-    group2.transform = AffineTransform::new(2.0, 3.0, 0.0);
+    group2.transform = Some(AffineTransform::new(2.0, 3.0, 0.0));
     group2.children.push(rect_id.clone());
     let group2_id = group2.id.clone();
     repo.insert(Node::Group(group2));
 
     let mut group1 = nf.create_group_node();
-    group1.transform = AffineTransform::new(5.0, 5.0, 0.0);
+    group1.transform = Some(AffineTransform::new(5.0, 5.0, 0.0));
     group1.children.push(group2_id.clone());
     let group1_id = group1.id.clone();
     repo.insert(Node::Group(group1));

@@ -34,13 +34,13 @@ pub extern "C" fn init(
     height: i32,
     cfg_font_fallback: bool,
 ) -> Box<EmscriptenApplication> {
-    Box::new(EmscriptenApplication::new(
+    EmscriptenApplication::new(
         width,
         height,
         cg::runtime::scene::RendererOptions {
             font_fallback: cfg_font_fallback,
         },
-    ))
+    )
 }
 
 #[no_mangle]
@@ -288,12 +288,63 @@ pub unsafe extern "C" fn devtools_rendering_set_show_ruler(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn highlight_strokes(
+    app: *mut EmscriptenApplication,
+    ptr: *const u8,
+    len: usize,
+) {
+    use serde::Deserialize;
+    use serde_json;
+    #[derive(Deserialize)]
+    struct JsStyle {
+        #[serde(rename = "strokeWidth")]
+        stroke_width: Option<f32>,
+        stroke: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct JsArgs {
+        nodes: Vec<String>,
+        #[serde(default)]
+        style: Option<JsStyle>,
+    }
+
+    if let Some(app) = app.as_mut() {
+        if let Some(json) = __str_from_ptr_len(ptr, len) {
+            if let Ok(args) = serde_json::from_str::<JsArgs>(&json) {
+                let style = args.style.map(|s| {
+                    let mut st = cg::devtools::stroke_overlay::StrokeOverlayStyle::default();
+                    if let Some(w) = s.stroke_width {
+                        st.stroke_width = w;
+                    }
+                    if let Some(color) = s.stroke {
+                        let rgba = math2::hex_to_rgba8888(&color);
+                        st.stroke = cg::cg::CGColor(rgba.r, rgba.g, rgba.b, (rgba.a * 255.0) as u8);
+                    }
+                    st
+                });
+                app.highlight_strokes(args.nodes, style);
+            }
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
     app: *mut EmscriptenApplication,
     enabled: bool,
 ) {
     if let Some(app) = app.as_mut() {
         app.devtools_rendering_set_show_tiles(enabled);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn runtime_renderer_set_cache_tile(
+    app: *mut EmscriptenApplication,
+    enabled: bool,
+) {
+    if let Some(app) = app.as_mut() {
+        app.runtime_renderer_set_cache_tile(enabled);
     }
 }
 

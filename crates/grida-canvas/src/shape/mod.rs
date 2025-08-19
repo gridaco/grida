@@ -8,7 +8,7 @@ pub mod regular_polygon;
 pub mod regular_star;
 pub mod rrect;
 pub mod stroke;
-pub mod vn;
+pub mod stroke_varwidth;
 
 pub use corner::*;
 pub use ellipse::*;
@@ -20,7 +20,9 @@ pub use regular_polygon::*;
 pub use regular_star::*;
 pub use rrect::*;
 pub use stroke::*;
-pub use vn::*;
+pub use stroke_varwidth::*;
+
+use crate::vectornetwork::*;
 
 pub enum Shape {
     RRect(RRectShape),
@@ -44,6 +46,26 @@ impl Into<skia_safe::Path> for &Shape {
             Shape::EllipticalRing(shape) => build_ring_path(&shape),
             Shape::RegularStarPolygon(shape) => build_star_path(&shape),
             Shape::RegularPolygon(shape) => build_regular_polygon_path(&shape),
+        }
+    }
+}
+
+impl Shape {
+    /// Convert this shape into a [`VectorNetwork`].
+    pub fn to_vector_network(&self) -> VectorNetwork {
+        match self {
+            Shape::RRect(shape) => build_rrect_vector_network(shape),
+            Shape::SimplePolygon(shape) => build_simple_polygon_vector_network(shape),
+            Shape::Ellipse(shape) => build_ellipse_vector_network(shape),
+            Shape::EllipticalRingSector(_shape) => {
+                todo!("Arc shape to vector network requires manual implementation")
+            }
+            Shape::EllipticalSector(_shape) => {
+                todo!("Arc shape to vector network requires manual implementation")
+            }
+            Shape::EllipticalRing(shape) => build_ring_vector_network(shape),
+            Shape::RegularStarPolygon(shape) => build_star_vector_network(shape),
+            Shape::RegularPolygon(shape) => build_regular_polygon_vector_network(shape),
         }
     }
 }

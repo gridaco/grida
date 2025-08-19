@@ -7,6 +7,7 @@ use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::shape::*;
 use crate::sk;
+use crate::vectornetwork::VectorNetwork;
 use math2::transform::AffineTransform;
 use skia_safe::Path;
 
@@ -72,11 +73,14 @@ use skia_safe::Path;
 pub enum PainterPictureLayer {
     Shape(PainterPictureShapeLayer),
     Text(PainterPictureTextLayer),
+    Vector(PainterPictureVectorLayer),
 }
 
 pub trait Layer {
     fn id(&self) -> &NodeId;
     fn z_index(&self) -> usize;
+    fn transform(&self) -> AffineTransform;
+    fn shape(&self) -> &PainterShape;
 }
 
 impl Layer for PainterPictureLayer {
@@ -84,6 +88,7 @@ impl Layer for PainterPictureLayer {
         match self {
             PainterPictureLayer::Shape(layer) => &layer.base.id,
             PainterPictureLayer::Text(layer) => &layer.base.id,
+            PainterPictureLayer::Vector(layer) => &layer.base.id,
         }
     }
 
@@ -91,6 +96,23 @@ impl Layer for PainterPictureLayer {
         match self {
             PainterPictureLayer::Shape(layer) => layer.base.z_index,
             PainterPictureLayer::Text(layer) => layer.base.z_index,
+            PainterPictureLayer::Vector(layer) => layer.base.z_index,
+        }
+    }
+
+    fn transform(&self) -> AffineTransform {
+        match self {
+            PainterPictureLayer::Shape(layer) => layer.base.transform,
+            PainterPictureLayer::Text(layer) => layer.base.transform,
+            PainterPictureLayer::Vector(layer) => layer.base.transform,
+        }
+    }
+
+    fn shape(&self) -> &PainterShape {
+        match self {
+            PainterPictureLayer::Shape(layer) => &layer.shape,
+            PainterPictureLayer::Text(layer) => &layer.shape,
+            PainterPictureLayer::Vector(layer) => &layer.shape,
         }
     }
 }
@@ -102,26 +124,44 @@ pub struct PainterPictureLayerBase {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub transform: AffineTransform,
-    pub shape: PainterShape,
-    pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
-    pub stroke_path: Option<skia_safe::Path>,
     pub clip_path: Option<skia_safe::Path>,
 }
 
 #[derive(Debug, Clone)]
 pub struct PainterPictureShapeLayer {
     pub base: PainterPictureLayerBase,
+    pub shape: PainterShape,
+    pub effects: LayerEffects,
+    pub strokes: Vec<Paint>,
+    pub fills: Vec<Paint>,
+    pub stroke_path: Option<skia_safe::Path>,
 }
 
 #[derive(Debug, Clone)]
 pub struct PainterPictureTextLayer {
     pub base: PainterPictureLayerBase,
+    pub shape: PainterShape,
+    pub effects: LayerEffects,
+    pub strokes: Vec<Paint>,
+    pub fills: Vec<Paint>,
+    pub stroke_path: Option<skia_safe::Path>,
     pub text: String,
     pub text_style: TextStyle,
     pub text_align: TextAlign,
     pub text_align_vertical: TextAlignVertical,
+}
+
+#[derive(Debug, Clone)]
+pub struct PainterPictureVectorLayer {
+    pub base: PainterPictureLayerBase,
+    pub effects: LayerEffects,
+    pub strokes: Vec<Paint>,
+    pub fills: Vec<Paint>,
+    pub shape: PainterShape,
+    pub vector: VectorNetwork,
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
 }
 
 /// Flat list of [`PainterPictureLayer`] entries.
@@ -164,6 +204,9 @@ impl LayerList {
         out: &mut Vec<PainterPictureLayer>,
     ) {
         if let Some(node) = repo.get(id) {
+            if !node.active() {
+                return;
+            }
             let transform = cache
                 .get_world_transform(id)
                 .unwrap_or_else(AffineTransform::identity);
@@ -194,13 +237,13 @@ impl LayerList {
                             opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.strokes.clone(),
-                            fills: n.fills.clone(),
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: n.strokes.clone(),
+                        fills: n.fills.clone(),
+                        stroke_path,
                     }));
                     for child in &n.children {
                         Self::flatten_node(child, repo, cache, opacity, out);
@@ -226,13 +269,13 @@ impl LayerList {
                                 opacity,
                                 blend_mode: n.blend_mode,
                                 transform,
-                                shape,
-                                effects: n.effects.clone(),
-                                strokes: n.stroke.clone().into_iter().collect(),
-                                fills: vec![n.fill.clone()],
-                                stroke_path,
                                 clip_path: Self::compute_clip_path(&n.id, repo, cache),
                             },
+                            shape,
+                            effects: n.effects.clone(),
+                            strokes: n.stroke.clone().into_iter().collect(),
+                            fills: vec![n.fill.clone()],
+                            stroke_path,
                         }));
                     } else {
                         for child in &n.children {
@@ -259,13 +302,13 @@ impl LayerList {
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.strokes.clone(),
-                            fills: n.fills.clone(),
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: n.strokes.clone(),
+                        fills: n.fills.clone(),
+                        stroke_path,
                     }))
                 }
                 Node::Ellipse(n) => {
@@ -287,13 +330,13 @@ impl LayerList {
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.strokes.clone(),
-                            fills: n.fills.clone(),
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: n.strokes.clone(),
+                        fills: n.fills.clone(),
+                        stroke_path,
                     }))
                 }
                 Node::Polygon(n) => {
@@ -315,13 +358,13 @@ impl LayerList {
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.strokes.clone(),
-                            fills: n.fills.clone(),
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: n.strokes.clone(),
+                        fills: n.fills.clone(),
+                        stroke_path,
                     }))
                 }
                 Node::RegularPolygon(n) => {
@@ -343,13 +386,13 @@ impl LayerList {
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.strokes.clone(),
-                            fills: n.fills.clone(),
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: n.strokes.clone(),
+                        fills: n.fills.clone(),
+                        stroke_path,
                     }))
                 }
                 Node::RegularStarPolygon(n) => {
@@ -371,13 +414,13 @@ impl LayerList {
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.strokes.clone(),
-                            fills: n.fills.clone(),
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: n.strokes.clone(),
+                        fills: n.fills.clone(),
+                        stroke_path,
                     }))
                 }
                 Node::Line(n) => {
@@ -399,13 +442,13 @@ impl LayerList {
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.strokes.clone(),
-                            fills: vec![],
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: n.strokes.clone(),
+                        fills: vec![],
+                        stroke_path,
                     }))
                 }
                 Node::TextSpan(n) => out.push(PainterPictureLayer::Text(PainterPictureTextLayer {
@@ -415,13 +458,13 @@ impl LayerList {
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        shape: build_shape(&IntrinsicSizeNode::TextSpan(n.clone())),
-                        effects: n.effects.clone(),
-                        strokes: n.stroke.clone().into_iter().collect(),
-                        fills: vec![n.fill.clone()],
-                        stroke_path: None,
                         clip_path: Self::compute_clip_path(&n.id, repo, cache),
                     },
+                    shape: build_shape(&IntrinsicSizeNode::TextSpan(n.clone())),
+                    effects: n.effects.clone(),
+                    strokes: n.stroke.clone().into_iter().collect(),
+                    fills: vec![n.fill.clone()],
+                    stroke_path: None,
                     text: n.text.clone(),
                     text_style: n.text_style.clone(),
                     text_align: n.text_align,
@@ -446,41 +489,34 @@ impl LayerList {
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.stroke.clone().into_iter().collect(),
-                            fills: vec![n.fill.clone()],
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: n.stroke.clone().into_iter().collect(),
+                        fills: vec![n.fill.clone()],
+                        stroke_path,
                     }))
                 }
                 Node::Vector(n) => {
                     let shape = build_shape(&IntrinsicSizeNode::Vector(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    out.push(PainterPictureLayer::Vector(PainterPictureVectorLayer {
                         base: PainterPictureLayerBase {
                             id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.strokes.clone(),
-                            fills: n.fill.clone().into_iter().collect(),
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: n.strokes.clone(),
+                        fills: n.fill.clone().into_iter().collect(),
+                        vector: n.network.clone(),
+                        stroke_width: n.stroke_width,
+                        stroke_align: n.stroke_align,
+                        stroke_width_profile: n.stroke_width_profile.clone(),
                     }))
                 }
                 Node::Image(n) => {
@@ -502,13 +538,13 @@ impl LayerList {
                             opacity: parent_opacity * n.opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: vec![n.stroke.clone()],
-                            fills: vec![Paint::Image(n.fill.clone())],
-                            stroke_path,
                             clip_path: Self::compute_clip_path(&n.id, repo, cache),
                         },
+                        shape,
+                        effects: n.effects.clone(),
+                        strokes: vec![n.stroke.clone()],
+                        fills: vec![Paint::Image(n.fill.clone())],
+                        stroke_path,
                     }))
                 }
                 Node::Error(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
@@ -518,13 +554,13 @@ impl LayerList {
                         opacity: parent_opacity * n.opacity,
                         blend_mode: BlendMode::Normal,
                         transform,
-                        shape: build_shape(&IntrinsicSizeNode::Error(n.clone())),
-                        effects: LayerEffects::new_empty(),
-                        strokes: vec![],
-                        fills: vec![],
-                        stroke_path: None,
                         clip_path: Self::compute_clip_path(&n.id, repo, cache),
                     },
+                    shape: build_shape(&IntrinsicSizeNode::Error(n.clone())),
+                    effects: LayerEffects::new_empty(),
+                    strokes: vec![],
+                    fills: vec![],
+                    stroke_path: None,
                 })),
             }
         }

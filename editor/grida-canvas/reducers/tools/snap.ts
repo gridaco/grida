@@ -1,7 +1,6 @@
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
-import { SnapToObjectsResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
-import { editor } from "@/grida-canvas";
+import { SnapResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
 import { dq } from "@/grida-canvas/query";
 
 const q = 1;
@@ -47,6 +46,79 @@ export function snapGuideTranslation(
   return { translated: v + delta };
 }
 
+export function snapMovement(
+  agent: cmath.Rectangle | cmath.Vector2[],
+  anchors: {
+    objects?: cmath.Rectangle[];
+    guides?: grida.program.document.Guide2D[];
+    points?: cmath.Vector2[];
+  },
+  movement: cmath.ext.movement.Movement,
+  threshold: number,
+  enabled = true
+): {
+  movement: cmath.ext.movement.Movement;
+  snapping: SnapResult | undefined;
+} {
+  // we are intentionally not falling back with ?? [] here.
+  const anchor_objects: cmath.Rectangle[] | undefined = anchors.objects
+    ? anchors.objects.map((r) => cmath.rect.quantize(r, q))
+    : undefined;
+
+  const normalized = cmath.ext.movement.normalize(movement);
+
+  let snapping: SnapResult | undefined;
+  let resultMovement: cmath.ext.movement.Movement = movement;
+
+  if (enabled) {
+    const agent_q = Array.isArray(agent)
+      ? agent.map((p) => cmath.vector2.quantize(p, q))
+      : cmath.rect.quantize(agent, q);
+    const moved_agent = Array.isArray(agent_q)
+      ? agent_q.map((p) => cmath.vector2.add(p, normalized))
+      : cmath.rect.translate(agent_q, normalized);
+
+    snapping = snapToCanvasGeometry(
+      moved_agent as any,
+      {
+        objects: anchor_objects,
+        guides: anchors.guides,
+        points: anchors.points,
+      },
+      {
+        x: movement[0] === null ? false : threshold,
+        y: movement[1] === null ? false : threshold,
+      }
+    );
+
+    const [dx, dy] = snapping.delta;
+    resultMovement = [
+      movement[0] === null ? null : normalized[0] + dx,
+      movement[1] === null ? null : normalized[1] + dy,
+    ];
+  }
+
+  return { movement: resultMovement, snapping };
+}
+
+type SnapObjectsResult = SnapResult<{
+  objects: cmath.Rectangle[];
+  guides: grida.program.document.Guide2D[];
+}>;
+
+/**
+ * Main universal function for translating objects with optional snapping.
+ *
+ * Always applies pixel quantization. When snapping is enabled, performs full snapping
+ * calculations. When disabled, skips snapping entirely and applies movement directly.
+ *
+ * @param agents - Objects to translate
+ * @param anchors - Snap targets (objects and guides)
+ * @param movement - Movement vector
+ * @param threshold - Snap threshold
+ * @param enabled - Whether to perform snapping (default: true)
+ * @returns Translated positions and optional snapping result
+ */
 export function snapObjectsTranslation(
   agents: cmath.Rectangle[],
   anchors: {
@@ -54,10 +126,11 @@ export function snapObjectsTranslation(
     guides?: grida.program.document.Guide2D[];
   },
   movement: cmath.ext.movement.Movement,
-  threshold: number
+  threshold: number,
+  enabled = true
 ): {
   translated: { position: cmath.Vector2 }[];
-  snapping: SnapToObjectsResult | undefined;
+  snapping: SnapObjectsResult | undefined;
 } {
   agents = agents.map((r) => cmath.rect.quantize(r, q));
   const anchorObjects =
@@ -70,27 +143,38 @@ export function snapObjectsTranslation(
     q
   );
 
-  const result = snapToCanvasGeometry(
-    _virtually_moved_rect,
-    { objects: anchorObjects, guides: anchors.guides ?? [] },
-    {
-      x: movement[0] === null ? false : threshold,
-      y: movement[1] === null ? false : threshold,
+  let result: SnapObjectsResult | undefined;
+  let bounding_box_xy: cmath.Vector2 = [
+    _virtually_moved_rect.x,
+    _virtually_moved_rect.y,
+  ];
+
+  if (enabled) {
+    result = snapToCanvasGeometry(
+      _virtually_moved_rect,
+      { objects: anchorObjects, guides: anchors.guides ?? [] },
+      {
+        x: movement[0] === null ? false : threshold,
+        y: movement[1] === null ? false : threshold,
+      }
+    );
+    if (result.by_objects) {
+      bounding_box_xy = [
+        result.by_objects.translated.x,
+        result.by_objects.translated.y,
+      ];
     }
-  );
+  } else {
+    result = undefined;
+  }
 
-  const { translated: _translated } = result;
-
-  // top left point of the bounding box
-  const bounding_box_snapped_xy: cmath.Vector2 = [_translated.x, _translated.y];
-
-  // return each xy point of input selection relative to the snapped bounding box
+  // return each xy point of input selection relative to the bounding box
   const translated = agents.map((r) => {
     const offset = cmath.vector2.sub(
       [r.x, r.y],
       [bounding_rect.x, bounding_rect.y]
     );
-    const position = cmath.vector2.add(bounding_box_snapped_xy, offset);
+    const position = cmath.vector2.add(bounding_box_xy, offset);
     return { position };
   });
 

@@ -3,7 +3,7 @@ import { PropertyEnum } from "../ui";
 import { TMixed } from "./utils/types";
 
 export function StrokeAlignControl({
-  value,
+  value = "inside",
   onValueChange,
 }: {
   value?: TMixed<cg.StrokeAlign>;

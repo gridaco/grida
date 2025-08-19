@@ -519,7 +519,7 @@ export class BitmapLayerEditor {
    * Pads the layer if the given bounding box is outside the current layer.
    */
   private expand_to_fit(bbox: cmath.Rectangle): void {
-    if (!cmath.rect.contains(bbox, this._rect)) {
+    if (!cmath.rect.contains(this._rect, bbox)) {
       const newRect = cmath.rect.union([this._rect, bbox]);
       this.expand(newRect);
     }

@@ -6,10 +6,12 @@ import {
   useBackendState,
   useBrushState,
   useClipboardSync,
+  useContentEditModeMinimalState,
   useCurrentSceneState,
   useDocumentState,
   useEventTargetCSSCursor,
   useGestureState,
+  useIsTransforming,
   useMultiplayerCursorState,
   useMultipleSelectionOverlayClick,
   useNode,
@@ -25,6 +27,7 @@ import {
   supports,
 } from "@/grida-canvas/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
+import { Lasso } from "./ui/lasso/lasso";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext, useViewport } from "./context";
 import {
@@ -35,6 +38,7 @@ import {
   useSingleSelection,
 } from "./surface-hooks";
 import { MeasurementGuide } from "./ui/measurement";
+import { VectorMeasurementGuide } from "./ui/vector-measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
@@ -42,9 +46,9 @@ import cmath from "@grida/cmath";
 import { cursors } from "../components/cursor";
 import { PointerCursor } from "@/components/multiplayer/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
-import { SurfacePathEditor } from "./ui/path-editor";
-import { SizeMeterLabel } from "./ui/meter";
+import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
+import { SizeMeterLabel } from "./ui/meter";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler/react";
@@ -61,6 +65,7 @@ import { EdgeScrollingEffect } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
 import { useFollowPlugin } from "../plugins/use-follow";
+import { SurfaceVariableWidthEditor } from "./ui/surface-varwidth-editor";
 
 const DRAG_THRESHOLD = 2;
 
@@ -127,24 +132,33 @@ function useSurfaceGesture(
 function SurfaceGroup({
   hidden,
   children,
-}: React.PropsWithChildren<{ hidden?: boolean }>) {
+  dontRenderWhenHidden,
+}: React.PropsWithChildren<{
+  hidden?: boolean;
+  /**
+   * completely remove from render tree, use this when the content is expensive and worth destroying.
+   */
+  dontRenderWhenHidden?: boolean;
+}>) {
   return (
     <div
       data-ux-hidden={hidden}
       className="opacity-100 data-[ux-hidden='true']:opacity-0 transition-colors"
     >
-      {children}
+      {hidden && dontRenderWhenHidden ? null : children}
     </div>
   );
 }
 
 export function EditorSurface() {
-  const isWindowResizing = useIsWindowResizing();
+  const is_window_resizing = useIsWindowResizing();
+  const is_transforming = useIsTransforming();
   const editor = useCurrentEditor();
   const { transform } = useTransformState();
   const { is_node_transforming, is_node_translating } = useGestureState();
   const { hovered_node_id, selection } = useSelectionState();
-  const { tool, content_edit_mode } = useToolState();
+  const tool = useToolState();
+  const content_edit_mode = useContentEditModeMinimalState();
   const pixelgrid = useEditorState(editor, (state) => state.pixelgrid);
   const ruler = useEditorState(editor, (state) => state.ruler);
   const dropzone = useEditorState(editor, (state) => state.dropzone);
@@ -341,6 +355,7 @@ export function EditorSurface() {
           {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
           <RemoteCursorOverlay />
           <MarqueeOverlay />
+          <LassoOverlay />
         </div>
         <div
           className="w-full h-full"
@@ -348,30 +363,53 @@ export function EditorSurface() {
           ref={portalRef}
         >
           <MeasurementGuide />
+          {content_edit_mode?.type === "vector" && <VectorMeasurementGuide />}
           <SnapGuide />
 
-          <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
+          <SurfaceGroup
+            hidden={
+              is_transforming ||
+              is_node_transforming ||
+              is_node_translating ||
+              is_window_resizing
+            }
+            dontRenderWhenHidden
+          >
             {content_edit_mode?.type === "text" && (
               <SurfaceTextEditor
                 key="text-editor"
                 node_id={content_edit_mode.node_id}
               />
             )}
-            {content_edit_mode?.type === "path" && (
-              <SurfacePathEditor
-                key="path-editor"
+            {content_edit_mode?.type === "vector" && (
+              <SurfaceVectorEditor
+                key="vector-geometry-editor"
                 node_id={content_edit_mode.node_id}
               />
             )}
             {content_edit_mode?.type === "fill/gradient" && (
               <SurfaceGradientEditor
                 key="gradient-editor"
-                {...content_edit_mode}
+                node_id={content_edit_mode.node_id}
               />
             )}
           </SurfaceGroup>
+
+          <SurfaceGroup hidden={is_window_resizing}>
+            {content_edit_mode?.type === "width" && (
+              <SurfaceVariableWidthEditor
+                key="varwidth-editor"
+                node_id={content_edit_mode.node_id}
+              />
+            )}
+          </SurfaceGroup>
+
           <SurfaceGroup
-            hidden={isWindowResizing || content_edit_mode?.type === "path"}
+            hidden={
+              is_transforming ||
+              is_window_resizing ||
+              content_edit_mode?.type === "vector"
+            }
           >
             <SelectionOverlay
               selection={selection}
@@ -379,7 +417,7 @@ export function EditorSurface() {
             />
           </SurfaceGroup>
           <SurfaceGroup
-            hidden={isWindowResizing || content_edit_mode?.type === "path"}
+            hidden={is_window_resizing || content_edit_mode?.type === "vector"}
           >
             <SurfaceGroup
               hidden={tool.type !== "cursor" || is_node_transforming}
@@ -499,6 +537,16 @@ function MarqueeOverlay() {
   );
 }
 
+function LassoOverlay() {
+  const editor = useCurrentEditor();
+  const lasso = useEditorState(editor, (state) => state.lasso);
+  const { transform } = useTransformState();
+
+  if (!lasso) return null;
+  const points = lasso.points.map((p) => cmath.vector2.transform(p, transform));
+  return <Lasso points={points} id="lasso-container" className="fixed" />;
+}
+
 function DropzoneOverlay(props: editor.state.DropzoneIndication) {
   const { transform } = useTransformState();
   switch (props.type) {
@@ -546,7 +594,9 @@ function RootFramesBarOverlay() {
         sideOffset={8}
       >
         <FloatingBarContent>
-          <FloatingBarTitle>{rootframe.name} (single mode)</FloatingBarTitle>
+          <NodeTitleBarTitle node={rootframe}>
+            {" (single mode)"}
+          </NodeTitleBarTitle>
         </FloatingBarContent>
       </NodeTitleBar>
     );
@@ -567,7 +617,7 @@ function RootFramesBarOverlay() {
                 : "idle"
           }
         >
-          <FloatingBarTitle>{node.name}</FloatingBarTitle>
+          <NodeTitleBarTitle node={node} />
         </NodeTitleBar>
       ))}
     </>
@@ -591,12 +641,18 @@ function NodeTitleBar({
   // TODO: knwon issue: when initially firing up the drag on not-selected node, it will cause the root to fire onDragEnd as soon as the drag starts.
   const bind = useSurfaceGesture(
     {
-      onPointerMove: ({ event }) => {
+      // TODO: this is required to make the node stays focused, as as soon as pointer moves, the editor will be calling its own on pointer move, causing empty hit testing, cancelling the hover.
+      // but whith this enabled, it will re-render every time. making the react's rendering very slow.
+      // need a graceful way to handle this.
+      // DISABLED: disabled for now, because keep-hovering when hovering on title bar is not a critical feature.
+      // onPointerMove: () => {
+      //   editor.hoverEnterNode(node.id);
+      // },
+      onPointerEnter: () => {
         editor.hoverEnterNode(node.id);
       },
-      onDoubleClick: ({ event }) => {
-        const name = prompt("rename", node.name);
-        if (name) editor.changeNodeName(node.id, name);
+      onPointerLeave: () => {
+        editor.hoverLeaveNode(node.id);
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
@@ -625,6 +681,71 @@ function NodeTitleBar({
         {children}
       </div>
     </FloatingBar>
+  );
+}
+
+function NodeTitleBarTitle({
+  node,
+  children,
+}: React.PropsWithChildren<{
+  node: grida.program.nodes.Node;
+}>) {
+  const editor = useCurrentEditor();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(node.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setValue(node.name);
+  }, [node.name]);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  const commit = () => {
+    const name = value.trim();
+    if (name && name !== node.name) {
+      editor.changeNodeName(node.id, name);
+    }
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setValue(node.name);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        className="max-w-full w-min pointer-events-auto text-xs truncate text-muted-foreground/65 bg-transparent outline-none"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onPointerDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") cancel();
+        }}
+      />
+    );
+  }
+
+  return (
+    <FloatingBarTitle
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+    >
+      {node.name}
+      {children}
+    </FloatingBarTitle>
   );
 }
 
@@ -815,7 +936,7 @@ function SelectionGroupOverlay({
   readonly?: boolean;
 }) {
   const editor = useCurrentEditor();
-  const { tool } = useToolState();
+  const tool = useToolState();
   const { multipleSelectionOverlayClick } = useMultipleSelectionOverlayClick();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
@@ -910,6 +1031,29 @@ function NodeOverlay({
 }) {
   const { scaleX, scaleY } = useTransformState();
   const backend = useBackendState();
+  const tool = useToolState();
+
+  // enable overlay dragging only when the cursor tool is active and editable
+  const enabled = !readonly && tool.type === "cursor";
+
+  const bind = useSurfaceGesture(
+    {
+      onPointerDown: ({ event }) => {
+        if (tool.type !== "insert" && tool.type !== "draw" && !event.shiftKey) {
+          // prevent default to keep selection when clicking empty overlay
+          // but allow shift+click to fall through for deselection
+          event.preventDefault();
+        }
+      },
+    },
+    {
+      drag: {
+        enabled,
+        threshold: DRAG_THRESHOLD,
+        keyboardDisplacement: 0,
+      },
+    }
+  );
 
   const data = useSingleSelection(node_id);
 
@@ -935,6 +1079,7 @@ function NodeOverlay({
   return (
     <>
       <LayerOverlay
+        {...bind()}
         readonly={readonly}
         transform={style}
         zIndex={zIndex}

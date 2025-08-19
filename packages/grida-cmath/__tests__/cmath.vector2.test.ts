@@ -345,4 +345,106 @@ describe("cmath.vector2", () => {
       expect(result).toEqual([3, 7]); // Expected: [3, 7]
     });
   });
+
+  describe("distance", () => {
+    it("should calculate Euclidean distance between two points", () => {
+      const a: cmath.Vector2 = [3, 4];
+      const b: cmath.Vector2 = [6, 8];
+
+      const result = cmath.vector2.distance(a, b);
+
+      expect(result).toBe(5); // Expected: 5 (3-4-5 triangle)
+    });
+
+    it("should calculate distance for points with negative coordinates", () => {
+      const a: cmath.Vector2 = [-1, -2];
+      const b: cmath.Vector2 = [2, 1];
+
+      const result = cmath.vector2.distance(a, b);
+
+      expect(result).toBeCloseTo(4.2426, 4); // Expected: sqrt(18) ≈ 4.2426
+    });
+
+    it("should return 0 for identical points", () => {
+      const a: cmath.Vector2 = [5, 5];
+      const b: cmath.Vector2 = [5, 5];
+
+      const result = cmath.vector2.distance(a, b);
+
+      expect(result).toBe(0); // Expected: 0
+    });
+  });
+
+  describe("lerp", () => {
+    it("should interpolate at t=0 (start point)", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [10, 20];
+      const t = 0;
+
+      const result = cmath.vector2.lerp(a, b, t);
+
+      expect(result).toEqual([0, 0]); // Expected: start point
+    });
+
+    it("should interpolate at t=1 (end point)", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [10, 20];
+      const t = 1;
+
+      const result = cmath.vector2.lerp(a, b, t);
+
+      expect(result).toEqual([10, 20]); // Expected: end point
+    });
+
+    it("should interpolate at t=0.5 (midpoint)", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [10, 20];
+      const t = 0.5;
+
+      const result = cmath.vector2.lerp(a, b, t);
+
+      expect(result).toEqual([5, 10]); // Expected: midpoint
+    });
+
+    it("should interpolate at t=0.25 (quarter point)", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [100, 50];
+      const t = 0.25;
+
+      const result = cmath.vector2.lerp(a, b, t);
+
+      expect(result).toEqual([25, 12.5]); // Expected: quarter point
+    });
+
+    it("should handle negative coordinates", () => {
+      const a: cmath.Vector2 = [-10, -20];
+      const b: cmath.Vector2 = [10, 20];
+      const t = 0.5;
+
+      const result = cmath.vector2.lerp(a, b, t);
+
+      expect(result).toEqual([0, 0]); // Expected: midpoint between negative and positive
+    });
+
+    it("should handle t values outside [0,1] range", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [10, 20];
+
+      const result1 = cmath.vector2.lerp(a, b, -0.5);
+      const result2 = cmath.vector2.lerp(a, b, 1.5);
+
+      expect(result1).toEqual([-5, -10]); // Expected: extrapolated before start
+      expect(result2).toEqual([15, 30]); // Expected: extrapolated after end
+    });
+
+    it("should handle identical start and end points", () => {
+      const a: cmath.Vector2 = [5, 5];
+      const b: cmath.Vector2 = [5, 5];
+      const t = 0.7;
+
+      const result = cmath.vector2.lerp(a, b, t);
+
+      expect(result).toEqual([5, 5]); // Expected: same point regardless of t
+    });
+  });
 });

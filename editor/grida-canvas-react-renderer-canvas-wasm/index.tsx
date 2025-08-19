@@ -1,10 +1,10 @@
 "use client";
 import React, { useEffect, useLayoutEffect, useState } from "react";
-import init, { Grida2D } from "@grida/canvas-wasm";
+import { Grida2D } from "@grida/canvas-wasm";
 import { useSize } from "@/grida-canvas-react/viewport/size";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
-import locateFile from "./locate-file";
+import { useGrida2D } from "./use-grida2d";
 
 function CanvasContent({
   width,
@@ -12,6 +12,7 @@ function CanvasContent({
   data,
   transform,
   debug,
+  highlightStrokes,
   onMount,
   className,
   dpr,
@@ -22,29 +23,21 @@ function CanvasContent({
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
+  highlightStrokes?: {
+    nodes: string[];
+    style?: { strokeWidth?: number; stroke?: string };
+  };
   onMount?: (surface: Grida2D) => void;
   className?: string;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const rendererRef = React.useRef<Grida2D | null>(null);
+  const rendererRef = useGrida2D(canvasRef);
 
   useLayoutEffect(() => {
-    if (canvasRef.current && !rendererRef.current) {
-      const canvasel = canvasRef.current;
-      init({
-        locateFile: locateFile,
-      }).then((factory) => {
-        console.log("grida wasm initialized");
-        const grida = factory.createWebGLCanvasSurface(canvasel);
-        // grida.setDebug(true);
-        // grida.setVerbose(true);
-
-        rendererRef.current = grida;
-
-        onMount?.(grida);
-      });
+    if (rendererRef.current) {
+      onMount?.(rendererRef.current);
     }
-  }, []);
+  }, [rendererRef.current, onMount]);
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
@@ -92,13 +85,20 @@ function CanvasContent({
     if (rendererRef.current && data) {
       rendererRef.current.loadScene(
         JSON.stringify({
-          version: "0.0.1-beta.1+20250303",
+          version: "0.0.1-beta.1+20250728",
           document: data,
         })
       );
       rendererRef.current.redraw();
     }
   }, [data]);
+
+  useLayoutEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.highlightStrokes(highlightStrokes);
+      rendererRef.current.redraw();
+    }
+  }, [highlightStrokes]);
 
   return (
     <canvas
@@ -130,6 +130,7 @@ export default function Canvas({
   data,
   transform,
   debug,
+  highlightStrokes,
   onMount,
   className,
 }: {
@@ -138,6 +139,10 @@ export default function Canvas({
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
+  highlightStrokes?: {
+    nodes: string[];
+    style?: { strokeWidth?: number; stroke?: string };
+  };
   onMount?: (surface: Grida2D) => void;
   className?: string;
 }) {
@@ -152,6 +157,7 @@ export default function Canvas({
       data={data}
       transform={transform}
       debug={debug}
+      highlightStrokes={highlightStrokes}
       onMount={onMount}
       className={className}
     />

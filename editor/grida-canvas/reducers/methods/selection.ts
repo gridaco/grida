@@ -58,6 +58,113 @@ export function self_selectNode<S extends editor.state.IEditorState>(
 export function self_clearSelection<S extends editor.state.IEditorState>(
   draft: Draft<S>
 ) {
-  draft.selection = [];
+  if (draft.content_edit_mode) {
+    switch (draft.content_edit_mode.type) {
+      case "vector": {
+        draft.content_edit_mode.selection = {
+          selected_vertices: [],
+          selected_segments: [],
+          selected_tangents: [],
+        };
+        draft.content_edit_mode.selection_neighbouring_vertices = [];
+        draft.content_edit_mode.a_point = null;
+        draft.content_edit_mode.next_ta = null;
+        break;
+      }
+    }
+  } else {
+    draft.selection = [];
+  }
+
   return draft;
+}
+
+export type VectorContentSelectionAction =
+  | { type: "vertex"; index: number; additive?: boolean }
+  | { type: "segment"; index: number; additive?: boolean }
+  | { type: "tangent"; index: [number, 0 | 1]; additive?: boolean };
+
+/**
+ * Reduces vector content selection state based on selection actions.
+ *
+ * Handles mixed selection of vertices and segments in VectorContentEditMode.
+ * When not additive (normal select), clears existing selection and selects only the target.
+ * When additive (shift key), toggles the selection state of the target.
+ *
+ * @param state - Current selection state with selected_vertices and selected_segments
+ * @param action - Selection action specifying type (vertex/segment), index, and additive flag
+ * @returns Updated selection state with modified selected_vertices and selected_segments
+ */
+export function reduceVectorContentSelection(
+  state: editor.state.VectorContentEditModeGeometryControlsSelection,
+  action: VectorContentSelectionAction
+): editor.state.VectorContentEditModeGeometryControlsSelection {
+  let { selected_vertices, selected_segments, selected_tangents } = state;
+  const additive = action.additive ?? false;
+
+  if (!additive) {
+    if (action.type === "vertex") {
+      selected_vertices = [action.index];
+      selected_segments = [];
+      selected_tangents = [];
+    } else {
+      if (action.type === "segment") {
+        selected_vertices = [];
+        selected_segments = [action.index];
+        selected_tangents = [];
+      } else {
+        selected_vertices = [];
+        selected_segments = [];
+        selected_tangents = [action.index];
+      }
+    }
+  } else {
+    if (action.type === "vertex") {
+      const set = new Set(selected_vertices);
+      if (set.has(action.index)) {
+        set.delete(action.index);
+      } else {
+        set.add(action.index);
+      }
+      selected_vertices = Array.from(set);
+    } else if (action.type === "segment") {
+      const set = new Set(selected_segments);
+      if (set.has(action.index)) {
+        set.delete(action.index);
+      } else {
+        set.add(action.index);
+      }
+      selected_segments = Array.from(set);
+    } else {
+      const key = (t: [number, 0 | 1]) => `${t[0]}:${t[1]}`;
+      const set = new Set(selected_tangents.map(key));
+      const k = key(action.index);
+      if (set.has(k)) {
+        set.delete(k);
+      } else {
+        set.add(k);
+      }
+      selected_tangents = Array.from(set).map((s) => {
+        const [v, t] = s.split(":");
+        return [parseInt(v), Number(t) as 0 | 1];
+      });
+    }
+  }
+
+  return { selected_vertices, selected_segments, selected_tangents };
+}
+
+export function getVectorSelectionStartPoint(
+  selection: Omit<
+    editor.state.VectorContentEditModeGeometryControlsSelection,
+    "selected_segments"
+  >
+): number | null {
+  if (selection.selected_vertices.length === 1) {
+    return selection.selected_vertices[0];
+  }
+  if (selection.selected_tangents.length === 1) {
+    return selection.selected_tangents[0][0];
+  }
+  return null;
 }

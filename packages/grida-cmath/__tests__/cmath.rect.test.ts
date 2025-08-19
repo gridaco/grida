@@ -38,6 +38,61 @@ describe("cmath.rect", () => {
     });
   });
 
+  describe("fromPointsOrZero", () => {
+    it("should create a rectangle that bounds more than two points", () => {
+      const points: cmath.Vector2[] = [
+        [10, 20],
+        [30, 40],
+        [15, 25],
+        [5, 35],
+      ];
+      const rect = cmath.rect.fromPointsOrZero(points);
+      expect(rect).toEqual({ x: 5, y: 20, width: 25, height: 20 });
+    });
+
+    it("should return zero rectangle if no points are provided", () => {
+      const rect = cmath.rect.fromPointsOrZero([]);
+      expect(rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    });
+
+    it("should handle single point (zero width and height)", () => {
+      const points: cmath.Vector2[] = [[10, 20]];
+      const rect = cmath.rect.fromPointsOrZero(points);
+      expect(rect).toEqual({ x: 10, y: 20, width: 0, height: 0 });
+    });
+
+    it("should handle points with negative coordinates", () => {
+      const points: cmath.Vector2[] = [
+        [-10, -20],
+        [30, 40],
+        [0, -5],
+      ];
+      const rect = cmath.rect.fromPointsOrZero(points);
+      expect(rect).toEqual({ x: -10, y: -20, width: 40, height: 60 });
+    });
+
+    it("should handle points forming a line (zero width or height)", () => {
+      const points: cmath.Vector2[] = [
+        [10, 20],
+        [10, 30],
+        [10, 25],
+      ];
+      const rect = cmath.rect.fromPointsOrZero(points);
+      expect(rect).toEqual({ x: 10, y: 20, width: 0, height: 10 });
+    });
+
+    it("should be identical to fromPoints for non-empty arrays", () => {
+      const points: cmath.Vector2[] = [
+        [10, 20],
+        [30, 40],
+        [15, 25],
+      ];
+      const rect1 = cmath.rect.fromPoints(points);
+      const rect2 = cmath.rect.fromPointsOrZero(points);
+      expect(rect1).toEqual(rect2);
+    });
+  });
+
   describe("toPoints", () => {
     it("[chunk] should return an 9-length array with 9 points with the exact index", () => {
       const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
@@ -112,25 +167,25 @@ describe("cmath.rect", () => {
     it("should return true when rectangle A is fully contained within rectangle B", () => {
       const a: cmath.Rectangle = { x: 20, y: 20, width: 40, height: 40 };
       const b: cmath.Rectangle = { x: 10, y: 10, width: 100, height: 100 };
-      expect(cmath.rect.contains(a, b)).toBe(true);
+      expect(cmath.rect.contains(b, a)).toBe(true);
     });
 
     it("should return false when rectangle A is partially outside rectangle B", () => {
       const a: cmath.Rectangle = { x: 90, y: 90, width: 30, height: 30 };
       const b: cmath.Rectangle = { x: 10, y: 10, width: 100, height: 100 };
-      expect(cmath.rect.contains(a, b)).toBe(false);
+      expect(cmath.rect.contains(b, a)).toBe(false);
     });
 
     it("should return false when rectangle A is completely outside rectangle B", () => {
       const a: cmath.Rectangle = { x: 200, y: 200, width: 50, height: 50 };
       const b: cmath.Rectangle = { x: 10, y: 10, width: 100, height: 100 };
-      expect(cmath.rect.contains(a, b)).toBe(false);
+      expect(cmath.rect.contains(b, a)).toBe(false);
     });
 
     it("should return false when rectangle A is larger than rectangle B", () => {
       const a: cmath.Rectangle = { x: 5, y: 5, width: 150, height: 150 };
       const b: cmath.Rectangle = { x: 10, y: 10, width: 100, height: 100 };
-      expect(cmath.rect.contains(a, b)).toBe(false);
+      expect(cmath.rect.contains(b, a)).toBe(false);
     });
   });
 

@@ -314,6 +314,23 @@ export class Grida2D {
     this.module._pointer_move(this.appptr, x, y);
   }
 
+  highlightStrokes(opts?: {
+    nodes?: string[];
+    style?: { strokeWidth?: number; stroke?: string };
+  }) {
+    const json = JSON.stringify({
+      nodes: opts?.nodes ?? [],
+      style: opts?.style,
+    });
+    const [ptr, len] = this._alloc_string(json);
+    this.module._highlight_strokes(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  runtime_renderer_set_cache_tile(enable: boolean) {
+    this.module._runtime_renderer_set_cache_tile(this.appptr, enable);
+  }
+
   // ====================================================================================================
   // DEVTOOLS
   // ====================================================================================================

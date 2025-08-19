@@ -14,7 +14,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import grida from "@grida/schema";
 import { useMetaEnter } from "@/hooks/use-meta-enter";
 import { Cross2Icon, FrameIcon } from "@radix-ui/react-icons";
@@ -28,9 +27,11 @@ import {
   ToolbarToolType,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/utils";
 import {
+  ToolGroupItem,
   ToolIcon,
   ToolsGroup,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
+import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
 import { ColorPicker } from "../sidecontrol/controls/color-picker";
 import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { PaintBucketIcon } from "lucide-react";
@@ -39,7 +40,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useToolState } from "@/grida-canvas-react/provider";
+import {
+  useContentEditModeMinimalState,
+  useToolState,
+} from "@/grida-canvas-react/provider";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -147,32 +151,34 @@ ${userprompt}
 
 export function PlaygroundToolbar() {
   const editor = useCurrentEditor();
-  const { tool, content_edit_mode } = useToolState();
+  const tool = useToolState();
+  const content_edit_mode = useContentEditModeMinimalState();
 
   const value = toolmode_to_toolbar_value(tool);
+  const [open, setOpen] = useState<string | null>(null);
 
   return (
-    <div className="relative">
+    <div className="relative" aria-label="Toolbar">
       {content_edit_mode?.type === "bitmap" && (
         <div className="relative bottom-2 w-full flex justify-center">
           <BitmapEditModeAuxiliaryToolbar />
         </div>
       )}
       <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto select-none">
-        <ToggleGroup
+        <ToggleGroupPrimitive.Root
+          data-slot="toggle-group"
           onValueChange={(v) => {
-            editor.setTool(
-              v
-                ? toolbar_value_to_cursormode(v as ToolbarToolType)
-                : { type: "cursor" }
-            );
+            editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
           value={value}
           defaultValue="cursor"
           type="single"
+          className="flex items-center justify-center gap-1"
         >
           <ToolsGroup
             value={value}
+            open={open === "cursor"}
+            onOpenChange={(o) => setOpen(o ? "cursor" : null)}
             options={[
               { value: "cursor", label: "Cursor", shortcut: "V" },
               { value: "hand", label: "Hand tool", shortcut: "H" },
@@ -182,19 +188,29 @@ export function PlaygroundToolbar() {
             }}
           />
           <VerticalDivider />
-          <ToggleGroupItem value={"container" satisfies ToolbarToolType}>
+          <ToolGroupItem
+            value={"container" satisfies ToolbarToolType}
+            label="Container tool"
+            shortcut="A, F"
+          >
             <FrameIcon />
-          </ToggleGroupItem>
-          <ToggleGroupItem value={"text" satisfies ToolbarToolType}>
+          </ToolGroupItem>
+          <ToolGroupItem
+            value={"text" satisfies ToolbarToolType}
+            label="Text tool"
+            shortcut="T"
+          >
             <ToolIcon type="text" />
-          </ToggleGroupItem>
+          </ToolGroupItem>
           <ToolsGroup
             value={value}
+            open={open === "shape"}
+            onOpenChange={(o) => setOpen(o ? "shape" : null)}
             options={[
               { value: "rectangle", label: "Rectangle", shortcut: "R" },
               { value: "ellipse", label: "Ellipse", shortcut: "O" },
               { value: "line", label: "Line", shortcut: "L" },
-              { value: "polygon", label: "Polygon" },
+              { value: "polygon", label: "Polygon", shortcut: "Y" },
               { value: "star", label: "Star" },
               { value: "image", label: "Image" },
             ]}
@@ -204,6 +220,8 @@ export function PlaygroundToolbar() {
           />
           <ToolsGroup
             value={value}
+            open={open === "draw"}
+            onOpenChange={(o) => setOpen(o ? "draw" : null)}
             options={[
               { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
               { value: "path", label: "Path tool", shortcut: "P" },
@@ -235,7 +253,7 @@ export function PlaygroundToolbar() {
           {/* <Button variant="ghost" className="px-3" onClick={onAddButtonClick}>
             <MixIcon />
           </Button> */}
-        </ToggleGroup>
+        </ToggleGroupPrimitive.Root>
       </div>
     </div>
   );
@@ -243,7 +261,7 @@ export function PlaygroundToolbar() {
 
 function BitmapEditModeAuxiliaryToolbar() {
   const editor = useCurrentEditor();
-  const { tool } = useToolState();
+  const tool = useToolState();
 
   return (
     <div className="rounded-full flex justify-center items-center gap-2 border bg-background shadow px-3 py-1 pointer-events-auto select-none">

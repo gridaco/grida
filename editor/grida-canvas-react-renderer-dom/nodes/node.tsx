@@ -86,8 +86,8 @@ export function NodeElement<P extends Record<string, any>>({
       case "video":
       case "text":
       case "bitmap":
+      case "svgpath":
       case "vector":
-      case "path":
       case "line":
       case "rectangle":
       case "component":
@@ -208,6 +208,8 @@ export function NodeElement<P extends Record<string, any>>({
 }
 
 const fillings = {
+  boolean: "none",
+  group: "none",
   text: "color",
   container: "background",
   component: "background",
@@ -221,9 +223,9 @@ const fillings = {
   star: "none",
   template_instance: "none",
   instance: "none",
-  vector: "none",
+  svgpath: "none",
   line: "none",
-  path: "none",
+  vector: "none",
   polyline: "none",
   bitmap: "background",
 } as const;

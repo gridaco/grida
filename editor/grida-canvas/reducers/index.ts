@@ -304,6 +304,13 @@ function _reducer<S extends editor.state.IEditorState>(
         self_update_gesture_transform(draft, context);
       });
     }
+    case "config/modifiers/translate-with-force-disable-snap": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.gesture_modifiers.translate_with_force_disable_snap =
+          action.translate_with_force_disable_snap;
+        self_update_gesture_transform(draft, context);
+      });
+    }
     case "config/modifiers/transform-with-center-origin": {
       return produce(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.transform_with_center_origin =
@@ -323,6 +330,18 @@ function _reducer<S extends editor.state.IEditorState>(
         draft.gesture_modifiers.rotate_with_quantize =
           action.rotate_with_quantize;
         self_update_gesture_transform(draft, context);
+      });
+    }
+    case "config/modifiers/curve-tangent-mirroring": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.gesture_modifiers.curve_tangent_mirroring =
+          action.curve_tangent_mirroring;
+      });
+    }
+    case "config/modifiers/path-keep-projecting": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.gesture_modifiers.path_keep_projecting =
+          action.path_keep_projecting;
       });
     }
     case "gesture/nudge": {

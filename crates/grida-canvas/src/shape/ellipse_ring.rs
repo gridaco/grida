@@ -1,3 +1,4 @@
+use super::vn::VectorNetwork;
 use skia_safe;
 
 pub struct EllipticalRingShape {
@@ -31,4 +32,36 @@ pub fn build_ring_path(shape: &EllipticalRingShape) -> skia_safe::Path {
     path.add_oval(inner_rect, Some((skia_safe::PathDirection::CCW, 0)));
 
     path
+}
+
+/// Build a [`VectorNetwork`] representing an elliptical ring. The outer
+/// contour is clockwise and the inner contour is counter-clockwise so that the
+/// resulting path forms a hole.
+pub fn build_ring_vector_network(shape: &EllipticalRingShape) -> VectorNetwork {
+    let outer = super::ellipse::build_ellipse_vector_network(&super::ellipse::EllipseShape {
+        width: shape.width,
+        height: shape.height,
+    });
+
+    let inner = super::ellipse::build_ellipse_vector_network_ccw(&super::ellipse::EllipseShape {
+        width: shape.width * shape.inner_radius_ratio,
+        height: shape.height * shape.inner_radius_ratio,
+    });
+
+    let mut vertices = outer.vertices;
+    let offset = vertices.len();
+    vertices.extend(inner.vertices);
+
+    let mut segments = outer.segments;
+    segments.extend(inner.segments.into_iter().map(|mut s| {
+        s.a += offset;
+        s.b += offset;
+        s
+    }));
+
+    VectorNetwork {
+        vertices,
+        segments,
+        regions: vec![],
+    }
 }

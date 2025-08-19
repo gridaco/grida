@@ -192,7 +192,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.0.1-beta.1+20250303";
+  export const SCHEMA_VERSION = "0.0.1-beta.1+20250728";
 
   /**
    * Simple Node Selector
@@ -759,6 +759,8 @@ export namespace grida.program.nodes {
   export type NodeType = Node["type"];
 
   export type Node =
+    | BooleanPathOperationNode
+    | GroupNode
     | TextNode
     | ImageNode
     | VideoNode
@@ -766,8 +768,8 @@ export namespace grida.program.nodes {
     | HTMLIFrameNode
     | HTMLRichTextNode
     | BitmapNode
+    | SVGPathNode
     | VectorNode
-    | PathNode
     | LineNode
     | RectangleNode
     | EllipseNode
@@ -785,8 +787,8 @@ export namespace grida.program.nodes {
     | ComputedContainerNode
     | ComputedHTMLIFrameNode
     | ComputedHTMLRichTextNode
+    | ComputedSVGPathNode
     | ComputedVectorNode
-    | ComputedPathNode
     | ComputedLineNode
     | ComputedRectangleNode
     | ComputedEllipseNode
@@ -805,8 +807,8 @@ export namespace grida.program.nodes {
       Partial<ComputedContainerNode> &
       Partial<ComputedHTMLIFrameNode> &
       Partial<ComputedHTMLRichTextNode> &
+      Partial<ComputedSVGPathNode> &
       Partial<ComputedVectorNode> &
-      Partial<ComputedPathNode> &
       Partial<ComputedLineNode> &
       Partial<ComputedRectangleNode> &
       Partial<ComputedEllipseNode> &
@@ -823,15 +825,17 @@ export namespace grida.program.nodes {
    * Unknwon node utility type - use within the correct context
    */
   export type UnknwonNode = Omit<
-    Partial<TextNode> &
+    Partial<BooleanPathOperationNode> &
+      Partial<GroupNode> &
+      Partial<TextNode> &
       Partial<BitmapNode> &
       Partial<ImageNode> &
       Partial<VideoNode> &
       Partial<ContainerNode> &
       Partial<HTMLIFrameNode> &
       Partial<HTMLRichTextNode> &
+      Partial<SVGPathNode> &
       Partial<VectorNode> &
-      Partial<PathNode> &
       Partial<LineNode> &
       Partial<RectangleNode> &
       Partial<EllipseNode> &
@@ -849,6 +853,19 @@ export namespace grida.program.nodes {
   export type UnknownNodeProperties<T = unknown> = Record<keyof UnknwonNode, T>;
 
   // #region node prototypes
+
+  export type BooleanPathOperationNodePrototype = __TPrototypeNode<
+    Omit<
+      Partial<BooleanPathOperationNode>,
+      __base_scene_node_properties | "children"
+    > &
+      __IPrototypeNodeChildren
+  >;
+
+  export type GroupNodePrototype = __TPrototypeNode<
+    Omit<Partial<GroupNode>, __base_scene_node_properties | "children"> &
+      __IPrototypeNodeChildren
+  >;
   export type TextNodePrototype = __TPrototypeNode<
     Omit<Partial<TextNode>, __base_scene_node_properties>
   >;
@@ -863,7 +880,7 @@ export namespace grida.program.nodes {
       __IPrototypeNodeChildren
   >;
   export type PathNodePrototype = __TPrototypeNode<
-    Omit<Partial<PathNode>, __base_scene_node_properties>
+    Omit<Partial<VectorNode>, __base_scene_node_properties>
   >;
   export type LineNodePrototype = __TPrototypeNode<
     Omit<Partial<LineNode>, __base_scene_node_properties>
@@ -874,6 +891,12 @@ export namespace grida.program.nodes {
   export type EllipseNodePrototype = __TPrototypeNode<
     Omit<Partial<EllipseNode>, __base_scene_node_properties>
   >;
+  export type PolygonNodePrototype = __TPrototypeNode<
+    Omit<Partial<RegularPolygonNode>, __base_scene_node_properties>
+  >;
+  export type StarNodePrototype = __TPrototypeNode<
+    Omit<Partial<RegularStarPolygonNode>, __base_scene_node_properties>
+  >;
 
   /**
    * A virtual, before-instantiation node that only stores the prototype of a node.
@@ -881,6 +904,8 @@ export namespace grida.program.nodes {
    * Main difference between an actual node or node data is, a prototype is only required to have a partial node data, and it has its own hierarchy of children.
    */
   export type NodePrototype =
+    | BooleanPathOperationNodePrototype
+    | GroupNodePrototype
     | TextNodePrototype
     | ImageNodePrototype
     | VideoNodePrototype
@@ -892,11 +917,13 @@ export namespace grida.program.nodes {
         Omit<Partial<HTMLRichTextNode>, __base_scene_node_properties>
       >
     | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<VectorNode>, __base_scene_node_properties>>
+    | __TPrototypeNode<Omit<Partial<SVGPathNode>, __base_scene_node_properties>>
     | PathNodePrototype
     | LineNodePrototype
     | RectangleNodePrototype
     | EllipseNodePrototype
+    | PolygonNodePrototype
+    | StarNodePrototype
     | __TPrototypeNode<
         Omit<
           Partial<ComponentNode>,
@@ -1230,6 +1257,11 @@ export namespace grida.program.nodes {
       strokeWidth: number;
 
       /**
+       * variable width stroke width profile
+       */
+      strokeWidthProfile?: cg.VariableWidthProfile;
+
+      /**
        * stroke alignment - takes effect when stroke is set
        */
       strokeAlign?: cg.StrokeAlign;
@@ -1434,16 +1466,38 @@ export namespace grida.program.nodes {
   //   b: ConnectorPoint;
   // }
 
-  // /**
-  //  * @deprecated - not ready - do not use in production
-  //  */
-  // export interface GroupNode
-  //   extends i.IBaseNode,
-  //     i.ISceneNode,
-  //     i.IChildrenReference,
-  //     i.IExpandable {
-  //   //
-  // }
+  /**
+   * Group Node
+   *
+   * [GroupNode] is not supported in the html/svg backend.
+   */
+  export interface GroupNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IChildrenReference,
+      i.IExpandable,
+      i.IPositioning {
+    type: "group";
+    //
+  }
+
+  /**
+   * Boolean Path Operation Node
+   *
+   * [BooleanPathOperationNode] is not supported in the html/svg backend.
+   */
+  export interface BooleanPathOperationNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IChildrenReference,
+      i.IExpandable,
+      i.IRotation,
+      i.IFill<cg.Paint>,
+      i.IStroke,
+      i.IPositioning {
+    type: "boolean";
+    op: cg.BooleanOperation;
+  }
 
   export interface TextNode
     extends i.IBaseNode,
@@ -1613,7 +1667,7 @@ export namespace grida.program.nodes {
   /**
    * @deprecated - not ready - do not use in production
    */
-  export interface VectorNode
+  export interface SVGPathNode
     extends i.IBaseNode,
       i.ISceneNode,
       i.IHrefable,
@@ -1626,7 +1680,7 @@ export namespace grida.program.nodes {
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
-    type: "vector";
+    type: "svgpath";
 
     /**
      * @deprecated - use vectorNetwork instead
@@ -1645,7 +1699,7 @@ export namespace grida.program.nodes {
   /**
    * @deprecated - not ready - do not use in production
    */
-  export type ComputedVectorNode = VectorNode;
+  export type ComputedSVGPathNode = SVGPathNode;
 
   export interface RegularPolygonNode
     extends i.IBaseNode,
@@ -1682,7 +1736,7 @@ export namespace grida.program.nodes {
     innerRadius: number;
   }
 
-  export interface PathNode
+  export interface VectorNode
     extends i.IBaseNode,
       i.ISceneNode,
       i.IHrefable,
@@ -1693,9 +1747,10 @@ export namespace grida.program.nodes {
       i.IBlendMode,
       i.IZIndex,
       i.IRotation,
+      i.ICornerRadius,
       i.IFill<cg.Paint>,
       i.IStroke {
-    readonly type: "path";
+    readonly type: "vector";
 
     /**
      * @deprecated
@@ -1703,16 +1758,12 @@ export namespace grida.program.nodes {
      */
     fillRule?: cg.FillRule;
 
-    /**
-     * @deprecated
-     * @todo
-     */
     vectorNetwork: vn.VectorNetwork;
   }
 
-  export interface ComputedPathNode
-    extends __ReplaceSubset<PathNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
-    readonly type: "path";
+  export interface ComputedVectorNode
+    extends __ReplaceSubset<VectorNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
+    readonly type: "vector";
   }
 
   /**
@@ -1965,6 +2016,8 @@ export namespace grida.program.nodes {
           } satisfies RectangleNode;
         }
         // TODO:
+        case "boolean":
+        case "group":
         case "container":
         case "component":
         case "instance":
@@ -1989,10 +2042,12 @@ export namespace grida.program.nodes {
         case "iframe":
         case "image":
         case "line":
-        case "path":
         case "richtext":
         case "text":
         case "vector":
+        case "svgpath":
+        case "polygon":
+        case "star":
         case "video": {
           // @ts-expect-error
           return {

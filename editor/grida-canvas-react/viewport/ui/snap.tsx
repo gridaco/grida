@@ -1,6 +1,8 @@
 import React, { useMemo } from "react";
 import {
+  useContentEditModeMinimalState,
   useGestureState,
+  useToolState,
   useTransformState,
 } from "@/grida-canvas-react/provider";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
@@ -18,14 +20,22 @@ function useSnapGuide(): guide.SnapGuide | undefined {
   );
   const { transform } = useTransformState();
   const { gesture } = useGestureState();
+  const cem = useContentEditModeMinimalState();
+  const tool = useToolState();
+
+  const shouldShow = useMemo(
+    () =>
+      (cem?.type === "vector" && tool.type === "path") ||
+      gesture.type === "translate" ||
+      gesture.type === "translate-vector-controls" ||
+      gesture.type === "curve" ||
+      gesture.type === "nudge" ||
+      gesture.type === "scale",
+    [gesture, cem?.type, tool.type]
+  );
 
   return useMemo(() => {
-    if (
-      (gesture.type === "translate" ||
-        gesture.type === "nudge" ||
-        gesture.type === "scale") &&
-      surface_snapping
-    ) {
+    if (shouldShow && surface_snapping) {
       const { lines, points, rules: rays } = guide.plot(surface_snapping);
       // finally, map the vectors to the surface space
       return {
@@ -37,8 +47,10 @@ function useSnapGuide(): guide.SnapGuide | undefined {
         }),
       } satisfies guide.SnapGuide;
     }
-  }, [gesture, transform, surface_snapping]);
+  }, [shouldShow, transform, surface_snapping]);
 }
+
+const Z_INDEX = 999999;
 
 export function SnapGuide() {
   const guide = useSnapGuide();
@@ -46,9 +58,9 @@ export function SnapGuide() {
   if (!guide) return <></>;
 
   return (
-    <div>
+    <div className="pointer-events-none">
       {guide.lines.map((l, i) => (
-        <Line key={i} {...l} />
+        <Line key={i} {...l} zIndex={Z_INDEX} />
       ))}
       {guide.rules.map(([axis, offset], i) => (
         <Rule
@@ -56,6 +68,7 @@ export function SnapGuide() {
           axis={cmath.counterAxis(axis)}
           offset={offset}
           width={1}
+          zIndex={Z_INDEX}
         />
       ))}
       {guide.points.map((p, i) => {
@@ -64,6 +77,7 @@ export function SnapGuide() {
             key={i}
             style={{
               position: "absolute",
+              zIndex: Z_INDEX,
               left: p[0],
               top: p[1],
               transform: "translate(-50%, -50%)",

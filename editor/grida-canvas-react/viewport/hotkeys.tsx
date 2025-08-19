@@ -1,8 +1,13 @@
 import { useHotkeys } from "react-hotkeys-hook";
-import { useCurrentSelection, useToolState, useA11yActions } from "../provider";
+import {
+  useToolState,
+  useA11yActions,
+  useContentEditModeMinimalState,
+  useCurrentSelectionIds,
+} from "../provider";
 import { toast } from "sonner";
 import type cg from "@grida/cg";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import cmath from "@grida/cmath";
 import { useCurrentEditor } from "../use-editor";
 
@@ -26,6 +31,11 @@ export const keybindings_sheet = [
     name: "duplicate",
     description: "Duplicate the current selection",
     keys: ["meta+d"],
+  },
+  {
+    name: "flatten",
+    description: "Flatten the current selection",
+    keys: ["meta+e", "alt+shift+f"],
   },
   {
     name: "undo",
@@ -208,6 +218,11 @@ export const keybindings_sheet = [
     keys: ["v"],
   },
   {
+    name: "lasso",
+    description: "Lasso tool (vector mode)",
+    keys: ["q"],
+  },
+  {
     name: "hand",
     description: "Hand tool",
     keys: ["h"],
@@ -221,6 +236,11 @@ export const keybindings_sheet = [
     name: "ellipse",
     description: "Ellipse tool",
     keys: ["o"],
+  },
+  {
+    name: "polygon",
+    description: "Polygon tool",
+    keys: ["y"],
   },
   {
     name: "text",
@@ -261,6 +281,11 @@ export const keybindings_sheet = [
     name: "paint bucket",
     description: "Paint bucket tool",
     keys: ["g"],
+  },
+  {
+    name: "variable width",
+    description: "Variable width tool",
+    keys: ["shif+w"],
   },
   {
     name: "increase brush size",
@@ -318,13 +343,16 @@ function useSingleDoublePressHotkey(
 
 export function useEditorHotKeys() {
   const editor = useCurrentEditor();
-  const { tool, content_edit_mode } = useToolState();
-  const { a11yarrow } = useA11yActions();
+  const tool = useToolState();
+  const content_edit_mode = useContentEditModeMinimalState();
+  const { a11yarrow, a11yalign } = useA11yActions();
 
-  const { selection, actions } = useCurrentSelection();
+  const selection = useCurrentSelectionIds();
+  const [altKey, setAltKey] = useState(false);
 
   useEffect(() => {
-    const cb = (e: any) => {
+    const cb = (e: FocusEvent) => {
+      if (e.defaultPrevented) return;
       editor.configureSurfaceRaycastTargeting({ target: "auto" });
       editor.configureMeasurement("off");
       editor.configureTranslateWithCloneModifier("off");
@@ -332,6 +360,8 @@ export function useEditorHotKeys() {
       editor.configureTranslateWithAxisLockModifier("off");
       editor.configureTransformWithPreserveAspectRatioModifier("off");
       editor.configureRotateWithQuantizeModifier("off");
+      setAltKey(false);
+      editor.setTool({ type: "cursor" }, "window blur");
     };
     window.addEventListener("blur", cb);
     return () => {
@@ -339,19 +369,34 @@ export function useEditorHotKeys() {
     };
   }, [editor]);
 
+  useEffect(() => {
+    let mode: "auto" | "all" | "none" = "auto";
+    if (tool.type === "bend") {
+      mode = "all";
+    }
+    if (altKey) {
+      mode = "none";
+    }
+    editor.configureCurveTangentMirroringModifier(mode);
+  }, [tool.type, altKey, editor]);
+
   // always triggering. (alt, meta, ctrl, shift)
   useHotkeys(
     "*",
     (e) => {
       switch (e.key) {
         case "Meta":
+          editor.configureSurfaceRaycastTargeting({ target: "deepest" });
+          break;
         case "Control":
           editor.configureSurfaceRaycastTargeting({ target: "deepest" });
+          editor.configureTranslateWithForceDisableSnap("on");
           break;
         case "Alt":
           editor.configureMeasurement("on");
           editor.configureTranslateWithCloneModifier("on");
           editor.configureTransformWithCenterOriginModifier("on");
+          setAltKey(true);
           // NOTE: on some systems, the alt key focuses to the browser menu, so we need to prevent that. (e.g. alt key on windows/chrome)
           e.preventDefault();
           break;
@@ -374,13 +419,17 @@ export function useEditorHotKeys() {
     (e) => {
       switch (e.key) {
         case "Meta":
+          editor.configureSurfaceRaycastTargeting({ target: "auto" });
+          break;
         case "Control":
           editor.configureSurfaceRaycastTargeting({ target: "auto" });
+          editor.configureTranslateWithForceDisableSnap("off");
           break;
         case "Alt":
           editor.configureMeasurement("off");
           editor.configureTranslateWithCloneModifier("off");
           editor.configureTransformWithCenterOriginModifier("off");
+          setAltKey(false);
           break;
         case "Shift":
           editor.configureTranslateWithAxisLockModifier("off");
@@ -412,7 +461,7 @@ export function useEditorHotKeys() {
           __hand_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          editor.setTool({ type: "cursor" });
+          editor.setTool({ type: "cursor" }, "hand tool keyup");
           __hand_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -442,6 +491,33 @@ export function useEditorHotKeys() {
         case "keyup":
           editor.setTool({ type: "cursor" });
           __zoom_tool_triggered_by_hotkey.current = false;
+          break;
+      }
+    },
+    {
+      keydown: true,
+      keyup: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  const __bend_tool_triggered_by_hotkey = useRef(false);
+  useHotkeys(
+    "meta",
+    (e) => {
+      if (e.type === "keydown" && content_edit_mode?.type !== "vector") return;
+      if (tool.type === "bend" && !__bend_tool_triggered_by_hotkey.current)
+        return;
+
+      switch (e.type) {
+        case "keydown":
+          editor.setTool({ type: "bend" });
+          __bend_tool_triggered_by_hotkey.current = true;
+          break;
+        case "keyup":
+          editor.setTool({ type: "cursor" }, "bend tool keyup");
+          __bend_tool_triggered_by_hotkey.current = false;
           break;
       }
     },
@@ -486,8 +562,7 @@ export function useEditorHotKeys() {
               const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
               // set fill if selection
               if (selection.length > 0) {
-                //
-                actions.fill({
+                editor.changeNodeFill(selection, {
                   type: "solid",
                   color: rgba,
                 } satisfies cg.SolidPaint);
@@ -522,10 +597,11 @@ export function useEditorHotKeys() {
   useHotkeys(
     "enter",
     () => {
-      editor.select(">");
-
-      // TODO: check if select(">") is possible first, then toggle when not possible
-      editor.tryToggleContentEditMode();
+      const maybe_selected = editor.select(">");
+      if (!maybe_selected) {
+        // check if select(">") is possible first, then toggle when not possible
+        editor.tryToggleContentEditMode();
+      }
     },
     {
       preventDefault: true,
@@ -570,9 +646,8 @@ export function useEditorHotKeys() {
     }
   );
 
-  useHotkeys("escape, clear", (e) => {
-    editor.tryExitContentEditMode();
-    editor.blur();
+  useHotkeys("escape, clear", () => {
+    editor.a11yEscape();
   });
 
   useHotkeys(
@@ -638,6 +713,16 @@ export function useEditorHotKeys() {
     }
   );
 
+  useHotkeys(
+    "meta+e, ctrl+e, alt+shift+f",
+    () => {
+      editor.flatten("selection");
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
   useHotkeys("shift+h", () => {
     // TODO:
     toast.error("[flip horizontal] is not implemented yet");
@@ -648,26 +733,26 @@ export function useEditorHotKeys() {
     toast.error("[flip vertical] is not implemented yet");
   });
 
-  useHotkeys("cut, meta+x, ctrl+x", () => editor.cut("selection"), {
+  useHotkeys("cut, meta+x, ctrl+x", () => editor.a11yCut(), {
     preventDefault: true,
     enableOnContentEditable: false,
     enableOnFormTags: false,
   });
 
-  useHotkeys("copy, meta+c, ctrl+c", () => editor.copy("selection"), {
+  useHotkeys("copy, meta+c, ctrl+c", () => editor.a11yCopy(), {
     preventDefault: false,
     enableOnContentEditable: false,
     enableOnFormTags: false,
   });
 
   // paste is handled via data transfer
-  // useHotkeys("paste, meta+v, ctrl+v", () => paste(), {
+  // useHotkeys("paste, meta+v, ctrl+v", () => editor.a11yPaste(), {
   //   preventDefault: false,
   //   enableOnContentEditable: false,
   //   enableOnFormTags: false,
   // });
 
-  useHotkeys("backspace, delete", () => editor.deleteNode("selection"), {
+  useHotkeys("backspace, delete", () => editor.a11yDelete(), {
     preventDefault: true,
     enableOnContentEditable: false,
     enableOnFormTags: false,
@@ -736,8 +821,14 @@ export function useEditorHotKeys() {
 
   // keyup
 
-  useHotkeys("v, escape", () => {
+  useHotkeys("v", () => {
     editor.setTool({ type: "cursor" });
+  });
+
+  useHotkeys("q", () => {
+    if (content_edit_mode?.type === "vector") {
+      editor.setTool({ type: "lasso" });
+    }
   });
 
   useHotkeys("h", () => {
@@ -756,6 +847,10 @@ export function useEditorHotKeys() {
     editor.setTool({ type: "insert", node: "ellipse" });
   });
 
+  useHotkeys("y", () => {
+    editor.setTool({ type: "insert", node: "polygon" });
+  });
+
   useHotkeys("t", () => {
     editor.setTool({ type: "insert", node: "text" });
   });
@@ -764,31 +859,45 @@ export function useEditorHotKeys() {
     editor.setTool({ type: "draw", tool: "line" });
   });
 
-  useHotkeys("p", () => {
-    editor.setTool({ type: "path" });
-  });
+  useHotkeys(
+    "p",
+    () => {
+      // Holding `p` continues a path even when closing on an existing vertex.
+      editor.configurePathKeepProjectingModifier("on");
+      editor.setTool({ type: "path" });
+    },
+    { keydown: true, keyup: false }
+  );
+
+  useHotkeys(
+    "p",
+    () => {
+      editor.configurePathKeepProjectingModifier("off");
+    },
+    { keydown: false, keyup: true }
+  );
 
   useHotkeys("shift+p", () => {
     editor.setTool({ type: "draw", tool: "pencil" });
   });
 
   useHotkeys("b", () => {
-    editor.setTool({
-      type: "brush",
-    });
+    editor.setTool({ type: "brush" });
   });
 
   useHotkeys("e", () => {
-    editor.setTool({
-      type: "eraser",
-    });
+    editor.setTool({ type: "eraser" });
   });
 
   useHotkeys("g", () => {
     if (content_edit_mode?.type === "bitmap") {
-      editor.setTool({
-        type: "flood-fill",
-      });
+      editor.setTool({ type: "flood-fill" });
+    }
+  });
+
+  useHotkeys("shift+w", () => {
+    if (content_edit_mode?.type === "vector") {
+      editor.setTool({ type: "width" });
     }
   });
 
@@ -854,40 +963,28 @@ export function useEditorHotKeys() {
     }
   });
 
-  useHotkeys("alt+a", (e) => {
-    editor.align("selection", {
-      horizontal: "min",
-    });
+  useHotkeys("alt+a", () => {
+    a11yalign({ horizontal: "min" });
   });
   useHotkeys(
     "alt+d",
-    (e) => {
-      editor.align("selection", {
-        horizontal: "max",
-      });
+    () => {
+      a11yalign({ horizontal: "max" });
     },
     { preventDefault: true }
   );
-  useHotkeys("alt+w", (e) => {
-    editor.align("selection", {
-      vertical: "min",
-    });
+  useHotkeys("alt+w", () => {
+    a11yalign({ vertical: "min" });
   });
-  useHotkeys("alt+s", (e) => {
-    editor.align("selection", {
-      vertical: "max",
-    });
+  useHotkeys("alt+s", () => {
+    a11yalign({ vertical: "max" });
   });
 
-  useHotkeys("alt+v", (e) => {
-    editor.align("selection", {
-      vertical: "center",
-    });
+  useHotkeys("alt+v", () => {
+    a11yalign({ vertical: "center" });
   });
-  useHotkeys("alt+h", (e) => {
-    editor.align("selection", {
-      horizontal: "center",
-    });
+  useHotkeys("alt+h", () => {
+    a11yalign({ horizontal: "center" });
   });
 
   useHotkeys("alt+ctrl+v", (e) => {
@@ -905,8 +1002,24 @@ export function useEditorHotKeys() {
   useHotkeys(
     "ctrl+g, meta+g",
     () => {
-      // TODO:
-      toast("use ⌥⌘G for grouping");
+      try {
+        editor.group("selection");
+      } catch (e) {
+        console.error(e);
+        toast.error("use ⌥⌘G for grouping");
+      }
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys(
+    "ctrl+shift+g, meta+shift+g",
+    () => {
+      try {
+        editor.ungroup("selection");
+      } catch {}
     },
     {
       preventDefault: true,

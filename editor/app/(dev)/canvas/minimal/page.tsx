@@ -2,7 +2,6 @@
 
 import React from "react";
 import {
-  Align,
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
@@ -106,8 +105,6 @@ export default function MinimalCanvasDemo() {
                     )}
                   />
                 </div>
-                <hr />
-                <Align />
               </SidebarHeader>
               <SidebarContent>
                 <FontFamilyListProvider fonts={fonts}>

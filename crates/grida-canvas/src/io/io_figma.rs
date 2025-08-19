@@ -1040,10 +1040,11 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
-            transform,
+            transform: Some(transform),
             op: op,
             children,
-            // corner_radius: RectangularCornerRadius::zero(),
+            // map this
+            corner_radius: None,
             fill: self
                 .convert_fills(Some(&origin.fills))
                 .first()

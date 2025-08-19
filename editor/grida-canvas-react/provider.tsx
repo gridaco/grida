@@ -1,12 +1,17 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import { io } from "@grida/io";
 import type { tokens } from "@grida/tokens";
 import type cg from "@grida/cg";
-import { dq } from "@/grida-canvas/query";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 import {
   DataProvider,
@@ -15,7 +20,6 @@ import {
 import { GoogleFontsManager } from "./components/google-fonts";
 import cmath from "@grida/cmath";
 import type { Action } from "@/grida-canvas/action";
-import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
 import equal from "fast-deep-equal";
 import { toast } from "sonner";
 import { is_direct_component_consumer } from "@/grida-canvas/utils/supports";
@@ -245,436 +249,10 @@ export function useNodeActions(node_id: string | undefined) {
   }, [node_id, instance]);
 }
 
-const compareNodeProperty: PropertyCompareFn<
-  grida.program.nodes.UnknwonNode
-> = (key, a, b): boolean => {
-  switch (key) {
-    case "fill":
-    case "stroke":
-      // support gradient (as the id should be ignored)
-      const _a = (a ?? {}) as cg.Paint;
-      const _b = (b ?? {}) as cg.Paint;
-      return equal(_a, _b);
-  }
-  return equal(a, b);
-};
-
-export function useCurrentSelection() {
+export function useCurrentSelectionIds() {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
-  const nodes = useEditorState(instance, (state) =>
-    selection.map((id) => state.document.nodes[id])
-  );
-
-  const mixedProperties = useMemo(
-    () =>
-      mixed<grida.program.nodes.UnknwonNode, typeof grida.mixed>(
-        nodes as grida.program.nodes.UnknwonNode[],
-        {
-          idKey: "id",
-          ignoredKey: ["id", "type", "userdata"],
-          compare: compareNodeProperty,
-          mixed: grida.mixed,
-        }
-      ),
-    [nodes]
-  );
-
-  const name = useCallback(
-    (value: string) => {
-      selection.forEach((id) => {
-        instance.changeNodeName(id, value);
-      });
-    },
-    [selection, instance.changeNodeName]
-  );
-
-  const copy = useCallback(() => {
-    instance.copy("selection");
-  }, [instance]);
-
-  const active = useCallback(
-    (value: boolean) => {
-      selection.forEach((id) => {
-        instance.changeNodeActive(id, value);
-      });
-    },
-    [selection, instance.changeNodeActive]
-  );
-
-  const locked = useCallback(
-    (value: boolean) => {
-      selection.forEach((id) => {
-        instance.changeNodeLocked(id, value);
-      });
-    },
-    [selection, instance.changeNodeLocked]
-  );
-
-  const rotation = useCallback(
-    (change: editor.api.NumberChange) => {
-      mixedProperties.rotation?.ids.forEach((id) => {
-        instance.changeNodeRotation(id, change);
-      });
-    },
-    [mixedProperties.rotation?.ids, instance.changeNodeRotation]
-  );
-
-  const opacity = useCallback(
-    (change: editor.api.NumberChange) => {
-      mixedProperties.opacity?.ids.forEach((id) => {
-        instance.changeNodeOpacity(id, change);
-      });
-    },
-    [mixedProperties.opacity?.ids, instance.changeNodeOpacity]
-  );
-
-  const width = useCallback(
-    (value: grida.program.css.LengthPercentage | "auto") => {
-      mixedProperties.width?.ids.forEach((id) => {
-        instance.changeNodeSize(id, "width", value);
-      });
-    },
-    [mixedProperties.width?.ids, instance.changeNodeSize]
-  );
-
-  const height = useCallback(
-    (value: grida.program.css.LengthPercentage | "auto") => {
-      mixedProperties.height?.ids.forEach((id) => {
-        instance.changeNodeSize(id, "height", value);
-      });
-    },
-    [mixedProperties.height?.ids, instance.changeNodeSize]
-  );
-
-  const positioningMode = useCallback(
-    (position: grida.program.nodes.i.IPositioning["position"]) => {
-      mixedProperties.position?.ids.forEach((id) => {
-        instance.changeNodePositioningMode(id, position);
-      });
-    },
-    [mixedProperties.position?.ids, instance.changeNodePositioningMode]
-  );
-
-  const fontFamily = useCallback(
-    (value: string) => {
-      mixedProperties.fontFamily?.ids.forEach((id) => {
-        instance.changeTextNodeFontFamily(id, value);
-      });
-    },
-    [mixedProperties.fontFamily?.ids, instance.changeTextNodeFontFamily]
-  );
-
-  const fontWeight = useCallback(
-    (value: cg.NFontWeight) => {
-      mixedProperties.fontWeight?.ids.forEach((id) => {
-        instance.changeTextNodeFontWeight(id, value);
-      });
-    },
-    [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontWeight]
-  );
-
-  const fontSize = useCallback(
-    (change: editor.api.NumberChange) => {
-      mixedProperties.fontSize?.ids.forEach((id) => {
-        instance.changeTextNodeFontSize(id, change);
-      });
-    },
-    [mixedProperties.fontSize?.ids, instance.changeTextNodeFontSize]
-  );
-
-  const lineHeight = useCallback(
-    (change: editor.api.NumberChange) => {
-      mixedProperties.lineHeight?.ids.forEach((id) => {
-        instance.changeTextNodeLineHeight(id, change);
-      });
-    },
-    [mixedProperties.lineHeight?.ids, instance.changeTextNodeLineHeight]
-  );
-
-  const letterSpacing = useCallback(
-    (
-      change: editor.api.TChange<grida.program.nodes.TextNode["letterSpacing"]>
-    ) => {
-      mixedProperties.letterSpacing?.ids.forEach((id) => {
-        instance.changeTextNodeLetterSpacing(id, change);
-      });
-    },
-    [mixedProperties.letterSpacing?.ids, instance.changeTextNodeLetterSpacing]
-  );
-
-  const textAlign = useCallback(
-    (value: cg.TextAlign) => {
-      mixedProperties.textAlign?.ids.forEach((id) => {
-        instance.changeTextNodeTextAlign(id, value);
-      });
-    },
-    [mixedProperties.textAlign?.ids, instance.changeTextNodeTextAlign]
-  );
-
-  const textAlignVertical = useCallback(
-    (value: cg.TextAlignVertical) => {
-      mixedProperties.textAlignVertical?.ids.forEach((id) => {
-        instance.changeTextNodeTextAlignVertical(id, value);
-      });
-    },
-    [
-      mixedProperties.textAlignVertical?.ids,
-      instance.changeTextNodeTextAlignVertical,
-    ]
-  );
-
-  const fit = useCallback(
-    (value: cg.BoxFit) => {
-      mixedProperties.fit?.ids.forEach((id) => {
-        instance.changeNodeFit(id, value);
-      });
-    },
-    [mixedProperties.fit?.ids, instance.changeNodeFit]
-  );
-
-  const fill = useCallback(
-    (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      mixedProperties.fill?.ids.forEach((id) => {
-        instance.changeNodeFill(id, value);
-      });
-    },
-    [mixedProperties.fill?.ids, instance.changeNodeFill]
-  );
-
-  const stroke = useCallback(
-    (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      mixedProperties.stroke?.ids.forEach((id) => {
-        instance.changeNodeStroke(id, value);
-      });
-    },
-    [mixedProperties.stroke?.ids, instance.changeNodeStroke]
-  );
-
-  const strokeWidth = useCallback(
-    (change: editor.api.NumberChange) => {
-      mixedProperties.strokeWidth?.ids.forEach((id) => {
-        instance.changeNodeStrokeWidth(id, change);
-      });
-    },
-    [mixedProperties.strokeWidth?.ids, instance.changeNodeStrokeWidth]
-  );
-
-  const strokeCap = useCallback(
-    (value: cg.StrokeCap) => {
-      mixedProperties.strokeCap?.ids.forEach((id) => {
-        instance.changeNodeStrokeCap(id, value);
-      });
-    },
-    [mixedProperties.strokeCap?.ids, instance.changeNodeStrokeCap]
-  );
-
-  const layout = useCallback(
-    (value: grida.program.nodes.i.IFlexContainer["layout"]) => {
-      mixedProperties.layout?.ids.forEach((id) => {
-        instance.changeContainerNodeLayout(id, value);
-      });
-    },
-    [mixedProperties.layout?.ids, instance.changeContainerNodeLayout]
-  );
-
-  const direction = useCallback(
-    (value: cg.Axis) => {
-      mixedProperties.direction?.ids.forEach((id) => {
-        instance.changeFlexContainerNodeDirection(id, value);
-      });
-    },
-    [mixedProperties.direction?.ids, instance.changeFlexContainerNodeDirection]
-  );
-
-  const mainAxisAlignment = useCallback(
-    (value: cg.MainAxisAlignment) => {
-      mixedProperties.mainAxisAlignment?.ids.forEach((id) => {
-        instance.changeFlexContainerNodeMainAxisAlignment(id, value);
-      });
-    },
-    [
-      mixedProperties.mainAxisAlignment?.ids,
-      instance.changeFlexContainerNodeMainAxisAlignment,
-    ]
-  );
-
-  const crossAxisAlignment = useCallback(
-    (value: cg.CrossAxisAlignment) => {
-      mixedProperties.crossAxisAlignment?.ids.forEach((id) => {
-        instance.changeFlexContainerNodeCrossAxisAlignment(id, value);
-      });
-    },
-    [
-      mixedProperties.crossAxisAlignment?.ids,
-      instance.changeFlexContainerNodeCrossAxisAlignment,
-    ]
-  );
-
-  const cornerRadius = useCallback(
-    (value: cg.CornerRadius) => {
-      mixedProperties.cornerRadius?.ids.forEach((id) => {
-        instance.changeNodeCornerRadius(id, value);
-      });
-    },
-    [mixedProperties.cornerRadius?.ids, instance.changeNodeCornerRadius]
-  );
-
-  const cursor = useCallback(
-    (value: cg.SystemMouseCursor) => {
-      mixedProperties.cursor?.ids.forEach((id) => {
-        instance.changeNodeMouseCursor(id, value);
-      });
-    },
-    [mixedProperties.cursor?.ids, instance.changeNodeMouseCursor]
-  );
-
-  const actions = useMemo(
-    () => ({
-      copy,
-      active,
-      locked,
-      name,
-      rotation,
-      opacity,
-      width,
-      height,
-      positioningMode,
-      fontWeight,
-      fontFamily,
-      fontSize,
-      lineHeight,
-      letterSpacing,
-      textAlign,
-      textAlignVertical,
-      fit,
-      fill,
-      stroke,
-      strokeWidth,
-      strokeCap,
-      layout,
-      direction,
-      mainAxisAlignment,
-      crossAxisAlignment,
-      cornerRadius,
-      cursor,
-    }),
-    [
-      copy,
-      active,
-      locked,
-      name,
-      rotation,
-      opacity,
-      width,
-      height,
-      positioningMode,
-      fontWeight,
-      fontFamily,
-      fontSize,
-      lineHeight,
-      letterSpacing,
-      textAlign,
-      textAlignVertical,
-      fit,
-      fill,
-      stroke,
-      strokeWidth,
-      strokeCap,
-      layout,
-      direction,
-      mainAxisAlignment,
-      crossAxisAlignment,
-      cornerRadius,
-      cursor,
-    ]
-  );
-
-  return useMemo(() => {
-    return {
-      selection,
-      nodes,
-      properties: mixedProperties,
-      actions,
-    };
-  }, [selection, nodes, mixedProperties, actions]);
-  //
-}
-
-export function useSelectionPaints() {
-  const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    selection: state.selection,
-    document: state.document,
-    document_ctx: state.document_ctx,
-  }));
-
-  const selection = state.selection;
-
-  const ids = useMemo(
-    // selection & its recursive children
-    () => [
-      ...selection,
-      ...selection
-        .map((s) => dq.getChildren(state.document_ctx, s, true))
-        .flat(),
-    ],
-    [selection, state.document_ctx]
-  );
-
-  const allnodes = useMemo(() => {
-    return ids.map((node_id) => {
-      return state.document.nodes[node_id];
-    });
-  }, [ids, state.document.nodes]);
-
-  const mixedProperties = useMemo(
-    () =>
-      mixed<grida.program.nodes.UnknwonNode, typeof grida.mixed>(
-        allnodes as grida.program.nodes.UnknwonNode[],
-        {
-          idKey: "id",
-          ignoredKey: (key) => {
-            return ![
-              "fill",
-              // TODO: support stroke
-              // "stroke"
-            ].includes(key);
-          },
-          compare: compareNodeProperty,
-          mixed: grida.mixed,
-        }
-      ),
-    [allnodes]
-  );
-
-  const paints = mixedProperties.fill?.values ?? [];
-
-  const setPaint = useCallback(
-    (
-      index: number,
-      value:
-        | grida.program.nodes.i.props.SolidPaintToken
-        | cg.Paint
-        | null
-        | null
-    ) => {
-      const group = paints[index];
-      group.ids.forEach((id) => {
-        instance.changeNodeFill(id, value);
-      });
-    },
-    [paints, instance.changeNodeFill]
-  );
-
-  return useMemo(() => {
-    return {
-      selection,
-      ids,
-      paints,
-      setPaint,
-    };
-  }, [selection, paints, ids, setPaint]);
+  return selection;
 }
 
 export function useEditorFlagsState() {
@@ -723,7 +301,6 @@ export function useDocumentState(): UseDocumentState {
 type UseSceneState = grida.program.document.Scene & {
   selection: editor.state.IEditorState["selection"];
   hovered_node_id: editor.state.IEditorState["hovered_node_id"];
-  hovered_vertex_idx: editor.state.IEditorState["hovered_vertex_idx"];
   document_ctx: editor.state.IEditorState["document_ctx"];
 };
 
@@ -733,7 +310,6 @@ export function useSceneState(scene_id: string): UseSceneState {
     return {
       selection: state.selection,
       hovered_node_id: state.hovered_node_id,
-      hovered_vertex_idx: state.hovered_vertex_idx,
       document_ctx: state.document_ctx,
       ...state.document.scenes[scene_id],
     } satisfies Omit<UseSceneState, "setBackgroundColor">;
@@ -773,6 +349,58 @@ export function useTransformState() {
   }, [transform]);
 }
 
+/**
+ * Hook to detect when the canvas is actively being transformed (panned, zoomed, etc.)
+ *
+ * @returns `true` when the canvas transform is changing, `false` when stable
+ * @example
+ * ```tsx
+ * const isTransforming = useIsTransforming();
+ * if (isTransforming) {
+ *   // Canvas is being panned, zoomed, or otherwise transformed
+ * }
+ * ```
+ */
+export function useIsTransforming() {
+  const editor = useCurrentEditor();
+  const transform = useEditorState(editor, (state) => state.transform);
+  const prevTransformRef = useRef(transform);
+  const [isTransforming, setIsTransforming] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const hasChanged = !equal(transform, prevTransformRef.current);
+
+    if (hasChanged) {
+      setIsTransforming(true);
+
+      // Clear existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Set timeout to mark as not transforming after a short delay
+      timeoutRef.current = setTimeout(() => {
+        setIsTransforming(false);
+      }, 100); // 100ms delay to detect when transform stops
+    }
+
+    // Update the previous transform reference
+    prevTransformRef.current = transform;
+  }, [transform]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return isTransforming;
+}
+
 export function useEventTargetCSSCursor() {
   const editor = useCurrentEditor();
   const tool = useEditorState(editor, (state) => state.tool);
@@ -804,6 +432,8 @@ export function useEventTargetCSSCursor() {
       case "eraser":
       case "flood-fill":
         return "cell";
+      case "lasso":
+        return "crosshair";
     }
   }, [tool]);
 }
@@ -818,25 +448,34 @@ export function useMultiplayerCursorState(): editor.state.IEditorMultiplayerCurs
   return useEditorState(editor, (state) => state.cursors);
 }
 
-interface UseToolState {
-  tool: editor.state.IEditorState["tool"];
-  content_edit_mode: editor.state.IEditorState["content_edit_mode"];
+export function useToolState(): editor.state.IEditorState["tool"] {
+  const editor = useCurrentEditor();
+  return useEditorState(editor, (state) => state.tool);
 }
 
-export function useToolState(): UseToolState {
+/**
+ * @deprecated {@link useContentEditModeState} can be expensive for certain modes.
+ * @returns
+ */
+export function useContentEditModeState(): editor.state.IEditorState["content_edit_mode"] {
   const editor = useCurrentEditor();
-  const tool = useEditorState(editor, (state) => state.tool);
-  const content_edit_mode = useEditorState(
-    editor,
-    (state) => state.content_edit_mode
-  );
 
-  return useMemo(() => {
+  return useEditorState(editor, (state) => state.content_edit_mode);
+}
+
+export function useContentEditModeMinimalState():
+  | { type: editor.state.ContentEditModeState["type"]; node_id: string }
+  | undefined {
+  const editor = useCurrentEditor();
+
+  return useEditorState(editor, (state) => {
+    const content_edit_mode = state.content_edit_mode;
+    if (!content_edit_mode) return undefined;
     return {
-      tool,
-      content_edit_mode,
+      type: content_edit_mode.type,
+      node_id: content_edit_mode.node_id,
     };
-  }, [tool, content_edit_mode]);
+  });
 }
 
 export function useBrushState() {
@@ -888,6 +527,10 @@ interface UseA11yActions {
     shiftKey: boolean,
     config?: editor.api.NudgeUXConfig
   ) => void;
+  a11yalign: (alignment: {
+    horizontal?: "min" | "max" | "center";
+    vertical?: "min" | "max" | "center";
+  }) => void;
   nudge: (
     target: "selection" | editor.NodeID,
     axis: "x" | "y",
@@ -976,9 +619,20 @@ export function useA11yActions(): UseA11yActions {
     [dispatch]
   );
 
+  const a11yalign = useCallback(
+    (alignment: {
+      horizontal?: "min" | "max" | "center";
+      vertical?: "min" | "max" | "center";
+    }) => {
+      dispatch({ type: "a11y/align", alignment });
+    },
+    [dispatch]
+  );
+
   return {
     nudge,
     a11yarrow,
+    a11yalign,
   };
 }
 
@@ -1170,63 +824,81 @@ export function useDataTransferEventTarget() {
         )
       ).filter((item) => item !== null);
 
-      const grida_payload = items.find((item) => item.type === "clipboard");
-
-      // 1. if there is a grida html clipboard, use it and ignore all others.
-      if (grida_payload) {
-        if (
-          current_clipboard?.payload_id === grida_payload.clipboard.payload_id
-        ) {
-          instance.paste();
+      const vector_payload = items.find(
+        (item) => item.type === "text" && item.text.startsWith("grida:vn:")
+      );
+      if (vector_payload) {
+        try {
+          assert(vector_payload.type === "text");
+          const net = JSON.parse(
+            atob(vector_payload.text.slice("grida:vn:".length))
+          );
+          instance.dispatch({ type: "paste", vector_network: net });
           pasted_from_data_transfer = true;
-        } else {
-          grida_payload.clipboard.prototypes.forEach((p) => {
-            const sub =
-              grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-                p,
-                nid
-              );
-            instance.insert({ document: sub });
-          });
-          pasted_from_data_transfer = true;
-        }
-      }
-      // 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
-      else {
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          try {
-            switch (item.type) {
-              case "text": {
-                const { text } = item;
-                insertText(text, {
-                  clientX: window.innerWidth / 2,
-                  clientY: window.innerHeight / 2,
-                });
-                pasted_from_data_transfer = true;
-                break;
-              }
-              case "image/gif":
-              case "image/jpeg":
-              case "image/png":
-              case "image/svg+xml": {
-                const { type, file } = item;
-                insertFromFile(type, file, {
-                  clientX: window.innerWidth / 2,
-                  clientY: window.innerHeight / 2,
-                });
-                pasted_from_data_transfer = true;
-                break;
-              }
-            }
-          } catch {}
-        }
+        } catch {}
       }
 
-      // 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
-      if (!pasted_from_data_transfer) {
-        instance.paste();
+      if (pasted_from_data_transfer) {
         event.preventDefault();
+      } else {
+        const grida_payload = items.find((item) => item.type === "clipboard");
+
+        // 1. if there is a grida html clipboard, use it and ignore all others.
+        if (grida_payload) {
+          if (
+            current_clipboard?.payload_id === grida_payload.clipboard.payload_id
+          ) {
+            instance.paste();
+            pasted_from_data_transfer = true;
+          } else {
+            grida_payload.clipboard.prototypes.forEach((p) => {
+              const sub =
+                grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+                  p,
+                  nid
+                );
+              instance.insert({ document: sub });
+            });
+            pasted_from_data_transfer = true;
+          }
+        }
+        // 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
+        else {
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            try {
+              switch (item.type) {
+                case "text": {
+                  const { text } = item;
+                  insertText(text, {
+                    clientX: window.innerWidth / 2,
+                    clientY: window.innerHeight / 2,
+                  });
+                  pasted_from_data_transfer = true;
+                  break;
+                }
+                case "image/gif":
+                case "image/jpeg":
+                case "image/png":
+                case "image/svg+xml": {
+                  const { type, file } = item;
+                  insertFromFile(type, file, {
+                    clientX: window.innerWidth / 2,
+                    clientY: window.innerHeight / 2,
+                  });
+                  pasted_from_data_transfer = true;
+                  break;
+                }
+              }
+            } catch {}
+          }
+        }
+
+        // 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
+        if (!pasted_from_data_transfer) {
+          instance.paste();
+          event.preventDefault();
+        }
       }
     },
     [instance, insertFromFile, insertText, current_clipboard]
@@ -1291,10 +963,18 @@ export function useClipboardSync() {
     instance,
     (state) => state.user_clipboard
   );
+  const vector_clipboard = useEditorState(instance, (state) =>
+    state.content_edit_mode?.type === "vector"
+      ? state.content_edit_mode.clipboard
+      : null
+  );
 
   useEffect(() => {
     try {
-      if (user_clipboard) {
+      if (vector_clipboard) {
+        const txt = `grida:vn:${btoa(JSON.stringify(vector_clipboard))}`;
+        navigator.clipboard.writeText(txt);
+      } else if (user_clipboard) {
         const items = io.clipboard.encode(
           user_clipboard as io.clipboard.ClipboardPayload
         );
@@ -1307,105 +987,8 @@ export function useClipboardSync() {
     } catch (e) {
       reportError(e);
     }
-  }, [user_clipboard]);
+  }, [user_clipboard, vector_clipboard]);
   //
-}
-
-export function useSurfacePathEditor() {
-  const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    content_edit_mode: state.content_edit_mode,
-    document: state.document,
-    hovered_vertex_idx: state.hovered_vertex_idx,
-    tool: state.tool,
-  }));
-
-  assert(state.content_edit_mode && state.content_edit_mode.type === "path");
-
-  const { hovered_vertex_idx: hovered_point, tool } = state;
-  const { node_id, selected_vertices, a_point, path_cursor_position, next_ta } =
-    state.content_edit_mode;
-  const node = state.document.nodes[node_id] as grida.program.nodes.PathNode;
-
-  const vertices = node.vectorNetwork.vertices;
-  const segments = node.vectorNetwork.segments;
-
-  // offset of the points (node position)
-  const offset: cmath.Vector2 = [node.left!, node.top!];
-
-  const selectVertex = useCallback(
-    (vertex: number) => {
-      if (tool.type === "path") {
-        return;
-      }
-      instance.selectVertex(node_id, vertex);
-    },
-    [tool.type, instance.selectVertex, node_id]
-  );
-
-  const onVertexHover = useCallback(
-    (vertex: number, eventType: "enter" | "leave") => {
-      instance.hoverVertex(node_id, vertex, eventType);
-    },
-    [instance, node_id]
-  );
-
-  const onVertexDragStart = useCallback(
-    (vertex: number) => {
-      instance.startTranslateVertexGesture(node_id, vertex);
-    },
-    [instance, node_id]
-  );
-
-  const onVertexDelete = useCallback(
-    (vertex: number) => {
-      instance.deleteVertex(node_id, vertex);
-    },
-    [node_id, instance.deleteVertex]
-  );
-
-  const onCurveControlPointDragStart = useCallback(
-    (segment: number, control: "ta" | "tb") => {
-      instance.startCurveGesture(node_id, segment, control);
-    },
-    [instance, node_id]
-  );
-
-  return useMemo(
-    () => ({
-      node_id,
-      path_cursor_position,
-      vertices,
-      segments,
-      offset,
-      selected_vertices,
-      hovered_point,
-      a_point,
-      next_ta,
-      selectVertex,
-      onVertexHover,
-      onVertexDragStart,
-      onVertexDelete,
-      onCurveControlPointDragStart,
-    }),
-    [
-      //
-      node_id,
-      path_cursor_position,
-      vertices,
-      segments,
-      offset,
-      selected_vertices,
-      hovered_point,
-      a_point,
-      next_ta,
-      selectVertex,
-      onVertexHover,
-      onVertexDragStart,
-      onVertexDelete,
-      onCurveControlPointDragStart,
-    ]
-  );
 }
 
 /**

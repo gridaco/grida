@@ -35,6 +35,7 @@ export function OpacityControl({
       </div>
       <div className="flex-1">
         <Slider
+          tabIndex={-1}
           min={0}
           max={1}
           step={0.01}

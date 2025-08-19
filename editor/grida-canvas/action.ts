@@ -3,6 +3,7 @@ import type cmath from "@grida/cmath";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
+import type vn from "@grida/vn";
 
 export type Action =
   | InternalAction
@@ -28,16 +29,23 @@ export type DocumentAction =
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
+  | EditorFlattenAction
+  | EditorA11yDeleteAction
   | EditorHierarchyAction
-  | EditorVectorPathAction
+  | EditorVectorEditorAction
+  | EditorVariableWidthAction
   | EditorGradientAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
   | EditorA11yArrowAction
+  | EditorA11yAlignAction
   | EditorAlignAction
   | EditorDistributeEvenlyAction
   | EditorAutoLayoutAction
   | EditorContainAction
+  | EditorGroupAction
+  | EditorUngroupAction
+  | EditorBooleanOperationAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -63,9 +71,48 @@ interface IVertexIdx {
   vertex: number;
 }
 
+interface ISegmentIdx {
+  /**
+   * index of the segment
+   */
+  segment: number;
+}
+
 interface VertexQuery extends IVertexIdx {
   /**
    * node id (must be a path node)
+   */
+  node_id: NodeID;
+}
+
+interface SegmentQuery extends ISegmentIdx {
+  /**
+   * node id (must be a path node)
+   */
+  node_id: NodeID;
+}
+
+interface TangentQuery extends IVertexIdx {
+  /**
+   * node id (must be a path node)
+   */
+  node_id: NodeID;
+  /**
+   * tangent index (0 for `a`, 1 for `b`)
+   */
+  tangent: 0 | 1;
+}
+
+interface IVariableWidthStopIdx {
+  /**
+   * index of the variable width stop
+   */
+  stop: number;
+}
+
+interface VariableWidthStopQuery extends IVariableWidthStopIdx {
+  /**
+   * node id (must be a variable width node)
    */
   node_id: NodeID;
 }
@@ -206,6 +253,7 @@ export interface EditorCutAction {
 
 export interface EditorPasteAction {
   type: "paste";
+  vector_network?: vn.VectorNetwork;
 }
 
 export interface EditorDuplicateAction {
@@ -218,6 +266,15 @@ export interface EditorDuplicateAction {
 export interface EditorDeleteAction {
   type: "delete";
   target: NodeID | "selection";
+}
+
+export interface EditorFlattenAction {
+  type: "flatten";
+  target: NodeID | "selection";
+}
+
+export interface EditorA11yDeleteAction {
+  type: "a11y/delete";
 }
 
 export type EditorHierarchyAction =
@@ -237,26 +294,142 @@ export interface EditorHierarchyMoveAction {
   index?: number;
 }
 
-// #region [path]
-export type EditorVectorPathAction =
-  | EditorDeleteVertexAction
-  | EditorSelectVertexAction
-  | EditorHoverVertexAction;
+// #region [vector]
+export type EditorVectorEditorAction =
+  | EditorVectorSelectVertexAction
+  | EditorVectorDeleteVertexAction
+  | EditorVectorSelectSegmentAction
+  | EditorVectorDeleteSegmentAction
+  | EditorVectorSplitSegmentAction
+  | EditorVectorSelectTangentAction
+  | EditorVectorDeleteTangentAction
+  | EditorVectorTranslateVertexAction
+  | EditorVectorTranslateSegmentAction
+  | EditorVectorBendSegmentAction
+  | EditorVectorPlanarizeAction
+  | EditorVectorBendOrClearCornerAction
+  | EditorVectorUpdateHoveredControlAction;
 
-export interface EditorDeleteVertexAction {
+export interface EditorVectorSelectVertexAction {
+  type: "select-vertex";
+  target: VertexQuery;
+  /** if true, toggle selection instead of resetting */
+  additive?: boolean;
+}
+
+export interface EditorVectorDeleteVertexAction {
   type: "delete-vertex";
   target: VertexQuery;
 }
 
-export interface EditorSelectVertexAction {
-  type: "select-vertex";
-  target: VertexQuery;
+export interface EditorVectorSelectSegmentAction {
+  type: "select-segment";
+  target: SegmentQuery;
+  /** if true, toggle selection instead of resetting */
+  additive?: boolean;
 }
 
-export interface EditorHoverVertexAction {
-  type: "hover-vertex";
-  event: "enter" | "leave";
+export interface EditorVectorDeleteSegmentAction {
+  type: "delete-segment";
+  target: SegmentQuery;
+}
+
+export interface EditorVectorSplitSegmentAction {
+  type: "split-segment";
+  target: {
+    node_id: string;
+    point: vn.PointOnSegment;
+  };
+}
+
+export interface EditorVectorSelectTangentAction {
+  type: "select-tangent";
+  target: TangentQuery;
+  /** if true, toggle selection instead of resetting */
+  additive?: boolean;
+}
+
+export interface EditorVectorDeleteTangentAction {
+  type: "delete-tangent";
+  target: TangentQuery;
+}
+
+export interface EditorVectorTranslateVertexAction {
+  type: "translate-vertex";
   target: VertexQuery;
+  delta: cmath.Vector2;
+}
+
+export interface EditorVectorTranslateSegmentAction {
+  type: "translate-segment";
+  target: SegmentQuery;
+  delta: cmath.Vector2;
+}
+
+export interface EditorVectorBendSegmentAction {
+  type: "bend-segment";
+  target: SegmentQuery;
+  /** parametric position (0-1) where the bend gesture started */
+  ca: number;
+  /** current cursor position in node space */
+  cb: cmath.Vector2;
+  /** frozen original segment state */
+  frozen: {
+    a: cmath.Vector2;
+    b: cmath.Vector2;
+    ta: cmath.Vector2;
+    tb: cmath.Vector2;
+  };
+}
+
+export interface EditorVectorBendOrClearCornerAction {
+  type: "bend-or-clear-corner";
+  target: VertexQuery & { ref?: "ta" | "tb" };
+  /**
+   * If provided, explicitly sets corner tangents to this value (or clears when 0).
+   * When omitted, the corner is bent or cleared based on existing tangents.
+   */
+  tangent?: Vector2 | 0;
+}
+
+export interface EditorVectorPlanarizeAction {
+  type: "vector/planarize";
+  target: NodeID | NodeID[];
+}
+
+// #region [variable width]
+export type EditorVariableWidthAction =
+  | EditorVariableWidthSelectStopAction
+  | EditorVariableWidthDeleteStopAction
+  | EditorVariableWidthAddStopAction;
+
+export interface EditorVariableWidthSelectStopAction {
+  type: "variable-width/select-stop";
+  target: VariableWidthStopQuery;
+}
+
+export interface EditorVariableWidthDeleteStopAction {
+  type: "variable-width/delete-stop";
+  target: VariableWidthStopQuery;
+}
+
+export interface EditorVariableWidthAddStopAction {
+  type: "variable-width/add-stop";
+  target: {
+    node_id: string;
+    u: number; // parametric position 0-1
+    r: number; // radius
+  };
+}
+
+// #endregion [variable width]
+
+export interface EditorVectorUpdateHoveredControlAction {
+  type: "vector/update-hovered-control";
+  hoveredControl: {
+    type: editor.state.VectorContentEditModeHoverableGeometryControlType;
+    index: number;
+  } | null;
 }
 // #endregion
 
@@ -310,6 +483,14 @@ export interface EditorA11yArrowAction {
   shiftKey?: boolean;
 }
 
+export interface EditorA11yAlignAction {
+  type: "a11y/align";
+  alignment: {
+    horizontal?: "min" | "max" | "center";
+    vertical?: "min" | "max" | "center";
+  };
+}
+
 export interface EditorAlignAction {
   type: "align";
   target: NodeID | "selection";
@@ -335,14 +516,33 @@ export interface EditorContainAction {
   target: NodeID[] | "selection";
 }
 
+export interface EditorGroupAction {
+  type: "group";
+  target: NodeID[] | "selection";
+}
+
+export interface EditorBooleanOperationAction {
+  type: "group-op";
+  target: ReadonlyArray<NodeID>;
+  op: cg.BooleanOperation;
+}
+
+export interface EditorUngroupAction {
+  type: "ungroup";
+  target: NodeID[] | "selection";
+}
+
 export type EditorConfigAction =
   | EditorConfigure_RaycastTargeting
   | EditorConfigure_Measurement
   | EditorConfigureModifier_TranslateWithClone
   | EditorConfigureModifier_TranslateWithAxisLock
+  | EditorConfigureModifier_TranslateWithForceDisableSnap
   | EditorConfigureModifier_TransformWithCenterOrigin
   | EditorConfigureModifier_TransformWithPreserveAspectRatio
-  | EditorConfigureModifier_RotateWithQuantize;
+  | EditorConfigureModifier_RotateWithQuantize
+  | EditorConfigureModifier_PathKeepProjecting
+  | EditorConfigureModifier_CurveTangentMirroring;
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
@@ -363,6 +563,11 @@ export interface EditorConfigureModifier_TranslateWithAxisLock {
   tarnslate_with_axis_lock: "on" | "off";
 }
 
+export interface EditorConfigureModifier_TranslateWithForceDisableSnap {
+  type: "config/modifiers/translate-with-force-disable-snap";
+  translate_with_force_disable_snap: "on" | "off";
+}
+
 export interface EditorConfigureModifier_TransformWithCenterOrigin {
   type: "config/modifiers/transform-with-center-origin";
   transform_with_center_origin: "on" | "off";
@@ -376,6 +581,16 @@ export interface EditorConfigureModifier_TransformWithPreserveAspectRatio {
 export interface EditorConfigureModifier_RotateWithQuantize {
   type: "config/modifiers/rotate-with-quantize";
   rotate_with_quantize: number | "off";
+}
+
+export interface EditorConfigureModifier_PathKeepProjecting {
+  type: "config/modifiers/path-keep-projecting";
+  path_keep_projecting: "on" | "off";
+}
+
+export interface EditorConfigureModifier_CurveTangentMirroring {
+  type: "config/modifiers/curve-tangent-mirroring";
+  curve_tangent_mirroring: vn.TangentMirroringMode;
 }
 
 /**
@@ -581,9 +796,14 @@ export type EditorSurface_StartGesture = {
         editor.gesture.GestureCurve,
         "type" | "control" | "node_id" | "segment"
       >
+    | Pick<editor.gesture.GestureTranslateVectorControls, "type" | "node_id">
     | Pick<
-        editor.gesture.GestureTranslateVertex,
-        "type" | "node_id" | "vertex"
+        editor.gesture.GestureTranslateVariableWidthStop,
+        "type" | "node_id" | "stop"
+      >
+    | Pick<
+        editor.gesture.GestureResizeVariableWidthStop,
+        "type" | "node_id" | "stop" | "side"
       >;
 };
 

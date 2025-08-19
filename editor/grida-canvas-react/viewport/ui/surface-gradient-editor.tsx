@@ -7,7 +7,10 @@ import {
   getTransformFromPoints,
 } from "@/grida-canvas-react-gradient";
 import cg from "@grida/cg";
-import { useNodeState } from "@/grida-canvas-react/provider";
+import {
+  useContentEditModeState,
+  useNodeState,
+} from "@/grida-canvas-react/provider";
 import { editor } from "@/grida-canvas";
 
 const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
@@ -18,10 +21,9 @@ const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
   ["diamond_gradient" satisfies cg.Paint["type"]]: "radial",
 };
 
-export function SurfaceGradientEditor({
-  node_id,
-  selected_stop,
-}: editor.state.FillGradientContentEditMode) {
+export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
+  const { selected_stop } =
+    useContentEditModeState()! as editor.state.FillGradientContentEditMode;
   const data = useSingleSelection(node_id);
   const { fill } = useNodeState(node_id, (node) => ({
     fill: node.fill,
@@ -186,35 +188,6 @@ function EditorUser({
     [stops, points, gradient.type, gradientType, onValueChange]
   );
 
-  const handleDeleteStop = useCallback(
-    (index: number) => {
-      if (stops.length <= 2) return; // Don't allow deleting if only 2 stops remain
-
-      const newStops = stops.filter((_, i) => i !== index);
-      setStops(newStops);
-
-      // Adjust focused stop
-      if (selected_stop === index) {
-        setFocusedStop(null);
-      } else if (selected_stop !== null && selected_stop > index) {
-        setFocusedStop(selected_stop - 1);
-      }
-
-      // Convert points to transform
-      const transform = getTransformFromPoints(
-        { A: points[0], B: points[1], C: points[2] },
-        gradientType
-      );
-
-      onValueChange?.({
-        type: `${gradientType}_gradient` as cg.GradientPaint["type"],
-        stops: newStops,
-        transform,
-      });
-    },
-    [stops, selected_stop, points, gradient.type, gradientType, onValueChange]
-  );
-
   return (
     <GradientControlPointsEditor
       stops={stops}
@@ -226,7 +199,6 @@ function EditorUser({
       onPointsChange={handlePointsChange}
       onPositionChange={handlePositionChange}
       onInsertStop={handleInsertStop}
-      onDeleteStop={handleDeleteStop}
       onFocusedStopChange={setFocusedStop}
     />
   );

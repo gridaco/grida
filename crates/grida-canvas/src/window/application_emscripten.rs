@@ -134,6 +134,10 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.export_node_as(id, format)
     }
 
+    fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
+        self.base.runtime_renderer_set_cache_tile(cache);
+    }
+
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {
         self.base.set_main_camera_transform(transform);
     }
@@ -159,6 +163,14 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.devtools_rendering_set_show_ruler(show);
     }
 
+    fn highlight_strokes(
+        &mut self,
+        ids: Vec<String>,
+        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+    ) {
+        self.base.highlight_strokes(ids, style);
+    }
+
     fn load_scene_json(&mut self, json: &str) {
         self.base.load_scene_json(json);
     }
@@ -175,7 +187,7 @@ impl ApplicationApi for EmscriptenApplication {
 
 impl EmscriptenApplication {
     /// Create a new [`EmscriptenApplication`] with an initialized renderer.
-    pub fn new(width: i32, height: i32, options: RendererOptions) -> Self {
+    pub fn new(width: i32, height: i32, options: RendererOptions) -> Box<Self> {
         init_gl();
         let mut gpu_state = create_gpu_state();
         let surface = state::create_surface(&mut gpu_state, width, height);
@@ -197,18 +209,18 @@ impl EmscriptenApplication {
         let base = UnknownTargetApplication::new(
             state, backend, camera, 120, image_rx, font_rx, None, options,
         );
-        let app = Self { base };
+        let app = Box::new(Self { base });
 
         #[cfg(target_os = "emscripten")]
         unsafe {
-            // Box and leak the app so its pointer can be used in the callback
-            let app_ptr = Box::into_raw(Box::new(app));
+            // Register the animation frame callback with the leaked pointer.
+            let app_ptr = Box::into_raw(app);
             emscripten_request_animation_frame_loop(
                 Some(request_animation_frame_callback),
                 app_ptr as *mut _,
             );
-            // Return the leaked app (ownership is now with the runtime)
-            return *Box::from_raw(app_ptr);
+            // Reconstruct the box so the caller retains ownership.
+            return Box::from_raw(app_ptr);
         }
 
         app

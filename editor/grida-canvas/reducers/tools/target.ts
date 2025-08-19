@@ -1,5 +1,25 @@
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
+import grida from "@grida/schema";
+
+/**
+ * Determines if a node type should be treated as selectable even when it's a root node with children.
+ * Container nodes are treated as containers (non-selectable when root with children).
+ * Group and boolean nodes are treated as selectable nodes (selectable even when root with children).
+ */
+function is_selectable_root_with_children(
+  node_type: grida.program.nodes.NodeType
+): boolean {
+  switch (node_type) {
+    case "container":
+      return false; // Container nodes are not selectable when root with children
+    case "group":
+    case "boolean":
+      return true; // Group and boolean nodes are selectable even when root with children
+    default:
+      return false; // Other node types are not selectable when root with children
+  }
+}
 
 export function getRayTarget(
   hits: string[],
@@ -23,13 +43,16 @@ export function getRayTarget(
       const node = nodes[node_id];
       const top_id = dq.getTopId(context.document_ctx, node_id);
       const maybeichildren = ichildren(node);
+
+      // Check if this is a root node with children that should be ignored
       if (
         maybeichildren &&
         maybeichildren.length > 0 &&
         config.ignores_root_with_children &&
-        node_id === top_id
+        node_id === top_id &&
+        !is_selectable_root_with_children(node.type)
       ) {
-        return false; // Ignore the root node if configured
+        return false; // Ignore the root node if configured and not selectable
       }
 
       if (!node) {
@@ -113,7 +136,8 @@ export function getMarqueeSelection(
       maybeichildren &&
       maybeichildren.length > 0 &&
       state.pointer_hit_testing_config.ignores_root_with_children &&
-      hit_id === root_id
+      hit_id === root_id &&
+      !is_selectable_root_with_children(hit.type)
     )
       return false;
 

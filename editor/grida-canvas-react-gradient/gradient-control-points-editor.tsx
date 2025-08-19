@@ -95,8 +95,6 @@ export interface GradientControlPointsEditorProps {
   onPositionChange?: (index: number, position: number) => void;
   /** Called when a new stop should be inserted */
   onInsertStop?: (at: number, position: number) => void;
-  /** Called when a stop should be deleted */
-  onDeleteStop?: (index: number) => void;
   /** Called when the focused stop changes */
   onFocusedStopChange?: (index: number | null) => void;
 }
@@ -120,7 +118,6 @@ export default function GradientControlPointsEditor({
   onPointsChange,
   onPositionChange,
   onInsertStop,
-  onDeleteStop,
   onFocusedStopChange,
 }: GradientControlPointsEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -496,24 +493,6 @@ export default function GradientControlPointsEditor({
     ]
   );
 
-  // Keyboard support for deleting stops
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (readonly) return;
-      if (
-        (e.key === "Delete" || e.key === "Backspace") &&
-        focusedStop !== null
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (stops.length > 2) {
-          onDeleteStop?.(focusedStop);
-        }
-      }
-    },
-    [readonly, focusedStop, stops.length, onDeleteStop]
-  );
-
   return (
     <div
       ref={containerRef}
@@ -523,7 +502,6 @@ export default function GradientControlPointsEditor({
       onPointerMove={drag ? undefined : handlePointerMove}
       onPointerUp={drag ? undefined : handlePointerUp}
       onPointerLeave={handlePointerLeave}
-      onKeyDown={handleKeyDown}
       data-popover-no-close
       role="application"
       aria-label="Gradient editor canvas"

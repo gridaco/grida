@@ -16,6 +16,7 @@ import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
 import type { Grida2D } from "@grida/canvas-wasm";
+import vn from "@grida/vn";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
@@ -207,6 +208,12 @@ export class Editor
     return this.debug;
   }
 
+  private log(...args: any[]) {
+    if (this.debug || process.env.NODE_ENV === "development") {
+      console.log(...args);
+    }
+  }
+
   public reset(
     state: editor.state.IEditorState,
     key: string | undefined = undefined,
@@ -249,7 +256,7 @@ export class Editor
 
   public archive(): Blob {
     const documentData = {
-      version: "0.0.1-beta.1+20250303",
+      version: "0.0.1-beta.1+20250728",
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
@@ -386,6 +393,25 @@ export class Editor
     this.listeners.forEach((l) => l(this, action));
   }
 
+  public dispatchAll(actions: Action[], force: boolean = false) {
+    if (this._locked && !force) return;
+    this.mstate = actions.reduce(
+      (state, action) =>
+        reducer(state, action, {
+          geometry: this,
+          viewport: {
+            width: this.viewport.size.width,
+            height: this.viewport.size.height,
+          },
+        }),
+      this.mstate
+    );
+    this._tid++;
+    if (actions.length) {
+      this.listeners.forEach((l) => l(this, actions[actions.length - 1]));
+    }
+  }
+
   public subscribe(fn: (editor: this, action?: Action) => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -508,7 +534,9 @@ export class Editor
     return ref;
   }
 
-  setTool(tool: editor.state.ToolMode) {
+  setTool(tool: editor.state.ToolMode, debug_label?: string) {
+    if (debug_label) this.log("debug:setTool", tool, debug_label);
+
     this.dispatch({
       type: "surface/tool",
       tool: tool,
@@ -580,7 +608,73 @@ export class Editor
     return ids;
   }
 
-  public blur() {
+  private _stackEscapeSteps(
+    state: editor.state.IEditorState
+  ): editor.a11y.EscapeStep[] {
+    const steps: editor.a11y.EscapeStep[] = [];
+
+    if (!state.content_edit_mode) {
+      // p1. if the tool is selected, escape the tool
+      if (state.tool.type !== "cursor") {
+        steps.push("escape-tool");
+      }
+      // p2. if the selection is not empty, escape the selection
+      if (state.selection.length > 0) {
+        steps.push("escape-selection");
+      }
+    } else {
+      switch (state.content_edit_mode.type) {
+        case "vector": {
+          const { selected_vertices, selected_segments, selected_tangents } =
+            state.content_edit_mode.selection;
+          const hasSelection =
+            selected_vertices.length > 0 ||
+            selected_segments.length > 0 ||
+            selected_tangents.length > 0;
+
+          // p1. if the selection is not empty, escape the selection
+          if (hasSelection) {
+            steps.push("escape-selection");
+          }
+
+          // p2. if the tool is selected, escape the tool
+          if (state.tool.type !== "cursor") {
+            steps.push("escape-tool");
+          }
+          break;
+        }
+      }
+
+      // p3. if the content edit mode is active, escape the content edit mode
+      steps.push("escape-content-edit-mode");
+    }
+
+    return steps;
+  }
+
+  public a11yEscape() {
+    const step = this._stackEscapeSteps(this.mstate)[0];
+
+    switch (step) {
+      case "escape-tool": {
+        this.setTool({ type: "cursor" }, "a11yEscape");
+        break;
+      }
+      case "escape-selection": {
+        this.blur("a11yEscape");
+        break;
+      }
+      case "escape-content-edit-mode":
+      default: {
+        this.tryExitContentEditMode();
+        break;
+      }
+    }
+  }
+
+  public blur(debug_label?: string) {
+    if (debug_label) this.log("debug:blur", debug_label);
+
     this.dispatch({
       type: "blur",
     });
@@ -618,10 +712,82 @@ export class Editor
     });
   }
 
+  public a11yCopy() {
+    if (this.mstate.content_edit_mode?.type === "vector") {
+      const { selected_vertices, selected_segments, selected_tangents } =
+        this.mstate.content_edit_mode.selection;
+      const hasSelection =
+        selected_vertices.length > 0 ||
+        selected_segments.length > 0 ||
+        selected_tangents.length > 0;
+      if (!hasSelection) return;
+    }
+    this.copy("selection");
+  }
+
+  public a11yCut() {
+    this.cut("selection");
+  }
+
+  public a11yPaste() {
+    this.paste();
+  }
+
+  public a11yDelete() {
+    this.dispatch({ type: "a11y/delete" });
+  }
+
   public duplicate(target: "selection" | editor.NodeID) {
     this.dispatch({
       type: "duplicate",
       target,
+    });
+  }
+
+  public flatten(target: "selection" | editor.NodeID) {
+    this.dispatch({
+      type: "flatten",
+      target,
+    });
+  }
+
+  public op(target: ReadonlyArray<editor.NodeID>, op: cg.BooleanOperation) {
+    this.dispatch({
+      type: "group-op",
+      target: target,
+      op: op,
+    });
+  }
+
+  public union(target: ReadonlyArray<editor.NodeID>) {
+    this.dispatch({
+      type: "group-op",
+      target: target,
+      op: "union",
+    });
+  }
+
+  public intersect(target: ReadonlyArray<editor.NodeID>) {
+    this.dispatch({
+      type: "group-op",
+      target: target,
+      op: "intersection",
+    });
+  }
+
+  public subtract(target: ReadonlyArray<editor.NodeID>) {
+    this.dispatch({
+      type: "group-op",
+      target: target,
+      op: "difference",
+    });
+  }
+
+  public exclude(target: ReadonlyArray<editor.NodeID>) {
+    this.dispatch({
+      type: "group-op",
+      target: target,
+      op: "xor",
     });
   }
 
@@ -632,13 +798,19 @@ export class Editor
     });
   }
 
-  public selectVertex(node_id: editor.NodeID, vertex: number) {
+  //
+  public selectVertex(
+    node_id: editor.NodeID,
+    vertex: number,
+    options: { additive?: boolean } = {}
+  ) {
     this.dispatch({
       type: "select-vertex",
       target: {
         node_id,
         vertex,
       },
+      additive: options.additive,
     });
   }
 
@@ -652,12 +824,176 @@ export class Editor
     });
   }
 
+  public selectSegment(
+    node_id: editor.NodeID,
+    segment: number,
+    options: { additive?: boolean } = {}
+  ): void {
+    this.dispatch({
+      type: "select-segment",
+      target: {
+        node_id,
+        segment,
+      },
+      additive: options.additive,
+    });
+  }
+
+  public selectTangent(
+    node_id: editor.NodeID,
+    vertex: number,
+    tangent: 0 | 1,
+    options: { additive?: boolean } = {}
+  ) {
+    this.dispatch({
+      type: "select-tangent",
+      target: {
+        node_id,
+        vertex,
+        tangent,
+      },
+      additive: options.additive,
+    });
+  }
+
+  public deleteSegment(node_id: editor.NodeID, segment: number): void {
+    this.dispatch({
+      type: "delete-segment",
+      target: {
+        node_id,
+        segment,
+      },
+    });
+  }
+
+  public splitSegment(node_id: editor.NodeID, point: vn.PointOnSegment) {
+    this.dispatch({
+      type: "split-segment",
+      target: {
+        node_id,
+        point,
+      },
+    });
+  }
+
+  public translateVertex(
+    node_id: editor.NodeID,
+    vertex: number,
+    delta: cmath.Vector2
+  ) {
+    this.dispatch({
+      type: "translate-vertex",
+      target: { node_id, vertex },
+      delta,
+    });
+  }
+
+  public translateSegment(
+    node_id: editor.NodeID,
+    segment: number,
+    delta: cmath.Vector2
+  ) {
+    this.dispatch({
+      type: "translate-segment",
+      target: { node_id, segment },
+      delta,
+    });
+  }
+
+  public bendSegment(
+    node_id: editor.NodeID,
+    segment: number,
+    ca: number,
+    cb: cmath.Vector2,
+    frozen: {
+      a: cmath.Vector2;
+      b: cmath.Vector2;
+      ta: cmath.Vector2;
+      tb: cmath.Vector2;
+    }
+  ) {
+    this.dispatch({
+      type: "bend-segment",
+      target: { node_id, segment },
+      ca,
+      cb,
+      frozen,
+    });
+  }
+
+  public planarize(ids: editor.NodeID | editor.NodeID[]): void {
+    this.dispatch({
+      type: "vector/planarize",
+      target: ids,
+    });
+  }
+
+  public updateVectorHoveredControl(
+    hoveredControl: {
+      type: editor.state.VectorContentEditModeHoverableGeometryControlType;
+      index: number;
+    } | null
+  ) {
+    this.dispatch({
+      type: "vector/update-hovered-control",
+      hoveredControl,
+    });
+  }
+
+  public bendOrClearCorner(
+    node_id: editor.NodeID,
+    vertex: number,
+    tangent?: cmath.Vector2 | 0,
+    ref?: "ta" | "tb"
+  ) {
+    this.dispatch({
+      type: "bend-or-clear-corner",
+      target: { node_id, vertex, ref },
+      tangent,
+    });
+  }
+
   public selectGradientStop(node_id: editor.NodeID, stop: number): void {
     this.dispatch({
       type: "select-gradient-stop",
       target: {
         node_id,
         stop,
+      },
+    });
+  }
+
+  public selectVariableWidthStop(node_id: editor.NodeID, stop: number): void {
+    this.dispatch({
+      type: "variable-width/select-stop",
+      target: {
+        node_id,
+        stop,
+      },
+    });
+  }
+
+  public deleteVariableWidthStop(node_id: editor.NodeID, stop: number): void {
+    this.dispatch({
+      type: "variable-width/delete-stop",
+      target: {
+        node_id,
+        stop,
+      },
+    });
+  }
+
+  public addVariableWidthStop(
+    node_id: editor.NodeID,
+    u: number,
+    r: number
+  ): void {
+    this.dispatch({
+      type: "variable-width/add-stop",
+      target: {
+        node_id,
+        u,
+        r,
       },
     });
   }
@@ -847,6 +1183,26 @@ export class Editor
     });
   }
 
+  public group(target: "selection" | editor.NodeID[]) {
+    if (this.backend === "dom") {
+      throw new Error("Grouping is not supported in DOM backend");
+    }
+    this.dispatch({
+      type: "group",
+      target,
+    });
+  }
+
+  public ungroup(target: "selection" | editor.NodeID[]) {
+    if (this.backend === "dom") {
+      throw new Error("Grouping is not supported in DOM backend");
+    }
+    this.dispatch({
+      type: "ungroup",
+      target,
+    });
+  }
+
   public configureSurfaceRaycastTargeting(
     config: Partial<editor.state.HitTestingConfig>
   ) {
@@ -881,6 +1237,15 @@ export class Editor
     });
   }
 
+  public configureTranslateWithForceDisableSnap(
+    translate_with_force_disable_snap: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/translate-with-force-disable-snap",
+      translate_with_force_disable_snap,
+    });
+  }
+
   public configureTransformWithCenterOriginModifier(
     transform_with_center_origin: "on" | "off"
   ) {
@@ -905,6 +1270,32 @@ export class Editor
     this.dispatch({
       type: "config/modifiers/rotate-with-quantize",
       rotate_with_quantize,
+    });
+  }
+
+  public configureCurveTangentMirroringModifier(
+    curve_tangent_mirroring: vn.TangentMirroringMode
+  ) {
+    this.dispatch({
+      type: "config/modifiers/curve-tangent-mirroring",
+      curve_tangent_mirroring,
+    });
+  }
+
+  /**
+   * Toggles whether the path tool should keep projecting after connecting
+   * to an existing vertex.
+   *
+   * When set to `"on"`, drawing a path and closing it on an existing
+   * vertex will continue extending the path from that vertex. When set to
+   * `"off"`, the path gesture concludes on close.
+   */
+  public configurePathKeepProjectingModifier(
+    path_keep_projecting: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/path-keep-projecting",
+      path_keep_projecting,
     });
   }
 
@@ -1227,30 +1618,35 @@ export class Editor
       });
     });
   }
+
   changeNodeFill(
-    node_id: string,
+    node_id: string | string[],
     fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => ({
         type: "node/change/*",
-        node_id: node_id,
+        node_id,
         fill: fill as cg.Paint,
-      });
-    });
+      }))
+    );
   }
+
   changeNodeStroke(
-    node_id: string,
+    node_id: string | string[],
     stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => ({
         type: "node/change/*",
-        node_id: node_id,
+        node_id,
         stroke: stroke as cg.Paint,
-      });
-    });
+      }))
+    );
   }
+
   changeNodeStrokeWidth(node_id: string, strokeWidth: editor.api.NumberChange) {
     try {
       const value = resolveNumberChangeValue(
@@ -1885,7 +2281,7 @@ export class Editor
   }
 
   dragEnd(event: PointerEvent) {
-    const { transform, marquee } = this.state;
+    const { marquee } = this.state;
     if (marquee) {
       // test area in canvas space
       const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
@@ -1931,21 +2327,6 @@ export class Editor
 
   public hoverLeaveNode(node_id: string) {
     this.hoverNode(node_id, "leave");
-  }
-
-  public hoverVertex(
-    node_id: string,
-    vertex: number,
-    event: "enter" | "leave"
-  ) {
-    this.dispatch({
-      type: "hover-vertex",
-      event: event,
-      target: {
-        node_id,
-        vertex,
-      },
-    });
   }
 
   startGuideGesture(axis: cmath.Axis, idx: number | -1) {
@@ -2017,13 +2398,39 @@ export class Editor
     });
   }
 
-  startTranslateVertexGesture(node_id: string, vertex: number) {
+  startTranslateVectorNetwork(node_id: string) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
-        type: "translate-vertex",
-        vertex,
+        type: "translate-vector-controls",
         node_id,
+      },
+    });
+  }
+
+  startTranslateVariableWidthStop(node_id: string, stop: number) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "translate-variable-width-stop",
+        node_id,
+        stop,
+      },
+    });
+  }
+
+  startResizeVariableWidthStop(
+    node_id: string,
+    stop: number,
+    side: "left" | "right"
+  ) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "resize-variable-width-stop",
+        node_id,
+        stop,
+        side,
       },
     });
   }

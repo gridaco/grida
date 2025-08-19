@@ -138,7 +138,7 @@ async fn demo_blendmode() -> Scene {
         // Create a group for the colored circles with the specific blend mode
         let mut circle_group = nf.create_group_node();
         circle_group.name = Some(format!("Circle Group {}", i));
-        circle_group.transform = AffineTransform::new(x, y, 0.0);
+        circle_group.transform = Some(AffineTransform::new(x, y, 0.0));
         circle_group.blend_mode = *blend_mode;
 
         let mut circle_ids = Vec::new();

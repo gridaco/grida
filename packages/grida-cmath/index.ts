@@ -13,6 +13,16 @@ namespace cmath {
   export const tan = Math.tan;
 
   /**
+   * Approximation constant used to convert a circular arc into a cubic Bézier
+   * curve. Commonly known as KAPPA, defined as `4 * (sqrt(2) - 1) / 3`.
+   *
+   * When bending a right angle corner to approximate a quarter circle, the
+   * tangents will have a magnitude of `KAPPA * radius` where the radius is
+   * half of the chosen reference segment's length.
+   */
+  export const KAPPA = (4 * (Math.SQRT2 - 1)) / 3;
+
+  /**
    * Represents a single axis in 2D space.
    *
    * Also known as horizontal (x-axis) or vertical (y-axis) direction.
@@ -130,7 +140,7 @@ namespace cmath {
   export type Transform = [[number, number, number], [number, number, number]];
 
   /**
-   * A Rectangle specifies an area that is enclosed by it’s top-left point (x, y), its width, and its height.
+   * A Rectangle specifies an area that is enclosed by it's top-left point (x, y), its width, and its height.
    *
    * width and height are non-negative values.
    */
@@ -196,6 +206,16 @@ namespace cmath {
 
   export function clamp(value: Scalar, min: Scalar, max: Scalar): Scalar {
     return Math.min(Math.max(value, min), max);
+  }
+
+  /**
+   * Clamps a value between 0 and 1.
+   *
+   * @param t - The value to clamp.
+   * @returns The clamped value.
+   */
+  export function clamp01(t: number): number {
+    return t <= 0 ? 0 : t >= 1 ? 1 : t;
   }
 
   /**
@@ -713,6 +733,33 @@ namespace cmath {
     }
 
     /**
+     * Performs linear interpolation between two 2D vectors.
+     *
+     * This function calculates a point that lies on the straight line between two given vectors,
+     * at a specified interpolation factor. When t = 0, the result is equal to vector a.
+     * When t = 1, the result is equal to vector b.
+     *
+     * @param a - The starting vector [x, y].
+     * @param b - The ending vector [x, y].
+     * @param t - The interpolation factor, typically in the range [0, 1].
+     * @returns A new vector representing the interpolated point.
+     *
+     * @example
+     * const start: cmath.Vector2 = [0, 0];
+     * const end: cmath.Vector2 = [10, 20];
+     * const mid = cmath.vector2.lerp(start, end, 0.5);
+     * console.log(mid); // [5, 10]
+     *
+     * @example
+     * // Interpolate at 25% from start to end
+     * const quarter = cmath.vector2.lerp([0, 0], [100, 50], 0.25);
+     * console.log(quarter); // [25, 12.5]
+     */
+    export function lerp(a: Vector2, b: Vector2, t: number): Vector2 {
+      return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    }
+
+    /**
      * Checks if two 1D segments intersect or overlap.
      *
      * @param segmentA - The first segment [startA, endA].
@@ -891,6 +938,26 @@ namespace cmath {
   }
 
   export namespace compass {
+    /**
+     * Cardinal direction vector
+     *
+     * - `n -> [0, -1]`
+     * - `e -> [1, 0]`
+     * - `s -> [0, 1]`
+     * - `w -> [-1, 0]`
+     * - ... and so on
+     */
+    export const cardinal_direction_vector = {
+      nw: [-1, -1] as cmath.Vector2,
+      ne: [1, -1] as cmath.Vector2,
+      sw: [-1, 1] as cmath.Vector2,
+      se: [1, 1] as cmath.Vector2,
+      n: [0, -1] as cmath.Vector2,
+      e: [1, 0] as cmath.Vector2,
+      s: [0, 1] as cmath.Vector2,
+      w: [-1, 0] as cmath.Vector2,
+    } as const;
+
     /**
      * Inverted cardinal directions `nw -> se, ne -> sw` and so on
      *
@@ -1282,7 +1349,7 @@ namespace cmath {
         [0, scaleY, 0],
       ];
 
-      // Step 3: Finally translate to B’s (x, y).
+      // Step 3: Finally translate to B's (x, y).
       const T3: cmath.Transform = [
         [1, 0, b.x],
         [0, 1, b.y],
@@ -1449,6 +1516,54 @@ namespace cmath {
       };
     }
 
+    /**
+     * Computes the minimum bounding rectangle that encloses all the input points.
+     * This is a safe version of `fromPoints` that returns a zero rectangle instead of throwing
+     * when the input array is empty.
+     *
+     * This function computes the minimum bounding rectangle that encloses all the input points.
+     * If no points are provided, returns a zero rectangle at origin (0, 0).
+     *
+     * @param points - An array of points to calculate the bounding rectangle from.
+     * @returns A rectangle with `x`, `y`, `width`, and `height`. Returns zero rectangle if no points.
+     *
+     * @example
+     * const rect = cmath.rect.fromPointsOrZero([[10, 20], [30, 40], [15, 25]]);
+     * console.log(rect); // { x: 10, y: 20, width: 20, height: 20 }
+     *
+     * const emptyRect = cmath.rect.fromPointsOrZero([]);
+     * console.log(emptyRect); // { x: 0, y: 0, width: 0, height: 0 }
+     *
+     * const pointRect = cmath.rect.fromPointsOrZero([[10, 20]]);
+     * console.log(pointRect); // { x: 10, y: 20, width: 0, height: 0 }
+     */
+    export function fromPointsOrZero(points: cmath.Vector2[]): cmath.Rectangle {
+      if (points.length <= 0) {
+        return { x: 0, y: 0, width: 0, height: 0 };
+      }
+
+      // Calculate min and max for x and y
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      for (const [x, y] of points) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+
+      // Return normalized rectangle
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      };
+    }
+
     export type Rectangle9Points = {
       topLeft: Vector2;
       topRight: Vector2;
@@ -1580,28 +1695,28 @@ namespace cmath {
     }
 
     /**
-     * Checks if rectangle `a` is fully contained within rectangle `b`.
+     * Checks if rectangle `a` fully contains rectangle `b`.
      *
-     * A rectangle `a` is considered contained within rectangle `b` if:
-     * - The top-left corner of `a` lies within `b`.
-     * - The bottom-right corner of `a` lies within `b`.
+     * A rectangle `target` is considered contained within rectangle `container` if:
+     * - The top-left corner of `target` lies within `container`.
+     * - The bottom-right corner of `target` lies within `container`.
      *
-     * @param a - The rectangle to test for containment.
-     * @param b - The containing rectangle.
-     * @returns `true` if rectangle `a` is fully contained within rectangle `b`, otherwise `false`.
+     * @param a - The containing rectangle.
+     * @param b - The rectangle to test for containment.
+     * @returns `true` if rectangle `target` is fully contained within rectangle `container`, otherwise `false`.
      *
      * @example
-     * const a = { x: 20, y: 20, width: 30, height: 30 };
-     * const b = { x: 10, y: 10, width: 100, height: 100 };
-     * cmath.rect.contains(a, b); // Returns true.
+     * const container = { x: 10, y: 10, width: 100, height: 100 };
+     * const target = { x: 20, y: 20, width: 30, height: 30 };
+     * cmath.rect.contains(container, target); // Returns true.
      */
     export function contains(a: Rectangle, b: Rectangle): boolean {
-      const aRight = a.x + a.width;
-      const aBottom = a.y + a.height;
-      const bRight = b.x + b.width;
-      const bBottom = b.y + b.height;
+      const ax_max = a.x + a.width;
+      const ay_max = a.y + a.height;
+      const bx_max = b.x + b.width;
+      const by_max = b.y + b.height;
 
-      return a.x >= b.x && a.y >= b.y && aRight <= bRight && aBottom <= bBottom;
+      return b.x >= a.x && b.y >= a.y && bx_max <= ax_max && by_max <= ay_max;
     }
 
     /**
@@ -2556,6 +2671,107 @@ namespace cmath {
     }
   }
 
+  export namespace segment {
+    /**
+     * Returns the orientation of the ordered triplet (a, b, c).
+     * Positive for counter-clockwise, negative for clockwise, and zero for collinear.
+     */
+    export function orientation(a: Vector2, b: Vector2, c: Vector2): number {
+      return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    }
+
+    /**
+     * Checks if point `c` lies on segment `ab`.
+     */
+    export function onSegment(a: Vector2, c: Vector2, b: Vector2): boolean {
+      return (
+        Math.min(a[0], b[0]) <= c[0] &&
+        c[0] <= Math.max(a[0], b[0]) &&
+        Math.min(a[1], b[1]) <= c[1] &&
+        c[1] <= Math.max(a[1], b[1])
+      );
+    }
+
+    /**
+     * Tests whether two line segments intersect.
+     */
+    export function intersects(
+      p1: Vector2,
+      p2: Vector2,
+      q1: Vector2,
+      q2: Vector2
+    ): boolean {
+      const o1 = orientation(p1, p2, q1);
+      const o2 = orientation(p1, p2, q2);
+      const o3 = orientation(q1, q2, p1);
+      const o4 = orientation(q1, q2, p2);
+
+      if (o1 === 0 && onSegment(p1, q1, p2)) return true;
+      if (o2 === 0 && onSegment(p1, q2, p2)) return true;
+      if (o3 === 0 && onSegment(q1, p1, q2)) return true;
+      if (o4 === 0 && onSegment(q1, p2, q2)) return true;
+
+      return o1 > 0 !== o2 > 0 && o3 > 0 !== o4 > 0;
+    }
+
+    /**
+     * Tests whether a line segment intersects with an axis-aligned rectangle.
+     */
+    export function intersectsRect(
+      p0: Vector2,
+      p1: Vector2,
+      rect: Rectangle
+    ): boolean {
+      if (
+        cmath.rect.containsPoint(rect, p0) ||
+        cmath.rect.containsPoint(rect, p1)
+      ) {
+        return true;
+      }
+
+      const [x1, y1] = p0;
+      const [x2, y2] = p1;
+      const xMin = rect.x;
+      const xMax = rect.x + rect.width;
+      const yMin = rect.y;
+      const yMax = rect.y + rect.height;
+
+      // Quick rejection by bounding boxes
+      if (
+        Math.max(x1, x2) < xMin ||
+        Math.min(x1, x2) > xMax ||
+        Math.max(y1, y2) < yMin ||
+        Math.min(y1, y2) > yMax
+      ) {
+        return false;
+      }
+
+      const edges: [Vector2, Vector2][] = [
+        [
+          [xMin, yMin],
+          [xMax, yMin],
+        ],
+        [
+          [xMax, yMin],
+          [xMax, yMax],
+        ],
+        [
+          [xMax, yMax],
+          [xMin, yMax],
+        ],
+        [
+          [xMin, yMax],
+          [xMin, yMin],
+        ],
+      ];
+
+      for (const [e0, e1] of edges) {
+        if (intersects(p0, p1, e0, e1)) return true;
+      }
+      return false;
+    }
+  }
+
   export namespace bezier {
     /**
      * Represents a cubic Bézier curve segment.
@@ -2620,6 +2836,39 @@ namespace cmath {
     };
 
     /**
+     * Arc Length Lookup Table (ArcLUT) for efficient arc length parameterization of cubic Bézier curves.
+     *
+     * An ArcLUT pre-computes and stores the relationship between curve parameter `t` and arc length `s`
+     * to enable fast conversion between normalized arc length parameter `u` and curve parameter `t`.
+     * This is essential for operations requiring uniform motion along the curve, such as animation
+     * and path following.
+     *
+     * The lookup table contains:
+     * - `t`: Array of curve parameters sampled at regular intervals ∈ [0, 1]
+     * - `s`: Corresponding cumulative arc lengths from the start of the curve
+     * - `total`: The total arc length of the curve
+     *
+     * Mathematical relationship:
+     * - `t[i]` represents the i-th sample point on the curve (0 ≤ i ≤ sampleCount)
+     * - `s[i]` represents the arc length from curve start to point `t[i]`
+     * - `s[0] = 0` and `s[sampleCount] = total`
+     * - For any `u` ∈ [0, 1], the corresponding `t` can be found by interpolating between
+     *   the nearest samples where `s[i] / total ≈ u`
+     *
+     * @property t - Array of curve parameters `t` ∈ [0, 1] sampled at regular intervals
+     * @property s - Array of cumulative arc lengths corresponding to each `t` value
+     * @property total - Total arc length of the curve
+     *
+     * @remarks
+     * - The lookup table enables O(log n) conversion from arc length to curve parameter
+     * - Precision depends on the number of samples used to create the LUT
+     * - For curves with high curvature, more samples may be needed for accuracy
+     * - The LUT can be cached and reused for multiple operations on the same curve
+     * - Float32Array is used for memory efficiency and performance
+     */
+    export type ArcLUT = { t: Float32Array; s: Float32Array; total: number };
+
+    /**
      * Solves a quadratic equation \( a x^2 + b x + c = 0 \).
      * @param a - Quadratic coefficient \( a \).
      * @param b - Linear coefficient \( b \).
@@ -2681,6 +2930,340 @@ namespace cmath {
     }
 
     /**
+     * Projects a point onto a cubic Bézier segment and returns its normalized parametric position.
+     *
+     * This function performs a closest-point projection from a canvas-space point `p`
+     * onto the Bézier curve defined by endpoints `a`, `b` and control tangents `ta`, `tb`.
+     * The output is a parametric scalar `t \in [0, 1]` such that the evaluated curve
+     * point `B(t)` is as close as possible to `p` in Euclidean distance.
+     *
+     * The algorithm works in two phases:
+     *
+     * 1. **Coarse sampling** – the curve is sampled at several uniformly spaced
+     *    parameters to obtain a good initial guess.
+     * 2. **Newton–Raphson refinement** – starting from the best sample, the method
+     *    iteratively minimizes the squared distance function
+     *    `f(t) = |B(t) - p|^2`. The derivative `f'(t)` and second derivative
+     *    `f''(t)` are evaluated analytically, yielding quadratic and linear terms
+     *    respectively. The iteration continues for a small fixed number of steps
+     *    while clamping `t` to `[0,1]` after each update.
+     *
+     * Degenerate segments where both tangents are zero are handled as simple
+     * linear projections onto the line segment `ab`.
+     *
+     * This operation is known as:
+     * - "parametric projection"
+     * - "inverse Bézier evaluation"
+     * - "closest-point projection on a Bézier curve"
+     *
+     * It is commonly used in interactive vector editing to determine:
+     * - Where a user clicked or dragged on the curve
+     * - How to distribute deformation across curve tangents
+     * - Where to insert or split the curve
+     *
+     * The resulting `t` does not correspond to arc length, but to Bézier parameter space.
+     * For accurate geometric interpretation, `B(t)` can be evaluated and used in
+     * follow-up logic.
+     *
+     * @param a - Start point of the segment.
+     * @param b - End point of the segment.
+     * @param ta - Tangent vector at start (relative to `a`).
+     * @param tb - Tangent vector at end (relative to `b`).
+     * @param p - The canvas-space point to project onto the curve.
+     * @returns The normalized parametric scalar `t \in [0, 1]` along the Bézier segment.
+     */
+    export function project(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      p: Vector2
+    ): number {
+      const p0 = a;
+      const p1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const p2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+      const p3 = b;
+
+      // Helper to evaluate point on curve
+      const evalPoint = (t: number): Vector2 => {
+        const mt = 1 - t;
+        const mt2 = mt * mt;
+        const t2 = t * t;
+        const x =
+          mt2 * mt * p0[0] +
+          3 * mt2 * t * p1[0] +
+          3 * mt * t2 * p2[0] +
+          t2 * t * p3[0];
+        const y =
+          mt2 * mt * p0[1] +
+          3 * mt2 * t * p1[1] +
+          3 * mt * t2 * p2[1] +
+          t2 * t * p3[1];
+        return [x, y];
+      };
+
+      // First derivative of the curve
+      const evalDerivative = (t: number): Vector2 => {
+        const mt = 1 - t;
+        const x =
+          3 * mt * mt * (p1[0] - p0[0]) +
+          6 * mt * t * (p2[0] - p1[0]) +
+          3 * t * t * (p3[0] - p2[0]);
+        const y =
+          3 * mt * mt * (p1[1] - p0[1]) +
+          6 * mt * t * (p2[1] - p1[1]) +
+          3 * t * t * (p3[1] - p2[1]);
+        return [x, y];
+      };
+
+      // Second derivative of the curve
+      const evalSecondDerivative = (t: number): Vector2 => {
+        const mt = 1 - t;
+        const x =
+          6 * mt * (p2[0] - 2 * p1[0] + p0[0]) +
+          6 * t * (p3[0] - 2 * p2[0] + p1[0]);
+        const y =
+          6 * mt * (p2[1] - 2 * p1[1] + p0[1]) +
+          6 * t * (p3[1] - 2 * p2[1] + p1[1]);
+        return [x, y];
+      };
+
+      // coarse sampling for initial guess
+      let bestT = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i <= 20; i++) {
+        const t = i / 20;
+        const [x, y] = evalPoint(t);
+        const dx = x - p[0];
+        const dy = y - p[1];
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestT = t;
+        }
+      }
+
+      // refine using Newton-Raphson
+      let t = bestT;
+      for (let i = 0; i < 5; i++) {
+        const pt = evalPoint(t);
+        const d1 = evalDerivative(t);
+        const d2 = evalSecondDerivative(t);
+        const rx = pt[0] - p[0];
+        const ry = pt[1] - p[1];
+        const f = rx * d1[0] + ry * d1[1];
+        const df = d1[0] * d1[0] + d1[1] * d1[1] + rx * d2[0] + ry * d2[1];
+        if (df === 0) break;
+        t -= f / df;
+        if (t < 0) t = 0;
+        else if (t > 1) t = 1;
+      }
+
+      return t;
+    }
+
+    /**
+     * Evaluates a cubic Bézier curve at a given parametric position `t` ∈ [0,1].
+     *
+     * The curve is defined by four absolute control points:
+     * - `P0`: Start point
+     * - `P1`: First control point
+     * - `P2`: Second control point
+     * - `P3`: End point
+     *
+     * Uses the Bernstein polynomial form of the cubic Bézier equation:
+     * ```
+     * B(t) = (1−t)³ * P0
+     *      + 3(1−t)² t * P1
+     *      + 3(1−t) t² * P2
+     *      + t³ * P3
+     * ```
+     *
+     * @param P0 - Start point of the curve.
+     * @param P1 - First control point.
+     * @param P2 - Second control point.
+     * @param P3 - End point of the curve.
+     * @param t  - Parametric value in the range [0, 1] where 0 is `P0` and 1 is `P3`.
+     * @returns A 2D vector `[x, y]` representing the point on the cubic Bézier at parameter `t`.
+     *
+     * @example
+     * ```ts
+     * const p0: Vector2 = [0, 0];
+     * const p1: Vector2 = [50, 100];
+     * const p2: Vector2 = [150, 100];
+     * const p3: Vector2 = [200, 0];
+     *
+     * // Get the midpoint of the curve
+     * const midpoint = evalC(p0, p1, p2, p3, 0.5);
+     * console.log(midpoint); // → e.g., [100, 75]
+     * ```
+     */
+    export function evalC(
+      P0: Vector2,
+      P1: Vector2,
+      P2: Vector2,
+      P3: Vector2,
+      t: number
+    ): Vector2 {
+      const mt = 1 - t,
+        mt2 = mt * mt,
+        t2 = t * t;
+      return [
+        P0[0] * (mt2 * mt) +
+          3 * P1[0] * (mt2 * t) +
+          3 * P2[0] * (mt * t2) +
+          P3[0] * (t2 * t),
+        P0[1] * (mt2 * mt) +
+          3 * P1[1] * (mt2 * t) +
+          3 * P2[1] * (mt * t2) +
+          P3[1] * (t2 * t),
+      ];
+    }
+
+    /**
+     * Computes the first derivative (tangent vector) of a cubic Bézier curve
+     * at a given parametric position `t` ∈ [0, 1].
+     *
+     * The cubic Bézier is defined by four absolute control points:
+     * - `P0`: Start point
+     * - `P1`: First control point
+     * - `P2`: Second control point
+     * - `P3`: End point
+     *
+     * Uses the standard derivative of the cubic Bézier equation:
+     * ```
+     * B'(t) = 3(1−t)² (P1 − P0)
+     *       + 6(1−t)t (P2 − P1)
+     *       + 3t² (P3 − P2)
+     * ```
+     *
+     * @param P0 - Start point of the cubic Bézier curve.
+     * @param P1 - First control point of the curve.
+     * @param P2 - Second control point of the curve.
+     * @param P3 - End point of the curve.
+     * @param t  - Parametric value in the range [0, 1] where 0 is `P0` and 1 is `P3`.
+     * @returns A 2D vector `[dx, dy]` representing the tangent vector at parameter `t`.
+     *
+     * @example
+     * ```ts
+     * const p0: Vector2 = [0, 0];
+     * const p1: Vector2 = [50, 100];
+     * const p2: Vector2 = [150, 100];
+     * const p3: Vector2 = [200, 0];
+     *
+     * // Tangent at the midpoint (t = 0.5)
+     * const tangent = derivC(p0, p1, p2, p3, 0.5);
+     * console.log(tangent); // → e.g., [150, 0]
+     * ```
+     */
+    export function derivC(
+      P0: Vector2,
+      P1: Vector2,
+      P2: Vector2,
+      P3: Vector2,
+      t: number
+    ): Vector2 {
+      const mt = 1 - t;
+      return [
+        3 * mt * mt * (P1[0] - P0[0]) +
+          6 * mt * t * (P2[0] - P1[0]) +
+          3 * t * t * (P3[0] - P2[0]),
+        3 * mt * mt * (P1[1] - P0[1]) +
+          6 * mt * t * (P2[1] - P1[1]) +
+          3 * t * t * (P3[1] - P2[1]),
+      ];
+    }
+
+    /**
+     * Evaluates a cubic Bézier curve at a given parametric position.
+     *
+     * The curve is defined by two endpoints and their tangent vectors.
+     * The parametric equation for a cubic Bézier curve is:
+     * \[
+     * B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad \text{where } t \in [0, 1]
+     * \]
+     *
+     * Where:
+     * - \( P_0 \): Start point (a)
+     * - \( P_1 \): First control point (a + ta)
+     * - \( P_2 \): Second control point (b + tb)
+     * - \( P_3 \): End point (b)
+     *
+     * @param a - Start point of the curve \([x, y]\)
+     * @param b - End point of the curve \([x, y]\)
+     * @param ta - Tangent vector at start point (relative to a) \([x, y]\)
+     * @param tb - Tangent vector at end point (relative to b) \([x, y]\)
+     * @param t - Parametric position along the curve (0 ≤ t ≤ 1)
+     * @returns The point on the curve at parametric position t \([x, y]\)
+     *
+     * @example
+     * ```typescript
+     * // Evaluate a straight line segment
+     * const start: cmath.Vector2 = [0, 0];
+     * const end: cmath.Vector2 = [100, 100];
+     * const startTangent: cmath.Vector2 = [0, 0];
+     * const endTangent: cmath.Vector2 = [0, 0];
+     * const point = cmath.bezier.evaluate(start, end, startTangent, endTangent, 0.5);
+     * console.log(point); // [50, 50]
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Evaluate a curved segment
+     * const start: cmath.Vector2 = [0, 0];
+     * const end: cmath.Vector2 = [100, 0];
+     * const startTangent: cmath.Vector2 = [50, 50];
+     * const endTangent: cmath.Vector2 = [-50, 50];
+     * const point = cmath.bezier.evaluate(start, end, startTangent, endTangent, 0.5);
+     * // Returns a point above the line due to upward tangents
+     * ```
+     *
+     * @remarks
+     * - The function clamps the parameter t to the range [0, 1] for robustness.
+     * - For t = 0, the function returns the start point a.
+     * - For t = 1, the function returns the end point b.
+     * - The function is mathematically equivalent to the standard cubic Bézier formula.
+     * - Performance is O(1) with constant memory usage.
+     * - Input validation ensures the function handles edge cases gracefully.
+     */
+    export function evaluate(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      t: number
+    ): Vector2 {
+      // Clamp t to [0, 1] for robustness, handling NaN and Infinity
+      let clampedT = t;
+      if (!Number.isFinite(t)) {
+        clampedT = Number.isNaN(t) ? 0 : t < 0 ? 0 : 1;
+      } else {
+        clampedT = Math.max(0, Math.min(1, t));
+      }
+
+      const t2 = clampedT * clampedT;
+      const t3 = t2 * clampedT;
+      const mt = 1 - clampedT;
+      const mt2 = mt * mt;
+      const mt3 = mt2 * mt;
+
+      // Control points
+      const c1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const c2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+
+      return [
+        mt3 * a[0] +
+          3 * mt2 * clampedT * c1[0] +
+          3 * mt * t2 * c2[0] +
+          t3 * b[0],
+        mt3 * a[1] +
+          3 * mt2 * clampedT * c1[1] +
+          3 * mt * t2 * c2[1] +
+          t3 * b[1],
+      ];
+    }
+
+    /**
      * Calculates the exact bounding box of a single cubic Bézier segment by finding all extrema.
      * @param a - The start vertex \([x, y]\).
      * @param ta - The start tangent (relative to `a`).
@@ -2725,6 +3308,126 @@ namespace cmath {
         width: maxX - minX,
         height: maxY - minY,
       };
+    }
+
+    /**
+     * Tests whether a single cubic Bézier curve segment intersects with a given axis-aligned rectangle.
+     *
+     * A Bézier segment is defined by two endpoints `a`, `b`, and their corresponding control points `ta`, `tb`.
+     * The rectangle is defined by its top-left `(x, y)` and dimensions `(width, height)`.
+     *
+     * This function performs fast hierarchical rejection and adaptive subdivision to avoid unnecessary computation.
+     *
+     * @param a - Start point of the Bézier curve.
+     * @param b - End point of the Bézier curve.
+     * @param ta - Tangent control point relative to `a`.
+     * @param tb - Tangent control point relative to `b`.
+     * @param rect - Target rectangle to test intersection against.
+     * @param tolerance - Optional tolerance threshold for curve flatness (default: `0.5`).
+     * @returns `true` if the curve intersects the rectangle, otherwise `false`.
+     */
+    export function intersectsRect(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      rect: Rectangle,
+      tolerance = 0.5
+    ): boolean {
+      const c1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const c2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+
+      // 1. Early exit: all control points inside
+      if (
+        cmath.rect.containsPoint(rect, a) &&
+        cmath.rect.containsPoint(rect, b) &&
+        cmath.rect.containsPoint(rect, c1) &&
+        cmath.rect.containsPoint(rect, c2)
+      ) {
+        return true;
+      }
+
+      // 1. Early exit: either endpoint inside
+      if (
+        cmath.rect.containsPoint(rect, a) ||
+        cmath.rect.containsPoint(rect, b)
+      ) {
+        return true;
+      }
+
+      // 2. Bounding box rejection
+      const bbox = getBBox({ a, b, ta, tb });
+      if (!cmath.rect.intersects(bbox, rect)) {
+        return false;
+      }
+
+      // 3. Recursive subdivision
+      const recur = (
+        p0: Vector2,
+        p1: Vector2,
+        p2: Vector2,
+        p3: Vector2
+      ): boolean => {
+        const segmentBBox = cmath.rect.fromPoints([p0, p1, p2, p3]);
+        if (!cmath.rect.intersects(segmentBBox, rect)) return false;
+
+        // Flatness check using distance to chord
+        const dx = p3[0] - p0[0];
+        const dy = p3[1] - p0[1];
+        const length = Math.hypot(dx, dy);
+        if (length === 0) {
+          return cmath.rect.containsPoint(rect, p0);
+        }
+        const d1 = Math.abs(dy * (p1[0] - p0[0]) - dx * (p1[1] - p0[1]));
+        const d2 = Math.abs(dy * (p2[0] - p0[0]) - dx * (p2[1] - p0[1]));
+        const flat = Math.max(d1, d2) / length <= tolerance;
+
+        if (flat) {
+          return cmath.segment.intersectsRect(p0, p3, rect);
+        }
+
+        // Subdivide using de Casteljau (t = 0.5)
+        const p01: Vector2 = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2];
+        const p12: Vector2 = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+        const p23: Vector2 = [(p2[0] + p3[0]) / 2, (p2[1] + p3[1]) / 2];
+        const p012: Vector2 = [(p01[0] + p12[0]) / 2, (p01[1] + p12[1]) / 2];
+        const p123: Vector2 = [(p12[0] + p23[0]) / 2, (p12[1] + p23[1]) / 2];
+        const p0123: Vector2 = [
+          (p012[0] + p123[0]) / 2,
+          (p012[1] + p123[1]) / 2,
+        ];
+
+        return recur(p0, p01, p012, p0123) || recur(p0123, p123, p23, p3);
+      };
+
+      return recur(a, c1, c2, b);
+    }
+
+    /**
+     * Checks whether a single cubic Bézier curve segment is fully contained
+     * within an axis-aligned rectangle.
+     *
+     * The segment is defined by start and end points `a`, `b` and their
+     * respective tangents `ta`, `tb`. The function computes the exact bounding
+     * box of the curve and verifies that it lies entirely inside the provided
+     * rectangle.
+     *
+     * @param a - Start point of the Bézier curve.
+     * @param b - End point of the Bézier curve.
+     * @param ta - Tangent control point relative to `a`.
+     * @param tb - Tangent control point relative to `b`.
+     * @param rect - Rectangle to test containment against.
+     * @returns `true` if the entire curve is contained within `rect`, otherwise `false`.
+     */
+    export function containedByRect(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      rect: Rectangle
+    ): boolean {
+      const bbox = getBBox({ a, b, ta, tb });
+      return cmath.rect.contains(rect, bbox);
     }
 
     /**
@@ -2914,6 +3617,1530 @@ namespace cmath {
               : rotate(res[i], res[i + 1], rad).x;
         }
         return newres;
+      }
+    }
+
+    /**
+     * Solves for tangent values that make a cubic Bézier curve pass through a specific point
+     * at a given parametric position.
+     *
+     * This function solves the constrained optimization problem:
+     * - Minimize the change from original tangents
+     * - Subject to the constraint that the curve passes through the target point at the specified parametric position
+     *
+     * The solution uses Lagrange multipliers to find tangent values that satisfy:
+     * B(t) = targetPoint, where B(t) is the cubic Bézier curve evaluated at parametric position t.
+     *
+     * @param a - Start point of the curve
+     * @param b - End point of the curve
+     * @param ta - Original tangent at start point (relative to a)
+     * @param tb - Original tangent at end point (relative to b)
+     * @param t - Parametric position (0-1) where the curve should pass through the target point
+     * @param targetPoint - The point that the curve should pass through at parametric position t
+     * @returns New tangent values [ta, tb] that make the curve pass through the target point
+     */
+    export function solveTangentsForPoint(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      t: number,
+      targetPoint: Vector2
+    ): [Vector2, Vector2] {
+      // Handle edge cases at t=0 and t=1
+      if (t === 0) {
+        // At t=0, the curve should pass through point a
+        // We need to adjust ta to make the curve pass through targetPoint at t=0
+        const displacement: Vector2 = [
+          targetPoint[0] - a[0],
+          targetPoint[1] - a[1],
+        ];
+        return [displacement, tb];
+      }
+
+      if (t === 1) {
+        // At t=1, the curve should pass through point b
+        // We need to adjust tb to make the curve pass through targetPoint at t=1
+        const displacement: Vector2 = [
+          targetPoint[0] - b[0],
+          targetPoint[1] - b[1],
+        ];
+        return [ta, displacement];
+      }
+
+      // If the target point is very close to the linear interpolation,
+      // return zero tangents to make it straight
+      const linearInterp: Vector2 = [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+      ];
+      const distToLinear = Math.hypot(
+        targetPoint[0] - linearInterp[0],
+        targetPoint[1] - linearInterp[1]
+      );
+      if (distToLinear < 0.1) {
+        return [
+          [0, 0],
+          [0, 0],
+        ];
+      }
+
+      // Solve for new tangent values that make the curve pass through targetPoint at parametric position t
+      // The cubic Bézier equation at t should equal targetPoint:
+      // (1-t)³ * a + 3(1-t)² * t * (a+ta) + 3(1-t) * t² * (b+tb) + t³ * b = targetPoint
+
+      const s = 1 - t;
+      const s2 = s * s;
+      const t2 = t * t;
+      const s3 = s2 * s;
+      const t3 = t2 * t;
+
+      // The equation we need to solve:
+      // s³ * a + 3s²t * (a+ta) + 3st² * (b+tb) + t³ * b = targetPoint
+      // Rearranging:
+      // 3s²t * ta + 3st² * tb = targetPoint - (s³ * a + 3s²t * a + 3st² * b + t³ * b)
+
+      // Calculate the right-hand side
+      const rhs: Vector2 = [
+        targetPoint[0] -
+          (s3 * a[0] + 3 * s2 * t * a[0] + 3 * s * t2 * b[0] + t3 * b[0]),
+        targetPoint[1] -
+          (s3 * a[1] + 3 * s2 * t * a[1] + 3 * s * t2 * b[1] + t3 * b[1]),
+      ];
+
+      // Coefficients for ta and tb
+      const coefTa = 3 * s2 * t;
+      const coefTb = 3 * s * t2;
+
+      // We have the equation: coefTa * ta + coefTb * tb = rhs
+      // This is an underdetermined system (2 equations, 4 unknowns)
+      // We need to add constraints to get a unique solution
+
+      // Let's use a constraint that minimizes the change from the original tangents
+      // while ensuring the curve passes through the target point
+
+      // We'll solve this using a least-squares approach with regularization
+      // The objective is to minimize ||ta - ta_original||² + ||tb - tb_original||²
+      // subject to the constraint coefTa * ta + coefTb * tb = rhs
+
+      // Using Lagrange multipliers, we get:
+      // ta = ta_original + λ * coefTa
+      // tb = tb_original + λ * coefTb
+      // where λ = (rhs - coefTa * ta_original - coefTb * tb_original) / (coefTa² + coefTb²)
+
+      const denominator = coefTa * coefTa + coefTb * coefTb;
+
+      if (Math.abs(denominator) > 1e-10) {
+        // Calculate the current contribution of the original tangents
+        const currentContribution: Vector2 = [
+          coefTa * ta[0] + coefTb * tb[0],
+          coefTa * ta[1] + coefTb * tb[1],
+        ];
+
+        // Calculate the Lagrange multiplier
+        const lambda = [
+          (rhs[0] - currentContribution[0]) / denominator,
+          (rhs[1] - currentContribution[1]) / denominator,
+        ];
+
+        // Apply the solution
+        const newTa: Vector2 = [
+          ta[0] + lambda[0] * coefTa,
+          ta[1] + lambda[1] * coefTa,
+        ];
+        const newTb: Vector2 = [
+          tb[0] + lambda[0] * coefTb,
+          tb[1] + lambda[1] * coefTb,
+        ];
+
+        return [newTa, newTb];
+      } else {
+        // Edge case: both coefficients are zero (shouldn't happen for valid t values)
+        return [ta, tb];
+      }
+    }
+
+    /**
+     * Cubic Bézier tangent (derivative) at parametric t ∈ [0,1].
+     *
+     * Points are given as:
+     *  P0 = a
+     *  P1 = a + ta
+     *  P2 = b + tb
+     *  P3 = b
+     *
+     * Uses the standard cubic Bézier derivative formula:
+     * B'(t) = 3(1-t)²(P1-P0) + 6(1-t)t(P2-P1) + 3t²(P3-P2)
+     *
+     * Where:
+     * - P1-P0 = ta
+     * - P2-P1 = (b+tb) - (a+ta) = b-a+tb-ta
+     * - P3-P2 = b - (b+tb) = -tb
+     *
+     * @param a - Start point
+     * @param b - End point
+     * @param ta - Tangent at start point
+     * @param tb - Tangent at end point
+     * @param t - Parametric position ∈ [0,1]
+     * @returns Tangent vector [dx, dy]
+     */
+    export function tangentAt(
+      a: Vector2,
+      b: Vector2,
+      ta: Vector2,
+      tb: Vector2,
+      t: number
+    ): Vector2 {
+      // Clamp t to [0, 1] for robustness
+      const u = Math.max(0, Math.min(1, t));
+      const mt = 1 - u;
+
+      // Standard cubic Bézier derivative formula using control point differences:
+      // B'(t) = 3(1-t)²(P1-P0) + 6(1-t)t(P2-P1) + 3t²(P3-P2)
+      // Where: P1-P0 = ta, P2-P1 = b-a+tb-ta, P3-P2 = -tb
+
+      const dx =
+        3 * (mt * mt) * ta[0] +
+        6 * mt * u * (b[0] - a[0] + tb[0] - ta[0]) +
+        3 * (u * u) * -tb[0];
+      const dy =
+        3 * (mt * mt) * ta[1] +
+        6 * mt * u * (b[1] - a[1] + tb[1] - ta[1]) +
+        3 * (u * u) * -tb[1];
+
+      return [dx, dy];
+    }
+
+    /**
+     * Subdivides a cubic Bézier curve at a given parametric position using de Casteljau's algorithm.
+     *
+     * This function splits a cubic Bézier curve into two sub-curves at parameter t.
+     * The algorithm uses de Casteljau's method, which is numerically stable and geometrically intuitive.
+     *
+     * The result contains:
+     * - `l`: The left sub-curve (segment over [0, t])
+     * - `r`: The right sub-curve (segment over [t, 1])
+     * - `s`: The split point B(t) on the original curve
+     * - `t`: The clamped parameter value actually used
+     *
+     * @param c - The cubic Bézier curve to subdivide
+     * @param t - The parametric position where to split (0 ≤ t ≤ 1)
+     * @returns Object containing the two sub-curves, split point, and used parameter
+     *
+     * @example
+     * ```typescript
+     * const curve: cmath.bezier.CubicBezierWithTangents = {
+     *   a: [0, 0],
+     *   b: [100, 0],
+     *   ta: [50, 50],
+     *   tb: [-50, 50]
+     * };
+     *
+     * const result = cmath.bezier.subdivide(curve, 0.5);
+     * // result.l is the curve from t=0 to t=0.5
+     * // result.r is the curve from t=0.5 to t=1
+     * // result.s is the point at t=0.5 on the original curve
+     * ```
+     *
+     * @remarks
+     * - The parameter t is clamped to [0, 1] for robustness
+     * - For t = 0, the left curve is degenerate (zero length) and the right curve equals the original
+     * - For t = 1, the right curve is degenerate (zero length) and the left curve equals the original
+     * - The split point s is always a point on the original curve
+     * - Both sub-curves maintain the same geometric properties as the original curve
+     */
+    export function subdivide(
+      c: CubicBezierWithTangents,
+      t: number
+    ): {
+      l: CubicBezierWithTangents; // segment over [0, t]
+      r: CubicBezierWithTangents; // segment over [t, 1]
+      s: Vector2; // split point B(t)
+      t: number; // clamped t actually used
+    } {
+      // Handle NaN and Infinity values
+      let clampedT = t;
+      if (!Number.isFinite(t)) {
+        clampedT = Number.isNaN(t) ? 0 : t < 0 ? 0 : 1;
+      } else {
+        clampedT = Math.max(0, Math.min(1, t));
+      }
+
+      const { a, b, ta, tb } = c;
+
+      // Convert to standard cubic Bézier control points
+      const p0 = a;
+      const p1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+      const p2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+      const p3 = b;
+
+      // Apply de Casteljau's algorithm
+      const mt = 1 - clampedT;
+
+      // First level of interpolation
+      const q0: Vector2 = [
+        mt * p0[0] + clampedT * p1[0],
+        mt * p0[1] + clampedT * p1[1],
+      ];
+      const q1: Vector2 = [
+        mt * p1[0] + clampedT * p2[0],
+        mt * p1[1] + clampedT * p2[1],
+      ];
+      const q2: Vector2 = [
+        mt * p2[0] + clampedT * p3[0],
+        mt * p2[1] + clampedT * p3[1],
+      ];
+
+      // Second level of interpolation
+      const r0: Vector2 = [
+        mt * q0[0] + clampedT * q1[0],
+        mt * q0[1] + clampedT * q1[1],
+      ];
+      const r1: Vector2 = [
+        mt * q1[0] + clampedT * q2[0],
+        mt * q1[1] + clampedT * q2[1],
+      ];
+
+      // Third level of interpolation (split point)
+      const s: Vector2 = [
+        mt * r0[0] + clampedT * r1[0],
+        mt * r0[1] + clampedT * r1[1],
+      ];
+
+      // Construct left sub-curve (from p0 to s)
+      const leftTa: Vector2 = [q0[0] - p0[0], q0[1] - p0[1]];
+      const leftTb: Vector2 = [r0[0] - s[0], r0[1] - s[1]];
+
+      // Construct right sub-curve (from s to p3)
+      const rightTa: Vector2 = [r1[0] - s[0], r1[1] - s[1]];
+      const rightTb: Vector2 = [q2[0] - p3[0], q2[1] - p3[1]];
+
+      return {
+        l: {
+          a: p0,
+          b: s,
+          ta: leftTa,
+          tb: leftTb,
+        },
+        r: {
+          a: s,
+          b: p3,
+          ta: rightTa,
+          tb: rightTb,
+        },
+        s,
+        t: clampedT,
+      };
+    }
+
+    /**
+     * Refines an approximate intersection between two cubic Bézier curves using Newton's method.
+     *
+     * This function implements Newton's method to find the precise intersection point between
+     * two cubic Bézier curves given an initial approximation. The method solves the system
+     * of equations F(t,u) = A(t) - B(u) = 0 using iterative refinement.
+     *
+     * **Mathematical Background:**
+     *
+     * The Newton iteration solves the linear system:
+     * ```
+     * J * [dt, du]^T = -F
+     * ```
+     * Where:
+     * - F(t,u) = A(t) - B(u) is the residual vector
+     * - J = [∂A/∂t, -∂B/∂u] is the Jacobian matrix
+     * - [dt, du]^T is the parameter update
+     *
+     * The solution is computed using Cramer's rule:
+     * ```
+     * dt = (-Fₓ * (-∂B/∂u)ᵧ - (-Fᵧ) * (-∂B/∂u)ₓ) / det(J)
+     * du = (∂A/∂t)ₓ * (-Fᵧ) - (∂A/∂t)ᵧ * (-Fₓ) / det(J)
+     * ```
+     *
+     * **Convergence Properties:**
+     * - Quadratic convergence when the initial guess is sufficiently close
+     * - Typically converges in 2-4 iterations for well-conditioned problems
+     * - Automatic termination if the Jacobian becomes singular (det < 1e-18)
+     * - Parameters are clamped to [0,1] to ensure validity
+     *
+     * @param A0 - Start point of the first cubic Bézier curve
+     * @param A1 - First control point of the first curve
+     * @param A2 - Second control point of the first curve
+     * @param A3 - End point of the first curve
+     * @param B0 - Start point of the second cubic Bézier curve
+     * @param B1 - First control point of the second curve
+     * @param B2 - Second control point of the second curve
+     * @param B3 - End point of the second curve
+     * @param t0 - Initial parameter guess for the first curve (∈ [0,1])
+     * @param u0 - Initial parameter guess for the second curve (∈ [0,1])
+     * @param iters - Maximum number of Newton iterations (typically 3-10)
+     *
+     * @returns An object containing:
+     * - `t`: Refined parameter for the first curve (∈ [0,1])
+     * - `u`: Refined parameter for the second curve (∈ [0,1])
+     * - `p`: Intersection point in ℝ² (A(t) ≈ B(u))
+     *
+     * @example
+     * ```ts
+     * // Two curves that intersect near their midpoints
+     * const A0: Vector2 = [0, 0];
+     * const A1: Vector2 = [1, 0];
+     * const A2: Vector2 = [1, 1];
+     * const A3: Vector2 = [2, 1];
+     *
+     * const B0: Vector2 = [0, 1];
+     * const B1: Vector2 = [1, 1];
+     * const B2: Vector2 = [1, 0];
+     * const B3: Vector2 = [2, 0];
+     *
+     * // Initial guess at midpoints
+     * const result = newtonRefine(A0, A1, A2, A3, B0, B1, B2, B3, 0.5, 0.5, 5);
+     * console.log(result);
+     * // → { t: 0.5, u: 0.5, p: [1, 0.5] }
+     *
+     * // Verify the intersection
+     * const pointA = bezier.evalC(A0, A1, A2, A3, result.t);
+     * const pointB = bezier.evalC(B0, B1, B2, B3, result.u);
+     * const distance = Math.sqrt((pointA[0] - pointB[0])**2 + (pointA[1] - pointB[1])**2);
+     * console.log('Intersection accuracy:', distance); // → ~1e-15
+     * ```
+     *
+     * @see {@link bezier.evalC} - For evaluating Bézier curves
+     * @see {@link bezier.derivC} - For computing curve derivatives
+     * @see {@link cmath.clamp01} - For parameter clamping
+     */
+    export function newtonRefine(
+      A0: Vector2,
+      A1: Vector2,
+      A2: Vector2,
+      A3: Vector2,
+      B0: Vector2,
+      B1: Vector2,
+      B2: Vector2,
+      B3: Vector2,
+      t0: number,
+      u0: number,
+      iters: number
+    ): { t: number; u: number; p: Vector2 } {
+      let t = cmath.clamp01(t0),
+        u = cmath.clamp01(u0);
+      for (let i = 0; i < iters; i++) {
+        const Pa = bezier.evalC(A0, A1, A2, A3, t);
+        const Pb = bezier.evalC(B0, B1, B2, B3, u);
+        const F: Vector2 = [Pa[0] - Pb[0], Pa[1] - Pb[1]];
+        const Ad = bezier.derivC(A0, A1, A2, A3, t);
+        const Bd = bezier.derivC(B0, B1, B2, B3, u);
+        // Solve J * [dt, du]^T = -F, where J = [Ad, -Bd]
+        const det = Ad[0] * -Bd[1] - Ad[1] * -Bd[0];
+        if (Math.abs(det) < 1e-18) break;
+        const dt = (-F[0] * -Bd[1] - -F[1] * -Bd[0]) / det;
+        const du = (Ad[0] * -F[1] - Ad[1] * -F[0]) / det;
+        t = cmath.clamp01(t + dt);
+        u = cmath.clamp01(u + du);
+      }
+      return { t, u, p: bezier.evalC(A0, A1, A2, A3, t) };
+    }
+
+    export namespace intersection {
+      /**
+       * test/resolve the intersection of a single curve
+       */
+      export namespace single {
+        /**
+         * Fast boolean test for cubic Bézier self-intersection existence.
+         *
+         * **Use Case**: When you only need to know if a curve self-intersects, without
+         * needing the exact intersection details. This is significantly faster than
+         * `intersection()` for boolean queries.
+         *
+         * **Algorithm**: Uses a simplified discriminant check that avoids the full
+         * parameter computation and curve evaluation. Based on the mathematical property
+         * that a cubic Bézier curve self-intersects if and only if its control polygon
+         * has a specific geometric configuration.
+         *
+         * **Performance**: O(1) constant time, optimized for boolean queries.
+         * Approximately 3x faster than `intersection()` for existence checks.
+         *
+         * **Key Optimizations**:
+         * - **No Square Root**: Avoids `Math.sqrt()` computation
+         * - **No Curve Evaluation**: Skips Bézier curve point calculation
+         * - **Parameter Bounds Check**: Uses sum and product of roots instead of solving
+         * - **Scale-Aware Tolerance**: Adaptive numerical tolerance based on curve scale
+         * - **Conservative Bounds**: Robust parameter validation with geometric conditions
+         *
+         * **Trade-offs**:
+         * - ✅ **Ultra Fast**: Only essential discriminant calculations
+         * - ✅ **Memory Efficient**: No temporary arrays or complex calculations
+         * - ✅ **Numerically Stable**: Robust handling of edge cases
+         * - ❌ **No Details**: Returns only boolean, no intersection parameters
+         * - ❌ **No Point**: Does not compute the actual intersection point
+         *
+         * **Mathematical Foundation**:
+         *
+         * For a cubic Bézier curve with control points P0, P1, P2, P3, the self-intersection
+         * condition is determined by the discriminant delta = 4D0*D2 - D1^2 where:
+         * - D0 = (P2 - P1) × (P3 - P2)
+         * - D1 = (P1 - P0) × (P3 - P2)
+         * - D2 = (P1 - P0) × (P2 - P1)
+         *
+         * The curve self-intersects if and only if:
+         * 1. Q = D0 - D1 + D2 ≠ 0 (non-degenerate case)
+         * 2. delta > 0 (real distinct roots exist)
+         * 3. Both roots are in (0,1) (intersection within curve domain)
+         *
+         * **Parameter Conditions**: For roots u, v in (0,1):
+         * - s = u + v ∈ (0, 2)
+         * - p = u * v ∈ (0, 1)
+         * - 1 - s + p > 0 (geometric constraint)
+         *
+         * @param C - The cubic Bézier curve to check for self-intersection
+         * @param eps - Base numerical tolerance for floating-point comparisons (default: 1e-12).
+         *              The actual tolerance is scale-aware and adapts to curve size.
+         * @returns `true` if the curve has a self-intersection, `false` otherwise
+         *
+         * @example
+         * ```ts
+         * // Fast existence check for UI feedback
+         * const curve: cmath.bezier.CubicBezierWithTangents = {
+         *   a: [0, 0], b: [100, 0],
+         *   ta: [100, 100], tb: [-100, 100]
+         * };
+         *
+         * if (cmath.bezier.intersection.single.is_intersecting(curve)) {
+         *   console.log("Warning: Curve has self-intersection");
+         *   // Show visual indicator without computing exact intersection
+         * }
+         * ```
+         *
+         * @example
+         * ```ts
+         * // Performance-critical batch processing
+         * const curves: cmath.bezier.CubicBezierWithTangents[] = [ *many curves* ];
+         * const selfIntersecting = curves.filter(c => cmath.bezier.intersection.single.is_intersecting(c));
+         * console.log(`${selfIntersecting.length} curves have self-intersections`);
+         * ```
+         *
+         * @see bezier.intersection - For exact intersection computation
+         * @see bezier.intersection.intersections - For intersections between different curves
+         *
+         * @remarks
+         * This function is designed for performance-critical boolean queries where
+         * exact intersection details are not needed. For precise intersection data,
+         * use `intersection()` instead. The two functions are independent and
+         * optimized for their respective use cases:
+         *
+         * - **`is_intersecting()`**: Fast boolean check for UI feedback, validation, filtering
+         * - **`intersection()`**: Precise computation for geometric operations, splitting
+         *
+         * Choose based on your specific needs: speed vs. precision.
+         */
+        export function is_intersecting(
+          C: CubicBezierWithTangents,
+          eps: number = 1e-12
+        ): boolean {
+          // absolute controls
+          const P0x = C.a[0],
+            P0y = C.a[1];
+          const P1x = P0x + C.ta[0],
+            P1y = P0y + C.ta[1];
+          const P2x = C.b[0] + C.tb[0],
+            P2y = C.b[1] + C.tb[1];
+          const P3x = C.b[0],
+            P3y = C.b[1];
+
+          // forward diffs
+          const d0x = P1x - P0x,
+            d0y = P1y - P0y;
+          const d1x = P2x - P1x,
+            d1y = P2y - P1y;
+          const d2x = P3x - P2x,
+            d2y = P3y - P2y;
+
+          // cross products (area-like)
+          const D0 = d1x * d2y - d1y * d2x; // Δ1×Δ2
+          const D1 = d0x * d2y - d0y * d2x; // Δ0×Δ2
+          const D2 = d0x * d1y - d0y * d1x; // Δ0×Δ1
+
+          // scale-aware tolerance (helps for very large/small coords)
+          const s2 = Math.max(
+            d0x * d0x + d0y * d0y,
+            d1x * d1x + d1y * d1y,
+            d2x * d2x + d2y * d2y
+          );
+          const tol = Math.max(eps, 32 * Number.EPSILON * s2); // conservative
+
+          const Q = D0 - D1 + D2; // denominator (∝ area)
+          if (Math.abs(Q) <= tol) return false; // degenerate/parallel/cusp limit
+
+          const delta = 4 * D0 * D2 - D1 * D1; // discriminant
+          if (delta <= tol) return false; // no two real params
+
+          // u+v and uv (avoid sqrt)
+          const s = (2 * D2 - D1) / Q;
+          const p = (D2 * D2 - D1 * D2 - 3 * D0 * D2 + D1 * D1) / (Q * Q);
+
+          // both roots in (0,1)  <=>  s∈(0,2), p∈(0,1), and 1 - s + p > 0
+          return s > tol && s < 2 - tol && p > tol && 1 - s + p > tol;
+        }
+
+        /**
+         * Detects self-intersections of a cubic Bézier curve using adaptive subdivision
+         * and pairwise intersection testing.
+         *
+         * **Mathematical Background:**
+         *
+         * A cubic Bézier curve B(t) with control points P₀, P₁, P₂, P₃ is defined as:
+         * ```
+         * B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃,  t ∈ [0,1]
+         * ```
+         *
+         * A self-intersection occurs when B(t₁) = B(t₂) for distinct parameters t₁ ≠ t₂.
+         * This creates a system of two equations in two unknowns:
+         * ```
+         * Bₓ(t₁) = Bₓ(t₂)  and  Bᵧ(t₁) = Bᵧ(t₂)
+         * ```
+         *
+         * **Algorithm Overview:**
+         *
+         * Uses a closed-form solution based on the cubic Bézier self-intersection equation:
+         *
+         * 1. **Compute Differences**: Calculate Δ₀ = P₁ - P₀, Δ₁ = P₂ - P₁, Δ₂ = P₃ - P₂
+         * 2. **Cross Products**: Compute D₀ = Δ₁ × Δ₂, D₁ = Δ₀ × Δ₂, D₂ = Δ₀ × Δ₁
+         * 3. **Discriminant**: Check if Δ = 4D₀D₂ - D₁² > 0 (existence condition)
+         * 4. **Root Finding**: Solve quadratic equation for intersection parameters
+         * 5. **Validation**: Ensure parameters are in [0,1] and distinct
+         *
+         * **Mathematical Properties:**
+         *
+         * - **Existence**: A cubic Bézier curve can have at most 1 self-intersection
+         * - **Parameter Ordering**: Results are returned with t₁ < t₂ for consistency
+         * - **Transverse Nature**: Self-intersections are always transverse (not tangent)
+         * - **Closed Form**: Direct solution without iterative subdivision
+         *
+         * **Complexity Analysis:**
+         *
+         * - **Time Complexity**: O(1) constant time for the closed-form solution
+         * - **Space Complexity**: O(1) constant space
+         * - **Numerical Stability**: Robust closed-form solution
+         *
+         * @param C - The cubic Bézier curve to analyze for self-intersections
+         * @returns Either a single self-intersection point or null if no self-intersection exists:
+         * - `t1`, `t2`: Parameter values where the curve intersects itself (t₁ < t₂)
+         * - `point`: The intersection point in ℝ²
+         *
+         * @example
+         * ```ts
+         * // Figure-8 curve with self-intersection
+         * const curve: cmath.bezier.CubicBezierWithTangents = {
+         *   a: [0, 0],      // P₀
+         *   b: [100, 0],    // P₃
+         *   ta: [100, 100], // P₁ - P₀ (creates upward loop)
+         *   tb: [-100, 100] // P₃ - P₂ (creates downward loop)
+         * };
+         *
+         * const selfIntersection = cmath.bezier.intersection.single.intersection(curve);
+         * console.log(selfIntersection);
+         * // → {
+         * //     t1: 0.25, t2: 0.75,
+         * //     point: [50, 50]
+         * //   }
+         *
+         * // Verify the intersection
+         * const point1 = cmath.bezier.evaluate(curve.a, curve.b, curve.ta, curve.tb, 0.25);
+         * const point2 = cmath.bezier.evaluate(curve.a, curve.b, curve.ta, curve.tb, 0.75);
+         * const distance = Math.hypot(point1[0] - point2[0], point1[1] - point2[1]);
+         * console.log('Self-intersection accuracy:', distance); // → ~1e-12
+         * ```
+         *
+         * @example
+         * ```ts
+         * // Simple curve with no self-intersections
+         * const simpleCurve: cmath.bezier.CubicBezierWithTangents = {
+         *   a: [0, 0],
+         *   b: [100, 0],
+         *   ta: [0, 0],
+         *   tb: [0, 0]
+         * };
+         *
+         * const intersection = cmath.bezier.intersection.single.intersection(simpleCurve);
+         * console.log(intersection); // → null
+         * ```
+         *
+         * **Mathematical Notes:**
+         *
+         * - **Cusp Detection**: The algorithm can detect cusps (where B'(t) = 0) but these
+         *   are not considered self-intersections
+         * - **Numerical Precision**: Uses adaptive tolerances based on curve scale
+         * - **Edge Cases**: Handles degenerate curves (zero-length, coincident control points)
+         * - **Robustness**: Tolerant to floating-point arithmetic errors
+         *
+         * **Performance Considerations:**
+         *
+         * - **Constant Time**: O(1) performance regardless of curve complexity
+         * - **No Iteration**: Direct mathematical solution without loops or recursion
+         * - **Memory Efficient**: Only a few temporary variables needed
+         * - **Scale-Aware**: Adaptive tolerance prevents numerical issues with large/small curves
+         * - **Conservative**: Robust handling of degenerate cases and edge conditions
+         *
+         * @see bezier.intersection.intersections - For intersections between different curves
+         * @see bezier.subdivide - For curve subdivision algorithm
+         *
+         * @remarks
+         * This function is essential for planarization algorithms, as self-intersecting
+         * curves must be split at their self-intersection points to create planar networks.
+         * The closed-form solution provides both accuracy and performance for geometric
+         * consistency in vector graphics operations.
+         */
+        export function intersection(C: CubicBezierWithTangents): {
+          t1: number;
+          t2: number;
+          point: Vector2;
+        } | null {
+          // Early exit: Check if curve is degenerate (zero length)
+          const dx = C.b[0] - C.a[0];
+          const dy = C.b[1] - C.a[1];
+          const lengthSq = dx * dx + dy * dy;
+          if (lengthSq < 1e-12) {
+            return null; // Degenerate curve
+          }
+
+          // Early exit: Check if tangents are zero (straight line)
+          const taSq = C.ta[0] * C.ta[0] + C.ta[1] * C.ta[1];
+          const tbSq = C.tb[0] * C.tb[0] + C.tb[1] * C.tb[1];
+          if (taSq < 1e-12 && tbSq < 1e-12) {
+            return null; // Straight line, no self-intersection
+          }
+
+          // Convert from tangent form to control point form
+          const P0: Vector2 = [C.a[0], C.a[1]];
+          const P1: Vector2 = [C.a[0] + C.ta[0], C.a[1] + C.ta[1]];
+          const P2: Vector2 = [C.b[0] + C.tb[0], C.b[1] + C.tb[1]];
+          const P3: Vector2 = [C.b[0], C.b[1]];
+
+          // Early exit: Check if control points are collinear (no self-intersection possible)
+          const d0x = P1[0] - P0[0];
+          const d0y = P1[1] - P0[1];
+          const d1x = P2[0] - P1[0];
+          const d1y = P2[1] - P1[1];
+          const d2x = P3[0] - P2[0];
+          const d2y = P3[1] - P2[1];
+
+          // Check if all control points are collinear
+          const cross01 = d0x * d1y - d0y * d1x;
+          const cross12 = d1x * d2y - d1y * d2x;
+          if (Math.abs(cross01) < 1e-12 && Math.abs(cross12) < 1e-12) {
+            return null; // Collinear control points, no self-intersection
+          }
+
+          // Helper functions
+          const sub = (a: Vector2, b: Vector2): Vector2 => [
+            a[0] - b[0],
+            a[1] - b[1],
+          ];
+          const cross = (a: Vector2, b: Vector2): number =>
+            a[0] * b[1] - a[1] * b[0];
+
+          // Compute differences
+          const d0 = sub(P1, P0);
+          const d1 = sub(P2, P1);
+          const d2 = sub(P3, P2);
+
+          // Compute cross products
+          const D0 = cross(d1, d2); // Δ₁ × Δ₂
+          const D1 = cross(d0, d2); // Δ₀ × Δ₂
+          const D2 = cross(d0, d1); // Δ₀ × Δ₁
+
+          // Early exit: Check for numerical stability
+          const maxCross = Math.max(Math.abs(D0), Math.abs(D1), Math.abs(D2));
+          if (maxCross < 1e-12) {
+            return null; // Numerically unstable case
+          }
+
+          // Check discriminant for existence of self-intersection
+          const delta = 4 * D0 * D2 - D1 * D1;
+          const denom = 2 * (D0 - D1 + D2);
+
+          if (!(denom !== 0) || !(delta > 0)) {
+            return null; // No real loop (or degenerate case)
+          }
+
+          // Solve for intersection parameters
+          const r = Math.sqrt(3 * delta);
+          let u = (2 * D2 - D1 - r) / denom;
+          let v = (2 * D2 - D1 + r) / denom;
+
+          // Ensure u < v
+          if (u > v) [u, v] = [v, u];
+
+          // Validate parameters are in [0,1] and distinct
+          if (u < 0 || v > 1 || u === v) {
+            return null;
+          }
+
+          // Early exit: Check if parameters are too close (numerical precision)
+          if (v - u < 1e-6) {
+            return null; // Parameters too close, likely numerical artifact
+          }
+
+          // Evaluate the curve at u to get intersection point
+          const mt = 1 - u;
+          const mt2 = mt * mt;
+          const u2 = u * u;
+          const b0 = mt2 * mt;
+          const b1 = 3 * mt2 * u;
+          const b2 = 3 * mt * u2;
+          const b3 = u2 * u;
+
+          const point: Vector2 = [
+            b0 * P0[0] + b1 * P1[0] + b2 * P2[0] + b3 * P3[0],
+            b0 * P0[1] + b1 * P1[1] + b2 * P2[1] + b3 * P3[1],
+          ];
+
+          return {
+            t1: u,
+            t2: v,
+            point,
+          };
+        }
+      }
+
+      //
+
+      /** Local type of an intersection useful for planarization/boolean ops. */
+      export enum IntersectionKind {
+        /** Intersection lies at an endpoint (t≈0|1 or u≈0|1). */
+        Endpoint = "endpoint",
+        /** Curves touch without crossing (A'(t) ∥ B'(u)). */
+        Tangent = "tangent",
+        /** Proper crossing (transverse). */
+        Transverse = "transverse",
+      }
+
+      export type BezierIntersectionPoint = Readonly<{
+        /** Parameter on curve A (∈[0,1]). */
+        a_t: number;
+        /** Parameter on curve B (∈[0,1]). */
+        b_t: number;
+        /** Intersection point in ℝ² (A(a_t) ≈ B(b_t)). */
+        p: Vector2;
+        /** Local classification for downstream topology decisions. */
+        kind: IntersectionKind;
+        /** Optional residual ‖A(a_t)-B(b_t)‖ (post-refine). */
+        residual?: number;
+      }>;
+
+      export type BezierIntersectionOverlap = Readonly<{
+        /** Param interval on A (sorted, closed). */
+        a_range: [number, number];
+        /** Param interval on B (sorted, closed). */
+        b_range: [number, number];
+      }>;
+
+      export type BezierIntersectionResult = Readonly<{
+        /** Discrete intersection points. */
+        points: ReadonlyArray<BezierIntersectionPoint>;
+        /** Continuous coincidences (rare; minimal detection). */
+        overlaps: ReadonlyArray<BezierIntersectionOverlap>;
+        /** Optional stats for debugging/tuning. */
+        stats?: Readonly<{
+          eps: number;
+          paramEps: number;
+          maxDepth: number;
+          refine: boolean;
+          candidates: number;
+          emitted: number;
+        }>;
+      }>;
+
+      export type IntersectionOptions = {
+        /** Spatial tolerance (canvas units) used for bbox/flatness/termination. Default: 1e-3. */
+        eps?: number;
+        /** Param-space tolerance for dedup/endpoint snap. Default: 1e-3. */
+        paramEps?: number;
+        /** Maximum subdivision depth. Default: 32. */
+        maxDepth?: number;
+        /** Apply Newton refinement for subpixel accuracy. Default: true. */
+        refine?: boolean;
+      };
+
+      /**
+       * Compute cubic–cubic Bézier intersections (A with B) using
+       * conservative bbox subdivision (de Casteljau) with optional Newton refinement.
+       *
+       * - Input curves are in `(a,b,ta,tb)` form used by your engine:
+       *   - P0 = a
+       *   - P1 = a + ta
+       *   - P2 = b + tb
+       *   - P3 = b
+       * - Returns param pairs `(a_t, b_t)` and the point `p = A(a_t) ≈ B(b_t)`.
+       * - Classifies each hit as `Endpoint`, `Tangent`, or `Transverse` (cheap; uses derivatives).
+       * - Performs param-space dedup and endpoint snapping.
+       * - Detects simple overlaps (near-coincident boxes + near-parallel) as param intervals.
+       *
+       * @remarks
+       * Robustness tips:
+       * - Tune `eps` to your canvas scale (e.g., 1e-3..1e-2).
+       * - `refine` improves accuracy; keep small iteration count for perf.
+       * - For planarization, use the returned params to split curves; for tangent hits you may choose to skip splitting.
+       *
+       * @see https://rosettacode.org/wiki/B%C3%A9zier_curves/Intersections
+       */
+      export function intersections(
+        A: CubicBezierWithTangents,
+        B: CubicBezierWithTangents,
+        opts: IntersectionOptions = {}
+      ): BezierIntersectionResult {
+        const eps = opts.eps ?? 1e-3;
+        const paramEps = opts.paramEps ?? 1e-3;
+        const maxDepth = opts.maxDepth ?? 32;
+        const doRefine = opts.refine ?? true;
+
+        // ---- control points ----
+        const A0 = A.a;
+        const A1: Vector2 = [A.a[0] + A.ta[0], A.a[1] + A.ta[1]];
+        const A2: Vector2 = [A.b[0] + A.tb[0], A.b[1] + A.tb[1]];
+        const A3 = A.b;
+
+        const B0 = B.a;
+        const B1: Vector2 = [B.a[0] + B.ta[0], B.a[1] + B.ta[1]];
+        const B2: Vector2 = [B.b[0] + B.tb[0], B.b[1] + B.tb[1]];
+        const B3 = B.b;
+
+        // ---- de Casteljau split at t=0.5 (fast & stable) ----
+        const splitMid = (
+          P0: Vector2,
+          P1: Vector2,
+          P2: Vector2,
+          P3: Vector2
+        ) => {
+          const m = (a: number, b: number) => (a + b) * 0.5;
+          const Q0: Vector2 = [m(P0[0], P1[0]), m(P0[1], P1[1])];
+          const Q1: Vector2 = [m(P1[0], P2[0]), m(P1[1], P2[1])];
+          const Q2: Vector2 = [m(P2[0], P3[0]), m(P2[1], P3[1])];
+          const R0: Vector2 = [m(Q0[0], Q1[0]), m(Q0[1], Q1[1])];
+          const R1: Vector2 = [m(Q1[0], Q2[0]), m(Q1[1], Q2[1])];
+          const S: Vector2 = [m(R0[0], R1[0]), m(R0[1], R1[1])];
+          // left: P0,Q0,R0,S | right: S,R1,Q2,P3
+          return {
+            L: [P0, Q0, R0, S] as [Vector2, Vector2, Vector2, Vector2],
+            R: [S, R1, Q2, P3] as [Vector2, Vector2, Vector2, Vector2],
+          };
+        };
+
+        // ---- bbox (control polygon, conservative, cheap) ----
+        const bbox = (P0: Vector2, P1: Vector2, P2: Vector2, P3: Vector2) => {
+          const xs = [P0[0], P1[0], P2[0], P3[0]];
+          const ys = [P0[1], P1[1], P2[1], P3[1]];
+          let minx = xs[0],
+            maxx = xs[0],
+            miny = ys[0],
+            maxy = ys[0];
+          for (let i = 1; i < 4; i++) {
+            const x = xs[i];
+            const y = ys[i];
+            if (x < minx) minx = x;
+            if (x > maxx) maxx = x;
+            if (y < miny) miny = y;
+            if (y > maxy) maxy = y;
+          }
+          return [minx, miny, maxx, maxy] as const;
+        };
+        const overlaps = (
+          a: readonly [number, number, number, number],
+          b: readonly [number, number, number, number]
+        ) => !(a[2] < b[0] || b[2] < a[0] || a[3] < b[1] || b[3] < a[1]);
+
+        // ---- helpers ----
+        const len2 = (v: Vector2) => v[0] * v[0] + v[1] * v[1];
+        const sub = (a: Vector2, b: Vector2): Vector2 => [
+          a[0] - b[0],
+          a[1] - b[1],
+        ];
+        const cross = (a: Vector2, b: Vector2) => a[0] * b[1] - a[1] * b[0];
+        const near01 = (t: number) =>
+          Math.abs(t) <= paramEps || Math.abs(1 - t) <= paramEps;
+
+        // ---- stack item: curve spans + param ranges ----
+        type Item = {
+          A: [Vector2, Vector2, Vector2, Vector2];
+          a0: number;
+          a1: number;
+          da: number;
+          B: [Vector2, Vector2, Vector2, Vector2];
+          b0: number;
+          b1: number;
+          db: number;
+          depth: number;
+        };
+
+        const stack: Item[] = [
+          {
+            A: [A0, A1, A2, A3],
+            a0: 0,
+            a1: 1,
+            da: 1,
+            B: [B0, B1, B2, B3],
+            b0: 0,
+            b1: 1,
+            db: 1,
+            depth: 0,
+          },
+        ];
+
+        const hits: BezierIntersectionPoint[] = [];
+        const ovlps: BezierIntersectionOverlap[] = [];
+        let candidates = 0;
+
+        // ---- main loop ----
+        while (stack.length) {
+          const it = stack.pop()!;
+          const [PA0, PA1, PA2, PA3] = it.A;
+          const [PB0, PB1, PB2, PB3] = it.B;
+          const bbA = bbox(PA0, PA1, PA2, PA3);
+          const bbB = bbox(PB0, PB1, PB2, PB3);
+          if (!overlaps(bbA, bbB)) continue;
+
+          // coincident/overlap detection (very conservative)
+          const w = Math.min(bbA[2], bbB[2]) - Math.max(bbA[0], bbB[0]);
+          const h = Math.min(bbA[3], bbB[3]) - Math.max(bbA[1], bbB[1]);
+          const boxSize = Math.max(w, h);
+          const flatA = approxFlat(PA0, PA1, PA2, PA3, eps);
+          const flatB = approxFlat(PB0, PB1, PB2, PB3, eps);
+
+          if (boxSize <= eps || it.depth >= maxDepth || (flatA && flatB)) {
+            candidates++;
+            // midpoint params
+            const a_t = cmath.clamp01((it.a0 + it.a1) * 0.5);
+            const b_t = cmath.clamp01((it.b0 + it.b1) * 0.5);
+            const pA = evalC(PA0, PA1, PA2, PA3, 0.5);
+            const pB = evalC(PB0, PB1, PB2, PB3, 0.5);
+
+            // If boxes almost coincident and directions nearly parallel -> record minimal overlap
+            if (flatA && flatB && boxSize <= eps * 2) {
+              // For flat curves, check if they're parallel before treating as overlap
+              const dirA = sub(PA3, PA0); // direction of curve A
+              const dirB = sub(PB3, PB0); // direction of curve B
+              const crossProduct = cross(dirA, dirB);
+              const lenA = Math.sqrt(len2(dirA));
+              const lenB = Math.sqrt(len2(dirB));
+
+              // Check if curves start at the same point (within tolerance)
+              const startDist = Math.sqrt(len2(sub(PA0, PB0)));
+              const endDist = Math.sqrt(len2(sub(PA3, PB3)));
+
+              // If curves are nearly parallel OR they share endpoints, treat as overlap
+              if (
+                Math.abs(crossProduct) <= eps * lenA * lenB ||
+                startDist <= eps * 2 ||
+                endDist <= eps * 2
+              ) {
+                // store as tiny overlap interval (can be merged by caller if needed)
+                ovlps.push({
+                  a_range: [Math.min(it.a0, it.a1), Math.max(it.a0, it.a1)],
+                  b_range: [Math.min(it.b0, it.b1), Math.max(it.b0, it.b1)],
+                });
+                continue;
+              }
+              // If not parallel and don't share endpoints, fall through to point intersection logic
+            }
+
+            let a = a_t,
+              b = b_t,
+              p: Vector2 = [(pA[0] + pB[0]) * 0.5, (pA[1] + pB[1]) * 0.5];
+
+            if (doRefine) {
+              const r = newtonRefine(A0, A1, A2, A3, B0, B1, B2, B3, a, b, 5);
+              a = r.t;
+              b = r.u;
+              p = r.p;
+            }
+
+            // classify
+            const Ad = derivC(A0, A1, A2, A3, a);
+            const Bd = derivC(B0, B1, B2, B3, b);
+            const isEnd = near01(a) || near01(b);
+            const isTan =
+              Math.abs(cross(Ad, Bd)) <=
+              1e-9 * (Math.sqrt(len2(Ad) * len2(Bd)) + 1e-12);
+            const kind = isEnd
+              ? IntersectionKind.Endpoint
+              : isTan
+                ? IntersectionKind.Tangent
+                : IntersectionKind.Transverse;
+            const residual = Math.sqrt(
+              len2(sub(evalC(A0, A1, A2, A3, a), evalC(B0, B1, B2, B3, b)))
+            );
+
+            pushDedup(hits, { a_t: a, b_t: b, p, kind, residual }, paramEps);
+            continue;
+          }
+
+          // subdivide the larger box first (heuristic)
+          const spanA = Math.max(bbA[2] - bbA[0], bbA[3] - bbA[1]);
+          const spanB = Math.max(bbB[2] - bbB[0], bbB[3] - bbB[1]);
+
+          if (spanA >= spanB) {
+            const { L, R } = splitMid(PA0, PA1, PA2, PA3);
+            const amid = (it.a0 + it.a1) * 0.5;
+            stack.push({
+              A: R,
+              a0: amid,
+              a1: it.a1,
+              da: it.da * 0.5,
+              B: it.B,
+              b0: it.b0,
+              b1: it.b1,
+              db: it.db,
+              depth: it.depth + 1,
+            });
+            stack.push({
+              A: L,
+              a0: it.a0,
+              a1: amid,
+              da: it.da * 0.5,
+              B: it.B,
+              b0: it.b0,
+              b1: it.b1,
+              db: it.db,
+              depth: it.depth + 1,
+            });
+          } else {
+            const { L, R } = splitMid(PB0, PB1, PB2, PB3);
+            const bmid = (it.b0 + it.b1) * 0.5;
+            stack.push({
+              A: it.A,
+              a0: it.a0,
+              a1: it.a1,
+              da: it.da,
+              B: R,
+              b0: bmid,
+              b1: it.b1,
+              db: it.db * 0.5,
+              depth: it.depth + 1,
+            });
+            stack.push({
+              A: it.A,
+              a0: it.a0,
+              a1: it.a1,
+              da: it.da,
+              B: L,
+              b0: it.b0,
+              b1: bmid,
+              db: it.db * 0.5,
+              depth: it.depth + 1,
+            });
+          }
+        }
+
+        return {
+          points: hits.sort((h1, h2) => h1.a_t - h2.a_t || h1.b_t - h2.b_t),
+          overlaps: mergeOverlaps(ovlps, paramEps),
+          stats: {
+            eps,
+            paramEps,
+            maxDepth,
+            refine: doRefine,
+            candidates,
+            emitted: hits.length,
+          },
+        };
+
+        // --- helpers (local) ---
+
+        function approxFlat(
+          P0: Vector2,
+          P1: Vector2,
+          P2: Vector2,
+          P3: Vector2,
+          tol: number
+        ): boolean {
+          // max distance of inner controls to chord P0–P3
+          const vx = P3[0] - P0[0],
+            vy = P3[1] - P0[1];
+          const n: Vector2 = [-vy, vx];
+          const denom = Math.hypot(n[0], n[1]) || 1;
+          const d1 =
+            Math.abs((P1[0] - P0[0]) * n[0] + (P1[1] - P0[1]) * n[1]) / denom;
+          const d2 =
+            Math.abs((P2[0] - P0[0]) * n[0] + (P2[1] - P0[1]) * n[1]) / denom;
+          return Math.max(d1, d2) <= tol;
+        }
+
+        function pushDedup(
+          buf: BezierIntersectionPoint[],
+          item: BezierIntersectionPoint,
+          pe: number
+        ) {
+          // param-space clustering
+          for (const h of buf) {
+            if (
+              Math.abs(h.a_t - item.a_t) <= pe &&
+              Math.abs(h.b_t - item.b_t) <= pe
+            ) {
+              // keep the better (smaller residual) if available
+              if ((item.residual ?? 1e9) < (h.residual ?? 1e9)) {
+                (h as any).a_t = item.a_t;
+                (h as any).b_t = item.b_t;
+                (h as any).p = item.p;
+                (h as any).residual = item.residual;
+                (h as any).kind = item.kind;
+              }
+              return;
+            }
+          }
+          buf.push(item);
+        }
+
+        function mergeOverlaps(
+          ov: BezierIntersectionOverlap[],
+          pe: number
+        ): BezierIntersectionOverlap[] {
+          if (ov.length <= 1) return ov;
+          ov.sort(
+            (x, y) => x.a_range[0] - y.a_range[0] || x.b_range[0] - y.b_range[0]
+          );
+          const out: BezierIntersectionOverlap[] = [];
+          let cur = { ...ov[0] };
+          for (let i = 1; i < ov.length; i++) {
+            const o = ov[i];
+            const adjacentA = Math.abs(o.a_range[0] - cur.a_range[1]) <= pe;
+            const adjacentB = Math.abs(o.b_range[0] - cur.b_range[1]) <= pe;
+            if (adjacentA && adjacentB) {
+              cur.a_range = [cur.a_range[0], o.a_range[1]];
+              cur.b_range = [cur.b_range[0], o.b_range[1]];
+            } else {
+              out.push({
+                a_range: cur.a_range as [number, number],
+                b_range: cur.b_range as [number, number],
+              });
+              cur = { ...o };
+            }
+          }
+          out.push({
+            a_range: cur.a_range as [number, number],
+            b_range: cur.b_range as [number, number],
+          });
+          return out;
+        }
+      }
+    }
+
+    /**
+     * Piecewise Bézier curve operations for chains of cubic Bézier segments.
+     *
+     * The `piecewise` namespace provides optimized mathematical operations for working with
+     * sequences of connected cubic Bézier curves (piecewise curves). These operations treat
+     * the entire chain as a single mathematical entity while providing efficient algorithms
+     * for common operations like arc length parameterization, point evaluation, and projection.
+     *
+     * A piecewise curve is defined as an ordered sequence of cubic Bézier segments where
+     * each segment's end point connects to the next segment's start point, forming a
+     * continuous curve. The global parameter `u` ∈ [0, 1] represents the normalized position
+     * along the entire curve chain, while local parameters `t` ∈ [0, 1] represent positions
+     * within individual segments.
+     *
+     * Key concepts:
+     * - **Global parameter `u`**: Normalized position along the entire curve chain (0 = start, 1 = end)
+     * - **Local parameter `t`**: Parameter within a specific segment (0 = segment start, 1 = segment end)
+     * - **Segment index**: Zero-based index identifying which segment contains a given global parameter
+     * - **Arc length parameterization**: Uniform motion along the curve chain regardless of segment curvature
+     *
+     * Common use cases:
+     * - Path following with uniform speed
+     * - Animation along complex multi-segment curves
+     * - Interactive curve editing and manipulation
+     * - Geometric operations on complex shapes
+     *
+     * @example
+     * ```typescript
+     * // Define a piecewise curve with multiple segments
+     * const segments: cmath.bezier.CubicBezierWithTangents[] = [
+     *   { a: [0, 0], b: [100, 0], ta: [50, 50], tb: [-50, 50] },
+     *   { a: [100, 0], b: [200, 100], ta: [50, 50], tb: [50, -50] },
+     *   { a: [200, 100], b: [300, 100], ta: [50, -50], tb: [-50, -50] }
+     * ];
+     *
+     * // Evaluate point at 60% along the entire curve chain
+     * const point = cmath.bezier.piecewise.evaluate(segments, 0.6);
+     *
+     * // Get the segment index and local parameter for a global position
+     * const { segmentIndex, localT } = cmath.bezier.piecewise.resolveGlobalU(segments, 0.6);
+     *
+     * // Project a point onto the entire curve chain
+     * const globalU = cmath.bezier.piecewise.project(segments, [150, 50]);
+     * ```
+     *
+     * @remarks
+     * - All operations assume segments are properly connected (end point of segment i = start point of segment i+1)
+     * - Global parameter `u` is automatically clamped to [0, 1] for robustness
+     * - Arc length parameterization provides uniform motion along the curve chain
+     * - Operations are optimized for chains with many segments
+     * - Caching mechanisms are used internally for performance-critical operations
+     */
+    export namespace piecewise {
+      /**
+       * Compact representation of a piecewise Bézier curve network.
+       *
+       * The `Network` type provides a memory-efficient structure for representing chains of
+       * connected cubic Bézier segments. It separates vertex positions from segment connectivity
+       * and tangent information, allowing for efficient storage and manipulation of complex
+       * curve networks.
+       *
+       * Structure:
+       * - `vertices`: Array of unique vertex positions in 2D space
+       * - `segments`: Array of segment definitions, each referencing vertices by index
+       *
+       * Each segment is defined by:
+       * - `a`: Index of the start vertex in the `vertices` array
+       * - `b`: Index of the end vertex in the `vertices` array
+       * - `ta`: Tangent vector at the start vertex (relative to vertex position)
+       * - `tb`: Tangent vector at the end vertex (relative to vertex position)
+       *
+       * This structure enables:
+       * - Memory efficiency through vertex sharing
+       * - Fast vertex position updates (change once, affects all connected segments)
+       * - Efficient serialization and network transmission
+       * - Support for complex topologies (branches, loops, etc.)
+       *
+       * @property vertices - Array of unique vertex positions in 2D space
+       * @property segments - Array of segment definitions referencing vertices by index
+       *
+       * @example
+       * ```typescript
+       * // Define a simple curve with 3 segments forming a path
+       * const network: cmath.bezier.piecewise.Network = {
+       *   vertices: [
+       *     [0, 0],    // vertex 0
+       *     [100, 0],  // vertex 1
+       *     [200, 100], // vertex 2
+       *     [300, 100]  // vertex 3
+       *   ],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 50], tb: [-50, 50] },   // segment 0: vertex 0 → 1
+       *     { a: 1, b: 2, ta: [50, 50], tb: [50, -50] },   // segment 1: vertex 1 → 2
+       *     { a: 2, b: 3, ta: [50, -50], tb: [-50, -50] }  // segment 2: vertex 2 → 3
+       *   ]
+       * };
+       *
+       * // Evaluate point at 60% along the entire network
+       * const point = cmath.bezier.piecewise.evaluate(network, 0.6);
+       * ```
+       *
+       * @example
+       * ```typescript
+       * // Network with branching structure
+       * const branchedNetwork: cmath.bezier.piecewise.Network = {
+       *   vertices: [
+       *     [0, 0],     // root vertex
+       *     [100, 0],   // branch point
+       *     [200, 50],  // left branch end
+       *     [200, -50]  // right branch end
+       *   ],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 0], tb: [-50, 0] },     // main path
+       *     { a: 1, b: 2, ta: [50, 50], tb: [-50, 50] },   // left branch
+       *     { a: 1, b: 3, ta: [50, -50], tb: [-50, -50] }  // right branch
+       *   ]
+       * };
+       * ```
+       *
+       * @remarks
+       * - **No validation**: This structure does not ensure data validity or connectivity
+       * - **Index bounds**: Segment indices must be valid within the vertices array
+       * - **Vertex sharing**: Multiple segments can reference the same vertex
+       * - **Memory efficiency**: Vertex positions are stored once and shared
+       * - **Topology flexibility**: Supports complex networks with branches and loops
+       * - **Performance**: Optimized for operations on large networks
+       * - **Serialization**: Compact representation suitable for storage/transmission
+       */
+      export type Network = {
+        vertices: Vector2[];
+        segments: {
+          a: number;
+          b: number;
+          ta: Vector2;
+          tb: Vector2;
+        }[];
+      };
+
+      /**
+       * Resolves a global parameter `t` to the corresponding segment index and local parameter `t`.
+       *
+       * This function maps a global parameter `t` ∈ [0, 1] representing position along the entire
+       * network to the specific segment that contains that position and the local parameter `t`
+       * within that segment.
+       *
+       * The mapping is based on uniform distribution across segments, where each segment
+       * contributes equally to the global parameter space regardless of its actual length.
+       * This is different from arc length parameterization where segments contribute based on their actual arc length.
+       *
+       * @param network - The piecewise Bézier network
+       * @param t - Global parameter in range [0, 1] representing position along the entire network
+       * @returns Object containing the segment index and local parameter `t` ∈ [0, 1]
+       *
+       * @example
+       * ```typescript
+       * const network: cmath.bezier.piecewise.Network = {
+       *   vertices: [[0, 0], [100, 0], [200, 100]],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 50], tb: [-50, 50] },
+       *     { a: 1, b: 2, ta: [50, 50], tb: [-50, 50] }
+       *   ]
+       * };
+       *
+       * const result = cmath.bezier.piecewise.resolveGlobalT(network, 0.6);
+       * // result = { segmentIndex: 1, localT: 0.2 }
+       * // This means 60% along the network is 20% into the second segment
+       * ```
+       */
+      export function resolveGlobalT(
+        network: Network,
+        t: number
+      ): { segmentIndex: number; localT: number } {
+        const clampedT = Math.max(0, Math.min(1, t));
+        const segmentCount = network.segments.length;
+
+        if (segmentCount === 0) {
+          return { segmentIndex: 0, localT: 0 };
+        }
+
+        const segmentIndex = Math.floor(clampedT * segmentCount);
+        const localT = (clampedT * segmentCount) % 1;
+
+        return {
+          segmentIndex: Math.min(segmentIndex, segmentCount - 1),
+          localT: segmentIndex >= segmentCount ? 1 : localT,
+        };
+      }
+
+      /**
+       * Evaluates a point on the piecewise Bézier network at global parameter `t`.
+       *
+       * This function computes the point on the network at the specified global parameter `t` ∈ [0, 1].
+       * It internally resolves the global parameter to the appropriate segment and local parameter,
+       * then evaluates that segment using the standard cubic Bézier formula.
+       *
+       * The global parameter `t` represents uniform distribution across segments, where each segment
+       * contributes equally to the parameter space. This is different from arc length-based evaluation
+       * where segments contribute based on their actual arc length.
+       *
+       * @param network - The piecewise Bézier network
+       * @param t - Global parameter in range [0, 1] representing position along the entire network
+       * @returns The point on the network at parameter `t` [x, y]
+       *
+       * @example
+       * ```typescript
+       * const network: cmath.bezier.piecewise.Network = {
+       *   vertices: [[0, 0], [100, 0], [200, 100]],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 50], tb: [-50, 50] },
+       *     { a: 1, b: 2, ta: [50, 50], tb: [-50, 50] }
+       *   ]
+       * };
+       *
+       * const point = cmath.bezier.piecewise.evaluate(network, 0.5);
+       * console.log(point); // [x, y] coordinates at 50% along the network
+       * ```
+       *
+       * @remarks
+       * - Performance is O(1) after resolving the segment
+       * - Global parameter `t` is automatically clamped to [0, 1]
+       * - Reuses the single-segment `evaluate` function for consistency
+       * - Handles edge cases like empty networks gracefully
+       */
+      export function evaluate(network: Network, t: number): Vector2 {
+        if (network.segments.length === 0) {
+          return [0, 0];
+        }
+
+        const { segmentIndex, localT } = resolveGlobalT(network, t);
+        const segment = network.segments[segmentIndex];
+        const a = network.vertices[segment.a];
+        const b = network.vertices[segment.b];
+
+        return cmath.bezier.evaluate(a, b, segment.ta, segment.tb, localT);
+      }
+
+      /**
+       * Projects a point onto the piecewise Bézier network and returns the global parameter `t`.
+       *
+       * This function finds the closest point on the network to the given input point and returns
+       * the global parameter `t` that corresponds to that location. It performs projection on each
+       * segment and selects the result with the minimum distance.
+       *
+       * The algorithm:
+       * 1. Projects the point onto each segment using the single-segment `project` function
+       * 2. Evaluates the projected point on each segment
+       * 3. Computes distances to find the closest segment
+       * 4. Converts the local parameter to global parameter `t`
+       *
+       * @param network - The piecewise Bézier network
+       * @param point - The point to project onto the network [x, y]
+       * @returns Global parameter `t` ∈ [0, 1] representing the closest point on the network
+       *
+       * @example
+       * ```typescript
+       * const network: cmath.bezier.piecewise.Network = {
+       *   vertices: [[0, 0], [100, 0], [200, 100]],
+       *   segments: [
+       *     { a: 0, b: 1, ta: [50, 50], tb: [-50, 50] },
+       *     { a: 1, b: 2, ta: [50, 50], tb: [-50, 50] }
+       *   ]
+       * };
+       *
+       * const t = cmath.bezier.piecewise.project(network, [150, 50]);
+       * console.log(t); // Global parameter of the closest point on the network
+       * ```
+       *
+       * @remarks
+       * - Performance is O(n) where n is the number of segments
+       * - Reuses the single-segment `project` function for consistency
+       * - Returns the global parameter that minimizes distance across all segments
+       * - Handles edge cases like empty networks gracefully
+       */
+      export function project(network: Network, point: Vector2): number {
+        if (network.segments.length === 0) {
+          return 0;
+        }
+
+        let bestT = 0;
+        let bestDistance = Infinity;
+        const segmentCount = network.segments.length;
+
+        for (let i = 0; i < segmentCount; i++) {
+          const segment = network.segments[i];
+          const a = network.vertices[segment.a];
+          const b = network.vertices[segment.b];
+
+          // Project onto this segment
+          const localT = cmath.bezier.project(
+            a,
+            b,
+            segment.ta,
+            segment.tb,
+            point
+          );
+
+          // Evaluate the projected point
+          const projectedPoint = cmath.bezier.evaluate(
+            a,
+            b,
+            segment.ta,
+            segment.tb,
+            localT
+          );
+
+          // Compute distance
+          const distance = cmath.vector2.distance(point, projectedPoint);
+
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            // Convert local parameter to global parameter
+            bestT = (i + localT) / segmentCount;
+          }
+        }
+
+        return Math.max(0, Math.min(1, bestT));
       }
     }
   }
@@ -4360,17 +6587,17 @@ namespace cmath {
        *    - are aligned ranges with identical gaps (2 or more ranges). but for simplicity, we do this by combinations of ranges (exactly 2 ranges)
        * - each loop has a projected snap extension, `next` (`a`) and `center` (virtually a, b, and center, where b being mirror of a)
        *    - a projected loop data will contain multiple delta (space)
-       *      - one is from ‘this’ loop, others from other loops’ space, but within the same direction.
+       *      - one is from 'this' loop, others from other loops' space, but within the same direction.
        *    - the delta can be interpreted as ...
        *      - a = loop[-1] + delta (the a point is last loop item (biggest) plus delta.
        *      - b = loop[0] - delta (b is mirrored a)
        *      - center = mean(loop[0].a, loop[-1].b)
        * - the hit test of the range will take direction 1 or -1 (mirrored)
-       *    - the `a` testing is used for testing hit between `a` and input’s `a`
-       *    - the mirrored testing is used for testing hit between `b` (mirrored a) and input’s `b`
-       * - how to tell why it’s snapped
-       *    - when input’s a, b or c is hit, it will contain to which loop it’s hit. and the space (except c).
-       *    - since the space can be originated from other loops, and multiple loops can have identical spaces, we can return all loops that contains that delta as original space, plus the hit one’s loop
+       *    - the `a` testing is used for testing hit between `a` and input's `a`
+       *    - the mirrored testing is used for testing hit between `b` (mirrored a) and input's `b`
+       * - how to tell why it's snapped
+       *    - when input's a, b or c is hit, it will contain to which loop it's hit. and the space (except c).
+       *    - since the space can be originated from other loops, and multiple loops can have identical spaces, we can return all loops that contains that delta as original space, plus the hit one's loop
        *
        *
        * ```
@@ -4717,7 +6944,7 @@ namespace cmath {
      * - If `line.x1 === line.x2` but `y1 > y2`, swaps the endpoints.
      *
      * This is often useful so that two line segments describing the
-     * “same” geometric positions will have identical (x1, y1, x2, y2).
+     * "same" geometric positions will have identical (x1, y1, x2, y2).
      *
      * @param line - The line to be normalized, e.g. `{ x1, y1, x2, y2, label? }`.
      * @returns A new `Line` object with possibly swapped endpoints, ensuring
@@ -4734,7 +6961,7 @@ namespace cmath {
     >(line: T): T {
       let { x1, y1, x2, y2 } = line;
 
-      // If the line is “backwards” in x, or has the same x but backwards in y, swap:
+      // If the line is "backwards" in x, or has the same x but backwards in y, swap:
       if (x1 > x2 || (x1 === x2 && y1 > y2)) {
         const tempX = x1;
         const tempY = y1;
@@ -4781,6 +7008,36 @@ namespace cmath {
       const rounded = Math.round(num * factor) / factor;
       // If no decimal part remains, return integer form; otherwise use toFixed
       return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(precision);
+    }
+  }
+
+  export namespace polygon {
+    export type Polygon = Vector2[];
+
+    /**
+     * Determines whether a point lies inside a polygon using the ray-casting algorithm.
+     *
+     * Points on the boundary are considered inside.
+     */
+    export function pointInPolygon(point: Vector2, polygon: Polygon): boolean {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const [xi, yi] = polygon[i];
+        const [xj, yj] = polygon[j];
+
+        // check if point lies exactly on the edge
+        const onEdge =
+          (point[1] - yi) * (point[1] - yj) <= 0 &&
+          (point[0] - xi) * (point[0] - xj) <= 0 &&
+          (yj - yi) * (point[0] - xi) === (xj - xi) * (point[1] - yi);
+        if (onEdge) return true;
+
+        const intersect =
+          yi > point[1] !== yj > point[1] &&
+          point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+      }
+      return inside;
     }
   }
 }

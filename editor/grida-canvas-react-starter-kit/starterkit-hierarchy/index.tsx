@@ -1,5 +1,43 @@
 "use client";
 
+/**
+ * Hierarchy UI Components for Grida Canvas Editor
+ *
+ * This module provides tree-based hierarchy components for managing scenes and nodes
+ * in the Grida Canvas editor. It includes auto-expansion and focus functionality
+ * similar to VSCode and Figma, where selecting an item automatically:
+ *
+ * 1. Expands all parent folders to make the selected item visible
+ * 2. Focuses the selected item in the tree
+ * 3. Scrolls the item into view with smooth animation
+ *
+ * Features:
+ * - UX-friendly auto-expansion that preserves user's manual expansion state
+ * - Automatic calculation of required expanded items based on selection
+ * - Smooth scrolling to bring selected items into view
+ * - Performance optimized with dependency-based updates
+ * - Consistent behavior across both scenes and node hierarchies
+ *
+ * Implementation Approach:
+ * - Uses useMemo to calculate which parent folders need to be expanded
+ * - Preserves user's manual expansion/collapse actions
+ * - Combines required expansions with user preferences
+ * - Provides immediate, predictable expansion behavior without auto-collapse
+ *
+ * UX Design Principles:
+ * - Auto-expand: Automatically expands parent folders to reveal selected items
+ * - No auto-collapse: Never collapses folders that users have manually expanded
+ * - State preservation: Maintains user's expansion preferences across selection changes
+ * - Clean design: Simple, predictable behavior that feels natural
+ *
+ * The implementation uses the headless-tree library which provides:
+ * - expandedItems state management for declarative expansion control
+ * - setExpandedItems callback to track user actions
+ * - item.setFocused() - focuses an item
+ * - item.scrollTo() - scrolls an item into view
+ * - Dependency-based state updates for optimal performance
+ */
+
 import React, {
   useState,
   useMemo,
@@ -7,7 +45,12 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
+import {
+  useCurrentEditor,
+  useEditorState,
+  useContextMenuActions,
+  ContextMenuAction,
+} from "@/grida-canvas-react";
 import {
   Tree,
   TreeDragLine,
@@ -144,6 +187,27 @@ export function ScenesList() {
     ],
   });
 
+  // Focus and scroll to selected scene when it changes
+  useEffect(() => {
+    if (!scene_id || !tree) return;
+
+    const selectedItem = tree
+      .getItems()
+      .find((item) => item.getId() === scene_id);
+
+    if (selectedItem) {
+      // Focus the selected item
+      selectedItem.setFocused();
+
+      // Scroll the item into view with smooth behavior
+      selectedItem.scrollTo({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
+    }
+  }, [scene_id, tree]);
+
   useEffect(() => {
     tree.rebuildTree();
   }, [scenes]);
@@ -201,81 +265,49 @@ function NodeHierarchyItemContextMenuWrapper({
   node_id: string;
   onStartRenaming?: () => void;
 }>) {
-  const editor = useCurrentEditor();
+  const actions = useContextMenuActions([node_id]);
+
+  const ActionItem = ({ action }: { action: ContextMenuAction }) => (
+    <ContextMenuItem
+      onSelect={action.onSelect}
+      disabled={action.disabled}
+      className="text-xs"
+    >
+      {action.label}
+      {action.shortcut && (
+        <ContextMenuShortcut>{action.shortcut}</ContextMenuShortcut>
+      )}
+    </ContextMenuItem>
+  );
 
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-52">
-        <ContextMenuItem
-          onSelect={() => {
-            editor.copy(node_id);
+        <ActionItem action={actions.copy} />
+        <ActionItem
+          action={{
+            label: "Rename",
+            onSelect: onStartRenaming || (() => {}),
+            disabled: !onStartRenaming,
           }}
-          className="text-xs"
-        >
-          Copy
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={!onStartRenaming}
-          onSelect={() => {
-            onStartRenaming?.();
-          }}
-          className="text-xs"
-        >
-          Rename
-        </ContextMenuItem>
+        />
+        <ActionItem action={actions.flatten} />
         <ContextMenuSeparator />
-        {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
-        {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
-        <ContextMenuItem
-          onSelect={() => editor.order(node_id, "front")}
-          className="text-xs"
-        >
-          Bring to front
-          <ContextMenuShortcut>{"]"}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => editor.order(node_id, "back")}
-          className="text-xs"
-        >
-          Send to back
-          <ContextMenuShortcut>{"["}</ContextMenuShortcut>
-        </ContextMenuItem>
+        <ActionItem action={actions.bringToFront} />
+        <ActionItem action={actions.sendToBack} />
         <ContextMenuSeparator />
-        {/* <ContextMenuItem>Add Container</ContextMenuItem> */}
-        <ContextMenuItem
-          onSelect={() => editor.toggleNodeActive(node_id)}
-          className="text-xs"
-        >
-          Set Active/Inactive
-          <ContextMenuShortcut>{"⌘⇧H"}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => {
-            editor.fit([node_id], { margin: 64, animate: true });
-          }}
-          className="text-xs"
-        >
-          Zoom to fit
-          <ContextMenuShortcut>{"⇧1"}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => editor.toggleNodeLocked(node_id)}
-          className="text-xs"
-        >
-          Lock/Unlock
-          <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
-        </ContextMenuItem>
+        <ActionItem action={actions.group} />
+        <ActionItem action={actions.ungroup} />
+        <ActionItem action={actions.groupWithContainer} />
+        <ActionItem action={actions.autoLayout} />
         <ContextMenuSeparator />
-        <ContextMenuItem
-          onSelect={() => {
-            editor.deleteNode(node_id);
-          }}
-          className="text-xs"
-        >
-          Delete
-          <ContextMenuShortcut>{"⌫"}</ContextMenuShortcut>
-        </ContextMenuItem>
+        <ActionItem action={actions.zoomToFit} />
+        <ContextMenuSeparator />
+        <ActionItem action={actions.toggleActive} />
+        <ActionItem action={actions.toggleLocked} />
+        <ContextMenuSeparator />
+        <ActionItem action={actions.delete} />
       </ContextMenuContent>
     </ContextMenu>
   );
@@ -288,18 +320,82 @@ export function NodeHierarchyList() {
   const { id, name, children, selection, hovered_node_id } =
     useCurrentSceneState();
 
+  // Track user's manual expansion state - preserve across selection changes
+  const [userExpandedItems, setUserExpandedItems] = useState<string[]>([]);
+
+  // Calculate which items need to be expanded to show the selected items
+  const requiredExpandedItems = useMemo(() => {
+    if (!selection.length) return [];
+
+    const expandedItems = new Set<string>();
+
+    // Helper function to get all parent IDs for a given node ID
+    const getParentIds = (nodeId: string): string[] => {
+      const parentIds: string[] = [];
+      let currentId = nodeId;
+
+      // Walk up the tree to find all parent IDs
+      while (currentId) {
+        const node = editor.state.document.nodes[currentId];
+        if (!node) break;
+
+        // Find the parent of this node
+        const parentId = Object.keys(
+          editor.state.document_ctx.__ctx_nid_to_children_ids
+        ).find((parentId) =>
+          editor.state.document_ctx.__ctx_nid_to_children_ids[
+            parentId
+          ]?.includes(currentId)
+        );
+
+        if (parentId && parentId !== "<root>") {
+          parentIds.push(parentId);
+          currentId = parentId;
+        } else {
+          break;
+        }
+      }
+
+      return parentIds;
+    };
+
+    // For each selected item, add all its parent IDs to the expanded set
+    selection.forEach((selectedId) => {
+      const parentIds = getParentIds(selectedId);
+      parentIds.forEach((parentId) => expandedItems.add(parentId));
+    });
+
+    return Array.from(expandedItems);
+  }, [
+    selection,
+    editor.state.document.nodes,
+    editor.state.document_ctx.__ctx_nid_to_children_ids,
+  ]);
+
+  // Combine user's manual expansions with required expansions
+  const allExpandedItems = useMemo(() => {
+    const combined = new Set([...userExpandedItems, ...requiredExpandedItems]);
+    return Array.from(combined);
+  }, [userExpandedItems, requiredExpandedItems]);
+
   // root item id must be "<root>"
   const tree = useTree<grida.program.nodes.Node>({
     rootItemId: "<root>",
     canReorder: true,
     initialState: {
       selectedItems: selection,
+      expandedItems: allExpandedItems,
     },
     state: {
       selectedItems: selection,
+      expandedItems: allExpandedItems,
     },
     setSelectedItems: (items) => {
       editor.select(items as string[]);
+    },
+    setExpandedItems: (items) => {
+      // Track user's manual expansion/collapse actions
+      setUserExpandedItems(items);
     },
     getItemName: (item) => {
       if (item.getId() === "<root>") {
@@ -337,6 +433,41 @@ export function NodeHierarchyList() {
       renamingFeature,
     ],
   });
+
+  // Initialize user expanded items from the tree's current state when it's first available
+  useEffect(() => {
+    if (tree && userExpandedItems.length === 0) {
+      // Get all currently expanded items from the tree
+      const currentExpanded = tree
+        .getItems()
+        .filter((item) => item.isExpanded())
+        .map((item) => item.getId());
+      setUserExpandedItems(currentExpanded);
+    }
+  }, [tree, userExpandedItems.length]);
+
+  // Focus and scroll to selected items when they become available
+  useEffect(() => {
+    if (!selection.length || !tree) return;
+
+    // Get the first selected item
+    const selectedItemId = selection[0];
+    const selectedItem = tree
+      .getItems()
+      .find((item) => item.getId() === selectedItemId);
+
+    if (selectedItem) {
+      // Focus the selected item
+      selectedItem.setFocused();
+
+      // Scroll the item into view with smooth behavior
+      selectedItem.scrollTo({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
+    }
+  }, [selection, tree, allExpandedItems]);
 
   useEffect(() => {
     tree.rebuildTree();

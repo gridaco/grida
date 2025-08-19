@@ -114,6 +114,7 @@ export type EnumItem<T extends string> =
       label?: string;
       value: T;
       disabled?: boolean;
+      title?: string;
     };
 
 export function enumLabel<T extends string>(e: EnumItem<T>) {
@@ -134,18 +135,23 @@ export function PropertyEnum<T extends string>({
   enum: enums,
   placeholder,
   value,
+  tabIndex,
   ...props
 }: Omit<React.ComponentProps<typeof Select>, "value" | "onValueChange"> & {
   enum: EnumItem<T>[];
   value?: TMixed<T>;
   placeholder?: string;
   onValueChange?: (value: T) => void;
+  tabIndex?: number;
 }) {
   const mixed = value === grida.mixed;
   const hasIcon = enums.some((e) => typeof e !== "string" && e.icon);
   return (
     <Select value={mixed ? undefined : value} {...props}>
-      <SelectTrigger className={cn(WorkbenchUI.inputVariants({ size: "xs" }))}>
+      <SelectTrigger
+        tabIndex={tabIndex}
+        className={cn(WorkbenchUI.inputVariants({ size: "xs" }))}
+      >
         <SelectValue placeholder={mixed ? "mixed" : placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -241,18 +247,18 @@ export function PropertyEnumTabs<T extends string>({
           const value = typeof e === "string" ? e : e.value;
           const label = typeof e === "string" ? e : e.label;
           const icon = typeof e === "string" ? undefined : e.icon;
+          const title = typeof e === "string" ? undefined : e.title;
           const hasIcon = typeof e === "string" ? false : !!e.icon;
           const disabled = typeof e === "string" ? false : e.disabled;
           return (
             <TabsTrigger
               key={value}
               value={value}
-              title={label}
+              title={title}
               disabled={disabled}
               className="text-xs p-0.5"
             >
-              {hasIcon && icon && <>{icon}</>}
-              {label ?? value}
+              {hasIcon && icon ? <>{icon}</> : (label ?? value)}
             </TabsTrigger>
           );
         })}

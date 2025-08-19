@@ -3,7 +3,6 @@
   "description": "turbo ci rust wrapper",
   "private": true,
   "scripts": {
-    "build": "cargo build --release",
-    "test": "cargo test"
+    "build": "cargo build --release"
   }
 }

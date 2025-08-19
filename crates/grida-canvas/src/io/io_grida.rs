@@ -1,6 +1,7 @@
 use crate::cg::types::*;
+use crate::cg::varwidth::{VarWidthProfile, WidthStop};
 use crate::node::schema::*;
-use crate::shape::*;
+use crate::vectornetwork::*;
 use math2::transform::AffineTransform;
 use serde::Deserialize;
 use serde_json::Value;
@@ -91,6 +92,17 @@ pub struct JSONRGBA {
     pub g: u8,
     pub b: u8,
     pub a: f32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct JSONVarWidthStop {
+    pub u: f32,
+    pub r: f32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct JSONVariableWidthProfile {
+    pub stops: Vec<JSONVarWidthStop>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,6 +199,24 @@ impl From<Option<JSONPaint>> for Paint {
     }
 }
 
+impl From<JSONVariableWidthProfile> for VarWidthProfile {
+    fn from(profile: JSONVariableWidthProfile) -> Self {
+        VarWidthProfile {
+            base: 1.0, // TODO: need to use node's stroke width as base
+            stops: profile.stops.into_iter().map(|s| s.into()).collect(),
+        }
+    }
+}
+
+impl From<JSONVarWidthStop> for WidthStop {
+    fn from(stop: JSONVarWidthStop) -> Self {
+        WidthStop {
+            u: stop.u,
+            r: stop.r,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct JSONScene {
     pub id: String,
@@ -233,10 +263,18 @@ pub struct JSONUnknownNodeProperties {
     pub border: Option<CSSBorder>,
     #[serde(rename = "style")]
     pub style: Option<HashMap<String, serde_json::Value>>,
-    // geometry
-    #[serde(rename = "width", deserialize_with = "de_css_length")]
+    // geometry - defaults to 0 for non-intrinsic size nodes
+    #[serde(
+        rename = "width",
+        default = "default_width",
+        deserialize_with = "de_css_length"
+    )]
     pub width: f32,
-    #[serde(rename = "height", deserialize_with = "de_css_length")]
+    #[serde(
+        rename = "height",
+        default = "default_height",
+        deserialize_with = "de_css_length"
+    )]
     pub height: f32,
 
     #[serde(rename = "cornerRadius", default)]
@@ -272,6 +310,8 @@ pub struct JSONUnknownNodeProperties {
     // stroke
     #[serde(rename = "strokeWidth", default = "default_stroke_width")]
     pub stroke_width: f32,
+    #[serde(rename = "strokeWidthProfile")]
+    pub stroke_width_profile: Option<JSONVariableWidthProfile>,
     #[serde(rename = "strokeAlign")]
     pub stroke_align: Option<StrokeAlign>,
     #[serde(rename = "strokeCap")]
@@ -293,12 +333,14 @@ pub struct JSONUnknownNodeProperties {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 pub enum JSONNode {
+    #[serde(rename = "group")]
+    Group(JSONGroupNode),
     #[serde(rename = "container")]
     Container(JSONContainerNode),
+    #[serde(rename = "svgpath")]
+    SVGPath(JSONSVGPathNode),
     #[serde(rename = "vector")]
-    Vector(JSONLegacyVectorNode),
-    #[serde(rename = "path")]
-    Path(JSONPathNode),
+    Path(JSONVectorNode),
     #[serde(rename = "ellipse")]
     Ellipse(JSONEllipseNode),
     #[serde(rename = "rectangle")]
@@ -311,6 +353,8 @@ pub enum JSONNode {
     Line(JSONLineNode),
     #[serde(rename = "text")]
     Text(JSONTextNode),
+    #[serde(rename = "boolean")]
+    BooleanOperation(JSONBooleanOperationNode),
     Unknown(JSONUnknownNodeProperties),
 }
 
@@ -339,6 +383,17 @@ pub struct JSONContainerNode {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct JSONGroupNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "expanded")]
+    pub expanded: Option<bool>,
+    #[serde(rename = "children")]
+    pub children: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct JSONTextNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
@@ -363,24 +418,21 @@ pub struct JSONTextNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JSONLegacyVectorNode {
+pub struct JSONSVGPathNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
     pub paths: Option<Vec<JSONSVGPath>>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct JSONVectorNetworkVertex {
-    pub p: [f32; 2],
-}
+pub type JSONVectorNetworkVertex = (f32, f32);
 
 #[derive(Debug, Deserialize)]
 pub struct JSONVectorNetworkSegment {
     pub a: usize,
     pub b: usize,
-    pub ta: [f32; 2],
-    pub tb: [f32; 2],
+    pub ta: Option<(f32, f32)>,
+    pub tb: Option<(f32, f32)>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -394,17 +446,18 @@ pub struct JSONVectorNetwork {
 impl From<JSONVectorNetwork> for VectorNetwork {
     fn from(network: JSONVectorNetwork) -> Self {
         VectorNetwork {
-            vertices: network.vertices.into_iter().map(|v| v.p).collect(),
+            vertices: network.vertices.into_iter().map(|v| (v.0, v.1)).collect(),
             segments: network
                 .segments
                 .into_iter()
                 .map(|s| VectorNetworkSegment {
                     a: s.a,
                     b: s.b,
-                    ta: Some(s.ta),
-                    tb: Some(s.tb),
+                    ta: s.ta,
+                    tb: s.tb,
                 })
                 .collect(),
+            regions: vec![],
         }
     }
 }
@@ -416,7 +469,7 @@ pub struct JSONLineNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JSONPathNode {
+pub struct JSONVectorNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
@@ -469,6 +522,18 @@ pub struct JSONRegularStarPolygonNode {
     pub inner_radius: f32,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct JSONBooleanOperationNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "op")]
+    pub op: BooleanPathOperation,
+
+    #[serde(rename = "children")]
+    pub children: Vec<String>,
+}
+
 // Default value functions
 fn default_active() -> bool {
     true
@@ -484,6 +549,12 @@ fn default_rotation() -> f32 {
 }
 fn default_z_index() -> i32 {
     0
+}
+fn default_width() -> f32 {
+    0.0
+}
+fn default_height() -> f32 {
+    0.0
 }
 fn default_text_align() -> TextAlign {
     TextAlign::Left
@@ -505,13 +576,42 @@ pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
     serde_json::from_str(file)
 }
 
+impl From<JSONGroupNode> for GroupNode {
+    fn from(node: JSONGroupNode) -> Self {
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
+
+        GroupNode {
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
+            // TODO: group's transform should be handled differently
+            transform: Some(transform),
+            children: node.children.unwrap_or_default(),
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+        }
+    }
+}
+
 impl From<JSONContainerNode> for ContainerNode {
     fn from(node: JSONContainerNode) -> Self {
         ContainerNode {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
+            transform: AffineTransform::from_box_center(
+                node.base.left,
+                node.base.top,
+                node.base.width,
+                node.base.height,
+                node.base.rotation,
+            ),
             size: Size {
                 width: node.base.width,
                 height: node.base.height,
@@ -549,7 +649,13 @@ impl From<JSONTextNode> for TextSpanNode {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform: AffineTransform::new(node.base.left, node.base.top, node.base.rotation),
+            transform: AffineTransform::from_box_center(
+                node.base.left,
+                node.base.top,
+                node.base.width,
+                node.base.height,
+                node.base.rotation,
+            ),
             size: Size { width, height },
             text: node.text,
             text_style: TextStyle {
@@ -581,7 +687,13 @@ impl From<JSONTextNode> for TextSpanNode {
 
 impl From<JSONEllipseNode> for Node {
     fn from(node: JSONEllipseNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::Ellipse(EllipseNode {
             id: node.base.id,
@@ -615,7 +727,13 @@ impl From<JSONEllipseNode> for Node {
 
 impl From<JSONRectangleNode> for Node {
     fn from(node: JSONRectangleNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::Rectangle(RectangleNode {
             id: node.base.id,
@@ -651,7 +769,13 @@ impl From<JSONRectangleNode> for Node {
 
 impl From<JSONRegularPolygonNode> for Node {
     fn from(node: JSONRegularPolygonNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::RegularPolygon(RegularPolygonNode {
             id: node.base.id,
@@ -682,7 +806,13 @@ impl From<JSONRegularPolygonNode> for Node {
 
 impl From<JSONRegularStarPolygonNode> for Node {
     fn from(node: JSONRegularStarPolygonNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::RegularStarPolygon(RegularStarPolygonNode {
             id: node.base.id,
@@ -712,9 +842,15 @@ impl From<JSONRegularStarPolygonNode> for Node {
     }
 }
 
-impl From<JSONLegacyVectorNode> for Node {
-    fn from(node: JSONLegacyVectorNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+impl From<JSONSVGPathNode> for Node {
+    fn from(node: JSONSVGPathNode) -> Self {
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         // For vector nodes, we'll create a path node with the path data
         Node::SVGPath(SVGPathNode {
@@ -747,7 +883,13 @@ impl From<JSONLegacyVectorNode> for Node {
 
 impl From<JSONLineNode> for Node {
     fn from(node: JSONLineNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
 
         Node::Line(LineNode {
             id: node.base.id,
@@ -773,19 +915,33 @@ impl From<JSONLineNode> for Node {
     }
 }
 
-impl From<JSONPathNode> for Node {
-    fn from(node: JSONPathNode) -> Self {
-        let transform = AffineTransform::new(node.base.left, node.base.top, node.base.rotation);
+impl From<JSONVectorNode> for Node {
+    fn from(node: JSONVectorNode) -> Self {
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
+
+        let network = node
+            .vector_network
+            .or(node.base.vector_network)
+            .map(|vn| vn.into())
+            .unwrap_or_default();
 
         Node::Vector(VectorNode {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
             transform,
+            network,
+            corner_radius: node.base.corner_radius.unwrap_or(0.0),
             fill: Some(node.base.fill.into()),
-            network: node.vector_network.map(|vn| vn.into()).unwrap_or_default(),
             strokes: vec![node.base.stroke.into()],
             stroke_width: node.base.stroke_width,
+            stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             blend_mode: node.base.blend_mode,
@@ -799,18 +955,55 @@ impl From<JSONPathNode> for Node {
     }
 }
 
+impl From<JSONBooleanOperationNode> for Node {
+    fn from(node: JSONBooleanOperationNode) -> Self {
+        // TODO: boolean operation's transform should be handled differently
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
+
+        Node::BooleanOperation(BooleanPathOperationNode {
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
+            transform: Some(transform),
+            op: node.op,
+            corner_radius: node.base.corner_radius,
+            children: node.children,
+            fill: node.base.fill.into(),
+            stroke: node.base.stroke.map(|s| Paint::from(Some(s))),
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+        })
+    }
+}
+
 impl From<JSONNode> for Node {
     fn from(node: JSONNode) -> Self {
         match node {
+            JSONNode::Group(group) => Node::Group(group.into()),
             JSONNode::Container(container) => Node::Container(container.into()),
             JSONNode::Text(text) => Node::TextSpan(text.into()),
-            JSONNode::Vector(vector) => vector.into(),
+            JSONNode::SVGPath(vector) => vector.into(),
             JSONNode::Path(path) => path.into(),
             JSONNode::Ellipse(ellipse) => ellipse.into(),
             JSONNode::Rectangle(rectangle) => rectangle.into(),
             JSONNode::RegularPolygon(rpolygon) => rpolygon.into(),
             JSONNode::RegularStarPolygon(rsp) => rsp.into(),
             JSONNode::Line(line) => line.into(),
+            JSONNode::BooleanOperation(boolean) => boolean.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNode {
                 id: unknown.id,
                 name: unknown.name,
@@ -926,10 +1119,142 @@ mod tests {
         };
         let parsed: JSONCanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
 
-        assert_eq!(parsed.version, "0.0.1-beta.1+20250303");
+        assert_eq!(parsed.version, "0.0.1-beta.1+20250728");
         assert!(
             !parsed.document.nodes.is_empty(),
             "nodes should not be empty"
         );
+    }
+
+    #[test]
+    fn deserialize_boolean_operation_node() {
+        let json = r#"{
+            "id": "boolean-1",
+            "name": "Boolean Operation",
+            "type": "boolean",
+            "operation": "union",
+            "children": ["child-1", "child-2"],
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": 200.0,
+            "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("failed to deserialize BooleanOperationNode");
+
+        match node {
+            JSONNode::BooleanOperation(boolean_node) => {
+                assert_eq!(boolean_node.base.id, "boolean-1");
+                assert_eq!(
+                    boolean_node.base.name,
+                    Some("Boolean Operation".to_string())
+                );
+                assert_eq!(boolean_node.op, BooleanPathOperation::Union);
+                assert_eq!(boolean_node.children, vec!["child-1", "child-2"]);
+                assert_eq!(boolean_node.base.left, 100.0);
+                assert_eq!(boolean_node.base.top, 100.0);
+                assert_eq!(boolean_node.base.width, 200.0);
+                assert_eq!(boolean_node.base.height, 200.0);
+            }
+            _ => panic!("Expected BooleanOperation node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_json_vector_network() {
+        // Test with a simple vector network
+        let json = r#"{
+            "vertices": [
+                [0.0, 0.0],
+                [100.0, 0.0],
+                [100.0, 100.0],
+                [0.0, 100.0]
+            ],
+            "segments": [
+                {"a": 0, "b": 1},
+                {"a": 1, "b": 2},
+                {"a": 2, "b": 3},
+                {"a": 3, "b": 0}
+            ]
+        }"#;
+
+        let network: JSONVectorNetwork =
+            serde_json::from_str(json).expect("failed to deserialize JSONVectorNetwork");
+
+        assert_eq!(network.vertices.len(), 4);
+        assert_eq!(network.segments.len(), 4);
+
+        // Check vertices
+        assert_eq!(network.vertices[0], (0.0, 0.0));
+        assert_eq!(network.vertices[1], (100.0, 0.0));
+        assert_eq!(network.vertices[2], (100.0, 100.0));
+        assert_eq!(network.vertices[3], (0.0, 100.0));
+
+        // Check segments
+        assert_eq!(network.segments[0].a, 0);
+        assert_eq!(network.segments[0].b, 1);
+        assert_eq!(network.segments[1].a, 1);
+        assert_eq!(network.segments[1].b, 2);
+        assert_eq!(network.segments[2].a, 2);
+        assert_eq!(network.segments[2].b, 3);
+        assert_eq!(network.segments[3].a, 3);
+        assert_eq!(network.segments[3].b, 0);
+    }
+
+    #[test]
+    fn deserialize_json_vector_network_with_tangents() {
+        // Test with segments that have tangent handles
+        let json = r#"{
+            "vertices": [
+                [0.0, 0.0],
+                [100.0, 100.0]
+            ],
+            "segments": [
+                {"a": 0, "b": 1, "ta": [10.0, -10.0], "tb": [-10.0, 10.0]}
+            ]
+        }"#;
+
+        let network: JSONVectorNetwork = serde_json::from_str(json)
+            .expect("failed to deserialize JSONVectorNetwork with tangents");
+
+        assert_eq!(network.vertices.len(), 2);
+        assert_eq!(network.segments.len(), 1);
+
+        // Check tangent handles
+        assert_eq!(network.segments[0].ta, Some((10.0, -10.0)));
+        assert_eq!(network.segments[0].tb, Some((-10.0, 10.0)));
+    }
+
+    #[test]
+    fn deserialize_json_vector_network_empty() {
+        // Test with empty vectors (should use defaults)
+        let json = r#"{}"#;
+
+        let network: JSONVectorNetwork =
+            serde_json::from_str(json).expect("failed to deserialize empty JSONVectorNetwork");
+
+        assert_eq!(network.vertices.len(), 0);
+        assert_eq!(network.segments.len(), 0);
+    }
+
+    #[test]
+    fn deserialize_json_vector_network_partial() {
+        // Test with only vertices, no segments
+        let json = r#"{
+            "vertices": [
+                [0.0, 0.0],
+                [50.0, 50.0]
+            ]
+        }"#;
+
+        let network: JSONVectorNetwork =
+            serde_json::from_str(json).expect("failed to deserialize partial JSONVectorNetwork");
+
+        assert_eq!(network.vertices.len(), 2);
+        assert_eq!(network.segments.len(), 0);
+        assert_eq!(network.vertices[0], (0.0, 0.0));
+        assert_eq!(network.vertices[1], (50.0, 50.0));
     }
 }

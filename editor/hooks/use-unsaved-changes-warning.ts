@@ -28,7 +28,19 @@ export function useUnsavedChangesWarning(
       const target = e.target as HTMLElement;
       const link = target.closest("a[href]");
 
-      if (link && isDirty() && !window.confirm(message)) {
+      if (!link) return;
+
+      const targetAttr = link.getAttribute("target");
+      const isModifiedClick =
+        e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
+
+      // Only warn when navigating within the current tab/window
+      if (
+        isDirty() &&
+        !isModifiedClick &&
+        (!targetAttr || targetAttr === "_self") &&
+        !window.confirm(message)
+      ) {
         e.preventDefault();
         router.push(window.location.href);
       }

@@ -19,24 +19,62 @@ import nid from "../tools/id";
 import type { ReducerContext } from "..";
 
 /**
- * Cardinal direction vector
- *
- * - `n -> [0, -1]`
- * - `e -> [1, 0]`
- * - `s -> [0, 1]`
- * - `w -> [-1, 0]`
- * - ... and so on
+ * Determines if a node type allows hierarchy changes during translation.
+ * Container nodes allow children to escape/enter during translation.
+ * Group and boolean nodes do not allow hierarchy changes - children must stay within their parent.
  */
-const cardinal_direction_vector = {
-  nw: [-1, -1] as cmath.Vector2,
-  ne: [1, -1] as cmath.Vector2,
-  sw: [-1, 1] as cmath.Vector2,
-  se: [1, 1] as cmath.Vector2,
-  n: [0, -1] as cmath.Vector2,
-  e: [1, 0] as cmath.Vector2,
-  s: [0, 1] as cmath.Vector2,
-  w: [-1, 0] as cmath.Vector2,
-} as const;
+function allows_hierarchy_change(
+  node_type: grida.program.nodes.NodeType
+): boolean {
+  switch (node_type) {
+    case "container":
+      return true;
+    case "group":
+    case "boolean":
+      return false;
+    default:
+      return false;
+  }
+}
+
+export function self_nudge_transform<S extends editor.state.IEditorState>(
+  draft: Draft<S>,
+  targets: string[],
+  dx: number,
+  dy: number,
+  context: ReducerContext
+) {
+  // clear the previous surface snapping
+  draft.surface_snapping = undefined;
+
+  // for nudge, gesture is not required, but only for surface ux.
+  if (draft.gesture.type === "nudge") {
+    const snap_target_node_ids = getSnapTargets(draft.selection, draft);
+    const snap_target_node_rects = snap_target_node_ids.map(
+      (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
+    );
+    const origin_rects = targets.map(
+      (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
+    );
+    const { snapping } = snapObjectsTranslation(
+      origin_rects,
+      { objects: snap_target_node_rects },
+      [dx, dy],
+      editor.config.DEFAULT_SNAP_NUDGE_THRESHOLD
+    );
+    draft.surface_snapping = snapping;
+  }
+
+  for (const node_id of targets) {
+    const node = dq.__getNodeById(draft, node_id);
+
+    draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      type: "translate",
+      dx: dx,
+      dy: dy,
+    });
+  }
+}
 
 export function self_update_gesture_transform<
   S extends editor.state.IEditorState,
@@ -45,7 +83,7 @@ export function self_update_gesture_transform<
   if (draft.gesture.type === "draw") return;
   if (draft.gesture.type === "corner-radius") return;
   if (draft.gesture.type === "nudge") return; // nudge is not a transform gesture - only a virtual gesture
-  if (draft.gesture.type === "translate-vertex") return;
+  if (draft.gesture.type === "translate-vector-controls") return;
   if (draft.gesture.type === "curve") return;
   if (draft.gesture.type === "gap") return;
   if (draft.gesture.type === "brush") return;
@@ -58,6 +96,7 @@ export function self_update_gesture_transform<
     case "sort": {
       return __self_update_gesture_transform_translate_sort(draft);
     }
+    case "insert-and-resize":
     case "scale": {
       return __self_update_gesture_transform_scale(draft, context);
     }
@@ -89,7 +128,10 @@ function __self_update_gesture_transform_translate(
     translate_with_clone,
     tarnslate_with_axis_lock,
     translate_with_hierarchy_change,
+    translate_with_force_disable_snap: __translate_with_force_disable_snap,
   } = draft.gesture_modifiers;
+
+  const should_snap = __translate_with_force_disable_snap !== "on";
 
   // TODO: translate_with_clone - move it somewhere else
   // FIXME: this does not respect the hierarchy and relative position
@@ -218,7 +260,7 @@ function __self_update_gesture_transform_translate(
 
         const node = dq.__getNodeById(draft, node_id);
         // [2]
-        if (node.type !== "container") return false;
+        if (!allows_hierarchy_change(node.type)) return false;
 
         return true;
       });
@@ -232,6 +274,15 @@ function __self_update_gesture_transform_translate(
         //
         const prev_parent_id = dq.getParentId(draft.document_ctx, node_id);
         if (prev_parent_id === new_parent_id) return;
+
+        // Check if the current parent allows hierarchy changes
+        if (prev_parent_id) {
+          const current_parent = dq.__getNodeById(draft, prev_parent_id);
+          if (!allows_hierarchy_change(current_parent.type)) {
+            // Current parent doesn't allow hierarchy changes, so prevent escaping
+            return;
+          }
+        }
 
         is_parent_changed = true;
 
@@ -299,7 +350,8 @@ function __self_update_gesture_transform_translate(
     threshold(
       editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
       draft.transform
-    )
+    ),
+    should_snap
   );
 
   draft.surface_snapping = snapping;
@@ -438,7 +490,11 @@ function __self_update_gesture_transform_scale(
   draft: Draft<editor.state.IEditorState>,
   context: ReducerContext
 ) {
-  assert(draft.gesture.type === "scale", "Gesture type must be scale");
+  assert(
+    draft.gesture.type === "scale" ||
+      draft.gesture.type === "insert-and-resize",
+    "Gesture type must be scale or insert-and-resize"
+  );
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.scenes[draft.scene_id];
   const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =
@@ -500,7 +556,7 @@ function __self_update_gesture_transform_scale(
 
   // inverse the delta based on handle
   const movement = cmath.vector2.multiply(
-    cardinal_direction_vector[direction],
+    cmath.compass.cardinal_direction_vector[direction],
     rawMovement,
     transform_with_center_origin === "on" ? [2, 2] : [1, 1]
   );
@@ -559,7 +615,7 @@ function __self_update_gesture_transform_scale(
       });
     }
 
-    if (node.type === "path") {
+    if (node.type === "vector") {
       // TODO: mrege with the above
       const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
       const scale = cmath.rect.getScaleFactors(initial_rect, {
@@ -570,7 +626,7 @@ function __self_update_gesture_transform_scale(
       });
       vne.scale(scale);
       (
-        draft.document.nodes[node_id] as grida.program.nodes.PathNode
+        draft.document.nodes[node_id] as grida.program.nodes.VectorNode
       ).vectorNetwork = vne.value;
       //
     }

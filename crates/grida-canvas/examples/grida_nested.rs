@@ -30,11 +30,11 @@ async fn demo_nested() -> Scene {
             // Create group with rotation transform
             let mut group = nf.create_group_node();
             group.name = Some(format!("Group {}", i));
-            group.transform = AffineTransform::new(
+            group.transform = Some(AffineTransform::new(
                 50.0 * (i as f32 + 1.0), // x offset
                 50.0 * (i as f32 + 1.0), // y offset
                 0.0,
-            );
+            ));
 
             // Add a rectangle to the group
             let mut group_rect = nf.create_rectangle_node();

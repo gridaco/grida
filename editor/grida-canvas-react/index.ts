@@ -22,3 +22,8 @@ export {
   type StandaloneDocumentContentProps,
 } from "./renderer";
 export * from "./viewport";
+export {
+  useContextMenuActions,
+  type ContextMenuAction,
+  type ContextMenuActions,
+} from "./use-context-menu-actions";

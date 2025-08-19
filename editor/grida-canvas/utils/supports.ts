@@ -8,7 +8,7 @@ type Renderer =
   | "grida-canvas-dom"
   | "grida-canvas-dom-svg";
 
-type Feature =
+type NodeFeatureProperty =
   | "arcData"
   | "cornerRadius"
   | "cornerRadius4"
@@ -16,7 +16,9 @@ type Feature =
   | "children"
   | "stroke"
   | "feDropShadow"
-  | "strokeCap";
+  | "strokeCap"
+  | "pointCount"
+  | "boolean";
 
 type INodePropertiesConfig = {
   opacity: boolean;
@@ -48,8 +50,8 @@ const GRIDA_TCANVAS_RECTANGLE_NODE: INodePropertiesConfig = {
   },
 };
 
-const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
-  arcData: ["ellipse"],
+const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
+  arcData: [],
   cornerRadius: [
     "rectangle",
     "image",
@@ -68,15 +70,17 @@ const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
   ],
   border: ["container", "component", "instance", "image", "video"],
   children: ["container", "component", "instance"],
-  stroke: ["path", "line", "rectangle", "ellipse"],
+  stroke: ["vector", "line", "rectangle", "ellipse", "polygon", "star"],
   feDropShadow: ["container", "component", "instance"],
   /**
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
    */
-  strokeCap: ["path", "line"],
+  strokeCap: ["vector", "line"],
+  pointCount: ["polygon", "star"],
+  boolean: [],
 } as const;
 
-const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
+const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   arcData: ["ellipse"],
   cornerRadius: [
     "rectangle",
@@ -84,9 +88,11 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "star",
     "image",
     "video",
+    "vector",
     "container",
     "component",
     "instance",
+    "boolean",
   ],
   cornerRadius4: [
     "rectangle",
@@ -97,14 +103,14 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "instance",
   ],
   border: [],
-  children: ["container", "component", "instance"],
+  children: ["container", "component", "instance", "boolean"],
   stroke: [
     "container",
     "rectangle",
     "image",
     "video",
     "container",
-    "path",
+    "vector",
     "line",
     "rectangle",
     "ellipse",
@@ -112,6 +118,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "star",
     "component",
     "instance",
+    "boolean",
   ],
   feDropShadow: [
     "container",
@@ -119,7 +126,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "image",
     "video",
     "instance",
-    "path",
+    "vector",
     "line",
     "rectangle",
     "ellipse",
@@ -127,8 +134,11 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
     "star",
     "container",
     "component",
+    "boolean",
   ],
-  strokeCap: ["path", "line"],
+  strokeCap: ["vector", "line"],
+  pointCount: ["polygon", "star"],
+  boolean: ["boolean", "rectangle", "polygon", "star"],
 } as const;
 
 type Context = {
@@ -198,6 +208,14 @@ export namespace supports {
         return dom_supports.feDropShadow.includes(type);
       case "canvas":
         return canvas_supports.feDropShadow.includes(type);
+    }
+  };
+  export const pointCount = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.pointCount.includes(type);
+      case "canvas":
+        return canvas_supports.pointCount.includes(type);
     }
   };
 }

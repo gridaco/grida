@@ -14,7 +14,9 @@ import {
   MixIcon,
   VideoIcon,
   GlobeIcon,
+  GroupIcon,
 } from "@radix-ui/react-icons";
+import { SquaresUniteIcon } from "lucide-react";
 
 export function NodeTypeIcon({
   className,
@@ -54,12 +56,16 @@ export function NodeTypeIcon({
       return <BoxIcon className={className} />;
     case "ellipse":
       return <CircleIcon className={className} />;
-    case "vector":
+    case "svgpath":
     case "line":
-    case "path":
+    case "vector":
       return <TransformIcon className={className} />;
     case "bitmap":
       return <TransparencyGridIcon className={className} />;
+    case "group":
+      return <GroupIcon className={className} />;
+    case "boolean":
+      return <SquaresUniteIcon className={className} />;
   }
   return <BoxIcon className={className} />;
 }

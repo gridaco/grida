@@ -7,9 +7,20 @@ import assert from "assert";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
-import { self_clearSelection, self_selectNode } from "./methods";
+import vn from "@grida/vn";
+import {
+  self_clearSelection,
+  self_selectNode,
+  encodeTranslateVectorCommand,
+  self_flattenNode,
+  self_optimizeVectorNetwork,
+  self_try_remove_node,
+  self_select_tool,
+  self_revert_tool,
+} from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
+import equal from "fast-deep-equal";
 
 function createLayoutSnapshot(
   state: editor.state.IEditorState,
@@ -86,9 +97,79 @@ function __self_try_content_edit_mode_fill_gradient(
   };
 }
 
+export function __self_try_enter_content_edit_mode_vector(
+  draft: editor.state.IEditorState,
+  node_id: string,
+  context: ReducerContext
+) {
+  const node = dq.__getNodeById(draft, node_id);
+  const nodeSnapshot: grida.program.nodes.UnknwonNode = JSON.parse(
+    JSON.stringify(node)
+  );
+
+  switch (node.type) {
+    case "vector": {
+      draft.content_edit_mode = {
+        type: "vector",
+        node_id: node_id,
+        selection: {
+          selected_vertices: [],
+          selected_segments: [],
+          selected_tangents: [],
+        },
+        a_point: null,
+        next_ta: null,
+        initial_vector_network: node.vectorNetwork,
+        original: nodeSnapshot,
+        selection_neighbouring_vertices: [],
+        cursor: draft.pointer.position,
+        clipboard: null,
+        clipboard_node_position: null,
+        hovered_control: null,
+        snapped_vertex_idx: null,
+        snapped_segment_p: null,
+      };
+      break;
+    }
+    // primitive shapes
+    case "rectangle":
+    case "star":
+    case "polygon":
+    case "ellipse":
+    case "line": {
+      const flattened = self_flattenNode(draft, node_id, context);
+      if (!flattened) return;
+      const { node: vectornode } = flattened;
+      draft.content_edit_mode = {
+        type: "vector",
+        node_id: node_id,
+        selection: {
+          selected_vertices: [],
+          selected_segments: [],
+          selected_tangents: [],
+        },
+        a_point: null,
+        next_ta: null,
+        initial_vector_network: vectornode.vectorNetwork,
+        original: nodeSnapshot,
+        selection_neighbouring_vertices: [],
+        cursor: draft.pointer.position,
+        clipboard: null,
+        clipboard_node_position: null,
+        hovered_control: null,
+        snapped_vertex_idx: null,
+        snapped_segment_p: null,
+      };
+
+      break;
+    }
+  }
+}
+
 function __self_try_enter_content_edit_mode_auto(
   draft: editor.state.IEditorState,
-  node_id: string
+  node_id: string,
+  context: ReducerContext
 ) {
   const node = dq.__getNodeById(draft, node_id);
 
@@ -103,17 +184,15 @@ function __self_try_enter_content_edit_mode_auto(
       };
       break;
     }
-    // case "vector":
-    case "path": {
-      draft.content_edit_mode = {
-        type: "path",
-        node_id: node_id,
-        selected_vertices: [],
-        a_point: null,
-        next_ta: null,
-        path_cursor_position: draft.pointer.position,
-      };
-      break;
+    // case "svgpath":
+    case "vector":
+    // primitive shapes
+    case "rectangle":
+    case "star":
+    case "polygon":
+    case "ellipse":
+    case "line": {
+      return __self_try_enter_content_edit_mode_vector(draft, node_id, context);
     }
     case "bitmap": {
       const node = dq.__getNodeById(
@@ -125,64 +204,102 @@ function __self_try_enter_content_edit_mode_auto(
         node_id: node.id,
         imageRef: node.imageRef,
       };
-      draft.tool = {
-        type: "brush",
-      };
+      self_select_tool(
+        draft,
+        {
+          type: "brush",
+        },
+        context
+      );
       self_clearSelection(draft);
       break;
     }
   }
 }
 
-function __self_try_exit_content_edit_mode(draft: editor.state.IEditorState) {
-  draft.content_edit_mode = undefined;
-  draft.tool = { type: "cursor" };
+function __try_restore_vector_mode_original_node(
+  draft: Draft<editor.state.IEditorState>,
+  mode: editor.state.VectorContentEditMode
+) {
+  if (!mode.original) return;
+
+  const current = dq.__getNodeById(
+    draft,
+    mode.node_id
+  ) as grida.program.nodes.VectorNode;
+
+  const dirty = !equal(mode.initial_vector_network, current.vectorNetwork);
+  if (dirty) return;
+
+  draft.document.nodes[mode.node_id] = {
+    ...mode.original,
+    // TODO: need to implement this by having the initial xy position and comparing that diff.
+    // // while the vector data itself is not changed, the position of the node may have been changed. - keep that.
+    // // this happens when translating the node, by dragging the region. - when even the data is translated, it's 0,0 relative, so the data itself may be identical.
+    // left: current.left,
+    // top: current.top,
+  } as grida.program.nodes.Node;
+  //
 }
 
-function __self_set_tool(
-  draft: editor.state.IEditorState,
-  tool: editor.state.ToolMode
+/**
+ * For vector edit mode, if no edits were performed, the node is restored to the
+ * original primitive node that existed before entering the mode.
+ */
+function __self_before_exit_content_edit_mode(
+  draft: Draft<editor.state.IEditorState>
 ) {
-  if (
-    draft.flags.__unstable_brush_tool !== "on" &&
-    (tool.type === "brush" || tool.type === "eraser")
-  ) {
-    console.warn("unstable brush tool is not enabled");
-    return;
-  }
+  const mode = draft.content_edit_mode;
 
-  const path_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
-    "cursor",
-    "hand",
-    "path",
-  ];
-  const text_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
-    "cursor",
-  ];
-  const bitmap_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
-    "brush",
-    "eraser",
-    "flood-fill",
-  ];
+  switch (mode?.type) {
+    case "vector": {
+      // optimize the vector network before exiting the mode.
+      self_optimizeVectorNetwork(draft);
+      // restore the original node if no changes were made.
+      __try_restore_vector_mode_original_node(draft, mode);
 
-  // validate cursor mode
-  if (draft.content_edit_mode) {
-    switch (draft.content_edit_mode.type) {
-      case "path":
-        if (!path_edit_mode_valid_tool_modes.includes(tool.type)) return;
-        break;
-      case "text":
-        if (!text_edit_mode_valid_tool_modes.includes(tool.type)) return;
-        break;
-      case "bitmap":
-        if (!bitmap_edit_mode_valid_tool_modes.includes(tool.type)) {
-          draft.content_edit_mode = undefined;
-        }
-        break;
+      {
+        if (!mode.original) return;
+
+        const current = dq.__getNodeById(
+          draft,
+          mode.node_id
+        ) as grida.program.nodes.VectorNode;
+
+        const dirty = !equal(
+          mode.initial_vector_network,
+          current.vectorNetwork
+        );
+        if (dirty) return;
+
+        draft.document.nodes[mode.node_id] =
+          mode.original as grida.program.nodes.Node;
+      }
+      break;
+    }
+    case "text": {
+      const current = dq.__getNodeById(
+        draft,
+        mode.node_id
+      ) as grida.program.nodes.TextNode;
+      // when text is empty, remove that. - (when perfectly empty)
+      if (typeof current.text === "string" && current.text === "") {
+        self_try_remove_node(draft, mode.node_id);
+      }
+      break;
     }
   }
+}
 
-  draft.tool = tool;
+/**
+ * Attempts to exit the current content edit mode.
+ */
+function __self_try_exit_content_edit_mode(
+  draft: Draft<editor.state.IEditorState>
+) {
+  __self_before_exit_content_edit_mode(draft);
+  draft.content_edit_mode = undefined;
+  self_revert_tool(draft);
 }
 
 function __self_set_brush(
@@ -287,7 +404,7 @@ function __self_start_gesture(
     case "curve": {
       const { node_id, segment, control } = gesture;
 
-      assert(draft.content_edit_mode?.type === "path");
+      assert(draft.content_edit_mode?.type === "vector");
       assert(draft.content_edit_mode?.node_id === node_id);
 
       draft.gesture = getInitialCurveGesture(draft, {
@@ -300,8 +417,9 @@ function __self_start_gesture(
     }
     case "scale": {
       const { selection, direction } = gesture;
-      //
-
+      if (draft.content_edit_mode?.type === "vector") {
+        self_optimizeVectorNetwork(draft);
+      }
       draft.content_edit_mode = undefined;
       draft.hovered_node_id = null;
 
@@ -342,31 +460,135 @@ function __self_start_gesture(
       //
       break;
     }
-    case "translate-vertex": {
-      const { vertex: index } = gesture;
-
+    case "translate-vector-controls": {
       const { content_edit_mode } = draft;
-      assert(content_edit_mode && content_edit_mode.type === "path");
+      assert(content_edit_mode && content_edit_mode.type === "vector");
       const { node_id } = content_edit_mode;
       const node = dq.__getNodeById(
         draft,
         node_id
-      ) as grida.program.nodes.PathNode;
+      ) as grida.program.nodes.VectorNode;
 
-      const verticies = node.vectorNetwork.vertices.map((v) => v.p);
+      const verticies = node.vectorNetwork.vertices.map((v) => v);
+      const segments = node.vectorNetwork.segments.map((s) => ({ ...s }));
 
-      content_edit_mode.selected_vertices = [index];
-      content_edit_mode.a_point = index;
+      const { vertices, tangents } = encodeTranslateVectorCommand(
+        node.vectorNetwork,
+        {
+          selected_vertices: content_edit_mode.selection.selected_vertices,
+          selected_segments: content_edit_mode.selection.selected_segments,
+          selected_tangents: content_edit_mode.selection.selected_tangents,
+        }
+      );
+
+      const abs = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+      const absolute_position: cmath.Vector2 = [abs.x, abs.y];
 
       draft.gesture = {
-        type: "translate-vertex",
+        type: "translate-vector-controls",
         node_id: node_id,
         initial_verticies: verticies,
-        vertex: index,
+        initial_segments: segments,
+        vertices,
+        tangents,
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
         initial_position: [node.left!, node.top!],
+        initial_absolute_position: absolute_position,
+      };
+      break;
+      //
+    }
+    case "translate-variable-width-stop": {
+      const { content_edit_mode } = draft;
+      assert(content_edit_mode && content_edit_mode.type === "width");
+      const { node_id, stop } = gesture;
+      const node = dq.__getNodeById(
+        draft,
+        node_id
+      ) as grida.program.nodes.VectorNode;
+
+      const profile = content_edit_mode.variable_width_profile;
+      const initial_stop = profile.stops[stop];
+
+      const abs = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+      const absolute_position: cmath.Vector2 = [abs.x, abs.y];
+
+      draft.gesture = {
+        type: "translate-variable-width-stop",
+        node_id: node_id,
+        stop: stop,
+        initial_stop: { ...initial_stop },
+        movement: cmath.vector2.zero,
+        first: cmath.vector2.zero,
+        last: cmath.vector2.zero,
+        initial_position: [node.left!, node.top!],
+        initial_absolute_position: absolute_position,
+      };
+      break;
+      //
+    }
+    case "resize-variable-width-stop": {
+      const { content_edit_mode } = draft;
+      assert(content_edit_mode && content_edit_mode.type === "width");
+      const { node_id, stop, side } = gesture;
+      const node = dq.__getNodeById(
+        draft,
+        node_id
+      ) as grida.program.nodes.VectorNode;
+
+      const profile = content_edit_mode.variable_width_profile;
+      const initial_stop = profile.stops[stop];
+
+      const abs = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+      const absolute_position: cmath.Vector2 = [abs.x, abs.y];
+
+      // Calculate the initial angle from the curve at the curve position
+      // This matches the calculation in SurfaceVariableWidthEditor
+      const t_param = initial_stop.u;
+      const segments = node.vectorNetwork.segments;
+      const totalSegments = segments.length;
+      const segmentIndex = Math.floor(t_param * totalSegments);
+      const ct = (t_param * totalSegments) % 1;
+
+      let initial_angle = 0;
+      let curve_position: cmath.Vector2 = [0, 0];
+
+      if (segmentIndex < totalSegments) {
+        const segment = segments[segmentIndex];
+
+        // Get absolute vertices (similar to useVariableWithEditor)
+        const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+        const absolute_vertices = vne.getVerticesAbsolute([
+          node.left!,
+          node.top!,
+        ]);
+
+        const a = absolute_vertices[segment.a];
+        const b = absolute_vertices[segment.b];
+        const ta = segment.ta;
+        const tb = segment.tb;
+
+        // Evaluate the curve position and tangent at the given parameter
+        curve_position = cmath.bezier.evaluate(a, b, ta, tb, ct);
+        const tangent = cmath.bezier.tangentAt(a, b, ta, tb, ct);
+        initial_angle = Math.atan2(tangent[1], tangent[0]);
+      }
+
+      draft.gesture = {
+        type: "resize-variable-width-stop",
+        node_id: node_id,
+        stop: stop,
+        side: side,
+        initial_stop: { ...initial_stop },
+        movement: cmath.vector2.zero,
+        first: cmath.vector2.zero,
+        last: cmath.vector2.zero,
+        initial_position: [node.left!, node.top!],
+        initial_absolute_position: absolute_position,
+        initial_angle: initial_angle,
+        initial_curve_position: curve_position,
       };
       break;
       //
@@ -628,7 +850,7 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       case "surface/content-edit-mode/try-enter": {
         if (state.selection.length !== 1) break;
         const node_id = state.selection[0];
-        __self_try_enter_content_edit_mode_auto(draft, node_id);
+        __self_try_enter_content_edit_mode_auto(draft, node_id, context);
         break;
       }
       case "surface/content-edit-mode/fill/gradient": {
@@ -642,7 +864,7 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       }
       case "surface/tool": {
         const { tool } = action;
-        __self_set_tool(draft, tool);
+        self_select_tool(draft, tool, context);
         break;
       }
       case "surface/brush": {

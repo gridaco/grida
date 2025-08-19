@@ -7,8 +7,11 @@ use crate::runtime::counter::FrameCounter;
 use crate::sk;
 use crate::{
     cache,
-    runtime::camera::Camera2D,
-    runtime::repository::{FontRepository, ImageRepository},
+    runtime::{
+        camera::Camera2D,
+        config::RuntimeRendererConfig,
+        repository::{FontRepository, ImageRepository},
+    },
 };
 
 use math2::{self, rect, region};
@@ -119,6 +122,8 @@ pub struct Renderer {
     fc: FrameCounter,
     /// the frame plan for the next frame, to be drawn and flushed
     plan: Option<FramePlan>,
+    /// Runtime configuration for renderer behaviour
+    config: RuntimeRendererConfig,
 }
 
 impl Renderer {
@@ -154,6 +159,7 @@ impl Renderer {
             request_redraw,
             fc: FrameCounter::new(),
             plan: None,
+            config: RuntimeRendererConfig::default(),
         }
     }
 
@@ -187,6 +193,14 @@ impl Renderer {
         }
     }
 
+    /// Enable or disable the image tile cache.
+    pub fn set_cache_tile(&mut self, enable: bool) {
+        self.config.cache_tile = enable;
+        if !enable {
+            self.scene_cache.tile.clear_all();
+        }
+    }
+
     /// Render the queued frame if any and return the completed statistics.
     /// Intended to be called by the host when a redraw request is received.
     pub fn flush(&mut self) -> FrameFlushResult {
@@ -212,7 +226,7 @@ impl Renderer {
         let mut canvas = surface.canvas();
         let draw = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
-        if frame.stable {
+        if self.config.cache_tile && frame.stable {
             // if !self.camera.has_zoom_changed() {}
             self.scene_cache.update_tiles(&self.camera, surface, true);
         }
@@ -272,15 +286,17 @@ impl Renderer {
         // let deps_camera_changed = self.camera.changed();
         // TODO: check for dependencies
 
+        // Always compute the latest frame plan so that a subsequent flush uses up-to-date state,
+        // even if a previous frame is already pending.
+        let rect = Some(self.camera.rect());
+        self.plan = Some(self.frame(
+            rect.unwrap_or(rect::Rectangle::empty()),
+            self.camera.get_zoom(),
+            stable,
+        ));
+
+        // Only request a redraw if there isn't already one pending.
         if !self.fc.has_pending() {
-            let rect = Some(self.camera.rect());
-
-            self.plan = Some(self.frame(
-                rect.unwrap_or(rect::Rectangle::empty()),
-                self.camera.get_zoom(),
-                stable,
-            ));
-
             self.fc.queue();
             self.request_redraw();
         }
@@ -354,16 +370,20 @@ impl Renderer {
             ImageTileCacheResolutionStrategy::ForceCache
         };
 
-        // Get tiles for the region with blur information and sorting
-        let region_tiles = self
-            .scene_cache
-            .tile
-            .get_region_tiles(&bounds, zoom, strategy);
+        let (visible_tiles, tile_rects) = if self.config.cache_tile {
+            let region_tiles = self
+                .scene_cache
+                .tile
+                .get_region_tiles(&bounds, zoom, strategy);
+            (
+                region_tiles.tiles().to_vec(),
+                region_tiles.tile_rects().to_vec(),
+            )
+        } else {
+            (Vec::new(), Vec::new())
+        };
 
-        let visible_tiles: Vec<FramePlanTileInfo> = region_tiles.tiles().to_vec();
-        let tile_rects: Vec<_> = region_tiles.tile_rects().to_vec();
-
-        let painter_region = if stable {
+        let painter_region = if stable || !self.config.cache_tile {
             vec![bounds]
         } else {
             region::difference(bounds, &tile_rects)
@@ -660,3 +680,4 @@ mod tests {
         renderer.free();
     }
 }
+

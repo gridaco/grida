@@ -6,12 +6,14 @@ export function Rule({
   width = 0.5,
   padding = 0,
   className,
+  zIndex = 10,
   ...props
 }: {
   axis: "x" | "y";
   offset: number;
   width?: number;
   padding?: number;
+  zIndex?: number;
   className?: string;
 }) {
   const totalSize = width + padding * 2;
@@ -22,6 +24,7 @@ export function Rule({
       style={{
         position: "absolute",
         pointerEvents: "auto",
+        zIndex,
         width: axis === "x" ? "100%" : `${totalSize}px`,
         height: axis === "y" ? "100%" : `${totalSize}px`,
         transform:

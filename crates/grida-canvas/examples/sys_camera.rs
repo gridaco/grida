@@ -14,6 +14,7 @@ use glutin::{
 };
 use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
+#[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{gpu, Surface};
 use std::{ffi::CString, num::NonZeroU32};
@@ -49,7 +50,7 @@ fn create_static_scene() -> Scene {
         id: "root".to_string(),
         name: Some("Root Group".to_string()),
         active: true,
-        transform: AffineTransform::identity(),
+        transform: None,
         children: ids,
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
@@ -111,6 +112,7 @@ fn init_window(
         .unwrap();
 
     let window = window.expect("Could not create window with OpenGL context");
+    #[allow(deprecated)]
     let raw_window_handle = window
         .raw_window_handle()
         .expect("Failed to get window handle");
@@ -260,6 +262,7 @@ fn main() {
     let mut total_time = 0.0;
     let start_time = std::time::Instant::now();
 
+    #[allow(deprecated)]
     el.run(move |event, elwt| {
         match event {
             Event::WindowEvent {

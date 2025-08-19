@@ -152,7 +152,7 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
-            transform: AffineTransform::identity(),
+            transform: None,
             children: Vec::new(),
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,

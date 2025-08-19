@@ -13,26 +13,74 @@ import {
   EraserIcon,
   StarIcon,
 } from "@radix-ui/react-icons";
-import { BrushIcon, PenToolIcon, TriangleIcon } from "lucide-react";
+import { BrushIcon, LassoIcon, PenToolIcon, TriangleIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/utils";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
 import {
   useCurrentEditor,
   useEditorFlagsState,
   useToolState,
 } from "@/grida-canvas-react";
 import { cn } from "@/components/lib/utils";
+
+export function ToolGroupItem({
+  className,
+  children,
+  label,
+  shortcut,
+  ...props
+}: React.ComponentProps<typeof ToggleGroupPrimitive.Item> & {
+  label?: string;
+  shortcut?: string;
+}) {
+  const content = (
+    <ToggleGroupPrimitive.Item
+      data-slot="toggle-group-item"
+      className={cn(
+        "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium hover:bg-muted hover:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none transition-[color,box-shadow] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive whitespace-nowrap h-9 px-2 min-w-9",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </ToggleGroupPrimitive.Item>
+  );
+
+  if (!label) {
+    return content;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>{content}</span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {label}
+        {shortcut ? ` (${shortcut})` : null}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function ToolbarPosition({
   className,
@@ -54,9 +102,10 @@ export function ToolbarPosition({
 
 export default function Toolbar() {
   const editor = useCurrentEditor();
-  const { tool } = useToolState();
+  const tool = useToolState();
   const { flags } = useEditorFlagsState();
   const value = toolmode_to_toolbar_value(tool);
+  const [open, setOpen] = useState<string | null>(null);
 
   const tools = useMemo(() => {
     const stable: Array<{
@@ -78,7 +127,8 @@ export default function Toolbar() {
 
   return (
     <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
-      <ToggleGroup
+      <ToggleGroupPrimitive.Root
+        data-slot="toggle-group"
         onValueChange={(v) => {
           editor.setTool(
             v
@@ -89,9 +139,12 @@ export default function Toolbar() {
         value={value}
         defaultValue="cursor"
         type="single"
+        className="flex items-center justify-center gap-1"
       >
         <ToolsGroup
           value={value}
+          open={open === "cursor"}
+          onOpenChange={(o) => setOpen(o ? "cursor" : null)}
           options={[
             { value: "cursor", label: "Cursor", shortcut: "V" },
             { value: "hand", label: "Hand tool", shortcut: "H" },
@@ -101,34 +154,48 @@ export default function Toolbar() {
           }}
         />
         <VerticalDivider />
-        <ToggleGroupItem value={"container" satisfies ToolbarToolType}>
+        <ToolGroupItem
+          value={"container" satisfies ToolbarToolType}
+          className="aspect-square"
+          label="Container tool"
+          shortcut="A, F"
+        >
           <FrameIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"text" satisfies ToolbarToolType}>
+        </ToolGroupItem>
+        <ToolGroupItem
+          value={"text" satisfies ToolbarToolType}
+          className="aspect-square"
+          label="Text tool"
+          shortcut="T"
+        >
           <ToolIcon type="text" />
-        </ToggleGroupItem>
+        </ToolGroupItem>
         <ToolsGroup
           value={value}
-          options={[
-            { value: "rectangle", label: "Rectangle", shortcut: "R" },
-            { value: "ellipse", label: "Ellipse", shortcut: "O" },
-            { value: "line", label: "Line", shortcut: "L" },
-            { value: "polygon", label: "Polygon" },
-            { value: "star", label: "Star" },
-            { value: "image", label: "Image" },
-          ]}
+          open={open === "shape"}
+          onOpenChange={(o) => setOpen(o ? "shape" : null)}
+            options={[
+              { value: "rectangle", label: "Rectangle", shortcut: "R" },
+              { value: "ellipse", label: "Ellipse", shortcut: "O" },
+              { value: "line", label: "Line", shortcut: "L" },
+              { value: "polygon", label: "Polygon", shortcut: "Y" },
+              { value: "star", label: "Star" },
+              { value: "image", label: "Image" },
+            ]}
           onValueChange={(v) => {
             editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <ToolsGroup
           value={value}
+          open={open === "draw"}
+          onOpenChange={(o) => setOpen(o ? "draw" : null)}
           options={tools}
           onValueChange={(v) => {
             editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
-      </ToggleGroup>
+      </ToggleGroupPrimitive.Root>
     </div>
   );
 }
@@ -139,10 +206,14 @@ export function ToolsGroup({
   value,
   options,
   onValueChange,
+  open,
+  onOpenChange,
 }: {
   value: ToolbarToolType;
   options: Array<{ value: ToolbarToolType; label: string; shortcut?: string }>;
   onValueChange?: (value: ToolbarToolType) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [primary, setPrimary] = useState<ToolbarToolType>(
     options.find((o) => o.value === value)?.value ?? options[0].value
@@ -157,35 +228,41 @@ export function ToolsGroup({
 
   return (
     <>
-      <ToggleGroupItem value={primary}>
+      <ToolGroupItem
+        value={primary}
+        className="aspect-square"
+        label={options.find((o) => o.value === primary)?.label}
+        shortcut={options.find((o) => o.value === primary)?.shortcut}
+      >
         <ToolIcon type={primary} className="size-4" />
-      </ToggleGroupItem>
+      </ToolGroupItem>
       {options.length > 1 && (
-        <DropdownMenu modal>
+        <DropdownMenu modal open={open} onOpenChange={onOpenChange}>
           <DropdownMenuTrigger>
             <CaretDownIcon />
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" sideOffset={16}>
-            {options.map((option) => (
-              <DropdownMenuItem
-                key={option.value}
-                onSelect={() => {
-                  setPrimary(option.value);
-                  onValueChange?.(option.value);
-                }}
-                asChild
-              >
-                <button className="w-full flex items-center gap-2">
-                  <ToolIcon type={option.value} className="size-4" />
+          <DropdownMenuContent align="start" side="top" sideOffset={16}>
+            <DropdownMenuRadioGroup
+              onValueChange={(v) => {
+                setPrimary(v as ToolbarToolType);
+                onValueChange?.(v as ToolbarToolType);
+              }}
+              value={primary}
+            >
+              {options.map((option) => (
+                <DropdownMenuRadioItem value={option.value} key={option.value}>
+                  {/* <div className="w-full flex items-center gap-2"> */}
+                  <ToolIcon type={option.value} />
                   <span>{option.label}</span>
                   {option.shortcut && (
                     <DropdownMenuShortcut>
                       {option.shortcut}
                     </DropdownMenuShortcut>
                   )}
-                </button>
-              </DropdownMenuItem>
-            ))}
+                  {/* </div> */}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
@@ -226,6 +303,8 @@ export function ToolIcon({
       return <BrushIcon {...props} />;
     case "eraser":
       return <EraserIcon {...props} />;
+    case "lasso":
+      return <LassoIcon {...props} />;
     default:
       return null;
   }

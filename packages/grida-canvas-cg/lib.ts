@@ -168,6 +168,16 @@ export namespace cg {
   export type FillRule = "nonzero" | "evenodd";
 
   /**
+   * @see https://skia.org/docs/dev/present/pathops/
+   * @see https://www.figma.com/plugin-docs/api/BooleanOperationNode/
+   */
+  export type BooleanOperation =
+    | "difference"
+    | "intersection"
+    | "union"
+    | "xor";
+
+  /**
    *
    * Supported fit modes
    *
@@ -564,4 +574,21 @@ export namespace cg {
       value[0] === value[1] && value[1] === value[2] && value[2] === value[3]
     );
   }
+
+  export type VariableWidthStop = {
+    /**
+     * u(t)
+     * 0-1
+     * 0 - start (0%)
+     * 1 - end (100%)
+     */
+    u: number;
+    /**
+     * r px
+     */
+    r: number;
+  };
+  export type VariableWidthProfile = {
+    stops: VariableWidthStop[];
+  };
 }

@@ -104,7 +104,7 @@ export function BlendModeDropdown({
 }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger asChild tabIndex={-1}>
         <Button variant="ghost" size="xs">
           <BlendingModeIcon />
         </Button>

@@ -2,6 +2,7 @@ import grida from "@grida/schema";
 import { svg } from "@/grida-canvas-utils/svg";
 import queryattributes from "./utils/attributes";
 import React, { useMemo } from "react";
+import vn from "@grida/vn";
 
 export function RegularPolygonWidget({
   width,
@@ -22,17 +23,15 @@ export function RegularPolygonWidget({
     : { defs: undefined, ref: "none" };
 
   const points = useMemo(() => {
-    const cx = width / 2;
-    const cy = height / 2;
-    const rx = (width / 2) * 0.9;
-    const ry = (height / 2) * 0.9;
-    const step = (Math.PI * 2) / pointCount;
-    return Array.from({ length: pointCount }, (_, i) => {
-      const angle = i * step - Math.PI / 2;
-      const x = cx + rx * Math.cos(angle);
-      const y = cy + ry * Math.sin(angle);
-      return `${x},${y}`;
-    }).join(" ");
+    const v = vn.fromRegularPolygon({
+      x: 0,
+      y: 0,
+      width,
+      height,
+      points: pointCount,
+    });
+
+    return v.vertices.map((v) => `${v[0]},${v[1]}`).join(" ");
   }, [width, height, pointCount]);
 
   return (
@@ -44,7 +43,12 @@ export function RegularPolygonWidget({
     >
       {fillDefs && <g dangerouslySetInnerHTML={{ __html: fillDefs }} />}
       {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}
-      <polygon points={points} fill={fillDef} stroke={strokeDef} strokeWidth={strokeWidth} />
+      <polygon
+        points={points}
+        fill={fillDef}
+        stroke={strokeDef}
+        strokeWidth={strokeWidth}
+      />
     </svg>
   );
 }

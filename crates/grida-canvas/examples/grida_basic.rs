@@ -182,7 +182,6 @@ async fn demo_basic() -> Scene {
     // Create a group node for the shapes (rectangle, ellipse, polygon)
     let mut shapes_group_node = nf.create_group_node();
     shapes_group_node.name = Some("Shapes Group".to_string());
-    shapes_group_node.transform = AffineTransform::new(0.0, 0.0, 0.0);
 
     // Create a root container node containing the shapes group, text, and line
     let mut root_container_node = nf.create_container_node();

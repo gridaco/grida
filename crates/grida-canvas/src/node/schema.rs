@@ -1,9 +1,10 @@
+use crate::cg;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::shape::*;
+use crate::vectornetwork::*;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
-
 pub type NodeId = String;
 
 #[derive(Debug, Clone)]
@@ -167,6 +168,7 @@ pub enum Node {
 pub trait NodeTrait {
     fn id(&self) -> NodeId;
     fn name(&self) -> Option<String>;
+    fn active(&self) -> bool;
 }
 
 impl NodeTrait for Node {
@@ -207,6 +209,25 @@ impl NodeTrait for Node {
             Node::Image(n) => n.name.clone(),
         }
     }
+
+    fn active(&self) -> bool {
+        match self {
+            Node::Error(n) => n.active,
+            Node::Group(n) => n.active,
+            Node::Container(n) => n.active,
+            Node::Rectangle(n) => n.active,
+            Node::Ellipse(n) => n.active,
+            Node::Polygon(n) => n.active,
+            Node::RegularPolygon(n) => n.active,
+            Node::RegularStarPolygon(n) => n.active,
+            Node::Line(n) => n.active,
+            Node::TextSpan(n) => n.active,
+            Node::SVGPath(n) => n.active,
+            Node::Vector(n) => n.active,
+            Node::BooleanOperation(n) => n.active,
+            Node::Image(n) => n.active,
+        }
+    }
 }
 
 pub trait NodeFillsMixin {
@@ -231,6 +252,7 @@ pub trait NodeGeometryMixin {
 pub trait NodeShapeMixin {
     fn to_shape(&self) -> Shape;
     fn to_path(&self) -> skia_safe::Path;
+    fn to_vector_network(&self) -> VectorNetwork;
 }
 
 /// Intrinsic size node is a node that has a fixed size, and can be rendered soley on its own.
@@ -265,6 +287,56 @@ pub enum LeafNode {
     Image(ImageNode),
 }
 
+impl NodeTrait for LeafNode {
+    fn id(&self) -> NodeId {
+        match self {
+            LeafNode::Error(n) => n.id.clone(),
+            LeafNode::Rectangle(n) => n.id.clone(),
+            LeafNode::Ellipse(n) => n.id.clone(),
+            LeafNode::Polygon(n) => n.id.clone(),
+            LeafNode::RegularPolygon(n) => n.id.clone(),
+            LeafNode::RegularStarPolygon(n) => n.id.clone(),
+            LeafNode::Line(n) => n.id.clone(),
+            LeafNode::TextSpan(n) => n.id.clone(),
+            LeafNode::SVGPath(n) => n.id.clone(),
+            LeafNode::Vector(n) => n.id.clone(),
+            LeafNode::Image(n) => n.id.clone(),
+        }
+    }
+
+    fn name(&self) -> Option<String> {
+        match self {
+            LeafNode::Error(n) => n.name.clone(),
+            LeafNode::Rectangle(n) => n.name.clone(),
+            LeafNode::Ellipse(n) => n.name.clone(),
+            LeafNode::Polygon(n) => n.name.clone(),
+            LeafNode::RegularPolygon(n) => n.name.clone(),
+            LeafNode::RegularStarPolygon(n) => n.name.clone(),
+            LeafNode::Line(n) => n.name.clone(),
+            LeafNode::TextSpan(n) => n.name.clone(),
+            LeafNode::SVGPath(n) => n.name.clone(),
+            LeafNode::Vector(n) => n.name.clone(),
+            LeafNode::Image(n) => n.name.clone(),
+        }
+    }
+
+    fn active(&self) -> bool {
+        match self {
+            LeafNode::Error(n) => n.active,
+            LeafNode::Rectangle(n) => n.active,
+            LeafNode::Ellipse(n) => n.active,
+            LeafNode::Polygon(n) => n.active,
+            LeafNode::RegularPolygon(n) => n.active,
+            LeafNode::RegularStarPolygon(n) => n.active,
+            LeafNode::Line(n) => n.active,
+            LeafNode::TextSpan(n) => n.active,
+            LeafNode::SVGPath(n) => n.active,
+            LeafNode::Vector(n) => n.active,
+            LeafNode::Image(n) => n.active,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ErrorNode {
     pub id: NodeId,
@@ -292,7 +364,7 @@ pub struct GroupNode {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
-    pub transform: AffineTransform,
+    pub transform: Option<AffineTransform>,
     pub children: Vec<NodeId>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
@@ -369,6 +441,10 @@ impl NodeShapeMixin for ContainerNode {
     fn to_path(&self) -> skia_safe::Path {
         build_rrect_path(&self.to_own_shape())
     }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_rrect_vector_network(&self.to_own_shape())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -429,6 +505,20 @@ impl NodeGeometryMixin for RectangleNode {
         } else {
             0.0
         }
+    }
+}
+
+impl NodeShapeMixin for RectangleNode {
+    fn to_shape(&self) -> Shape {
+        Shape::RRect(self.to_own_shape())
+    }
+
+    fn to_path(&self) -> skia_safe::Path {
+        build_rrect_path(&self.to_own_shape())
+    }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_rrect_vector_network(&self.to_own_shape())
     }
 }
 
@@ -596,6 +686,10 @@ impl NodeShapeMixin for EllipseNode {
     fn to_path(&self) -> skia_safe::Path {
         (&self.to_shape()).into()
     }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        self.to_shape().to_vector_network()
+    }
 }
 
 impl NodeGeometryMixin for EllipseNode {
@@ -626,8 +720,9 @@ pub struct BooleanPathOperationNode {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
-    pub transform: AffineTransform,
+    pub transform: Option<AffineTransform>,
     pub op: BooleanPathOperation,
+    pub corner_radius: Option<f32>,
     pub children: Vec<NodeId>,
     pub fill: Paint,
     pub stroke: Option<Paint>,
@@ -648,15 +743,32 @@ pub struct VectorNode {
     pub name: Option<String>,
     pub active: bool,
     pub transform: AffineTransform,
-    pub fill: Option<Paint>,
     pub network: VectorNetwork,
+    /// The corner radius of the vector node.
+    pub corner_radius: f32,
+    /// The fill paint of the vector node. (currently only one fill is supported)
+    pub fill: Option<Paint>,
     pub strokes: Vec<Paint>,
     pub stroke_width: f32,
+    pub stroke_width_profile: Option<cg::varwidth::VarWidthProfile>,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+}
+
+impl VectorNode {
+    /// Build a [`skia_safe::Path`] representing this vector node,
+    /// applying the node's `corner_radius` when greater than zero.
+    pub fn to_path(&self) -> skia_safe::Path {
+        let path: skia_safe::Path = self.network.clone().into();
+        if self.corner_radius <= 0.0 {
+            path
+        } else {
+            build_corner_radius_path(&path, self.corner_radius)
+        }
+    }
 }
 
 ///
@@ -757,6 +869,10 @@ impl NodeShapeMixin for PolygonNode {
     fn to_path(&self) -> skia_safe::Path {
         let shape = self.to_own_shape();
         build_simple_polygon_path(&shape)
+    }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_simple_polygon_vector_network(&self.to_own_shape())
     }
 }
 
@@ -865,6 +981,10 @@ impl NodeShapeMixin for RegularPolygonNode {
             corner_radius: self.corner_radius,
         })
     }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_regular_polygon_vector_network(&self.to_own_shape())
+    }
 }
 
 /// A regular star polygon node rendered within a bounding box.
@@ -959,6 +1079,10 @@ impl NodeShapeMixin for RegularStarPolygonNode {
 
     fn to_path(&self) -> skia_safe::Path {
         build_star_path(&self.to_own_shape())
+    }
+
+    fn to_vector_network(&self) -> VectorNetwork {
+        build_star_vector_network(&self.to_own_shape())
     }
 }
 

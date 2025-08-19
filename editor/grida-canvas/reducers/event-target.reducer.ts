@@ -25,22 +25,27 @@ import {
   self_selectNode,
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
+  self_optimizeVectorNetwork,
+  self_select_tool,
+  self_select_cursor_tool,
 } from "./methods";
-import cmath from "@grida/cmath";
-import nid from "./tools/id";
+import { self_moveNode } from "./methods/move";
+import { self_updateVectorAreaSelection } from "./methods/vector";
+import * as cem_varwidth from "./event-target.cem-width.reducer";
+import * as cem_vector from "./event-target.cem-vector.reducer";
+import * as cem_bitmap from "./event-target.cem-bitmap.reducer";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
-import vn from "@grida/vn";
-import { getInitialCurveGesture } from "./tools/gesture";
 import { snapGuideTranslation, threshold } from "./tools/snap";
-import { BitmapLayerEditor } from "@grida/bitmap";
-import cg from "@grida/cg";
+import nid from "./tools/id";
+import cmath from "@grida/cmath";
 import type { ReducerContext } from ".";
 
 const black = { r: 0, g: 0, b: 0, a: 1 };
 
 function __self_evt_on_pointer_move(
   draft: editor.state.IEditorState,
-  action: EditorEventTarget_PointerMove
+  action: EditorEventTarget_PointerMove,
+  context: ReducerContext
 ) {
   const {
     position_canvas: { x, y },
@@ -58,41 +63,20 @@ function __self_evt_on_pointer_move(
     client: [position_client.x, position_client.y],
     position: canvas_space_pointer_position,
     last: draft.pointer.position,
+    logical: canvas_space_pointer_position,
   };
 
-  if (draft.content_edit_mode?.type === "path") {
-    const { a_point, node_id } = draft.content_edit_mode;
-    const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
-
-    if (typeof a_point === "number" && tarnslate_with_axis_lock === "on") {
-      const node = dq.__getNodeById(
+  switch (draft.content_edit_mode?.type) {
+    case "vector":
+      cem_vector.on_pointer_move(draft, canvas_space_pointer_position, context);
+      break;
+    case "width":
+      cem_varwidth.on_pointer_move(
         draft,
-        node_id
-      ) as grida.program.nodes.PathNode;
-      const { left: nx, top: ny } = node;
-      const n_offset: cmath.Vector2 = [nx!, ny!];
-      const { vertices } = node.vectorNetwork;
-      const a = vertices[a_point];
-
-      // mock the movement (movement = cursor pos - anchor pos)
-      const movement = cmath.vector2.sub(
-        draft.pointer.position,
-        cmath.vector2.add(n_offset, a.p)
+        canvas_space_pointer_position,
+        context
       );
-
-      // movement relative to `a` point
-      const adj_movement = cmath.ext.movement.axisLockedByDominance(movement);
-
-      const adj_pos = cmath.vector2.add(
-        a.p,
-        cmath.ext.movement.normalize(adj_movement),
-        n_offset
-      );
-      draft.content_edit_mode.path_cursor_position = adj_pos;
-    } else {
-      draft.content_edit_mode.path_cursor_position =
-        canvas_space_pointer_position;
-    }
+      break;
   }
 }
 
@@ -164,7 +148,7 @@ function __self_evt_on_click(
       }
 
       self_try_insert_node(draft, parent, nnode);
-      draft.tool = { type: "cursor" };
+      self_select_cursor_tool(draft);
       self_selectNode(draft, "reset", nnode.id);
 
       // if the node is text, enter content edit mode
@@ -232,8 +216,14 @@ function __self_evt_on_pointer_down(
   switch (draft.tool.type) {
     case "cursor": {
       const { hovered_node_id } = self_updateSurfaceHoverState(draft);
-      // ignore if in content edit mode
-      if (draft.content_edit_mode) break;
+
+      if (draft.content_edit_mode?.type === "vector") {
+        if (!shiftKey && draft.content_edit_mode.snapped_vertex_idx === null) {
+          // clear the selection for vector content edit mode
+          self_clearSelection(draft);
+        }
+        break;
+      }
 
       if (shiftKey) {
         if (hovered_node_id) {
@@ -251,112 +241,31 @@ function __self_evt_on_pointer_down(
 
       break;
     }
-    case "insert":
+    case "insert": {
       // ignore - insert mode will be handled via click or drag
       break;
+    }
+    case "width": {
+      // Handle variable width tool pointer down
+      cem_varwidth.on_pointer_down(draft, action, context);
+      break;
+    }
     case "path": {
-      if (draft.content_edit_mode?.type === "path") {
-        const { hovered_vertex_idx: hovered_point } = draft;
-        const { node_id, path_cursor_position, a_point, next_ta } =
-          draft.content_edit_mode;
-
-        const node = dq.__getNodeById(
-          draft,
-          node_id
-        ) as grida.program.nodes.PathNode;
-
-        const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-
-        const position =
-          typeof hovered_point === "number"
-            ? node.vectorNetwork.vertices[hovered_point].p
-            : // relative position
-              cmath.vector2.sub(path_cursor_position, [node.left!, node.top!]);
-
-        const new_vertex_idx = vne.addVertex(
-          position,
-          a_point,
-          next_ta ?? undefined
-        );
-
-        // clear the next ta as it's used
-        draft.content_edit_mode.next_ta = null;
-
-        const bb_b = vne.getBBox();
-
-        const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
-        vne.translate(cmath.vector2.invert(delta));
-
-        const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
-
-        node.left = new_pos[0];
-        node.top = new_pos[1];
-        node.width = bb_b.width;
-        node.height = bb_b.height;
-
-        node.vectorNetwork = vne.value;
-
-        draft.content_edit_mode.selected_vertices = [new_vertex_idx];
-        draft.content_edit_mode.a_point = new_vertex_idx;
-
-        // ...
+      if (draft.content_edit_mode?.type === "vector") {
+        cem_vector.on_path_pointer_down(draft, action, context);
       } else {
-        // create a new node
-        const new_node_id = nid();
-
-        const vector = {
-          type: "path",
-          name: "path",
-          id: new_node_id,
-          active: true,
-          locked: false,
-          position: "absolute",
-          left: 0,
-          top: 0,
-          opacity: 1,
-          width: 0,
-          height: 0,
-          rotation: 0,
-          zIndex: 0,
-          stroke: { type: "solid", color: black },
-          strokeCap: "butt",
-          strokeWidth: 1,
-          vectorNetwork: {
-            vertices: [{ p: cmath.vector2.zero }],
-            segments: [],
-          },
-        } satisfies grida.program.nodes.PathNode;
-
-        const pos = draft.pointer.position;
-
-        vector.left = pos[0];
-        vector.top = pos[1];
-
-        const parent = __get_insertion_target(draft);
-        self_try_insert_node(draft, parent, vector);
-        self_selectNode(draft, "reset", vector.id);
-
-        draft.content_edit_mode = {
-          type: "path",
-          node_id: new_node_id,
-          selected_vertices: [0], // select the first point
-          a_point: 0,
-          next_ta: null,
-          path_cursor_position: pos,
-        };
+        cem_vector.create_new_vector_node(draft, context);
       }
-
-      //
       break;
     }
     case "eraser":
     case "brush": {
-      __self_brush(draft, { is_gesture: false }, context);
+      cem_bitmap.on_brush(draft, { is_gesture: false }, context);
       break;
     }
     case "flood-fill": {
       assert(draft.content_edit_mode?.type === "bitmap");
-      __self_floodfill(draft, draft.content_edit_mode.imageRef);
+      cem_bitmap.on_flood_fill(draft, draft.content_edit_mode.imageRef);
       break;
     }
   }
@@ -380,31 +289,43 @@ function __self_evt_on_drag_start(
 
   // clear all trasform state
   draft.marquee = undefined;
+  draft.lasso = undefined;
   draft.dropzone = undefined;
   draft.surface_snapping = undefined;
 
   switch (draft.tool.type) {
     case "cursor": {
-      // TODO: improve logic
-      if (shiftKey) {
-        if (draft.hovered_node_id) {
-          __self_start_gesture_translate(draft, context);
-        } else {
-          // marquee selection
-          draft.marquee = {
-            a: draft.pointer.position,
-            b: draft.pointer.position,
-          };
-        }
+      // when vector content edit mode is active, dragging should marquee select
+      if (draft.content_edit_mode?.type === "vector") {
+        draft.marquee = {
+          a: draft.pointer.position,
+          b: draft.pointer.position,
+          additive: shiftKey,
+        };
       } else {
-        if (draft.selection.length === 0) {
-          // marquee selection
-          draft.marquee = {
-            a: draft.pointer.position,
-            b: draft.pointer.position,
-          };
+        // TODO: improve logic
+        if (shiftKey) {
+          if (draft.hovered_node_id) {
+            __self_start_gesture_translate(draft, context);
+          } else {
+            // marquee selection
+            draft.marquee = {
+              a: draft.pointer.position,
+              b: draft.pointer.position,
+              additive: shiftKey,
+            };
+          }
         } else {
-          __self_start_gesture_translate(draft, context);
+          if (draft.selection.length === 0) {
+            // marquee selection
+            draft.marquee = {
+              a: draft.pointer.position,
+              b: draft.pointer.position,
+              additive: shiftKey,
+            };
+          } else {
+            __self_start_gesture_translate(draft, context);
+          }
         }
       }
       break;
@@ -414,6 +335,7 @@ function __self_evt_on_drag_start(
       draft.marquee = {
         a: draft.pointer.position,
         b: draft.pointer.position,
+        additive: shiftKey,
       };
       break;
     }
@@ -424,6 +346,10 @@ function __self_evt_on_drag_start(
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
       };
+      break;
+    }
+    case "lasso": {
+      draft.lasso = { points: [draft.pointer.position], additive: shiftKey };
       break;
     }
     case "insert": {
@@ -443,158 +369,41 @@ function __self_evt_on_drag_start(
         height: initial_rect.height as 0, // casting for line node
       });
 
+      let pending: {
+        node_id: string;
+        prototype: grida.program.nodes.Node;
+      } | null = null;
+      if (draft.tool.node === "container") {
+        pending = {
+          node_id: nnode.id,
+          prototype: JSON.parse(JSON.stringify(nnode)),
+        };
+        // UX: temporary remove fill to let user see whats behind.
+        (nnode as grida.program.nodes.ContainerNode).fill = undefined;
+      }
+
       self_try_insert_node(draft, parent, nnode);
-      draft.tool = { type: "cursor" };
+      self_select_tool(draft, { type: "cursor" }, context);
       self_selectNode(draft, "reset", nnode.id);
-      __self_start_gesture_scale_draw_new_node(draft, {
+      __self_start_gesture_insert_and_resize_draw_new_node(draft, {
         new_node_id: nnode.id,
         new_node_rect: initial_rect,
+        pending_insertion: pending,
       });
 
       break;
     }
     case "draw": {
-      const tool = draft.tool.tool;
-
-      let vector: grida.program.nodes.PathNode | grida.program.nodes.LineNode;
-
-      const new_node_id = nid();
-      const __base = {
-        id: new_node_id,
-        active: true,
-        locked: false,
-        position: "absolute",
-        left: 0,
-        top: 0,
-        opacity: 1,
-        width: 0,
-        height: 0,
-        rotation: 0,
-        zIndex: 0,
-        stroke: { type: "solid", color: black },
-        strokeCap: "butt",
-      } as const;
-
-      switch (tool) {
-        case "pencil": {
-          vector = {
-            ...__base,
-            type: "path",
-            name: "path",
-            strokeWidth: 3,
-            vectorNetwork: vn.polyline([cmath.vector2.zero]),
-          } satisfies grida.program.nodes.PathNode;
-          break;
-        }
-        case "line": {
-          // vector = {
-          //   ...__base,
-          //   type: "line",
-          //   name: "line",
-          // } satisfies grida.program.nodes.LineNode;
-
-          vector = {
-            ...__base,
-            type: "path",
-            name: "line",
-            strokeWidth: 1,
-            vectorNetwork: vn.polyline([cmath.vector2.zero]),
-          } satisfies grida.program.nodes.PathNode;
-          break;
-        }
-      }
-
-      // insert a new vector node
-      const parent = __get_insertion_target(draft);
-      self_try_insert_node(draft, parent, vector);
-
-      // position relative to the parent
-      let node_relative_pos = draft.pointer.position;
-      if (parent) {
-        const parent_rect =
-          context.geometry.getNodeAbsoluteBoundingRect(parent)!;
-        node_relative_pos = cmath.vector2.sub(draft.pointer.position, [
-          parent_rect.x,
-          parent_rect.y,
-        ]);
-      }
-
-      vector.left = node_relative_pos[0];
-      vector.top = node_relative_pos[1];
-
-      draft.gesture = {
-        type: "draw",
-        mode: tool,
-        origin: node_relative_pos,
-        movement: cmath.vector2.zero,
-        first: cmath.vector2.zero,
-        last: cmath.vector2.zero,
-        points: [cmath.vector2.zero],
-        node_id: vector.id,
-      };
-
-      // selection & hover state
-      switch (tool) {
-        case "line":
-          // self_selectNode(draft, "reset", vector.id);
-          self_clearSelection(draft);
-          break;
-        case "pencil":
-          // clear selection for pencil mode
-          self_clearSelection(draft);
-          break;
-      }
+      cem_vector.on_draw_pointer_down(draft, context);
       break;
     }
     case "path": {
-      // [path tool, drag start]
-      assert(draft.content_edit_mode?.type === "path");
-      const { node_id, selected_vertices } = draft.content_edit_mode;
-      assert(selected_vertices.length === 1);
-      const vertex = selected_vertices[0];
-
-      const node = dq.__getNodeById(
-        draft,
-        node_id
-      ) as grida.program.nodes.PathNode;
-
-      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-      const segments = vne.findSegments(vertex);
-
-      if (segments.length === 0) {
-        draft.gesture = {
-          type: "curve-a",
-          node_id,
-          vertex,
-          control: "ta",
-          initial: cmath.vector2.zero,
-          movement: cmath.vector2.zero,
-          first: cmath.vector2.zero,
-          last: cmath.vector2.zero,
-          invert: false,
-        };
-      } else if (segments.length === 1) {
-        const segment_idx = segments[0];
-
-        const gesture = getInitialCurveGesture(draft, {
-          node_id,
-          segment: segment_idx,
-          control: "tb",
-          invert: true,
-        });
-
-        draft.gesture = gesture;
-      } else {
-        reportError(
-          "invalid vector network path editing state. multiple segments found"
-        );
-      }
-
+      cem_vector.on_path_drag_start(draft, action, context);
       break;
     }
     case "eraser":
     case "brush": {
-      __self_brush(draft, { is_gesture: true }, context);
+      cem_bitmap.on_brush(draft, { is_gesture: true }, context);
       break;
     }
   }
@@ -610,8 +419,8 @@ function __self_evt_on_drag_end(
 
   switch (draft.tool.type) {
     case "draw":
-      // keep if pencil mode
-      if (draft.tool.tool === "pencil") break;
+      cem_vector.on_draw_drag_end(draft, context);
+      break;
     case "brush":
     case "eraser":
     case "flood-fill":
@@ -619,6 +428,8 @@ function __self_evt_on_drag_end(
       break;
     case "path":
     case "hand":
+    case "lasso":
+    case "width":
       // keep
       break;
     case "zoom": {
@@ -637,11 +448,11 @@ function __self_evt_on_drag_end(
       }
 
       // cancel to default
-      draft.tool = { type: "cursor" };
+      self_select_tool(draft, { type: "cursor" }, context);
       break;
     }
     case "cursor": {
-      if (node_ids_from_area) {
+      if (draft.content_edit_mode?.type !== "vector" && node_ids_from_area) {
         const target_node_ids = getMarqueeSelection(draft, node_ids_from_area);
 
         self_selectNode(
@@ -652,19 +463,20 @@ function __self_evt_on_drag_end(
       }
 
       // cancel to default
-      draft.tool = { type: "cursor" };
+      self_select_tool(draft, { type: "cursor" }, context);
       break;
     }
     case "insert":
     default:
       // cancel to default
-      draft.tool = { type: "cursor" };
+      self_select_tool(draft, { type: "cursor" }, context);
       break;
   }
 
-  __self_maybe_end_gesture(draft);
+  __self_maybe_end_gesture(draft, context);
   draft.gesture = { type: "idle" };
   draft.marquee = undefined;
+  draft.lasso = undefined;
 }
 
 function __self_evt_on_drag(
@@ -678,7 +490,30 @@ function __self_evt_on_drag(
   } = <EditorEventTarget_Drag>action;
 
   if (draft.marquee) {
-    draft.marquee!.b = draft.pointer.position;
+    draft.marquee.b = draft.pointer.position;
+    if (draft.content_edit_mode?.type === "vector") {
+      const mrect = cmath.rect.fromPoints([draft.marquee.a, draft.marquee.b]);
+      self_updateVectorAreaSelection(
+        draft,
+        context,
+        (p) => cmath.rect.containsPoint(mrect, p),
+        draft.marquee.additive ?? false,
+        mrect
+      );
+    }
+  } else if (draft.lasso) {
+    draft.lasso.points.push(draft.pointer.position);
+    if (
+      draft.content_edit_mode?.type === "vector" &&
+      draft.lasso.points.length > 2
+    ) {
+      self_updateVectorAreaSelection(
+        draft,
+        context,
+        (p) => cmath.polygon.pointInPolygon(p, draft.lasso!.points),
+        draft.lasso.additive ?? false
+      );
+    }
   } else {
     if (draft.gesture.type === "idle") return;
     if (draft.gesture.type === "nudge") return;
@@ -729,6 +564,7 @@ function __self_evt_on_drag(
         break;
       }
       // [insertion mode - resize after insertion]
+      case "insert-and-resize":
       case "scale": {
         self_update_gesture_transform(draft, context);
         break;
@@ -747,171 +583,32 @@ function __self_evt_on_drag(
         break;
       }
       case "draw": {
-        const {
-          gesture_modifiers: { tarnslate_with_axis_lock },
-        } = draft;
-
-        const adj_movement =
-          tarnslate_with_axis_lock === "on"
-            ? cmath.ext.movement.axisLockedByDominance(movement)
-            : movement;
-
-        const point = cmath.ext.movement.normalize(adj_movement);
-
-        const mode = draft.gesture.mode;
-
-        const { origin, points, node_id } =
-          draft.gesture as editor.gesture.GestureDraw;
-
-        const node = dq.__getNodeById(
-          draft,
-          node_id
-        ) as grida.program.nodes.PathNode;
-
-        const vne = new vn.VectorNetworkEditor({
-          vertices: points.map((p) => ({ p })),
-          segments: node.vectorNetwork.segments,
-        });
-
-        switch (mode) {
-          case "line":
-            vne.extendLine(point);
-            break;
-          case "pencil":
-            vne.extendPolyline(point);
-            break;
-        }
-
-        draft.gesture.points = vne.value.vertices.map((v) => v.p);
-
-        // get the box of the points
-        const bb = vne.getBBox();
-        const raw_offset: cmath.Vector2 = [bb.x, bb.y];
-        // snap/round the offset so it doesn't keep producing sub-pixel re-centers
-        const snapped_offset = cmath.vector2.quantize(raw_offset, 1);
-
-        vne.translate(cmath.vector2.invert(snapped_offset));
-
-        const new_pos = cmath.vector2.add(origin, snapped_offset);
-        node.left = new_pos[0];
-        node.top = new_pos[1];
-        node.width = bb.width;
-        node.height = bb.height;
-        node.vectorNetwork = vne.value;
-
+        cem_vector.on_drag_gesture_draw(draft, movement);
         break;
       }
 
       case "brush": {
-        __self_brush(draft, { is_gesture: true }, context);
+        cem_bitmap.on_brush(draft, { is_gesture: true }, context);
         break;
       }
       case "curve": {
-        assert(draft.content_edit_mode?.type === "path");
-        const { node_id, segment, initial, control, invert } = draft.gesture;
-
-        const node = dq.__getNodeById(
-          draft,
-          node_id
-        ) as grida.program.nodes.PathNode;
-
-        const { vectorNetwork } = node;
-        const vne = new vn.VectorNetworkEditor(vectorNetwork);
-
-        const tangentPos = cmath.vector2.add(
-          initial,
-          invert ? cmath.vector2.invert(movement) : movement
-        );
-
-        vne.updateTangent(segment, control, tangentPos, true);
-
-        if (segment === vne.segments.length - 1) {
-          // TODO: add a new "curve-b" and make it isolated from control point editing.
-          // on drawing mode - this should be true.
-          // on control point edit mode, this should be false
-          // if last segment, update the next ta as mirror of the tangent
-          draft.content_edit_mode.next_ta = cmath.vector2.invert(tangentPos);
-        }
-
-        // TODO: try consider updating the transform on drag end as it could be expensive
-
-        const bb = vne.getBBox();
-        const delta: cmath.Vector2 = [bb.x, bb.y];
-
-        vne.translate(cmath.vector2.invert(delta));
-
-        const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
-
-        node.left = new_pos[0];
-        node.top = new_pos[1];
-        node.width = bb.width;
-        node.height = bb.height;
-
-        node.vectorNetwork = vne.value;
+        cem_vector.on_drag_gesture_curve(draft);
         break;
-        //
       }
       case "curve-a": {
-        assert(draft.content_edit_mode?.type === "path");
-        const { node_id, vertex, initial, control, invert } = draft.gesture;
-
-        const tangentPos = cmath.vector2.add(
-          initial,
-          invert ? cmath.vector2.invert(movement) : movement
-        );
-
-        draft.content_edit_mode.next_ta = tangentPos;
-
+        cem_vector.on_drag_gesture_curve_a(draft);
         break;
       }
-      case "translate-vertex": {
-        assert(draft.content_edit_mode?.type === "path");
-        const { content_edit_mode } = draft;
-        const { node_id } = content_edit_mode;
-        const node = dq.__getNodeById(
-          draft,
-          node_id
-        ) as grida.program.nodes.PathNode;
-
-        const { movement: _movement } = draft.gesture;
-
-        assert(draft.gesture.type === "translate-vertex");
-        const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
-        // axis lock movement with dominant axis
-        const adj_movement =
-          tarnslate_with_axis_lock === "on"
-            ? cmath.ext.movement.axisLockedByDominance(_movement)
-            : _movement;
-
-        const { initial_verticies, initial_position } = draft.gesture;
-
-        const vne = new vn.VectorNetworkEditor({
-          vertices: initial_verticies.map((p) => ({ p })),
-          segments: node.vectorNetwork.segments,
-        });
-
-        const bb_a = vne.getBBox();
-
-        for (const i of content_edit_mode.selected_vertices) {
-          vne.translateVertex(i, cmath.ext.movement.normalize(adj_movement));
-        }
-
-        const bb_b = vne.getBBox();
-
-        const delta = cmath.vector2.sub([bb_b.x, bb_b.y], [bb_a.x, bb_a.y]);
-
-        vne.translate(cmath.vector2.invert(delta));
-
-        // position & dimension
-        const new_pos = cmath.vector2.add(initial_position, delta);
-        node.left = new_pos[0];
-        node.top = new_pos[1];
-        node.width = bb_b.width;
-        node.height = bb_b.height;
-
-        // update the node's vector network
-        node.vectorNetwork = vne.value;
-
+      case "translate-vector-controls": {
+        cem_vector.on_drag_gesture_translate_vector_controls(draft);
+        break;
+      }
+      case "translate-variable-width-stop": {
+        cem_varwidth.on_drag_gesture_translate_variable_width_stop(draft);
+        break;
+      }
+      case "resize-variable-width-stop": {
+        cem_varwidth.on_drag_resize_variable_width_stop(draft);
         break;
       }
       case "corner-radius": {
@@ -1035,208 +732,23 @@ function __self_evt_on_multiple_selection_overlay_click(
   }
 }
 
-function __self_prepare_bitmap_node(
-  draft: Draft<editor.state.IEditorState>,
-  node_id: string | null,
-  context: ReducerContext
-): Draft<grida.program.nodes.BitmapNode> {
-  if (!node_id) {
-    const new_node_id = nid();
-    const new_bitmap_ref_id = nid(); // TODO: use other id generator
-
-    const parent = __get_insertion_target(draft);
-    if (!parent) throw new Error("document level insertion not supported"); // FIXME: support document level insertion
-    const parent_rect = context.geometry.getNodeAbsoluteBoundingRect(parent)!;
-    const node_relative_pos = cmath.vector2.quantize(
-      cmath.vector2.sub(draft.pointer.position, [parent_rect.x, parent_rect.y]),
-      1
-    );
-
-    const width = 0;
-    const height = 0;
-    const x = node_relative_pos[0];
-    const y = node_relative_pos[1];
-
-    const bitmap: grida.program.nodes.BitmapNode = {
-      type: "bitmap",
-      name: "bitmap",
-      id: new_node_id,
-      active: true,
-      locked: false,
-      position: "absolute",
-      opacity: 1,
-      rotation: 0,
-      zIndex: 0,
-      left: x,
-      top: y,
-      width: width,
-      height: height,
-      imageRef: new_bitmap_ref_id,
-    };
-
-    draft.document.bitmaps[new_bitmap_ref_id] = {
-      data: new Uint8ClampedArray(0),
-      width: 0,
-      height: 0,
-      version: 0,
-    };
-
-    self_try_insert_node(draft, parent, bitmap);
-
-    const node = dq.__getNodeById(
-      draft,
-      new_node_id
-    ) as grida.program.nodes.BitmapNode;
-
-    self_clearSelection(draft);
-
-    return node;
-  } else {
-    return dq.__getNodeById(draft, node_id) as grida.program.nodes.BitmapNode;
-  }
-}
-
-function __self_brush(
-  draft: Draft<editor.state.IEditorState>,
-  {
-    is_gesture,
-  }: {
-    is_gesture: boolean;
-  },
-  context: ReducerContext
-) {
-  assert(draft.tool.type === "brush" || draft.tool.type === "eraser");
-
-  let node_id =
-    draft.content_edit_mode?.type === "bitmap"
-      ? draft.content_edit_mode.node_id
-      : null;
-
-  let color: cmath.Vector4;
-  if (draft.gesture && draft.gesture.type == "brush") {
-    color = draft.gesture.color;
-  } else {
-    color = get_next_brush_pain_color(draft, draft.user_clipboard_color);
-  }
-
-  const blendmode =
-    draft.tool.type === "brush" ? "source-over" : "destination-out";
-  const brush = draft.brush;
-
-  const node = __self_prepare_bitmap_node(draft, node_id, context);
-
-  const nodepos: cmath.Vector2 = [node.left!, node.top!];
-
-  const image = draft.document.bitmaps[node.imageRef];
-
-  // set up the editor from global.
-  let bme: BitmapLayerEditor;
-  if (
-    editor.__global_editors.bitmap &&
-    editor.__global_editors.bitmap.id === node.imageRef
-  ) {
-    bme = editor.__global_editors.bitmap;
-  } else {
-    bme = new BitmapLayerEditor(
-      node.imageRef,
-      {
-        x: nodepos[0],
-        y: nodepos[1],
-        width: node.width,
-        height: node.height,
-      },
-      image.data,
-      image.version
-    );
-    editor.__global_editors.bitmap = bme;
-  }
-  bme.open();
-
-  const pos: cmath.Vector2 = [...draft.pointer.position];
-
-  // brush
-  bme.brush(
-    // relpos,
-    pos,
-    { color, ...brush },
-    blendmode,
-    blendmode === "source-over" ? "auto" : "clip"
-  );
-
-  // update image
-  draft.document.bitmaps[node.imageRef] = {
-    data: bme.data,
-    version: bme.frame,
-    width: bme.width,
-    height: bme.height,
-  };
-
-  // transform node
-  node.left = bme.x;
-  node.top = bme.y;
-  node.width = bme.width;
-  node.height = bme.height;
-
-  if (is_gesture) {
-    if (draft.gesture.type === "idle") {
-      draft.gesture = {
-        type: "brush",
-        movement: cmath.vector2.zero,
-        first: cmath.vector2.zero,
-        last: cmath.vector2.zero,
-        color: color,
-        node_id: node.id,
-      };
-    }
-  } else {
-    bme.close();
-  }
-
-  draft.content_edit_mode = {
-    type: "bitmap",
-    node_id: node.id,
-    imageRef: node.imageRef,
-  };
-
-  return bme;
-}
-
-function __self_floodfill(
-  draft: Draft<editor.state.IEditorState>,
-  imageRef: string
-) {
-  const color = get_next_brush_pain_color(draft, draft.user_clipboard_color);
-  const bme = editor.__global_editors.bitmap!;
-  bme.floodfill(draft.pointer.position, color);
-  draft.document.bitmaps[imageRef] = {
-    data: bme.data,
-    version: bme.frame,
-    width: bme.width,
-    height: bme.height,
-  };
-}
-
-function get_next_brush_pain_color(
-  state: editor.state.IEditorFeatureBrushState,
-  fallback?: cg.RGBA8888
-): cmath.Vector4 {
-  return cmath.color.rgba_to_unit8_chunk(
-    state.brush_color ?? fallback ?? black
-  );
-}
-
-function __self_start_gesture_scale_draw_new_node(
+function __self_start_gesture_insert_and_resize_draw_new_node(
   draft: Draft<editor.state.IEditorState>,
   {
     new_node_id,
     new_node_rect,
+    pending_insertion,
   }: {
     new_node_id: string;
     new_node_rect: cmath.Rectangle;
+    pending_insertion: {
+      node_id: string;
+      prototype: grida.program.nodes.Node;
+    } | null;
   }
 ) {
   draft.gesture = {
-    type: "scale",
+    type: "insert-and-resize",
     initial_snapshot: editor.state.snapshot(draft),
     initial_rects: [new_node_rect],
     movement: cmath.vector2.zero,
@@ -1244,6 +756,7 @@ function __self_start_gesture_scale_draw_new_node(
     last: cmath.vector2.zero,
     selection: [new_node_id],
     direction: "se",
+    pending_insertion,
   };
 }
 
@@ -1272,10 +785,82 @@ function __self_start_gesture_translate(
   };
 }
 
-function __self_maybe_end_gesture(draft: Draft<editor.state.IEditorState>) {
+/**
+ * Optimizes the vector network before a translate-vector-controls gesture ends.
+ *
+ * This merges duplicated vertices/segments by running `vne.optimize()` on the
+ * vector network of the node being edited, ensuring the network stays
+ * normalized after user interaction.
+ */
+function __before_end_translate_vector_controls(
+  draft: Draft<editor.state.IEditorState>
+) {
+  self_optimizeVectorNetwork(draft);
+}
+
+function __before_end_insert_and_resize(
+  draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext
+) {
+  assert(draft.gesture.type === "insert-and-resize");
+  const pending = draft.gesture.pending_insertion;
+  if (!pending) return;
+
+  const node = dq.__getNodeById(
+    draft,
+    pending.node_id
+  ) as grida.program.nodes.ContainerNode;
+  node.fill = (
+    pending.prototype as grida.program.nodes.ContainerNodePrototype
+  ).fill;
+
+  if (cmath.vector2.isZero(draft.gesture.movement)) return;
+
+  const container_rect = context.geometry.getNodeAbsoluteBoundingRect(
+    pending.node_id
+  )!;
+  const parent_id = dq.getParentId(draft.document_ctx, pending.node_id);
+  const siblings = parent_id
+    ? [
+        ...(
+          dq.__getNodeById(
+            draft,
+            parent_id
+          ) as grida.program.nodes.i.IChildrenReference
+        ).children,
+      ]
+    : [...draft.document.scenes[draft.scene_id!].children];
+
+  siblings.forEach((id) => {
+    if (id === pending.node_id) return;
+    const rect = context.geometry.getNodeAbsoluteBoundingRect(id)!;
+    if (cmath.rect.contains(container_rect, rect)) {
+      self_moveNode(draft, id, pending.node_id);
+      const child = dq.__getNodeById(
+        draft,
+        id
+      ) as grida.program.nodes.i.IPositioning;
+      if (typeof child.left === "number")
+        child.left = rect.x - container_rect.x;
+      if (typeof child.top === "number") child.top = rect.y - container_rect.y;
+    }
+  });
+}
+
+function __self_maybe_end_gesture(
+  draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext
+) {
   switch (draft.gesture.type) {
     case "brush": {
-      editor.__global_editors.bitmap?.close();
+      cem_bitmap.on_brush_gesture_end();
+      break;
+    }
+    case "insert-and-resize": {
+      __before_end_insert_and_resize(draft, context);
+      break;
+    }
+    case "scale": {
       break;
     }
     case "translate": {
@@ -1284,6 +869,10 @@ function __self_maybe_end_gesture(draft: Draft<editor.state.IEditorState>) {
         self_selectNode(draft, "reset", ...draft.gesture.selection);
       }
       draft.surface_measurement_targeting_locked = false;
+      break;
+    }
+    case "translate-vector-controls": {
+      __before_end_translate_vector_controls(draft);
       break;
     }
     case "sort": {
@@ -1356,7 +945,7 @@ export default function eventTargetReducer<S extends editor.state.IEditorState>(
     // #region [html backend] canvas event target
     case "event-target/event/on-pointer-move": {
       return produce(state, (draft) => {
-        __self_evt_on_pointer_move(draft, action);
+        __self_evt_on_pointer_move(draft, action, context);
       });
     }
     case "event-target/event/on-pointer-move-raycast": {

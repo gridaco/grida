@@ -1,6 +1,10 @@
 use super::rect::Rectangle;
 use super::vector2::Vector2;
 
+/// Approximation constant used to convert a circular arc into a cubic Bézier
+/// curve. Commonly known as KAPPA, defined as `4 * (sqrt(2) - 1) / 3`.
+pub const KAPPA: f32 = 4.0 * (std::f32::consts::SQRT_2 - 1.0) / 3.0;
+
 /// Represents a cubic Bézier curve segment with absolute control points.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CubicBezier {

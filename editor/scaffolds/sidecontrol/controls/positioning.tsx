@@ -16,6 +16,7 @@ export function PositioningModeControl({
 }) {
   return (
     <PropertyEnum
+      tabIndex={-1}
       enum={[
         {
           value: "absolute",
@@ -45,6 +46,7 @@ export function PositioningConstraintsControl({
         <InputPropertyNumber
           mode="fixed"
           placeholder="--"
+          aria-label="Top"
           type="number"
           value={value.top ?? ""}
           onValueCommit={(v) => {
@@ -61,6 +63,7 @@ export function PositioningConstraintsControl({
           mode="fixed"
           placeholder="--"
           type="number"
+          aria-label="Left"
           value={value.left ?? ""}
           onValueCommit={(v) => {
             onValueCommit?.({
@@ -68,7 +71,7 @@ export function PositioningConstraintsControl({
               left: v,
             });
           }}
-          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}
+          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-auto")}
         />
         <ConstraintsBox
           constraint={{
@@ -88,6 +91,7 @@ export function PositioningConstraintsControl({
           mode="fixed"
           placeholder="--"
           type="number"
+          aria-label="Right"
           value={value.right ?? ""}
           onValueCommit={(v) => {
             onValueCommit?.({
@@ -95,7 +99,7 @@ export function PositioningConstraintsControl({
               right: v,
             });
           }}
-          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}
+          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-auto")}
         />
       </div>
       <div className="flex items-center justify-center">
@@ -103,6 +107,7 @@ export function PositioningConstraintsControl({
           mode="fixed"
           placeholder="--"
           type="number"
+          aria-label="Bottom"
           value={value.bottom ?? ""}
           onValueCommit={(v) => {
             onValueCommit?.({
@@ -138,24 +143,28 @@ function ConstraintsBox({
         <AnchorLineButton
           checked={constraint.top}
           onClick={() => onConstraintChange?.("top", !constraint.top)}
+          tabIndex={-1}
         />
       </div>
       <div className="absolute left-1 w-3">
         <AnchorLineButton
           checked={constraint.left}
           onClick={() => onConstraintChange?.("left", !constraint.left)}
+          tabIndex={-1}
         />
       </div>
       <div className="absolute bottom-1 w-3 rotate-90">
         <AnchorLineButton
           checked={constraint.bottom}
           onClick={() => onConstraintChange?.("bottom", !constraint.bottom)}
+          tabIndex={-1}
         />
       </div>
       <div className="absolute right-1 w-3">
         <AnchorLineButton
           checked={constraint.right}
           onClick={() => onConstraintChange?.("right", !constraint.right)}
+          tabIndex={-1}
         />
       </div>
       <div className="w-1/3 aspect-square rounded-sm border" />
@@ -166,12 +175,15 @@ function ConstraintsBox({
 function AnchorLineButton({
   checked,
   onClick,
+  tabIndex,
 }: {
   checked?: boolean;
   onClick?: () => void;
+  tabIndex?: number;
 }) {
   return (
     <button
+      tabIndex={tabIndex}
       onClick={onClick}
       className="h-4 w-full flex items-center justify-center hover:bg-accent"
     >

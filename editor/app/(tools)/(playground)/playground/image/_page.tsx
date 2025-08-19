@@ -29,7 +29,6 @@ import {
   useCredits,
 } from "@/lib/ai/hooks";
 import {
-  Align,
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
@@ -216,8 +215,6 @@ function SidebarRight() {
             )}
           />
         </div>
-        <hr />
-        <Align />
       </SidebarHeader>
       <SidebarContent>
         <FontFamilyListProvider fonts={fonts}>

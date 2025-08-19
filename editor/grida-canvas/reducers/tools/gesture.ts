@@ -18,7 +18,10 @@ export function getInitialCurveGesture(
 ): editor.gesture.GestureCurve {
   const { node_id, segment: segment_idx, control, invert } = target;
 
-  const node = dq.__getNodeById(state, node_id) as grida.program.nodes.PathNode;
+  const node = dq.__getNodeById(
+    state,
+    node_id
+  ) as grida.program.nodes.VectorNode;
 
   const segment = node.vectorNetwork.segments[segment_idx];
   const tangent = segment[control];

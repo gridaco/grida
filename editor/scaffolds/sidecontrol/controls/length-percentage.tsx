@@ -58,6 +58,7 @@ export function LengthPercentageControl({
     <div className="flex items-center gap-2">
       <__Input value={value} mode={mode} onValueCommit={onValueCommit} />
       <PropertyEnum<Mode>
+        tabIndex={-1}
         value={mode}
         onValueChange={onModeChange}
         enum={[

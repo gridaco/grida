@@ -5,7 +5,8 @@
     "**/.hg": true,
     "**/CVS": true,
     "**/.DS_Store": true,
-    "**/node_modules": true
+    "**/node_modules": true,
+    "**/.legacy": true
   },
   "files.associations": {
     ".babelrc": "jsonc",
@@ -29,6 +30,7 @@
     ".git": true,
     "**/.next": true,
     "**/.turbo": true,
+    "**/.legacy": true,
     ".eslintcache": true,
     "src/dist": true,
     "src/main.prod.js": true,

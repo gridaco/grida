@@ -1,5 +1,5 @@
 import { ContainerWidget } from "./container";
-import { VectorWidget } from "./vector";
+import { SVGPathWidget } from "./svg-path";
 import { TextWidget } from "./text";
 import { ImageWidget } from "./image";
 import { VideoWidget } from "./video";
@@ -9,7 +9,7 @@ import { SVGLineWidget } from "./line";
 import { SVGPolyLineWidget } from "./polyline";
 import { IFrameWidget } from "./iframe";
 import { RichTextWidget } from "./richtext";
-import { PathWidget } from "./path";
+import { VectorWidget } from "./vector";
 import { BitmapWidget } from "./bitmap";
 import { RegularPolygonWidget } from "./polygon";
 import { RegularStarPolygonWidget } from "./star";
@@ -18,8 +18,8 @@ export namespace ReactNodeRenderers {
   export const container = ContainerWidget;
   export const component = ContainerWidget; // TODO:
   export const iframe = IFrameWidget;
+  export const svgpath = SVGPathWidget;
   export const vector = VectorWidget;
-  export const path = PathWidget;
   export const line = SVGLineWidget;
   export const polyline = SVGPolyLineWidget;
   export const rectangle = RectangleWidget;

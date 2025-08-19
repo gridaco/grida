@@ -5,11 +5,12 @@ import type {
 } from "@/grida-canvas/action";
 import type { BitmapEditorBrush, BitmapLayerEditor } from "@grida/bitmap";
 import type cg from "@grida/cg";
-import type { SnapToObjectsResult } from "@grida/cmath/_snap";
+import type { SnapResult } from "@grida/cmath/_snap";
 import type { tokens } from "@grida/tokens";
 import type { NodeProxy } from "./editor";
 import { dq } from "./query";
 import cmath from "@grida/cmath";
+import vn from "@grida/vn";
 import grida from "@grida/schema";
 
 export { type Action };
@@ -124,6 +125,11 @@ export namespace editor.config {
   export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
 
   /**
+   * The camera movement to be multiplied when panning with keyboard input.
+   */
+  export const DEFAULT_CAMERA_KEYBOARD_MOVEMENT = 50;
+
+  /**
    * The base snap threshold (in px) used during a real pointer movement (drag gesture).
    *
    * In practice, the final threshold often scales inversely with the current zoom level:
@@ -146,6 +152,20 @@ export namespace editor.config {
   export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
 
   /**
+   * the tolerance for the vector geometry vertex (when cleaning the vector geometry)
+   * @deprecated - will be removed
+   */
+  export const DEFAULT_VECTOR_GEOMETRY_VERTEX_TOLERANCE = 0.5;
+
+  /**
+   * Default optimization configuration for vector networks.
+   */
+  export const DEFAULT_VECTOR_OPTIMIZATION_CONFIG: vn.OptimizationConfig = {
+    vertex_tolerance: DEFAULT_VECTOR_GEOMETRY_VERTEX_TOLERANCE,
+    remove_unused_verticies: true,
+  };
+
+  /**
    * default quantization step for rotation gestures (in degrees)
    */
   export const DEFAULT_ROTATION_QUANTIZE_STEP = 1;
@@ -160,9 +180,12 @@ export namespace editor.config {
     translate_with_hierarchy_change: "on",
     translate_with_clone: "off",
     tarnslate_with_axis_lock: "off",
+    translate_with_force_disable_snap: "off",
     transform_with_center_origin: "off",
     transform_with_preserve_aspect_ratio: "off",
+    path_keep_projecting: "off",
     rotate_with_quantize: "off",
+    curve_tangent_mirroring: "auto",
   };
 
   export const DEFAULT_BRUSH: state.CurrentBrush = {
@@ -237,6 +260,19 @@ export namespace editor.state {
   export type CurrentBrush = BitmapEditorBrush & { opacity: number };
 
   export type ToolModeType = ToolMode["type"];
+
+  export type VariableWidthTool = {
+    type: "width";
+  };
+
+  export type BendTool = {
+    type: "bend";
+  };
+
+  export type PenPathTool = {
+    type: "path";
+  };
+
   export type ToolMode =
     | {
         type: "cursor";
@@ -244,6 +280,12 @@ export namespace editor.state {
     | {
         type: "hand";
       }
+    | {
+        type: "lasso";
+      }
+    | BendTool
+    | VariableWidthTool
+    | PenPathTool
     | {
         type: "zoom";
       }
@@ -264,9 +306,6 @@ export namespace editor.state {
       }
     | {
         type: "brush" | "eraser" | "flood-fill";
-      }
-    | {
-        type: "path";
       };
 
   /**
@@ -277,6 +316,17 @@ export namespace editor.state {
   export type Marquee = {
     a: cmath.Vector2;
     b: cmath.Vector2;
+    /** when true, adds to existing selection */
+    additive?: boolean;
+  };
+
+  /**
+   * A lasso is a list of points that is represented as a polygon (as its fill regions)
+   */
+  export type Lasso = {
+    points: cmath.Vector2[];
+    /** when true, adds to existing selection */
+    additive?: boolean;
   };
 
   export type HitTestingConfig = {
@@ -325,8 +375,23 @@ export namespace editor.state {
      * user can configure the axis lock mode (turn this on when shift key is pressed, the node will move only in x or y axis)
      */
     tarnslate_with_axis_lock: "on" | "off";
+    /**
+     * force disable snapping while translating
+     *
+     * when on, translation will ignore any snap guides and move freely
+     */
+    translate_with_force_disable_snap: "on" | "off";
     transform_with_center_origin: "on" | "off";
     transform_with_preserve_aspect_ratio: "on" | "off";
+    /**
+     * Continue projecting a path after connecting to an existing vertex.
+     *
+     * This is typically toggled momentarily while the `p` key is held
+     * during a pen gesture.
+     *
+     * @default "off"
+     */
+    path_keep_projecting: "on" | "off";
     /**
      *
      * Set the quantize value for the rotation (in degrees)
@@ -336,6 +401,12 @@ export namespace editor.state {
      * @default "off"
      */
     rotate_with_quantize: "off" | number;
+    /**
+     * tangent control mirroring mode for curve gestures
+     *
+     * @default "auto"
+     */
+    curve_tangent_mirroring: vn.TangentMirroringMode;
   };
 
   export interface IViewportTransformState {
@@ -473,7 +544,7 @@ export namespace editor.state {
     /**
      * the latest snap result from the gesture
      */
-    surface_snapping?: SnapToObjectsResult;
+    surface_snapping?: SnapResult;
 
     /**
      * general hover state
@@ -481,13 +552,6 @@ export namespace editor.state {
      * @default null
      */
     hovered_node_id: string | null;
-
-    /**
-     * hovered vertex index (of a selected path node)
-     *
-     * @default null
-     */
-    hovered_vertex_idx: number | null;
 
     /**
      * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
@@ -511,6 +575,11 @@ export namespace editor.state {
      * @default undefined
      */
     marquee?: editor.state.Marquee;
+
+    /**
+     * Lasso state
+     */
+    lasso?: editor.state.Lasso;
   }
 
   /**
@@ -526,6 +595,7 @@ export namespace editor.state {
       client: cmath.Vector2;
       position: cmath.Vector2;
       last: cmath.Vector2;
+      logical: cmath.Vector2;
       // position_snap: cmath.Vector2;
     };
 
@@ -544,11 +614,19 @@ export namespace editor.state {
      * @default {type: "cursor"}
      */
     tool: editor.state.ToolMode;
+
+    /**
+     * @private - internal use only
+     *
+     * previously selected tool type
+     */
+    __tool_previous: editor.state.ToolMode | null;
   }
 
   export type ContentEditModeState =
     | TextContentEditMode
-    | PathContentEditMode
+    | VariableWidthContentEditMode
+    | VectorContentEditMode
     | BitmapContentEditMode
     | FillGradientContentEditMode;
 
@@ -561,14 +639,43 @@ export namespace editor.state {
     // selectedTextRange;
   };
 
-  type PathContentEditMode = {
-    type: "path";
-    node_id: string;
+  export type VectorContentEditModeHoverableGeometryControlType =
+    | "vertex"
+    | "segment";
 
+  export type VectorContentEditModeGeometryControlsSelection = {
     /**
      * selected vertex indices
      */
     selected_vertices: number[];
+
+    /**
+     * selected segment indices
+     */
+    selected_segments: number[];
+
+    /**
+     * selected tangent indices
+     *
+     * each tangent is represented as [vertex_index, a_or_b]
+     * where a_or_b is 0 for `a` and 1 for `b`
+     */
+    selected_tangents: [number, 0 | 1][];
+  };
+
+  // export type VectorContentEditModeCursorTarget =
+  //   | { type: "vertex"; vertex: number }
+  //   | { type: "segment"; segment: vn.PointOnSegment };
+
+  export type VectorContentEditMode = {
+    type: "vector";
+    node_id: string;
+
+    selection: VectorContentEditModeGeometryControlsSelection;
+    /**
+     * vertices considered active for showing tangent handles
+     */
+    selection_neighbouring_vertices: number[];
 
     /**
      * origin point - the new point will be connected to this point
@@ -586,11 +693,82 @@ export namespace editor.state {
     next_ta: cmath.Vector2 | null;
 
     /**
-     * next points position
+     * initial vector network data
      *
-     * @deprecated - remove me - use global sanp pointer
+     * The VectorNetwork data as entering the vector edit mode
+     *
+     * used to check if the content has changed, and revert the node if no changes were made
      */
-    path_cursor_position: cmath.Vector2;
+    initial_vector_network: vn.VectorNetwork;
+
+    /**
+     * Snapshot of the node before entering vector edit mode. Used to revert the node
+     * when no edits were performed.
+     */
+    original: grida.program.nodes.UnknwonNode | null;
+
+    /**
+     * clipboard data for vector content copy/paste
+     */
+    clipboard: vn.VectorNetwork | null;
+
+    /**
+     * Position of the vector node when the clipboard was populated.
+     *
+     * This allows pasted geometry to retain the absolute coordinates
+     * it had at copy time, even if the node moves before pasting.
+     */
+    clipboard_node_position: cmath.Vector2 | null;
+
+    /**
+     * next point position, snapped, in vector network space
+     */
+    cursor: cmath.Vector2;
+
+    /**
+     * snapped vertex index (of a selected path node)
+     *
+     * This is mathematically resolved based on proximity calculations and snap guides.
+     * Used for measurement calculations and precise vertex targeting.
+     *
+     * @default null
+     */
+    snapped_vertex_idx: number | null;
+
+    /**
+     * snapped segment with parametric position and evaluated point
+     *
+     * This is mathematically resolved based on proximity calculations and snap guides.
+     * Contains the segment index, parametric position (t), and evaluated point for precise targeting.
+     * Used for measurement calculations and precise segment targeting.
+     *
+     * @default null
+     */
+    snapped_segment_p: vn.EvaluatedPointOnSegment | null;
+
+    /**
+     * hovered control for UI feedback and measurement
+     *
+     * This is a UI-triggered hover state based on surface interaction, not mathematically resolved.
+     * Used for visual feedback and measurement calculations when alt key is pressed.
+     * Cannot have multiple mixed hover states - only one control can be hovered at a time.
+     *
+     * @default null
+     */
+    hovered_control: {
+      type: VectorContentEditModeHoverableGeometryControlType;
+      index: number;
+    } | null;
+  };
+
+  export type VariableWidthContentEditMode = {
+    type: "width";
+    node_id: string;
+    snapped_p: vn.EvaluatedPointOnSegment | null;
+    initial_vector_network: vn.VectorNetwork;
+    variable_width_selected_stop: number | null;
+    initial_variable_width_profile: cg.VariableWidthProfile;
+    variable_width_profile: cg.VariableWidthProfile;
   };
 
   type BitmapContentEditMode = {
@@ -715,7 +893,6 @@ export namespace editor.state {
     dropzone: undefined,
     gesture: { type: "idle" },
     hovered_node_id: null,
-    hovered_vertex_idx: null,
     marquee: undefined,
     selection: [],
     hits: [],
@@ -770,6 +947,7 @@ export namespace editor.state {
         client: cmath.vector2.zero,
         position: cmath.vector2.zero,
         last: cmath.vector2.zero,
+        logical: cmath.vector2.zero,
       },
       cursors: [],
       history: {
@@ -788,6 +966,7 @@ export namespace editor.state {
       googlefonts: s.fonts().map((family) => ({ family })),
       brushes: [],
       tool: { type: "cursor" },
+      __tool_previous: null,
       brush: editor.config.DEFAULT_BRUSH,
       scene_id: doc.entry_scene_id ?? Object.keys(doc.scenes)[0] ?? undefined,
       flags: {
@@ -843,12 +1022,15 @@ export namespace editor.gesture {
     | GestureTranslate
     | GestureSort
     | GestureGap
+    | GestureInsertAndResize
     | GestureScale
     | GestureRotate
     | GestureCornerRadius
     | GestureDraw
     | GestureBrush
-    | GestureTranslateVertex
+    | GestureTranslateVectorControls
+    | GestureTranslateVariableWidthStop
+    | GestureResizeVariableWidthStop
     | GestureCurve
     | GestureCurveA;
 
@@ -1011,6 +1193,14 @@ export namespace editor.gesture {
     readonly direction: cmath.CardinalDirection;
   };
 
+  export type GestureInsertAndResize = Omit<GestureScale, "type"> & {
+    readonly type: "insert-and-resize";
+    pending_insertion: {
+      node_id: string;
+      prototype: grida.program.nodes.Node;
+    } | null;
+  };
+
   export type GestureRotate = IGesture & {
     readonly type: "rotate";
     readonly initial_bounding_rectangle: cmath.Rectangle | null;
@@ -1075,27 +1265,76 @@ export namespace editor.gesture {
    * Translate certain path point
    *
    * @remarks
-   * This is only valid with content edit mode is "path"
+   * This is only valid with content edit mode is "vector"
    */
-  export type GestureTranslateVertex = IGesture & {
-    type: "translate-vertex";
-
-    /**
-     * initial (snapshot) value of the points
-     */
-    readonly initial_verticies: cmath.Vector2[];
-
-    /**
-     * index of the vertex
-     */
-    readonly vertex: number;
-
+  export type GestureTranslateVectorControls = IGesture & {
+    type: "translate-vector-controls";
     readonly node_id: string;
-
-    /**
-     * initial position of node
-     */
+    readonly vertices: number[];
+    readonly tangents: [number, 0 | 1][];
+    readonly initial_verticies: cmath.Vector2[];
+    readonly initial_segments: vn.VectorNetworkSegment[];
     readonly initial_position: cmath.Vector2;
+    /**
+     * Absolute position of the node when the gesture started.
+     *
+     * Used for snap guide rendering inside nested containers where the local
+     * position does not reflect the node's location on the canvas.
+     */
+    readonly initial_absolute_position: cmath.Vector2;
+  };
+
+  /**
+   * Translate variable width stop
+   *
+   * @remarks
+   * This is only valid with content edit mode is "width"
+   */
+  export type GestureTranslateVariableWidthStop = IGesture & {
+    type: "translate-variable-width-stop";
+    readonly node_id: string;
+    readonly stop: number;
+    readonly initial_stop: cg.VariableWidthStop;
+    readonly initial_position: cmath.Vector2;
+    /**
+     * Absolute position of the node when the gesture started.
+     *
+     * Used for snap guide rendering inside nested containers where the local
+     * position does not reflect the node's location on the canvas.
+     */
+    readonly initial_absolute_position: cmath.Vector2;
+  };
+
+  /**
+   * Resize variable width stop radius
+   *
+   * @remarks
+   * This is only valid with content edit mode is "width"
+   */
+  export type GestureResizeVariableWidthStop = IGesture & {
+    type: "resize-variable-width-stop";
+    readonly node_id: string;
+    readonly stop: number;
+    readonly side: "left" | "right";
+    readonly initial_stop: cg.VariableWidthStop;
+    readonly initial_position: cmath.Vector2;
+    /**
+     * Absolute position of the node when the gesture started.
+     *
+     * Used for snap guide rendering inside nested containers where the local
+     * position does not reflect the node's location on the canvas.
+     */
+    readonly initial_absolute_position: cmath.Vector2;
+    /**
+     * Initial angle of the curve at the stop position.
+     * Used to transform movement perpendicular to the curve direction.
+     */
+    readonly initial_angle: number;
+    /**
+     * Initial curve position at the stop.
+     * Used to calculate the radius based on cursor distance from curve.
+     */
+    readonly initial_curve_position: cmath.Vector2;
   };
 
   /**
@@ -1190,7 +1429,6 @@ export namespace editor.history {
 
     // hover state should be cleared to prevent errors
     draft.hovered_node_id = null;
-    draft.hovered_vertex_idx = null;
     return;
   }
 
@@ -1242,6 +1480,11 @@ export namespace editor.history {
 }
 
 export namespace editor.a11y {
+  export type EscapeStep =
+    | "escape-tool"
+    | "escape-selection"
+    | "escape-content-edit-mode";
+
   export const a11y_direction_to_order = {
     "a11y/up": "backward",
     "a11y/right": "forward",
@@ -1250,10 +1493,10 @@ export namespace editor.a11y {
   } as const;
 
   export const a11y_direction_to_vector = {
-    "a11y/up": [0, -1],
-    "a11y/right": [1, 0],
-    "a11y/down": [0, 1],
-    "a11y/left": [-1, 0],
+    "a11y/up": [0, -1] as cmath.Vector2,
+    "a11y/right": [1, 0] as cmath.Vector2,
+    "a11y/down": [0, 1] as cmath.Vector2,
+    "a11y/left": [-1, 0] as cmath.Vector2,
   } as const;
 }
 
@@ -1369,8 +1612,16 @@ export namespace editor.api {
       node_id: NodeID,
       fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
     ): void;
+    changeNodeFill(
+      node_id: NodeID[],
+      fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
+    ): void;
     changeNodeStroke(
       node_id: NodeID,
+      stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
+    ): void;
+    changeNodeStroke(
+      node_id: NodeID[],
       stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
     ): void;
     changeNodeStrokeWidth(
@@ -1493,11 +1744,6 @@ export namespace editor.api {
     hoverNode(node_id: string, event: "enter" | "leave"): void;
     hoverEnterNode(node_id: string): void;
     hoverLeaveNode(node_id: string): void;
-    hoverVertex(
-      node_id: string,
-      vertex: number,
-      event: "enter" | "leave"
-    ): void;
 
     startGuideGesture(axis: cmath.Axis, idx: number | -1): void;
     startScaleGesture(
@@ -1508,7 +1754,7 @@ export namespace editor.api {
     startGapGesture(selection: string | string[], axis: "x" | "y"): void;
     startCornerRadiusGesture(selection: string): void;
     startRotateGesture(selection: string): void;
-    startTranslateVertexGesture(node_id: string, vertex: number): void;
+    startTranslateVectorNetwork(node_id: string): void;
     startCurveGesture(
       node_id: string,
       segment: number,
@@ -1654,6 +1900,41 @@ export namespace editor.api {
      * @returns the selected node ids. or `false` if ignored.
      */
     select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
+
+    /**
+     * ux a11y escape command.
+     *
+     * - In vector content edit mode, prioritizes:
+     *   1. resetting active tool to cursor,
+     *   2. clearing vector selection,
+     *   3. exiting the content edit mode.
+     * - Otherwise exits the content edit mode.
+     *
+     * bind this to `escape` key.
+     */
+    a11yEscape(): void;
+
+    /**
+     * semantic copy command for accessibility features.
+     *
+     * currently proxies to copying the current selection.
+     */
+    a11yCopy(): void;
+
+    /**
+     * semantic cut command for accessibility features.
+     *
+     * currently proxies to cutting the current selection.
+     */
+    a11yCut(): void;
+
+    /**
+     * semantic paste command for accessibility features.
+     *
+     * currently proxies to the standard paste behavior.
+     */
+    a11yPaste(): void;
+    a11yDelete(): void;
     blur(): void;
     undo(): void;
     redo(): void;
@@ -1661,12 +1942,57 @@ export namespace editor.api {
     copy(target: "selection" | NodeID): void;
     paste(): void;
     duplicate(target: "selection" | NodeID): void;
+    flatten(target: "selection" | NodeID): void;
+    op(target: ReadonlyArray<NodeID>, op: cg.BooleanOperation): void;
+    union(target: ReadonlyArray<NodeID>): void;
+    subtract(target: ReadonlyArray<NodeID>): void;
+    intersect(target: ReadonlyArray<NodeID>): void;
+    exclude(target: ReadonlyArray<NodeID>): void;
 
     setClipboardColor(color: cg.RGBA8888): void;
 
-    //
+    // vector editor
     selectVertex(node_id: NodeID, vertex: number): void;
     deleteVertex(node_id: NodeID, vertex: number): void;
+    selectSegment(node_id: NodeID, segment: number): void;
+    deleteSegment(node_id: NodeID, segment: number): void;
+    splitSegment(node_id: NodeID, point: vn.PointOnSegment): void;
+    translateVertex(
+      node_id: NodeID,
+      vertex: number,
+      delta: cmath.Vector2
+    ): void;
+    translateSegment(
+      node_id: NodeID,
+      segment: number,
+      delta: cmath.Vector2
+    ): void;
+    bendSegment(
+      node_id: NodeID,
+      segment: number,
+      ca: number,
+      cb: cmath.Vector2,
+      frozen: {
+        a: cmath.Vector2;
+        b: cmath.Vector2;
+        ta: cmath.Vector2;
+        tb: cmath.Vector2;
+      }
+    ): void;
+    planarize(node_id: NodeID): void;
+
+    /**
+     * Updates the hovered control in vector content edit mode.
+     *
+     * @param hoveredControl - The hovered control with type and index, or null if no control is hovered
+     */
+    updateVectorHoveredControl(
+      hoveredControl: {
+        type: editor.state.VectorContentEditModeHoverableGeometryControlType;
+        index: number;
+      } | null
+    ): void;
+
     //
 
     //
@@ -1720,6 +2046,18 @@ export namespace editor.api {
     distributeEvenly(target: "selection" | NodeID[], axis: "x" | "y"): void;
     autoLayout(target: "selection" | NodeID[]): void;
     contain(target: "selection" | NodeID[]): void;
+
+    /**
+     * group the nodes
+     * @param target - the nodes to group
+     */
+    group(target: "selection" | NodeID[]): void;
+
+    /**
+     * ungroup the nodes (from group or boolean)
+     * @param target - the nodes to ungroup
+     */
+    ungroup(target: "selection" | NodeID[]): void;
     configureSurfaceRaycastTargeting(
       config: Partial<state.HitTestingConfig>
     ): void;
@@ -1730,6 +2068,9 @@ export namespace editor.api {
     configureTranslateWithAxisLockModifier(
       tarnslate_with_axis_lock: "on" | "off"
     ): void;
+    configureTranslateWithForceDisableSnap(
+      translate_with_force_disable_snap: "on" | "off"
+    ): void;
     configureTransformWithCenterOriginModifier(
       transform_with_center_origin: "on" | "off"
     ): void;
@@ -1738,6 +2079,9 @@ export namespace editor.api {
     ): void;
     configureRotateWithQuantizeModifier(
       rotate_with_quantize: number | "off"
+    ): void;
+    configureCurveTangentMirroringModifier(
+      curve_tangent_mirroring: vn.TangentMirroringMode
     ): void;
     // //
     toggleActive(target: "selection" | NodeID): void;

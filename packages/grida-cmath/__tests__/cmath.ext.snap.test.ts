@@ -1,6 +1,17 @@
+import cmath from "..";
+import { snapToCanvasGeometry } from "../_snap";
+
 describe("snap", () => {
   it("noop", () => {
     expect(true).toBe(true);
+  });
+});
+
+describe("snapToCanvasGeometry", () => {
+  it("handles empty agent points", () => {
+    const res = snapToCanvasGeometry([], { points: [[0, 0]] }, { x: 1, y: 1 });
+    expect(res.by_points).toBe(false);
+    expect(res.delta).toEqual([0, 0]);
   });
 });
 
