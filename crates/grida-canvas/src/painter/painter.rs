@@ -61,6 +61,14 @@ impl<'a> Painter<'a> {
     // === Helper Methods ========
     // ============================
 
+    fn with_transform_option<F: FnOnce()>(&self, transform: &Option<AffineTransform>, f: F) {
+        if let Some(transform) = transform {
+            self.with_transform(&transform.matrix, f);
+        } else {
+            f();
+        }
+    }
+
     /// Save/restore transform state and apply a 2×3 matrix
     fn with_transform<F: FnOnce()>(&self, transform: &[[f32; 3]; 2], f: F) {
         let canvas = self.canvas;
@@ -857,7 +865,7 @@ impl<'a> NodePainter<'a> {
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
-        self.painter.with_transform(&node.transform.matrix, || {
+        self.painter.with_transform_option(&node.transform, || {
             self.painter.with_opacity(node.opacity, || {
                 for child_id in &node.children {
                     if let Some(child) = repository.get(child_id) {
@@ -874,7 +882,7 @@ impl<'a> NodePainter<'a> {
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
-        self.painter.with_transform(&node.transform.matrix, || {
+        self.painter.with_transform_option(&node.transform, || {
             if let Some(shape) = boolean_operation_shape(node, repository, cache) {
                 self.painter
                     .draw_shape_with_effects(&node.effects, &shape, || {

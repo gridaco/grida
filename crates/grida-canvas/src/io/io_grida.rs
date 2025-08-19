@@ -578,17 +578,20 @@ pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
 
 impl From<JSONGroupNode> for GroupNode {
     fn from(node: JSONGroupNode) -> Self {
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width,
+            node.base.height,
+            node.base.rotation,
+        );
+
         GroupNode {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform: AffineTransform::from_box_center(
-                node.base.left,
-                node.base.top,
-                node.base.width,
-                node.base.height,
-                node.base.rotation,
-            ),
+            // TODO: group's transform should be handled differently
+            transform: Some(transform),
             children: node.children.unwrap_or_default(),
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode,
@@ -954,6 +957,7 @@ impl From<JSONVectorNode> for Node {
 
 impl From<JSONBooleanOperationNode> for Node {
     fn from(node: JSONBooleanOperationNode) -> Self {
+        // TODO: boolean operation's transform should be handled differently
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
@@ -966,7 +970,7 @@ impl From<JSONBooleanOperationNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform,
+            transform: Some(transform),
             op: node.op,
             corner_radius: node.base.corner_radius,
             children: node.children,

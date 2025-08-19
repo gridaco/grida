@@ -49,7 +49,7 @@ fn create_static_scene() -> Scene {
         id: "root".to_string(),
         name: Some("Root Group".to_string()),
         active: true,
-        transform: AffineTransform::identity(),
+        transform: None,
         children: ids,
         opacity: 1.0,
         blend_mode: BlendMode::Normal,

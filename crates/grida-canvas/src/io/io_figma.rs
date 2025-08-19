@@ -1040,7 +1040,7 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
-            transform,
+            transform: Some(transform),
             op: op,
             children,
             // map this

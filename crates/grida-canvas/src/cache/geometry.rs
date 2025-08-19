@@ -67,7 +67,7 @@ impl GeometryCache {
 
         match node {
             Node::Group(n) => {
-                let world_transform = parent_world.compose(&n.transform);
+                let world_transform = parent_world.compose(&n.transform.unwrap_or_default());
                 let mut union_bounds: Option<Rectangle> = None;
                 let mut union_render_bounds: Option<Rectangle> = None;
                 for child_id in &n.children {
@@ -111,7 +111,7 @@ impl GeometryCache {
                 let render_bounds = union_render_bounds.unwrap_or(world_bounds);
 
                 let entry = GeometryEntry {
-                    transform: n.transform,
+                    transform: n.transform.unwrap_or_default(),
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
@@ -125,7 +125,7 @@ impl GeometryCache {
                 entry.absolute_bounding_box
             }
             Node::BooleanOperation(n) => {
-                let world_transform = parent_world.compose(&n.transform);
+                let world_transform = parent_world.compose(&n.transform.unwrap_or_default());
                 let mut union_bounds: Option<Rectangle> = None;
                 for child_id in &n.children {
                     let child_bounds = Self::build_recursive(
@@ -171,7 +171,7 @@ impl GeometryCache {
                 );
 
                 let entry = GeometryEntry {
-                    transform: n.transform,
+                    transform: n.transform.unwrap_or_default(),
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,

@@ -56,7 +56,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         id: "root".to_string(),
         name: Some("Root Group".to_string()),
         active: true,
-        transform: AffineTransform::identity(),
+        transform: None,
         children: ids.clone(),
         opacity: 1.0,
         blend_mode: BlendMode::Normal,

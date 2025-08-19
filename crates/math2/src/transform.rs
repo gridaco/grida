@@ -192,3 +192,9 @@ impl AffineTransform {
         self.matrix[1][0].atan2(self.matrix[0][0])
     }
 }
+
+impl Default for AffineTransform {
+    fn default() -> Self {
+        Self::identity()
+    }
+}
