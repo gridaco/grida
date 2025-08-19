@@ -35,6 +35,7 @@ import {
   supportsFlatten,
   self_select_tool,
   getVectorSelectionStartPoint,
+  self_nudge_transform,
 } from "./methods";
 import {
   self_wrapNodes,
@@ -43,11 +44,7 @@ import {
 } from "./methods/wrap";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
-import {
-  getSnapTargets,
-  snapObjectsTranslation,
-  snapMovement,
-} from "./tools/snap";
+import { snapMovement } from "./tools/snap";
 import nid from "./tools/id";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
@@ -610,7 +607,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       if (target_node_ids.length === 0) return state;
       return produce(state, (draft) => {
-        __self_nudge(draft, target_node_ids, dx, dy, context);
+        self_nudge_transform(draft, target_node_ids, dx, dy, context);
       });
     }
     case "nudge-resize": {
@@ -777,11 +774,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
 
           if (out_flow_node_ids.length > 0) {
-            const nudge_dx =
-              nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0];
-            const nudge_dy =
-              nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1];
-            __self_nudge(draft, out_flow_node_ids, nudge_dx, nudge_dy, context);
+            const [dx, dy] = cmath.vector2.multiply(
+              editor.a11y.a11y_direction_to_vector[direction],
+              [nudge_mod, nudge_mod]
+            );
+
+            self_nudge_transform(draft, out_flow_node_ids, dx, dy, context);
           }
         });
       }
@@ -1831,43 +1829,4 @@ function __self_order(
   // update the hierarchy graph
   const context = dq.Context.from(draft.document);
   draft.document_ctx = context.snapshot();
-}
-
-function __self_nudge(
-  draft: Draft<editor.state.IEditorState>,
-  targets: string[],
-  dx: number,
-  dy: number,
-  context: ReducerContext
-) {
-  // clear the previous surface snapping
-  draft.surface_snapping = undefined;
-
-  // for nudge, gesture is not required, but only for surface ux.
-  if (draft.gesture.type === "nudge") {
-    const snap_target_node_ids = getSnapTargets(draft.selection, draft);
-    const snap_target_node_rects = snap_target_node_ids.map(
-      (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
-    );
-    const origin_rects = targets.map(
-      (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
-    );
-    const { snapping } = snapObjectsTranslation(
-      origin_rects,
-      { objects: snap_target_node_rects },
-      [dx, dy],
-      editor.config.DEFAULT_SNAP_NUDGE_THRESHOLD
-    );
-    draft.surface_snapping = snapping;
-  }
-
-  for (const node_id of targets) {
-    const node = dq.__getNodeById(draft, node_id);
-
-    draft.document.nodes[node_id] = nodeTransformReducer(node, {
-      type: "translate",
-      dx: dx,
-      dy: dy,
-    });
-  }
 }

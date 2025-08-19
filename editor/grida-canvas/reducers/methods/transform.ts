@@ -57,6 +57,45 @@ function allows_hierarchy_change(
   }
 }
 
+export function self_nudge_transform<S extends editor.state.IEditorState>(
+  draft: Draft<S>,
+  targets: string[],
+  dx: number,
+  dy: number,
+  context: ReducerContext
+) {
+  // clear the previous surface snapping
+  draft.surface_snapping = undefined;
+
+  // for nudge, gesture is not required, but only for surface ux.
+  if (draft.gesture.type === "nudge") {
+    const snap_target_node_ids = getSnapTargets(draft.selection, draft);
+    const snap_target_node_rects = snap_target_node_ids.map(
+      (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
+    );
+    const origin_rects = targets.map(
+      (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
+    );
+    const { snapping } = snapObjectsTranslation(
+      origin_rects,
+      { objects: snap_target_node_rects },
+      [dx, dy],
+      editor.config.DEFAULT_SNAP_NUDGE_THRESHOLD
+    );
+    draft.surface_snapping = snapping;
+  }
+
+  for (const node_id of targets) {
+    const node = dq.__getNodeById(draft, node_id);
+
+    draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      type: "translate",
+      dx: dx,
+      dy: dy,
+    });
+  }
+}
+
 export function self_update_gesture_transform<
   S extends editor.state.IEditorState,
 >(draft: Draft<S>, context: ReducerContext) {

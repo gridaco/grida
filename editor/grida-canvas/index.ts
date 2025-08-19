@@ -1493,10 +1493,10 @@ export namespace editor.a11y {
   } as const;
 
   export const a11y_direction_to_vector = {
-    "a11y/up": [0, -1],
-    "a11y/right": [1, 0],
-    "a11y/down": [0, 1],
-    "a11y/left": [-1, 0],
+    "a11y/up": [0, -1] as cmath.Vector2,
+    "a11y/right": [1, 0] as cmath.Vector2,
+    "a11y/down": [0, 1] as cmath.Vector2,
+    "a11y/left": [-1, 0] as cmath.Vector2,
   } as const;
 }
 
