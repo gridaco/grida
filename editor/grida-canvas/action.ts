@@ -521,15 +521,15 @@ export interface EditorGroupAction {
   target: NodeID[] | "selection";
 }
 
+export interface EditorBooleanOperationAction {
+  type: "group-op";
+  target: ReadonlyArray<NodeID>;
+  op: cg.BooleanOperation;
+}
+
 export interface EditorUngroupAction {
   type: "ungroup";
   target: NodeID[] | "selection";
-}
-
-export interface EditorBooleanOperationAction {
-  type: "op";
-  target: ReadonlyArray<NodeID>;
-  op: cg.BooleanOperation;
 }
 
 export type EditorConfigAction =

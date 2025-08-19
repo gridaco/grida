@@ -162,14 +162,14 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
 }
 
 /**
- * Ungroups the provided group nodes, preserving the children's absolute positions.
+ * Ungroups the provided group or boolean nodes, preserving the children's absolute positions.
  *
- * This operation is only allowed for "group" nodes (GroupNode). It moves all children
- * to the parent of the group node and adjusts their positions to preserve their
+ * This operation is allowed for "group" nodes (GroupNode) and "boolean" nodes (BooleanPathOperationNode).
+ * It moves all children to the parent of the node and adjusts their positions to preserve their
  * absolute positions in the canvas.
  *
  * @param draft - Mutable editor state draft
- * @param groupNodeIds - Array of group node ids to ungroup
+ * @param groupNodeIds - Array of group or boolean node ids to ungroup
  * @param geometry - Geometry query used to compute bounding rectangles
  */
 export function self_ungroup<S extends editor.state.IEditorState>(
@@ -177,10 +177,10 @@ export function self_ungroup<S extends editor.state.IEditorState>(
   groupNodeIds: string[],
   geometry: editor.api.IDocumentGeometryQuery
 ): void {
-  // Filter to only group nodes
+  // Filter to only group nodes and boolean nodes
   const validGroupNodeIds = groupNodeIds.filter((node_id) => {
     const node = dq.__getNodeById(draft, node_id);
-    return node.type === "group";
+    return node.type === "group" || node.type === "boolean";
   });
 
   if (validGroupNodeIds.length === 0) {
@@ -190,24 +190,27 @@ export function self_ungroup<S extends editor.state.IEditorState>(
   // Collect all ungrouped children to select them later
   const ungroupedChildren: string[] = [];
 
-  // Process each group node
-  validGroupNodeIds.forEach((group_id) => {
-    const group_node = dq.__getNodeById(
-      draft,
-      group_id
-    ) as grida.program.nodes.GroupNode;
-    const parent_id = dq.getParentId(draft.document_ctx, group_id);
+  // Process each group or boolean node
+  validGroupNodeIds.forEach((node_id) => {
+    const node = dq.__getNodeById(draft, node_id);
+
+    // Ensure the node has children (group or boolean nodes)
+    if (!("children" in node) || !Array.isArray(node.children)) {
+      return;
+    }
+
+    const parent_id = dq.getParentId(draft.document_ctx, node_id);
     const target_parent = parent_id === null ? "<root>" : parent_id;
 
-    // Get the group's absolute position
-    const group_rect = geometry.getNodeAbsoluteBoundingRect(group_id);
-    if (!group_rect) {
+    // Get the node's absolute position
+    const node_rect = geometry.getNodeAbsoluteBoundingRect(node_id);
+    if (!node_rect) {
       return;
     }
 
     // Calculate the offset needed to preserve absolute positions
-    let offset_x = group_rect.x;
-    let offset_y = group_rect.y;
+    let offset_x = node_rect.x;
+    let offset_y = node_rect.y;
 
     // If the target parent is not root, we need to account for its position
     if (target_parent !== "<root>") {
@@ -218,10 +221,10 @@ export function self_ungroup<S extends editor.state.IEditorState>(
       }
     }
 
-    // Move all children to the parent of the group, preserving their order
-    const children_to_move = [...group_node.children];
+    // Move all children to the parent of the node, preserving their order
+    const children_to_move: string[] = [...node.children];
     children_to_move.forEach((child_id) => {
-      // Move the child to the group's parent
+      // Move the child to the node's parent
       self_moveNode(draft, child_id, target_parent);
 
       // Adjust the child's position to preserve absolute position
@@ -237,11 +240,11 @@ export function self_ungroup<S extends editor.state.IEditorState>(
       ungroupedChildren.push(child_id);
     });
 
-    // Remove the group node
+    // Remove the node
     if (parent_id === null) {
       // Remove from scene children
       const scene = draft.document.scenes[draft.scene_id!];
-      const index = scene.children.indexOf(group_id);
+      const index = scene.children.indexOf(node_id);
       if (index !== -1) {
         scene.children.splice(index, 1);
       }
@@ -249,15 +252,15 @@ export function self_ungroup<S extends editor.state.IEditorState>(
       // Remove from parent's children
       const parent = dq.__getNodeById(draft, parent_id);
       if ("children" in parent && Array.isArray(parent.children)) {
-        const index = parent.children.indexOf(group_id);
+        const index = parent.children.indexOf(node_id);
         if (index !== -1) {
           parent.children.splice(index, 1);
         }
       }
     }
 
-    // Remove the group node from the document
-    delete draft.document.nodes[group_id];
+    // Remove the node from the document
+    delete draft.document.nodes[node_id];
   });
 
   // Update document context

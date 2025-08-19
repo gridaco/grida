@@ -2046,7 +2046,17 @@ export namespace editor.api {
     distributeEvenly(target: "selection" | NodeID[], axis: "x" | "y"): void;
     autoLayout(target: "selection" | NodeID[]): void;
     contain(target: "selection" | NodeID[]): void;
+
+    /**
+     * group the nodes
+     * @param target - the nodes to group
+     */
     group(target: "selection" | NodeID[]): void;
+
+    /**
+     * ungroup the nodes (from group or boolean)
+     * @param target - the nodes to ungroup
+     */
     ungroup(target: "selection" | NodeID[]): void;
     configureSurfaceRaycastTargeting(
       config: Partial<state.HitTestingConfig>

@@ -1069,7 +1069,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
       break;
     }
-    case "op": {
+    case "group-op": {
       const { target, op } = action;
       const target_node_ids = target;
 

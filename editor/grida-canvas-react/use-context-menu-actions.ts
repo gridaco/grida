@@ -49,7 +49,10 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
     hasSelection && ids.every((id) => supportsFlatten(nodes[id]));
 
   const canUngroup =
-    hasSelection && ids.some((id) => nodes[id].type === "group");
+    hasSelection &&
+    ids.some(
+      (id) => nodes[id].type === "group" || nodes[id].type === "boolean"
+    );
 
   const canPlanarize =
     hasSelection && ids.every((id) => nodes[id].type === "vector");
