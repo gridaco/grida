@@ -1709,12 +1709,57 @@ function __self_delete_nodes<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   target_node_ids: string[]
 ) {
+  // Collect parent IDs before deletion
+  const parent_ids_to_check = new Set<string>();
+  for (const node_id of target_node_ids) {
+    const parent_id = dq.getParentId(draft.document_ctx, node_id);
+    if (parent_id) {
+      parent_ids_to_check.add(parent_id);
+    }
+  }
+
   for (const node_id of target_node_ids) {
     if (
       // the deleting node cannot be.. in content edit mode
       node_id !== draft.content_edit_mode?.node_id
     ) {
       self_try_remove_node(draft, node_id);
+    }
+  }
+
+  // Clean up empty boolean/group nodes after deletion
+  __self_post_hierarchy_change_commit(draft, Array.from(parent_ids_to_check));
+}
+
+/**
+ * Post-deletion cleanup function that removes empty boolean and group nodes.
+ * Boolean and group nodes are not allowed to have no children in the editor.
+ */
+function __self_post_hierarchy_change_commit<
+  S extends editor.state.IEditorState,
+>(draft: Draft<S>, parent_ids_to_check: string[]) {
+  const nodes_to_check = new Set<string>(parent_ids_to_check);
+
+  // Check each parent node to see if it's now empty
+  for (const parent_id of nodes_to_check) {
+    const parent_node = dq.__getNodeById(draft, parent_id);
+    if (!parent_node) continue;
+
+    // Only check boolean and group nodes
+    if (parent_node.type === "boolean" || parent_node.type === "group") {
+      // Check if the node has children property and if it's empty
+      if ("children" in parent_node && Array.isArray(parent_node.children)) {
+        if (parent_node.children.length === 0) {
+          // Remove the empty boolean/group node
+          self_try_remove_node(draft, parent_id);
+
+          // Recursively check the parent of this removed node
+          const grandparent_id = dq.getParentId(draft.document_ctx, parent_id);
+          if (grandparent_id) {
+            nodes_to_check.add(grandparent_id);
+          }
+        }
+      }
     }
   }
 }
