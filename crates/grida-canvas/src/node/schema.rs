@@ -148,20 +148,20 @@ pub struct UnknownNodeProperties {
 
 #[derive(Debug, Clone)]
 pub enum Node {
-    Error(ErrorNode),
-    Group(GroupNode),
-    Container(ContainerNode),
-    Rectangle(RectangleNode),
-    Ellipse(EllipseNode),
-    Polygon(PolygonNode),
-    RegularPolygon(RegularPolygonNode),
-    RegularStarPolygon(RegularStarPolygonNode),
-    Line(LineNode),
-    TextSpan(TextSpanNode),
-    SVGPath(SVGPathNode),
-    Vector(VectorNode),
-    BooleanOperation(BooleanPathOperationNode),
-    Image(ImageNode),
+    Error(ErrorNodeRec),
+    Group(GroupNodeRec),
+    Container(ContainerNodeRec),
+    Rectangle(RectangleNodeRec),
+    Ellipse(EllipseNodeRec),
+    Polygon(PolygonNodeRec),
+    RegularPolygon(RegularPolygonNodeRec),
+    RegularStarPolygon(RegularStarPolygonNodeRec),
+    Line(LineNodeRec),
+    TextSpan(TextSpanNodeRec),
+    SVGPath(SVGPathNodeRec),
+    Vector(VectorNodeRec),
+    BooleanOperation(BooleanPathOperationNodeRec),
+    Image(ImageNodeRec),
 }
 
 // node trait
@@ -258,33 +258,33 @@ pub trait NodeShapeMixin {
 /// Intrinsic size node is a node that has a fixed size, and can be rendered soley on its own.
 #[derive(Debug, Clone)]
 pub enum IntrinsicSizeNode {
-    Error(ErrorNode),
-    Container(ContainerNode),
-    Rectangle(RectangleNode),
-    Ellipse(EllipseNode),
-    Polygon(PolygonNode),
-    RegularPolygon(RegularPolygonNode),
-    RegularStarPolygon(RegularStarPolygonNode),
-    Line(LineNode),
-    TextSpan(TextSpanNode),
-    SVGPath(SVGPathNode),
-    Vector(VectorNode),
-    Image(ImageNode),
+    Error(ErrorNodeRec),
+    Container(ContainerNodeRec),
+    Rectangle(RectangleNodeRec),
+    Ellipse(EllipseNodeRec),
+    Polygon(PolygonNodeRec),
+    RegularPolygon(RegularPolygonNodeRec),
+    RegularStarPolygon(RegularStarPolygonNodeRec),
+    Line(LineNodeRec),
+    TextSpan(TextSpanNodeRec),
+    SVGPath(SVGPathNodeRec),
+    Vector(VectorNodeRec),
+    Image(ImageNodeRec),
 }
 
 #[derive(Debug, Clone)]
 pub enum LeafNode {
-    Error(ErrorNode),
-    Rectangle(RectangleNode),
-    Ellipse(EllipseNode),
-    Polygon(PolygonNode),
-    RegularPolygon(RegularPolygonNode),
-    RegularStarPolygon(RegularStarPolygonNode),
-    Line(LineNode),
-    TextSpan(TextSpanNode),
-    SVGPath(SVGPathNode),
-    Vector(VectorNode),
-    Image(ImageNode),
+    Error(ErrorNodeRec),
+    Rectangle(RectangleNodeRec),
+    Ellipse(EllipseNodeRec),
+    Polygon(PolygonNodeRec),
+    RegularPolygon(RegularPolygonNodeRec),
+    RegularStarPolygon(RegularStarPolygonNodeRec),
+    Line(LineNodeRec),
+    TextSpan(TextSpanNodeRec),
+    SVGPath(SVGPathNodeRec),
+    Vector(VectorNodeRec),
+    Image(ImageNodeRec),
 }
 
 impl NodeTrait for LeafNode {
@@ -338,7 +338,7 @@ impl NodeTrait for LeafNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct ErrorNode {
+pub struct ErrorNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -348,7 +348,7 @@ pub struct ErrorNode {
     pub opacity: f32,
 }
 
-impl ErrorNode {
+impl ErrorNodeRec {
     pub fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -360,7 +360,7 @@ impl ErrorNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct GroupNode {
+pub struct GroupNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -371,7 +371,7 @@ pub struct GroupNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct ContainerNode {
+pub struct ContainerNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -390,7 +390,7 @@ pub struct ContainerNode {
     pub clip: bool,
 }
 
-impl ContainerNode {
+impl ContainerNodeRec {
     pub fn to_own_shape(&self) -> RRectShape {
         RRectShape {
             width: self.size.width,
@@ -400,7 +400,7 @@ impl ContainerNode {
     }
 }
 
-impl NodeFillsMixin for ContainerNode {
+impl NodeFillsMixin for ContainerNodeRec {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = vec![fill];
     }
@@ -410,7 +410,7 @@ impl NodeFillsMixin for ContainerNode {
     }
 }
 
-impl NodeGeometryMixin for ContainerNode {
+impl NodeGeometryMixin for ContainerNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -433,7 +433,7 @@ impl NodeGeometryMixin for ContainerNode {
     }
 }
 
-impl NodeShapeMixin for ContainerNode {
+impl NodeShapeMixin for ContainerNodeRec {
     fn to_shape(&self) -> Shape {
         Shape::RRect(self.to_own_shape())
     }
@@ -448,7 +448,7 @@ impl NodeShapeMixin for ContainerNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct RectangleNode {
+pub struct RectangleNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -465,7 +465,7 @@ pub struct RectangleNode {
     pub effects: LayerEffects,
 }
 
-impl RectangleNode {
+impl RectangleNodeRec {
     pub fn to_own_shape(&self) -> RRectShape {
         RRectShape {
             width: self.size.width,
@@ -475,7 +475,7 @@ impl RectangleNode {
     }
 }
 
-impl NodeFillsMixin for RectangleNode {
+impl NodeFillsMixin for RectangleNodeRec {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = vec![fill];
     }
@@ -485,7 +485,7 @@ impl NodeFillsMixin for RectangleNode {
     }
 }
 
-impl NodeGeometryMixin for RectangleNode {
+impl NodeGeometryMixin for RectangleNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -508,7 +508,7 @@ impl NodeGeometryMixin for RectangleNode {
     }
 }
 
-impl NodeShapeMixin for RectangleNode {
+impl NodeShapeMixin for RectangleNodeRec {
     fn to_shape(&self) -> Shape {
         Shape::RRect(self.to_own_shape())
     }
@@ -523,7 +523,7 @@ impl NodeShapeMixin for RectangleNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct LineNode {
+pub struct LineNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -538,7 +538,7 @@ pub struct LineNode {
     pub effects: LayerEffects,
 }
 
-impl LineNode {
+impl LineNodeRec {
     /// line's stoke align is no-op, it's always center. this value is ignored, but will be affected when line transforms to a path.
     pub fn get_stroke_align(&self) -> StrokeAlign {
         StrokeAlign::Center
@@ -546,7 +546,7 @@ impl LineNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct ImageNode {
+pub struct ImageNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -564,7 +564,7 @@ pub struct ImageNode {
     pub hash: String,
 }
 
-impl ImageNode {
+impl ImageNodeRec {
     pub fn to_own_shape(&self) -> RRectShape {
         RRectShape {
             width: self.size.width,
@@ -574,7 +574,7 @@ impl ImageNode {
     }
 }
 
-impl NodeGeometryMixin for ImageNode {
+impl NodeGeometryMixin for ImageNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -610,7 +610,7 @@ impl NodeGeometryMixin for ImageNode {
 ///
 /// For details on arc mathematics, see: <https://mathworld.wolfram.com/Arc.html> (implementation varies)
 #[derive(Debug, Clone)]
-pub struct EllipseNode {
+pub struct EllipseNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -638,7 +638,7 @@ pub struct EllipseNode {
     pub corner_radius: Option<f32>,
 }
 
-impl NodeFillsMixin for EllipseNode {
+impl NodeFillsMixin for EllipseNodeRec {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = vec![fill];
     }
@@ -648,7 +648,7 @@ impl NodeFillsMixin for EllipseNode {
     }
 }
 
-impl NodeShapeMixin for EllipseNode {
+impl NodeShapeMixin for EllipseNodeRec {
     fn to_shape(&self) -> Shape {
         let w = self.size.width;
         let h = self.size.height;
@@ -692,7 +692,7 @@ impl NodeShapeMixin for EllipseNode {
     }
 }
 
-impl NodeGeometryMixin for EllipseNode {
+impl NodeGeometryMixin for EllipseNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -716,7 +716,7 @@ impl NodeGeometryMixin for EllipseNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct BooleanPathOperationNode {
+pub struct BooleanPathOperationNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -738,7 +738,7 @@ pub struct BooleanPathOperationNode {
 /// Vector Network Node.
 ///
 #[derive(Debug, Clone)]
-pub struct VectorNode {
+pub struct VectorNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -758,7 +758,7 @@ pub struct VectorNode {
     pub effects: LayerEffects,
 }
 
-impl VectorNode {
+impl VectorNodeRec {
     /// Build a [`skia_safe::Path`] representing this vector node,
     /// applying the node's `corner_radius` when greater than zero.
     pub fn to_path(&self) -> skia_safe::Path {
@@ -775,7 +775,7 @@ impl VectorNode {
 /// SVG Path compatible path node.
 ///
 #[derive(Debug, Clone)]
-pub struct SVGPathNode {
+pub struct SVGPathNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -801,7 +801,7 @@ pub struct SVGPathNode {
 /// Mirrors the behavior of the SVG `<polygon>` element:  
 /// https://developer.mozilla.org/en-US/docs/Web/SVG/Element/polygon
 #[derive(Debug, Clone)]
-pub struct PolygonNode {
+pub struct PolygonNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -832,7 +832,7 @@ pub struct PolygonNode {
     pub effects: LayerEffects,
 }
 
-impl NodeFillsMixin for PolygonNode {
+impl NodeFillsMixin for PolygonNodeRec {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = vec![fill];
     }
@@ -842,7 +842,7 @@ impl NodeFillsMixin for PolygonNode {
     }
 }
 
-impl NodeStrokesMixin for PolygonNode {
+impl NodeStrokesMixin for PolygonNodeRec {
     fn set_stroke(&mut self, stroke: Paint) {
         self.strokes = vec![stroke];
     }
@@ -852,7 +852,7 @@ impl NodeStrokesMixin for PolygonNode {
     }
 }
 
-impl PolygonNode {
+impl PolygonNodeRec {
     pub fn to_own_shape(&self) -> SimplePolygonShape {
         SimplePolygonShape {
             points: self.points.clone(),
@@ -861,7 +861,7 @@ impl PolygonNode {
     }
 }
 
-impl NodeShapeMixin for PolygonNode {
+impl NodeShapeMixin for PolygonNodeRec {
     fn to_shape(&self) -> Shape {
         Shape::SimplePolygon(self.to_own_shape())
     }
@@ -889,7 +889,7 @@ impl NodeShapeMixin for PolygonNode {
 ///
 /// For details on regular polygon mathematics, see: <https://mathworld.wolfram.com/RegularPolygon.html> (implementation varies)
 #[derive(Debug, Clone)]
-pub struct RegularPolygonNode {
+pub struct RegularPolygonNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -922,7 +922,7 @@ pub struct RegularPolygonNode {
     pub effects: LayerEffects,
 }
 
-impl NodeFillsMixin for RegularPolygonNode {
+impl NodeFillsMixin for RegularPolygonNodeRec {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = vec![fill];
     }
@@ -932,7 +932,7 @@ impl NodeFillsMixin for RegularPolygonNode {
     }
 }
 
-impl NodeGeometryMixin for RegularPolygonNode {
+impl NodeGeometryMixin for RegularPolygonNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -955,7 +955,7 @@ impl NodeGeometryMixin for RegularPolygonNode {
     }
 }
 
-impl RegularPolygonNode {
+impl RegularPolygonNodeRec {
     pub fn to_own_shape(&self) -> RegularPolygonShape {
         RegularPolygonShape {
             width: self.size.width,
@@ -970,7 +970,7 @@ impl RegularPolygonNode {
     }
 }
 
-impl NodeShapeMixin for RegularPolygonNode {
+impl NodeShapeMixin for RegularPolygonNodeRec {
     fn to_shape(&self) -> Shape {
         Shape::RegularPolygon(self.to_own_shape())
     }
@@ -995,7 +995,7 @@ impl NodeShapeMixin for RegularPolygonNode {
 ///
 /// For details on star polygon mathematics, see: <https://mathworld.wolfram.com/StarPolygon.html>
 #[derive(Debug, Clone)]
-pub struct RegularStarPolygonNode {
+pub struct RegularStarPolygonNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -1038,7 +1038,7 @@ pub struct RegularStarPolygonNode {
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
-impl NodeFillsMixin for RegularStarPolygonNode {
+impl NodeFillsMixin for RegularStarPolygonNodeRec {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = vec![fill];
     }
@@ -1048,7 +1048,7 @@ impl NodeFillsMixin for RegularStarPolygonNode {
     }
 }
 
-impl NodeGeometryMixin for RegularStarPolygonNode {
+impl NodeGeometryMixin for RegularStarPolygonNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -1072,7 +1072,7 @@ impl NodeGeometryMixin for RegularStarPolygonNode {
     }
 }
 
-impl NodeShapeMixin for RegularStarPolygonNode {
+impl NodeShapeMixin for RegularStarPolygonNodeRec {
     fn to_shape(&self) -> Shape {
         Shape::RegularStarPolygon(self.to_own_shape())
     }
@@ -1086,7 +1086,7 @@ impl NodeShapeMixin for RegularStarPolygonNode {
     }
 }
 
-impl RegularStarPolygonNode {
+impl RegularStarPolygonNodeRec {
     pub fn to_points(&self) -> Vec<CGPoint> {
         build_star_points(&self.to_own_shape())
     }
@@ -1105,7 +1105,7 @@ impl RegularStarPolygonNode {
 /// A node representing a plain text block (non-rich).
 /// For multi-style content, see `RichTextNode` (not implemented yet).
 #[derive(Debug, Clone)]
-pub struct TextSpanNode {
+pub struct TextSpanNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
@@ -1145,7 +1145,7 @@ pub struct TextSpanNode {
 
 #[derive(Debug, Clone)]
 #[deprecated(note = "Not implemented yet")]
-pub struct TextNode {
+pub struct TextNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,

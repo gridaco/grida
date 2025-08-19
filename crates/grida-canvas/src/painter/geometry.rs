@@ -236,7 +236,7 @@ pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
 
 /// Compute the resulting path for a [`BooleanPathOperationNode`] in its local coordinate space.
 pub fn boolean_operation_path(
-    node: &BooleanPathOperationNode,
+    node: &BooleanPathOperationNodeRec,
     repo: &NodeRepository,
     cache: &GeometryCache,
 ) -> Option<Path> {
@@ -291,7 +291,7 @@ pub fn boolean_operation_path(
 
 /// Convenience wrapper around [`boolean_operation_path`] returning a [`PainterShape`].
 pub fn boolean_operation_shape(
-    node: &BooleanPathOperationNode,
+    node: &BooleanPathOperationNodeRec,
     repo: &NodeRepository,
     cache: &GeometryCache,
 ) -> Option<PainterShape> {

@@ -576,7 +576,7 @@ pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
     serde_json::from_str(file)
 }
 
-impl From<JSONGroupNode> for GroupNode {
+impl From<JSONGroupNode> for GroupNodeRec {
     fn from(node: JSONGroupNode) -> Self {
         let transform = AffineTransform::from_box_center(
             node.base.left,
@@ -586,7 +586,7 @@ impl From<JSONGroupNode> for GroupNode {
             node.base.rotation,
         );
 
-        GroupNode {
+        GroupNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -599,9 +599,9 @@ impl From<JSONGroupNode> for GroupNode {
     }
 }
 
-impl From<JSONContainerNode> for ContainerNode {
+impl From<JSONContainerNode> for ContainerNodeRec {
     fn from(node: JSONContainerNode) -> Self {
-        ContainerNode {
+        ContainerNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -641,11 +641,11 @@ impl From<JSONContainerNode> for ContainerNode {
     }
 }
 
-impl From<JSONTextNode> for TextSpanNode {
+impl From<JSONTextNode> for TextSpanNodeRec {
     fn from(node: JSONTextNode) -> Self {
         let width = node.base.width;
         let height = node.base.height;
-        TextSpanNode {
+        TextSpanNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -695,7 +695,7 @@ impl From<JSONEllipseNode> for Node {
             node.base.rotation,
         );
 
-        Node::Ellipse(EllipseNode {
+        Node::Ellipse(EllipseNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -735,7 +735,7 @@ impl From<JSONRectangleNode> for Node {
             node.base.rotation,
         );
 
-        Node::Rectangle(RectangleNode {
+        Node::Rectangle(RectangleNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -777,7 +777,7 @@ impl From<JSONRegularPolygonNode> for Node {
             node.base.rotation,
         );
 
-        Node::RegularPolygon(RegularPolygonNode {
+        Node::RegularPolygon(RegularPolygonNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -814,7 +814,7 @@ impl From<JSONRegularStarPolygonNode> for Node {
             node.base.rotation,
         );
 
-        Node::RegularStarPolygon(RegularStarPolygonNode {
+        Node::RegularStarPolygon(RegularStarPolygonNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -853,7 +853,7 @@ impl From<JSONSVGPathNode> for Node {
         );
 
         // For vector nodes, we'll create a path node with the path data
-        Node::SVGPath(SVGPathNode {
+        Node::SVGPath(SVGPathNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -891,7 +891,7 @@ impl From<JSONLineNode> for Node {
             node.base.rotation,
         );
 
-        Node::Line(LineNode {
+        Node::Line(LineNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -931,7 +931,7 @@ impl From<JSONVectorNode> for Node {
             .map(|vn| vn.into())
             .unwrap_or_default();
 
-        Node::Vector(VectorNode {
+        Node::Vector(VectorNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -966,7 +966,7 @@ impl From<JSONBooleanOperationNode> for Node {
             node.base.rotation,
         );
 
-        Node::BooleanOperation(BooleanPathOperationNode {
+        Node::BooleanOperation(BooleanPathOperationNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -1004,7 +1004,7 @@ impl From<JSONNode> for Node {
             JSONNode::RegularStarPolygon(rsp) => rsp.into(),
             JSONNode::Line(line) => line.into(),
             JSONNode::BooleanOperation(boolean) => boolean.into(),
-            JSONNode::Unknown(unknown) => Node::Error(ErrorNode {
+            JSONNode::Unknown(unknown) => Node::Error(ErrorNodeRec {
                 id: unknown.id,
                 name: unknown.name,
                 active: unknown.active,

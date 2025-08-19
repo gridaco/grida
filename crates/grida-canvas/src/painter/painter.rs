@@ -557,7 +557,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a RectangleNode, respecting its transform, effect, fill, stroke, blend mode, opacity
-    pub fn draw_rect_node(&self, node: &RectangleNode) {
+    pub fn draw_rect_node(&self, node: &RectangleNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Rectangle(node.clone()));
             self.painter
@@ -579,7 +579,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw an ImageNode, respecting transform, effect, rounded corners, blend mode, opacity
-    pub fn draw_image_node(&self, node: &ImageNode) -> bool {
+    pub fn draw_image_node(&self, node: &ImageNodeRec) -> bool {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Image(node.clone()));
 
@@ -611,7 +611,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw an EllipseNode
-    pub fn draw_ellipse_node(&self, node: &EllipseNode) {
+    pub fn draw_ellipse_node(&self, node: &EllipseNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Ellipse(node.clone()));
             self.painter
@@ -633,7 +633,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a LineNode
-    pub fn draw_line_node(&self, node: &LineNode) {
+    pub fn draw_line_node(&self, node: &LineNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Line(node.clone()));
 
@@ -654,7 +654,7 @@ impl<'a> NodePainter<'a> {
         });
     }
 
-    pub fn draw_vector_node(&self, node: &VectorNode) {
+    pub fn draw_vector_node(&self, node: &VectorNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
             let shape = PainterShape::from_path(path);
@@ -679,7 +679,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a PathNode (SVG path data)
-    pub fn draw_path_node(&self, node: &SVGPathNode) {
+    pub fn draw_path_node(&self, node: &SVGPathNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = self.painter.cached_path(&node.id, &node.data);
             let shape = PainterShape::from_path((*path).clone());
@@ -704,7 +704,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
-    pub fn draw_polygon_node(&self, node: &PolygonNode) {
+    pub fn draw_polygon_node(&self, node: &PolygonNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
             let shape = PainterShape::from_path(path.clone());
@@ -727,10 +727,10 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a RegularPolygonNode by converting to a PolygonNode
-    pub fn draw_regular_polygon_node(&self, node: &RegularPolygonNode) {
+    pub fn draw_regular_polygon_node(&self, node: &RegularPolygonNodeRec) {
         let points = node.to_points();
 
-        let polygon = PolygonNode {
+        let polygon = PolygonNodeRec {
             id: node.id.clone(),
             name: node.name.clone(),
             active: node.active,
@@ -751,10 +751,10 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a RegularStarPolygonNode by converting to a PolygonNode
-    pub fn draw_regular_star_polygon_node(&self, node: &RegularStarPolygonNode) {
+    pub fn draw_regular_star_polygon_node(&self, node: &RegularStarPolygonNodeRec) {
         let points = node.to_points();
 
-        let polygon = PolygonNode {
+        let polygon = PolygonNodeRec {
             id: node.id.clone(),
             name: node.name.clone(),
             active: node.active,
@@ -775,7 +775,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a TextSpanNode (simple text block)
-    pub fn draw_text_span_node(&self, node: &TextSpanNode) {
+    pub fn draw_text_span_node(&self, node: &TextSpanNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             self.painter.with_opacity(node.opacity, || {
                 self.painter.with_blendmode(node.blend_mode, || {
@@ -796,7 +796,7 @@ impl<'a> NodePainter<'a> {
     /// Draw a ContainerNode (background + stroke + children)
     pub fn draw_container_node_recursively(
         &self,
-        node: &ContainerNode,
+        node: &ContainerNodeRec,
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
@@ -840,7 +840,7 @@ impl<'a> NodePainter<'a> {
         });
     }
 
-    pub fn draw_error_node(&self, node: &ErrorNode) {
+    pub fn draw_error_node(&self, node: &ErrorNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Error(node.clone()));
 
@@ -865,7 +865,7 @@ impl<'a> NodePainter<'a> {
     /// Draw a GroupNode: no shape of its own, only children, but apply transform + opacity
     pub fn draw_group_node_recursively(
         &self,
-        node: &GroupNode,
+        node: &GroupNodeRec,
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
@@ -882,7 +882,7 @@ impl<'a> NodePainter<'a> {
 
     pub fn draw_boolean_operation_node_recursively(
         &self,
-        node: &BooleanPathOperationNode,
+        node: &BooleanPathOperationNodeRec,
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {

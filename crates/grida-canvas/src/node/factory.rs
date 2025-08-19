@@ -49,8 +49,8 @@ impl NodeFactory {
     }
 
     /// Creates a new rectangle node with default values
-    pub fn create_rectangle_node(&self) -> RectangleNode {
-        RectangleNode {
+    pub fn create_rectangle_node(&self) -> RectangleNodeRec {
+        RectangleNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -69,8 +69,8 @@ impl NodeFactory {
     }
 
     /// Creates a new ellipse node with default values
-    pub fn create_ellipse_node(&self) -> EllipseNode {
-        EllipseNode {
+    pub fn create_ellipse_node(&self) -> EllipseNodeRec {
+        EllipseNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -92,8 +92,8 @@ impl NodeFactory {
     }
 
     /// Creates a new line node with default values
-    pub fn create_line_node(&self) -> LineNode {
-        LineNode {
+    pub fn create_line_node(&self) -> LineNodeRec {
+        LineNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -113,8 +113,8 @@ impl NodeFactory {
     }
 
     /// Creates a new text span node with default values
-    pub fn create_text_span_node(&self) -> TextSpanNode {
-        TextSpanNode {
+    pub fn create_text_span_node(&self) -> TextSpanNodeRec {
+        TextSpanNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -147,8 +147,8 @@ impl NodeFactory {
     }
 
     /// Creates a new group node with default values
-    pub fn create_group_node(&self) -> GroupNode {
-        GroupNode {
+    pub fn create_group_node(&self) -> GroupNodeRec {
+        GroupNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -160,8 +160,8 @@ impl NodeFactory {
     }
 
     /// Creates a new container node with default values
-    pub fn create_container_node(&self) -> ContainerNode {
-        ContainerNode {
+    pub fn create_container_node(&self) -> ContainerNodeRec {
+        ContainerNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -182,8 +182,8 @@ impl NodeFactory {
     }
 
     /// Creates a new path node with default values
-    pub fn create_path_node(&self) -> SVGPathNode {
-        SVGPathNode {
+    pub fn create_path_node(&self) -> SVGPathNodeRec {
+        SVGPathNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -201,8 +201,8 @@ impl NodeFactory {
     }
 
     /// Creates a new regular polygon node with default values
-    pub fn create_regular_polygon_node(&self) -> RegularPolygonNode {
-        RegularPolygonNode {
+    pub fn create_regular_polygon_node(&self) -> RegularPolygonNodeRec {
+        RegularPolygonNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -221,8 +221,8 @@ impl NodeFactory {
         }
     }
 
-    pub fn create_regular_star_polygon_node(&self) -> RegularStarPolygonNode {
-        RegularStarPolygonNode {
+    pub fn create_regular_star_polygon_node(&self) -> RegularStarPolygonNodeRec {
+        RegularStarPolygonNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -242,8 +242,8 @@ impl NodeFactory {
         }
     }
 
-    pub fn create_polygon_node(&self) -> PolygonNode {
-        PolygonNode {
+    pub fn create_polygon_node(&self) -> PolygonNodeRec {
+        PolygonNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -262,8 +262,8 @@ impl NodeFactory {
     }
 
     /// Creates a new image node with default values
-    pub fn create_image_node(&self) -> ImageNode {
-        ImageNode {
+    pub fn create_image_node(&self) -> ImageNodeRec {
+        ImageNodeRec {
             id: self.id(),
             name: None,
             active: true,

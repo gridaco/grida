@@ -15,7 +15,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         let id = format!("rect-{}", i);
         ids.push(id.clone());
 
-        let rect = RectangleNode {
+        let rect = RectangleNodeRec {
             id: id.clone(),
             name: None,
             active: true,
@@ -52,7 +52,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
     }
 
     // Create root group
-    let root_group = GroupNode {
+    let root_group = GroupNodeRec {
         id: "root".to_string(),
         name: Some("Root Group".to_string()),
         active: true,

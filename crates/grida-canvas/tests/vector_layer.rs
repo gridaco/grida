@@ -53,7 +53,7 @@ fn test_vector_layer_creation() {
     });
 
     // Create a vector node
-    let vector_node = VectorNode {
+    let vector_node = VectorNodeRec {
         id: "test_vector".to_string(),
         name: Some("Test Vector".to_string()),
         active: true,

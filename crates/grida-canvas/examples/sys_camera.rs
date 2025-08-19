@@ -46,7 +46,7 @@ fn create_static_scene() -> Scene {
     }
 
     // Create a root group containing all rectangles
-    let root_group = GroupNode {
+    let root_group = GroupNodeRec {
         id: "root".to_string(),
         name: Some("Root Group".to_string()),
         active: true,
