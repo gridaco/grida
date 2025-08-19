@@ -1,4 +1,4 @@
-import cmath from "../dist";
+import cmath from "../";
 
 describe("cmath.bezier.intersection.single", () => {
   describe("is_intersecting", () => {
