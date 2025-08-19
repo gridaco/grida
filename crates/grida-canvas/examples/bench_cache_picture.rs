@@ -7,6 +7,7 @@ use glutin::{
     surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, SwapInterval, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
+#[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{Canvas, Color, Paint, Picture, PictureRecorder, Rect, Surface};
 use std::{ffi::CString, num::NonZeroU32, time::Instant};
@@ -103,6 +104,7 @@ fn init_window(
         })
         .unwrap();
     let window = window.expect("Could not create window with OpenGL context");
+    #[allow(deprecated)]
     let raw_window_handle = window
         .raw_window_handle()
         .expect("Failed to get window handle");
@@ -202,12 +204,12 @@ fn main() {
         surface_ptr,
         el,
         window,
-        mut gl_surface,
+        gl_surface,
         gl_context,
-        gl_config,
-        fb_info,
-        mut gr_context,
-        scale_factor,
+        _gl_config,
+        _fb_info,
+        _gr_context,
+        _scale_factor,
     ) = init_window(800, 600);
 
     // SAFETY: We own the surface pointer
@@ -228,6 +230,7 @@ fn main() {
     // Enable pre-present notification for better frame timing
     window.pre_present_notify();
 
+    #[allow(deprecated)]
     el.run(move |event, elwt| {
         match event {
             Event::WindowEvent {
@@ -235,46 +238,6 @@ fn main() {
                 ..
             } => {
                 elwt.exit();
-            }
-            Event::WindowEvent {
-                event: WindowEvent::Resized(size),
-                ..
-            } => {
-                // Recreate GL surface and Skia surface on resize
-                let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
-                    window
-                        .raw_window_handle()
-                        .expect("Failed to get window handle"),
-                    NonZeroU32::new(size.width).unwrap(),
-                    NonZeroU32::new(size.height).unwrap(),
-                );
-                gl_surface = unsafe {
-                    gl_config
-                        .display()
-                        .create_window_surface(&gl_config, &attrs)
-                        .expect("Could not create gl window surface")
-                };
-                let backend_render_target = skia_safe::gpu::backend_render_targets::make_gl(
-                    (size.width as i32, size.height as i32),
-                    gl_config.num_samples() as usize,
-                    gl_config.stencil_size() as usize,
-                    fb_info,
-                );
-                let new_surface = skia_safe::gpu::surfaces::wrap_backend_render_target(
-                    &mut gr_context,
-                    &backend_render_target,
-                    skia_safe::gpu::SurfaceOrigin::BottomLeft,
-                    skia_safe::ColorType::RGBA8888,
-                    None,
-                    None,
-                )
-                .expect("Could not create skia surface");
-                unsafe { _ = Box::from_raw(surface_ptr) };
-                let new_surface_ptr = Box::into_raw(Box::new(new_surface));
-                // SAFETY: update surface pointer
-                let surface = unsafe { &mut *new_surface_ptr };
-                // Optionally, re-record the scene if you want to match new size
-                // scene = CachedScene::new(size.width as f32, size.height as f32);
             }
             Event::WindowEvent {
                 event: WindowEvent::RedrawRequested,
