@@ -110,7 +110,7 @@ fn main() {
             color: stroke_color,
             width_profile: None,
         };
-        painter.draw(&network, Some(&options));
+        painter.draw(&network, &[], Some(&options));
         canvas.restore();
     }
 

@@ -514,7 +514,11 @@ impl<'a> Painter<'a> {
                                     None
                                 };
 
-                                vn_painter.draw(&vector_layer.vector, stroke_options.as_ref());
+                                vn_painter.draw(
+                                    &vector_layer.vector,
+                                    &vector_layer.fills,
+                                    stroke_options.as_ref(),
+                                );
                             });
                         };
                         if let Some(clip) = clip_path {

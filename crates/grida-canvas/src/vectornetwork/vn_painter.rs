@@ -30,10 +30,27 @@ impl<'a> VNPainter<'a> {
     }
 
     /// Draw the provided vector network onto the canvas.
-    pub fn draw(&self, vn: &VectorNetwork, stroke: Option<&StrokeOptions>) {
+    ///
+    /// Fills defined on individual regions take precedence. When a region
+    /// does not provide its own fills, the `node_fills` slice is used as a
+    /// fallback, matching the behavior of vector nodes that have a single
+    /// node-level fill.
+    pub fn draw(
+        &self,
+        vn: &VectorNetwork,
+        fills_fallback: &[Paint],
+        stroke: Option<&StrokeOptions>,
+    ) {
         let paths = vn.to_paths();
         for (region, path) in vn.regions.iter().zip(paths.iter()) {
-            let Some(fills) = &region.fills else { continue };
+            let fills = region
+                .fills
+                .as_ref()
+                .map(|v| v.as_slice())
+                .unwrap_or(fills_fallback);
+            if fills.is_empty() {
+                continue;
+            }
             let bounds = path.compute_tight_bounds();
             let size = (bounds.width(), bounds.height());
             for fill in fills {
