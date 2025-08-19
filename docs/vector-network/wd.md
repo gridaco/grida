@@ -95,11 +95,11 @@
   - [ ] bend tool - click segment - bend segment
   - [x] bend tool - drag segment - bend segment
 - [ ] measurement
-  - [x] measure vertex <> curve-parametric-point
-  - [x] measure verticies (as bbox) <> curve-parametric-point
-  - [ ] measure region (as bbox) <> region (as bbox)
-  - [ ] measure vertex <> region (as bbox)
-  - [ ] measure verticies (as bbox) <> region (as bbox)
+  - [x] measure vertex ↔️ curve-parametric-point
+  - [x] measure verticies (as bbox) ↔️ curve-parametric-point
+  - [ ] measure region (as bbox) ↔️ region (as bbox)
+  - [ ] measure vertex ↔️ region (as bbox)
+  - [ ] measure verticies (as bbox) ↔️ region (as bbox)
 - [ ] context menu (common context menu items are disabled for vector edit mode)
   - [ ] copy vector selection
   - [ ] paste vector selection
