@@ -1100,11 +1100,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       }
 
-      if (flattenable.length < 2) {
-        // Need at least 2 nodes for boolean operations
-        return state;
-      }
-
       return produce(state, (draft) => {
         const insertions = self_wrapNodesAsBooleanOperation(
           draft,

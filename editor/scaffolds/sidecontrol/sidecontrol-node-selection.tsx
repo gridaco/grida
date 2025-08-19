@@ -155,7 +155,7 @@ function Header() {
   return (
     <>
       <div className="w-full flex items-center justify-end gap-1">
-        <MaskControl />
+        <MaskControl disabled />
         <BooleanOperations />
       </div>
       <hr />

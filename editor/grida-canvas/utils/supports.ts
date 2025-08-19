@@ -8,7 +8,7 @@ type Renderer =
   | "grida-canvas-dom"
   | "grida-canvas-dom-svg";
 
-type Feature =
+type NodeFeatureProperty =
   | "arcData"
   | "cornerRadius"
   | "cornerRadius4"
@@ -17,7 +17,8 @@ type Feature =
   | "stroke"
   | "feDropShadow"
   | "strokeCap"
-  | "pointCount";
+  | "pointCount"
+  | "boolean";
 
 type INodePropertiesConfig = {
   opacity: boolean;
@@ -49,7 +50,7 @@ const GRIDA_TCANVAS_RECTANGLE_NODE: INodePropertiesConfig = {
   },
 };
 
-const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
+const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   arcData: [],
   cornerRadius: [
     "rectangle",
@@ -76,9 +77,10 @@ const dom_supports: Record<Feature, ReadonlyArray<NodeType>> = {
    */
   strokeCap: ["vector", "line"],
   pointCount: ["polygon", "star"],
+  boolean: [],
 } as const;
 
-const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
+const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   arcData: ["ellipse"],
   cornerRadius: [
     "rectangle",
@@ -136,6 +138,7 @@ const canvas_supports: Record<Feature, ReadonlyArray<NodeType>> = {
   ],
   strokeCap: ["vector", "line"],
   pointCount: ["polygon", "star"],
+  boolean: ["boolean", "rectangle", "polygon", "star"],
 } as const;
 
 type Context = {
