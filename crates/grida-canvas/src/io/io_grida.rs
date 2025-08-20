@@ -1,5 +1,6 @@
 use crate::cg::types::*;
 use crate::cg::varwidth::{VarWidthProfile, WidthStop};
+use crate::io::io_css::{de_css_dimension, default_height_css, default_width_css, CSSDimension};
 use crate::node::schema::*;
 use crate::vectornetwork::*;
 use math2::transform::AffineTransform;
@@ -266,16 +267,16 @@ pub struct JSONUnknownNodeProperties {
     // geometry - defaults to 0 for non-intrinsic size nodes
     #[serde(
         rename = "width",
-        default = "default_width",
-        deserialize_with = "de_css_length"
+        default = "default_width_css",
+        deserialize_with = "de_css_dimension"
     )]
-    pub width: f32,
+    pub width: CSSDimension,
     #[serde(
         rename = "height",
-        default = "default_height",
-        deserialize_with = "de_css_length"
+        default = "default_height_css",
+        deserialize_with = "de_css_dimension"
     )]
-    pub height: f32,
+    pub height: CSSDimension,
 
     #[serde(rename = "cornerRadius", default)]
     pub corner_radius: Option<f32>,
@@ -550,12 +551,7 @@ fn default_rotation() -> f32 {
 fn default_z_index() -> i32 {
     0
 }
-fn default_width() -> f32 {
-    0.0
-}
-fn default_height() -> f32 {
-    0.0
-}
+
 fn default_text_align() -> TextAlign {
     TextAlign::Left
 }
@@ -581,8 +577,8 @@ impl From<JSONGroupNode> for GroupNodeRec {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -608,13 +604,13 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             transform: AffineTransform::from_box_center(
                 node.base.left,
                 node.base.top,
-                node.base.width,
-                node.base.height,
+                node.base.width.length(0.0),
+                node.base.height.length(0.0),
                 node.base.rotation,
             ),
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
@@ -643,8 +639,12 @@ impl From<JSONContainerNode> for ContainerNodeRec {
 
 impl From<JSONTextNode> for TextSpanNodeRec {
     fn from(node: JSONTextNode) -> Self {
-        // let width = node.base.width;
-        // let height = node.base.height;
+        // For text nodes, width can be Auto or fixed Length
+        let width = match node.base.width {
+            CSSDimension::Auto => None,
+            CSSDimension::LengthPX(length) => Some(length),
+        };
+
         TextSpanNodeRec {
             id: node.base.id,
             name: node.base.name,
@@ -652,11 +652,11 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             transform: AffineTransform::from_box_center(
                 node.base.left,
                 node.base.top,
-                node.base.width,
-                node.base.height,
+                node.base.width.length(0.0),
+                node.base.height.length(0.0),
                 node.base.rotation,
             ),
-            width: None,
+            width,
             max_lines: None,
             ellipsis: None,
             text: node.text,
@@ -692,8 +692,8 @@ impl From<JSONEllipseNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -703,8 +703,8 @@ impl From<JSONEllipseNode> for Node {
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
@@ -732,8 +732,8 @@ impl From<JSONRectangleNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -743,8 +743,8 @@ impl From<JSONRectangleNode> for Node {
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
@@ -774,8 +774,8 @@ impl From<JSONRegularPolygonNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -785,8 +785,8 @@ impl From<JSONRegularPolygonNode> for Node {
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
             fills: vec![node.base.fill.into()],
@@ -811,8 +811,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -822,8 +822,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
             inner_radius: node.inner_radius,
@@ -849,8 +849,8 @@ impl From<JSONSVGPathNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -888,8 +888,8 @@ impl From<JSONLineNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -899,7 +899,7 @@ impl From<JSONLineNode> for Node {
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
+                width: node.base.width.length(0.0),
                 height: 0.0,
             },
             strokes: vec![node.base.stroke.into()],
@@ -922,8 +922,8 @@ impl From<JSONVectorNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -963,8 +963,8 @@ impl From<JSONBooleanOperationNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -1012,24 +1012,13 @@ impl From<JSONNode> for Node {
                 active: unknown.active,
                 transform: AffineTransform::identity(),
                 size: Size {
-                    width: unknown.width,
-                    height: unknown.height,
+                    width: unknown.width.length(0.0),
+                    height: unknown.height.length(0.0),
                 },
                 opacity: unknown.opacity,
                 error: "Unknown node".to_string(),
             }),
         }
-    }
-}
-
-fn de_css_length<'de, D>(deserializer: D) -> Result<f32, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value: Value = Deserialize::deserialize(deserializer)?;
-    match value {
-        Value::Number(n) => Ok(n.as_f64().unwrap_or(0.0) as f32),
-        _ => Ok(0.0),
     }
 }
 
@@ -1134,7 +1123,7 @@ mod tests {
             "id": "boolean-1",
             "name": "Boolean Operation",
             "type": "boolean",
-            "operation": "union",
+            "op": "union",
             "children": ["child-1", "child-2"],
             "left": 100.0,
             "top": 100.0,
@@ -1157,8 +1146,8 @@ mod tests {
                 assert_eq!(boolean_node.children, vec!["child-1", "child-2"]);
                 assert_eq!(boolean_node.base.left, 100.0);
                 assert_eq!(boolean_node.base.top, 100.0);
-                assert_eq!(boolean_node.base.width, 200.0);
-                assert_eq!(boolean_node.base.height, 200.0);
+                assert_eq!(boolean_node.base.width, CSSDimension::LengthPX(200.0));
+                assert_eq!(boolean_node.base.height, CSSDimension::LengthPX(200.0));
             }
             _ => panic!("Expected BooleanOperation node"),
         }
@@ -1258,5 +1247,78 @@ mod tests {
         assert_eq!(network.segments.len(), 0);
         assert_eq!(network.vertices[0], (0.0, 0.0));
         assert_eq!(network.vertices[1], (50.0, 50.0));
+    }
+
+    #[test]
+    fn test_css_dimension_integration() {
+        // Test JSON with auto width for text node
+        let json_text_auto = r#"{
+            "id": "text-1",
+            "name": "Auto Width Text",
+            "type": "text",
+            "text": "Hello World",
+            "left": 100.0,
+            "top": 100.0,
+            "width": "auto",
+            "height": "auto"
+        }"#;
+
+        let text_node: JSONNode =
+            serde_json::from_str(json_text_auto).expect("failed to deserialize text node");
+
+        match text_node {
+            JSONNode::Text(text) => {
+                assert_eq!(text.base.width, CSSDimension::Auto);
+                assert_eq!(text.base.height, CSSDimension::Auto);
+            }
+            _ => panic!("Expected Text node"),
+        }
+
+        // Test JSON with fixed width for text node
+        let json_text_fixed = r#"{
+            "id": "text-2",
+            "name": "Fixed Width Text",
+            "type": "text",
+            "text": "Hello World",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": "auto"
+        }"#;
+
+        let text_node_fixed: JSONNode = serde_json::from_str(json_text_fixed)
+            .expect("failed to deserialize text node with fixed width");
+
+        match text_node_fixed {
+            JSONNode::Text(text) => {
+                assert_eq!(text.base.width, CSSDimension::LengthPX(200.0));
+                assert_eq!(text.base.height, CSSDimension::Auto);
+            }
+            _ => panic!("Expected Text node"),
+        }
+
+        // Test JSON with auto width for rectangle (should default to 0.0)
+        let json_rect_auto = r#"{
+            "id": "rect-1",
+            "name": "Auto Width Rectangle",
+            "type": "rectangle",
+            "left": 100.0,
+            "top": 100.0,
+            "width": "auto",
+            "height": "auto",
+            "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
+        }"#;
+
+        let rect_node: JSONNode =
+            serde_json::from_str(json_rect_auto).expect("failed to deserialize rectangle node");
+
+        match rect_node {
+            JSONNode::Rectangle(rect) => {
+                // Rectangle should use 0.0 for auto dimensions
+                assert_eq!(rect.base.width, CSSDimension::Auto);
+                assert_eq!(rect.base.height, CSSDimension::Auto);
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
     }
 }
