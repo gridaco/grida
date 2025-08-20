@@ -688,6 +688,10 @@ export function useDataTransferEventTarget() {
       node.$.text = text;
       node.$.left = x;
       node.$.top = y;
+      node.$.fill = {
+        type: "solid",
+        color: { r: 0, g: 0, b: 0, a: 1 },
+      } as cg.Paint;
     },
     [instance]
   );

@@ -1085,6 +1085,10 @@ export class Editor
         text: "",
         width: "auto",
         height: "auto",
+        fill: {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+        },
       },
     });
 
