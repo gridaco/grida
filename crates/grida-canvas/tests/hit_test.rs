@@ -1,6 +1,7 @@
 use cg::cache::scene::SceneCache;
 use cg::hittest::HitTester;
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use cg::runtime::repository::FontRepository;
 use math2::{rect::Rectangle, transform::AffineTransform};
 
 #[test]
@@ -35,7 +36,8 @@ fn hit_first_returns_topmost() {
     };
 
     let mut cache = SceneCache::new();
-    cache.update_geometry(&scene);
+    let fonts = FontRepository::new();
+    cache.update_geometry(&scene, &fonts);
     cache.update_layers(&scene);
 
     let tester = HitTester::new(&cache);
@@ -70,7 +72,8 @@ fn path_hit_testing_uses_contains() {
     };
 
     let mut cache = SceneCache::new();
-    cache.update_geometry(&scene);
+    let fonts = FontRepository::new();
+    cache.update_geometry(&scene, &fonts);
     cache.update_layers(&scene);
     cache
         .path
@@ -118,7 +121,8 @@ fn intersects_returns_all_nodes_in_rect() {
     };
 
     let mut cache = SceneCache::new();
-    cache.update_geometry(&scene);
+    let fonts = FontRepository::new();
+    cache.update_geometry(&scene, &fonts);
     cache.update_layers(&scene);
 
     let tester = HitTester::new(&cache);

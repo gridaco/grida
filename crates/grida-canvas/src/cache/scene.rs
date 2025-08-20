@@ -1,5 +1,6 @@
 use crate::node::schema::{NodeId, Scene};
 use crate::runtime::camera::Camera2D;
+use crate::runtime::repository::FontRepository;
 use crate::{
     cache::{
         geometry::GeometryCache,
@@ -55,12 +56,16 @@ impl SceneCache {
     }
 
     /// Rebuild the geometry cache from the provided scene.
-    pub fn update_geometry(&mut self, scene: &Scene) {
-        self.geometry = GeometryCache::from_scene(scene);
+    pub fn update_geometry(&mut self, scene: &Scene, fonts: &FontRepository) {
+        self.geometry = GeometryCache::from_scene_with_paragraph_cache(
+            scene,
+            &mut self.paragraph.borrow_mut(),
+            fonts,
+        );
     }
 
     pub fn update_layers(&mut self, scene: &Scene) {
-        self.layers = LayerList::from_scene(scene, &self.geometry);
+        self.layers = LayerList::from_scene(scene, self);
         self.layers.layers.sort_by_key(|l| l.z_index());
         self.layer_index = RTree::new();
         for (i, layer) in self.layers.layers.iter().enumerate() {

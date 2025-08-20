@@ -3,7 +3,7 @@ use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
 use super::shadow;
 use crate::cache::geometry::GeometryCache;
-use crate::cache::{paragraph::ParagraphCache, vector_path::VectorPathCache};
+use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
@@ -22,29 +22,25 @@ pub struct Painter<'a> {
     canvas: &'a skia_safe::Canvas,
     fonts: Rc<RefCell<FontRepository>>,
     images: Rc<RefCell<ImageRepository>>,
-    paragraph_cache: RefCell<ParagraphCache>,
     path_cache: RefCell<VectorPathCache>,
+    scene_cache: Option<&'a SceneCache>,
 }
 
 impl<'a> Painter<'a> {
-    /// Create a new Painter for the given canvas
-    pub fn new(
+    /// Create a new Painter that uses the SceneCache's paragraph cache
+    pub fn new_with_scene_cache(
         canvas: &'a skia_safe::Canvas,
         fonts: Rc<RefCell<FontRepository>>,
         images: Rc<RefCell<ImageRepository>>,
+        scene_cache: &'a SceneCache,
     ) -> Self {
         Self {
             canvas,
             fonts,
             images,
-            paragraph_cache: RefCell::new(ParagraphCache::new()),
             path_cache: RefCell::new(VectorPathCache::new()),
+            scene_cache: Some(scene_cache), // Store reference to scene cache
         }
-    }
-
-    #[cfg(test)]
-    pub fn paragraph_cache(&self) -> &RefCell<ParagraphCache> {
-        &self.paragraph_cache
     }
 
     #[cfg(test)]
@@ -177,22 +173,32 @@ impl<'a> Painter<'a> {
         &self,
         id: &NodeId,
         text: &str,
-        size: &Size,
+        width: &Option<f32>,
         fill: &Paint,
         align: &TextAlign,
-        valign: &TextAlignVertical,
+        // TODO: vertical align shall be computed on our end, since sk paragraph does not have a concept of "vertical align"
+        _valign: &TextAlignVertical,
         style: &TextStyle,
-    ) -> Rc<textlayout::Paragraph> {
-        self.paragraph_cache.borrow_mut().get_or_create(
+    ) -> Rc<RefCell<textlayout::Paragraph>> {
+        let scene_cache = self
+            .scene_cache
+            .expect("Painter must have scene_cache for text rendering");
+        let paragraph_rc = scene_cache.paragraph.borrow_mut().get_or_create(
             id,
             text,
-            size,
             fill,
             align,
-            valign,
             style,
             &self.fonts.borrow(),
-        )
+        );
+
+        // Layout the paragraph with the given width (this is cheap after build)
+        if let Some(width) = width {
+            // We can now safely call layout on the paragraph through RefCell
+            paragraph_rc.borrow_mut().layout(*width);
+        }
+
+        paragraph_rc
     }
 
     /// Determine the transformation matrix for an [`ImagePaint`].
@@ -398,7 +404,7 @@ impl<'a> Painter<'a> {
         &self,
         id: &NodeId,
         text: &str,
-        size: &Size,
+        width: &Option<f32>,
         fill: &Paint,
         text_align: &TextAlign,
         text_align_vertical: &TextAlignVertical,
@@ -407,13 +413,13 @@ impl<'a> Painter<'a> {
         let paragraph = self.cached_paragraph(
             id,
             text,
-            size,
+            width,
             fill,
             text_align,
             text_align_vertical,
             text_style,
         );
-        paragraph.paint(self.canvas, Point::new(0.0, 0.0));
+        paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
     }
 
     /// Draw a single [`PainterPictureLayer`].
@@ -451,38 +457,36 @@ impl<'a> Painter<'a> {
                 });
             }
             PainterPictureLayer::Text(text_layer) => {
-                self.with_transform(&text_layer.base.transform.matrix, || {
-                    let shape = &text_layer.shape;
-                    let effect_ref = &text_layer.effects;
-                    let clip_path = &text_layer.base.clip_path;
-                    let draw_content = || {
-                        self.with_opacity(text_layer.base.opacity, || {
-                            self.draw_text_span(
-                                &text_layer.base.id,
-                                &text_layer.text,
-                                &Size {
-                                    width: shape.rect.width(),
-                                    height: shape.rect.height(),
-                                },
-                                // TODO: support multiple fills for text
-                                match text_layer.fills.first() {
-                                    Some(f) => f,
-                                    None => return,
-                                },
-                                &text_layer.text_align,
-                                &text_layer.text_align_vertical,
-                                &text_layer.text_style,
-                            );
-                        });
-                    };
-                    if let Some(clip) = clip_path {
-                        self.canvas.save();
-                        self.canvas.clip_path(clip, None, true);
-                        self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                        self.canvas.restore();
-                    } else {
-                        self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                    }
+                self.with_blendmode(text_layer.base.blend_mode, || {
+                    self.with_transform(&text_layer.base.transform.matrix, || {
+                        let _effect_ref = &text_layer.effects;
+                        let clip_path = &text_layer.base.clip_path;
+                        let draw_content = || {
+                            self.with_opacity(text_layer.base.opacity, || {
+                                self.draw_text_span(
+                                    &text_layer.base.id,
+                                    &text_layer.text,
+                                    &text_layer.width,
+                                    // TODO: support multiple fills for text
+                                    match text_layer.fills.first() {
+                                        Some(f) => f,
+                                        None => return,
+                                    },
+                                    &text_layer.text_align,
+                                    &text_layer.text_align_vertical,
+                                    &text_layer.text_style,
+                                );
+                            });
+                        };
+                        if let Some(clip) = clip_path {
+                            self.canvas.save();
+                            self.canvas.clip_path(clip, None, true);
+                            draw_content();
+                            self.canvas.restore();
+                        } else {
+                            draw_content();
+                        }
+                    });
                 });
             }
             PainterPictureLayer::Vector(vector_layer) => {
@@ -782,7 +786,7 @@ impl<'a> NodePainter<'a> {
                     self.painter.draw_text_span(
                         &node.id,
                         &node.text,
-                        &node.size,
+                        &node.width,
                         &node.fill,
                         &node.text_align,
                         &node.text_align_vertical,

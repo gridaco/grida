@@ -878,10 +878,14 @@ impl FigmaConverter {
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             transform: Self::convert_transform(origin.relative_transform.as_ref()),
-            size: Size {
-                width: origin.size.as_ref().map_or(0.0, |size| size.x as f32),
-                height: origin.size.as_ref().map_or(0.0, |size| size.y as f32),
-            },
+            width: origin
+                .size
+                .as_ref()
+                .map_or(None, |size| Some(size.x as f32)),
+            // size: Size {
+            //     width: origin.size.as_ref().map_or(0.0, |size| size.x as f32),
+            //     height: origin.size.as_ref().map_or(0.0, |size| size.y as f32),
+            // },
             text: origin.characters.clone(),
             text_style: TextStyle {
                 text_decoration: Self::convert_text_decoration(style.text_decoration.as_ref()),

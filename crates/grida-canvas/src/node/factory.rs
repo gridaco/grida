@@ -119,10 +119,7 @@ impl NodeFactory {
             name: None,
             active: true,
             transform: AffineTransform::identity(),
-            size: Size {
-                width: Self::DEFAULT_SIZE.width,
-                height: 20.0,
-            },
+            width: None,
             text: String::new(),
             text_style: TextStyle {
                 text_decoration: TextDecoration::None,

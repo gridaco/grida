@@ -1,6 +1,7 @@
 use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::Deserialize;
+use std::hash::Hash;
 
 /// A 2D point with x and y coordinates.
 #[derive(Debug, Clone, Copy)]
@@ -38,7 +39,7 @@ impl Into<skia_safe::Point> for CGPoint {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
 impl CGColor {
@@ -49,17 +50,26 @@ impl CGColor {
     pub const BLUE: Self = Self(0, 0, 255, 255);
 }
 
+impl Into<SolidPaint> for CGColor {
+    fn into(self) -> SolidPaint {
+        SolidPaint {
+            color: self,
+            opacity: 1.0,
+        }
+    }
+}
+
 /// Boolean path operation.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum BooleanPathOperation {
     #[serde(rename = "union")]
-    Union,        // A ∪ B
+    Union, // A ∪ B
     #[serde(rename = "intersection")]
     Intersection, // A ∩ B
     #[serde(rename = "difference")]
-    Difference,   // A - B
+    Difference, // A - B
     #[serde(rename = "xor")]
-    Xor,          // A ⊕ B
+    Xor, // A ⊕ B
 }
 
 /// Blend modes for compositing layers, compatible with Skia and SVG/CSS.
@@ -435,6 +445,49 @@ impl Paint {
             Paint::SweepGradient(gradient) => gradient.opacity,
             Paint::DiamondGradient(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
+        }
+    }
+
+    /// Hash the paint properties for caching purposes
+    pub fn hash_for_cache(&self, hasher: &mut std::collections::hash_map::DefaultHasher) {
+        match self {
+            Paint::Solid(solid) => {
+                solid.color.0.hash(hasher);
+                solid.opacity.to_bits().hash(hasher);
+            }
+            Paint::LinearGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::RadialGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::SweepGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::DiamondGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::Image(image) => {
+                // For image paints, hash the image hash
+                image.hash.hash(hasher);
+                image.opacity.to_bits().hash(hasher);
+            }
         }
     }
 }

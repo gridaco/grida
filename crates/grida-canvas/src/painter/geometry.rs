@@ -18,11 +18,21 @@ pub struct PainterShape {
 }
 
 impl PainterShape {
-    /// Construct a plain rectangle shape
-    pub fn from_rect(rect: Rect) -> Self {
+    pub fn empty() -> Self {
         Self {
-            rect,
-            rect_shape: Some(rect),
+            rect: Rect::new(0.0, 0.0, 0.0, 0.0),
+            rect_shape: None,
+            rrect: None,
+            oval: None,
+            path: None,
+        }
+    }
+    /// Construct a plain rectangle shape
+    pub fn from_rect(rect: impl Into<Rect>) -> Self {
+        let r: Rect = rect.into();
+        Self {
+            rect: r,
+            rect_shape: Some(r),
             rrect: None,
             oval: None,
             path: None,
@@ -165,10 +175,6 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
         IntrinsicSizeNode::Error(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             PainterShape::from_rect(rect)
-        }
-        IntrinsicSizeNode::TextSpan(n) => {
-            // Text spans don't have a shape
-            PainterShape::from_rect(Rect::new(0.0, 0.0, n.size.width, n.size.height))
         }
     }
 }

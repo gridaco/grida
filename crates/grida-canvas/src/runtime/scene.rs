@@ -276,7 +276,8 @@ impl Renderer {
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
         self.scene_cache = cache::scene::SceneCache::new();
-        self.scene_cache.update_geometry(&scene);
+        self.scene_cache
+            .update_geometry(&scene, &self.fonts.borrow());
         self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);
         self.queue_stable();
@@ -330,7 +331,12 @@ impl Renderer {
             bounds.y + bounds.height,
         );
         let canvas = recorder.begin_recording(sk_bounds, None);
-        let painter = Painter::new(canvas, self.fonts.clone(), self.images.clone());
+        let painter = Painter::new_with_scene_cache(
+            canvas,
+            self.fonts.clone(),
+            self.images.clone(),
+            &self.scene_cache,
+        );
         draw(&painter);
         recorder.finish_recording_as_picture(None)
     }
@@ -554,7 +560,12 @@ impl Renderer {
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
         // draw picture regions
-        let painter = Painter::new(canvas, self.fonts.clone(), self.images.clone());
+        let painter = Painter::new_with_scene_cache(
+            canvas,
+            self.fonts.clone(),
+            self.images.clone(),
+            &self.scene_cache,
+        );
         for (_region, indices) in &plan.regions {
             for idx in indices {
                 if let Some(layer) = self.scene_cache.layers.layers.get(*idx) {
@@ -680,4 +691,3 @@ mod tests {
         renderer.free();
     }
 }
-

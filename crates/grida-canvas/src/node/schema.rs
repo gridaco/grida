@@ -240,6 +240,11 @@ pub trait NodeStrokesMixin {
     fn set_strokes(&mut self, strokes: Vec<Paint>);
 }
 
+pub trait NodeTransformMixin {
+    fn x(&self) -> f32;
+    fn y(&self) -> f32;
+}
+
 pub trait NodeGeometryMixin {
     fn rect(&self) -> Rectangle;
     /// if there is any valud stroke that should be taken into account for rendering, return true.
@@ -266,7 +271,6 @@ pub enum IntrinsicSizeNode {
     RegularPolygon(RegularPolygonNodeRec),
     RegularStarPolygon(RegularStarPolygonNodeRec),
     Line(LineNodeRec),
-    TextSpan(TextSpanNodeRec),
     SVGPath(SVGPathNodeRec),
     Vector(VectorNodeRec),
     Image(ImageNodeRec),
@@ -348,6 +352,16 @@ pub struct ErrorNodeRec {
     pub opacity: f32,
 }
 
+impl NodeTransformMixin for ErrorNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
+    }
+}
+
 impl ErrorNodeRec {
     pub fn rect(&self) -> Rectangle {
         Rectangle {
@@ -407,6 +421,16 @@ impl NodeFillsMixin for ContainerNodeRec {
 
     fn set_fills(&mut self, fills: Vec<Paint>) {
         self.fills = fills;
+    }
+}
+
+impl NodeTransformMixin for ContainerNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
     }
 }
 
@@ -482,6 +506,16 @@ impl NodeFillsMixin for RectangleNodeRec {
 
     fn set_fills(&mut self, fills: Vec<Paint>) {
         self.fills = fills;
+    }
+}
+
+impl NodeTransformMixin for RectangleNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
     }
 }
 
@@ -571,6 +605,16 @@ impl ImageNodeRec {
             height: self.size.height,
             corner_radius: self.corner_radius,
         }
+    }
+}
+
+impl NodeTransformMixin for ImageNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
     }
 }
 
@@ -692,6 +736,16 @@ impl NodeShapeMixin for EllipseNodeRec {
     }
 }
 
+impl NodeTransformMixin for EllipseNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
+    }
+}
+
 impl NodeGeometryMixin for EllipseNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
@@ -791,6 +845,16 @@ pub struct SVGPathNodeRec {
     pub effects: LayerEffects,
 }
 
+impl NodeTransformMixin for SVGPathNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
+    }
+}
+
 /// A polygon shape defined by a list of absolute 2D points, following the SVG `<polygon>` model.
 ///
 /// ## Characteristics
@@ -858,6 +922,16 @@ impl PolygonNodeRec {
             points: self.points.clone(),
             corner_radius: self.corner_radius,
         }
+    }
+}
+
+impl NodeTransformMixin for PolygonNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
     }
 }
 
@@ -929,6 +1003,16 @@ impl NodeFillsMixin for RegularPolygonNodeRec {
 
     fn set_fills(&mut self, fills: Vec<Paint>) {
         self.fills = fills;
+    }
+}
+
+impl NodeTransformMixin for RegularPolygonNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
     }
 }
 
@@ -1048,6 +1132,16 @@ impl NodeFillsMixin for RegularStarPolygonNodeRec {
     }
 }
 
+impl NodeTransformMixin for RegularStarPolygonNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
+    }
+}
+
 impl NodeGeometryMixin for RegularStarPolygonNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
@@ -1114,7 +1208,7 @@ pub struct TextSpanNodeRec {
     pub transform: AffineTransform,
 
     /// Layout bounds (used for wrapping and alignment).
-    pub size: Size,
+    pub width: Option<f32>,
 
     /// Text content (plain UTF-8).
     pub text: String,
@@ -1141,6 +1235,16 @@ pub struct TextSpanNodeRec {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+}
+
+impl NodeTransformMixin for TextSpanNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
+    }
 }
 
 #[derive(Debug, Clone)]

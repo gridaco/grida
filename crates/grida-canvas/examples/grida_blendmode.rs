@@ -207,10 +207,7 @@ async fn demo_blendmode() -> Scene {
         let mut label = nf.create_text_span_node();
         label.name = Some(format!("Label {}", i));
         label.transform = AffineTransform::new(x + 10.0, y + 10.0, 0.0);
-        label.size = Size {
-            width: base_size - 20.0,
-            height: 30.0,
-        };
+        label.width = Some(base_size - 20.0);
         label.text = format!("{:?}", blend_mode);
         label.text_style = TextStyle {
             text_decoration: TextDecoration::None,

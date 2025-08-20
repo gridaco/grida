@@ -23,10 +23,7 @@ async fn demo_texts() -> Scene {
     let mut word_text_node = nf.create_text_span_node();
     word_text_node.name = Some("Word Text".to_string());
     word_text_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
-    word_text_node.size = Size {
-        width: 400.0,
-        height: 100.0,
-    };
+    word_text_node.width = Some(400.0);
     word_text_node.text = "Grida Canvas".to_string();
     word_text_node.text_style = TextStyle {
         text_decoration: TextDecoration::None,
@@ -50,10 +47,7 @@ async fn demo_texts() -> Scene {
     let mut sentence_text_node = nf.create_text_span_node();
     sentence_text_node.name = Some("Sentence Text".to_string());
     sentence_text_node.transform = AffineTransform::new(50.0, 150.0, 0.0);
-    sentence_text_node.size = Size {
-        width: 500.0,
-        height: 100.0,
-    };
+    sentence_text_node.width = Some(500.0);
     sentence_text_node.text =
         "Grida Canvas Skia Backend provides accurate rendering of Texts and Text layouts"
             .to_string();
@@ -74,10 +68,7 @@ async fn demo_texts() -> Scene {
     let mut paragraph_text_node = nf.create_text_span_node();
     paragraph_text_node.name = Some("Paragraph Text".to_string());
     paragraph_text_node.transform = AffineTransform::new(50.0, 250.0, 0.0);
-    paragraph_text_node.size = Size {
-        width: 800.0,
-        height: 300.0,
-    };
+    paragraph_text_node.width = Some(800.0);
     paragraph_text_node.text = LOREM.to_string();
     paragraph_text_node.text_style = TextStyle {
         text_decoration: TextDecoration::None,
@@ -96,10 +87,7 @@ async fn demo_texts() -> Scene {
     let mut second_paragraph_text_node = nf.create_text_span_node();
     second_paragraph_text_node.name = Some("Second Paragraph Text".to_string());
     second_paragraph_text_node.transform = AffineTransform::new(50.0, 800.0, 0.0);
-    second_paragraph_text_node.size = Size {
-        width: 800.0,
-        height: 300.0,
-    };
+    second_paragraph_text_node.width = Some(800.0);
     second_paragraph_text_node.text = LOREM_SHORT.to_string();
     second_paragraph_text_node.text_style = TextStyle {
         text_decoration: TextDecoration::None,

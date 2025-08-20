@@ -643,8 +643,8 @@ impl From<JSONContainerNode> for ContainerNodeRec {
 
 impl From<JSONTextNode> for TextSpanNodeRec {
     fn from(node: JSONTextNode) -> Self {
-        let width = node.base.width;
-        let height = node.base.height;
+        // let width = node.base.width;
+        // let height = node.base.height;
         TextSpanNodeRec {
             id: node.base.id,
             name: node.base.name,
@@ -656,7 +656,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 node.base.height,
                 node.base.rotation,
             ),
-            size: Size { width, height },
+            width: None,
             text: node.text,
             text_style: TextStyle {
                 text_decoration: node.text_decoration,
