@@ -1,12 +1,13 @@
 use crate::cache::scene::SceneCache;
+use crate::devtools::text_overlay;
 
 use crate::fonts::geistmono::sk_font_geistmono;
 use crate::node::schema::NodeId;
-use crate::painter::layer::{Layer, PainterPictureTextLayer};
+use crate::painter::layer::Layer;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::FontRepository;
 use crate::sk;
-use skia_safe::{Canvas, Color, Font, Paint, PaintStyle, Path};
+use skia_safe::{Canvas, Color, Font, Paint, PaintStyle};
 
 #[derive(Debug, Clone)]
 pub struct StrokeOverlayStyle {
@@ -61,7 +62,7 @@ impl StrokeOverlay {
                     } else {
                         match layer {
                             crate::painter::layer::PainterPictureLayer::Text(t) => {
-                                Self::text_layer_path(cache, t)
+                                text_overlay::TextOverlay::text_layer_baseline(cache, t)
                             }
                             _ => shape.to_path(),
                         }
@@ -72,30 +73,6 @@ impl StrokeOverlay {
                     canvas.draw_path(&path, &paint);
                 }
             }
-        }
-    }
-
-    fn text_layer_path(cache: &SceneCache, layer: &PainterPictureTextLayer) -> Path {
-        // Try to get paragraph from cache first
-        if let Some(entry) = cache.paragraph.borrow().get(&layer.base.id) {
-            let paragraph = &entry.paragraph;
-            let mut paragraph_ref = paragraph.borrow_mut();
-
-            // Apply layout if width is specified
-            if let Some(width) = layer.width {
-                paragraph_ref.layout(width);
-            }
-
-            let mut path = Path::new();
-            let lines = paragraph_ref.line_number();
-            for i in 0..lines {
-                let (_, line_path) = paragraph_ref.get_path_at(i);
-                path.add_path(&line_path, (0.0, 0.0), None);
-            }
-            path
-        } else {
-            // This should not happen now that Painter shares the SceneCache's paragraph cache
-            unreachable!("text layer not in cache - this should not happen with shared cache")
         }
     }
 }
