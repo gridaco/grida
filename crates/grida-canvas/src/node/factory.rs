@@ -120,6 +120,8 @@ impl NodeFactory {
             active: true,
             transform: AffineTransform::identity(),
             width: None,
+            max_lines: None,
+            ellipsis: None,
             text: String::new(),
             text_style: TextStyle {
                 text_decoration: TextDecoration::None,

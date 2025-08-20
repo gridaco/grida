@@ -1222,6 +1222,15 @@ pub struct TextSpanNodeRec {
     /// Vertical alignment.
     pub text_align_vertical: TextAlignVertical,
 
+    /// Maximum number of lines to render.
+    /// If `None`, the text will be rendered until the end of the text. ellipsis will be applied if the text is too long.
+    pub max_lines: Option<usize>,
+
+    /// Ellipsis text to be shown when the text is too long.
+    /// If `None`, the text will be truncated with "...".
+    /// to change this behaviour, set ellipsis to empty string.
+    pub ellipsis: Option<String>,
+
     /// Fill paint (solid or gradient)
     pub fill: Paint,
 

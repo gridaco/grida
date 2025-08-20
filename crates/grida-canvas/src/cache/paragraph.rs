@@ -28,7 +28,12 @@ impl ParagraphCache {
         }
     }
 
-    fn shape_key(text: &str, style: &TextStyle, align: &TextAlign) -> u64 {
+    fn shape_key(
+        text: &str,
+        style: &TextStyle,
+        align: &TextAlign,
+        max_lines: &Option<usize>,
+    ) -> u64 {
         let mut h = DefaultHasher::new();
         text.hash(&mut h);
         style.text_decoration.hash(&mut h);
@@ -40,6 +45,7 @@ impl ParagraphCache {
         style.line_height.map(|v| v.to_bits()).hash(&mut h);
         style.text_transform.hash(&mut h);
         (*align as u8).hash(&mut h);
+        max_lines.hash(&mut h);
         h.finish()
     }
 
@@ -54,10 +60,12 @@ impl ParagraphCache {
         fill: &Paint,
         align: &TextAlign,
         style: &TextStyle,
+        max_lines: &Option<usize>,
+        ellipsis: &Option<String>,
         fonts: &FontRepository,
     ) -> Rc<RefCell<textlayout::Paragraph>> {
         let fonts_gen = fonts.generation();
-        let hash = Self::shape_key(text, style, align);
+        let hash = Self::shape_key(text, style, align, max_lines);
         if let Some(entry) = self.entries.borrow().get(id) {
             if entry.hash == hash && entry.font_generation == fonts_gen {
                 return entry.paragraph.clone();
@@ -75,6 +83,12 @@ impl ParagraphCache {
         let mut paragraph_style = textlayout::ParagraphStyle::new();
         paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
         paragraph_style.set_text_align(align.clone().into());
+
+        // Set max lines if specified
+        if let Some(max_lines) = max_lines {
+            paragraph_style.set_max_lines(*max_lines);
+            paragraph_style.set_ellipsis(ellipsis.as_ref().unwrap_or(&"...".to_string()));
+        }
 
         let mut para_builder =
             textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());

@@ -264,15 +264,34 @@ impl GeometryCache {
                     &n.fill,
                     &n.text_align,
                     &n.text_style,
+                    &n.max_lines,
+                    &n.ellipsis,
                     fonts,
                 );
 
-                // Apply layout with the specified width (or use intrinsic width if not specified)
-                let layout_width = n.width.unwrap_or_else(|| {
+                // For intrinsic sizing, we need to layout with infinity first to measure
+                let layout_width = if n.width.is_none() {
+                    // Layout with infinity to get intrinsic width
                     let mut para_ref = paragraph.borrow_mut();
                     para_ref.layout(f32::INFINITY);
-                    para_ref.max_width()
-                });
+                    let intrinsic_width = para_ref.max_width();
+
+                    // If max_width is still infinity, use a reasonable fallback
+                    let final_width = if intrinsic_width.is_infinite() {
+                        // Fallback: estimate width based on text length and font size
+                        let estimated_width = n.text.len() as f32 * n.text_style.font_size * 0.6;
+                        estimated_width.max(100.0) // Minimum width
+                    } else {
+                        intrinsic_width
+                    };
+
+                    // Re-layout with the measured width
+                    para_ref.layout(final_width);
+                    final_width
+                } else {
+                    // Use the specified width
+                    n.width.unwrap()
+                };
 
                 // Apply layout with the determined width
                 paragraph.borrow_mut().layout(layout_width);

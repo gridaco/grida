@@ -657,6 +657,8 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 node.base.rotation,
             ),
             width: None,
+            max_lines: None,
+            ellipsis: None,
             text: node.text,
             text_style: TextStyle {
                 text_decoration: node.text_decoration,

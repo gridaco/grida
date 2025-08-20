@@ -174,6 +174,8 @@ impl<'a> Painter<'a> {
         id: &NodeId,
         text: &str,
         width: &Option<f32>,
+        max_lines: &Option<usize>,
+        ellipsis: &Option<String>,
         fill: &Paint,
         align: &TextAlign,
         // TODO: vertical align shall be computed on our end, since sk paragraph does not have a concept of "vertical align"
@@ -189,14 +191,18 @@ impl<'a> Painter<'a> {
             fill,
             align,
             style,
+            max_lines,
+            ellipsis,
             &self.fonts.borrow(),
         );
 
-        // Layout the paragraph with the given width (this is cheap after build)
-        if let Some(width) = width {
-            // We can now safely call layout on the paragraph through RefCell
-            paragraph_rc.borrow_mut().layout(*width);
-        }
+        // Always apply layout - either with specified width or intrinsic width
+        let layout_width = width.unwrap_or_else(|| {
+            let mut para_ref = paragraph_rc.borrow_mut();
+            para_ref.layout(f32::INFINITY);
+            para_ref.max_width()
+        });
+        paragraph_rc.borrow_mut().layout(layout_width);
 
         paragraph_rc
     }
@@ -405,6 +411,8 @@ impl<'a> Painter<'a> {
         id: &NodeId,
         text: &str,
         width: &Option<f32>,
+        max_lines: &Option<usize>,
+        ellipsis: &Option<String>,
         fill: &Paint,
         text_align: &TextAlign,
         text_align_vertical: &TextAlignVertical,
@@ -414,6 +422,8 @@ impl<'a> Painter<'a> {
             id,
             text,
             width,
+            max_lines,
+            ellipsis,
             fill,
             text_align,
             text_align_vertical,
@@ -467,6 +477,8 @@ impl<'a> Painter<'a> {
                                     &text_layer.base.id,
                                     &text_layer.text,
                                     &text_layer.width,
+                                    &text_layer.max_lines,
+                                    &text_layer.ellipsis,
                                     // TODO: support multiple fills for text
                                     match text_layer.fills.first() {
                                         Some(f) => f,
@@ -787,6 +799,8 @@ impl<'a> NodePainter<'a> {
                         &node.id,
                         &node.text,
                         &node.width,
+                        &node.max_lines,
+                        &node.ellipsis,
                         &node.fill,
                         &node.text_align,
                         &node.text_align_vertical,

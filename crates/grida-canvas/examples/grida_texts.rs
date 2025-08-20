@@ -6,13 +6,11 @@ use cg::resource::FontLoader;
 use cg::window;
 use math2::transform::AffineTransform;
 
-const LOREM: &str = r#"
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed leo quis orci porta auctor eget nec dui. Nullam egestas tempus sapien quis venenatis. Nullam placerat, elit eu aliquet luctus, risus elit sodales elit, eu iaculis ante lacus nec lacus. Vestibulum eget dolor at orci iaculis malesuada. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Quisque cursus tincidunt accumsan. In hac habitasse platea dictumst. Etiam ultricies laoreet ipsum id pulvinar. Aenean fermentum gravida nisi, et congue lectus interdum et. Cras pellentesque scelerisque quam, ut mollis ligula aliquet ut.
+const LOREM: &str = r#"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed leo quis orci porta auctor eget nec dui. Nullam egestas tempus sapien quis venenatis. Nullam placerat, elit eu aliquet luctus, risus elit sodales elit, eu iaculis ante lacus nec lacus. Vestibulum eget dolor at orci iaculis malesuada. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Quisque cursus tincidunt accumsan. In hac habitasse platea dictumst. Etiam ultricies laoreet ipsum id pulvinar. Aenean fermentum gravida nisi, et congue lectus interdum et. Cras pellentesque scelerisque quam, ut mollis ligula aliquet ut.
 
 Maecenas convallis nisl non porta consectetur. Nulla scelerisque urna ut massa condimentum hendrerit. Cras eu orci malesuada, ornare est ut, viverra libero. Praesent at turpis ultrices, eleifend leo id, gravida lorem. Aenean eu nunc ac orci aliquam ultricies. Suspendisse mi est, convallis et tincidunt nec, iaculis nec metus. Vestibulum vitae metus nisi. Etiam felis mauris, ullamcorper sed aliquet eu, porttitor eu magna. Vestibulum vel mattis purus, vitae semper tortor. Etiam vestibulum ex id risus viverra vulputate. Aenean euismod lectus tortor, vitae interdum erat blandit sed. Vestibulum accumsan massa vehicula tellus efficitur vehicula. Donec accumsan eget purus sed condimentum. Nunc tempor imperdiet odio a molestie. Phasellus velit nulla, volutpat ac ipsum id, iaculis pretium ipsum.
 
-Cras ac justo iaculis, sollicitudin nisl vel, maximus turpis. Nulla sed nunc elit. Maecenas ultricies auctor mi quis semper. Suspendisse eget rhoncus enim. Morbi tincidunt, urna sed dapibus consequat, ex lorem scelerisque risus, vel auctor libero dui eu diam. Aliquam a rutrum risus. Nunc facilisis, est a rutrum commodo, eros ipsum pulvinar enim, sit amet elementum est dolor quis mi. Nam aliquet, massa eget vestibulum tincidunt, tortor leo dictum arcu, quis eleifend felis ligula in odio. Nullam pharetra mauris ac tortor pharetra ultricies. Aenean in dictum lorem, eu vestibulum libero. Praesent efficitur pretium magna, nec tristique urna condimentum vitae. Aliquam eu nibh quis urna rhoncus porta. Duis lacus leo, tempus ut urna sit amet, dignissim consectetur lorem. Duis luctus scelerisque ultricies. Quisque pharetra feugiat metus in tempor.
-"#;
+Cras ac justo iaculis, sollicitudin nisl vel, maximus turpis. Nulla sed nunc elit. Maecenas ultricies auctor mi quis semper. Suspendisse eget rhoncus enim. Morbi tincidunt, urna sed dapibus consequat, ex lorem scelerisque risus, vel auctor libero dui eu diam. Aliquam a rutrum risus. Nunc facilisis, est a rutrum commodo, eros ipsum pulvinar enim, sit amet elementum est dolor quis mi. Nam aliquet, massa eget vestibulum tincidunt, tortor leo dictum arcu, quis eleifend felis ligula in odio. Nullam pharetra mauris ac tortor pharetra ultricies. Aenean in dictum lorem, eu vestibulum libero. Praesent efficitur pretium magna, nec tristique urna condimentum vitae. Aliquam eu nibh quis urna rhoncus porta. Duis lacus leo, tempus ut urna sit amet, dignissim consectetur lorem. Duis luctus scelerisque ultricies. Quisque pharetra feugiat metus in tempor."#;
 
 const LOREM_SHORT: &str = r#"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed leo quis orci porta auctor eget nec dui. Nullam egestas tempus sapien quis venenatis. Nullam placerat, elit eu aliquet luctus, risus elit sodales elit, eu iaculis ante lacus nec lacus. Vestibulum eget dolor at orci iaculis malesuada. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Quisque cursus tincidunt accumsan. In hac habitasse platea dictumst. Etiam ultricies laoreet ipsum id pulvinar. Aenean fermentum gravida nisi, et congue lectus interdum et. Cras pellentesque scelerisque quam, ut mollis ligula aliquet ut."#;
 
@@ -23,7 +21,6 @@ async fn demo_texts() -> Scene {
     let mut word_text_node = nf.create_text_span_node();
     word_text_node.name = Some("Word Text".to_string());
     word_text_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
-    word_text_node.width = Some(400.0);
     word_text_node.text = "Grida Canvas".to_string();
     word_text_node.text_style = TextStyle {
         text_decoration: TextDecoration::None,
@@ -47,9 +44,8 @@ async fn demo_texts() -> Scene {
     let mut sentence_text_node = nf.create_text_span_node();
     sentence_text_node.name = Some("Sentence Text".to_string());
     sentence_text_node.transform = AffineTransform::new(50.0, 150.0, 0.0);
-    sentence_text_node.width = Some(500.0);
     sentence_text_node.text =
-        "Grida Canvas Skia Backend provides accurate rendering of Texts and Text layouts"
+        "Grida Canvas Skia Backend provides\nAccurate rendering of Texts and Text layouts"
             .to_string();
     sentence_text_node.text_style = TextStyle {
         text_decoration: TextDecoration::Underline,
@@ -69,6 +65,7 @@ async fn demo_texts() -> Scene {
     paragraph_text_node.name = Some("Paragraph Text".to_string());
     paragraph_text_node.transform = AffineTransform::new(50.0, 250.0, 0.0);
     paragraph_text_node.width = Some(800.0);
+    paragraph_text_node.max_lines = Some(14);
     paragraph_text_node.text = LOREM.to_string();
     paragraph_text_node.text_style = TextStyle {
         text_decoration: TextDecoration::None,
