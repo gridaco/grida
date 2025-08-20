@@ -11,12 +11,12 @@ impl TextOverlay {
         // Try to get paragraph from cache first
         if let Some(entry) = cache.paragraph.borrow().get(&layer.base.id) {
             let paragraph = &entry.paragraph;
-            let mut paragraph_ref = paragraph.borrow_mut();
+            let paragraph_ref = paragraph.borrow_mut();
 
-            // Apply layout if width is specified
-            if let Some(width) = layer.width {
-                paragraph_ref.layout(width);
-            }
+            // // Apply layout if width is specified
+            // if let Some(width) = layer.width {
+            //     paragraph_ref.layout(width);
+            // }
 
             // Create a path with just the baselines
             let mut path = Path::new();

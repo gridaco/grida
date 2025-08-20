@@ -200,7 +200,7 @@ impl<'a> Painter<'a> {
         let layout_width = width.unwrap_or_else(|| {
             let mut para_ref = paragraph_rc.borrow_mut();
             para_ref.layout(f32::INFINITY);
-            para_ref.max_width()
+            para_ref.max_intrinsic_width()
         });
         paragraph_rc.borrow_mut().layout(layout_width);
 

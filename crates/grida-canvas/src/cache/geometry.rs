@@ -258,36 +258,29 @@ impl GeometryCache {
             }
             Node::TextSpan(n) => {
                 // Get or create paragraph from cache and apply layout to measure size
-                let paragraph = paragraph_cache.get_or_create(
-                    id,
-                    &n.text,
-                    &n.fill,
-                    &n.text_align,
-                    &n.text_style,
-                    &n.max_lines,
-                    &n.ellipsis,
-                    fonts,
-                );
+                let paragraph = paragraph_cache
+                    .get_or_create(
+                        id,
+                        &n.text,
+                        &n.fill,
+                        &n.text_align,
+                        &n.text_style,
+                        &n.max_lines,
+                        &n.ellipsis,
+                        fonts,
+                    )
+                    .clone();
 
                 // For intrinsic sizing, we need to layout with infinity first to measure
                 let layout_width = if n.width.is_none() {
                     // Layout with infinity to get intrinsic width
                     let mut para_ref = paragraph.borrow_mut();
                     para_ref.layout(f32::INFINITY);
-                    let intrinsic_width = para_ref.max_width();
-
-                    // If max_width is still infinity, use a reasonable fallback
-                    let final_width = if intrinsic_width.is_infinite() {
-                        // Fallback: estimate width based on text length and font size
-                        let estimated_width = n.text.len() as f32 * n.text_style.font_size * 0.6;
-                        estimated_width.max(100.0) // Minimum width
-                    } else {
-                        intrinsic_width
-                    };
+                    let intrinsic_width = para_ref.max_intrinsic_width();
 
                     // Re-layout with the measured width
-                    para_ref.layout(final_width);
-                    final_width
+                    para_ref.layout(intrinsic_width);
+                    intrinsic_width
                 } else {
                     // Use the specified width
                     n.width.unwrap()
