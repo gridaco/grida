@@ -220,6 +220,18 @@ export namespace cg {
   export type TextDecoration = "none" | "underline";
 
   /**
+   * Text transform modes
+   *
+   * - `none`
+   * - `uppercase`
+   * - `lowercase`
+   * - `capitalize`
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-transform
+   */
+  export type TextTransform = "none" | "uppercase" | "lowercase" | "capitalize";
+
+  /**
    * Supported text align modes
    *
    * Does not support `start` and `end` as they are not supported in the current version.

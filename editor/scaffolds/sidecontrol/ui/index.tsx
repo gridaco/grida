@@ -176,6 +176,7 @@ export function PropertyEnumToggle<T extends string>({
   enum: enums,
   value,
   onValueChange,
+  onValueSeeked,
   ...props
 }: Omit<
   React.ComponentProps<typeof ToggleGroup>,
@@ -184,6 +185,7 @@ export function PropertyEnumToggle<T extends string>({
   enum: EnumItem<T>[];
   value?: TMixed<T>;
   onValueChange?: (value: T) => void;
+  onValueSeeked?: (value: T | null) => void;
 }) {
   const mixed = value === grida.mixed;
 
@@ -208,6 +210,8 @@ export function PropertyEnumToggle<T extends string>({
             value={value}
             title={label}
             disabled={disabled}
+            onMouseEnter={() => onValueSeeked?.(value as T)}
+            onMouseLeave={() => onValueSeeked?.(null)}
           >
             {icon}
           </ToggleGroupItem>

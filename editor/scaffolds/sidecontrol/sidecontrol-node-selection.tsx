@@ -58,6 +58,7 @@ import {
   Crosshair2Icon,
   LockClosedIcon,
   LockOpen1Icon,
+  MixerVerticalIcon,
   PlusIcon,
 } from "@radix-ui/react-icons";
 import { supports } from "@/grida-canvas/utils/supports";
@@ -95,6 +96,7 @@ import {
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 import { dq } from "@/grida-canvas/query";
 import { StrokeAlignControl } from "./controls/stroke-align";
+import { TextDetails } from "./controls/widgets/text-details";
 import cg from "@grida/cg";
 import { editor } from "@/grida-canvas";
 import { FeControl } from "./controls/fe";
@@ -369,6 +371,49 @@ function ModeMixedNodeProperties({
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Opacity</PropertyLineLabel>
+            <OpacityControl
+              value={opacity?.value}
+              // onValueChange={change.opacity}
+              onValueCommit={change.opacity}
+            />
+          </PropertyLine>
+          {supports_corner_radius && (
+            <PropertyLine>
+              <PropertyLineLabel>Radius</PropertyLineLabel>
+              {cornerRadius?.mixed ? (
+                <CornerRadius4Control onValueCommit={change.cornerRadius} />
+              ) : (
+                <CornerRadius4Control
+                  value={{ cornerRadius: cornerRadius?.value }}
+                  onValueCommit={change.cornerRadius}
+                />
+              )}
+            </PropertyLine>
+          )}
+          {/* {supports.border(node.type) && (
+              <PropertyLine>
+                <PropertyLineLabel>Border</PropertyLineLabel>
+                <BorderControl value={border} onValueChange={actions.border} />
+              </PropertyLine>
+            )} */}
+
+          {/* <PropertyLine>
+              <PropertyLineLabel>Shadow</PropertyLineLabel>
+              <BoxShadowControl
+                value={{ boxShadow }}
+                onValueChange={actions.boxShadow}
+              />
+            </PropertyLine> */}
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+
       {/* TODO: */}
       {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
           <SidebarSectionHeaderItem>
@@ -545,48 +590,6 @@ function ModeMixedNodeProperties({
           </SidebarMenuSectionContent>
         </SidebarSection>
       )}
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Opacity</PropertyLineLabel>
-            <OpacityControl
-              value={opacity?.value}
-              // onValueChange={change.opacity}
-              onValueCommit={change.opacity}
-            />
-          </PropertyLine>
-          {supports_corner_radius && (
-            <PropertyLine>
-              <PropertyLineLabel>Radius</PropertyLineLabel>
-              {cornerRadius?.mixed ? (
-                <CornerRadius4Control onValueCommit={change.cornerRadius} />
-              ) : (
-                <CornerRadius4Control
-                  value={{ cornerRadius: cornerRadius?.value }}
-                  onValueCommit={change.cornerRadius}
-                />
-              )}
-            </PropertyLine>
-          )}
-          {/* {supports.border(node.type) && (
-              <PropertyLine>
-                <PropertyLineLabel>Border</PropertyLineLabel>
-                <BorderControl value={border} onValueChange={actions.border} />
-              </PropertyLine>
-            )} */}
-
-          {/* <PropertyLine>
-              <PropertyLineLabel>Shadow</PropertyLineLabel>
-              <BoxShadowControl
-                value={{ boxShadow }}
-                onValueChange={actions.boxShadow}
-              />
-            </PropertyLine> */}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
 
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
@@ -913,12 +916,117 @@ function ModeNodeProperties({
         )}
       </SidebarSection>
 
+      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderActions>
+            <BlendModeDropdown
+              value={blendMode}
+              onValueChange={actions.blendMode}
+            />
+          </SidebarSectionHeaderActions>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLineOpacity node_id={node_id} />
+          {supports.border(node.type, { backend }) && (
+            <PropertyLine>
+              <PropertyLineLabel>Border</PropertyLineLabel>
+              <BorderControl value={border} onValueChange={actions.border} />
+            </PropertyLine>
+          )}
+          {supports.cornerRadius(node.type, { backend }) && (
+            <>
+              {supports.cornerRadius4(node.type, { backend }) ? (
+                <PropertyLine>
+                  <PropertyLineLabel>Radius</PropertyLineLabel>
+                  <CornerRadius4Control
+                    value={{
+                      cornerRadius,
+                      cornerRadiusTopLeft,
+                      cornerRadiusTopRight,
+                      cornerRadiusBottomRight,
+                      cornerRadiusBottomLeft,
+                    }}
+                    onValueCommit={actions.cornerRadius}
+                  />
+                </PropertyLine>
+              ) : (
+                <PropertyLine>
+                  <PropertyLineLabel>Radius</PropertyLineLabel>
+                  <CornerRadiusControl
+                    value={cornerRadius}
+                    onValueCommit={actions.cornerRadius}
+                  />
+                </PropertyLine>
+              )}
+            </>
+          )}
+          {(pointCount != null || innerRadius != null) && (
+            <>
+              {pointCount != null &&
+                supports.pointCount(node.type, { backend }) && (
+                  <PropertyLine>
+                    <PropertyLineLabel>Count</PropertyLineLabel>
+                    <InputPropertyNumber
+                      mode="fixed"
+                      min={3}
+                      max={60}
+                      value={pointCount}
+                      onValueCommit={actions.pointCount}
+                    />
+                  </PropertyLine>
+                )}
+              {innerRadius != null && type !== "ellipse" && (
+                <PropertyLine>
+                  <PropertyLineLabel>Ratio</PropertyLineLabel>
+                  <InputPropertyNumber
+                    mode="fixed"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={innerRadius}
+                    onValueCommit={actions.innerRadius}
+                  />
+                </PropertyLine>
+              )}
+            </>
+          )}
+          {supports.arcData(node.type, { backend }) && (
+            <PropertyLine>
+              <PropertyLineLabel>Arc</PropertyLineLabel>
+              <ArcPropertiesControl
+                value={{
+                  angle: angle ?? 360,
+                  angleOffset: angleOffset ?? 0,
+                  innerRadius: innerRadius ?? 0,
+                }}
+                onValueChange={(v) => {
+                  actions.arcData(v);
+                }}
+              />
+            </PropertyLine>
+          )}
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+
       <SidebarSection
         hidden={config.text === "off" || !is_text}
         className="border-b pb-4"
       >
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderActions>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="xs">
+                  <MixerVerticalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 h-96">
+                <TextDetails />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarSectionHeaderActions>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
@@ -1077,98 +1185,7 @@ function ModeNodeProperties({
           </SidebarMenuSectionContent>
         </SidebarSection>
       )}
-      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
-          <SidebarSectionHeaderActions>
-            <BlendModeDropdown
-              value={blendMode}
-              onValueChange={actions.blendMode}
-            />
-          </SidebarSectionHeaderActions>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLineOpacity node_id={node_id} />
-          {supports.border(node.type, { backend }) && (
-            <PropertyLine>
-              <PropertyLineLabel>Border</PropertyLineLabel>
-              <BorderControl value={border} onValueChange={actions.border} />
-            </PropertyLine>
-          )}
-          {supports.cornerRadius(node.type, { backend }) && (
-            <>
-              {supports.cornerRadius4(node.type, { backend }) ? (
-                <PropertyLine>
-                  <PropertyLineLabel>Radius</PropertyLineLabel>
-                  <CornerRadius4Control
-                    value={{
-                      cornerRadius,
-                      cornerRadiusTopLeft,
-                      cornerRadiusTopRight,
-                      cornerRadiusBottomRight,
-                      cornerRadiusBottomLeft,
-                    }}
-                    onValueCommit={actions.cornerRadius}
-                  />
-                </PropertyLine>
-              ) : (
-                <PropertyLine>
-                  <PropertyLineLabel>Radius</PropertyLineLabel>
-                  <CornerRadiusControl
-                    value={cornerRadius}
-                    onValueCommit={actions.cornerRadius}
-                  />
-                </PropertyLine>
-              )}
-            </>
-          )}
-          {(pointCount != null || innerRadius != null) && (
-            <>
-              {pointCount != null &&
-                supports.pointCount(node.type, { backend }) && (
-                  <PropertyLine>
-                    <PropertyLineLabel>Count</PropertyLineLabel>
-                    <InputPropertyNumber
-                      mode="fixed"
-                      min={3}
-                      max={60}
-                      value={pointCount}
-                      onValueCommit={actions.pointCount}
-                    />
-                  </PropertyLine>
-                )}
-              {innerRadius != null && type !== "ellipse" && (
-                <PropertyLine>
-                  <PropertyLineLabel>Ratio</PropertyLineLabel>
-                  <InputPropertyNumber
-                    mode="fixed"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={innerRadius}
-                    onValueCommit={actions.innerRadius}
-                  />
-                </PropertyLine>
-              )}
-            </>
-          )}
-          {supports.arcData(node.type, { backend }) && (
-            <PropertyLine>
-              <PropertyLineLabel>Arc</PropertyLineLabel>
-              <ArcPropertiesControl
-                value={{
-                  angle: angle ?? 360,
-                  angleOffset: angleOffset ?? 0,
-                  innerRadius: innerRadius ?? 0,
-                }}
-                onValueChange={(v) => {
-                  actions.arcData(v);
-                }}
-              />
-            </PropertyLine>
-          )}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+
       <SectionFills node_id={node_id} />
       {supports.stroke(node.type, { backend }) && (
         <SectionStrokes
