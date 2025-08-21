@@ -1509,6 +1509,8 @@ export namespace grida.program.nodes {
       i.ITextNodeStyle,
       i.ITextValue {
     readonly type: "text";
+
+    maxLines?: number | null;
     // textAutoResize: "none" | "width" | "height" | "auto";
   }
 
@@ -1519,6 +1521,7 @@ export namespace grida.program.nodes {
       i.IComputedTextValue & i.IComputedTextNodeStyle
     > {
     readonly type: "text";
+    maxLines?: number | null;
   }
 
   export interface ImageNode
