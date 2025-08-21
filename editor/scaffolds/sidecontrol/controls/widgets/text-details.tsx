@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Slider } from "@/components/ui/slider";
+import { Slider } from "../utils/slider";
 import { Separator } from "@/components/ui/separator";
 import { PropertyLine, PropertyLineLabel, PropertyEnumToggle } from "../../ui";
 import InputPropertyNumber from "../../ui/number";
@@ -233,7 +233,7 @@ export function TextDetails(props: TextDetailsProps = {}) {
   return (
     <div className="w-full">
       <Tabs defaultValue="basics" className="w-full">
-        <TabsList className="w-full h-7">
+        <TabsList className="w-full h-7 my-1">
           <TabsTrigger value="basics" className="text-xs">
             Basics
           </TabsTrigger>
@@ -362,7 +362,7 @@ export function TextDetails(props: TextDetailsProps = {}) {
         <TabsContent value="variable" className="space-y-4 mt-3 px-2">
           {/* Slant Slider */}
           <div className="space-y-2">
-            <PropertyLine>
+            <PropertyLine className="items-center" disabled>
               <PropertyLineLabel>Slant</PropertyLineLabel>
               <div className="flex-1">
                 <Slider
@@ -379,7 +379,7 @@ export function TextDetails(props: TextDetailsProps = {}) {
 
           {/* Weight Slider */}
           <div className="space-y-2">
-            <PropertyLine>
+            <PropertyLine className="items-center">
               <PropertyLineLabel>Weight</PropertyLineLabel>
               <div className="flex-1">
                 <Slider

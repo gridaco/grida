@@ -19,15 +19,18 @@ export function PropertyLine({
   children,
   className,
   hidden,
+  disabled,
 }: React.PropsWithChildren<{
   className?: string;
   hidden?: boolean;
+  disabled?: boolean;
 }>) {
   return (
     <div
       data-hidden={hidden}
+      data-disabled={disabled}
       className={cn(
-        "group flex items-start justify-between max-w-full data-[hidden='true']:hidden",
+        "group flex items-start justify-between max-w-full data-[hidden='true']:hidden data-[disabled='true']:opacity-50 data-[disabled='true']:pointer-events-none data-[disabled='true']:cursor-not-allowed",
         className
       )}
     >
