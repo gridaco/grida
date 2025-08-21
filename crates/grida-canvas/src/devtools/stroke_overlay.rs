@@ -62,7 +62,14 @@ impl StrokeOverlay {
                     } else {
                         match layer {
                             crate::painter::layer::PainterPictureLayer::Text(t) => {
-                                text_overlay::TextOverlay::text_layer_baseline(cache, t)
+                                if let Some(text_path) =
+                                    text_overlay::TextOverlay::text_layer_baseline(cache, t)
+                                {
+                                    text_path
+                                } else {
+                                    // Skip rendering if text path is not available
+                                    continue;
+                                }
                             }
                             _ => shape.to_path(),
                         }

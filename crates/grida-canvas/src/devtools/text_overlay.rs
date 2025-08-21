@@ -7,7 +7,11 @@ pub struct TextOverlay;
 impl TextOverlay {
     /// Creates a path with just the baselines for a text layer
     /// This is much more efficient than rendering the entire text outline
-    pub fn text_layer_baseline(cache: &SceneCache, layer: &PainterPictureTextLayer) -> Path {
+    /// Returns None if the text layer is not found in cache
+    pub fn text_layer_baseline(
+        cache: &SceneCache,
+        layer: &PainterPictureTextLayer,
+    ) -> Option<Path> {
         // Try to get paragraph from cache first
         if let Some(entry) = cache.paragraph.borrow().get(&layer.base.id) {
             let paragraph = &entry.paragraph;
@@ -37,10 +41,10 @@ impl TextOverlay {
                     path.line_to((line_end_x, baseline_y));
                 }
             }
-            path
+            Some(path)
         } else {
-            // This should not happen now that Painter shares the SceneCache's paragraph cache
-            unreachable!("text layer not in cache - this should not happen with shared cache")
+            // Return None if text layer is not in cache
+            None
         }
     }
 }
