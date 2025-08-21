@@ -755,6 +755,7 @@ function ModeNodeProperties({
     letterSpacing: node.letterSpacing,
     textAlign: node.textAlign,
     textAlignVertical: node.textAlignVertical,
+    maxLines: node.maxLines,
     maxLength: node.maxLength,
 
     //
@@ -806,6 +807,7 @@ function ModeNodeProperties({
     letterSpacing,
     textAlign,
     textAlignVertical,
+    maxLines,
     maxLength,
 
     //
@@ -1023,7 +1025,16 @@ function ModeNodeProperties({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 h-96">
-                <TextDetails />
+                <TextDetails
+                  weight={fontWeight}
+                  onWeightChange={(value) =>
+                    actions.fontWeight(value as cg.NFontWeight)
+                  }
+                  alignment={textAlign}
+                  onAlignmentChange={actions.textAlign}
+                  maxLines={maxLines}
+                  onMaxLinesChange={actions.maxLines}
+                />
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarSectionHeaderActions>

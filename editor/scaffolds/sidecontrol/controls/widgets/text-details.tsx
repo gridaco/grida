@@ -115,7 +115,7 @@ interface TextDetailsProps {
   case?: cg.TextTransform;
   verticalTrim?: VerticalTrim;
   truncate?: boolean;
-  maxLines?: number;
+  maxLines?: number | null;
   slant?: number;
   weight?: number;
 
@@ -341,7 +341,7 @@ export function TextDetails(props: TextDetailsProps = {}) {
               <PropertyLineLabel>Max lines</PropertyLineLabel>
               <InputPropertyNumber
                 mode="fixed"
-                value={maxLines}
+                value={maxLines ?? undefined}
                 onValueCommit={onMaxLinesChange}
                 min={1}
                 step={1}
@@ -386,7 +386,7 @@ export function TextDetails(props: TextDetailsProps = {}) {
                   value={[weight]}
                   max={900}
                   min={100}
-                  step={100}
+                  step={1}
                   className="w-full"
                   onValueChange={(values) => onWeightChange?.(values[0])}
                 />

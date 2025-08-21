@@ -211,6 +211,8 @@ export function useNodeActions(node_id: string | undefined) {
       ) => instance.changeTextNodeLetterSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
         instance.changeTextNodeMaxlength(node_id, value),
+      maxLines: (value: number | null) =>
+        instance.changeTextNodeMaxLines(node_id, value),
 
       // border
       border: (value: grida.program.css.Border | undefined) =>

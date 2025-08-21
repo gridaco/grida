@@ -1660,6 +1660,7 @@ export namespace editor.api {
       node_id: NodeID,
       maxlength: number | undefined
     ): void;
+    changeTextNodeMaxLines(node_id: NodeID, maxLines: number | null): void;
     changeContainerNodePadding(
       node_id: NodeID,
       padding: grida.program.nodes.i.IPadding["padding"]

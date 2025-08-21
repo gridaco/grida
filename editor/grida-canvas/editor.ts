@@ -1845,6 +1845,14 @@ export class Editor
     });
   }
 
+  changeTextNodeMaxLines(node_id: string, maxLines: number | null): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      maxLines,
+    });
+  }
+
   //
   changeNodeBorder(
     node_id: string,
