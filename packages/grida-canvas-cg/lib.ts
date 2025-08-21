@@ -254,6 +254,7 @@ export namespace cg {
   /**
    * Open type feature tags
    *
+   * @see https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist
    * @see https://learn.microsoft.com/en-us/typography/opentype/spec/featuretags
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_fonts/OpenType_fonts_guide
    */
