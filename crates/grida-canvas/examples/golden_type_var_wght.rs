@@ -1,6 +1,8 @@
+use cg::cg::types::{FontWeight, TextDecoration, TextStyle};
+use cg::text::text_style::textstyle;
 use skia_safe::textlayout::FontCollection;
 use skia_safe::textlayout::{
-    ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection, TextStyle, TypefaceFontProvider,
+    ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection, TypefaceFontProvider,
 };
 use skia_safe::{surfaces, Color, FontMgr, Paint, Point};
 use std::fs;
@@ -25,9 +27,9 @@ fn main() {
 
     // Define the weights we want to demonstrate (100 to 1000 in 25-step increments)
     let weights = vec![
-        100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525,
-        550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975,
-        1000,
+        25, 50, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475,
+        500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925,
+        950, 975, 1000,
     ];
 
     // Create a paragraph style
@@ -47,33 +49,49 @@ fn main() {
     let start_y = 120.0;
     let font_size = 20.0;
 
-    // Draw title
-    let mut title_style = TextStyle::new();
-    title_style.set_foreground_paint(&paint);
-    title_style.set_font_size(32.0);
-    title_style.set_font_families(&["Geist"]);
+    // Draw title using cg TextStyle
+    let title_style = TextStyle {
+        text_decoration: TextDecoration::None,
+        font_family: "Geist".to_string(),
+        font_size: 32.0,
+        font_weight: FontWeight::new(400),
+        italic: false,
+        letter_spacing: None,
+        line_height: None,
+        text_transform: cg::cg::types::TextTransform::None,
+    };
+    let mut title_ts = textstyle(&title_style);
+    title_ts.set_foreground_paint(&paint);
 
     let mut title_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
-    title_builder.push_style(&title_style);
+    title_builder.push_style(&title_ts);
     title_builder.add_text("Variable Font Weight Demo");
     let mut title_paragraph = title_builder.build();
     title_paragraph.layout(1100.0);
     title_paragraph.paint(canvas, Point::new(start_x, start_y - 80.0));
 
-    // Draw subtitle
-    let mut subtitle_style = TextStyle::new();
-    subtitle_style.set_foreground_paint(&paint);
-    subtitle_style.set_font_size(16.0);
-    subtitle_style.set_font_families(&["Geist"]);
+    // Draw subtitle using cg TextStyle
+    let subtitle_style = TextStyle {
+        text_decoration: TextDecoration::None,
+        font_family: "Geist".to_string(),
+        font_size: 16.0,
+        font_weight: FontWeight::new(400),
+        italic: false,
+        letter_spacing: None,
+        line_height: None,
+        text_transform: cg::cg::types::TextTransform::None,
+    };
+    let mut subtitle_ts = textstyle(&subtitle_style);
+    subtitle_ts.set_foreground_paint(&paint);
 
     let mut subtitle_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
-    subtitle_builder.push_style(&subtitle_style);
+    subtitle_builder.push_style(&subtitle_ts);
     subtitle_builder.add_text("Weight range: 100-1000 in 25-step increments");
     let mut subtitle_paragraph = subtitle_builder.build();
     subtitle_paragraph.layout(1100.0);
     subtitle_paragraph.paint(canvas, Point::new(start_x, start_y - 30.0));
 
-    // Draw simple rows of weight variations
+    // Draw simple rows of weight variations using cg TextStyle
     let mut y_pos = start_y + 40.0; // Add 40px space after subtitle
     for (i, &weight) in weights.iter().enumerate() {
         // Add subtle alternating background for better readability
@@ -85,30 +103,27 @@ fn main() {
                 &bg_paint,
             );
         }
+
         // Create a paragraph builder
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
 
-        // Create text style with specific weight
-        let mut text_style = TextStyle::new();
-        text_style.set_foreground_paint(&paint);
-        text_style.set_font_size(font_size);
-        text_style.set_font_families(&["Geist"]);
-
-        // Create font arguments with weight variation
-        let coordinates = vec![skia_safe::font_arguments::variation_position::Coordinate {
-            axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
-            value: weight as f32,
-        }];
-        let variation_position = skia_safe::font_arguments::VariationPosition {
-            coordinates: &coordinates[..],
+        // Create cg TextStyle with specific weight
+        let text_style = TextStyle {
+            text_decoration: TextDecoration::None,
+            font_family: "Geist".to_string(),
+            font_size: font_size,
+            font_weight: FontWeight::new(weight),
+            italic: false,
+            letter_spacing: None,
+            line_height: None,
+            text_transform: cg::cg::types::TextTransform::None,
         };
-        let font_args =
-            skia_safe::FontArguments::new().set_variation_design_position(variation_position);
 
-        // Set font arguments on text style
-        text_style.set_font_arguments(&font_args);
+        // Convert to Skia TextStyle using our textstyle() function
+        let mut skia_text_style = textstyle(&text_style);
+        skia_text_style.set_foreground_paint(&paint);
 
-        para_builder.push_style(&text_style);
+        para_builder.push_style(&skia_text_style);
         let text = format!("The quick brown fox jumps over the lazy dog ({})", weight);
         para_builder.add_text(&text);
 

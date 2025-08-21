@@ -422,6 +422,22 @@ pub struct TextStyle {
     /// Text transform (e.g. uppercase, lowercase, capitalize)
     pub text_transform: TextTransform,
 }
+
+impl TextStyle {
+    pub fn from_font(font: &str, size: f32) -> Self {
+        Self {
+            text_decoration: TextDecoration::None,
+            font_family: font.to_string(),
+            font_size: size,
+            font_weight: FontWeight::default(),
+            italic: false,
+            letter_spacing: None,
+            line_height: None,
+            text_transform: TextTransform::None,
+        }
+    }
+}
+
 // #endregion
 
 // #region paint

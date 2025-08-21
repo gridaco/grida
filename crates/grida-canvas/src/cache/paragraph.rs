@@ -1,7 +1,8 @@
 use crate::cg::types::*;
 use crate::node::schema::NodeId;
-use crate::painter::{cvt, make_textstyle};
+use crate::painter::cvt;
 use crate::runtime::repository::FontRepository;
+use crate::text::text_style::textstyle;
 use skia_safe::textlayout;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
@@ -92,7 +93,7 @@ impl ParagraphCache {
 
         let mut para_builder =
             textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
-        let mut ts = make_textstyle(style);
+        let mut ts = textstyle(style);
         ts.set_foreground_paint(&fill_paint);
         para_builder.push_style(&ts);
         let transformed_text =
