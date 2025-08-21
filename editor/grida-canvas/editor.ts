@@ -1776,6 +1776,7 @@ export class Editor
       textAlign,
     });
   }
+
   changeTextNodeTextAlignVertical(
     node_id: string,
     textAlignVertical: cg.TextAlignVertical
@@ -1784,6 +1785,17 @@ export class Editor
       type: "node/change/*",
       node_id: node_id,
       textAlignVertical,
+    });
+  }
+
+  changeTextNodeTextDecoration(
+    node_id: string,
+    textDecoration: cg.TextDecoration
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecoration,
     });
   }
 

@@ -202,6 +202,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: cg.TextAlignVertical) =>
         instance.changeTextNodeTextAlignVertical(node_id, value),
+      textDecoration: (value: cg.TextDecoration) =>
+        instance.changeTextNodeTextDecoration(node_id, value),
       lineHeight: (change: editor.api.NumberChange) =>
         instance.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (

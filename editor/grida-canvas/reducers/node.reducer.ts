@@ -379,6 +379,12 @@ const safe_properties: Partial<
       (draft as UN).textAlignVertical = value;
     },
   }),
+  textDecoration: defineNodeProperty<"textDecoration">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecoration = value;
+    },
+  }),
   fontWeight: defineNodeProperty<"fontWeight">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {

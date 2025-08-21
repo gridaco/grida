@@ -1648,6 +1648,10 @@ export namespace editor.api {
       node_id: NodeID,
       textAlignVertical: cg.TextAlignVertical
     ): void;
+    changeTextNodeTextDecoration(
+      node_id: NodeID,
+      textDecoration: cg.TextDecoration
+    ): void;
     changeTextNodeLineHeight(
       node_id: NodeID,
       lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>

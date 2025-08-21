@@ -755,6 +755,7 @@ function ModeNodeProperties({
     letterSpacing: node.letterSpacing,
     textAlign: node.textAlign,
     textAlignVertical: node.textAlignVertical,
+    textDecoration: node.textDecoration,
     maxLines: node.maxLines,
     maxLength: node.maxLength,
 
@@ -807,6 +808,7 @@ function ModeNodeProperties({
     letterSpacing,
     textAlign,
     textAlignVertical,
+    textDecoration,
     maxLines,
     maxLength,
 
@@ -1032,6 +1034,8 @@ function ModeNodeProperties({
                   }
                   alignment={textAlign}
                   onAlignmentChange={actions.textAlign}
+                  decoration={textDecoration}
+                  onDecorationChange={actions.textDecoration}
                   maxLines={maxLines}
                   onMaxLinesChange={actions.maxLines}
                 />
