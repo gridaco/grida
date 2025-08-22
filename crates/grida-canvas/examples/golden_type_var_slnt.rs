@@ -1,4 +1,4 @@
-use cg::cg::types::{FontWeight, TextDecoration, TextStyle};
+use cg::cg::types::*;
 use cg::text::text_style::textstyle;
 use skia_safe::textlayout::FontCollection;
 use skia_safe::textlayout::{
@@ -51,16 +51,7 @@ fn main() {
     let font_size = 24.0;
 
     // Draw title using cg TextStyle
-    let title_style = TextStyle {
-        text_decoration: TextDecoration::None,
-        font_family: "Recursive".to_string(),
-        font_size: 32.0,
-        font_weight: FontWeight::new(400),
-        italic: false,
-        letter_spacing: None,
-        line_height: None,
-        text_transform: cg::cg::types::TextTransform::None,
-    };
+    let title_style = TextStyle::from_font("Recursive", 32.0);
     let mut title_ts = textstyle(&title_style);
     title_ts.set_foreground_paint(&paint);
 
@@ -72,16 +63,7 @@ fn main() {
     title_paragraph.paint(canvas, Point::new(start_x, start_y - 80.0));
 
     // Draw subtitle using cg TextStyle
-    let subtitle_style = TextStyle {
-        text_decoration: TextDecoration::None,
-        font_family: "Recursive".to_string(),
-        font_size: 16.0,
-        font_weight: FontWeight::new(400),
-        italic: false,
-        letter_spacing: None,
-        line_height: None,
-        text_transform: cg::cg::types::TextTransform::None,
-    };
+    let subtitle_style = TextStyle::from_font("Recursive", 16.0);
     let mut subtitle_ts = textstyle(&subtitle_style);
     subtitle_ts.set_foreground_paint(&paint);
 
@@ -111,6 +93,10 @@ fn main() {
         // Create cg TextStyle with specific slant
         let text_style = TextStyle {
             text_decoration: TextDecoration::None,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
             font_family: "Recursive".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(400), // Keep weight constant

@@ -1,13 +1,35 @@
 use crate::cg::types::*;
 use skia_safe;
 
+fn decoration(style: &TextStyle) -> skia_safe::textlayout::Decoration {
+    let color: skia_safe::Color = style
+        .text_decoration_color
+        .unwrap_or(
+            // TODO: get the color args
+            CGColor::BLACK,
+        )
+        .into();
+
+    let mode = if style.text_decoration_skip_ink.unwrap_or(true) {
+        skia_safe::textlayout::TextDecorationMode::Gaps
+    } else {
+        skia_safe::textlayout::TextDecorationMode::Gaps
+    };
+
+    skia_safe::textlayout::Decoration {
+        ty: style.text_decoration.into(),
+        mode: mode,
+        color: color,
+        style: style.text_decoration_style.unwrap_or_default().into(),
+        thickness_multiplier: style.text_decoration_thinkness.unwrap_or(1.0),
+    }
+}
+
 pub fn textstyle(style: &TextStyle) -> skia_safe::textlayout::TextStyle {
     let mut ts = skia_safe::textlayout::TextStyle::new();
 
     // [decoration]
-    let mut decor = skia_safe::textlayout::Decoration::default();
-    decor.ty = style.text_decoration.into();
-    decor.color = skia_safe::Color::BLACK; // TODO: get the color args
+    let decor = decoration(style);
 
     // [font_style]
     let font_style = skia_safe::FontStyle::new(

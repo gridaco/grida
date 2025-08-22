@@ -1352,10 +1352,15 @@ export namespace grida.program.nodes {
      * a set of properties that can be either applied to a text or textspan
      */
     export interface ITextStyle {
-      textDecoration: cg.TextDecoration;
       fontFamily?: string;
       fontSize: number;
       fontWeight: cg.NFontWeight;
+      textDecoration: cg.TextDecoration;
+      textDecorationStyle?: cg.TextDecorationStyle | null;
+      textDecorationColor?: cg.TextDecorationColorValue | null;
+      textDecorationSkipInk?: cg.TextDecorationSkipInkFlag | null;
+      textDecorationThickness?: cg.TextDecorationThicknessPercentage | null;
+      textTransform?: cg.TextTransform;
       /**
        * @default 0
        */

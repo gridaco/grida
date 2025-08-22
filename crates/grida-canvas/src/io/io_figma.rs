@@ -891,6 +891,10 @@ impl FigmaConverter {
             text: origin.characters.clone(),
             text_style: TextStyle {
                 text_decoration: Self::convert_text_decoration(style.text_decoration.as_ref()),
+                text_decoration_color: None,
+                text_decoration_style: None,
+                text_decoration_skip_ink: None,
+                text_decoration_thinkness: None,
                 font_family: style
                     .font_family
                     .clone()

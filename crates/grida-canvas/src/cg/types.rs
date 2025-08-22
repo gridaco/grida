@@ -48,6 +48,19 @@ impl CGColor {
     pub const RED: Self = Self(255, 0, 0, 255);
     pub const GREEN: Self = Self(0, 255, 0, 255);
     pub const BLUE: Self = Self(0, 0, 255, 255);
+
+    pub fn r(&self) -> u8 {
+        self.0
+    }
+    pub fn g(&self) -> u8 {
+        self.1
+    }
+    pub fn b(&self) -> u8 {
+        self.2
+    }
+    pub fn a(&self) -> u8 {
+        self.3
+    }
 }
 
 impl Into<SolidPaint> for CGColor {
@@ -312,6 +325,24 @@ pub enum TextDecoration {
     LineThrough,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
+pub enum TextDecorationStyle {
+    #[serde(rename = "solid")]
+    Solid,
+    #[serde(rename = "double")]
+    Double,
+    #[serde(rename = "dotted")]
+    Dotted,
+    #[serde(rename = "dashed")]
+    Dashed,
+}
+
+impl Default for TextDecorationStyle {
+    fn default() -> Self {
+        TextDecorationStyle::Solid
+    }
+}
+
 /// Supported horizontal text alignment.
 ///
 /// Does not include `Start` or `End`, as they are not supported currently.
@@ -400,6 +431,18 @@ pub struct TextStyle {
     /// Text decoration (e.g. underline or none).
     pub text_decoration: TextDecoration,
 
+    /// Text decoration color
+    pub text_decoration_color: Option<CGColor>,
+
+    /// The style in which to paint the text decorations (e.g., dashed).
+    pub text_decoration_style: Option<TextDecorationStyle>,
+
+    /// Text decoration skip ink
+    pub text_decoration_skip_ink: Option<bool>,
+
+    /// The thickness of the decoration stroke as a multiplier of the thickness defined by the font.
+    pub text_decoration_thinkness: Option<f32>,
+
     /// Optional font family name (e.g. "Roboto").
     pub font_family: String,
 
@@ -427,6 +470,10 @@ impl TextStyle {
     pub fn from_font(font: &str, size: f32) -> Self {
         Self {
             text_decoration: TextDecoration::None,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
             font_family: font.to_string(),
             font_size: size,
             font_weight: FontWeight::default(),

@@ -24,6 +24,10 @@ async fn demo_texts() -> Scene {
     word_text_node.text = "Grida Canvas".to_string();
     word_text_node.text_style = TextStyle {
         text_decoration: TextDecoration::None,
+        text_decoration_color: None,
+        text_decoration_style: None,
+        text_decoration_skip_ink: None,
+        text_decoration_thinkness: None,
         font_family: "Arial".to_string(),
         font_size: 48.0,
         italic: false,                     // TODO: add italic to text style
@@ -47,16 +51,7 @@ async fn demo_texts() -> Scene {
     sentence_text_node.text =
         "Grida Canvas Skia Backend provides\nAccurate rendering of Texts and Text layouts"
             .to_string();
-    sentence_text_node.text_style = TextStyle {
-        text_decoration: TextDecoration::Underline,
-        font_family: "Caveat".to_string(),
-        font_size: 32.0,
-        italic: false,                     // TODO: add italic to text style
-        font_weight: FontWeight::new(400), // Regular
-        letter_spacing: None,
-        line_height: None,
-        text_transform: TextTransform::None,
-    };
+    sentence_text_node.text_style = TextStyle::from_font("Caveat", 32.0);
     sentence_text_node.text_align = TextAlign::Left;
     sentence_text_node.text_align_vertical = TextAlignVertical::Center;
 
@@ -67,16 +62,7 @@ async fn demo_texts() -> Scene {
     paragraph_text_node.width = Some(800.0);
     paragraph_text_node.max_lines = Some(14);
     paragraph_text_node.text = LOREM.to_string();
-    paragraph_text_node.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
-        font_family: "Arial".to_string(),
-        font_size: 16.0,
-        italic: false,                     // TODO: add italic to text style
-        font_weight: FontWeight::new(400), // Regular
-        letter_spacing: None,
-        line_height: Some(1.5), // 1.5 line height for better readability
-        text_transform: TextTransform::None,
-    };
+    paragraph_text_node.text_style = TextStyle::from_font("Caveat", 16.0);
     paragraph_text_node.text_align = TextAlign::Left;
     paragraph_text_node.text_align_vertical = TextAlignVertical::Top;
 
@@ -86,16 +72,7 @@ async fn demo_texts() -> Scene {
     second_paragraph_text_node.transform = AffineTransform::new(50.0, 800.0, 0.0);
     second_paragraph_text_node.width = Some(800.0);
     second_paragraph_text_node.text = LOREM_SHORT.to_string();
-    second_paragraph_text_node.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
-        font_family: "VT323".to_string(),
-        font_size: 16.0,
-        italic: false,                     // TODO: add italic to text style
-        font_weight: FontWeight::new(400), // Regular
-        letter_spacing: None,
-        line_height: Some(1.5), // 1.5 line height for better readability
-        text_transform: TextTransform::None,
-    };
+    second_paragraph_text_node.text_style = TextStyle::from_font("VT323", 16.0);
     second_paragraph_text_node.text_align = TextAlign::Left;
     second_paragraph_text_node.text_align_vertical = TextAlignVertical::Top;
     second_paragraph_text_node.fill = Paint::Solid(SolidPaint {

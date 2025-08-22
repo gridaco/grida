@@ -385,6 +385,36 @@ const safe_properties: Partial<
       (draft as UN).textDecoration = value;
     },
   }),
+  textDecorationStyle: defineNodeProperty<"textDecorationStyle">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecorationStyle = value;
+    },
+  }),
+  textDecorationColor: defineNodeProperty<"textDecorationColor">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecorationColor = value;
+    },
+  }),
+  textDecorationSkipInk: defineNodeProperty<"textDecorationSkipInk">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecorationSkipInk = value;
+    },
+  }),
+  textDecorationThickness: defineNodeProperty<"textDecorationThickness">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecorationThickness = value;
+    },
+  }),
+  textTransform: defineNodeProperty<"textTransform">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textTransform = value;
+    },
+  }),
   fontWeight: defineNodeProperty<"fontWeight">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {

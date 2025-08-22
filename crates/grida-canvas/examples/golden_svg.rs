@@ -31,6 +31,10 @@ async fn demo_scene() -> Scene {
     title_text.text = "Grida Canvas SVG Demo".to_string();
     title_text.text_style = TextStyle {
         text_decoration: TextDecoration::None,
+        text_decoration_color: None,
+        text_decoration_style: None,
+        text_decoration_skip_ink: None,
+        text_decoration_thinkness: None,
         font_family: "".to_string(),
         font_size: 36.0,
         font_weight: FontWeight::new(700),
@@ -55,16 +59,7 @@ async fn demo_scene() -> Scene {
     subtitle_text.width = Some(700.0);
     subtitle_text.text =
         "Rich content demonstration with shapes, gradients, and effects".to_string();
-    subtitle_text.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
-        font_family: "".to_string(),
-        font_size: 18.0,
-        font_weight: FontWeight::new(400),
-        italic: true,
-        letter_spacing: None,
-        line_height: None,
-        text_transform: TextTransform::None,
-    };
+    subtitle_text.text_style = TextStyle::from_font("", 18.0);
     subtitle_text.text_align = TextAlign::Center;
     subtitle_text.text_align_vertical = TextAlignVertical::Center;
     subtitle_text.fill = Paint::Solid(SolidPaint {
@@ -280,16 +275,7 @@ async fn demo_scene() -> Scene {
     description_text.transform = AffineTransform::new(50.0, 550.0, 0.0);
     description_text.width = Some(700.0);
     description_text.text = "This PDF demonstrates various rendering capabilities including gradients, shapes, text, and effects.".to_string();
-    description_text.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
-        font_family: "".to_string(),
-        font_size: 14.0,
-        font_weight: FontWeight::new(400),
-        italic: false,
-        letter_spacing: None,
-        line_height: None,
-        text_transform: TextTransform::None,
-    };
+    description_text.text_style = TextStyle::from_font("", 14.0);
     description_text.text_align = TextAlign::Center;
     description_text.text_align_vertical = TextAlignVertical::Center;
     description_text.fill = Paint::Solid(SolidPaint {

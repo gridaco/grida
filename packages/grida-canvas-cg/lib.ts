@@ -217,7 +217,40 @@ export namespace cg {
    * @see https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration
    */
-  export type TextDecoration = "none" | "underline";
+  export type TextDecoration =
+    | "none"
+    | "underline"
+    | "overline"
+    | "line-through";
+
+  /**
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-style
+   */
+  export type TextDecorationStyle =
+    | "solid"
+    | "double"
+    | "dotted"
+    | "dashed"
+    | "wavy";
+
+  /**
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-color
+   */
+  export type TextDecorationColor = "currentcolor" | cg.SolidPaint;
+  export type TextDecorationColorValue = cg.RGBA8888;
+
+  /**
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-skip-ink
+   */
+  export type TextDecorationSkipInk = "auto" | "none";
+  export type TextDecorationSkipInkFlag = boolean;
+
+  /**
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-thickness
+   *
+   * auto or thickness in percentage
+   */
+  export type TextDecorationThicknessPercentage = "auto" | number;
 
   /**
    * Text transform modes

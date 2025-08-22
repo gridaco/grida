@@ -406,6 +406,16 @@ pub struct JSONTextNode {
     pub text_align_vertical: TextAlignVertical,
     #[serde(rename = "textDecoration", default = "default_text_decoration")]
     pub text_decoration: TextDecoration,
+
+    #[serde(rename = "textDecorationStyle", default)]
+    pub text_decoration_style: Option<TextDecorationStyle>,
+    #[serde(rename = "textDecorationColor", default)]
+    pub text_decoration_color: Option<JSONRGBA>,
+    #[serde(rename = "textDecorationSkipInk", default)]
+    pub text_decoration_skip_ink: Option<bool>,
+    #[serde(rename = "textDecorationThinkness", default)]
+    pub text_decoration_thinkness: Option<f32>,
+
     #[serde(rename = "lineHeight")]
     pub line_height: Option<f32>,
     #[serde(rename = "letterSpacing")]
@@ -416,6 +426,9 @@ pub struct JSONTextNode {
     pub font_family: Option<String>,
     #[serde(rename = "fontWeight", default = "default_font_weight")]
     pub font_weight: FontWeight,
+
+    #[serde(rename = "textTransform", default)]
+    pub text_transform: TextTransform,
 }
 
 #[derive(Debug, Deserialize)]
@@ -662,13 +675,17 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             text: node.text,
             text_style: TextStyle {
                 text_decoration: node.text_decoration,
-                font_family: node.font_family.unwrap_or_else(|| "Inter".to_string()),
+                text_decoration_color: node.text_decoration_color.map(CGColor::from),
+                text_decoration_style: node.text_decoration_style,
+                text_decoration_skip_ink: node.text_decoration_skip_ink,
+                text_decoration_thinkness: node.text_decoration_thinkness,
+                font_family: node.font_family.unwrap_or_else(|| "".to_string()),
                 font_size: node.font_size.unwrap_or(14.0),
                 font_weight: node.font_weight,
                 italic: false,
                 letter_spacing: node.letter_spacing,
                 line_height: node.line_height,
-                text_transform: TextTransform::None,
+                text_transform: node.text_transform,
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,

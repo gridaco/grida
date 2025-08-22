@@ -1,6 +1,12 @@
 use crate::cg::types::*;
 use skia_safe;
 
+impl From<CGColor> for skia_safe::Color {
+    fn from(color: CGColor) -> Self {
+        skia_safe::Color::from_argb(color.a(), color.r(), color.g(), color.b())
+    }
+}
+
 impl From<BooleanPathOperation> for skia_safe::PathOp {
     fn from(op: BooleanPathOperation) -> Self {
         match op {
@@ -44,6 +50,17 @@ impl From<TextDecoration> for skia_safe::textlayout::TextDecoration {
             TextDecoration::Underline => skia_safe::textlayout::TextDecoration::UNDERLINE,
             TextDecoration::Overline => skia_safe::textlayout::TextDecoration::OVERLINE,
             TextDecoration::LineThrough => skia_safe::textlayout::TextDecoration::LINE_THROUGH,
+        }
+    }
+}
+
+impl From<TextDecorationStyle> for skia_safe::textlayout::TextDecorationStyle {
+    fn from(mode: TextDecorationStyle) -> Self {
+        match mode {
+            TextDecorationStyle::Solid => skia_safe::textlayout::TextDecorationStyle::Solid,
+            TextDecorationStyle::Double => skia_safe::textlayout::TextDecorationStyle::Double,
+            TextDecorationStyle::Dotted => skia_safe::textlayout::TextDecorationStyle::Dotted,
+            TextDecorationStyle::Dashed => skia_safe::textlayout::TextDecorationStyle::Dashed,
         }
     }
 }
