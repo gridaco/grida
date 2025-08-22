@@ -1,3 +1,3 @@
 # CHANGELOG
 
-https://x.com/univ___erses
+https://x.com/univ___erse
