@@ -14,6 +14,8 @@ import {
   LetterCaseLowercaseIcon,
   LetterCaseUppercaseIcon,
   MinusIcon,
+  OverlineIcon,
+  StrikethroughIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
 
@@ -70,6 +72,16 @@ const DECORATION_OPTIONS = [
     icon: <UnderlineIcon className="size-3" />,
     label: "Underline",
   },
+  {
+    value: "overline" as cg.TextDecoration,
+    icon: <OverlineIcon className="size-3" />,
+    label: "Overline",
+  },
+  {
+    value: "line-through" as cg.TextDecoration,
+    icon: <StrikethroughIcon className="size-3" />,
+    label: "Line-through",
+  },
 ];
 
 // Case options
@@ -110,24 +122,24 @@ const TRUNCATE_OPTIONS = [
 
 interface TextDetailsProps {
   // Properties
-  alignment?: cg.TextAlign;
-  decoration?: cg.TextDecoration;
-  case?: cg.TextTransform;
+  textAlign?: cg.TextAlign;
+  textDecoration?: cg.TextDecoration;
+  textTransform?: cg.TextTransform;
+  maxLines?: number | null;
   verticalTrim?: VerticalTrim;
   truncate?: boolean;
-  maxLines?: number | null;
   slant?: number;
-  weight?: number;
+  fontWeight?: number;
 
   // Change handlers
-  onAlignmentChange?: (value: cg.TextAlign) => void;
-  onDecorationChange?: (value: cg.TextDecoration) => void;
-  onCaseChange?: (value: cg.TextTransform) => void;
+  onTextAlignChange?: (value: cg.TextAlign) => void;
+  onTextDecorationChange?: (value: cg.TextDecoration) => void;
+  onTextTransformChange?: (value: cg.TextTransform) => void;
+  onMaxLinesChange?: (value: number) => void;
   onVerticalTrimChange?: (value: VerticalTrim) => void;
   onTruncateChange?: (value: boolean) => void;
-  onMaxLinesChange?: (value: number) => void;
   onSlantChange?: (value: number) => void;
-  onWeightChange?: (value: number) => void;
+  onFontWeightChange?: (value: number) => void;
 }
 
 const getTextStyle = (
@@ -192,24 +204,24 @@ function ParagraphPreview({ hoverPreview }: ParagraphPreviewProps) {
 export function TextDetails(props: TextDetailsProps = {}) {
   const {
     // Properties
-    alignment = "left",
-    decoration = "none",
-    case: textCase = "none",
+    textAlign = "left",
+    textDecoration = "none",
+    textTransform = "none",
     verticalTrim = "all",
     truncate = false,
     maxLines = 1,
     slant = 0,
-    weight = 400,
+    fontWeight = 400,
 
     // Change handlers
-    onAlignmentChange,
-    onDecorationChange,
-    onCaseChange,
+    onTextAlignChange,
+    onTextDecorationChange,
+    onTextTransformChange,
     onVerticalTrimChange,
     onTruncateChange,
     onMaxLinesChange,
     onSlantChange,
-    onWeightChange,
+    onFontWeightChange,
   } = props;
 
   const [hoverPreview, setHoverPreview] = useState<HoverPreview>(null);
@@ -256,10 +268,10 @@ export function TextDetails(props: TextDetailsProps = {}) {
               <PropertyLineLabel>Alignment</PropertyLineLabel>
               <PropertyEnumToggle
                 enum={ALIGNMENT_OPTIONS}
-                value={alignment}
+                value={textAlign}
                 className="w-full"
                 size="sm"
-                onValueChange={onAlignmentChange}
+                onValueChange={onTextAlignChange}
                 onValueSeeked={(value) =>
                   value
                     ? handleHover("alignment", value as cg.TextAlign)
@@ -275,10 +287,10 @@ export function TextDetails(props: TextDetailsProps = {}) {
               <PropertyLineLabel>Decoration</PropertyLineLabel>
               <PropertyEnumToggle
                 enum={DECORATION_OPTIONS}
-                value={decoration}
+                value={textDecoration}
                 className="w-full"
                 size="sm"
-                onValueChange={onDecorationChange}
+                onValueChange={onTextDecorationChange}
                 onValueSeeked={(value) =>
                   value
                     ? handleHover("decoration", value as cg.TextDecoration)
@@ -294,10 +306,10 @@ export function TextDetails(props: TextDetailsProps = {}) {
               <PropertyLineLabel>Case</PropertyLineLabel>
               <PropertyEnumToggle
                 enum={CASE_OPTIONS}
-                value={textCase}
+                value={textTransform}
                 className="w-full"
                 size="sm"
-                onValueChange={onCaseChange}
+                onValueChange={onTextTransformChange}
                 onValueSeeked={(value) =>
                   value
                     ? handleHover("case", value as cg.TextTransform)
@@ -383,12 +395,12 @@ export function TextDetails(props: TextDetailsProps = {}) {
               <PropertyLineLabel>Weight</PropertyLineLabel>
               <div className="flex-1">
                 <Slider
-                  value={[weight]}
+                  value={[fontWeight]}
                   max={900}
                   min={100}
                   step={1}
                   className="w-full"
-                  onValueChange={(values) => onWeightChange?.(values[0])}
+                  onValueChange={(values) => onFontWeightChange?.(values[0])}
                 />
               </div>
             </PropertyLine>

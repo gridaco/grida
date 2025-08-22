@@ -325,6 +325,12 @@ pub enum TextDecoration {
     LineThrough,
 }
 
+impl Default for TextDecoration {
+    fn default() -> Self {
+        TextDecoration::None
+    }
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextDecorationStyle {
     #[serde(rename = "solid")]
@@ -396,6 +402,12 @@ impl Default for TextAlignVertical {
 /// - [OpenType spec](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass)
 #[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub struct FontWeight(pub u32);
+
+impl Default for FontWeight {
+    fn default() -> Self {
+        Self(400)
+    }
+}
 
 impl FontWeight {
     /// Creates a new font weight value.

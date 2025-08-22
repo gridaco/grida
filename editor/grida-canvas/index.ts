@@ -1648,6 +1648,10 @@ export namespace editor.api {
       node_id: NodeID,
       textAlignVertical: cg.TextAlignVertical
     ): void;
+    changeTextNodeTextTransform(
+      node_id: NodeID,
+      transform: cg.TextTransform
+    ): void;
     changeTextNodeTextDecoration(
       node_id: NodeID,
       textDecoration: cg.TextDecoration

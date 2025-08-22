@@ -202,6 +202,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: cg.TextAlignVertical) =>
         instance.changeTextNodeTextAlignVertical(node_id, value),
+      textTransform: (value: cg.TextTransform) =>
+        instance.changeTextNodeTextTransform(node_id, value),
       textDecoration: (value: cg.TextDecoration) =>
         instance.changeTextNodeTextDecoration(node_id, value),
       lineHeight: (change: editor.api.NumberChange) =>
@@ -1139,6 +1141,9 @@ export function useNode(node_id: string): NodeWithMeta {
   };
 }
 
+/**
+ * @deprecated - expensive
+ */
 export function useComputedNode(
   node_id: string
 ): grida.program.nodes.UnknwonComputedNode {

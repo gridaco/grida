@@ -734,7 +734,6 @@ function ModeNodeProperties({
     component_id: node.component_id,
     properties: node.properties,
     src: node.src,
-    text: node.text,
     type: node.type,
     blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
@@ -748,16 +747,6 @@ function ModeNodeProperties({
     angleOffset: node.angleOffset,
 
     fit: node.fit,
-    fontFamily: node.fontFamily,
-    fontWeight: node.fontWeight,
-    fontSize: node.fontSize,
-    lineHeight: node.lineHeight,
-    letterSpacing: node.letterSpacing,
-    textAlign: node.textAlign,
-    textAlignVertical: node.textAlignVertical,
-    textDecoration: node.textDecoration,
-    maxLines: node.maxLines,
-    maxLength: node.maxLength,
 
     //
     border: node.border,
@@ -801,16 +790,6 @@ function ModeNodeProperties({
     angleOffset,
 
     fit,
-    fontFamily,
-    fontWeight,
-    fontSize,
-    lineHeight,
-    letterSpacing,
-    textAlign,
-    textAlignVertical,
-    textDecoration,
-    maxLines,
-    maxLength,
 
     //
     border,
@@ -1012,107 +991,7 @@ function ModeNodeProperties({
           )}
         </SidebarMenuSectionContent>
       </SidebarSection>
-
-      <SidebarSection
-        hidden={config.text === "off" || !is_text}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
-          <SidebarSectionHeaderActions>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs">
-                  <MixerVerticalIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 h-96">
-                <TextDetails
-                  weight={fontWeight}
-                  onWeightChange={(value) =>
-                    actions.fontWeight(value as cg.NFontWeight)
-                  }
-                  alignment={textAlign}
-                  onAlignmentChange={actions.textAlign}
-                  decoration={textDecoration}
-                  onDecorationChange={actions.textDecoration}
-                  maxLines={maxLines}
-                  onMaxLinesChange={actions.maxLines}
-                />
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarSectionHeaderActions>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Value</PropertyLineLabel>
-            <StringValueControl
-              value={node.text}
-              maxlength={maxLength}
-              onValueChange={(value) => actions.text(value ?? null)}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Font</PropertyLineLabel>
-            <div className="flex-1">
-              <FontFamilyControl
-                value={fontFamily}
-                onValueChange={actions.fontFamily}
-              />
-            </div>
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Weight</PropertyLineLabel>
-            <FontWeightControl
-              value={fontWeight}
-              onValueChange={actions.fontWeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Size</PropertyLineLabel>
-            <FontSizeControl
-              value={fontSize}
-              onValueCommit={actions.fontSize}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Line</PropertyLineLabel>
-            <LineHeightControl
-              value={lineHeight}
-              onValueCommit={actions.lineHeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Letter</PropertyLineLabel>
-            <LetterSpacingControl
-              value={letterSpacing}
-              onValueCommit={actions.letterSpacing}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Align</PropertyLineLabel>
-            <TextAlignControl
-              value={textAlign}
-              onValueChange={actions.textAlign}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel></PropertyLineLabel>
-            <TextAlignVerticalControl
-              value={textAlignVertical}
-              onValueChange={actions.textAlignVertical}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Max Length</PropertyLineLabel>
-            <MaxlengthControl
-              value={maxLength}
-              placeholder={(computed.text as any as string)?.length?.toString()}
-              onValueCommit={actions.maxLength}
-            />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {config.text === "on" && is_text && <SectionText node_id={node_id} />}
       <SidebarSection
         hidden={config.image === "off" || !is_image}
         className="border-b pb-4"
@@ -1383,6 +1262,145 @@ function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
           <RotateControl
             value={mp.properties.rotation?.value}
             onValueCommit={mp.actions.rotation}
+          />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function SectionText({ node_id }: { node_id: string }) {
+  const actions = useNodeActions(node_id)!;
+  const computed = useComputedNode(node_id);
+  const {
+    text,
+    fontFamily,
+    fontWeight,
+    fontSize,
+    lineHeight,
+    letterSpacing,
+    textAlign,
+    textAlignVertical,
+    textDecoration,
+    textDecorationStyle,
+    textDecorationColor,
+    textDecorationSkipInk,
+    textDecorationThickness,
+    textTransform,
+    maxLines,
+    maxLength,
+  } = useNodeState(node_id, (node) => ({
+    text: node.text,
+    fontFamily: node.fontFamily,
+    fontWeight: node.fontWeight,
+    fontSize: node.fontSize,
+    lineHeight: node.lineHeight,
+    letterSpacing: node.letterSpacing,
+    textAlign: node.textAlign,
+    textAlignVertical: node.textAlignVertical,
+    textDecoration: node.textDecoration,
+    textDecorationStyle: node.textDecorationStyle,
+    textDecorationColor: node.textDecorationColor,
+    textDecorationSkipInk: node.textDecorationSkipInk,
+    textDecorationThickness: node.textDecorationThickness,
+    textTransform: node.textTransform,
+    maxLines: node.maxLines,
+    maxLength: node.maxLength,
+  }));
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+        <SidebarSectionHeaderActions>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="xs">
+                <MixerVerticalIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64 h-96">
+              <TextDetails
+                fontWeight={fontWeight}
+                textAlign={textAlign}
+                textDecoration={textDecoration}
+                textTransform={textTransform}
+                maxLines={maxLines}
+                onTextTransformChange={actions.textTransform}
+                onTextAlignChange={actions.textAlign}
+                onTextDecorationChange={actions.textDecoration}
+                onMaxLinesChange={actions.maxLines}
+                onFontWeightChange={(value) =>
+                  actions.fontWeight(value as cg.NFontWeight)
+                }
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarSectionHeaderActions>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Value</PropertyLineLabel>
+          <StringValueControl
+            value={text}
+            maxlength={maxLength}
+            onValueChange={(value) => actions.text(value ?? null)}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Font</PropertyLineLabel>
+          <div className="flex-1">
+            <FontFamilyControl
+              value={fontFamily}
+              onValueChange={actions.fontFamily}
+            />
+          </div>
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Weight</PropertyLineLabel>
+          <FontWeightControl
+            value={fontWeight}
+            onValueChange={actions.fontWeight}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Size</PropertyLineLabel>
+          <FontSizeControl value={fontSize} onValueCommit={actions.fontSize} />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Line</PropertyLineLabel>
+          <LineHeightControl
+            value={lineHeight}
+            onValueCommit={actions.lineHeight}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Letter</PropertyLineLabel>
+          <LetterSpacingControl
+            value={letterSpacing}
+            onValueCommit={actions.letterSpacing}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Align</PropertyLineLabel>
+          <TextAlignControl
+            value={textAlign}
+            onValueChange={actions.textAlign}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel></PropertyLineLabel>
+          <TextAlignVerticalControl
+            value={textAlignVertical}
+            onValueChange={actions.textAlignVertical}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Max Length</PropertyLineLabel>
+          <MaxlengthControl
+            value={maxLength}
+            placeholder={(computed.text as any as string)?.length?.toString()}
+            onValueCommit={actions.maxLength}
           />
         </PropertyLine>
       </SidebarMenuSectionContent>

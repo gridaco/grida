@@ -1788,6 +1788,17 @@ export class Editor
     });
   }
 
+  changeTextNodeTextTransform(
+    node_id: string,
+    textTransform: cg.TextTransform
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textTransform,
+    });
+  }
+
   changeTextNodeTextDecoration(
     node_id: string,
     textDecoration: cg.TextDecoration

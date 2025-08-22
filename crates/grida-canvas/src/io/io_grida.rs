@@ -400,13 +400,13 @@ pub struct JSONTextNode {
     pub base: JSONUnknownNodeProperties,
 
     pub text: String,
-    #[serde(rename = "textAlign", default = "default_text_align")]
+    #[serde(rename = "textAlign", default)]
     pub text_align: TextAlign,
-    #[serde(rename = "textAlignVertical", default = "default_text_align_vertical")]
+    #[serde(rename = "textAlignVertical", default)]
     pub text_align_vertical: TextAlignVertical,
-    #[serde(rename = "textDecoration", default = "default_text_decoration")]
-    pub text_decoration: TextDecoration,
 
+    #[serde(rename = "textDecoration", default)]
+    pub text_decoration: TextDecoration,
     #[serde(rename = "textDecorationStyle", default)]
     pub text_decoration_style: Option<TextDecorationStyle>,
     #[serde(rename = "textDecorationColor", default)]
@@ -416,15 +416,15 @@ pub struct JSONTextNode {
     #[serde(rename = "textDecorationThinkness", default)]
     pub text_decoration_thinkness: Option<f32>,
 
-    #[serde(rename = "lineHeight")]
+    #[serde(rename = "lineHeight", default)]
     pub line_height: Option<f32>,
-    #[serde(rename = "letterSpacing")]
+    #[serde(rename = "letterSpacing", default)]
     pub letter_spacing: Option<f32>,
-    #[serde(rename = "fontSize")]
+    #[serde(rename = "fontSize", default)]
     pub font_size: Option<f32>,
-    #[serde(rename = "fontFamily")]
+    #[serde(rename = "fontFamily", default)]
     pub font_family: Option<String>,
-    #[serde(rename = "fontWeight", default = "default_font_weight")]
+    #[serde(rename = "fontWeight", default)]
     pub font_weight: FontWeight,
 
     #[serde(rename = "textTransform", default)]
@@ -565,18 +565,6 @@ fn default_z_index() -> i32 {
     0
 }
 
-fn default_text_align() -> TextAlign {
-    TextAlign::Left
-}
-fn default_text_align_vertical() -> TextAlignVertical {
-    TextAlignVertical::Top
-}
-fn default_text_decoration() -> TextDecoration {
-    TextDecoration::None
-}
-fn default_font_weight() -> FontWeight {
-    FontWeight::new(400)
-}
 fn default_stroke_width() -> f32 {
     0.0
 }
