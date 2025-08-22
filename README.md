@@ -86,7 +86,9 @@
 
 ![Grida Database Editor](./.readme/cover-grida-canvas.png)
 
-# Canvas (Technical Preview)
+# Canvas
+
+> (Technical Preview)
 
 [Technical Demo](https://app.grida.co/canvas) • [Canary](https://canary.grida.co/canvas)
 
@@ -97,10 +99,9 @@
 - [x] Import from Figma
 - [x] Bitmap Editor (TP)
 - [x] SVG Editor (TP)
-- [x] HTML Backend
-- [x] HTML Layout Backend
-- [ ] WebGL Backend
-- [ ] WebGPU Backend
+- [x] DOM Backend
+- [x] WebGL Backend (Skia)
+- [ ] WebGPU Backend (Skia Graphite)
 - [ ] Connector Nodes
 - [ ] Design Components
 - [ ] Design Presentations
