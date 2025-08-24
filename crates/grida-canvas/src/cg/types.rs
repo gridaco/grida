@@ -370,7 +370,7 @@ pub struct DecorationRecBuildContext {
 
 #[derive(Debug, Clone, Copy)]
 pub struct DecorationRec {
-    pub text_decoration: Option<TextDecorationLine>,
+    pub text_decoration_line: Option<TextDecorationLine>,
     pub text_decoration_color: Option<CGColor>,
     pub text_decoration_style: Option<TextDecorationStyle>,
     pub text_decoration_skip_ink: Option<bool>,
@@ -380,7 +380,7 @@ pub struct DecorationRec {
 impl Default for DecorationRec {
     fn default() -> Self {
         Self {
-            text_decoration: None,
+            text_decoration_line: None,
             text_decoration_color: None,
             text_decoration_style: None,
             text_decoration_skip_ink: None,
@@ -391,7 +391,7 @@ impl Default for DecorationRec {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Decoration {
-    pub text_decoration: TextDecorationLine,
+    pub text_decoration_line: TextDecorationLine,
     pub text_decoration_color: CGColor,
     pub text_decoration_style: TextDecorationStyle,
     pub text_decoration_skip_ink: bool,
@@ -401,7 +401,7 @@ pub struct Decoration {
 impl Default for Decoration {
     fn default() -> Self {
         Self {
-            text_decoration: TextDecorationLine::None,
+            text_decoration_line: TextDecorationLine::None,
             text_decoration_color: CGColor::TRANSPARENT,
             text_decoration_style: TextDecorationStyle::Solid,
             text_decoration_skip_ink: true,
@@ -420,7 +420,9 @@ impl FromWithContext<DecorationRec, DecorationRecBuildContext> for Decoration {
         let text_decoration_thinkness = value.text_decoration_thinkness.unwrap_or(1.0);
 
         Self {
-            text_decoration: value.text_decoration.unwrap_or(TextDecorationLine::None),
+            text_decoration_line: value
+                .text_decoration_line
+                .unwrap_or(TextDecorationLine::None),
             text_decoration_color: text_decoration_color,
             text_decoration_style: text_decoration_style,
             text_decoration_skip_ink: text_decoration_skip_ink,
@@ -535,7 +537,7 @@ impl Default for TextStyleRecBuildContext {
 #[derive(Debug, Clone)]
 pub struct TextStyleRec {
     /// Text decoration (e.g. underline or none).
-    pub text_decoration: TextDecorationLine,
+    pub text_decoration_line: TextDecorationLine,
 
     /// Text decoration color
     pub text_decoration_color: Option<CGColor>,
@@ -575,7 +577,7 @@ pub struct TextStyleRec {
 impl TextStyleRec {
     pub fn from_font(font: &str, size: f32) -> Self {
         Self {
-            text_decoration: TextDecorationLine::None,
+            text_decoration_line: TextDecorationLine::None,
             text_decoration_color: None,
             text_decoration_style: None,
             text_decoration_skip_ink: None,

@@ -13,7 +13,7 @@ pub fn textstyle(
 
     // [decoration]
     let decoration = Decoration {
-        text_decoration: style.text_decoration,
+        text_decoration_line: style.text_decoration_line,
         text_decoration_color: style.text_decoration_color.unwrap_or(ctx.color),
         text_decoration_style: style
             .text_decoration_style

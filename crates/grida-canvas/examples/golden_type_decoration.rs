@@ -94,7 +94,7 @@ fn main() {
 
     for (decoration, label) in decorations.iter() {
         let text_style = TextStyleRec {
-            text_decoration: *decoration,
+            text_decoration_line: *decoration,
             text_decoration_color: Some(CGColor::RED),
             text_decoration_style: None,
             text_decoration_skip_ink: None,
@@ -140,7 +140,7 @@ fn main() {
 
     for (style, label) in styles.iter() {
         let text_style = TextStyleRec {
-            text_decoration: TextDecorationLine::Underline,
+            text_decoration_line: TextDecorationLine::Underline,
             text_decoration_color: Some(CGColor::BLACK),
             text_decoration_style: Some(*style),
             text_decoration_skip_ink: None,
@@ -186,7 +186,7 @@ fn main() {
 
     for (color, label) in colors.iter() {
         let text_style = TextStyleRec {
-            text_decoration: TextDecorationLine::Underline,
+            text_decoration_line: TextDecorationLine::Underline,
             text_decoration_color: Some(*color),
             text_decoration_style: None,
             text_decoration_skip_ink: None,
@@ -236,7 +236,7 @@ fn main() {
 
     for (thickness, label) in thicknesses.iter() {
         let text_style = TextStyleRec {
-            text_decoration: TextDecorationLine::Underline,
+            text_decoration_line: TextDecorationLine::Underline,
             text_decoration_color: Some(CGColor::BLACK),
             text_decoration_style: None,
             text_decoration_skip_ink: None,
@@ -280,7 +280,7 @@ fn main() {
 
     for (skip_ink, label) in skip_ink_settings.iter() {
         let text_style = TextStyleRec {
-            text_decoration: TextDecorationLine::Underline,
+            text_decoration_line: TextDecorationLine::Underline,
             text_decoration_color: Some(CGColor(255, 0, 0, 255)),
             text_decoration_style: None,
             text_decoration_skip_ink: Some(*skip_ink),
@@ -343,7 +343,7 @@ fn main() {
 
     for (decoration, style, color, thickness, label) in combined_examples.iter() {
         let text_style = TextStyleRec {
-            text_decoration: *decoration,
+            text_decoration_line: *decoration,
             text_decoration_color: *color,
             text_decoration_style: *style,
             text_decoration_skip_ink: None,
@@ -392,7 +392,7 @@ fn main() {
 
     for decoration in decorations_multi.iter() {
         let text_style = TextStyleRec {
-            text_decoration: *decoration,
+            text_decoration_line: *decoration,
             text_decoration_color: Some(CGColor(100, 100, 100, 255)),
             text_decoration_style: Some(TextDecorationStyle::Solid),
             text_decoration_skip_ink: None,

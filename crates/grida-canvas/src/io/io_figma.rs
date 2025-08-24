@@ -890,7 +890,7 @@ impl FigmaConverter {
             // },
             text: origin.characters.clone(),
             text_style: TextStyleRec {
-                text_decoration: Self::convert_text_decoration(style.text_decoration.as_ref()),
+                text_decoration_line: Self::convert_text_decoration(style.text_decoration.as_ref()),
                 text_decoration_color: None,
                 text_decoration_style: None,
                 text_decoration_skip_ink: None,

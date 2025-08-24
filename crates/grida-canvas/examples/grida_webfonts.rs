@@ -22,7 +22,7 @@ async fn demo_webfonts() -> Scene {
     heading_node.width = Some(800.0);
     heading_node.text = "Web fonts demo".to_string();
     heading_node.text_style = TextStyleRec {
-        text_decoration: TextDecorationLine::None,
+        text_decoration_line: TextDecorationLine::None,
         text_decoration_color: None,
         text_decoration_style: None,
         text_decoration_skip_ink: None,
@@ -45,7 +45,7 @@ async fn demo_webfonts() -> Scene {
     description_node.width = Some(800.0);
     description_node.text = PARAGRAPH.to_string();
     description_node.text_style = TextStyleRec {
-        text_decoration: TextDecorationLine::None,
+        text_decoration_line: TextDecorationLine::None,
         text_decoration_color: None,
         text_decoration_style: None,
         text_decoration_skip_ink: None,
@@ -90,7 +90,7 @@ async fn demo_webfonts() -> Scene {
         text_node.width = Some(800.0);
         text_node.text = format!("AlbertSans {}", variant);
         text_node.text_style = TextStyleRec {
-            text_decoration: TextDecorationLine::None,
+            text_decoration_line: TextDecorationLine::None,
             text_decoration_color: None,
             text_decoration_style: None,
             text_decoration_skip_ink: None,

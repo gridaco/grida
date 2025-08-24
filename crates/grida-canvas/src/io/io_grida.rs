@@ -405,8 +405,8 @@ pub struct JSONTextNode {
     #[serde(rename = "textAlignVertical", default)]
     pub text_align_vertical: TextAlignVertical,
 
-    #[serde(rename = "textDecoration", default)]
-    pub text_decoration: TextDecorationLine,
+    #[serde(rename = "textDecorationLine", default)]
+    pub text_decoration_line: TextDecorationLine,
     #[serde(rename = "textDecorationStyle", default)]
     pub text_decoration_style: Option<TextDecorationStyle>,
     #[serde(rename = "textDecorationColor", default)]
@@ -662,7 +662,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             ellipsis: None,
             text: node.text,
             text_style: TextStyleRec {
-                text_decoration: node.text_decoration,
+                text_decoration_line: node.text_decoration_line,
                 text_decoration_color: node.text_decoration_color.map(CGColor::from),
                 text_decoration_style: node.text_decoration_style,
                 text_decoration_skip_ink: node.text_decoration_skip_ink,
