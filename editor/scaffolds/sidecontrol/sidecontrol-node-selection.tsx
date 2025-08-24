@@ -1319,7 +1319,7 @@ function SectionText({ node_id }: { node_id: string }) {
                 <MixerVerticalIcon />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 h-96">
+            <DropdownMenuContent align="end" className="p-0 w-64 h-[500px]">
               <TextDetails
                 fontWeight={fontWeight}
                 textAlign={textAlign}
@@ -1330,6 +1330,7 @@ function SectionText({ node_id }: { node_id: string }) {
                 textDecorationSkipInk={textDecorationSkipInk ?? undefined}
                 textTransform={textTransform}
                 maxLines={maxLines}
+                maxLength={maxLength}
                 onTextTransformChange={actions.textTransform}
                 onTextAlignChange={actions.textAlign}
                 onTextDecorationLineChange={actions.textDecorationLine}
@@ -1340,6 +1341,7 @@ function SectionText({ node_id }: { node_id: string }) {
                 onTextDecorationColorChange={actions.textDecorationColor}
                 onTextDecorationSkipInkChange={actions.textDecorationSkipInk}
                 onMaxLinesChange={actions.maxLines}
+                onMaxLengthChange={actions.maxLength}
                 onFontWeightChange={(value) =>
                   actions.fontWeight(value as cg.NFontWeight)
                 }
@@ -1403,14 +1405,6 @@ function SectionText({ node_id }: { node_id: string }) {
           <TextAlignVerticalControl
             value={textAlignVertical}
             onValueChange={actions.textAlignVertical}
-          />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Max Length</PropertyLineLabel>
-          <MaxlengthControl
-            value={maxLength}
-            placeholder={(computed.text as any as string)?.length?.toString()}
-            onValueCommit={actions.maxLength}
           />
         </PropertyLine>
       </SidebarMenuSectionContent>

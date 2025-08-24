@@ -22,9 +22,9 @@ import {
   MinusIcon,
   OverlineIcon,
   StrikethroughIcon,
-  DotFilledIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
+import { ChevronRight } from "lucide-react";
 
 const PANGRAM_EN = "The Quick Brown Fox Jumps Over The Lazy Dog";
 
@@ -54,15 +54,15 @@ interface PreviewProps {
 
 function Preview({ style, showPlaceholder = false }: PreviewProps) {
   return (
-    <div className="p-3 border rounded-md bg-muted/30 h-20">
+    <div className="p-4 border rounded-md bg-muted/30 h-32">
       {style ? (
-        <div className="text-sm leading-relaxed" style={style}>
+        <div className="text-base leading-relaxed" style={style}>
           {PANGRAM_EN}
         </div>
       ) : showPlaceholder ? (
-        <span className="text-muted-foreground text-xs">Preview</span>
+        <span className="text-muted-foreground text-sm">Preview</span>
       ) : (
-        <div className="text-sm leading-relaxed">{PANGRAM_EN}</div>
+        <div className="text-base leading-relaxed">{PANGRAM_EN}</div>
       )}
     </div>
   );
@@ -223,8 +223,30 @@ const DECORATION_STYLE_OPTIONS = [
 
 // Skip Ink options
 const SKIP_INK_OPTIONS = [
-  { value: "auto" as cg.TextDecorationSkipInk, label: "Auto" },
-  { value: "none" as cg.TextDecorationSkipInk, label: "None" },
+  {
+    value: "auto" as cg.TextDecorationSkipInk,
+    icon: (
+      <span
+        className="text-xs underline"
+        style={{ textDecorationSkipInk: "auto" }}
+      >
+        Ag
+      </span>
+    ),
+    label: "Auto",
+  },
+  {
+    value: "none" as cg.TextDecorationSkipInk,
+    icon: (
+      <span
+        className="text-xs underline"
+        style={{ textDecorationSkipInk: "none" }}
+      >
+        Ag
+      </span>
+    ),
+    label: "None",
+  },
 ];
 
 interface DecorationDetailsProps {
@@ -236,7 +258,6 @@ interface DecorationDetailsProps {
   textDecorationSkipInk?: cg.TextDecorationSkipInkFlag;
 
   // Change handlers
-  onTextDecorationLineChange?: (value: cg.TextDecorationLine) => void;
   onTextDecorationStyleChange?: (value: cg.TextDecorationStyle) => void;
   onTextDecorationThicknessChange?: (
     value: cg.TextDecorationThicknessPercentage
@@ -262,11 +283,10 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
     textDecorationLine = "none",
     textDecorationStyle = "solid",
     textDecorationThickness = "auto",
-    textDecorationColor = { r: 0, g: 0, b: 0, a: 1 },
+    textDecorationColor,
     textDecorationSkipInk = true,
 
     // Change handlers
-    onTextDecorationLineChange,
     onTextDecorationStyleChange,
     onTextDecorationThicknessChange,
     onTextDecorationColorChange,
@@ -288,24 +308,35 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
   return (
     <div className="space-y-3">
       {/* Style */}
-      <div className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Style</PropertyLineLabel>
-          <PropertyEnumToggle
-            enum={DECORATION_STYLE_OPTIONS}
-            value={textDecorationStyle}
-            className="w-full"
-            size="sm"
-            disabled={!isDecorationActive}
-            onValueChange={onTextDecorationStyleChange}
-            onValueSeeked={(value) =>
-              value
-                ? onHover?.("decorationStyle", value as cg.TextDecorationStyle)
-                : onHoverLeave?.()
-            }
-          />
-        </PropertyLine>
-      </div>
+      <PropertyLine>
+        <PropertyLineLabel>Style</PropertyLineLabel>
+        <PropertyEnumToggle
+          enum={DECORATION_STYLE_OPTIONS}
+          value={textDecorationStyle}
+          className="w-full"
+          size="sm"
+          disabled={!isDecorationActive}
+          onValueChange={onTextDecorationStyleChange}
+          onValueSeeked={(value) =>
+            value
+              ? onHover?.("decorationStyle", value as cg.TextDecorationStyle)
+              : onHoverLeave?.()
+          }
+        />
+      </PropertyLine>
+
+      {/* Skip Ink */}
+      <PropertyLine>
+        <PropertyLineLabel>Skip Ink</PropertyLineLabel>
+        <PropertyEnumToggle
+          enum={SKIP_INK_OPTIONS}
+          value={textDecorationSkipInk ? "auto" : "none"}
+          className="w-full"
+          size="sm"
+          disabled={!isUnderline}
+          onValueChange={handleSkipInkToggleChange}
+        />
+      </PropertyLine>
 
       {/* Thickness */}
       <PropertyLine className="flex-col items-start space-y-2">
@@ -324,7 +355,7 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
             step={0.1}
             placeholder="auto"
             className="w-16"
-            disabled={!isUnderline}
+            disabled={!isDecorationActive}
           />
         </div>
         <div className="w-full">
@@ -338,7 +369,7 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
             min={0.1}
             step={0.1}
             className="w-full"
-            disabled={!isUnderline}
+            disabled={!isDecorationActive}
             onValueChange={(values) =>
               onTextDecorationThicknessChange?.(values[0])
             }
@@ -346,31 +377,15 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
         </div>
       </PropertyLine>
 
-      {/* Skip Ink */}
-      <div className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Skip Ink</PropertyLineLabel>
-          <PropertyEnumToggle
-            enum={SKIP_INK_OPTIONS}
-            value={textDecorationSkipInk ? "auto" : "none"}
-            className="w-full"
-            size="sm"
-            disabled={!isUnderline}
-            onValueChange={handleSkipInkToggleChange}
-          />
-        </PropertyLine>
-      </div>
-
       {/* Color */}
-      <div className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Color</PropertyLineLabel>
-          <RGBAColorControl
-            value={textDecorationColor}
-            onValueChange={onTextDecorationColorChange}
-          />
-        </PropertyLine>
-      </div>
+      <PropertyLine>
+        <PropertyLineLabel>Color</PropertyLineLabel>
+        <RGBAColorControl
+          value={textDecorationColor}
+          onValueChange={onTextDecorationColorChange}
+          disabled={!isDecorationActive}
+        />
+      </PropertyLine>
     </div>
   );
 }
@@ -385,6 +400,7 @@ interface TextDetailsProps {
   textDecorationSkipInk?: cg.TextDecorationSkipInkFlag;
   textTransform?: cg.TextTransform;
   maxLines?: number | null;
+  maxLength?: number | null;
   verticalTrim?: VerticalTrim;
   truncate?: boolean;
   slant?: number;
@@ -401,6 +417,7 @@ interface TextDetailsProps {
   onTextDecorationSkipInkChange?: (value: cg.TextDecorationSkipInkFlag) => void;
   onTextTransformChange?: (value: cg.TextTransform) => void;
   onMaxLinesChange?: (value: number) => void;
+  onMaxLengthChange?: (value: number) => void;
   onVerticalTrimChange?: (value: VerticalTrim) => void;
   onTruncateChange?: (value: boolean) => void;
   onSlantChange?: (value: number) => void;
@@ -472,6 +489,7 @@ export function TextDetails({
   verticalTrim = "all",
   truncate = false,
   maxLines = 1,
+  maxLength = null,
   slant = 0,
   fontWeight = 400,
 
@@ -486,6 +504,7 @@ export function TextDetails({
   onVerticalTrimChange,
   onTruncateChange,
   onMaxLinesChange,
+  onMaxLengthChange,
   onSlantChange,
   onFontWeightChange,
 }: TextDetailsProps) {
@@ -512,194 +531,228 @@ export function TextDetails({
   };
 
   return (
-    <div className="w-full">
-      <Tabs defaultValue="basics" className="w-full">
-        <TabsList className="w-full h-7 my-1">
-          <TabsTrigger value="basics" className="text-xs">
-            Basics
-          </TabsTrigger>
-          <TabsTrigger value="details" className="text-xs" disabled>
-            Details
-          </TabsTrigger>
-          <TabsTrigger value="variable" className="text-xs">
-            Variable
-          </TabsTrigger>
-        </TabsList>
+    <div className="w-full h-full flex flex-col">
+      <Tabs defaultValue="basics" className="w-full h-full flex flex-col">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 p-1">
+          <TabsList className="w-full h-7 my-1">
+            <TabsTrigger value="basics" className="text-xs">
+              Basics
+            </TabsTrigger>
+            <TabsTrigger value="details" className="text-xs" disabled>
+              Details
+            </TabsTrigger>
+            <TabsTrigger value="variable" className="text-xs">
+              Variable
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        {/* Basics Tab */}
-        <TabsContent value="basics" className="space-y-3 mt-3 px-2">
-          {/* Preview */}
+        {/* Fixed Preview */}
+        <div className="flex-shrink-0 px-2">
           <ParagraphPreview hoverPreview={hoverPreview} />
+        </div>
 
-          {/* Alignment */}
-          <div className="space-y-2">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto pr-1">
+          {/* Basics Tab */}
+          <TabsContent value="basics" className="space-y-3 mt-3 px-2 pb-4">
+            {/* Alignment */}
+            <div className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Alignment</PropertyLineLabel>
+                <PropertyEnumToggle
+                  enum={ALIGNMENT_OPTIONS}
+                  value={textAlign}
+                  className="w-full"
+                  size="sm"
+                  onValueChange={onTextAlignChange}
+                  onValueSeeked={(value) =>
+                    value
+                      ? handleHover("alignment", value as cg.TextAlign)
+                      : handleHoverLeave()
+                  }
+                />
+              </PropertyLine>
+            </div>
+
+            <Separator />
+
+            {/* Decoration */}
+            <div className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Decoration</PropertyLineLabel>
+                <PropertyEnumToggle
+                  enum={DECORATION_OPTIONS}
+                  value={textDecorationLine}
+                  className="w-full"
+                  size="sm"
+                  onValueChange={onTextDecorationLineChange}
+                  onValueSeeked={(value) =>
+                    value
+                      ? handleHover(
+                          "decoration",
+                          value as cg.TextDecorationLine
+                        )
+                      : handleHoverLeave()
+                  }
+                />
+              </PropertyLine>
+            </div>
+
+            {/* Decoration Details - Collapsible */}
+            <Collapsible className="group/collapsible">
+              <CollapsibleTrigger className="w-full flex items-center justify-between">
+                <PropertyLineLabel className="text-left">
+                  More
+                </PropertyLineLabel>
+                <ChevronRight className="h-3 w-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3 mt-2">
+                <DecorationDetails
+                  textDecorationLine={textDecorationLine}
+                  textDecorationStyle={textDecorationStyle}
+                  textDecorationThickness={textDecorationThickness}
+                  textDecorationColor={textDecorationColor}
+                  textDecorationSkipInk={textDecorationSkipInk}
+                  onTextDecorationStyleChange={onTextDecorationStyleChange}
+                  onTextDecorationThicknessChange={
+                    onTextDecorationThicknessChange
+                  }
+                  onTextDecorationColorChange={onTextDecorationColorChange}
+                  onTextDecorationSkipInkChange={onTextDecorationSkipInkChange}
+                  onHover={handleHover}
+                  onHoverLeave={handleHoverLeave}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+
+            <Separator />
+
+            {/* Case (Text Transform) */}
+            <div className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Case</PropertyLineLabel>
+                <PropertyEnumToggle
+                  enum={CASE_OPTIONS}
+                  value={textTransform}
+                  className="w-full"
+                  size="sm"
+                  onValueChange={onTextTransformChange}
+                  onValueSeeked={(value) =>
+                    value
+                      ? handleHover("case", value as cg.TextTransform)
+                      : handleHoverLeave()
+                  }
+                />
+              </PropertyLine>
+            </div>
+
+            <Separator />
+
+            {/* Vertical Trim */}
+            <div className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Vertical Trim</PropertyLineLabel>
+                <PropertyEnumToggle
+                  enum={VERTICAL_TRIM_OPTIONS}
+                  value={verticalTrim}
+                  className="w-full"
+                  size="sm"
+                  onValueChange={onVerticalTrimChange}
+                />
+              </PropertyLine>
+            </div>
+
+            <Separator />
+
+            {/* Truncate Text */}
             <PropertyLine>
-              <PropertyLineLabel>Alignment</PropertyLineLabel>
+              <PropertyLineLabel>Truncate text</PropertyLineLabel>
               <PropertyEnumToggle
-                enum={ALIGNMENT_OPTIONS}
-                value={textAlign}
+                enum={TRUNCATE_OPTIONS}
+                value={truncate ? "on" : "off"}
                 className="w-full"
                 size="sm"
-                onValueChange={onTextAlignChange}
-                onValueSeeked={(value) =>
-                  value
-                    ? handleHover("alignment", value as cg.TextAlign)
-                    : handleHoverLeave()
-                }
+                onValueChange={handleTruncateToggleChange}
               />
             </PropertyLine>
-          </div>
 
-          {/* Decoration */}
-          <div className="space-y-2">
+            {/* Max Lines - only show when truncate is enabled */}
+            {truncate && (
+              <PropertyLine>
+                <PropertyLineLabel>Max lines</PropertyLineLabel>
+                <InputPropertyNumber
+                  mode="fixed"
+                  value={maxLines ?? undefined}
+                  onValueCommit={onMaxLinesChange}
+                  min={1}
+                  step={1}
+                  placeholder="1"
+                />
+              </PropertyLine>
+            )}
+
+            <Separator />
+
+            {/* Max Length */}
             <PropertyLine>
-              <PropertyLineLabel>Decoration</PropertyLineLabel>
-              <PropertyEnumToggle
-                enum={DECORATION_OPTIONS}
-                value={textDecorationLine}
-                className="w-full"
-                size="sm"
-                onValueChange={onTextDecorationLineChange}
-                onValueSeeked={(value) =>
-                  value
-                    ? handleHover("decoration", value as cg.TextDecorationLine)
-                    : handleHoverLeave()
-                }
-              />
-            </PropertyLine>
-          </div>
-
-          {/* Decoration Details - Collapsible */}
-          <Collapsible>
-            <CollapsibleTrigger className="w-full text-left text-xs text-muted-foreground hover:text-foreground transition-colors">
-              Decoration Details
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-3 mt-2">
-              <DecorationDetails
-                textDecorationLine={textDecorationLine}
-                textDecorationStyle={textDecorationStyle}
-                textDecorationThickness={textDecorationThickness}
-                textDecorationColor={textDecorationColor}
-                textDecorationSkipInk={textDecorationSkipInk}
-                onTextDecorationLineChange={onTextDecorationLineChange}
-                onTextDecorationStyleChange={onTextDecorationStyleChange}
-                onTextDecorationThicknessChange={
-                  onTextDecorationThicknessChange
-                }
-                onTextDecorationColorChange={onTextDecorationColorChange}
-                onTextDecorationSkipInkChange={onTextDecorationSkipInkChange}
-                onHover={handleHover}
-                onHoverLeave={handleHoverLeave}
-              />
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* Case (Text Transform) */}
-          <div className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Case</PropertyLineLabel>
-              <PropertyEnumToggle
-                enum={CASE_OPTIONS}
-                value={textTransform}
-                className="w-full"
-                size="sm"
-                onValueChange={onTextTransformChange}
-                onValueSeeked={(value) =>
-                  value
-                    ? handleHover("case", value as cg.TextTransform)
-                    : handleHoverLeave()
-                }
-              />
-            </PropertyLine>
-          </div>
-
-          {/* Vertical Trim */}
-          <div className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Vertical Trim</PropertyLineLabel>
-              <PropertyEnumToggle
-                enum={VERTICAL_TRIM_OPTIONS}
-                value={verticalTrim}
-                className="w-full"
-                size="sm"
-                onValueChange={onVerticalTrimChange}
-              />
-            </PropertyLine>
-          </div>
-
-          <Separator />
-
-          {/* Truncate Text */}
-          <PropertyLine>
-            <PropertyLineLabel>Truncate text</PropertyLineLabel>
-            <PropertyEnumToggle
-              enum={TRUNCATE_OPTIONS}
-              value={truncate ? "on" : "off"}
-              className="w-full"
-              size="sm"
-              onValueChange={handleTruncateToggleChange}
-            />
-          </PropertyLine>
-
-          {/* Max Lines - only show when truncate is enabled */}
-          {truncate && (
-            <PropertyLine>
-              <PropertyLineLabel>Max lines</PropertyLineLabel>
+              <PropertyLineLabel>Max Length</PropertyLineLabel>
               <InputPropertyNumber
                 mode="fixed"
-                value={maxLines ?? undefined}
-                onValueCommit={onMaxLinesChange}
+                value={maxLength ?? undefined}
+                onValueCommit={onMaxLengthChange}
                 min={1}
                 step={1}
-                placeholder="1"
+                placeholder="No limit"
               />
             </PropertyLine>
-          )}
-        </TabsContent>
+          </TabsContent>
 
-        {/* Details Tab - Disabled for now */}
-        <TabsContent value="details" className="mt-3 px-2">
-          <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
-            Details tab is disabled for now
-          </div>
-        </TabsContent>
+          {/* Details Tab - Disabled for now */}
+          <TabsContent value="details" className="mt-3 px-2 pb-4">
+            <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
+              Details tab is disabled for now
+            </div>
+          </TabsContent>
 
-        {/* Variable Tab */}
-        <TabsContent value="variable" className="space-y-4 mt-3 px-2">
-          {/* Slant Slider */}
-          <div className="space-y-2">
-            <PropertyLine className="items-center" disabled>
-              <PropertyLineLabel>Slant</PropertyLineLabel>
-              <div className="flex-1">
-                <Slider
-                  value={[slant]}
-                  max={30}
-                  min={-30}
-                  step={1}
-                  className="w-full"
-                  onValueChange={(values) => onSlantChange?.(values[0])}
-                />
-              </div>
-            </PropertyLine>
-          </div>
+          {/* Variable Tab */}
+          <TabsContent value="variable" className="space-y-4 mt-3 px-2 pb-4">
+            {/* Slant Slider */}
+            <div className="space-y-2">
+              <PropertyLine className="items-center" disabled>
+                <PropertyLineLabel>Slant</PropertyLineLabel>
+                <div className="flex-1">
+                  <Slider
+                    value={[slant]}
+                    max={30}
+                    min={-30}
+                    step={1}
+                    className="w-full"
+                    onValueChange={(values) => onSlantChange?.(values[0])}
+                  />
+                </div>
+              </PropertyLine>
+            </div>
 
-          {/* Weight Slider */}
-          <div className="space-y-2">
-            <PropertyLine className="items-center">
-              <PropertyLineLabel>Weight</PropertyLineLabel>
-              <div className="flex-1">
-                <Slider
-                  value={[fontWeight]}
-                  max={900}
-                  min={100}
-                  step={1}
-                  className="w-full"
-                  onValueChange={(values) => onFontWeightChange?.(values[0])}
-                />
-              </div>
-            </PropertyLine>
-          </div>
-        </TabsContent>
+            {/* Weight Slider */}
+            <div className="space-y-2">
+              <PropertyLine className="items-center">
+                <PropertyLineLabel>Weight</PropertyLineLabel>
+                <div className="flex-1">
+                  <Slider
+                    value={[fontWeight]}
+                    max={900}
+                    min={100}
+                    step={1}
+                    className="w-full"
+                    onValueChange={(values) => onFontWeightChange?.(values[0])}
+                  />
+                </div>
+              </PropertyLine>
+            </div>
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );

@@ -39,9 +39,17 @@ export function PropertyLine({
   );
 }
 
-export function PropertyLineLabel({ children }: React.PropsWithChildren<{}>) {
+export function PropertyLineLabel({
+  children,
+  className,
+}: React.ComponentProps<"label">) {
   return (
-    <Label className="text-[11px] text-muted-foreground h-6 min-w-16 w-16 flex items-center me-4 overflow-hidden">
+    <Label
+      className={cn(
+        "text-[11px] text-muted-foreground h-6 min-w-16 w-16 flex items-center me-4 overflow-hidden",
+        className
+      )}
+    >
       <span className="text-ellipsis overflow-hidden">{children}</span>
     </Label>
   );
