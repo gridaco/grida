@@ -358,6 +358,35 @@ impl Default for TextDecorationStyle {
     }
 }
 
+pub trait FromWithContext<T, C> {
+    fn from_with_context(value: T, ctx: &C) -> Self;
+}
+
+pub struct DecorationRecBuildContext {
+    pub color: CGColor,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct DecorationRec {
+    pub text_decoration: Option<TextDecoration>,
+    pub text_decoration_color: Option<CGColor>,
+    pub text_decoration_style: Option<TextDecorationStyle>,
+    pub text_decoration_skip_ink: Option<bool>,
+    pub text_decoration_thinkness: Option<f32>,
+}
+
+impl Default for DecorationRec {
+    fn default() -> Self {
+        Self {
+            text_decoration: None,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Decoration {
     pub text_decoration: TextDecoration,
@@ -365,6 +394,37 @@ pub struct Decoration {
     pub text_decoration_style: TextDecorationStyle,
     pub text_decoration_skip_ink: bool,
     pub text_decoration_thinkness: f32,
+}
+
+impl Default for Decoration {
+    fn default() -> Self {
+        Self {
+            text_decoration: TextDecoration::None,
+            text_decoration_color: CGColor::TRANSPARENT,
+            text_decoration_style: TextDecorationStyle::Solid,
+            text_decoration_skip_ink: true,
+            text_decoration_thinkness: 1.0,
+        }
+    }
+}
+
+impl FromWithContext<DecorationRec, DecorationRecBuildContext> for Decoration {
+    fn from_with_context(value: DecorationRec, ctx: &DecorationRecBuildContext) -> Self {
+        let text_decoration_color = value.text_decoration_color.unwrap_or(ctx.color);
+        let text_decoration_style = value
+            .text_decoration_style
+            .unwrap_or(TextDecorationStyle::default());
+        let text_decoration_skip_ink = value.text_decoration_skip_ink.unwrap_or(true);
+        let text_decoration_thinkness = value.text_decoration_thinkness.unwrap_or(1.0);
+
+        Self {
+            text_decoration: value.text_decoration.unwrap_or(TextDecoration::None),
+            text_decoration_color: text_decoration_color,
+            text_decoration_style: text_decoration_style,
+            text_decoration_skip_ink: text_decoration_skip_ink,
+            text_decoration_thinkness: text_decoration_thinkness,
+        }
+    }
 }
 
 /// Supported horizontal text alignment.
@@ -455,9 +515,23 @@ impl FontWeight {
     }
 }
 
+/// Context for building a text style.
+pub struct TextStyleRecBuildContext {
+    /// The color of the text. this is used as fallback for [Decoration::text_decoration_color].
+    pub color: CGColor,
+}
+
+impl Default for TextStyleRecBuildContext {
+    fn default() -> Self {
+        Self {
+            color: CGColor::TRANSPARENT,
+        }
+    }
+}
+
 /// A set of style properties that can be applied to a text or text span.
 #[derive(Debug, Clone)]
-pub struct TextStyle {
+pub struct TextStyleRec {
     /// Text decoration (e.g. underline or none).
     pub text_decoration: TextDecoration,
 
@@ -496,7 +570,7 @@ pub struct TextStyle {
     pub text_transform: TextTransform,
 }
 
-impl TextStyle {
+impl TextStyleRec {
     pub fn from_font(font: &str, size: f32) -> Self {
         Self {
             text_decoration: TextDecoration::None,
@@ -538,6 +612,14 @@ impl Paint {
             Paint::SweepGradient(gradient) => gradient.opacity,
             Paint::DiamondGradient(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
+        }
+    }
+
+    /// Returns the color of the solid paint, if any.
+    pub fn solid_color(&self) -> Option<CGColor> {
+        match self {
+            Paint::Solid(solid) => Some(solid.color),
+            _ => None,
         }
     }
 

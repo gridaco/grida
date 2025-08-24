@@ -180,7 +180,7 @@ impl<'a> Painter<'a> {
         align: &TextAlign,
         // TODO: vertical align shall be computed on our end, since sk paragraph does not have a concept of "vertical align"
         _valign: &TextAlignVertical,
-        style: &TextStyle,
+        style: &TextStyleRec,
     ) -> Rc<RefCell<textlayout::Paragraph>> {
         let scene_cache = self
             .scene_cache
@@ -416,7 +416,7 @@ impl<'a> Painter<'a> {
         fill: &Paint,
         text_align: &TextAlign,
         text_align_vertical: &TextAlignVertical,
-        text_style: &TextStyle,
+        text_style: &TextStyleRec,
     ) {
         let paragraph = self.cached_paragraph(
             id,

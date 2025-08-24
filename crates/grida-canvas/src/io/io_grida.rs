@@ -661,7 +661,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             max_lines: None,
             ellipsis: None,
             text: node.text,
-            text_style: TextStyle {
+            text_style: TextStyleRec {
                 text_decoration: node.text_decoration,
                 text_decoration_color: node.text_decoration_color.map(CGColor::from),
                 text_decoration_style: node.text_decoration_style,

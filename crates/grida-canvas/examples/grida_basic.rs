@@ -132,7 +132,7 @@ async fn demo_basic() -> Scene {
     text_span_node.transform = AffineTransform::new(300.0, 300.0, 0.0);
     text_span_node.width = Some(300.0);
     text_span_node.text = "Grida Canvas SKIA Bindings Backend".to_string();
-    text_span_node.text_style = TextStyle::from_font(font_caveat_family.as_str(), 32.0);
+    text_span_node.text_style = TextStyleRec::from_font(font_caveat_family.as_str(), 32.0);
     text_span_node.text_align = TextAlign::Center;
     text_span_node.text_align_vertical = TextAlignVertical::Center;
     text_span_node.stroke = Some(Paint::Solid(SolidPaint {

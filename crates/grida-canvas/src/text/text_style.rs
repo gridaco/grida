@@ -1,13 +1,20 @@
 use crate::cg::types::*;
 use skia_safe;
 
-pub fn textstyle(style: &TextStyle) -> skia_safe::textlayout::TextStyle {
+// pub fn decoration()
+
+pub fn textstyle(
+    style: &TextStyleRec,
+    _ctx: &Option<TextStyleRecBuildContext>,
+) -> skia_safe::textlayout::TextStyle {
     let mut ts = skia_safe::textlayout::TextStyle::new();
+    let default_ctx = TextStyleRecBuildContext::default();
+    let ctx = _ctx.as_ref().unwrap_or(&default_ctx);
 
     // [decoration]
     let decoration = Decoration {
         text_decoration: style.text_decoration,
-        text_decoration_color: style.text_decoration_color.unwrap_or(CGColor::BLACK),
+        text_decoration_color: style.text_decoration_color.unwrap_or(ctx.color),
         text_decoration_style: style
             .text_decoration_style
             .unwrap_or(TextDecorationStyle::Solid),

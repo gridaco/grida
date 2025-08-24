@@ -149,7 +149,7 @@ pub struct PainterPictureTextLayer {
     pub max_lines: Option<usize>,
     pub ellipsis: Option<String>,
     pub text: String,
-    pub text_style: TextStyle,
+    pub text_style: TextStyleRec,
     pub text_align: TextAlign,
     pub text_align_vertical: TextAlignVertical,
 }

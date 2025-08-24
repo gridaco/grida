@@ -889,7 +889,7 @@ impl FigmaConverter {
             //     height: origin.size.as_ref().map_or(0.0, |size| size.y as f32),
             // },
             text: origin.characters.clone(),
-            text_style: TextStyle {
+            text_style: TextStyleRec {
                 text_decoration: Self::convert_text_decoration(style.text_decoration.as_ref()),
                 text_decoration_color: None,
                 text_decoration_style: None,

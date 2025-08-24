@@ -45,8 +45,8 @@ fn main() {
     let section_spacing = 15.0;
 
     // Draw title
-    let title_style = TextStyle::from_font("Geist", 30.0);
-    let mut title_ts = textstyle(&title_style);
+    let title_style = TextStyleRec::from_font("Geist", 30.0);
+    let mut title_ts = textstyle(&title_style, &None);
     title_ts.set_foreground_paint(&paint);
 
     let mut title_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -57,8 +57,8 @@ fn main() {
     title_paragraph.paint(canvas, Point::new(start_x, start_y - 60.0));
 
     // Draw subtitle
-    let subtitle_style = TextStyle::from_font("Geist", 14.0);
-    let mut subtitle_ts = textstyle(&subtitle_style);
+    let subtitle_style = TextStyleRec::from_font("Geist", 14.0);
+    let mut subtitle_ts = textstyle(&subtitle_style, &None);
     subtitle_ts.set_foreground_paint(&paint);
 
     let mut subtitle_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -72,8 +72,8 @@ fn main() {
     let mut y_pos = start_y + 20.0;
 
     // Section title
-    let section_style = TextStyle::from_font("Geist", 18.0);
-    let mut section_ts = textstyle(&section_style);
+    let section_style = TextStyleRec::from_font("Geist", 18.0);
+    let mut section_ts = textstyle(&section_style, &None);
     section_ts.set_foreground_paint(&paint);
 
     let mut section_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -93,7 +93,7 @@ fn main() {
     ];
 
     for (decoration, label) in decorations.iter() {
-        let text_style = TextStyle {
+        let text_style = TextStyleRec {
             text_decoration: *decoration,
             text_decoration_color: Some(CGColor::RED),
             text_decoration_style: None,
@@ -108,7 +108,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style);
+        let mut ts = textstyle(&text_style, &None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -139,7 +139,7 @@ fn main() {
     ];
 
     for (style, label) in styles.iter() {
-        let text_style = TextStyle {
+        let text_style = TextStyleRec {
             text_decoration: TextDecoration::Underline,
             text_decoration_color: None,
             text_decoration_style: Some(*style),
@@ -154,7 +154,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style);
+        let mut ts = textstyle(&text_style, &None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -185,7 +185,7 @@ fn main() {
     ];
 
     for (color, label) in colors.iter() {
-        let text_style = TextStyle {
+        let text_style = TextStyleRec {
             text_decoration: TextDecoration::Underline,
             text_decoration_color: Some(*color),
             text_decoration_style: None,
@@ -200,7 +200,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style);
+        let mut ts = textstyle(&text_style, &None);
         // Create a paint with the same color as the decoration for better visibility
         let mut text_paint = Paint::default();
         text_paint.set_anti_alias(true);
@@ -235,7 +235,7 @@ fn main() {
     ];
 
     for (thickness, label) in thicknesses.iter() {
-        let text_style = TextStyle {
+        let text_style = TextStyleRec {
             text_decoration: TextDecoration::Underline,
             text_decoration_color: None,
             text_decoration_style: None,
@@ -250,7 +250,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style);
+        let mut ts = textstyle(&text_style, &None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -279,7 +279,7 @@ fn main() {
     ];
 
     for (skip_ink, label) in skip_ink_settings.iter() {
-        let text_style = TextStyle {
+        let text_style = TextStyleRec {
             text_decoration: TextDecoration::Underline,
             text_decoration_color: Some(CGColor(255, 0, 0, 255)),
             text_decoration_style: None,
@@ -294,7 +294,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style);
+        let mut ts = textstyle(&text_style, &None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -342,7 +342,7 @@ fn main() {
     ];
 
     for (decoration, style, color, thickness, label) in combined_examples.iter() {
-        let text_style = TextStyle {
+        let text_style = TextStyleRec {
             text_decoration: *decoration,
             text_decoration_color: *color,
             text_decoration_style: *style,
@@ -357,7 +357,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style);
+        let mut ts = textstyle(&text_style, &None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -391,7 +391,7 @@ fn main() {
     ];
 
     for decoration in decorations_multi.iter() {
-        let text_style = TextStyle {
+        let text_style = TextStyleRec {
             text_decoration: *decoration,
             text_decoration_color: Some(CGColor(100, 100, 100, 255)),
             text_decoration_style: Some(TextDecorationStyle::Solid),
@@ -406,7 +406,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style);
+        let mut ts = textstyle(&text_style, &None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);

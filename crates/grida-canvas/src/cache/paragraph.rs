@@ -31,7 +31,7 @@ impl ParagraphCache {
 
     fn shape_key(
         text: &str,
-        style: &TextStyle,
+        style: &TextStyleRec,
         align: &TextAlign,
         max_lines: &Option<usize>,
     ) -> u64 {
@@ -60,7 +60,7 @@ impl ParagraphCache {
         text: &str,
         fill: &Paint,
         align: &TextAlign,
-        style: &TextStyle,
+        style: &TextStyleRec,
         max_lines: &Option<usize>,
         ellipsis: &Option<String>,
         fonts: &FontRepository,
@@ -91,9 +91,12 @@ impl ParagraphCache {
             paragraph_style.set_ellipsis(ellipsis.as_ref().unwrap_or(&"...".to_string()));
         }
 
+        let ctx = TextStyleRecBuildContext {
+            color: fill.solid_color().unwrap_or(CGColor::TRANSPARENT),
+        };
         let mut para_builder =
             textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
-        let mut ts = textstyle(style);
+        let mut ts = textstyle(style, &Some(ctx));
         ts.set_foreground_paint(&fill_paint);
         para_builder.push_style(&ts);
         let transformed_text =

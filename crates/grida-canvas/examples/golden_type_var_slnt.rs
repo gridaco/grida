@@ -51,8 +51,8 @@ fn main() {
     let font_size = 24.0;
 
     // Draw title using cg TextStyle
-    let title_style = TextStyle::from_font("Recursive", 32.0);
-    let mut title_ts = textstyle(&title_style);
+    let title_style = TextStyleRec::from_font("Recursive", 32.0);
+    let mut title_ts = textstyle(&title_style, &None);
     title_ts.set_foreground_paint(&paint);
 
     let mut title_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -63,8 +63,8 @@ fn main() {
     title_paragraph.paint(canvas, Point::new(start_x, start_y - 80.0));
 
     // Draw subtitle using cg TextStyle
-    let subtitle_style = TextStyle::from_font("Recursive", 16.0);
-    let mut subtitle_ts = textstyle(&subtitle_style);
+    let subtitle_style = TextStyleRec::from_font("Recursive", 16.0);
+    let mut subtitle_ts = textstyle(&subtitle_style, &None);
     subtitle_ts.set_foreground_paint(&paint);
 
     let mut subtitle_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -91,7 +91,7 @@ fn main() {
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
 
         // Create cg TextStyle with specific slant
-        let text_style = TextStyle {
+        let text_style = TextStyleRec {
             text_decoration: TextDecoration::None,
             text_decoration_color: None,
             text_decoration_style: None,
@@ -107,7 +107,7 @@ fn main() {
         };
 
         // Convert to Skia TextStyle using our textstyle() function
-        let mut skia_text_style = textstyle(&text_style);
+        let mut skia_text_style = textstyle(&text_style, &None);
         skia_text_style.set_foreground_paint(&paint);
 
         // Apply slant variation directly to Skia text style

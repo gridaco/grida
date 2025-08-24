@@ -44,8 +44,8 @@ fn main() {
     let line_height = 50.0;
 
     // Draw title
-    let title_style = TextStyle::from_font("Geist", 32.0);
-    let mut title_ts = textstyle(&title_style);
+    let title_style = TextStyleRec::from_font("Geist", 32.0);
+    let mut title_ts = textstyle(&title_style, &None);
     title_ts.set_foreground_paint(&paint);
 
     let mut title_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -56,8 +56,8 @@ fn main() {
     title_paragraph.paint(canvas, Point::new(start_x, start_y - 60.0));
 
     // Draw subtitle
-    let subtitle_style = TextStyle::from_font("Geist", 16.0);
-    let mut subtitle_ts = textstyle(&subtitle_style);
+    let subtitle_style = TextStyleRec::from_font("Geist", 16.0);
+    let mut subtitle_ts = textstyle(&subtitle_style, &None);
     subtitle_ts.set_foreground_paint(&paint);
 
     let mut subtitle_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -84,7 +84,7 @@ fn main() {
     ];
 
     for (color, label) in colors.iter() {
-        let text_style = TextStyle {
+        let text_style = TextStyleRec {
             text_decoration: TextDecoration::Underline,
             text_decoration_color: Some(*color),
             text_decoration_style: None,
@@ -99,7 +99,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style);
+        let mut ts = textstyle(&text_style, &None);
         // Keep text color black for readability
         let mut text_paint = Paint::default();
         text_paint.set_anti_alias(true);

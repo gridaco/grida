@@ -123,7 +123,7 @@ impl NodeFactory {
             max_lines: None,
             ellipsis: None,
             text: String::new(),
-            text_style: TextStyle::from_font("Geist", 16.0),
+            text_style: TextStyleRec::from_font("Geist", 16.0),
             text_align: TextAlign::Left,
             text_align_vertical: TextAlignVertical::Top,
             fill: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),

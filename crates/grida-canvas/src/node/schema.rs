@@ -139,7 +139,7 @@ pub struct UnknownNodeProperties {
     /// Text content (plain UTF-8).
     pub text: Option<String>,
     /// Font & fill appearance.
-    pub text_style: Option<TextStyle>,
+    pub text_style: Option<TextStyleRec>,
     /// Horizontal alignment.
     pub text_align: Option<TextAlign>,
     /// Vertical alignment.
@@ -1214,7 +1214,7 @@ pub struct TextSpanNodeRec {
     pub text: String,
 
     /// Font & fill appearance.
-    pub text_style: TextStyle,
+    pub text_style: TextStyleRec,
 
     /// Horizontal alignment.
     pub text_align: TextAlign,
