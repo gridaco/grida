@@ -1552,6 +1552,8 @@ export namespace editor.api {
     toggleNodeActive(node_id: NodeID): void;
     toggleNodeLocked(node_id: NodeID): void;
     toggleNodeBold(node_id: NodeID): void;
+    toggleNodeUnderline(node_id: NodeID): void;
+    toggleNodeLineThrough(node_id: NodeID): void;
     changeNodeActive(node_id: NodeID, active: boolean): void;
     changeNodeLocked(node_id: NodeID, locked: boolean): void;
     changeNodeName(node_id: NodeID, name: string): void;
@@ -1648,6 +1650,30 @@ export namespace editor.api {
       node_id: NodeID,
       textAlignVertical: cg.TextAlignVertical
     ): void;
+    changeTextNodeTextTransform(
+      node_id: NodeID,
+      transform: cg.TextTransform
+    ): void;
+    changeTextNodeTextDecorationLine(
+      node_id: NodeID,
+      textDecorationLine: cg.TextDecorationLine
+    ): void;
+    changeTextNodeTextDecorationStyle(
+      node_id: NodeID,
+      textDecorationStyle: cg.TextDecorationStyle
+    ): void;
+    changeTextNodeTextDecorationThickness(
+      node_id: NodeID,
+      textDecorationThickness: cg.TextDecorationThicknessPercentage
+    ): void;
+    changeTextNodeTextDecorationColor(
+      node_id: NodeID,
+      textDecorationColor: cg.TextDecorationColor
+    ): void;
+    changeTextNodeTextDecorationSkipInk(
+      node_id: NodeID,
+      textDecorationSkipInk: cg.TextDecorationSkipInkFlag
+    ): void;
     changeTextNodeLineHeight(
       node_id: NodeID,
       lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
@@ -1660,6 +1686,7 @@ export namespace editor.api {
       node_id: NodeID,
       maxlength: number | undefined
     ): void;
+    changeTextNodeMaxLines(node_id: NodeID, maxLines: number | null): void;
     changeContainerNodePadding(
       node_id: NodeID,
       padding: grida.program.nodes.i.IPadding["padding"]
@@ -2087,6 +2114,8 @@ export namespace editor.api {
     toggleActive(target: "selection" | NodeID): void;
     toggleLocked(target: "selection" | NodeID): void;
     toggleBold(target: "selection" | NodeID): void;
+    toggleUnderline(target: "selection" | NodeID): void;
+    toggleLineThrough(target: "selection" | NodeID): void;
     // //
     setOpacity(target: "selection" | NodeID, opacity: number): void;
   }

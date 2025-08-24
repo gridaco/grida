@@ -157,6 +157,12 @@ export interface Grida2DScene extends Grida2DRuntime {
 
   loadImage(url: string): Promise<Image>;
   registerImage(image: Image): TODO;
+  /**
+   * Register a font with the renderer.
+   * @param family - CSS font-family name.
+   * @param data - Raw font bytes.
+   */
+  registerFont(family: string, data: Uint8Array): void;
 
   /**
    * @privateRemarks

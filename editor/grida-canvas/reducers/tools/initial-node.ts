@@ -70,7 +70,7 @@ export default function initialNode(
         type: "text",
         textAlign: "left",
         textAlignVertical: "top",
-        textDecoration: "none",
+        textDecorationLine: "none",
         fontFamily: "Inter",
         fontWeight: 400,
         fontSize: 14,

@@ -168,6 +168,25 @@ export class Grida2D {
   }
 
   /**
+   * Register a font with the renderer.
+   *
+   * The wasm module cannot fetch font files directly from the network, so the
+   * host environment must fetch the font bytes and pass them here.
+   *
+   * @param family - CSS font-family name for the typeface.
+   * @param data - Raw font file bytes (e.g. TTF/OTF).
+   */
+  registerFont(family: string, data: Uint8Array) {
+    const [fptr, flen] = this._alloc_string(family);
+    const len = data.length;
+    const ptr = this.module._allocate(len);
+    this.module.HEAPU8.set(data, ptr);
+    this.module._register_font(this.appptr, fptr, flen - 1, ptr, len);
+    this.module._deallocate(fptr, flen);
+    this.module._deallocate(ptr, len);
+  }
+
+  /**
    * Tick the application clock.
    * bind this to requestAnimationFrame loop or similar
    * @param time - The time in milliseconds. use performance.now()

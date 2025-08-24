@@ -130,6 +130,8 @@ export function useNodeActions(node_id: string | undefined) {
       toggleLocked: () => instance.toggleNodeLocked(node_id),
       toggleActive: () => instance.toggleNodeActive(node_id),
       toggleBold: () => instance.toggleNodeBold(node_id),
+      toggleUnderline: () => instance.toggleNodeUnderline(node_id),
+      toggleLineThrough: () => instance.toggleNodeLineThrough(node_id),
       component: (component_id: string) =>
         instance.changeNodeComponent(node_id, component_id),
       text: (text: tokens.StringValueExpression | null) =>
@@ -202,6 +204,18 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: cg.TextAlignVertical) =>
         instance.changeTextNodeTextAlignVertical(node_id, value),
+      textTransform: (value: cg.TextTransform) =>
+        instance.changeTextNodeTextTransform(node_id, value),
+      textDecorationLine: (value: cg.TextDecorationLine) =>
+        instance.changeTextNodeTextDecorationLine(node_id, value),
+      textDecorationStyle: (value: cg.TextDecorationStyle) =>
+        instance.changeTextNodeTextDecorationStyle(node_id, value),
+      textDecorationThickness: (value: cg.TextDecorationThicknessPercentage) =>
+        instance.changeTextNodeTextDecorationThickness(node_id, value),
+      textDecorationColor: (value: cg.TextDecorationColor) =>
+        instance.changeTextNodeTextDecorationColor(node_id, value),
+      textDecorationSkipInk: (value: cg.TextDecorationSkipInkFlag) =>
+        instance.changeTextNodeTextDecorationSkipInk(node_id, value),
       lineHeight: (change: editor.api.NumberChange) =>
         instance.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (
@@ -211,6 +225,8 @@ export function useNodeActions(node_id: string | undefined) {
       ) => instance.changeTextNodeLetterSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
         instance.changeTextNodeMaxlength(node_id, value),
+      maxLines: (value: number | null) =>
+        instance.changeTextNodeMaxLines(node_id, value),
 
       // border
       border: (value: grida.program.css.Border | undefined) =>
@@ -688,6 +704,10 @@ export function useDataTransferEventTarget() {
       node.$.text = text;
       node.$.left = x;
       node.$.top = y;
+      node.$.fill = {
+        type: "solid",
+        color: { r: 0, g: 0, b: 0, a: 1 },
+      } as cg.Paint;
     },
     [instance]
   );
@@ -1131,6 +1151,9 @@ export function useNode(node_id: string): NodeWithMeta {
   };
 }
 
+/**
+ * @deprecated - expensive
+ */
 export function useComputedNode(
   node_id: string
 ): grida.program.nodes.UnknwonComputedNode {

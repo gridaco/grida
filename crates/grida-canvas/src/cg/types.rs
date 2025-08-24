@@ -1,6 +1,7 @@
 use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::Deserialize;
+use std::hash::Hash;
 
 /// A 2D point with x and y coordinates.
 #[derive(Debug, Clone, Copy)]
@@ -38,28 +39,59 @@ impl Into<skia_safe::Point> for CGPoint {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
 impl CGColor {
+    pub const TRANSPARENT: Self = Self(0, 0, 0, 0);
     pub const BLACK: Self = Self(0, 0, 0, 255);
     pub const WHITE: Self = Self(255, 255, 255, 255);
     pub const RED: Self = Self(255, 0, 0, 255);
     pub const GREEN: Self = Self(0, 255, 0, 255);
     pub const BLUE: Self = Self(0, 0, 255, 255);
+
+    pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self(r, g, b, a)
+    }
+
+    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
+        Self(r, g, b, 255)
+    }
+
+    pub fn r(&self) -> u8 {
+        self.0
+    }
+    pub fn g(&self) -> u8 {
+        self.1
+    }
+    pub fn b(&self) -> u8 {
+        self.2
+    }
+    pub fn a(&self) -> u8 {
+        self.3
+    }
+}
+
+impl Into<SolidPaint> for CGColor {
+    fn into(self) -> SolidPaint {
+        SolidPaint {
+            color: self,
+            opacity: 1.0,
+        }
+    }
 }
 
 /// Boolean path operation.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum BooleanPathOperation {
     #[serde(rename = "union")]
-    Union,        // A ∪ B
+    Union, // A ∪ B
     #[serde(rename = "intersection")]
     Intersection, // A ∩ B
     #[serde(rename = "difference")]
-    Difference,   // A - B
+    Difference, // A - B
     #[serde(rename = "xor")]
-    Xor,          // A ⊕ B
+    Xor, // A ⊕ B
 }
 
 /// Blend modes for compositing layers, compatible with Skia and SVG/CSS.
@@ -289,9 +321,9 @@ impl Default for TextTransform {
 /// Only `Underline` and `None` are supported in the current version.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html)  
-/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration)
+/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-line)
 #[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
-pub enum TextDecoration {
+pub enum TextDecorationLine {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "underline")]
@@ -300,6 +332,142 @@ pub enum TextDecoration {
     Overline,
     #[serde(rename = "line-through")]
     LineThrough,
+}
+
+impl Default for TextDecorationLine {
+    fn default() -> Self {
+        TextDecorationLine::None
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
+pub enum TextDecorationStyle {
+    #[serde(rename = "solid")]
+    Solid,
+    #[serde(rename = "double")]
+    Double,
+    #[serde(rename = "dotted")]
+    Dotted,
+    #[serde(rename = "dashed")]
+    Dashed,
+    #[serde(rename = "wavy")]
+    Wavy,
+}
+
+impl Default for TextDecorationStyle {
+    fn default() -> Self {
+        TextDecorationStyle::Solid
+    }
+}
+
+pub trait FromWithContext<T, C> {
+    fn from_with_context(value: T, ctx: &C) -> Self;
+}
+
+pub struct DecorationRecBuildContext {
+    pub color: CGColor,
+}
+
+impl From<&TextStyleRecBuildContext> for DecorationRecBuildContext {
+    fn from(ctx: &TextStyleRecBuildContext) -> Self {
+        Self { color: ctx.color }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TextDecorationRec {
+    /// Text decoration line (e.g. underline or none).
+    pub text_decoration_line: TextDecorationLine,
+
+    /// Text decoration color
+    pub text_decoration_color: Option<CGColor>,
+
+    /// Text decoration style (e.g. dashed or solid).
+    pub text_decoration_style: Option<TextDecorationStyle>,
+
+    /// Text decoration skip ink
+    pub text_decoration_skip_ink: Option<bool>,
+
+    /// The thickness of the decoration stroke as a multiplier of the thickness defined by the font.
+    pub text_decoration_thinkness: Option<f32>,
+}
+
+impl TextDecorationRec {
+    pub fn none() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::None,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
+        }
+    }
+
+    pub fn underline() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::Underline,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
+        }
+    }
+
+    pub fn overline() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::Overline,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
+        }
+    }
+}
+
+impl Default for TextDecorationRec {
+    fn default() -> Self {
+        Self::none()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TextDecoration {
+    pub text_decoration_line: TextDecorationLine,
+    pub text_decoration_color: CGColor,
+    pub text_decoration_style: TextDecorationStyle,
+    pub text_decoration_skip_ink: bool,
+    pub text_decoration_thinkness: f32,
+}
+
+impl Default for TextDecoration {
+    fn default() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::None,
+            text_decoration_color: CGColor::TRANSPARENT,
+            text_decoration_style: TextDecorationStyle::Solid,
+            text_decoration_skip_ink: true,
+            text_decoration_thinkness: 1.0,
+        }
+    }
+}
+
+impl FromWithContext<TextDecorationRec, DecorationRecBuildContext> for TextDecoration {
+    fn from_with_context(value: TextDecorationRec, ctx: &DecorationRecBuildContext) -> Self {
+        let text_decoration_color = value.text_decoration_color.unwrap_or(ctx.color);
+        let text_decoration_style = value
+            .text_decoration_style
+            .unwrap_or(TextDecorationStyle::default());
+        let text_decoration_skip_ink = value.text_decoration_skip_ink.unwrap_or(true);
+        let text_decoration_thinkness = value.text_decoration_thinkness.unwrap_or(1.0);
+
+        Self {
+            text_decoration_line: value.text_decoration_line,
+            text_decoration_color: text_decoration_color,
+            text_decoration_style: text_decoration_style,
+            text_decoration_skip_ink: text_decoration_skip_ink,
+            text_decoration_thinkness: text_decoration_thinkness,
+        }
+    }
 }
 
 /// Supported horizontal text alignment.
@@ -356,6 +524,12 @@ impl Default for TextAlignVertical {
 #[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub struct FontWeight(pub u32);
 
+impl Default for FontWeight {
+    fn default() -> Self {
+        Self(400)
+    }
+}
+
 impl FontWeight {
     /// Creates a new font weight value.
     ///
@@ -384,11 +558,24 @@ impl FontWeight {
     }
 }
 
+/// Context for building a text style.
+pub struct TextStyleRecBuildContext {
+    /// The color of the text. this is used as fallback for [Decoration::text_decoration_color].
+    pub color: CGColor,
+}
+
+impl Default for TextStyleRecBuildContext {
+    fn default() -> Self {
+        Self {
+            color: CGColor::TRANSPARENT,
+        }
+    }
+}
+
 /// A set of style properties that can be applied to a text or text span.
 #[derive(Debug, Clone)]
-pub struct TextStyle {
-    /// Text decoration (e.g. underline or none).
-    pub text_decoration: TextDecoration,
+pub struct TextStyleRec {
+    pub text_decoration: Option<TextDecorationRec>,
 
     /// Optional font family name (e.g. "Roboto").
     pub font_family: String,
@@ -412,6 +599,22 @@ pub struct TextStyle {
     /// Text transform (e.g. uppercase, lowercase, capitalize)
     pub text_transform: TextTransform,
 }
+
+impl TextStyleRec {
+    pub fn from_font(font: &str, size: f32) -> Self {
+        Self {
+            text_decoration: None,
+            font_family: font.to_string(),
+            font_size: size,
+            font_weight: FontWeight::default(),
+            italic: false,
+            letter_spacing: None,
+            line_height: None,
+            text_transform: TextTransform::None,
+        }
+    }
+}
+
 // #endregion
 
 // #region paint
@@ -435,6 +638,57 @@ impl Paint {
             Paint::SweepGradient(gradient) => gradient.opacity,
             Paint::DiamondGradient(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
+        }
+    }
+
+    /// Returns the color of the solid paint, if any.
+    pub fn solid_color(&self) -> Option<CGColor> {
+        match self {
+            Paint::Solid(solid) => Some(solid.color),
+            _ => None,
+        }
+    }
+
+    /// Hash the paint properties for caching purposes
+    pub fn hash_for_cache(&self, hasher: &mut std::collections::hash_map::DefaultHasher) {
+        match self {
+            Paint::Solid(solid) => {
+                solid.color.0.hash(hasher);
+                solid.opacity.to_bits().hash(hasher);
+            }
+            Paint::LinearGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::RadialGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::SweepGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::DiamondGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::Image(image) => {
+                // For image paints, hash the image hash
+                image.hash.hash(hasher);
+                image.opacity.to_bits().hash(hasher);
+            }
         }
     }
 }

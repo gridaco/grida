@@ -172,7 +172,11 @@ export namespace css {
       const { textAlign, textAlignVertical } =
         styles as Partial<grida.program.nodes.i.ITextNodeStyle>;
       const {
-        textDecoration,
+        textDecorationLine,
+        textDecorationStyle,
+        textDecorationThickness,
+        textDecorationColor,
+        textDecorationSkipInk,
         fontFamily,
         fontSize,
         fontWeight,
@@ -187,7 +191,11 @@ export namespace css {
           textAlign: textAlign ?? "left",
           textAlignVertical: textAlignVertical ?? "top",
           // text span style
-          textDecoration,
+          textDecorationLine,
+          textDecorationStyle,
+          textDecorationThickness,
+          textDecorationColor,
+          textDecorationSkipInk,
           fontFamily,
           fontSize,
           fontWeight,
@@ -240,6 +248,11 @@ export namespace css {
     | "textAlign"
     | "alignContent"
     | "textDecoration"
+    | "textDecorationLine"
+    | "textDecorationStyle"
+    | "textDecorationThickness"
+    | "textDecorationColor"
+    | "textDecorationSkipInk"
     | "fontFamily"
     | "fontSize"
     | "fontWeight"
@@ -250,7 +263,11 @@ export namespace css {
     const {
       textAlign,
       textAlignVertical,
-      textDecoration,
+      textDecorationLine,
+      textDecorationStyle,
+      textDecorationThickness,
+      textDecorationColor,
+      textDecorationSkipInk,
       fontFamily,
       fontSize,
       fontWeight,
@@ -264,7 +281,23 @@ export namespace css {
       alignContent: textAlignVertical
         ? text_align_vertical_to_css_align_content[textAlignVertical]
         : undefined,
-      textDecoration: textDecoration,
+      textDecorationLine: textDecorationLine,
+      textDecorationStyle: textDecorationStyle ?? undefined,
+      textDecorationThickness:
+        typeof textDecorationThickness === "number"
+          ? textDecorationThickness
+          : textDecorationThickness === "auto"
+          ? "auto"
+          : undefined,
+      textDecorationColor: textDecorationColor
+        ? toRGBAString(textDecorationColor)
+        : undefined,
+      textDecorationSkipInk:
+        typeof textDecorationSkipInk === "boolean"
+          ? textDecorationSkipInk
+            ? "auto"
+            : "none"
+          : undefined,
       fontFamily: fontFamily,
       lineHeight: lineHeight ?? "normal",
       letterSpacing: letterSpacing,

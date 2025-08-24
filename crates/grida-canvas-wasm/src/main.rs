@@ -104,6 +104,22 @@ pub unsafe extern "C" fn pointer_move(app: *mut EmscriptenApplication, x: f32, y
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn register_font(
+    app: *mut EmscriptenApplication,
+    family_ptr: *const u8,
+    family_len: usize,
+    data_ptr: *const u8,
+    data_len: usize,
+) {
+    if let Some(app) = app.as_mut() {
+        if let Some(family) = __str_from_ptr_len(family_ptr, family_len) {
+            let data = std::slice::from_raw_parts(data_ptr, data_len);
+            app.add_font(&family, data);
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn command(app: *mut EmscriptenApplication, id: u32, a: f32, b: f32) {
     use cg::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {

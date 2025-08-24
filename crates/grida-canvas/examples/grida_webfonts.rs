@@ -19,13 +19,10 @@ async fn demo_webfonts() -> Scene {
     let mut heading_node = nf.create_text_span_node();
     heading_node.name = Some("Heading".to_string());
     heading_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
-    heading_node.size = Size {
-        width: 800.0,
-        height: 100.0,
-    };
+    heading_node.width = Some(800.0);
     heading_node.text = "Web fonts demo".to_string();
-    heading_node.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
+    heading_node.text_style = TextStyleRec {
+        text_decoration: None,
         font_family: "Playfair Display".to_string(),
         font_size: 64.0,
         font_weight: FontWeight::new(700), // Bold
@@ -41,13 +38,10 @@ async fn demo_webfonts() -> Scene {
     let mut description_node = nf.create_text_span_node();
     description_node.name = Some("Description".to_string());
     description_node.transform = AffineTransform::new(50.0, 120.0, 0.0);
-    description_node.size = Size {
-        width: 800.0,
-        height: 120.0,
-    };
+    description_node.width = Some(800.0);
     description_node.text = PARAGRAPH.to_string();
-    description_node.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
+    description_node.text_style = TextStyleRec {
+        text_decoration: None,
         font_family: "Playfair Display".to_string(),
         font_size: 14.0,
         font_weight: FontWeight::new(400), // Regular
@@ -85,13 +79,10 @@ async fn demo_webfonts() -> Scene {
         let mut text_node = nf.create_text_span_node();
         text_node.name = Some(format!("Albert Sans {}", variant));
         text_node.transform = AffineTransform::new(50.0, 280.0 + (i as f32 * 40.0), 0.0);
-        text_node.size = Size {
-            width: 800.0,
-            height: 40.0,
-        };
+        text_node.width = Some(800.0);
         text_node.text = format!("AlbertSans {}", variant);
-        text_node.text_style = TextStyle {
-            text_decoration: TextDecoration::None,
+        text_node.text_style = TextStyleRec {
+            text_decoration: None,
             font_family: "Albert Sans".to_string(),
             font_size: 24.0,
             font_weight: FontWeight::new(*weight),

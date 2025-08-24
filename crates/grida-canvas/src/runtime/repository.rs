@@ -176,6 +176,29 @@ impl FontRepository {
     pub fn get_family_fonts(&self, family: &str) -> Option<&Vec<Vec<u8>>> {
         self.fonts.get(family)
     }
+
+    /// get Variable Axes for a family
+    ///
+    /// [More about variable axes](https://grida.co/docs/reference/open-type-variable-axes)
+    pub fn variation_design_parameters_for_family(
+        &self,
+        family: &str,
+    ) -> Option<Vec<skia_safe::font_parameters::variation::Axis>> {
+        self.variation_design_parameters_for_family_style(family, skia_safe::FontStyle::default())
+    }
+
+    /// get Variable Axes for a family and style
+    ///
+    /// [More about variable axes](https://grida.co/docs/reference/open-type-variable-axes)
+    pub fn variation_design_parameters_for_family_style(
+        &self,
+        family: &str,
+        style: skia_safe::FontStyle,
+    ) -> Option<Vec<skia_safe::font_parameters::variation::Axis>> {
+        // get typeface by family name
+        let typeface = self.provider.match_family_style(family, style)?;
+        typeface.variation_design_parameters()
+    }
 }
 
 impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
@@ -225,6 +248,8 @@ impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
 mod tests {
     use super::*;
     use skia_safe::surfaces;
+    use std::fs;
+    use std::path::Path;
 
     #[test]
     fn image_repository_basic() {
@@ -246,5 +271,195 @@ mod tests {
         assert_eq!(repo.len(), 1);
         repo.remove(&"f1".to_string());
         assert!(repo.is_empty());
+    }
+
+    #[test]
+    fn variation_design_parameters_for_family_with_roboto_flex() {
+        let mut repo = FontRepository::new();
+
+        // Load the Roboto Flex font file
+        let font_path = Path::new("../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf");
+        let font_bytes = fs::read(font_path).expect("Failed to read Roboto Flex font file");
+
+        // Add the font to the repository
+        repo.add(&font_bytes, "Roboto Flex");
+
+        // Test that the font was added successfully
+        assert_eq!(repo.family_count(), 1);
+        assert_eq!(repo.total_font_count(), 1);
+        assert!(repo.get_family_fonts("Roboto Flex").is_some());
+
+        // Test variation design parameters
+        let variation_params = repo.variation_design_parameters_for_family("Roboto Flex");
+        assert!(
+            variation_params.is_some(),
+            "Should return variation parameters for Roboto Flex"
+        );
+
+        let params = variation_params.unwrap();
+        assert!(!params.is_empty(), "Roboto Flex should have variation axes");
+
+        // Verify specific axes that Roboto Flex should have
+        let axis_tags: Vec<String> = params.iter().map(|axis| axis.tag.to_string()).collect();
+
+        // Create a mapping from numeric tag values to expected tag names
+        // These are the actual numeric representations found in the Roboto Flex font
+        let tag_mapping = [
+            ("1869640570", "opsz"),     // optical size
+            ("2003265652", "XTRA"),     // x-transparency
+            ("1196572996", "GRAD"),     // grade
+            ("2003072104", "YOPQ"),     // y-opacity
+            ("1936486004", "slnt"),     // slant
+            ("1481592913", "XOPQ"),     // x-opacity
+            ("1498370129", "YTAS"),     // y-ascender
+            ("1481921089", "YTDE"),     // y-descender
+            ("1498699075", "YTFI"),     // y-figure
+            ("1498696771", "YTLC"),     // y-lowercase
+            ("1498693971", "unknown1"), // unknown axis
+            ("1498694725", "YTUC"),     // y-uppercase
+            ("1498695241", "unknown2"), // unknown axis
+        ];
+
+        // Check that we have the expected number of axes (Roboto Flex has 13 axes)
+        assert_eq!(
+            params.len(),
+            13,
+            "Roboto Flex should have 13 variation axes, found: {}",
+            params.len()
+        );
+
+        // Verify that we have the expected axes by checking their numeric representations
+        for (numeric_tag, expected_name) in tag_mapping {
+            assert!(
+                axis_tags.contains(&numeric_tag.to_string()),
+                "Roboto Flex should have '{}' axis (tag: {}), found: {:?}",
+                expected_name,
+                numeric_tag,
+                axis_tags
+            );
+        }
+
+        // Test specific axis properties
+        for axis in &params {
+            let tag_str = axis.tag.to_string();
+            match tag_str.as_str() {
+                "1869640570" => {
+                    // opsz - optical size
+                    // Optical size axis should have reasonable min/max values
+                    assert!(axis.min >= 8.0, "Optical size min should be >= 8");
+                    assert!(axis.max <= 144.0, "Optical size max should be <= 144");
+                    assert!(
+                        axis.def >= axis.min && axis.def <= axis.max,
+                        "Default optical size should be within range"
+                    );
+                }
+                "1936486004" => {
+                    // slnt - slant
+                    // Slant axis should have reasonable min/max values (typically -15 to 0)
+                    assert!(axis.min >= -15.0, "Slant min should be >= -15");
+                    assert!(axis.max <= 0.0, "Slant max should be <= 0");
+                    assert!(
+                        axis.def >= axis.min && axis.def <= axis.max,
+                        "Default slant should be within range"
+                    );
+                }
+                "1196572996" => {
+                    // GRAD - grade
+                    // Grade axis should have reasonable min/max values
+                    assert!(axis.min >= -200.0, "Grade min should be >= -200");
+                    assert!(axis.max <= 200.0, "Grade max should be <= 200");
+                    assert!(
+                        axis.def >= axis.min && axis.def <= axis.max,
+                        "Default grade should be within range"
+                    );
+                }
+                _ => {
+                    // For other axes, just verify they have valid ranges
+                    assert!(axis.min <= axis.max, "Axis min should be <= max");
+                    assert!(
+                        axis.def >= axis.min && axis.def <= axis.max,
+                        "Default should be within range"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn variation_design_parameters_for_family_style_with_roboto_flex() {
+        let mut repo = FontRepository::new();
+
+        // Load the Roboto Flex font file
+        let font_path = Path::new("../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf");
+        let font_bytes = fs::read(font_path).expect("Failed to read Roboto Flex font file");
+
+        // Add the font to the repository
+        repo.add(&font_bytes, "Roboto Flex");
+
+        // Test with different font styles
+        let styles = vec![
+            skia_safe::FontStyle::normal(),
+            skia_safe::FontStyle::bold(),
+            skia_safe::FontStyle::italic(),
+            skia_safe::FontStyle::bold_italic(),
+        ];
+
+        for style in styles {
+            let variation_params =
+                repo.variation_design_parameters_for_family_style("Roboto Flex", style);
+            assert!(
+                variation_params.is_some(),
+                "Should return variation parameters for style {:?}",
+                style
+            );
+
+            let params = variation_params.unwrap();
+            assert!(
+                !params.is_empty(),
+                "Roboto Flex should have variation axes for style {:?}",
+                style
+            );
+
+            // Verify that all axes have valid ranges
+            for axis in &params {
+                assert!(
+                    axis.min <= axis.max,
+                    "Axis min should be <= max for style {:?}",
+                    style
+                );
+                assert!(
+                    axis.def >= axis.min && axis.def <= axis.max,
+                    "Default should be within range for style {:?}",
+                    style
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn variation_design_parameters_for_nonexistent_family() {
+        let repo = FontRepository::new();
+
+        // Test with a family that doesn't exist
+        let variation_params = repo.variation_design_parameters_for_family("Nonexistent Font");
+        assert!(
+            variation_params.is_none(),
+            "Should return None for nonexistent font family"
+        );
+    }
+
+    #[test]
+    fn variation_design_parameters_for_family_with_non_variable_font() {
+        let mut repo = FontRepository::new();
+
+        // Create a simple test font (this won't be a real font, but tests the behavior)
+        let fake_font_bytes = vec![0u8; 1000]; // This won't be a valid font, but tests the method
+
+        repo.add(&fake_font_bytes, "Fake Font");
+
+        // The method should handle invalid fonts gracefully
+        let _variation_params = repo.variation_design_parameters_for_family("Fake Font");
+        // This might return None or an empty vector depending on how Skia handles invalid fonts
+        // We just test that it doesn't panic
     }
 }
