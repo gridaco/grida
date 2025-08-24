@@ -29,7 +29,7 @@ async fn demo_scene() -> Scene {
     title_text.width = Some(700.0);
     title_text.text = "Grida Canvas PDF Demo".to_string();
     title_text.text_style = TextStyleRec {
-        text_decoration: TextDecoration::None,
+        text_decoration: TextDecorationLine::None,
         text_decoration_color: None,
         text_decoration_style: None,
         text_decoration_skip_ink: None,
@@ -59,7 +59,7 @@ async fn demo_scene() -> Scene {
     subtitle_text.text =
         "Rich content demonstration with shapes, gradients, and effects".to_string();
     subtitle_text.text_style = TextStyleRec {
-        text_decoration: TextDecoration::None,
+        text_decoration: TextDecorationLine::None,
         text_decoration_color: None,
         text_decoration_style: None,
         text_decoration_skip_ink: None,
@@ -288,7 +288,7 @@ async fn demo_scene() -> Scene {
     description_text.width = Some(700.0);
     description_text.text = "This PDF demonstrates various rendering capabilities including gradients, shapes, text, and effects.".to_string();
     description_text.text_style = TextStyleRec {
-        text_decoration: TextDecoration::None,
+        text_decoration: TextDecorationLine::None,
         text_decoration_color: None,
         text_decoration_style: None,
         text_decoration_skip_ink: None,

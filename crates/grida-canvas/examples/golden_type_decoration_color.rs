@@ -85,7 +85,7 @@ fn main() {
 
     for (color, label) in colors.iter() {
         let text_style = TextStyleRec {
-            text_decoration: TextDecoration::Underline,
+            text_decoration: TextDecorationLine::Underline,
             text_decoration_color: Some(*color),
             text_decoration_style: None,
             text_decoration_skip_ink: None,

@@ -180,12 +180,12 @@ impl From<&FigmaTextAlignVertical> for TextAlignVertical {
     }
 }
 
-impl From<&FigmaTextDecoration> for TextDecoration {
+impl From<&FigmaTextDecoration> for TextDecorationLine {
     fn from(decoration: &FigmaTextDecoration) -> Self {
         match decoration {
-            FigmaTextDecoration::None => TextDecoration::None,
-            FigmaTextDecoration::Underline => TextDecoration::Underline,
-            FigmaTextDecoration::Strikethrough => TextDecoration::LineThrough,
+            FigmaTextDecoration::None => TextDecorationLine::None,
+            FigmaTextDecoration::Underline => TextDecorationLine::Underline,
+            FigmaTextDecoration::Strikethrough => TextDecorationLine::LineThrough,
         }
     }
 }
@@ -459,8 +459,8 @@ impl FigmaConverter {
     }
 
     /// Convert Figma's text decoration to our TextDecoration
-    fn convert_text_decoration(decoration: Option<&FigmaTextDecoration>) -> TextDecoration {
-        map_option(decoration).unwrap_or(TextDecoration::None)
+    fn convert_text_decoration(decoration: Option<&FigmaTextDecoration>) -> TextDecorationLine {
+        map_option(decoration).unwrap_or(TextDecorationLine::None)
     }
 
     /// Convert Figma's text alignment to our TextAlign

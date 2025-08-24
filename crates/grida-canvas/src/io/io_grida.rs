@@ -406,7 +406,7 @@ pub struct JSONTextNode {
     pub text_align_vertical: TextAlignVertical,
 
     #[serde(rename = "textDecoration", default)]
-    pub text_decoration: TextDecoration,
+    pub text_decoration: TextDecorationLine,
     #[serde(rename = "textDecorationStyle", default)]
     pub text_decoration_style: Option<TextDecorationStyle>,
     #[serde(rename = "textDecorationColor", default)]

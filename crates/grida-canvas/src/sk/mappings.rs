@@ -43,13 +43,13 @@ impl From<BlendMode> for skia_safe::BlendMode {
     }
 }
 
-impl From<TextDecoration> for skia_safe::textlayout::TextDecoration {
-    fn from(mode: TextDecoration) -> Self {
+impl From<TextDecorationLine> for skia_safe::textlayout::TextDecoration {
+    fn from(mode: TextDecorationLine) -> Self {
         match mode {
-            TextDecoration::None => skia_safe::textlayout::TextDecoration::NO_DECORATION,
-            TextDecoration::Underline => skia_safe::textlayout::TextDecoration::UNDERLINE,
-            TextDecoration::Overline => skia_safe::textlayout::TextDecoration::OVERLINE,
-            TextDecoration::LineThrough => skia_safe::textlayout::TextDecoration::LINE_THROUGH,
+            TextDecorationLine::None => skia_safe::textlayout::TextDecoration::NO_DECORATION,
+            TextDecorationLine::Underline => skia_safe::textlayout::TextDecoration::UNDERLINE,
+            TextDecorationLine::Overline => skia_safe::textlayout::TextDecoration::OVERLINE,
+            TextDecorationLine::LineThrough => skia_safe::textlayout::TextDecoration::LINE_THROUGH,
         }
     }
 }

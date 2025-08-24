@@ -86,10 +86,10 @@ fn main() {
 
     // Basic decorations
     let decorations = [
-        (TextDecoration::None, "No Decoration"),
-        (TextDecoration::Underline, "Underlined Text"),
-        (TextDecoration::Overline, "Overlined Text"),
-        (TextDecoration::LineThrough, "Strikethrough Text"),
+        (TextDecorationLine::None, "No Decoration"),
+        (TextDecorationLine::Underline, "Underlined Text"),
+        (TextDecorationLine::Overline, "Overlined Text"),
+        (TextDecorationLine::LineThrough, "Strikethrough Text"),
     ];
 
     for (decoration, label) in decorations.iter() {
@@ -140,7 +140,7 @@ fn main() {
 
     for (style, label) in styles.iter() {
         let text_style = TextStyleRec {
-            text_decoration: TextDecoration::Underline,
+            text_decoration: TextDecorationLine::Underline,
             text_decoration_color: Some(CGColor::BLACK),
             text_decoration_style: Some(*style),
             text_decoration_skip_ink: None,
@@ -186,7 +186,7 @@ fn main() {
 
     for (color, label) in colors.iter() {
         let text_style = TextStyleRec {
-            text_decoration: TextDecoration::Underline,
+            text_decoration: TextDecorationLine::Underline,
             text_decoration_color: Some(*color),
             text_decoration_style: None,
             text_decoration_skip_ink: None,
@@ -236,7 +236,7 @@ fn main() {
 
     for (thickness, label) in thicknesses.iter() {
         let text_style = TextStyleRec {
-            text_decoration: TextDecoration::Underline,
+            text_decoration: TextDecorationLine::Underline,
             text_decoration_color: Some(CGColor::BLACK),
             text_decoration_style: None,
             text_decoration_skip_ink: None,
@@ -280,7 +280,7 @@ fn main() {
 
     for (skip_ink, label) in skip_ink_settings.iter() {
         let text_style = TextStyleRec {
-            text_decoration: TextDecoration::Underline,
+            text_decoration: TextDecorationLine::Underline,
             text_decoration_color: Some(CGColor(255, 0, 0, 255)),
             text_decoration_style: None,
             text_decoration_skip_ink: Some(*skip_ink),
@@ -319,21 +319,21 @@ fn main() {
 
     let combined_examples = [
         (
-            TextDecoration::Underline,
+            TextDecorationLine::Underline,
             Some(TextDecorationStyle::Dashed),
             Some(CGColor(128, 0, 128, 255)),
             Some(2.0),
             "Purple Dashed Thick Underline",
         ),
         (
-            TextDecoration::Overline,
+            TextDecorationLine::Overline,
             Some(TextDecorationStyle::Double),
             Some(CGColor(255, 140, 0, 255)),
             Some(1.5),
             "Orange Double Thick Overline",
         ),
         (
-            TextDecoration::LineThrough,
+            TextDecorationLine::LineThrough,
             Some(TextDecorationStyle::Dotted),
             Some(CGColor(0, 128, 128, 255)),
             Some(2.5),
@@ -385,9 +385,9 @@ fn main() {
     // Show examples of different decorations on the same text
     let multi_text = "Multiple Decorations Example";
     let decorations_multi = [
-        TextDecoration::Underline,
-        TextDecoration::Overline,
-        TextDecoration::LineThrough,
+        TextDecorationLine::Underline,
+        TextDecorationLine::Overline,
+        TextDecorationLine::LineThrough,
     ];
 
     for decoration in decorations_multi.iter() {

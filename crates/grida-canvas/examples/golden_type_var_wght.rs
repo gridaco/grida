@@ -91,7 +91,7 @@ fn main() {
 
         // Create cg TextStyle with specific weight
         let text_style = TextStyleRec {
-            text_decoration: TextDecoration::None,
+            text_decoration: TextDecorationLine::None,
             text_decoration_color: None,
             text_decoration_style: None,
             text_decoration_skip_ink: None,
