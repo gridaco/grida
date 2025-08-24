@@ -6,6 +6,7 @@ import type {
   TemplateEditorSetTemplatePropsAction,
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
+  NodeToggleUnderlineAction,
   EditorSelectGradientStopAction,
   EditorVectorBendOrClearCornerAction,
   EditorVariableWidthSelectStopAction,
@@ -1543,6 +1544,19 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         } else {
           node.fontWeight = 700;
         }
+      });
+      //
+    }
+    //
+    case "node/toggle/underline": {
+      return produce(state, (draft) => {
+        const { node_id } = <NodeToggleUnderlineAction>action;
+        const node = dq.__getNodeById(draft, node_id);
+        assert(node, `node not found with node_id: "${node_id}"`);
+        if (node.type !== "text") return;
+
+        const isUnderline = node.textDecorationLine === "underline";
+        node.textDecorationLine = isUnderline ? "none" : "underline";
       });
       //
     }

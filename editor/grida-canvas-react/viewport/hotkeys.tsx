@@ -693,6 +693,10 @@ export function useEditorHotKeys() {
     editor.toggleBold("selection");
   });
 
+  useHotkeys("meta+u, ctrl+u", () => {
+    editor.toggleUnderline("selection");
+  });
+
   useHotkeys("shift+r", () => {
     const v = editor.toggleRuler();
     toast.success(`Ruler ${v === "on" ? "on" : "off"}`);

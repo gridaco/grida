@@ -1331,6 +1331,19 @@ export class Editor
     });
   }
 
+  public toggleUnderline(
+    target: "selection" | editor.NodeID = "selection"
+  ) {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.dispatch({
+        type: "node/toggle/underline",
+        node_id,
+      });
+    });
+  }
+
   public setOpacity(
     target: "selection" | editor.NodeID = "selection",
     opacity: number
@@ -1457,6 +1470,12 @@ export class Editor
   toggleNodeBold(node_id: string) {
     this.dispatch({
       type: "node/toggle/bold",
+      node_id: node_id,
+    });
+  }
+  toggleNodeUnderline(node_id: string) {
+    this.dispatch({
+      type: "node/toggle/underline",
       node_id: node_id,
     });
   }

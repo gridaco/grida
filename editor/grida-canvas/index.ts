@@ -1552,6 +1552,7 @@ export namespace editor.api {
     toggleNodeActive(node_id: NodeID): void;
     toggleNodeLocked(node_id: NodeID): void;
     toggleNodeBold(node_id: NodeID): void;
+    toggleNodeUnderline(node_id: NodeID): void;
     changeNodeActive(node_id: NodeID, active: boolean): void;
     changeNodeLocked(node_id: NodeID, locked: boolean): void;
     changeNodeName(node_id: NodeID, name: string): void;
@@ -2112,6 +2113,7 @@ export namespace editor.api {
     toggleActive(target: "selection" | NodeID): void;
     toggleLocked(target: "selection" | NodeID): void;
     toggleBold(target: "selection" | NodeID): void;
+    toggleUnderline(target: "selection" | NodeID): void;
     // //
     setOpacity(target: "selection" | NodeID, opacity: number): void;
   }

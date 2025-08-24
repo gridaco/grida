@@ -52,6 +52,7 @@ export type DocumentAction =
   //
   | NodeChangeAction
   | NodeToggleBoldAction
+  | NodeToggleUnderlineAction
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction
   //
@@ -861,6 +862,10 @@ export type NodeChangeAction =
   | ({ type: "node/change/props" } & INodeChangePropsAction);
 
 export type NodeToggleBoldAction = { type: "node/toggle/bold" } & INodeID;
+
+export type NodeToggleUnderlineAction = {
+  type: "node/toggle/underline";
+} & INodeID;
 
 export type TemplateNodeOverrideChangeAction = ITemplateInstanceNodeID & {
   type: "document/template/override/change/*";
