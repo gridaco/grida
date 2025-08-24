@@ -12,16 +12,9 @@ pub fn textstyle(
     let ctx = _ctx.as_ref().unwrap_or(&default_ctx);
 
     // [decoration]
-    let decoration = Decoration {
-        text_decoration_line: style.text_decoration_line,
-        text_decoration_color: style.text_decoration_color.unwrap_or(ctx.color),
-        text_decoration_style: style
-            .text_decoration_style
-            .unwrap_or(TextDecorationStyle::Solid),
-        text_decoration_skip_ink: style.text_decoration_skip_ink.unwrap_or(true),
-        text_decoration_thinkness: style.text_decoration_thinkness.unwrap_or(1.0),
-    }
-    .into();
+    let decoration =
+        TextDecoration::from_with_context(style.text_decoration.unwrap_or_default(), &ctx.into())
+            .into();
 
     // [font_style]
     let font_style = skia_safe::FontStyle::new(

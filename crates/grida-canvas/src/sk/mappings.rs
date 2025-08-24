@@ -78,8 +78,8 @@ impl From<TextAlign> for skia_safe::textlayout::TextAlign {
     }
 }
 
-impl From<Decoration> for skia_safe::textlayout::Decoration {
-    fn from(decoration: Decoration) -> Self {
+impl From<TextDecoration> for skia_safe::textlayout::Decoration {
+    fn from(decoration: TextDecoration) -> Self {
         skia_safe::textlayout::Decoration {
             ty: decoration.text_decoration_line.into(),
             // Set the decoration mode based on skip_ink setting

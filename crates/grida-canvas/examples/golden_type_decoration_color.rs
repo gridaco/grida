@@ -85,11 +85,13 @@ fn main() {
 
     for (color, label) in colors.iter() {
         let text_style = TextStyleRec {
-            text_decoration_line: TextDecorationLine::Underline,
-            text_decoration_color: Some(*color),
-            text_decoration_style: None,
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: Some(1.5),
+            text_decoration: Some(TextDecorationRec {
+                text_decoration_line: TextDecorationLine::Underline,
+                text_decoration_color: Some(*color),
+                text_decoration_style: None,
+                text_decoration_skip_ink: None,
+                text_decoration_thinkness: Some(1.5),
+            }),
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(400),

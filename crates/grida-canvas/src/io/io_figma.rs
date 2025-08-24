@@ -890,11 +890,15 @@ impl FigmaConverter {
             // },
             text: origin.characters.clone(),
             text_style: TextStyleRec {
-                text_decoration_line: Self::convert_text_decoration(style.text_decoration.as_ref()),
-                text_decoration_color: None,
-                text_decoration_style: None,
-                text_decoration_skip_ink: None,
-                text_decoration_thinkness: None,
+                text_decoration: Some(TextDecorationRec {
+                    text_decoration_line: Self::convert_text_decoration(
+                        style.text_decoration.as_ref(),
+                    ),
+                    text_decoration_color: None,
+                    text_decoration_style: None,
+                    text_decoration_skip_ink: None,
+                    text_decoration_thinkness: None,
+                }),
                 font_family: style
                     .font_family
                     .clone()

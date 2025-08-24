@@ -662,11 +662,13 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             ellipsis: None,
             text: node.text,
             text_style: TextStyleRec {
-                text_decoration_line: node.text_decoration_line,
-                text_decoration_color: node.text_decoration_color.map(CGColor::from),
-                text_decoration_style: node.text_decoration_style,
-                text_decoration_skip_ink: node.text_decoration_skip_ink,
-                text_decoration_thinkness: node.text_decoration_thinkness,
+                text_decoration: Some(TextDecorationRec {
+                    text_decoration_line: node.text_decoration_line,
+                    text_decoration_color: node.text_decoration_color.map(CGColor::from),
+                    text_decoration_style: node.text_decoration_style,
+                    text_decoration_skip_ink: node.text_decoration_skip_ink,
+                    text_decoration_thinkness: node.text_decoration_thinkness,
+                }),
                 font_family: node.font_family.unwrap_or_else(|| "".to_string()),
                 font_size: node.font_size.unwrap_or(14.0),
                 font_weight: node.font_weight,

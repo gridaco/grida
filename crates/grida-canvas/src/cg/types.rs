@@ -368,19 +368,54 @@ pub struct DecorationRecBuildContext {
     pub color: CGColor,
 }
 
+impl From<&TextStyleRecBuildContext> for DecorationRecBuildContext {
+    fn from(ctx: &TextStyleRecBuildContext) -> Self {
+        Self { color: ctx.color }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
-pub struct DecorationRec {
-    pub text_decoration_line: Option<TextDecorationLine>,
+pub struct TextDecorationRec {
+    /// Text decoration line (e.g. underline or none).
+    pub text_decoration_line: TextDecorationLine,
+
+    /// Text decoration color
     pub text_decoration_color: Option<CGColor>,
+
+    /// Text decoration style (e.g. dashed or solid).
     pub text_decoration_style: Option<TextDecorationStyle>,
+
+    /// Text decoration skip ink
     pub text_decoration_skip_ink: Option<bool>,
+
+    /// The thickness of the decoration stroke as a multiplier of the thickness defined by the font.
     pub text_decoration_thinkness: Option<f32>,
 }
 
-impl Default for DecorationRec {
-    fn default() -> Self {
+impl TextDecorationRec {
+    pub fn none() -> Self {
         Self {
-            text_decoration_line: None,
+            text_decoration_line: TextDecorationLine::None,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
+        }
+    }
+
+    pub fn underline() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::Underline,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
+        }
+    }
+
+    pub fn overline() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::Overline,
             text_decoration_color: None,
             text_decoration_style: None,
             text_decoration_skip_ink: None,
@@ -389,8 +424,14 @@ impl Default for DecorationRec {
     }
 }
 
+impl Default for TextDecorationRec {
+    fn default() -> Self {
+        Self::none()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
-pub struct Decoration {
+pub struct TextDecoration {
     pub text_decoration_line: TextDecorationLine,
     pub text_decoration_color: CGColor,
     pub text_decoration_style: TextDecorationStyle,
@@ -398,7 +439,7 @@ pub struct Decoration {
     pub text_decoration_thinkness: f32,
 }
 
-impl Default for Decoration {
+impl Default for TextDecoration {
     fn default() -> Self {
         Self {
             text_decoration_line: TextDecorationLine::None,
@@ -410,8 +451,8 @@ impl Default for Decoration {
     }
 }
 
-impl FromWithContext<DecorationRec, DecorationRecBuildContext> for Decoration {
-    fn from_with_context(value: DecorationRec, ctx: &DecorationRecBuildContext) -> Self {
+impl FromWithContext<TextDecorationRec, DecorationRecBuildContext> for TextDecoration {
+    fn from_with_context(value: TextDecorationRec, ctx: &DecorationRecBuildContext) -> Self {
         let text_decoration_color = value.text_decoration_color.unwrap_or(ctx.color);
         let text_decoration_style = value
             .text_decoration_style
@@ -420,9 +461,7 @@ impl FromWithContext<DecorationRec, DecorationRecBuildContext> for Decoration {
         let text_decoration_thinkness = value.text_decoration_thinkness.unwrap_or(1.0);
 
         Self {
-            text_decoration_line: value
-                .text_decoration_line
-                .unwrap_or(TextDecorationLine::None),
+            text_decoration_line: value.text_decoration_line,
             text_decoration_color: text_decoration_color,
             text_decoration_style: text_decoration_style,
             text_decoration_skip_ink: text_decoration_skip_ink,
@@ -536,20 +575,7 @@ impl Default for TextStyleRecBuildContext {
 /// A set of style properties that can be applied to a text or text span.
 #[derive(Debug, Clone)]
 pub struct TextStyleRec {
-    /// Text decoration (e.g. underline or none).
-    pub text_decoration_line: TextDecorationLine,
-
-    /// Text decoration color
-    pub text_decoration_color: Option<CGColor>,
-
-    /// The style in which to paint the text decorations (e.g., dashed).
-    pub text_decoration_style: Option<TextDecorationStyle>,
-
-    /// Text decoration skip ink
-    pub text_decoration_skip_ink: Option<bool>,
-
-    /// The thickness of the decoration stroke as a multiplier of the thickness defined by the font.
-    pub text_decoration_thinkness: Option<f32>,
+    pub text_decoration: Option<TextDecorationRec>,
 
     /// Optional font family name (e.g. "Roboto").
     pub font_family: String,
@@ -577,11 +603,7 @@ pub struct TextStyleRec {
 impl TextStyleRec {
     pub fn from_font(font: &str, size: f32) -> Self {
         Self {
-            text_decoration_line: TextDecorationLine::None,
-            text_decoration_color: None,
-            text_decoration_style: None,
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: None,
+            text_decoration: None,
             font_family: font.to_string(),
             font_size: size,
             font_weight: FontWeight::default(),

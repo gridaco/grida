@@ -23,11 +23,7 @@ async fn demo_texts() -> Scene {
     word_text_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
     word_text_node.text = "Grida Canvas".to_string();
     word_text_node.text_style = TextStyleRec {
-        text_decoration_line: TextDecorationLine::None,
-        text_decoration_color: None,
-        text_decoration_style: None,
-        text_decoration_skip_ink: None,
-        text_decoration_thinkness: None,
+        text_decoration: None,
         font_family: "Arial".to_string(),
         font_size: 48.0,
         italic: false,                     // TODO: add italic to text style

@@ -37,7 +37,6 @@ impl ParagraphCache {
     ) -> u64 {
         let mut h = DefaultHasher::new();
         text.hash(&mut h);
-        style.text_decoration_line.hash(&mut h);
         style.font_family.hash(&mut h);
         style.font_size.to_bits().hash(&mut h);
         style.font_weight.0.hash(&mut h);

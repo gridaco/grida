@@ -91,11 +91,7 @@ fn main() {
 
         // Create cg TextStyle with specific weight
         let text_style = TextStyleRec {
-            text_decoration_line: TextDecorationLine::None,
-            text_decoration_color: None,
-            text_decoration_style: None,
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: None,
+            text_decoration: None,
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(weight),

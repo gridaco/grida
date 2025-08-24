@@ -22,11 +22,7 @@ async fn demo_webfonts() -> Scene {
     heading_node.width = Some(800.0);
     heading_node.text = "Web fonts demo".to_string();
     heading_node.text_style = TextStyleRec {
-        text_decoration_line: TextDecorationLine::None,
-        text_decoration_color: None,
-        text_decoration_style: None,
-        text_decoration_skip_ink: None,
-        text_decoration_thinkness: None,
+        text_decoration: None,
         font_family: "Playfair Display".to_string(),
         font_size: 64.0,
         font_weight: FontWeight::new(700), // Bold
@@ -45,11 +41,7 @@ async fn demo_webfonts() -> Scene {
     description_node.width = Some(800.0);
     description_node.text = PARAGRAPH.to_string();
     description_node.text_style = TextStyleRec {
-        text_decoration_line: TextDecorationLine::None,
-        text_decoration_color: None,
-        text_decoration_style: None,
-        text_decoration_skip_ink: None,
-        text_decoration_thinkness: None,
+        text_decoration: None,
         font_family: "Playfair Display".to_string(),
         font_size: 14.0,
         font_weight: FontWeight::new(400), // Regular
@@ -90,11 +82,7 @@ async fn demo_webfonts() -> Scene {
         text_node.width = Some(800.0);
         text_node.text = format!("AlbertSans {}", variant);
         text_node.text_style = TextStyleRec {
-            text_decoration_line: TextDecorationLine::None,
-            text_decoration_color: None,
-            text_decoration_style: None,
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: None,
+            text_decoration: None,
             font_family: "Albert Sans".to_string(),
             font_size: 24.0,
             font_weight: FontWeight::new(*weight),

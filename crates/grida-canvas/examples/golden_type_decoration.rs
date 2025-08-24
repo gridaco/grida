@@ -94,11 +94,13 @@ fn main() {
 
     for (decoration, label) in decorations.iter() {
         let text_style = TextStyleRec {
-            text_decoration_line: *decoration,
-            text_decoration_color: Some(CGColor::RED),
-            text_decoration_style: None,
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: None,
+            text_decoration: Some(TextDecorationRec {
+                text_decoration_line: *decoration,
+                text_decoration_color: Some(CGColor::RED),
+                text_decoration_style: None,
+                text_decoration_skip_ink: None,
+                text_decoration_thinkness: None,
+            }),
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(400),
@@ -140,11 +142,13 @@ fn main() {
 
     for (style, label) in styles.iter() {
         let text_style = TextStyleRec {
-            text_decoration_line: TextDecorationLine::Underline,
-            text_decoration_color: Some(CGColor::BLACK),
-            text_decoration_style: Some(*style),
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: None,
+            text_decoration: Some(TextDecorationRec {
+                text_decoration_line: TextDecorationLine::Underline,
+                text_decoration_color: Some(CGColor::BLACK),
+                text_decoration_style: Some(*style),
+                text_decoration_skip_ink: None,
+                text_decoration_thinkness: None,
+            }),
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(400),
@@ -186,11 +190,13 @@ fn main() {
 
     for (color, label) in colors.iter() {
         let text_style = TextStyleRec {
-            text_decoration_line: TextDecorationLine::Underline,
-            text_decoration_color: Some(*color),
-            text_decoration_style: None,
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: None,
+            text_decoration: Some(TextDecorationRec {
+                text_decoration_line: TextDecorationLine::Underline,
+                text_decoration_color: Some(*color),
+                text_decoration_style: None,
+                text_decoration_skip_ink: None,
+                text_decoration_thinkness: None,
+            }),
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(400),
@@ -236,11 +242,13 @@ fn main() {
 
     for (thickness, label) in thicknesses.iter() {
         let text_style = TextStyleRec {
-            text_decoration_line: TextDecorationLine::Underline,
-            text_decoration_color: Some(CGColor::BLACK),
-            text_decoration_style: None,
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: Some(*thickness),
+            text_decoration: Some(TextDecorationRec {
+                text_decoration_line: TextDecorationLine::Underline,
+                text_decoration_color: Some(CGColor::BLACK),
+                text_decoration_style: None,
+                text_decoration_skip_ink: None,
+                text_decoration_thinkness: Some(*thickness),
+            }),
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(400),
@@ -280,11 +288,13 @@ fn main() {
 
     for (skip_ink, label) in skip_ink_settings.iter() {
         let text_style = TextStyleRec {
-            text_decoration_line: TextDecorationLine::Underline,
-            text_decoration_color: Some(CGColor(255, 0, 0, 255)),
-            text_decoration_style: None,
-            text_decoration_skip_ink: Some(*skip_ink),
-            text_decoration_thinkness: None,
+            text_decoration: Some(TextDecorationRec {
+                text_decoration_line: TextDecorationLine::Underline,
+                text_decoration_color: Some(CGColor(255, 0, 0, 255)),
+                text_decoration_style: None,
+                text_decoration_skip_ink: Some(*skip_ink),
+                text_decoration_thinkness: None,
+            }),
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(400),
@@ -343,11 +353,13 @@ fn main() {
 
     for (decoration, style, color, thickness, label) in combined_examples.iter() {
         let text_style = TextStyleRec {
-            text_decoration_line: *decoration,
-            text_decoration_color: *color,
-            text_decoration_style: *style,
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: *thickness,
+            text_decoration: Some(TextDecorationRec {
+                text_decoration_line: *decoration,
+                text_decoration_color: *color,
+                text_decoration_style: *style,
+                text_decoration_skip_ink: None,
+                text_decoration_thinkness: *thickness,
+            }),
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(400),
@@ -392,11 +404,13 @@ fn main() {
 
     for decoration in decorations_multi.iter() {
         let text_style = TextStyleRec {
-            text_decoration_line: *decoration,
-            text_decoration_color: Some(CGColor(100, 100, 100, 255)),
-            text_decoration_style: Some(TextDecorationStyle::Solid),
-            text_decoration_skip_ink: None,
-            text_decoration_thinkness: Some(1.5),
+            text_decoration: Some(TextDecorationRec {
+                text_decoration_line: *decoration,
+                text_decoration_color: Some(CGColor(100, 100, 100, 255)),
+                text_decoration_style: Some(TextDecorationStyle::Solid),
+                text_decoration_skip_ink: None,
+                text_decoration_thinkness: Some(1.5),
+            }),
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(400),

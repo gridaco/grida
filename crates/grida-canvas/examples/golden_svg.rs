@@ -30,11 +30,7 @@ async fn demo_scene() -> Scene {
     title_text.width = Some(700.0);
     title_text.text = "Grida Canvas SVG Demo".to_string();
     title_text.text_style = TextStyleRec {
-        text_decoration_line: TextDecorationLine::None,
-        text_decoration_color: None,
-        text_decoration_style: None,
-        text_decoration_skip_ink: None,
-        text_decoration_thinkness: None,
+        text_decoration: None,
         font_family: "".to_string(),
         font_size: 36.0,
         font_weight: FontWeight::new(700),
