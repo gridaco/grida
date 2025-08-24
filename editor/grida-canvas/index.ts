@@ -1652,9 +1652,9 @@ export namespace editor.api {
       node_id: NodeID,
       transform: cg.TextTransform
     ): void;
-    changeTextNodeTextDecoration(
+    changeTextNodeTextDecorationLine(
       node_id: NodeID,
-      textDecoration: cg.TextDecoration
+      textDecorationLine: cg.TextDecorationLine
     ): void;
     changeTextNodeTextDecorationStyle(
       node_id: NodeID,

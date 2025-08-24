@@ -1298,7 +1298,7 @@ function SectionText({ node_id }: { node_id: string }) {
     letterSpacing: node.letterSpacing,
     textAlign: node.textAlign,
     textAlignVertical: node.textAlignVertical,
-    textDecoration: node.textDecoration,
+    textDecoration: node.textDecorationLine,
     textDecorationStyle: node.textDecorationStyle,
     textDecorationColor: node.textDecorationColor,
     textDecorationSkipInk: node.textDecorationSkipInk,
@@ -1323,7 +1323,7 @@ function SectionText({ node_id }: { node_id: string }) {
               <TextDetails
                 fontWeight={fontWeight}
                 textAlign={textAlign}
-                textDecoration={textDecoration}
+                textDecorationLine={textDecoration}
                 textDecorationStyle={textDecorationStyle ?? undefined}
                 textDecorationThickness={textDecorationThickness ?? undefined}
                 textDecorationColor={textDecorationColor ?? undefined}
@@ -1332,7 +1332,7 @@ function SectionText({ node_id }: { node_id: string }) {
                 maxLines={maxLines}
                 onTextTransformChange={actions.textTransform}
                 onTextAlignChange={actions.textAlign}
-                onTextDecorationChange={actions.textDecoration}
+                onTextDecorationLineChange={actions.textDecoration}
                 onTextDecorationStyleChange={actions.textDecorationStyle}
                 onTextDecorationThicknessChange={
                   actions.textDecorationThickness

@@ -1355,7 +1355,7 @@ export namespace grida.program.nodes {
       fontFamily?: string;
       fontSize: number;
       fontWeight: cg.NFontWeight;
-      textDecoration: cg.TextDecoration;
+      textDecorationLine: cg.TextDecorationLine;
       textDecorationStyle?: cg.TextDecorationStyle | null;
       textDecorationColor?: cg.TextDecorationColorValue | null;
       textDecorationSkipInk?: cg.TextDecorationSkipInkFlag | null;

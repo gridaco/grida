@@ -1799,14 +1799,14 @@ export class Editor
     });
   }
 
-  changeTextNodeTextDecoration(
+  changeTextNodeTextDecorationLine(
     node_id: string,
-    textDecoration: cg.TextDecoration
+    textDecorationLine: cg.TextDecorationLine
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecoration,
+      textDecorationLine: textDecorationLine,
     });
   }
 

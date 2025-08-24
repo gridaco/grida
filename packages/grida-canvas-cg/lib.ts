@@ -217,7 +217,7 @@ export namespace cg {
    * @see https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration
    */
-  export type TextDecoration =
+  export type TextDecorationLine =
     | "none"
     | "underline"
     | "overline"

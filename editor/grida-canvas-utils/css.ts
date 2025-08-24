@@ -172,7 +172,7 @@ export namespace css {
       const { textAlign, textAlignVertical } =
         styles as Partial<grida.program.nodes.i.ITextNodeStyle>;
       const {
-        textDecoration,
+        textDecorationLine,
         fontFamily,
         fontSize,
         fontWeight,
@@ -187,7 +187,7 @@ export namespace css {
           textAlign: textAlign ?? "left",
           textAlignVertical: textAlignVertical ?? "top",
           // text span style
-          textDecoration,
+          textDecorationLine,
           fontFamily,
           fontSize,
           fontWeight,
@@ -250,7 +250,7 @@ export namespace css {
     const {
       textAlign,
       textAlignVertical,
-      textDecoration,
+      textDecorationLine,
       fontFamily,
       fontSize,
       fontWeight,
@@ -264,7 +264,7 @@ export namespace css {
       alignContent: textAlignVertical
         ? text_align_vertical_to_css_align_content[textAlignVertical]
         : undefined,
-      textDecoration: textDecoration,
+      textDecoration: textDecorationLine,
       fontFamily: fontFamily,
       lineHeight: lineHeight ?? "normal",
       letterSpacing: letterSpacing,

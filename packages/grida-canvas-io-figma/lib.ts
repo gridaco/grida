@@ -69,7 +69,7 @@ export namespace iofigma {
 
       export const textDecorationMap: Record<
         NonNullable<TypeStyle["textDecoration"]>,
-        cg.TextDecoration | undefined
+        cg.TextDecorationLine | undefined
       > = {
         NONE: "none",
         STRIKETHROUGH: undefined,
@@ -643,7 +643,7 @@ export namespace iofigma {
               textAlignVertical: node.style.textAlignVertical
                 ? map.textAlignVerticalMap[node.style.textAlignVertical]
                 : "top",
-              textDecoration: node.style.textDecoration
+              textDecorationLine: node.style.textDecoration
                 ? (map.textDecorationMap[node.style.textDecoration] ?? "none")
                 : "none",
               lineHeight: node.style.lineHeightPercentFontSize

@@ -33,13 +33,39 @@ type HoverPreview = {
   key: PropertyKey;
   value:
     | cg.TextAlign
-    | cg.TextDecoration
+    | cg.TextDecorationLine
     | cg.TextTransform
     | cg.TextDecorationStyle;
 } | null;
 
 interface ParagraphPreviewProps {
   hoverPreview: HoverPreview;
+}
+
+interface PreviewProps {
+  style?: React.CSSProperties;
+  showPlaceholder?: boolean;
+}
+
+function Preview({ style, showPlaceholder = false }: PreviewProps) {
+  return (
+    <div className="p-3 border rounded-md bg-muted/30 h-20">
+      {style ? (
+        <div className="text-sm leading-relaxed" style={style}>
+          {PANGRAM_EN}
+        </div>
+      ) : showPlaceholder ? (
+        <span className="text-muted-foreground text-xs">Preview</span>
+      ) : (
+        <div className="text-sm leading-relaxed">{PANGRAM_EN}</div>
+      )}
+    </div>
+  );
+}
+
+function ParagraphPreview({ hoverPreview }: ParagraphPreviewProps) {
+  const style = useMemo(() => getTextStyle(hoverPreview), [hoverPreview]);
+  return <Preview style={style || undefined} showPlaceholder={!style} />;
 }
 
 // Alignment options
@@ -69,22 +95,22 @@ const ALIGNMENT_OPTIONS = [
 // Decoration options
 const DECORATION_OPTIONS = [
   {
-    value: "none" as cg.TextDecoration,
+    value: "none" as cg.TextDecorationLine,
     icon: <MinusIcon className="size-3" />,
     label: "None",
   },
   {
-    value: "underline" as cg.TextDecoration,
+    value: "underline" as cg.TextDecorationLine,
     icon: <UnderlineIcon className="size-3" />,
     label: "Underline",
   },
   {
-    value: "overline" as cg.TextDecoration,
+    value: "overline" as cg.TextDecorationLine,
     icon: <OverlineIcon className="size-3" />,
     label: "Overline",
   },
   {
-    value: "line-through" as cg.TextDecoration,
+    value: "line-through" as cg.TextDecorationLine,
     icon: <StrikethroughIcon className="size-3" />,
     label: "Line-through",
   },
@@ -130,54 +156,61 @@ const TRUNCATE_OPTIONS = [
 const DECORATION_STYLE_OPTIONS = [
   {
     value: "solid" as cg.TextDecorationStyle,
-    icon: <MinusIcon className="size-3" />,
+    icon: (
+      <span
+        className="text-xs underline"
+        style={{ textDecorationStyle: "solid" }}
+      >
+        A
+      </span>
+    ),
     label: "Solid",
   },
   {
     value: "double" as cg.TextDecorationStyle,
     icon: (
-      <div className="flex flex-col gap-0.5">
-        <MinusIcon className="size-3" />
-        <MinusIcon className="size-3" />
-      </div>
+      <span
+        className="text-xs underline"
+        style={{ textDecorationStyle: "double" }}
+      >
+        A
+      </span>
     ),
     label: "Double",
   },
   {
     value: "dotted" as cg.TextDecorationStyle,
     icon: (
-      <div className="flex gap-0.5">
-        <DotFilledIcon className="size-2" />
-        <DotFilledIcon className="size-2" />
-        <DotFilledIcon className="size-2" />
-      </div>
+      <span
+        className="text-xs underline"
+        style={{ textDecorationStyle: "dotted" }}
+      >
+        A
+      </span>
     ),
     label: "Dotted",
   },
   {
     value: "dashed" as cg.TextDecorationStyle,
     icon: (
-      <div className="flex gap-0.5">
-        <MinusIcon className="size-2" />
-        <MinusIcon className="size-2" />
-        <MinusIcon className="size-2" />
-      </div>
+      <span
+        className="text-xs underline"
+        style={{ textDecorationStyle: "dashed" }}
+      >
+        A
+      </span>
     ),
     label: "Dashed",
   },
   {
     value: "wavy" as cg.TextDecorationStyle,
     icon: (
-      <div className="flex items-center">
-        <svg className="size-3" viewBox="0 0 12 12" fill="currentColor">
-          <path
-            d="M1 6C1.5 5 2.5 5 3 6C3.5 7 4.5 7 5 6C5.5 5 6.5 5 7 6C7.5 7 8.5 7 9 6C9.5 5 10.5 5 11 6"
-            stroke="currentColor"
-            strokeWidth="1"
-            fill="none"
-          />
-        </svg>
-      </div>
+      <span
+        className="text-xs underline"
+        style={{ textDecorationStyle: "wavy" }}
+      >
+        A
+      </span>
     ),
     label: "Wavy",
   },
@@ -191,14 +224,14 @@ const SKIP_INK_OPTIONS = [
 
 interface DecorationDetailsProps {
   // Properties
-  textDecoration?: cg.TextDecoration;
+  textDecorationLine?: cg.TextDecorationLine;
   textDecorationStyle?: cg.TextDecorationStyle;
   textDecorationThickness?: cg.TextDecorationThicknessPercentage;
   textDecorationColor?: cg.TextDecorationColorValue;
   textDecorationSkipInk?: cg.TextDecorationSkipInkFlag;
 
   // Change handlers
-  onTextDecorationChange?: (value: cg.TextDecoration) => void;
+  onTextDecorationLineChange?: (value: cg.TextDecorationLine) => void;
   onTextDecorationStyleChange?: (value: cg.TextDecorationStyle) => void;
   onTextDecorationThicknessChange?: (
     value: cg.TextDecorationThicknessPercentage
@@ -210,14 +243,14 @@ interface DecorationDetailsProps {
 function DecorationDetails(props: DecorationDetailsProps = {}) {
   const {
     // Properties
-    textDecoration = "none",
+    textDecorationLine = "none",
     textDecorationStyle = "solid",
     textDecorationThickness = "auto",
     textDecorationColor = { r: 0, g: 0, b: 0, a: 1 },
     textDecorationSkipInk = true,
 
     // Change handlers
-    onTextDecorationChange,
+    onTextDecorationLineChange,
     onTextDecorationStyleChange,
     onTextDecorationThicknessChange,
     onTextDecorationColorChange,
@@ -229,21 +262,66 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
     onTextDecorationSkipInkChange?.(isEnabled);
   };
 
-  const isUnderline = textDecoration === "underline";
-  const isDecorationActive = textDecoration !== "none";
+  const isUnderline = textDecorationLine === "underline";
+  const isDecorationActive = textDecorationLine !== "none";
+
+  // Generate preview styles based on current decoration settings
+  const getDecorationPreviewStyle = (): React.CSSProperties => {
+    if (!isDecorationActive) return {};
+
+    const style: React.CSSProperties = {};
+
+    // Set text decoration
+    switch (textDecorationLine) {
+      case "underline":
+        style.textDecorationLine = "underline";
+        break;
+      case "overline":
+        style.textDecorationLine = "overline";
+        break;
+      case "line-through":
+        style.textDecorationLine = "line-through";
+        break;
+    }
+
+    // Set decoration style
+    if (textDecorationStyle !== "solid") {
+      style.textDecorationStyle = textDecorationStyle;
+    }
+
+    // Set decoration color
+    if (textDecorationColor && textDecorationColor.r !== 0) {
+      style.textDecorationColor = `rgba(${textDecorationColor.r}, ${textDecorationColor.g}, ${textDecorationColor.b}, ${textDecorationColor.a})`;
+    }
+
+    // Set decoration thickness (only for underline)
+    if (isUnderline && typeof textDecorationThickness === "number") {
+      style.textDecorationThickness = `${textDecorationThickness}px`;
+    }
+
+    // Set skip ink (only for underline)
+    if (isUnderline) {
+      style.textDecorationSkipInk = textDecorationSkipInk ? "auto" : "none";
+    }
+
+    return style;
+  };
 
   return (
     <div className="space-y-3">
+      {/* Preview */}
+      <Preview style={getDecorationPreviewStyle()} />
+
       {/* Decoration Type */}
       <div className="space-y-2">
         <PropertyLine>
           <PropertyLineLabel>Decoration</PropertyLineLabel>
           <PropertyEnumToggle
             enum={DECORATION_OPTIONS}
-            value={textDecoration}
+            value={textDecorationLine}
             className="w-full"
             size="sm"
-            onValueChange={onTextDecorationChange}
+            onValueChange={onTextDecorationLineChange}
           />
         </PropertyLine>
       </div>
@@ -334,7 +412,7 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
 interface TextDetailsProps {
   // Properties
   textAlign?: cg.TextAlign;
-  textDecoration?: cg.TextDecoration;
+  textDecorationLine?: cg.TextDecorationLine;
   textDecorationStyle?: cg.TextDecorationStyle;
   textDecorationThickness?: cg.TextDecorationThicknessPercentage;
   textDecorationColor?: cg.TextDecorationColorValue;
@@ -348,7 +426,7 @@ interface TextDetailsProps {
 
   // Change handlers
   onTextAlignChange?: (value: cg.TextAlign) => void;
-  onTextDecorationChange?: (value: cg.TextDecoration) => void;
+  onTextDecorationLineChange?: (value: cg.TextDecorationLine) => void;
   onTextDecorationStyleChange?: (value: cg.TextDecorationStyle) => void;
   onTextDecorationThicknessChange?: (
     value: cg.TextDecorationThicknessPercentage
@@ -375,7 +453,7 @@ const getTextStyle = (
       style.textAlign = hoverPreview.value as cg.TextAlign;
       break;
     case "decoration":
-      switch (hoverPreview.value as cg.TextDecoration) {
+      switch (hoverPreview.value as cg.TextDecorationLine) {
         case "underline":
           style.textDecoration = "underline";
           break;
@@ -409,27 +487,10 @@ const getTextStyle = (
   return style;
 };
 
-function ParagraphPreview({ hoverPreview }: ParagraphPreviewProps) {
-  const style = useMemo(() => getTextStyle(hoverPreview), [hoverPreview]);
-  return (
-    <div className="p-3 border rounded-md bg-muted/30 h-32">
-      {style ? (
-        <div className="text-sm leading-relaxed" style={style}>
-          {PANGRAM_EN}
-        </div>
-      ) : (
-        <>
-          <span className="text-muted-foreground text-xs">Preview</span>
-        </>
-      )}
-    </div>
-  );
-}
-
 export function TextDetails({
   // Properties
   textAlign = "left",
-  textDecoration = "none",
+  textDecorationLine = "none",
   textDecorationStyle = "solid",
   textDecorationThickness = "auto",
   textDecorationColor = { r: 0, g: 0, b: 0, a: 1 },
@@ -443,7 +504,7 @@ export function TextDetails({
 
   // Change handlers
   onTextAlignChange,
-  onTextDecorationChange,
+  onTextDecorationLineChange,
   onTextDecorationStyleChange,
   onTextDecorationThicknessChange,
   onTextDecorationColorChange,
@@ -461,7 +522,7 @@ export function TextDetails({
     key: PropertyKey,
     value:
       | cg.TextAlign
-      | cg.TextDecoration
+      | cg.TextDecorationLine
       | cg.TextTransform
       | cg.TextDecorationStyle
   ) => {
@@ -525,13 +586,13 @@ export function TextDetails({
               <PropertyLineLabel>Decoration</PropertyLineLabel>
               <PropertyEnumToggle
                 enum={DECORATION_OPTIONS}
-                value={textDecoration}
+                value={textDecorationLine}
                 className="w-full"
                 size="sm"
-                onValueChange={onTextDecorationChange}
+                onValueChange={onTextDecorationLineChange}
                 onValueSeeked={(value) =>
                   value
-                    ? handleHover("decoration", value as cg.TextDecoration)
+                    ? handleHover("decoration", value as cg.TextDecorationLine)
                     : handleHoverLeave()
                 }
               />
@@ -604,12 +665,12 @@ export function TextDetails({
         {/* Decoration Tab */}
         <TabsContent value="decoration" className="mt-3 px-2">
           <DecorationDetails
-            textDecoration={textDecoration}
+            textDecorationLine={textDecorationLine}
             textDecorationStyle={textDecorationStyle}
             textDecorationThickness={textDecorationThickness}
             textDecorationColor={textDecorationColor}
             textDecorationSkipInk={textDecorationSkipInk}
-            onTextDecorationChange={onTextDecorationChange}
+            onTextDecorationLineChange={onTextDecorationLineChange}
             onTextDecorationStyleChange={onTextDecorationStyleChange}
             onTextDecorationThicknessChange={onTextDecorationThicknessChange}
             onTextDecorationColorChange={onTextDecorationColorChange}

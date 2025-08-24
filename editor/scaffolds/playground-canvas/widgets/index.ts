@@ -97,7 +97,7 @@ export namespace prototypes {
     textAlignVertical: "top",
     lineHeight: 1.5,
     letterSpacing: 0,
-    textDecoration: "none",
+    textDecorationLine: "none",
   } satisfies grida.program.nodes.NodePrototype;
 
   export const image = {
@@ -177,7 +177,7 @@ export namespace prototypes {
         textAlignVertical: "center",
         lineHeight: 1.5,
         letterSpacing: 0,
-        textDecoration: "none",
+        textDecorationLine: "none",
       },
     ],
   } satisfies grida.program.nodes.NodePrototype;
