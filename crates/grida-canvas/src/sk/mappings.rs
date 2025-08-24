@@ -61,6 +61,7 @@ impl From<TextDecorationStyle> for skia_safe::textlayout::TextDecorationStyle {
             TextDecorationStyle::Double => skia_safe::textlayout::TextDecorationStyle::Double,
             TextDecorationStyle::Dotted => skia_safe::textlayout::TextDecorationStyle::Dotted,
             TextDecorationStyle::Dashed => skia_safe::textlayout::TextDecorationStyle::Dashed,
+            TextDecorationStyle::Wavy => skia_safe::textlayout::TextDecorationStyle::Wavy,
         }
     }
 }

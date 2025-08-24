@@ -350,6 +350,8 @@ pub enum TextDecorationStyle {
     Dotted,
     #[serde(rename = "dashed")]
     Dashed,
+    #[serde(rename = "wavy")]
+    Wavy,
 }
 
 impl Default for TextDecorationStyle {
