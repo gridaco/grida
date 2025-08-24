@@ -32,7 +32,12 @@ const PANGRAM_EN = "The Quick Brown Fox Jumps Over The Lazy Dog";
 
 type VerticalTrim = "all" | "disable-all";
 
-type PropertyKey = "alignment" | "decoration" | "case" | "decorationStyle";
+type PropertyKey =
+  | "textAlign"
+  | "textDecorationLine"
+  | "textTransform"
+  | "textDecorationStyle"
+  | "textDecorationSkipInk";
 
 type HoverPreview = {
   key: PropertyKey;
@@ -40,7 +45,8 @@ type HoverPreview = {
     | cg.TextAlign
     | cg.TextDecorationLine
     | cg.TextTransform
-    | cg.TextDecorationStyle;
+    | cg.TextDecorationStyle
+    | cg.TextDecorationSkipInkFlag;
 } | null;
 
 interface ParagraphPreviewProps {
@@ -273,6 +279,7 @@ interface DecorationDetailsProps {
       | cg.TextDecorationLine
       | cg.TextTransform
       | cg.TextDecorationStyle
+      | cg.TextDecorationSkipInkFlag
   ) => void;
   onHoverLeave?: () => void;
 }
@@ -319,7 +326,10 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
           onValueChange={onTextDecorationStyleChange}
           onValueSeeked={(value) =>
             value
-              ? onHover?.("decorationStyle", value as cg.TextDecorationStyle)
+              ? onHover?.(
+                  "textDecorationStyle",
+                  value as cg.TextDecorationStyle
+                )
               : onHoverLeave?.()
           }
         />
@@ -335,6 +345,11 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
           size="sm"
           disabled={!isUnderline}
           onValueChange={handleSkipInkToggleChange}
+          onValueSeeked={(value) =>
+            value
+              ? onHover?.("textDecorationSkipInk", value === "auto")
+              : onHoverLeave?.()
+          }
         />
       </PropertyLine>
 
@@ -432,10 +447,10 @@ const getTextStyle = (
   const style: React.CSSProperties = {};
 
   switch (hoverPreview.key) {
-    case "alignment":
+    case "textAlign":
       style.textAlign = hoverPreview.value as cg.TextAlign;
       break;
-    case "decoration":
+    case "textDecorationLine":
       switch (hoverPreview.value as cg.TextDecorationLine) {
         case "underline":
           style.textDecorationLine = "underline";
@@ -451,12 +466,18 @@ const getTextStyle = (
           break;
       }
       break;
-    case "decorationStyle":
+    case "textDecorationStyle":
       // For decoration style preview, we need to combine with existing decoration
       style.textDecorationLine = "underline";
       style.textDecorationStyle = hoverPreview.value as cg.TextDecorationStyle;
       break;
-    case "case":
+    case "textDecorationSkipInk":
+      // For skip ink preview, we need to combine with existing decoration
+      style.textDecorationLine = "underline";
+      style.textDecorationSkipInk =
+        (hoverPreview.value as cg.TextDecorationSkipInkFlag) ? "auto" : "none";
+      break;
+    case "textTransform":
       switch (hoverPreview.value as cg.TextTransform) {
         case "uppercase":
           style.textTransform = "uppercase";
@@ -517,6 +538,7 @@ export function TextDetails({
       | cg.TextDecorationLine
       | cg.TextTransform
       | cg.TextDecorationStyle
+      | cg.TextDecorationSkipInkFlag
   ) => {
     setHoverPreview({ key, value });
   };
@@ -569,7 +591,7 @@ export function TextDetails({
                   onValueChange={onTextAlignChange}
                   onValueSeeked={(value) =>
                     value
-                      ? handleHover("alignment", value as cg.TextAlign)
+                      ? handleHover("textAlign", value as cg.TextAlign)
                       : handleHoverLeave()
                   }
                 />
@@ -591,7 +613,7 @@ export function TextDetails({
                   onValueSeeked={(value) =>
                     value
                       ? handleHover(
-                          "decoration",
+                          "textDecorationLine",
                           value as cg.TextDecorationLine
                         )
                       : handleHoverLeave()
@@ -641,7 +663,7 @@ export function TextDetails({
                   onValueChange={onTextTransformChange}
                   onValueSeeked={(value) =>
                     value
-                      ? handleHover("case", value as cg.TextTransform)
+                      ? handleHover("textTransform", value as cg.TextTransform)
                       : handleHoverLeave()
                   }
                 />
