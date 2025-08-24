@@ -236,7 +236,7 @@ export namespace cg {
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-color
    */
-  export type TextDecorationColor = "currentcolor" | cg.SolidPaint;
+  export type TextDecorationColor = "currentcolor" | cg.RGBA8888;
   export type TextDecorationColorValue = cg.RGBA8888;
 
   /**

@@ -1324,11 +1324,21 @@ function SectionText({ node_id }: { node_id: string }) {
                 fontWeight={fontWeight}
                 textAlign={textAlign}
                 textDecoration={textDecoration}
+                textDecorationStyle={textDecorationStyle ?? undefined}
+                textDecorationThickness={textDecorationThickness ?? undefined}
+                textDecorationColor={textDecorationColor ?? undefined}
+                textDecorationSkipInk={textDecorationSkipInk ?? undefined}
                 textTransform={textTransform}
                 maxLines={maxLines}
                 onTextTransformChange={actions.textTransform}
                 onTextAlignChange={actions.textAlign}
                 onTextDecorationChange={actions.textDecoration}
+                onTextDecorationStyleChange={actions.textDecorationStyle}
+                onTextDecorationThicknessChange={
+                  actions.textDecorationThickness
+                }
+                onTextDecorationColorChange={actions.textDecorationColor}
+                onTextDecorationSkipInkChange={actions.textDecorationSkipInk}
                 onMaxLinesChange={actions.maxLines}
                 onFontWeightChange={(value) =>
                   actions.fontWeight(value as cg.NFontWeight)

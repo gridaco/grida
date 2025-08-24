@@ -1656,6 +1656,22 @@ export namespace editor.api {
       node_id: NodeID,
       textDecoration: cg.TextDecoration
     ): void;
+    changeTextNodeTextDecorationStyle(
+      node_id: NodeID,
+      textDecorationStyle: cg.TextDecorationStyle
+    ): void;
+    changeTextNodeTextDecorationThickness(
+      node_id: NodeID,
+      textDecorationThickness: cg.TextDecorationThicknessPercentage
+    ): void;
+    changeTextNodeTextDecorationColor(
+      node_id: NodeID,
+      textDecorationColor: cg.TextDecorationColor
+    ): void;
+    changeTextNodeTextDecorationSkipInk(
+      node_id: NodeID,
+      textDecorationSkipInk: cg.TextDecorationSkipInkFlag
+    ): void;
     changeTextNodeLineHeight(
       node_id: NodeID,
       lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>

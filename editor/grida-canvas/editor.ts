@@ -1810,6 +1810,53 @@ export class Editor
     });
   }
 
+  changeTextNodeTextDecorationStyle(
+    node_id: string,
+    textDecorationStyle: cg.TextDecorationStyle
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationStyle,
+    });
+  }
+
+  changeTextNodeTextDecorationThickness(
+    node_id: string,
+    textDecorationThickness: cg.TextDecorationThicknessPercentage
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationThickness,
+    });
+  }
+
+  changeTextNodeTextDecorationColor(
+    node_id: string,
+    textDecorationColor: cg.TextDecorationColor
+  ) {
+    const value =
+      textDecorationColor === "currentcolor" ? null : textDecorationColor;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationColor: value,
+    });
+  }
+
+  changeTextNodeTextDecorationSkipInk(
+    node_id: string,
+    textDecorationSkipInk: cg.TextDecorationSkipInkFlag
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationSkipInk,
+    });
+  }
+
   changeTextNodeLineHeight(
     node_id: string,
     lineHeight: editor.api.NumberChange

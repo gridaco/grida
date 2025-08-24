@@ -206,6 +206,14 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeTextTransform(node_id, value),
       textDecoration: (value: cg.TextDecoration) =>
         instance.changeTextNodeTextDecoration(node_id, value),
+      textDecorationStyle: (value: cg.TextDecorationStyle) =>
+        instance.changeTextNodeTextDecorationStyle(node_id, value),
+      textDecorationThickness: (value: cg.TextDecorationThicknessPercentage) =>
+        instance.changeTextNodeTextDecorationThickness(node_id, value),
+      textDecorationColor: (value: cg.TextDecorationColor) =>
+        instance.changeTextNodeTextDecorationColor(node_id, value),
+      textDecorationSkipInk: (value: cg.TextDecorationSkipInkFlag) =>
+        instance.changeTextNodeTextDecorationSkipInk(node_id, value),
       lineHeight: (change: editor.api.NumberChange) =>
         instance.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (

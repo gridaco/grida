@@ -4,6 +4,7 @@ import { Slider } from "../utils/slider";
 import { Separator } from "@/components/ui/separator";
 import { PropertyLine, PropertyLineLabel, PropertyEnumToggle } from "../../ui";
 import InputPropertyNumber from "../../ui/number";
+import { RGBAColorControl } from "../color";
 import {
   TextAlignLeftIcon,
   TextAlignCenterIcon,
@@ -16,6 +17,7 @@ import {
   MinusIcon,
   OverlineIcon,
   StrikethroughIcon,
+  DotFilledIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
 
@@ -25,11 +27,15 @@ const PANGRAM_EN = "The Quick Brown Fox Jumps Over The Lazy Dog";
 
 type VerticalTrim = "all" | "disable-all";
 
-type PropertyKey = "alignment" | "decoration" | "case";
+type PropertyKey = "alignment" | "decoration" | "case" | "decorationStyle";
 
 type HoverPreview = {
   key: PropertyKey;
-  value: cg.TextAlign | cg.TextDecoration | cg.TextTransform;
+  value:
+    | cg.TextAlign
+    | cg.TextDecoration
+    | cg.TextTransform
+    | cg.TextDecorationStyle;
 } | null;
 
 interface ParagraphPreviewProps {
@@ -120,10 +126,219 @@ const TRUNCATE_OPTIONS = [
   { value: "on", label: "On" },
 ];
 
+// Decoration Style options
+const DECORATION_STYLE_OPTIONS = [
+  {
+    value: "solid" as cg.TextDecorationStyle,
+    icon: <MinusIcon className="size-3" />,
+    label: "Solid",
+  },
+  {
+    value: "double" as cg.TextDecorationStyle,
+    icon: (
+      <div className="flex flex-col gap-0.5">
+        <MinusIcon className="size-3" />
+        <MinusIcon className="size-3" />
+      </div>
+    ),
+    label: "Double",
+  },
+  {
+    value: "dotted" as cg.TextDecorationStyle,
+    icon: (
+      <div className="flex gap-0.5">
+        <DotFilledIcon className="size-2" />
+        <DotFilledIcon className="size-2" />
+        <DotFilledIcon className="size-2" />
+      </div>
+    ),
+    label: "Dotted",
+  },
+  {
+    value: "dashed" as cg.TextDecorationStyle,
+    icon: (
+      <div className="flex gap-0.5">
+        <MinusIcon className="size-2" />
+        <MinusIcon className="size-2" />
+        <MinusIcon className="size-2" />
+      </div>
+    ),
+    label: "Dashed",
+  },
+  {
+    value: "wavy" as cg.TextDecorationStyle,
+    icon: (
+      <div className="flex items-center">
+        <svg className="size-3" viewBox="0 0 12 12" fill="currentColor">
+          <path
+            d="M1 6C1.5 5 2.5 5 3 6C3.5 7 4.5 7 5 6C5.5 5 6.5 5 7 6C7.5 7 8.5 7 9 6C9.5 5 10.5 5 11 6"
+            stroke="currentColor"
+            strokeWidth="1"
+            fill="none"
+          />
+        </svg>
+      </div>
+    ),
+    label: "Wavy",
+  },
+];
+
+// Skip Ink options
+const SKIP_INK_OPTIONS = [
+  { value: "auto" as cg.TextDecorationSkipInk, label: "Auto" },
+  { value: "none" as cg.TextDecorationSkipInk, label: "None" },
+];
+
+interface DecorationDetailsProps {
+  // Properties
+  textDecoration?: cg.TextDecoration;
+  textDecorationStyle?: cg.TextDecorationStyle;
+  textDecorationThickness?: cg.TextDecorationThicknessPercentage;
+  textDecorationColor?: cg.TextDecorationColorValue;
+  textDecorationSkipInk?: cg.TextDecorationSkipInkFlag;
+
+  // Change handlers
+  onTextDecorationChange?: (value: cg.TextDecoration) => void;
+  onTextDecorationStyleChange?: (value: cg.TextDecorationStyle) => void;
+  onTextDecorationThicknessChange?: (
+    value: cg.TextDecorationThicknessPercentage
+  ) => void;
+  onTextDecorationColorChange?: (value: cg.TextDecorationColorValue) => void;
+  onTextDecorationSkipInkChange?: (value: cg.TextDecorationSkipInkFlag) => void;
+}
+
+function DecorationDetails(props: DecorationDetailsProps = {}) {
+  const {
+    // Properties
+    textDecoration = "none",
+    textDecorationStyle = "solid",
+    textDecorationThickness = "auto",
+    textDecorationColor = { r: 0, g: 0, b: 0, a: 1 },
+    textDecorationSkipInk = true,
+
+    // Change handlers
+    onTextDecorationChange,
+    onTextDecorationStyleChange,
+    onTextDecorationThicknessChange,
+    onTextDecorationColorChange,
+    onTextDecorationSkipInkChange,
+  } = props;
+
+  const handleSkipInkToggleChange = (value: string) => {
+    const isEnabled = value === "auto";
+    onTextDecorationSkipInkChange?.(isEnabled);
+  };
+
+  const isUnderline = textDecoration === "underline";
+  const isDecorationActive = textDecoration !== "none";
+
+  return (
+    <div className="space-y-3">
+      {/* Decoration Type */}
+      <div className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Decoration</PropertyLineLabel>
+          <PropertyEnumToggle
+            enum={DECORATION_OPTIONS}
+            value={textDecoration}
+            className="w-full"
+            size="sm"
+            onValueChange={onTextDecorationChange}
+          />
+        </PropertyLine>
+      </div>
+
+      {/* Style */}
+      <div className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Style</PropertyLineLabel>
+          <PropertyEnumToggle
+            enum={DECORATION_STYLE_OPTIONS}
+            value={textDecorationStyle}
+            className="w-full"
+            size="sm"
+            disabled={!isDecorationActive}
+            onValueChange={onTextDecorationStyleChange}
+          />
+        </PropertyLine>
+      </div>
+
+      {/* Thickness */}
+      <PropertyLine className="flex-col items-start space-y-2">
+        <div className="flex items-center justify-between w-full">
+          <PropertyLineLabel>Thickness</PropertyLineLabel>
+          <InputPropertyNumber
+            mode="fixed"
+            value={
+              typeof textDecorationThickness === "number"
+                ? textDecorationThickness
+                : undefined
+            }
+            onValueCommit={onTextDecorationThicknessChange}
+            min={0.1}
+            max={5}
+            step={0.1}
+            placeholder="auto"
+            className="w-16"
+            disabled={!isUnderline}
+          />
+        </div>
+        <div className="w-full">
+          <Slider
+            value={[
+              typeof textDecorationThickness === "number"
+                ? textDecorationThickness
+                : 1,
+            ]}
+            max={5}
+            min={0.1}
+            step={0.1}
+            className="w-full"
+            disabled={!isUnderline}
+            onValueChange={(values) =>
+              onTextDecorationThicknessChange?.(values[0])
+            }
+          />
+        </div>
+      </PropertyLine>
+
+      {/* Skip Ink */}
+      <div className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Skip Ink</PropertyLineLabel>
+          <PropertyEnumToggle
+            enum={SKIP_INK_OPTIONS}
+            value={textDecorationSkipInk ? "auto" : "none"}
+            className="w-full"
+            size="sm"
+            disabled={!isUnderline}
+            onValueChange={handleSkipInkToggleChange}
+          />
+        </PropertyLine>
+      </div>
+
+      {/* Color */}
+      <div className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Color</PropertyLineLabel>
+          <RGBAColorControl
+            value={textDecorationColor}
+            onValueChange={onTextDecorationColorChange}
+          />
+        </PropertyLine>
+      </div>
+    </div>
+  );
+}
+
 interface TextDetailsProps {
   // Properties
   textAlign?: cg.TextAlign;
   textDecoration?: cg.TextDecoration;
+  textDecorationStyle?: cg.TextDecorationStyle;
+  textDecorationThickness?: cg.TextDecorationThicknessPercentage;
+  textDecorationColor?: cg.TextDecorationColorValue;
+  textDecorationSkipInk?: cg.TextDecorationSkipInkFlag;
   textTransform?: cg.TextTransform;
   maxLines?: number | null;
   verticalTrim?: VerticalTrim;
@@ -134,6 +349,12 @@ interface TextDetailsProps {
   // Change handlers
   onTextAlignChange?: (value: cg.TextAlign) => void;
   onTextDecorationChange?: (value: cg.TextDecoration) => void;
+  onTextDecorationStyleChange?: (value: cg.TextDecorationStyle) => void;
+  onTextDecorationThicknessChange?: (
+    value: cg.TextDecorationThicknessPercentage
+  ) => void;
+  onTextDecorationColorChange?: (value: cg.TextDecorationColorValue) => void;
+  onTextDecorationSkipInkChange?: (value: cg.TextDecorationSkipInkFlag) => void;
   onTextTransformChange?: (value: cg.TextTransform) => void;
   onMaxLinesChange?: (value: number) => void;
   onVerticalTrimChange?: (value: VerticalTrim) => void;
@@ -162,6 +383,10 @@ const getTextStyle = (
           style.textDecoration = "none";
           break;
       }
+      break;
+    case "decorationStyle":
+      // For decoration style preview, we need to combine with existing decoration
+      style.textDecorationStyle = hoverPreview.value as cg.TextDecorationStyle;
       break;
     case "case":
       switch (hoverPreview.value as cg.TextTransform) {
@@ -201,34 +426,44 @@ function ParagraphPreview({ hoverPreview }: ParagraphPreviewProps) {
   );
 }
 
-export function TextDetails(props: TextDetailsProps = {}) {
-  const {
-    // Properties
-    textAlign = "left",
-    textDecoration = "none",
-    textTransform = "none",
-    verticalTrim = "all",
-    truncate = false,
-    maxLines = 1,
-    slant = 0,
-    fontWeight = 400,
+export function TextDetails({
+  // Properties
+  textAlign = "left",
+  textDecoration = "none",
+  textDecorationStyle = "solid",
+  textDecorationThickness = "auto",
+  textDecorationColor = { r: 0, g: 0, b: 0, a: 1 },
+  textDecorationSkipInk = true,
+  textTransform = "none",
+  verticalTrim = "all",
+  truncate = false,
+  maxLines = 1,
+  slant = 0,
+  fontWeight = 400,
 
-    // Change handlers
-    onTextAlignChange,
-    onTextDecorationChange,
-    onTextTransformChange,
-    onVerticalTrimChange,
-    onTruncateChange,
-    onMaxLinesChange,
-    onSlantChange,
-    onFontWeightChange,
-  } = props;
-
+  // Change handlers
+  onTextAlignChange,
+  onTextDecorationChange,
+  onTextDecorationStyleChange,
+  onTextDecorationThicknessChange,
+  onTextDecorationColorChange,
+  onTextDecorationSkipInkChange,
+  onTextTransformChange,
+  onVerticalTrimChange,
+  onTruncateChange,
+  onMaxLinesChange,
+  onSlantChange,
+  onFontWeightChange,
+}: TextDetailsProps) {
   const [hoverPreview, setHoverPreview] = useState<HoverPreview>(null);
 
   const handleHover = (
     key: PropertyKey,
-    value: cg.TextAlign | cg.TextDecoration | cg.TextTransform
+    value:
+      | cg.TextAlign
+      | cg.TextDecoration
+      | cg.TextTransform
+      | cg.TextDecorationStyle
   ) => {
     setHoverPreview({ key, value });
   };
@@ -248,6 +483,9 @@ export function TextDetails(props: TextDetailsProps = {}) {
         <TabsList className="w-full h-7 my-1">
           <TabsTrigger value="basics" className="text-xs">
             Basics
+          </TabsTrigger>
+          <TabsTrigger value="decoration" className="text-xs">
+            Decoration
           </TabsTrigger>
           <TabsTrigger value="details" className="text-xs" disabled>
             Details
@@ -361,6 +599,22 @@ export function TextDetails(props: TextDetailsProps = {}) {
               />
             </PropertyLine>
           )}
+        </TabsContent>
+
+        {/* Decoration Tab */}
+        <TabsContent value="decoration" className="mt-3 px-2">
+          <DecorationDetails
+            textDecoration={textDecoration}
+            textDecorationStyle={textDecorationStyle}
+            textDecorationThickness={textDecorationThickness}
+            textDecorationColor={textDecorationColor}
+            textDecorationSkipInk={textDecorationSkipInk}
+            onTextDecorationChange={onTextDecorationChange}
+            onTextDecorationStyleChange={onTextDecorationStyleChange}
+            onTextDecorationThicknessChange={onTextDecorationThicknessChange}
+            onTextDecorationColorChange={onTextDecorationColorChange}
+            onTextDecorationSkipInkChange={onTextDecorationSkipInkChange}
+          />
         </TabsContent>
 
         {/* Details Tab - Disabled for now */}
