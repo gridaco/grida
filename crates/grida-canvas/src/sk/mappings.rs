@@ -85,6 +85,7 @@ impl From<Decoration> for skia_safe::textlayout::Decoration {
             // Gaps: decoration skips over descenders (g, p, q, etc.)
             // Through: decoration goes through all characters including descenders
             // FIXME: the `Gaps` mode will make non-skipping underlines to completely not draw the underline.
+            // see https://github.com/rust-skia/rust-skia/issues/1187
             // this might be a bug with skia-safe
             mode: skia_safe::textlayout::TextDecorationMode::Through,
             // mode: if decoration.text_decoration_skip_ink {
