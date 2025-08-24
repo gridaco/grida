@@ -131,6 +131,7 @@ export function useNodeActions(node_id: string | undefined) {
       toggleActive: () => instance.toggleNodeActive(node_id),
       toggleBold: () => instance.toggleNodeBold(node_id),
       toggleUnderline: () => instance.toggleNodeUnderline(node_id),
+      toggleLineThrough: () => instance.toggleNodeLineThrough(node_id),
       component: (component_id: string) =>
         instance.changeNodeComponent(node_id, component_id),
       text: (text: tokens.StringValueExpression | null) =>

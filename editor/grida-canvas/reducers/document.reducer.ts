@@ -7,6 +7,7 @@ import type {
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
   NodeToggleUnderlineAction,
+  NodeToggleLineThroughAction,
   EditorSelectGradientStopAction,
   EditorVectorBendOrClearCornerAction,
   EditorVariableWidthSelectStopAction,
@@ -1557,6 +1558,18 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
         const isUnderline = node.textDecorationLine === "underline";
         node.textDecorationLine = isUnderline ? "none" : "underline";
+      });
+      //
+    }
+    case "node/toggle/line-through": {
+      return produce(state, (draft) => {
+        const { node_id } = <NodeToggleLineThroughAction>action;
+        const node = dq.__getNodeById(draft, node_id);
+        assert(node, `node not found with node_id: "${node_id}"`);
+        if (node.type !== "text") return;
+
+        const isLineThrough = node.textDecorationLine === "line-through";
+        node.textDecorationLine = isLineThrough ? "none" : "line-through";
       });
       //
     }

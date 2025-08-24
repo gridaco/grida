@@ -68,6 +68,11 @@ export const keybindings_sheet = [
     keys: ["meta+b"],
   },
   {
+    name: "toggle line-through",
+    description: "Toggle line-through style",
+    keys: ["meta+shift+x"],
+  },
+  {
     name: "toggle active",
     description: "Toggle active state for the selection",
     keys: ["meta+shift+h"],
@@ -695,6 +700,10 @@ export function useEditorHotKeys() {
 
   useHotkeys("meta+u, ctrl+u", () => {
     editor.toggleUnderline("selection");
+  });
+
+  useHotkeys("meta+shift+x, ctrl+shift+x", () => {
+    editor.toggleLineThrough("selection");
   });
 
   useHotkeys("shift+r", () => {
