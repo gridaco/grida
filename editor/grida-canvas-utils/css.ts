@@ -240,6 +240,11 @@ export namespace css {
     | "textAlign"
     | "alignContent"
     | "textDecoration"
+    | "textDecorationLine"
+    | "textDecorationStyle"
+    | "textDecorationThickness"
+    | "textDecorationColor"
+    | "textDecorationSkipInk"
     | "fontFamily"
     | "fontSize"
     | "fontWeight"
@@ -264,7 +269,7 @@ export namespace css {
       alignContent: textAlignVertical
         ? text_align_vertical_to_css_align_content[textAlignVertical]
         : undefined,
-      textDecoration: textDecorationLine,
+      textDecorationLine: textDecorationLine,
       fontFamily: fontFamily,
       lineHeight: lineHeight ?? "normal",
       letterSpacing: letterSpacing,

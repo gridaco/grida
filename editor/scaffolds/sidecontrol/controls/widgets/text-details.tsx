@@ -1,5 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Slider } from "../utils/slider";
 import { Separator } from "@/components/ui/separator";
 import { PropertyLine, PropertyLineLabel, PropertyEnumToggle } from "../../ui";
@@ -238,6 +243,17 @@ interface DecorationDetailsProps {
   ) => void;
   onTextDecorationColorChange?: (value: cg.TextDecorationColorValue) => void;
   onTextDecorationSkipInkChange?: (value: cg.TextDecorationSkipInkFlag) => void;
+
+  // Hover handlers
+  onHover?: (
+    key: PropertyKey,
+    value:
+      | cg.TextAlign
+      | cg.TextDecorationLine
+      | cg.TextTransform
+      | cg.TextDecorationStyle
+  ) => void;
+  onHoverLeave?: () => void;
 }
 
 function DecorationDetails(props: DecorationDetailsProps = {}) {
@@ -255,6 +271,10 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
     onTextDecorationThicknessChange,
     onTextDecorationColorChange,
     onTextDecorationSkipInkChange,
+
+    // Hover handlers
+    onHover,
+    onHoverLeave,
   } = props;
 
   const handleSkipInkToggleChange = (value: string) => {
@@ -265,67 +285,8 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
   const isUnderline = textDecorationLine === "underline";
   const isDecorationActive = textDecorationLine !== "none";
 
-  // Generate preview styles based on current decoration settings
-  const getDecorationPreviewStyle = (): React.CSSProperties => {
-    if (!isDecorationActive) return {};
-
-    const style: React.CSSProperties = {};
-
-    // Set text decoration
-    switch (textDecorationLine) {
-      case "underline":
-        style.textDecorationLine = "underline";
-        break;
-      case "overline":
-        style.textDecorationLine = "overline";
-        break;
-      case "line-through":
-        style.textDecorationLine = "line-through";
-        break;
-    }
-
-    // Set decoration style
-    if (textDecorationStyle !== "solid") {
-      style.textDecorationStyle = textDecorationStyle;
-    }
-
-    // Set decoration color
-    if (textDecorationColor && textDecorationColor.r !== 0) {
-      style.textDecorationColor = `rgba(${textDecorationColor.r}, ${textDecorationColor.g}, ${textDecorationColor.b}, ${textDecorationColor.a})`;
-    }
-
-    // Set decoration thickness (only for underline)
-    if (isUnderline && typeof textDecorationThickness === "number") {
-      style.textDecorationThickness = `${textDecorationThickness}px`;
-    }
-
-    // Set skip ink (only for underline)
-    if (isUnderline) {
-      style.textDecorationSkipInk = textDecorationSkipInk ? "auto" : "none";
-    }
-
-    return style;
-  };
-
   return (
     <div className="space-y-3">
-      {/* Preview */}
-      <Preview style={getDecorationPreviewStyle()} />
-
-      {/* Decoration Type */}
-      <div className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Decoration</PropertyLineLabel>
-          <PropertyEnumToggle
-            enum={DECORATION_OPTIONS}
-            value={textDecorationLine}
-            className="w-full"
-            size="sm"
-            onValueChange={onTextDecorationLineChange}
-          />
-        </PropertyLine>
-      </div>
-
       {/* Style */}
       <div className="space-y-2">
         <PropertyLine>
@@ -337,6 +298,11 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
             size="sm"
             disabled={!isDecorationActive}
             onValueChange={onTextDecorationStyleChange}
+            onValueSeeked={(value) =>
+              value
+                ? onHover?.("decorationStyle", value as cg.TextDecorationStyle)
+                : onHoverLeave?.()
+            }
           />
         </PropertyLine>
       </div>
@@ -455,15 +421,22 @@ const getTextStyle = (
     case "decoration":
       switch (hoverPreview.value as cg.TextDecorationLine) {
         case "underline":
-          style.textDecoration = "underline";
+          style.textDecorationLine = "underline";
+          break;
+        case "overline":
+          style.textDecorationLine = "overline";
+          break;
+        case "line-through":
+          style.textDecorationLine = "line-through";
           break;
         case "none":
-          style.textDecoration = "none";
+          style.textDecorationLine = "none";
           break;
       }
       break;
     case "decorationStyle":
       // For decoration style preview, we need to combine with existing decoration
+      style.textDecorationLine = "underline";
       style.textDecorationStyle = hoverPreview.value as cg.TextDecorationStyle;
       break;
     case "case":
@@ -545,9 +518,6 @@ export function TextDetails({
           <TabsTrigger value="basics" className="text-xs">
             Basics
           </TabsTrigger>
-          <TabsTrigger value="decoration" className="text-xs">
-            Decoration
-          </TabsTrigger>
           <TabsTrigger value="details" className="text-xs" disabled>
             Details
           </TabsTrigger>
@@ -598,6 +568,31 @@ export function TextDetails({
               />
             </PropertyLine>
           </div>
+
+          {/* Decoration Details - Collapsible */}
+          <Collapsible>
+            <CollapsibleTrigger className="w-full text-left text-xs text-muted-foreground hover:text-foreground transition-colors">
+              Decoration Details
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 mt-2">
+              <DecorationDetails
+                textDecorationLine={textDecorationLine}
+                textDecorationStyle={textDecorationStyle}
+                textDecorationThickness={textDecorationThickness}
+                textDecorationColor={textDecorationColor}
+                textDecorationSkipInk={textDecorationSkipInk}
+                onTextDecorationLineChange={onTextDecorationLineChange}
+                onTextDecorationStyleChange={onTextDecorationStyleChange}
+                onTextDecorationThicknessChange={
+                  onTextDecorationThicknessChange
+                }
+                onTextDecorationColorChange={onTextDecorationColorChange}
+                onTextDecorationSkipInkChange={onTextDecorationSkipInkChange}
+                onHover={handleHover}
+                onHoverLeave={handleHoverLeave}
+              />
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Case (Text Transform) */}
           <div className="space-y-2">
@@ -660,22 +655,6 @@ export function TextDetails({
               />
             </PropertyLine>
           )}
-        </TabsContent>
-
-        {/* Decoration Tab */}
-        <TabsContent value="decoration" className="mt-3 px-2">
-          <DecorationDetails
-            textDecorationLine={textDecorationLine}
-            textDecorationStyle={textDecorationStyle}
-            textDecorationThickness={textDecorationThickness}
-            textDecorationColor={textDecorationColor}
-            textDecorationSkipInk={textDecorationSkipInk}
-            onTextDecorationLineChange={onTextDecorationLineChange}
-            onTextDecorationStyleChange={onTextDecorationStyleChange}
-            onTextDecorationThicknessChange={onTextDecorationThicknessChange}
-            onTextDecorationColorChange={onTextDecorationColorChange}
-            onTextDecorationSkipInkChange={onTextDecorationSkipInkChange}
-          />
         </TabsContent>
 
         {/* Details Tab - Disabled for now */}

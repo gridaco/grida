@@ -204,7 +204,7 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeTextAlignVertical(node_id, value),
       textTransform: (value: cg.TextTransform) =>
         instance.changeTextNodeTextTransform(node_id, value),
-      textDecoration: (value: cg.TextDecorationLine) =>
+      textDecorationLine: (value: cg.TextDecorationLine) =>
         instance.changeTextNodeTextDecorationLine(node_id, value),
       textDecorationStyle: (value: cg.TextDecorationStyle) =>
         instance.changeTextNodeTextDecorationStyle(node_id, value),
