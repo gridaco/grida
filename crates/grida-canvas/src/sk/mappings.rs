@@ -76,3 +76,25 @@ impl From<TextAlign> for skia_safe::textlayout::TextAlign {
         }
     }
 }
+
+impl From<Decoration> for skia_safe::textlayout::Decoration {
+    fn from(decoration: Decoration) -> Self {
+        skia_safe::textlayout::Decoration {
+            ty: decoration.text_decoration.into(),
+            // Set the decoration mode based on skip_ink setting
+            // Gaps: decoration skips over descenders (g, p, q, etc.)
+            // Through: decoration goes through all characters including descenders
+            // FIXME: the `Gaps` mode will make non-skipping underlines to completely not draw the underline.
+            // this might be a bug with skia-safe
+            mode: skia_safe::textlayout::TextDecorationMode::Through,
+            // mode: if decoration.text_decoration_skip_ink {
+            //     skia_safe::textlayout::TextDecorationMode::Gaps
+            // } else {
+            //     skia_safe::textlayout::TextDecorationMode::Through
+            // },
+            color: decoration.text_decoration_color.into(),
+            style: decoration.text_decoration_style.into(),
+            thickness_multiplier: decoration.text_decoration_thinkness,
+        }
+    }
+}

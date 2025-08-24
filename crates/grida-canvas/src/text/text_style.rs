@@ -1,35 +1,20 @@
 use crate::cg::types::*;
 use skia_safe;
 
-fn decoration(style: &TextStyle) -> skia_safe::textlayout::Decoration {
-    let color: skia_safe::Color = style
-        .text_decoration_color
-        .unwrap_or(
-            // TODO: get the color args
-            CGColor::BLACK,
-        )
-        .into();
-
-    let mode = if style.text_decoration_skip_ink.unwrap_or(true) {
-        skia_safe::textlayout::TextDecorationMode::Gaps
-    } else {
-        skia_safe::textlayout::TextDecorationMode::Gaps
-    };
-
-    skia_safe::textlayout::Decoration {
-        ty: style.text_decoration.into(),
-        mode: mode,
-        color: color,
-        style: style.text_decoration_style.unwrap_or_default().into(),
-        thickness_multiplier: style.text_decoration_thinkness.unwrap_or(1.0),
-    }
-}
-
 pub fn textstyle(style: &TextStyle) -> skia_safe::textlayout::TextStyle {
     let mut ts = skia_safe::textlayout::TextStyle::new();
 
     // [decoration]
-    let decor = decoration(style);
+    let decoration = Decoration {
+        text_decoration: style.text_decoration,
+        text_decoration_color: style.text_decoration_color.unwrap_or(CGColor::BLACK),
+        text_decoration_style: style
+            .text_decoration_style
+            .unwrap_or(TextDecorationStyle::Solid),
+        text_decoration_skip_ink: style.text_decoration_skip_ink.unwrap_or(true),
+        text_decoration_thinkness: style.text_decoration_thinkness.unwrap_or(1.0),
+    }
+    .into();
 
     // [font_style]
     let font_style = skia_safe::FontStyle::new(
@@ -60,7 +45,7 @@ pub fn textstyle(style: &TextStyle) -> skia_safe::textlayout::TextStyle {
     if let Some(line_height) = style.line_height {
         ts.set_height(line_height);
     }
-    ts.set_decoration(&decor);
+    ts.set_decoration(&decoration);
     ts.set_font_families(&[&style.font_family]);
     ts.set_font_arguments(&font_args);
     ts.set_font_style(font_style);

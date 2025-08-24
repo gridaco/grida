@@ -43,11 +43,20 @@ impl Into<skia_safe::Point> for CGPoint {
 pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
 impl CGColor {
+    pub const TRANSPARENT: Self = Self(0, 0, 0, 0);
     pub const BLACK: Self = Self(0, 0, 0, 255);
     pub const WHITE: Self = Self(255, 255, 255, 255);
     pub const RED: Self = Self(255, 0, 0, 255);
     pub const GREEN: Self = Self(0, 255, 0, 255);
     pub const BLUE: Self = Self(0, 0, 255, 255);
+
+    pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self(r, g, b, a)
+    }
+
+    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
+        Self(r, g, b, 255)
+    }
 
     pub fn r(&self) -> u8 {
         self.0
@@ -347,6 +356,15 @@ impl Default for TextDecorationStyle {
     fn default() -> Self {
         TextDecorationStyle::Solid
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Decoration {
+    pub text_decoration: TextDecoration,
+    pub text_decoration_color: CGColor,
+    pub text_decoration_style: TextDecorationStyle,
+    pub text_decoration_skip_ink: bool,
+    pub text_decoration_thinkness: f32,
 }
 
 /// Supported horizontal text alignment.
