@@ -173,6 +173,10 @@ export namespace css {
         styles as Partial<grida.program.nodes.i.ITextNodeStyle>;
       const {
         textDecorationLine,
+        textDecorationStyle,
+        textDecorationThickness,
+        textDecorationColor,
+        textDecorationSkipInk,
         fontFamily,
         fontSize,
         fontWeight,
@@ -188,6 +192,10 @@ export namespace css {
           textAlignVertical: textAlignVertical ?? "top",
           // text span style
           textDecorationLine,
+          textDecorationStyle,
+          textDecorationThickness,
+          textDecorationColor,
+          textDecorationSkipInk,
           fontFamily,
           fontSize,
           fontWeight,
@@ -256,6 +264,10 @@ export namespace css {
       textAlign,
       textAlignVertical,
       textDecorationLine,
+      textDecorationStyle,
+      textDecorationThickness,
+      textDecorationColor,
+      textDecorationSkipInk,
       fontFamily,
       fontSize,
       fontWeight,
@@ -270,6 +282,22 @@ export namespace css {
         ? text_align_vertical_to_css_align_content[textAlignVertical]
         : undefined,
       textDecorationLine: textDecorationLine,
+      textDecorationStyle: textDecorationStyle ?? undefined,
+      textDecorationThickness:
+        typeof textDecorationThickness === "number"
+          ? textDecorationThickness
+          : textDecorationThickness === "auto"
+          ? "auto"
+          : undefined,
+      textDecorationColor: textDecorationColor
+        ? toRGBAString(textDecorationColor)
+        : undefined,
+      textDecorationSkipInk:
+        typeof textDecorationSkipInk === "boolean"
+          ? textDecorationSkipInk
+            ? "auto"
+            : "none"
+          : undefined,
       fontFamily: fontFamily,
       lineHeight: lineHeight ?? "normal",
       letterSpacing: letterSpacing,
