@@ -413,7 +413,7 @@ pub struct JSONTextNode {
     pub text_decoration_color: Option<JSONRGBA>,
     #[serde(rename = "textDecorationSkipInk", default)]
     pub text_decoration_skip_ink: Option<bool>,
-    #[serde(rename = "textDecorationThinkness", default)]
+    #[serde(rename = "textDecorationThickness", default)]
     pub text_decoration_thinkness: Option<f32>,
 
     #[serde(rename = "lineHeight", default)]

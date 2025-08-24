@@ -141,7 +141,7 @@ fn main() {
     for (style, label) in styles.iter() {
         let text_style = TextStyleRec {
             text_decoration: TextDecoration::Underline,
-            text_decoration_color: None,
+            text_decoration_color: Some(CGColor::BLACK),
             text_decoration_style: Some(*style),
             text_decoration_skip_ink: None,
             text_decoration_thinkness: None,
@@ -237,7 +237,7 @@ fn main() {
     for (thickness, label) in thicknesses.iter() {
         let text_style = TextStyleRec {
             text_decoration: TextDecoration::Underline,
-            text_decoration_color: None,
+            text_decoration_color: Some(CGColor::BLACK),
             text_decoration_style: None,
             text_decoration_skip_ink: None,
             text_decoration_thinkness: Some(*thickness),
