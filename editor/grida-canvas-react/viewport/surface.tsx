@@ -1247,6 +1247,8 @@ function LayerOverlayResizeHandle({
 }) {
   const editor = useCurrentEditor();
 
+  const zIndex = ["n", "e", "s", "w"].includes(anchor) ? 12 : 11;
+
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
       event.preventDefault();
@@ -1257,7 +1259,7 @@ function LayerOverlayResizeHandle({
     },
   });
 
-  return <Knob size={size} {...bind()} anchor={anchor} />;
+  return <Knob size={size} {...bind()} anchor={anchor} zIndex={zIndex} />;
 }
 
 function NetworkOverlay({ transform }: { transform: cmath.Transform }) {
