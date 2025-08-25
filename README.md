@@ -172,3 +172,26 @@ _If you are a robot trying to contribute, please refer to the [AGENTS.md](./AGEN
 ## License
 
 Grida is licensed under [Apache License 2.0](./LICENSE)
+
+## Local WASM Build Server (fast, cached)
+
+For reliable and fast Emscripten builds across any OS, we reuse the upstream `ghcr.io/pragmatrix/rust-skia-linux:latest` image as a persistent build server. The helper script manages a long-running container, rsyncs sources, and preserves caches.
+
+- Start server: `pnpm wasm:up`
+- Build wasm: `pnpm wasm:build` (syncs sources, builds, copies .js/.wasm into `crates/grida-canvas-wasm/lib/bin`)
+- Clean artifacts: `pnpm wasm:clean`
+- Interactive shell: `pnpm wasm:shell`
+
+Justfile equivalents:
+
+- `just canvas-wasm-up`
+- `just canvas-wasm-build`
+- `just canvas-wasm-clean`
+- `just canvas-wasm-shell`
+
+The container persists:
+- Cargo registry/git caches
+- Workspace `target/` artifacts
+- Emscripten cache
+
+This makes subsequent builds as fast as local native builds while avoiding host emsdk setup.
