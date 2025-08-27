@@ -73,13 +73,18 @@ impl ParagraphCache {
         }
 
         // Build the paragraph (expensive operation)
-        let fill_paint = cvt::sk_paint(
-            fill,
-            1.0,
-            // FIXME: pass the resolved size - using default for now
-            // required for gradients
-            (0.0, 0.0),
-        );
+        // Only resolve a paint when it's a solid color; gradient paints
+        // require the final layout size and are handled during draw.
+        let fill_paint = if matches!(fill, Paint::Solid(_)) {
+            Some(cvt::sk_paint(
+                fill,
+                1.0,
+                // size is not relevant for solid colors
+                (0.0, 0.0),
+            ))
+        } else {
+            None
+        };
         let mut paragraph_style = textlayout::ParagraphStyle::new();
         paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
         paragraph_style.set_text_align(align.clone().into());
@@ -96,7 +101,9 @@ impl ParagraphCache {
         let mut para_builder =
             textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
         let mut ts = textstyle(style, &Some(ctx));
-        ts.set_foreground_paint(&fill_paint);
+        if let Some(ref paint) = fill_paint {
+            ts.set_foreground_paint(paint);
+        }
         para_builder.push_style(&ts);
         let transformed_text =
             crate::text::text_transform::transform_text(text, style.text_transform);

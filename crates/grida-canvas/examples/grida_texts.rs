@@ -24,7 +24,7 @@ async fn demo_texts() -> Scene {
     word_text_node.text = "Grida Canvas".to_string();
     word_text_node.text_style = TextStyleRec {
         text_decoration: None,
-        font_family: "Arial".to_string(),
+        font_family: "Geist".to_string(),
         font_size: 48.0,
         italic: false,                     // TODO: add italic to text style
         font_weight: FontWeight::new(700), // Bold
@@ -36,6 +36,10 @@ async fn demo_texts() -> Scene {
         color: CGColor(255, 255, 255, 255),
         opacity: 1.0,
     }));
+    word_text_node.fill = Paint::LinearGradient(LinearGradientPaint::from_colors(vec![
+        CGColor(255, 255, 255, 255),
+        CGColor(0, 0, 0, 255),
+    ]));
     word_text_node.stroke_width = Some(1.0);
     word_text_node.text_align = TextAlign::Left;
     word_text_node.text_align_vertical = TextAlignVertical::Top;

@@ -429,7 +429,38 @@ impl<'a> Painter<'a> {
             text_align_vertical,
             text_style,
         );
-        paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
+
+        // NOTE: we should be relying on paragraph.paint() to support the decorations.
+        // the current model does not support custom paint + decorations. - the decorations will be supported manually, in the future, after then, we will completely drop the paragraph.paint()
+        // see: https://github.com/gridaco/grida/issues/416
+
+        // If the fill is a gradient, we need the final layout size to resolve
+        // the shader. Measure the laid-out paragraph and draw glyphs manually
+        // with the resolved paint.
+        match fill {
+            Paint::LinearGradient(_)
+            | Paint::RadialGradient(_)
+            | Paint::SweepGradient(_)
+            | Paint::DiamondGradient(_) => {
+                let size = {
+                    let para = paragraph.borrow();
+                    (para.max_width(), para.height())
+                };
+                let paint = cvt::sk_paint(fill, 1.0, size);
+                paragraph.borrow_mut().visit(|_, info| {
+                    if let Some(info) = info {
+                        self.canvas.draw_glyphs_at(
+                            info.glyphs(),
+                            info.positions(),
+                            info.origin(),
+                            info.font(),
+                            &paint,
+                        );
+                    }
+                });
+            }
+            _ => paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0)),
+        }
     }
 
     /// Draw a single [`PainterPictureLayer`].

@@ -776,6 +776,23 @@ pub struct LinearGradientPaint {
     pub opacity: f32,
 }
 
+impl LinearGradientPaint {
+    pub fn from_colors(colors: Vec<CGColor>) -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: colors
+                .iter()
+                .enumerate()
+                .map(|(i, color)| GradientStop {
+                    offset: i as f32 / (colors.len() - 1) as f32,
+                    color: *color,
+                })
+                .collect(),
+            opacity: 1.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RadialGradientPaint {
     /// # Radial Gradient Transform Model
