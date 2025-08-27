@@ -62,7 +62,7 @@ pub struct FontFileInfo {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn load_webfonts_metadata() -> Result<Value, String> {
-    let url = "https://raw.githubusercontent.com/gridaco/google.fonts/refs/heads/main/metadata/webfonts.metadata.json";
+    let url = "https://fonts.grida.co/webfonts.metadata.json";
     let response = reqwest::get(url)
         .await
         .map_err(|e| format!("Failed to fetch webfonts metadata: {}", e))?;

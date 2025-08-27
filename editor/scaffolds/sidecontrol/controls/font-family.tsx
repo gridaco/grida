@@ -34,7 +34,7 @@ function Item({ option, selected }: ItemRendererProps) {
       <CheckIcon
         className={cn("size-4 min-w-4", selected ? "opacity-100" : "opacity-0")}
       />
-      <GoogleFontsPreview fontFamily={option.value} className="h-3" />
+      <GoogleFontsPreview fontFamily={option.value} className="h-5" />
     </>
   );
 }

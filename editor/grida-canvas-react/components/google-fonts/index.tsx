@@ -6,7 +6,7 @@ import * as google from "@grida/fonts/google";
 export function useGoogleFontsList() {
   const [fonts, setFonts] = useState<google.GoogleWebFontListItem[]>([]);
   useEffect(() => {
-    google.fetchGoogleFontsV2().then((r) => setFonts(r.items));
+    google.fetchWebfontList().then((r) => setFonts(r.items));
   }, []);
 
   return fonts;
@@ -93,13 +93,11 @@ export function GoogleFontsPreview({
   fontFamily: string;
   className?: string;
 }) {
-  const id = fontFamily.toLowerCase().replace(/\s+/g, "");
-
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       data-font-family={fontFamily}
-      src={google.svglink(id)}
+      src={google.svglink(google.fontFamilyToId(fontFamily))}
       alt={fontFamily}
       className={cn("dark:invert", className)}
     />

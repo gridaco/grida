@@ -3,13 +3,13 @@
  *
  * @example
  * - fontFamilyToId("Roboto") // "roboto"
- * - fontFamilyToId("Open Sans") // "open-sans"
+ * - fontFamilyToId("Open Sans") // "opensans"
  *
  * @param fontFamily
  * @returns
  */
 export function fontFamilyToId(fontFamily: string) {
-  return fontFamily.toLowerCase().replace(/\s+/g, "-");
+  return fontFamily.toLowerCase().replace(/\s+/g, "");
 }
 
 /**
@@ -18,7 +18,7 @@ export function fontFamilyToId(fontFamily: string) {
  */
 export function csslink({ fontFamily }: { fontFamily: string }) {
   const formattedFamily = fontFamily!.replace(/\s+/g, "+");
-  return `https://fonts.googleapis.com/css2?family=${formattedFamily}:wght@100..900&display=swap`;
+  return `https://fonts.googleapis.com/css2?family=${formattedFamily}`;
 }
 
 export function svglink(id: string) {
@@ -43,8 +43,11 @@ export type GoogleWebFontList = {
   items: GoogleWebFontListItem[];
 };
 
-export async function fetchGoogleFontsV2() {
-  return fetch("https://fonts.grida.co/webfonts.json").then(
+const WEBFONTS_URL = "https://fonts.grida.co/webfonts.json";
+const WEBFONTS_URL_VF = "https://fonts.grida.co/webfonts-vf.json";
+
+export async function fetchWebfontList(vf?: boolean) {
+  return fetch(vf ? WEBFONTS_URL_VF : WEBFONTS_URL).then(
     (r) => r.json() as Promise<GoogleWebFontList>
   );
 }
