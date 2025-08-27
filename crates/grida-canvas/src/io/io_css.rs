@@ -7,7 +7,7 @@
 //!
 //! ```
 //! use serde::Deserialize;
-//! use crate::io::io_css::{CSSDimension, de_css_dimension};
+//! use cg::io::io_css::{CSSDimension, de_css_dimension};
 //!
 //! #[derive(Deserialize)]
 //! struct MyNode {
@@ -41,7 +41,7 @@ impl CSSDimension {
     ///
     /// # Examples
     /// ```
-    /// use crate::io::io_css::CSSDimension;
+    /// use cg::io::io_css::CSSDimension;
     ///
     /// let auto = CSSDimension::Auto;
     /// assert_eq!(auto.length(42.0), 42.0);

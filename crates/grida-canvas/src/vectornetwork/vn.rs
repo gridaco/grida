@@ -172,7 +172,7 @@ impl PiecewiseVectorNetworkGeometry {
     /// # Example
     ///
     /// ```rust
-    /// use grida_canvas::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+    /// use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
     ///
     /// // Valid geometry - will succeed
     /// let geometry = PiecewiseVectorNetworkGeometry::new(
@@ -224,7 +224,7 @@ impl PiecewiseVectorNetworkGeometry {
     /// # Example
     ///
     /// ```rust
-    /// use grida_canvas::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+    /// use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
     ///
     /// let geometry = PiecewiseVectorNetworkGeometry {
     ///     vertices: vec![(0.0, 0.0), (100.0, 0.0), (200.0, 100.0)],
