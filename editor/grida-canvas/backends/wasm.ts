@@ -2,6 +2,7 @@ import cmath from "@grida/cmath";
 import type { editor } from "..";
 import type { Editor } from "../editor";
 import type { Grida2D } from "@grida/canvas-wasm";
+import type vn from "@grida/vn";
 
 export class CanvasWasmGeometryQueryInterfaceProvider
   implements editor.api.IDocumentGeometryInterfaceProvider
@@ -88,5 +89,18 @@ export class CanvasWasmSVGExportInterfaceProvider
     });
     const str = new TextDecoder("utf-8").decode(data.data);
     return str;
+  }
+}
+
+export class CanvasWasmVectorInterfaceProvider
+  implements editor.api.IDocumentVectorInterfaceProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Grida2D
+  ) {}
+
+  toVectorNetwork(node_id: string): vn.VectorNetwork | null {
+    return this.surface.toVectorNetwork(node_id);
   }
 }

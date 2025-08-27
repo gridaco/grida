@@ -1858,6 +1858,15 @@ export namespace editor.api {
     exportNodeAsPDF(node_id: string): Promise<Uint8Array>;
   }
 
+  export interface IDocumentVectorInterfaceProvider {
+    /**
+     * converts the node into a vector network
+     * @param node_id
+     * @returns vector network or null if unsupported
+     */
+    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+  }
+
   export interface IDocumentGeometryQuery {
     /**
      * returns a list of node ids that are intersecting with the point in canvas space
@@ -2138,6 +2147,10 @@ export namespace editor.api {
   export interface IFollowPluginActions {
     follow(cursor_id: string): void;
     unfollow(): void;
+  }
+
+  export interface IVectorInterfaceActions {
+    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
   }
 
   export interface IExportPluginActions {

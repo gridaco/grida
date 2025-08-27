@@ -15,6 +15,7 @@ import { v4 } from "uuid";
 
 export type ReducerContext = {
   geometry: editor.api.IDocumentGeometryQuery;
+  vector?: editor.api.IVectorInterfaceActions;
   viewport: {
     width: number;
     height: number;

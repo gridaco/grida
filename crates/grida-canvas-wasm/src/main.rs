@@ -273,6 +273,30 @@ pub unsafe extern "C" fn export_node_as(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn to_vector_network(
+    app: *mut EmscriptenApplication,
+    id_ptr: *const u8,
+    id_len: usize,
+) -> *const u8 {
+    use serde_json;
+    use std::ffi::CString;
+
+    let (Some(app), Some(id)) = (app.as_mut(), __str_from_ptr_len(id_ptr, id_len)) else {
+        return std::ptr::null();
+    };
+
+    if let Some(vn) = app.to_vector_network(&id) {
+        if let Ok(json) = serde_json::to_string(&vn) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
+    }
+
+    std::ptr::null()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn set_debug(app: *mut EmscriptenApplication, debug: bool) {
     if let Some(app) = app.as_mut() {
         app.set_debug(debug);

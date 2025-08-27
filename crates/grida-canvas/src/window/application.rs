@@ -3,7 +3,8 @@ use crate::devtools::{
 };
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
-use crate::node::schema::Scene;
+use crate::io::io_grida::JSONVectorNetwork;
+use crate::node::schema::*;
 use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
@@ -37,6 +38,7 @@ pub trait ApplicationApi {
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork>;
 
     /// Enable or disable caching of raster tiles.
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool);
@@ -256,6 +258,24 @@ impl ApplicationApi for UnknownTargetApplication {
             return export_node_as(scene, &self.renderer.get_cache().geometry, id, format);
         }
         return None;
+    }
+
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            if let Some(node) = scene.nodes.get(&id.to_string()) {
+                let vn = match node {
+                    Node::Rectangle(n) => Some(n.to_vector_network()),
+                    Node::Ellipse(n) => Some(n.to_vector_network()),
+                    Node::Polygon(n) => Some(n.to_vector_network()),
+                    Node::RegularPolygon(n) => Some(n.to_vector_network()),
+                    Node::RegularStarPolygon(n) => Some(n.to_vector_network()),
+                    Node::Vector(n) => Some(n.network.clone()),
+                    _ => None,
+                };
+                return vn.map(|v| v.into());
+            }
+        }
+        None
     }
 
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {

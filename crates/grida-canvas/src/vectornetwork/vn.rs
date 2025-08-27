@@ -10,6 +10,18 @@ pub struct VectorNetworkSegment {
     pub tb: Option<(f32, f32)>,
 }
 
+impl VectorNetworkSegment {
+    /// straight line segment between two vertex indices
+    pub fn from_line(a: usize, b: usize) -> Self {
+        Self {
+            a,
+            b,
+            ta: None,
+            tb: None,
+        }
+    }
+}
+
 /// A sequence of segment indices that form a closed contour (loop).
 ///
 /// Each `VectorNetworkLoop` corresponds to a single closed ring in the
@@ -89,6 +101,37 @@ pub struct VectorNetworkRegion {
 pub struct VectorNetworkGeometry {
     pub vertices: Vec<(f32, f32)>,
     pub segments: Vec<VectorNetworkSegment>,
+}
+
+impl VectorNetworkGeometry {
+    pub fn new() -> Self {
+        Self {
+            vertices: vec![],
+            segments: vec![],
+        }
+    }
+
+    pub fn from_rect(x: f32, y: f32, w: f32, h: f32) -> Self {
+        // Start at top-left (x, y). Proceed clockwise:
+        let mut geometry = Self::new();
+        geometry.vertices.push((x, y));
+        geometry.vertices.push((x + w, y));
+        geometry.vertices.push((x + w, y + h));
+        geometry.vertices.push((x, y + h));
+        geometry
+            .segments
+            .push(VectorNetworkSegment::from_line(0, 1));
+        geometry
+            .segments
+            .push(VectorNetworkSegment::from_line(1, 2));
+        geometry
+            .segments
+            .push(VectorNetworkSegment::from_line(2, 3));
+        geometry
+            .segments
+            .push(VectorNetworkSegment::from_line(3, 0));
+        geometry
+    }
 }
 
 #[derive(Debug, Clone)]

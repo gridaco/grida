@@ -9,6 +9,7 @@ use crate::window::command::ApplicationCommand;
 use crate::window::state::{self, GpuState, SurfaceState};
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
+use crate::io::io_grida::JSONVectorNetwork;
 
 #[cfg(target_os = "emscripten")]
 use crate::os::emscripten::*;
@@ -132,6 +133,10 @@ impl ApplicationApi for EmscriptenApplication {
         format: crate::export::ExportAs,
     ) -> Option<crate::export::Exported> {
         self.base.export_node_as(id, format)
+    }
+
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+        self.base.to_vector_network(id)
     }
 
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {

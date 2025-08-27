@@ -134,6 +134,12 @@ declare namespace createGridaCanvas {
       fmt_len: number
     ): Ptr;
 
+    _to_vector_network(
+      state: GridaCanvasWebGlApplicationPtr,
+      id_ptr: number,
+      id_len: number
+    ): Ptr;
+
     _command(
       state: GridaCanvasWebGlApplicationPtr,
       id: number,

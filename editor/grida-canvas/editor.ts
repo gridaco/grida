@@ -22,6 +22,7 @@ import {
   CanvasWasmImageExportInterfaceProvider,
   CanvasWasmPDFExportInterfaceProvider,
   CanvasWasmSVGExportInterfaceProvider,
+  CanvasWasmVectorInterfaceProvider,
 } from "./backends/wasm";
 
 function resolveNumberChangeValue(
@@ -74,6 +75,7 @@ export class Editor
     editor.api.ICameraActions,
     editor.api.IEventTargetActions,
     editor.api.IFollowPluginActions,
+    editor.api.IVectorInterfaceActions,
     editor.api.IExportPluginActions
 {
   private readonly __pointer_move_throttle_ms: number = 30;
@@ -101,6 +103,11 @@ export class Editor
   _m_exporter_svg: editor.api.IDocumentSVGExportInterfaceProvider | null = null;
   private get exporterSvg() {
     return this._m_exporter_svg;
+  }
+
+  _m_vector: editor.api.IDocumentVectorInterfaceProvider | null = null;
+  private get vectorProvider() {
+    return this._m_vector;
   }
 
   get state(): Readonly<editor.state.IEditorState> {
@@ -132,6 +139,7 @@ export class Editor
       export_as_image?: WithEditorInstance<editor.api.IDocumentImageExportInterfaceProvider>;
       export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
       export_as_svg?: WithEditorInstance<editor.api.IDocumentSVGExportInterfaceProvider>;
+      vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
     };
   }) {
     this.backend = backend;
@@ -161,6 +169,10 @@ export class Editor
         this,
         plugins.export_as_svg
       );
+    }
+
+    if (plugins?.vector) {
+      this._m_vector = resolveWithEditorInstance(this, plugins.vector);
     }
 
     this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
@@ -252,6 +264,8 @@ export class Editor
       this,
       surface
     );
+
+    this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
   }
 
   public archive(): Blob {
@@ -384,6 +398,7 @@ export class Editor
     if (this._locked && !force) return;
     this.mstate = reducer(this.mstate, action, {
       geometry: this,
+      vector: this,
       viewport: {
         width: this.viewport.size.width,
         height: this.viewport.size.height,
@@ -399,6 +414,7 @@ export class Editor
       (state, action) =>
         reducer(state, action, {
           geometry: this,
+          vector: this,
           viewport: {
             width: this.viewport.size.width,
             height: this.viewport.size.height,
@@ -2579,6 +2595,15 @@ export class Editor
     this.__pligin_follow.unfollow();
   }
   // #endregion IFollowPluginActions implementation
+
+  // #region IVectorInterfaceActions implementation
+  toVectorNetwork(node_id: string): vn.VectorNetwork | null {
+    if (!this.vectorProvider) {
+      throw new Error("Vector interface provider is not bound");
+    }
+    return this.vectorProvider.toVectorNetwork(node_id);
+  }
+  // #endregion IVectorInterfaceActions implementation
 
   // #region IExportPluginActions implementation
   exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;

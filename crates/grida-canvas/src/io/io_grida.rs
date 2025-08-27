@@ -4,7 +4,7 @@ use crate::io::io_css::{de_css_dimension, default_height_css, default_width_css,
 use crate::node::schema::*;
 use crate::vectornetwork::*;
 use math2::transform::AffineTransform;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -441,7 +441,7 @@ pub struct JSONSVGPathNode {
 
 pub type JSONVectorNetworkVertex = (f32, f32);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct JSONVectorNetworkSegment {
     pub a: usize,
     pub b: usize,
@@ -449,7 +449,7 @@ pub struct JSONVectorNetworkSegment {
     pub tb: Option<(f32, f32)>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct JSONVectorNetwork {
     #[serde(default)]
     pub vertices: Vec<JSONVectorNetworkVertex>,
@@ -473,6 +473,30 @@ impl From<JSONVectorNetwork> for VectorNetwork {
                 .collect(),
             regions: vec![],
         }
+    }
+}
+
+impl From<&VectorNetwork> for JSONVectorNetwork {
+    fn from(network: &VectorNetwork) -> Self {
+        JSONVectorNetwork {
+            vertices: network.vertices.iter().map(|v| (v.0, v.1)).collect(),
+            segments: network
+                .segments
+                .iter()
+                .map(|s| JSONVectorNetworkSegment {
+                    a: s.a,
+                    b: s.b,
+                    ta: s.ta,
+                    tb: s.tb,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl From<VectorNetwork> for JSONVectorNetwork {
+    fn from(network: VectorNetwork) -> Self {
+        (&network).into()
     }
 }
 

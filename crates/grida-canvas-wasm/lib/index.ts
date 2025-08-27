@@ -16,6 +16,11 @@ export interface GridaCanvasModuleInitOptions {
   locateFile(file: string, version: string): string;
 }
 
+// ====================================================================================================
+// TYPES
+// ====================================================================================================
+
+type Vector2 = [number, number];
 type Transform2D = [[number, number, number], [number, number, number]];
 type Rectangle = {
   x: number;
@@ -36,6 +41,20 @@ type ExportAsImage = {
   format: "PNG" | "JPEG" | "WEBP" | "BMP";
   constraints: ExportConstraints;
 };
+
+type VectorNetworkVertex = Vector2;
+type VectorNetworkSegment = {
+  a: number;
+  b: number;
+  ta: Vector2;
+  tb: Vector2;
+};
+interface VectorNetwork {
+  vertices: VectorNetworkVertex[];
+  segments: VectorNetworkSegment[];
+}
+
+// ====================================================================================================
 
 export default async function init(
   opts?: GridaCanvasModuleInitOptions
@@ -274,6 +293,23 @@ export class Grida2D {
     this.module._deallocate(outptr, 4 * 4);
 
     return utils.rect_from_vec4(rect);
+  }
+
+  /**
+   * @deprecated not fully implemented yet
+   */
+  toVectorNetwork(id: string): VectorNetwork | null {
+    const [ptr, len] = this._alloc_string(id);
+    const outptr = this.module._to_vector_network(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+
+    if (outptr === 0) {
+      return null;
+    }
+
+    const str = this.module.UTF8ToString(outptr);
+    // TODO: free ptr
+    return JSON.parse(str);
   }
 
   exportNodeAs(
