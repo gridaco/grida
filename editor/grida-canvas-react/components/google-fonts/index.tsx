@@ -40,7 +40,7 @@ export function GoogleFontsStylesheets() {
 
   useEffect(() => {
     fonts.forEach((font) => {
-      const fontId = `gfm-${google.fontFamilyToId(font.family)}`;
+      const fontId = `gfm-${google.familyid(font.family)}`;
 
       // Only inject if not already in the document or in the injectedFonts Set
       if (
@@ -70,7 +70,7 @@ export function GoogleFontsStylesheets() {
 }
 
 function injectGoogleFontsLink(fontFamily: string): HTMLLinkElement {
-  const id = `gfm-${google.fontFamilyToId(fontFamily)}`;
+  const id = `gfm-${google.familyid(fontFamily)}`;
   const existing = document.getElementById(id);
   if (existing) return existing as HTMLLinkElement;
 
@@ -97,7 +97,7 @@ export function GoogleFontsPreview({
     // eslint-disable-next-line @next/next/no-img-element
     <img
       data-font-family={fontFamily}
-      src={google.svglink(google.fontFamilyToId(fontFamily))}
+      src={google.svglink(google.familyid(fontFamily))}
       alt={fontFamily}
       className={cn("dark:invert", className)}
     />

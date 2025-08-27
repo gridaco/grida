@@ -2,13 +2,13 @@
  * converts google font family to id
  *
  * @example
- * - fontFamilyToId("Roboto") // "roboto"
- * - fontFamilyToId("Open Sans") // "opensans"
+ * - familyid("Roboto") // "roboto"
+ * - familyid("Open Sans") // "opensans"
  *
  * @param fontFamily
  * @returns
  */
-export function fontFamilyToId(fontFamily: string) {
+export function familyid(fontFamily: string) {
   return fontFamily.toLowerCase().replace(/\s+/g, "");
 }
 
@@ -50,8 +50,4 @@ export async function fetchWebfontList(vf?: boolean) {
   return fetch(vf ? WEBFONTS_URL_VF : WEBFONTS_URL).then(
     (r) => r.json() as Promise<GoogleWebFontList>
   );
-}
-
-export interface GoogleFontsFontInfo {
-  family: string;
 }
