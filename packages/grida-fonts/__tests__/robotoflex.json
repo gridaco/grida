@@ -1,0 +1,87 @@
+{
+  "family": "Roboto Flex",
+  "variants": ["regular"],
+  "subsets": [
+    "cyrillic",
+    "cyrillic-ext",
+    "greek",
+    "latin",
+    "latin-ext",
+    "vietnamese"
+  ],
+  "version": "v29",
+  "lastModified": "2025-06-02",
+  "files": {
+    "regular": "https://fonts.gstatic.com/s/robotoflex/v29/NaPccZLOBv5T3oB7Cb4i0wu9TsDOCZRS.ttf"
+  },
+  "category": "sans-serif",
+  "kind": "webfonts#webfont",
+  "menu": "https://fonts.gstatic.com/s/robotoflex/v29/NaNnepOXO_NexZs0b5QrzlOHb8wCikXpYqmZsWI-__OGbt8jZktqc2V3Zs0KvDLdBP8SBZtOs2IifRuUZQMsPJtUsR4DEK6cULNeUx9XgTnH37Ha_FIAp4Fm0PP1hw45DntW2x0wZGzhPmr1YNMYKYn9_1IQXGwJAiUJVUMdN5YUW4O8HtSoXjC1z3QSabshNFVe3e0O5j3ZjrZCu23Qd4G0EBysQNK-QKavMl1cKq3tHXtXi8mzLjaAcbCkmA.ttf",
+  "axes": [
+    {
+      "tag": "GRAD",
+      "start": -200,
+      "end": 150
+    },
+    {
+      "tag": "XOPQ",
+      "start": 27,
+      "end": 175
+    },
+    {
+      "tag": "XTRA",
+      "start": 323,
+      "end": 603
+    },
+    {
+      "tag": "YOPQ",
+      "start": 25,
+      "end": 135
+    },
+    {
+      "tag": "YTAS",
+      "start": 649,
+      "end": 854
+    },
+    {
+      "tag": "YTDE",
+      "start": -305,
+      "end": -98
+    },
+    {
+      "tag": "YTFI",
+      "start": 560,
+      "end": 788
+    },
+    {
+      "tag": "YTLC",
+      "start": 416,
+      "end": 570
+    },
+    {
+      "tag": "YTUC",
+      "start": 528,
+      "end": 760
+    },
+    {
+      "tag": "opsz",
+      "start": 8,
+      "end": 144
+    },
+    {
+      "tag": "slnt",
+      "start": -10,
+      "end": 0
+    },
+    {
+      "tag": "wdth",
+      "start": 25,
+      "end": 151
+    },
+    {
+      "tag": "wght",
+      "start": 100,
+      "end": 1000
+    }
+  ]
+}

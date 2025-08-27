@@ -3,8 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "tsup index.ts google.ts --format cjs,esm --dts --watch",
-    "build": "tsup index.ts google.ts --format cjs,esm --dts"
+    "dev": "tsup index.ts google.ts fontface.ts --format cjs,esm --dts --watch",
+    "build": "tsup index.ts google.ts fontface.ts --format cjs,esm --dts",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -22,9 +24,14 @@
       "types": "./dist/google.d.ts",
       "import": "./dist/google.mjs",
       "require": "./dist/google.js"
+    },
+    "./fontface": {
+      "types": "./dist/fontface.d.ts",
+      "import": "./dist/fontface.mjs",
+      "require": "./dist/fontface.js"
     }
   },
-  "jest": {
-    "preset": "ts-jest"
+  "devDependencies": {
+    "@types/node": "^22.15.28"
   }
 }
