@@ -8,6 +8,7 @@ Open Type variable fonts use axes to control different aspects of the font's app
 
 - [Microsoft OpenType Specification - Design Variation Axis Tag Registry](https://learn.microsoft.com/en-us/typography/opentype/spec/dvaraxisreg)
 - [W3C CSS Fonts Module Level 4 - font-variation-settings](https://www.w3.org/TR/css-fonts-4/#font-variation-settings-def)
+- [Google Fonts Axis Registry (Github)](https://github.com/google/fonts/tree/main/axisregistry)
 
 ## Standard Axes
 
