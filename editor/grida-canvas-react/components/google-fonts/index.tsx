@@ -93,7 +93,7 @@ export function GoogleFontsPreview({
   fontFamily: string;
   className?: string;
 }) {
-  const id = fontFamily.toLowerCase().replace(/\s+/g, "-");
+  const id = fontFamily.toLowerCase().replace(/\s+/g, "");
 
   return (
     // eslint-disable-next-line @next/next/no-img-element

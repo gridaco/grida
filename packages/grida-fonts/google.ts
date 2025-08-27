@@ -22,7 +22,7 @@ export function csslink({ fontFamily }: { fontFamily: string }) {
 }
 
 export function svglink(id: string) {
-  return `https://s3.us-west-1.amazonaws.com/google.fonts/${id}.svg`;
+  return `https://fonts.grida.co/svg/${id}.svg`;
 }
 
 export type GoogleWebFontListItem = {
