@@ -4,16 +4,16 @@ import { cn } from "@/components/lib/utils";
 import * as google from "@grida/fonts/google";
 
 export function useGoogleFontsList() {
-  const [fonts, setFonts] = useState<any[]>([]);
+  const [fonts, setFonts] = useState<google.GoogleWebFontListItem[]>([]);
   useEffect(() => {
-    google.fetchGoogleFontsV2().then(setFonts);
+    google.fetchGoogleFontsV2().then((r) => setFonts(r.items));
   }, []);
 
   return fonts;
 }
 
 const GoogleFontsManagerProviderContext = React.createContext<{
-  fonts: google.GoogleFontsFontInfo[];
+  fonts: { family: string }[];
 }>({ fonts: [] });
 
 export function GoogleFontsManager({
@@ -21,7 +21,7 @@ export function GoogleFontsManager({
   children,
   stylesheets,
 }: React.PropsWithChildren<{
-  fonts: google.GoogleFontsFontInfo[];
+  fonts: { family: string }[];
   stylesheets?: boolean;
 }>) {
   return (

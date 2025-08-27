@@ -71,7 +71,7 @@ export default function initialNode(
         textAlign: "left",
         textAlignVertical: "top",
         textDecorationLine: "none",
-        fontFamily: "Inter",
+        fontFamily: "Geist",
         fontWeight: 400,
         fontSize: 14,
         fill: black,

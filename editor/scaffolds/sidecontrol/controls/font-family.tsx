@@ -1,5 +1,4 @@
 import { GoogleFontsPreview } from "@/grida-canvas-react/components/google-fonts";
-import { fonts } from "@/grida-canvas/k/fonts.min";
 import {
   ItemRendererProps,
   VirtualizedCombobox,
@@ -10,18 +9,14 @@ import { CheckIcon } from "@radix-ui/react-icons";
 import React, { createContext } from "react";
 import { TMixed } from "./utils/types";
 import grida from "@grida/schema";
+import { type GoogleWebFontListItem } from "@grida/fonts/google";
 
-interface FontFamilyInfo {
-  family: string;
-  provider: "fonts.google.com";
-}
-
-const FontFamilyListContext = createContext<FontFamilyInfo[]>(fonts);
+const FontFamilyListContext = createContext<GoogleWebFontListItem[]>([]);
 
 export function FontFamilyListProvider({
   children,
   fonts,
-}: React.PropsWithChildren<{ fonts: FontFamilyInfo[] }>) {
+}: React.PropsWithChildren<{ fonts: GoogleWebFontListItem[] }>) {
   return (
     <FontFamilyListContext.Provider value={fonts}>
       {children}
