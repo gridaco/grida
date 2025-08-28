@@ -1859,6 +1859,14 @@ export namespace editor.api {
     ): Promise<Uint8Array>;
   }
 
+  export interface IDocumentFontLoaderInterfaceProvider {
+    /**
+     * loads the font so that the backend can render it
+     * @param font font descriptor
+     */
+    loadFont(font: { family: string }): Promise<void>;
+  }
+
   export interface IDocumentSVGExportInterfaceProvider {
     /**
      * exports the node as an svg
@@ -2170,6 +2178,10 @@ export namespace editor.api {
 
   export interface IVectorInterfaceActions {
     toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+  }
+
+  export interface IFontLoaderActions {
+    loadFont(font: { family: string }): Promise<void>;
   }
 
   export interface IExportPluginActions {

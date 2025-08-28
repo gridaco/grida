@@ -17,7 +17,6 @@ import {
   DataProvider,
   ProgramDataContextHost,
 } from "@/grida-react-program-context/data-context/context";
-import { GoogleFontsManager } from "./components/google-fonts";
 import cmath from "@grida/cmath";
 import type { Action } from "@/grida-canvas/action";
 import equal from "fast-deep-equal";
@@ -31,16 +30,6 @@ import * as google from "@grida/fonts/google";
 
 type Dispatcher = (action: Action) => void;
 
-function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
-  const editor = useCurrentEditor();
-  const fonts = useEditorState(editor, (state) => state.googlefonts);
-
-  return (
-    <GoogleFontsManager stylesheets fonts={fonts}>
-      {children}
-    </GoogleFontsManager>
-  );
-}
 
 export function StandaloneDocumentEditor({
   editor,
@@ -92,9 +81,7 @@ export function StandaloneDocumentEditor({
     <EditorContext.Provider value={editor}>
       <ProgramDataContextHost>
         {/* <DataProvider data={{ props: props }}> */}
-        <DataProvider>
-          <EditorGoogleFontsManager>{children}</EditorGoogleFontsManager>
-        </DataProvider>
+        <DataProvider>{children}</DataProvider>
       </ProgramDataContextHost>
     </EditorContext.Provider>
   );

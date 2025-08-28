@@ -76,8 +76,9 @@ export class Editor
     editor.api.IEventTargetActions,
     editor.api.IFollowPluginActions,
     editor.api.IVectorInterfaceActions,
+    editor.api.IFontLoaderActions,
     editor.api.IExportPluginActions
-{
+  {
   private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
@@ -110,6 +111,11 @@ export class Editor
     return this._m_vector;
   }
 
+  _m_font_loader: editor.api.IDocumentFontLoaderInterfaceProvider | null = null;
+  private get fontLoader() {
+    return this._m_font_loader;
+  }
+
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
@@ -140,6 +146,7 @@ export class Editor
       export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
       export_as_svg?: WithEditorInstance<editor.api.IDocumentSVGExportInterfaceProvider>;
       vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
+      fonts?: WithEditorInstance<editor.api.IDocumentFontLoaderInterfaceProvider>;
     };
   }) {
     this.backend = backend;
@@ -175,7 +182,15 @@ export class Editor
       this._m_vector = resolveWithEditorInstance(this, plugins.vector);
     }
 
+    if (plugins?.fonts) {
+      this._m_font_loader = resolveWithEditorInstance(this, plugins.fonts);
+    }
+
     this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
+    // load initial fonts
+    for (const font of this.mstate.googlefonts) {
+      this.loadFont(font);
+    }
     onCreate?.(this);
   }
 
@@ -369,6 +384,9 @@ export class Editor
       type: "insert",
       ...payload,
     });
+    for (const font of this.mstate.googlefonts) {
+      this.loadFont(font);
+    }
   }
 
   public __get_node_siblings(node_id: string): string[] {
@@ -1797,6 +1815,9 @@ export class Editor
       node_id: node_id,
       fontFamily,
     });
+    if (fontFamily) {
+      void this.loadFont({ family: fontFamily });
+    }
   }
   changeTextNodeFontWeight(node_id: string, fontWeight: cg.NFontWeight) {
     this.dispatch({
@@ -2604,6 +2625,13 @@ export class Editor
     return this.vectorProvider.toVectorNetwork(node_id);
   }
   // #endregion IVectorInterfaceActions implementation
+
+  // #region IFontLoaderActions implementation
+  async loadFont(font: { family: string }): Promise<void> {
+    if (!this.fontLoader) return;
+    await this.fontLoader.loadFont(font);
+  }
+  // #endregion IFontLoaderActions implementation
 
   // #region IExportPluginActions implementation
   exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;

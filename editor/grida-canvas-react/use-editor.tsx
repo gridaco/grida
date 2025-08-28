@@ -8,6 +8,7 @@ import {
   domapi,
   DOMGeometryQueryInterfaceProvider,
   DOMImageExportInterfaceProvider,
+  DOMFontLoaderInterfaceProvider,
   NoopGeometryQueryInterfaceProvider,
 } from "@/grida-canvas/backends";
 
@@ -45,6 +46,7 @@ export function useEditor(
           initialState: init ?? __DEFAULT_STATE,
           plugins: {
             export_as_image: (_) => new DOMImageExportInterfaceProvider(_),
+            fonts: (_) => new DOMFontLoaderInterfaceProvider(_),
           },
         });
       }

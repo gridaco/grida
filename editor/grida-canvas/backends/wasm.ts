@@ -104,3 +104,15 @@ export class CanvasWasmVectorInterfaceProvider
     return this.surface.toVectorNetwork(node_id);
   }
 }
+
+export class CanvasWasmFontLoaderInterfaceProvider
+  implements editor.api.IDocumentFontLoaderInterfaceProvider
+{
+  constructor(readonly editor: Editor, readonly surface: Grida2D) {}
+
+  async loadFont(font: { family: string }): Promise<void> {
+    // TODO: integrate with wasm backend font system
+    void font;
+    return;
+  }
+}
