@@ -89,7 +89,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { keysymbols } from "@/grida-canvas-react/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
@@ -188,7 +187,7 @@ export default function CanvasPlayground({
 }: CanvasPlaygroundProps) {
   const instance = useEditor(document, backend);
   useSyncMultiplayerCursors(instance, room_id);
-  const fonts = useGoogleFontsList();
+  const fonts = useEditorState(instance, (state) => state.webfontlist.items);
 
   useEffect(() => {
     if (!src) return;

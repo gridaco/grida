@@ -68,6 +68,12 @@ export default function reducer<S extends editor.state.IEditorState>(
         Object.assign(draft, editor.state.__RESET_SCENE_STATE);
       });
     }
+    case "webfonts/list/load": {
+      const { webfontlist } = action;
+      return produce(state, (draft: Draft<S>) => {
+        draft.webfontlist = webfontlist;
+      });
+    }
     case "scenes/new": {
       const { scene } = action;
       const new_scene = grida.program.document.init_scene(

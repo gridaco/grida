@@ -1,16 +1,7 @@
 "use client";
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef } from "react";
 import * as google from "@grida/fonts/google";
 import { FontFaceManager } from "@grida/fonts";
-
-export function useGoogleFontsList() {
-  const [fonts, setFonts] = useState<google.GoogleWebFontListItem[]>([]);
-  useEffect(() => {
-    google.fetchWebfontList().then((r) => setFonts(r.items));
-  }, []);
-
-  return fonts;
-}
 
 const GoogleFontsManagerProviderContext = React.createContext<{
   fonts: { family: string }[];

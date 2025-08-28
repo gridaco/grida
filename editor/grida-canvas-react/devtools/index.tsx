@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +21,6 @@ import {
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { __UNSAFE_CONSOLE } from "@/grida-canvas-react/devtools/__unsafe-console";
-import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import type grida from "@grida/schema";
 import { useCurrentEditor, useEditorState } from "../use-editor";
 import { useRecorder } from "../plugins/use-recorder";
@@ -220,7 +219,7 @@ function EditModePanel() {
 function FontsPanel() {
   const editor = useCurrentEditor();
   const state = useEditorState(editor, (state) => state);
-  const fonts = useGoogleFontsList();
+  const fonts = useEditorState(editor, (state) => state.webfontlist.items);
   const { googlefonts } = state;
 
   return (

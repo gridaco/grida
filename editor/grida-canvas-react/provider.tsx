@@ -27,6 +27,7 @@ import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
 import nid from "../grida-canvas/reducers/tools/id";
+import * as google from "@grida/fonts/google";
 
 type Dispatcher = (action: Action) => void;
 
@@ -78,6 +79,14 @@ export function StandaloneDocumentEditor({
   //     },
   //     {} as Record<string, tokens.StringValueExpression>
   //   );
+
+  useEffect(() => {
+    if (editor.state.webfontlist.items.length === 0) {
+      google.fetchWebfontList().then((webfontlist) => {
+        editor.dispatch({ type: "webfonts/list/load", webfontlist });
+      });
+    }
+  }, [editor]);
 
   return (
     <EditorContext.Provider value={editor}>

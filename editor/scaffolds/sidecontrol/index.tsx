@@ -2,18 +2,19 @@
 
 import React from "react";
 import { SidebarRoot } from "@/components/sidebar";
-import { useEditorState } from "../editor";
+import { useEditorState as useWorkbenchEditorState } from "../editor";
 import { SideControlDoctypeForm } from "./sidecontrol-doctype-form";
 import { SideControlDoctypeSite } from "./sidecontrol-doctype-site";
 import { SrcUploaderProvider } from "./controls/src";
 import { FontFamilyListProvider } from "./controls/font-family";
 import { useDocumentAssetUpload } from "../asset";
-import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import { SideControlDoctypeCanvas } from "./sidecontrol-doctype-canvas";
+import { useCurrentEditor, useEditorState as useCanvasEditorState } from "@/grida-canvas-react";
 
 export function SideControl() {
-  const fonts = useGoogleFontsList();
-  const [state] = useEditorState();
+  const editor = useCurrentEditor();
+  const fonts = useCanvasEditorState(editor, (state) => state.webfontlist.items);
+  const [state] = useWorkbenchEditorState();
   const { doctype } = state;
   const { uploadPublic } = useDocumentAssetUpload();
 

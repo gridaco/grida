@@ -4,6 +4,7 @@ import type { BitmapEditorBrush } from "@grida/bitmap";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
 import type vn from "@grida/vn";
+import type { GoogleWebFontList } from "@grida/fonts/google";
 
 export type Action =
   | InternalAction
@@ -11,7 +12,8 @@ export type Action =
   | EditorAction
   | EditorUndoAction
   | EditorRedoAction
-  | EditorClipAction;
+  | EditorClipAction
+  | EditorWebfontListLoadAction;
 
 export type InternalAction = __InternalResetAction;
 
@@ -235,6 +237,14 @@ export type EditorClipAction = {
   type: "clip/color";
   color: cg.RGBA8888;
 };
+
+/**
+ * load webfont list
+ */
+export interface EditorWebfontListLoadAction {
+  type: "webfonts/list/load";
+  webfontlist: GoogleWebFontList;
+}
 
 // #region copy cut paste
 export type EditorCopyCutPasteAction =
