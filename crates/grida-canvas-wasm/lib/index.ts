@@ -246,7 +246,8 @@ export class Grida2D {
       return null;
     }
     const str = this.module.UTF8ToString(ptr);
-    // TODO: free ptr
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
     return str;
   }
 
@@ -256,7 +257,8 @@ export class Grida2D {
       return [];
     }
     const str = this.module.UTF8ToString(ptr);
-    // TODO: free ptr
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
     return JSON.parse(str);
   }
 
@@ -272,7 +274,8 @@ export class Grida2D {
       return [];
     }
     const str = this.module.UTF8ToString(ptr);
-    // TODO: free ptr
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
     return JSON.parse(str);
   }
 
@@ -308,7 +311,8 @@ export class Grida2D {
     }
 
     const str = this.module.UTF8ToString(outptr);
-    // TODO: free ptr
+    const outlen = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(outptr, outlen);
     return JSON.parse(str);
   }
 
