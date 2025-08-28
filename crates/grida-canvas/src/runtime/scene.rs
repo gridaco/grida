@@ -276,8 +276,8 @@ impl Renderer {
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
         self.scene_cache = cache::scene::SceneCache::new();
-        self.scene_cache
-            .update_geometry(&scene, &self.fonts.borrow());
+        let fonts = self.fonts.borrow().clone();
+        self.scene_cache.update_geometry(&scene, &fonts);
         self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);
         self.queue_stable();

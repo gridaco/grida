@@ -115,6 +115,7 @@ impl ResourceRepository<ImageMipmaps> for ImageRepository {
 }
 
 /// A repository for managing fonts.
+#[derive(Clone)]
 pub struct FontRepository {
     provider: TypefaceFontProvider,
     fonts: HashMap<String, Vec<Vec<u8>>>,
