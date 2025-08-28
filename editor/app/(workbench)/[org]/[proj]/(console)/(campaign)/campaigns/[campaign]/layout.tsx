@@ -28,6 +28,7 @@ import {
 import { AboutGridaWestCard } from "./about-west-card";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
+import { DarwinSidebarHeaderDragArea } from "@/host/desktop";
 type Params = { org: string; proj: string; campaign: string };
 
 export const metadata: Metadata = {
@@ -62,7 +63,8 @@ export default async function CampaignLayout({
         <div className="flex flex-1 h-full overflow-hidden">
           <div className="h-full flex flex-1 w-full">
             <Sidebar>
-              <SidebarHeader>
+              <DarwinSidebarHeaderDragArea />
+              <SidebarHeader className="desktop-drag-area">
                 <SidebarMenu>
                   <Link href={`/${org}/${proj}/campaigns`}>
                     <SidebarMenuItem>
