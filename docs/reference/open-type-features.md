@@ -27,7 +27,7 @@ This document provides a comprehensive reference for OpenType features based on 
 | `cpsp`          | Capital Spacing                                     | Spacing adjustments for capital letters          | `TITLE`            |
 | `cswh`          | Contextual Swash                                    | Context-sensitive swash forms                    | `Q J`              |
 | `curs`          | Cursive Positioning                                 | Positioning for cursive connections              | `السلام`           |
-| `cv01` - `cv99` | Character Variants 1-99                             | Character variants numbered 1 through 99         | `a g`              |
+| `cv01` - `cv99` | Character Variants 1-99                             | Character variants numbered 1 through 99         | `1` ~ `99`         |
 | `c2pc`          | Petite Capitals From Capitals                       | Petite capitals derived from capital letters     | `ABC`              |
 | `c2sc`          | Small Capitals From Capitals                        | Small capitals derived from capital letters      | `ABC`              |
 | `dist`          | Distances                                           | Distance adjustments between characters          | `To AV`            |

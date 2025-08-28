@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import type cg from "@grida/cg";
+import { FEATURES } from "@grida/fonts/k";
 
 const PANGRAM_EN = "The Quick Brown Fox Jumps Over The Lazy Dog";
 
@@ -63,6 +64,10 @@ interface PreviewProps {
   fontVariations?: Record<string, number>;
   fontWeight?: number;
   fontFamily?: string;
+
+  // Features preview props
+  features?: cg.OpenTypeFeature[];
+  fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
 
   // Type indicator
   type: "basics" | "axes" | "features";
@@ -129,15 +134,20 @@ const getTextStyle = (
 
 function BasicsPreview({ style, showPlaceholder = false }: BasicsPreviewProps) {
   return (
-    <div className="p-4 border rounded-md bg-muted/30 h-32">
+    <div className="p-4 border rounded-md bg-muted/30 h-32 overflow-hidden">
       {style ? (
-        <div className="text-base leading-relaxed" style={style}>
+        <div
+          className="text-base leading-relaxed overflow-hidden text-ellipsis"
+          style={style}
+        >
           {PANGRAM_EN}
         </div>
       ) : showPlaceholder ? (
         <span className="text-muted-foreground text-sm">Preview</span>
       ) : (
-        <div className="text-base leading-relaxed">{PANGRAM_EN}</div>
+        <div className="text-base leading-relaxed overflow-hidden text-ellipsis">
+          {PANGRAM_EN}
+        </div>
       )}
     </div>
   );
@@ -154,7 +164,7 @@ function AxesPreview({
 }) {
   if (!hoveredAxis) {
     return (
-      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center">
+      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
         <span className="text-muted-foreground text-sm">Preview</span>
       </div>
     );
@@ -164,9 +174,9 @@ function AxesPreview({
   if (!axis) return null;
 
   return (
-    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center gap-8">
+    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center gap-8 overflow-hidden">
       <span
-        className="text-6xl font-medium"
+        className="text-6xl font-medium overflow-hidden"
         style={{
           fontFamily,
           fontVariationSettings: `"${hoveredAxis}" ${axis.min}`,
@@ -175,7 +185,7 @@ function AxesPreview({
         R
       </span>
       <span
-        className="text-6xl font-medium"
+        className="text-6xl font-medium overflow-hidden"
         style={{
           fontFamily,
           fontVariationSettings: `"${hoveredAxis}" ${axis.def}`,
@@ -184,7 +194,7 @@ function AxesPreview({
         R
       </span>
       <span
-        className="text-6xl font-medium"
+        className="text-6xl font-medium overflow-hidden"
         style={{
           fontFamily,
           fontVariationSettings: `"${hoveredAxis}" ${axis.max}`,
@@ -200,40 +210,47 @@ function FeaturesPreview({
   fontFamily,
   fontWeight,
   hoveredFeature,
+  features = [],
+  fontFeatures = {},
 }: {
   fontFamily?: string;
   fontWeight?: number;
   hoveredFeature: cg.OpenTypeFeature | null;
+  features?: cg.OpenTypeFeature[];
+  fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
 }) {
   if (!hoveredFeature) {
     return (
-      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center">
+      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
         <span className="text-muted-foreground text-sm">Preview</span>
       </div>
     );
   }
 
+  const featureInfo = FEATURES[hoveredFeature];
+  const demoText = featureInfo?.demo || "Ag123456789";
+
   return (
-    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center gap-8">
+    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center gap-8 overflow-hidden">
       <div
-        className="text-2xl font-medium"
+        className="text-2xl font-medium overflow-hidden"
         style={{
           fontFamily,
           fontWeight,
           fontFeatureSettings: `"${hoveredFeature}" off`,
         }}
       >
-        Ag123456789
+        {demoText}
       </div>
       <div
-        className="text-2xl font-medium"
+        className="text-2xl font-medium overflow-hidden"
         style={{
           fontFamily,
           fontWeight,
           fontFeatureSettings: `"${hoveredFeature}" on`,
         }}
       >
-        Ag123456789
+        {demoText}
       </div>
     </div>
   );
@@ -270,6 +287,8 @@ function Preview(props: PreviewProps) {
         fontFamily={props.fontFamily}
         fontWeight={props.fontWeight}
         hoveredFeature={featurePreview?.feature ?? null}
+        features={props.features}
+        fontFeatures={props.fontFeatures}
       />
     );
   }

@@ -24,9 +24,14 @@ import {
   StrikethroughIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
-import { AXES } from "@grida/fonts/k";
+import { AXES, FEATURES } from "@grida/fonts/k";
 import { ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Preview,
   type BasicPreview,
@@ -525,6 +530,8 @@ export function TextDetails({
             fontVariations={fontVariations}
             fontWeight={fontWeight}
             fontFamily={fontFamily}
+            features={features}
+            fontFeatures={fontFeatures}
           />
         </div>
 
@@ -692,23 +699,35 @@ export function TextDetails({
                   <PropertyLine>
                     <PropertyLineLabel>Features</PropertyLineLabel>
                   </PropertyLine>
-                  <div className="space-y-3">
+                  <div>
                     {features.map((feature) => {
                       const enabled = fontFeatures?.[feature] ?? true;
+                      const featureInfo = FEATURES[feature];
+                      const label = featureInfo?.name ?? feature;
                       return (
                         <div
                           key={feature}
                           onPointerEnter={() => handleFeatureHover(feature)}
                           onPointerLeave={handleFeatureHoverLeave}
+                          className="pb-3 last:pb-0"
                         >
                           <PropertyLine>
-                            <PropertyLineLabel>{feature}</PropertyLineLabel>
+                            <Tooltip delayDuration={200}>
+                              <TooltipTrigger className="text-left">
+                                <PropertyLineLabel className="w-auto">
+                                  {label}
+                                </PropertyLineLabel>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{feature}</p>
+                              </TooltipContent>
+                            </Tooltip>
                             <Switch
                               checked={enabled}
                               onCheckedChange={(checked) =>
                                 onFontFeatureChange?.(feature, checked)
                               }
-                              aria-label={`Toggle ${feature} feature`}
+                              aria-label={`Toggle ${label} feature`}
                             />
                           </PropertyLine>
                         </div>
