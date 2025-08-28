@@ -1,5 +1,4 @@
 import { Typr } from "../typr";
-import type { FontSource } from "../fontface";
 
 export type FvarAxis = { min: number; max: number; def: number };
 export type FvarAxes = Record<string, FvarAxis>;
@@ -16,18 +15,3 @@ export function parseFvar(buffer: ArrayBuffer): FvarAxes {
   return axes;
 }
 
-export async function fetchFvar(
-  source: FontSource,
-  opts: { fetch?: typeof fetch } = {}
-): Promise<FvarAxes> {
-  let buffer: ArrayBuffer;
-  if (source.kind === "url") {
-    const res = await (opts.fetch ?? fetch)(source.url);
-    buffer = await res.arrayBuffer();
-  } else if (source.kind === "buffer") {
-    buffer = source.bytes;
-  } else {
-    buffer = await source.file.arrayBuffer();
-  }
-  return parseFvar(buffer);
-}

@@ -8,7 +8,11 @@ import type cg from "@grida/cg";
 import type { SnapResult } from "@grida/cmath/_snap";
 import type { tokens } from "@grida/tokens";
 import type { NodeProxy } from "./editor";
-import type { GoogleWebFontList } from "@grida/fonts/google";
+import type {
+  GoogleWebFontList,
+  GoogleWebFontListItem,
+} from "@grida/fonts/google";
+import type { FvarAxes } from "@grida/fonts/parse";
 import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
@@ -2197,6 +2201,15 @@ export namespace editor.api {
      * Lists fonts currently loaded and available to the renderer.
      */
     listLoadedFonts(): string[];
+
+    /**
+     * Retrieves font metadata and variation axes.
+     */
+    getFontDetails(
+      fontFamily: string,
+    ): Promise<
+      { font: GoogleWebFontListItem; axes: FvarAxes } | null
+    >;
   }
 
   export interface IExportPluginActions {

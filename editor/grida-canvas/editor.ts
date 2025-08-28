@@ -17,6 +17,8 @@ import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
 import type { Grida2D } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
+import * as google from "@grida/fonts/google";
+import { parseFvar, type FvarAxes } from "@grida/fonts/parse";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
@@ -116,6 +118,11 @@ export class Editor
   private get fontLoader() {
     return this._m_font_loader;
   }
+
+  private fontDetailsCache = new Map<
+    string,
+    { font: google.GoogleWebFontListItem; axes: FvarAxes }
+  >();
 
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
@@ -2645,6 +2652,32 @@ export class Editor
   listLoadedFonts(): string[] {
     if (!this.fontLoader) return [];
     return this.fontLoader.listLoadedFonts();
+  }
+
+  async getFontDetails(
+    fontFamily: string,
+  ): Promise<{ font: google.GoogleWebFontListItem; axes: FvarAxes } | null> {
+    if (this.fontDetailsCache.has(fontFamily)) {
+      return this.fontDetailsCache.get(fontFamily)!;
+    }
+
+    let item = this.mstate.webfontlist.items.find(
+      (f) => f.family === fontFamily,
+    );
+    if (!item) {
+      const list = await google.fetchWebfontList();
+      this.dispatch({ type: "webfonts/list/load", webfontlist: list });
+      item = list.items.find((f) => f.family === fontFamily);
+      if (!item) return null;
+    }
+
+    const url = item.files[item.variants[0]] ?? Object.values(item.files)[0];
+    const res = await fetch(url);
+    const buffer = await res.arrayBuffer();
+    const axes = parseFvar(buffer);
+    const detail = { font: item, axes } as const;
+    this.fontDetailsCache.set(fontFamily, detail);
+    return detail;
   }
   // #endregion IFontLoaderActions implementation
 

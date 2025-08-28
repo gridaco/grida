@@ -78,8 +78,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";
-import { fetchFvar } from "@grida/fonts/parse";
-import * as google from "@grida/fonts/google";
 import { Button } from "@/components/ui-editor/button";
 import { ZoomControl } from "./controls/ext-zoom";
 import { SchemaProvider, useSchema } from "./schema";
@@ -100,7 +98,6 @@ import { dq } from "@/grida-canvas/query";
 import { StrokeAlignControl } from "./controls/stroke-align";
 import { TextDetails } from "./controls/widgets/text-details";
 import cg from "@grida/cg";
-import { editor } from "@/grida-canvas";
 import { FeControl } from "./controls/fe";
 import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
@@ -112,15 +109,7 @@ import {
   useMixedPaints,
   MixedPropertiesEditor,
 } from "@/grida-canvas-react/use-mixed-properties";
-
-const googleFontCache = new Map<string, google.GoogleWebFontListItem>();
-async function getGoogleFontItem(family: string) {
-  if (!googleFontCache.size) {
-    const list = await google.fetchWebfontList();
-    list.items.forEach((f) => googleFontCache.set(f.family, f));
-  }
-  return googleFontCache.get(family);
-}
+import { editor } from "@/grida-canvas";
 
 function Align() {
   const editor = useCurrentEditor();
@@ -1283,6 +1272,7 @@ function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
 function SectionText({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
   const computed = useComputedNode(node_id);
+  const instance = useCurrentEditor();
   const {
     text,
     fontFamily,
@@ -1328,16 +1318,18 @@ function SectionText({ node_id }: { node_id: string }) {
   React.useEffect(() => {
     let canceled = false;
     (async () => {
-      const font = await getGoogleFontItem(fontFamily ?? "");
-      if (!font) {
+      if (!fontFamily) {
         if (!canceled) setAxes({});
         return;
       }
-      const url = font.files[font.variants[0]] ?? Object.values(font.files)[0];
-      const fvar = await fetchFvar({ kind: "url", url });
+      const detail = await instance.getFontDetails(fontFamily);
+      if (!detail) {
+        if (!canceled) setAxes({});
+        return;
+      }
       const record: AxisMap = {};
-      for (const tag of Object.keys(fvar)) {
-        const axis = fvar[tag];
+      for (const tag of Object.keys(detail.axes)) {
+        const axis = detail.axes[tag];
         record[tag] = {
           ...axis,
           value: tag === "wght" ? (fontWeight as number) : axis.def,
@@ -1348,7 +1340,7 @@ function SectionText({ node_id }: { node_id: string }) {
     return () => {
       canceled = true;
     };
-  }, [fontFamily, fontWeight]);
+  }, [instance, fontFamily, fontWeight]);
 
   return (
     <SidebarSection className="border-b pb-4">

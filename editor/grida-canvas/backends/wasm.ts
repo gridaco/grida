@@ -9,7 +9,6 @@ import {
   type FontAdapterHandle,
   type FontVariant,
 } from "@grida/fonts/fontface";
-import * as google from "@grida/fonts/google";
 
 export class CanvasWasmGeometryQueryInterfaceProvider
   implements editor.api.IDocumentGeometryInterfaceProvider
@@ -134,7 +133,6 @@ export class CanvasWasmFontLoaderInterfaceProvider
 {
   private manager: UnifiedFontManager;
   private loadedFonts = new Set<string>();
-  private googleFontsCache = new Map<string, google.GoogleWebFontListItem>();
 
   constructor(
     readonly editor: Editor,
@@ -145,15 +143,9 @@ export class CanvasWasmFontLoaderInterfaceProvider
 
   async loadFont(font: { family: string }): Promise<void> {
     if (this.loadedFonts.has(font.family)) return;
-
-    if (this.googleFontsCache.size === 0) {
-      const list = await google.fetchWebfontList();
-      list.items.forEach((f) => this.googleFontsCache.set(f.family, f));
-    }
-
-    const googleFont = this.googleFontsCache.get(font.family);
-    if (googleFont) {
-      await this.manager.loadGoogleFont(googleFont);
+    const detail = await this.editor.getFontDetails(font.family);
+    if (detail) {
+      await this.manager.loadGoogleFont(detail.font);
       this.loadedFonts.add(font.family);
     }
   }
@@ -162,6 +154,6 @@ export class CanvasWasmFontLoaderInterfaceProvider
    * TODO: provide loaded fonts from wasm backend when available.
    */
   listLoadedFonts(): string[] {
-    return [];
+    return Array.from(this.loadedFonts);
   }
 }
