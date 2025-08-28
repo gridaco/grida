@@ -1321,7 +1321,14 @@ function SectionText({ node_id }: { node_id: string }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="p-0 w-64 h-[500px]">
               <TextDetails
-                fontWeight={fontWeight}
+                axes={{
+                  wght: {
+                    value: fontWeight,
+                    min: 100,
+                    max: 900,
+                    def: 400,
+                  },
+                }}
                 textAlign={textAlign}
                 textDecorationLine={textDecorationLine}
                 textDecorationStyle={textDecorationStyle ?? undefined}

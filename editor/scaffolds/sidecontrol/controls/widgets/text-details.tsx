@@ -418,8 +418,15 @@ interface TextDetailsProps {
   maxLength?: number | null;
   verticalTrim?: VerticalTrim;
   truncate?: boolean;
-  slant?: number;
-  fontWeight?: number;
+  axes?: Record<
+    string,
+    {
+      value?: number;
+      min: number;
+      max: number;
+      def: number;
+    }
+  >;
 
   // Change handlers
   onTextAlignChange?: (value: cg.TextAlign) => void;
@@ -435,7 +442,7 @@ interface TextDetailsProps {
   onMaxLengthChange?: (value: number) => void;
   onVerticalTrimChange?: (value: VerticalTrim) => void;
   onTruncateChange?: (value: boolean) => void;
-  onSlantChange?: (value: number) => void;
+  onAxesChange?: (key: string, value: number) => void;
   onFontWeightChange?: (value: number) => void;
 }
 
@@ -511,8 +518,7 @@ export function TextDetails({
   truncate = false,
   maxLines = 1,
   maxLength = null,
-  slant = 0,
-  fontWeight = 400,
+  axes = {},
 
   // Change handlers
   onTextAlignChange,
@@ -526,7 +532,7 @@ export function TextDetails({
   onTruncateChange,
   onMaxLinesChange,
   onMaxLengthChange,
-  onSlantChange,
+  onAxesChange,
   onFontWeightChange,
 }: TextDetailsProps) {
   const [hoverPreview, setHoverPreview] = useState<HoverPreview>(null);
@@ -740,39 +746,40 @@ export function TextDetails({
 
           {/* Variable Tab */}
           <TabsContent value="variable" className="space-y-4 mt-3 px-2 pb-4">
-            {/* Slant Slider */}
-            <div className="space-y-2">
-              <PropertyLine className="items-center" disabled>
-                <PropertyLineLabel>Slant</PropertyLineLabel>
-                <div className="flex-1">
-                  <Slider
-                    value={[slant]}
-                    max={30}
-                    min={-30}
-                    step={1}
-                    className="w-full"
-                    onValueChange={(values) => onSlantChange?.(values[0])}
-                  />
-                </div>
-              </PropertyLine>
-            </div>
+            {Object.entries(axes).map(([key, axis]) => {
+              const labelMap: Record<string, string> = {
+                wght: "Weight",
+                slnt: "Slant",
+                wdth: "Width",
+              };
+              const label = labelMap[key] ?? key;
+              const value = axis.value ?? axis.def;
 
-            {/* Weight Slider */}
-            <div className="space-y-2">
-              <PropertyLine className="items-center">
-                <PropertyLineLabel>Weight</PropertyLineLabel>
-                <div className="flex-1">
-                  <Slider
-                    value={[fontWeight]}
-                    max={900}
-                    min={100}
-                    step={1}
-                    className="w-full"
-                    onValueChange={(values) => onFontWeightChange?.(values[0])}
-                  />
+              return (
+                <div className="space-y-2" key={key}>
+                  <PropertyLine className="items-center">
+                    <PropertyLineLabel>{label}</PropertyLineLabel>
+                    <div className="flex-1">
+                      <Slider
+                        value={[value]}
+                        max={axis.max}
+                        min={axis.min}
+                        step={1}
+                        className="w-full"
+                        onValueChange={(values) => {
+                          const v = values[0];
+                          if (key === "wght") {
+                            onFontWeightChange?.(v);
+                          } else {
+                            onAxesChange?.(key, v);
+                          }
+                        }}
+                      />
+                    </div>
+                  </PropertyLine>
                 </div>
-              </PropertyLine>
-            </div>
+              );
+            })}
           </TabsContent>
         </div>
       </Tabs>
