@@ -8,7 +8,7 @@ import {
   type FontAdapter,
   type FontAdapterHandle,
   type FontVariant,
-} from "@grida/fonts";
+} from "@grida/fonts/fontface";
 import * as google from "@grida/fonts/google";
 
 export class CanvasWasmGeometryQueryInterfaceProvider
@@ -134,12 +134,12 @@ export class CanvasWasmFontLoaderInterfaceProvider
 {
   private manager: UnifiedFontManager;
   private loadedFonts = new Set<string>();
-  private googleFontsCache = new Map<
-    string,
-    google.GoogleWebFontListItem
-  >();
+  private googleFontsCache = new Map<string, google.GoogleWebFontListItem>();
 
-  constructor(readonly editor: Editor, readonly surface: Grida2D) {
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Grida2D
+  ) {
     this.manager = new UnifiedFontManager(new WasmFontAdapter(surface));
   }
 

@@ -32,7 +32,7 @@ export function FontWeightControl({
   return (
     <PropertyEnum
       value={isCustom ? undefined : valueString}
-      placeholder={isCustom ? `wght: ${valueString}` : undefined}
+      placeholder={isCustom ? `wght: ${valueString?.toString()}` : undefined}
       enum={FONT_WEIGHT_ENUM}
       onValueChange={(v) => {
         onValueChange?.(parseInt(v) as NFontWeight);

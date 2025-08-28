@@ -22,7 +22,7 @@ A unified font management system that mimics Skia's font collection/font manager
 ### Basic Usage
 
 ```typescript
-import { FontFaceManager } from "@grida/fonts";
+import { FontFaceManager } from "@grida/fonts/fontface-dom";
 
 // Load a Google Font family
 const manager = new FontFaceManager();
@@ -43,7 +43,7 @@ await manager.loadGoogleFont({
 ### WASM Integration
 
 ```typescript
-import { UnifiedFontManager } from "@grida/fonts";
+import { UnifiedFontManager } from "@grida/fonts/fontface";
 
 // Create custom adapter for your WASM graphics system
 class WasmFontAdapter {
@@ -65,7 +65,7 @@ await manager.loadGoogleFont(googleFontData);
 ### Google Fonts Integration
 
 ```typescript
-import { FontFaceManager } from "@grida/fonts";
+import { FontFaceManager } from "@grida/fonts/fontface-dom";
 
 // Load Google Fonts data
 const response = await fetch("https://fonts.grida.co/webfonts.json");

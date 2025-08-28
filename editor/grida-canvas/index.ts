@@ -8,7 +8,7 @@ import type cg from "@grida/cg";
 import type { SnapResult } from "@grida/cmath/_snap";
 import type { tokens } from "@grida/tokens";
 import type { NodeProxy } from "./editor";
-import type { GoogleWebFontList } from "@grida/fonts";
+import type { GoogleWebFontList } from "@grida/fonts/google";
 import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";

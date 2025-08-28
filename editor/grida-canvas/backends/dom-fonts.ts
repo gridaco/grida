@@ -1,4 +1,4 @@
-import { FontFaceManager } from "@grida/fonts";
+import { FontFaceManager } from "@grida/fonts/fontface-dom";
 import * as google from "@grida/fonts/google";
 import type { editor } from "..";
 import type { Editor } from "../editor";

@@ -78,6 +78,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";
+import { fetchFvar } from "@grida/fonts/parse";
+import * as google from "@grida/fonts/google";
 import { Button } from "@/components/ui-editor/button";
 import { ZoomControl } from "./controls/ext-zoom";
 import { SchemaProvider, useSchema } from "./schema";
@@ -110,6 +112,15 @@ import {
   useMixedPaints,
   MixedPropertiesEditor,
 } from "@/grida-canvas-react/use-mixed-properties";
+
+const googleFontCache = new Map<string, google.GoogleWebFontListItem>();
+async function getGoogleFontItem(family: string) {
+  if (!googleFontCache.size) {
+    const list = await google.fetchWebfontList();
+    list.items.forEach((f) => googleFontCache.set(f.family, f));
+  }
+  return googleFontCache.get(family);
+}
 
 function Align() {
   const editor = useCurrentEditor();
@@ -1308,6 +1319,37 @@ function SectionText({ node_id }: { node_id: string }) {
     maxLength: node.maxLength,
   }));
 
+  type AxisMap = Record<
+    string,
+    { value?: number; min: number; max: number; def: number }
+  >;
+  const [axes, setAxes] = React.useState<AxisMap>({});
+
+  React.useEffect(() => {
+    let canceled = false;
+    (async () => {
+      const font = await getGoogleFontItem(fontFamily ?? "");
+      if (!font) {
+        if (!canceled) setAxes({});
+        return;
+      }
+      const url = font.files[font.variants[0]] ?? Object.values(font.files)[0];
+      const fvar = await fetchFvar({ kind: "url", url });
+      const record: AxisMap = {};
+      for (const tag of Object.keys(fvar)) {
+        const axis = fvar[tag];
+        record[tag] = {
+          ...axis,
+          value: tag === "wght" ? (fontWeight as number) : axis.def,
+        };
+      }
+      if (!canceled) setAxes(record);
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [fontFamily, fontWeight]);
+
   return (
     <SidebarSection className="border-b pb-4">
       <SidebarSectionHeaderItem>
@@ -1321,14 +1363,7 @@ function SectionText({ node_id }: { node_id: string }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="p-0 w-64 h-[500px]">
               <TextDetails
-                axes={{
-                  wght: {
-                    value: fontWeight,
-                    min: 100,
-                    max: 900,
-                    def: 400,
-                  },
-                }}
+                axes={axes}
                 textAlign={textAlign}
                 textDecorationLine={textDecorationLine}
                 textDecorationStyle={textDecorationStyle ?? undefined}
