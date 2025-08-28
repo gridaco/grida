@@ -1355,6 +1355,20 @@ export namespace grida.program.nodes {
       fontFamily?: string;
       fontSize: number;
       fontWeight: cg.NFontWeight;
+      /**
+       * OpenType features
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-feature-settings
+       */
+      fontFeatures?: {
+        [feature in cg.OpenTypeFeature]: boolean;
+      };
+      /**
+       * custom font variations
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-variation-settings
+       */
+      fontVariations?: {
+        [key: string]: number;
+      };
       textDecorationLine: cg.TextDecorationLine;
       textDecorationStyle?: cg.TextDecorationStyle | null;
       textDecorationColor?: cg.TextDecorationColorValue | null;
