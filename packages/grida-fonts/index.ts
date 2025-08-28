@@ -11,3 +11,6 @@ export {
   FontFaceManager as FontFaceManagerDOM,
   DomFontAdapter,
 } from "./fontface-dom";
+
+// Re-export typr module
+export * from "./typr";

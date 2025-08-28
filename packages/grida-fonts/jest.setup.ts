@@ -38,3 +38,13 @@ Object.defineProperty(global, "document", {
     json: () => Promise.resolve({}),
   });
 });
+
+// Mock window for Typr library
+(global as any).window = {
+  TextDecoder: class TextDecoder {
+    constructor() {}
+    decode(buffer: Uint8Array): string {
+      return new TextDecoder().decode(buffer);
+    }
+  },
+};

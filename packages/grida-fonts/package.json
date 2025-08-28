@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "dev": "tsup index.ts google.ts fontface.ts fontface-dom.ts --format cjs,esm --dts --watch",
-    "build": "tsup index.ts google.ts fontface.ts fontface-dom.ts --format cjs,esm --dts",
+    "dev": "tsup index.ts google.ts fontface.ts fontface-dom.ts typr/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup index.ts google.ts fontface.ts fontface-dom.ts typr/index.ts --format cjs,esm --dts",
     "test": "jest",
     "test:watch": "jest --watch"
   },
@@ -35,6 +35,11 @@
       "types": "./dist/fontface-dom.d.ts",
       "import": "./dist/fontface-dom.mjs",
       "require": "./dist/fontface-dom.js"
+    },
+    "./typr": {
+      "types": "./dist/typr.d.ts",
+      "import": "./dist/typr.mjs",
+      "require": "./dist/typr.js"
     }
   },
   "devDependencies": {
