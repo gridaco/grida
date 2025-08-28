@@ -278,7 +278,7 @@ mod tests {
         let mut repo = FontRepository::new();
 
         // Load the Roboto Flex font file
-        let font_path = Path::new("../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf");
+        let font_path = Path::new("../../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf");
         let font_bytes = fs::read(font_path).expect("Failed to read Roboto Flex font file");
 
         // Add the font to the repository
@@ -390,7 +390,7 @@ mod tests {
         let mut repo = FontRepository::new();
 
         // Load the Roboto Flex font file
-        let font_path = Path::new("../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf");
+        let font_path = Path::new("../../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf");
         let font_bytes = fs::read(font_path).expect("Failed to read Roboto Flex font file");
 
         // Add the font to the repository

@@ -22,7 +22,7 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     // Load the image from file
-    let image_path = "../fixtures/images/checker.png";
+    let image_path = "../../fixtures/images/checker.png";
     let image_data = std::fs::read(image_path).expect("Failed to read image file");
     let image =
         sk::Image::from_encoded(Data::new_copy(&image_data)).expect("Failed to decode image");

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 fn fixture_path(name: &str) -> String {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../fixtures")
+        .join("../../fixtures")
         .join(name)
         .to_string_lossy()
         .to_string()

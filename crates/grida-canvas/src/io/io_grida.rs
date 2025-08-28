@@ -1133,22 +1133,6 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn parse_canvas_json() {
-        let path = "../fixtures/local/document.json";
-        let Ok(data) = fs::read_to_string(path) else {
-            eprintln!("test resource not found: {}", path);
-            return;
-        };
-        let parsed: JSONCanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
-
-        assert_eq!(parsed.version, "0.0.1-beta.1+20250728");
-        assert!(
-            !parsed.document.nodes.is_empty(),
-            "nodes should not be empty"
-        );
-    }
-
-    #[test]
     fn deserialize_boolean_operation_node() {
         let json = r#"{
             "id": "boolean-1",

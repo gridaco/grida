@@ -22,9 +22,10 @@ fn main() {
 
     // Load the Recursive variable font
     let font_mgr = FontMgr::new();
-    let recursive_font_data =
-        fs::read("../fixtures/fonts/Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf")
-            .unwrap();
+    let recursive_font_data = fs::read(
+        "../../fixtures/fonts/Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf",
+    )
+    .unwrap();
     let base_typeface = font_mgr.new_from_data(&recursive_font_data, None).unwrap();
 
     // Define the slant values we want to demonstrate (0 to -15 in 1-degree increments)

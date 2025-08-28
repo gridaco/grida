@@ -7,12 +7,12 @@ use math2::{box_fit::BoxFit, transform::AffineTransform};
 
 async fn demo_image() -> Scene {
     let nf = NodeFactory::new();
-    // let image4k = "../fixtures/images/4k.jpg".to_string();
+    // let image4k = "../../fixtures/images/4k.jpg".to_string();
     // let image4ksize = Size {
     //     width: 4000.0,
     //     height: 6000.0,
     // };
-    let image8k = "../fixtures/images/8k.jpg".to_string();
+    let image8k = "../../fixtures/images/8k.jpg".to_string();
     let image8ksize = Size {
         width: 8070.0,
         height: 5196.0,
