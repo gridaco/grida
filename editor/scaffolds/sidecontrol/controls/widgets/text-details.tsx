@@ -24,6 +24,7 @@ import {
   StrikethroughIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
+import { AXES } from "@grida/fonts/k";
 import { ChevronRight } from "lucide-react";
 
 const PANGRAM_EN = "The Quick Brown Fox Jumps Over The Lazy Dog";
@@ -747,12 +748,7 @@ export function TextDetails({
           {/* Variable Tab */}
           <TabsContent value="variable" className="space-y-4 mt-3 px-2 pb-4">
             {Object.entries(axes).map(([key, axis]) => {
-              const labelMap: Record<string, string> = {
-                wght: "Weight",
-                slnt: "Slant",
-                wdth: "Width",
-              };
-              const label = labelMap[key] ?? key;
+              const label = AXES[key] ?? key;
               const value = axis.value ?? axis.def;
 
               return (
