@@ -1,20 +1,40 @@
 /**
- * FontFace-based font manager using CSS Font Loading API
- * Replaces the stylesheet approach with direct FontFace loading
+ * Core FontFace utilities for both Node.js and browser environments
+ * Unified font manager that works for both DOM and WASM backends
  */
 
 import type { GoogleWebFontListItem } from "./google";
 
-export interface FontAxis {
-  tag: string;
-  start: number;
-  end: number;
+// ---------- Core Types ----------
+
+export type FontVariant = {
+  family: string; // canonical family id
+  weight?: string | number; // 100..900 or "400"
+  style?: "normal" | "italic" | "oblique" | string; // allow oblique with degrees
+  stretch?: string; // "normal" | "condensed" | etc.
+  display?: FontFaceDescriptors["display"];
+};
+
+export type FontSource =
+  | { kind: "url"; url: string }
+  | { kind: "buffer"; bytes: ArrayBuffer }
+  | { kind: "file"; file: File };
+
+export interface FontAdapterHandle {
+  // Adapter-specific pointer/handle (e.g., wasm face id or DOM FontFace)
+  id: unknown;
 }
 
-// Extend the existing interface from google.ts
-export interface GoogleWebFontListItemWithAxes extends GoogleWebFontListItem {
-  axes?: FontAxis[];
+export interface FontAdapter {
+  /** Called when font bytes need to be registered for a variant. Should be idempotent. */
+  onRegister(bytes: ArrayBuffer, v: FontVariant): Promise<FontAdapterHandle>;
+  /** Called when font should be unregistered (best-effort; browsers may keep in memory). */
+  onUnregister(handle: FontAdapterHandle, v: FontVariant): void;
+  /** Optional: called to check if the variant is already usable */
+  onCheck?(v: FontVariant): boolean | Promise<boolean>;
 }
+
+// ---------- Font Variant Parsing (preserved from original) ----------
 
 /**
  * Maps variant strings to CSS font-weight and font-style values
@@ -41,10 +61,20 @@ const VARIANT_MAP: Record<string, { weight: string; style: string }> = {
 };
 
 /**
- * Converts a variant string to CSS font-weight and font-style
+ * Converts a variant string to FontVariant object
  */
-function parseVariant(variant: string): { weight: string; style: string } {
-  return VARIANT_MAP[variant] || { weight: "400", style: "normal" };
+export function parseVariant(variant: string, family: string): FontVariant {
+  const { weight, style } = VARIANT_MAP[variant] || {
+    weight: "400",
+    style: "normal",
+  };
+  return {
+    family,
+    weight,
+    style: style as "normal" | "italic",
+    stretch: "normal",
+    display: "auto",
+  };
 }
 
 /**
@@ -70,61 +100,42 @@ function getFontFormat(url: string): string {
 }
 
 /**
- * Creates a FontFace descriptor for a given font variant
+ * Creates FontVariant objects for a static font family
  */
-function createFontFaceDescriptor(
-  family: string,
-  variant: string,
-  { display }: { display: FontFaceDescriptors["display"] } = { display: "auto" }
-): FontFaceDescriptors {
-  const { weight, style } = parseVariant(variant);
+export function createStaticFontVariants(
+  font: GoogleWebFontListItem
+): Array<{ variant: FontVariant; source: FontSource }> {
+  const variants: Array<{ variant: FontVariant; source: FontSource }> = [];
 
-  return {
-    style,
-    weight,
-    display,
-  };
-}
-
-/**
- * Creates FontFace objects for a static font family
- */
-function createStaticFontFaces(
-  font: GoogleWebFontListItemWithAxes
-): FontFace[] {
-  const fontFaces: FontFace[] = [];
-
-  for (const [variant, url] of Object.entries(font.files)) {
-    const descriptor = createFontFaceDescriptor(font.family, variant);
-    const format = getFontFormat(url);
-    const src = `url(${url}) format('${format}')`;
-    const fontFace = new FontFace(font.family, src, descriptor);
-    fontFaces.push(fontFace);
+  for (const [variantStr, url] of Object.entries(font.files)) {
+    const variant = parseVariant(variantStr, font.family);
+    const source: FontSource = { kind: "url", url };
+    variants.push({ variant, source });
   }
 
-  return fontFaces;
+  return variants;
 }
 
 /**
- * Creates FontFace objects for a variable font family
+ * Creates FontVariant objects for a variable font family
  */
-function createVariableFontFaces(
-  font: GoogleWebFontListItemWithAxes
-): FontFace[] {
-  const fontFaces: FontFace[] = [];
+export function createVariableFontVariants(
+  font: GoogleWebFontListItem
+): Array<{ variant: FontVariant; source: FontSource }> {
+  const variants: Array<{ variant: FontVariant; source: FontSource }> = [];
 
   if (!font.axes || font.axes.length === 0) {
     // Fallback to static font creation if no axes defined
-    return createStaticFontFaces(font);
+    return createStaticFontVariants(font);
   }
 
   // For variable fonts, we typically have one file with all variants
-  // We'll create FontFace objects for each variant that maps to the variable font
-  for (const variant of font.variants) {
-    const url = font.files[variant];
+  // We'll create FontVariant objects for each variant that maps to the variable font
+  for (const variantStr of font.variants) {
+    const url = font.files[variantStr];
     if (!url) continue;
 
-    const { weight, style } = parseVariant(variant);
+    const { weight, style } = parseVariant(variantStr, font.family);
 
     // For variable fonts, we need to determine the weight range
     const weightAxis = font.axes.find((axis) => axis.tag === "wght");
@@ -146,133 +157,148 @@ function createVariableFontFaces(
       finalStyle = `oblique ${slantAxis.start}deg ${slantAxis.end}deg`;
     }
 
-    const descriptor: FontFaceDescriptors = {
-      style: finalStyle,
+    const variant: FontVariant = {
+      family: font.family,
       weight: weightRange,
+      style: finalStyle as "normal" | "italic" | "oblique",
       stretch,
       display: "swap",
     };
 
-    const format = getFontFormat(url);
-    const src = `url(${url}) format('${format}')`;
-    const fontFace = new FontFace(font.family, src, descriptor);
-    fontFaces.push(fontFace);
+    const source: FontSource = { kind: "url", url };
+    variants.push({ variant, source });
   }
 
-  return fontFaces;
+  return variants;
 }
 
-/**
- * FontFace manager class for better control and tracking
- */
-class FontFaceManager {
-  private loadedFonts = new Map<string, FontFace[]>();
+// ---------- Core manager (no document.fonts dependency) ----------
 
-  /**
-   * Static method to load a font family using FontFace API
-   */
-  static async loadFontFamily(
-    font: GoogleWebFontListItemWithAxes
-  ): Promise<void> {
-    const fontFaces =
-      font.axes && font.axes.length > 0
-        ? createVariableFontFaces(font)
-        : createStaticFontFaces(font);
+type Key = string;
+const keyOf = (v: FontVariant) =>
+  `${v.family}__w:${v.weight ?? "400"}__s:${v.style ?? "normal"}__st:${v.stretch ?? "normal"}`;
 
-    // Load all FontFace objects
-    const loadPromises = fontFaces.map((fontFace) => fontFace.load());
-    await Promise.all(loadPromises);
+export class UnifiedFontManager {
+  private capacity: number | null;
 
-    // Add all loaded fonts to document.fonts
-    fontFaces.forEach((fontFace) => {
-      document.fonts.add(fontFace);
-    });
+  constructor(
+    private adapter: FontAdapter,
+    private opts: { capacity?: number; fetch?: typeof fetch } = {}
+  ) {
+    this.capacity = this.opts.capacity ?? null;
   }
 
-  /**
-   * Static method to load multiple font families
-   */
-  static async loadFontFamilies(fonts: GoogleWebFontListItem[]): Promise<void> {
-    const loadPromises = fonts.map((font) =>
-      FontFaceManager.loadFontFamily(font)
-    );
-    await Promise.all(loadPromises);
-  }
+  private bytesCache = new Map<Key, ArrayBuffer>(); // raw font file cache
+  private handles = new Map<Key, FontAdapterHandle>(); // adapter registrations
+  private refs = new Map<Key, number>();
+  private lru: Key[] = [];
 
-  /**
-   * Static method to check if a font family is already loaded
-   */
-  static isFontFamilyLoaded(family: string): boolean {
-    return document.fonts.check(`12px "${family}"`);
-  }
-
-  /**
-   * Static method to unload a font family (removes from document.fonts)
-   */
-  static unloadFontFamily(family: string): void {
-    // Note: FontFace API doesn't provide a direct way to unload fonts
-    // This is a limitation - fonts will remain in memory until page reload
-    // We can only remove FontFace objects that we've explicitly added
-    console.warn(`Font unloading is not supported by FontFace API: ${family}`);
-  }
-
-  /**
-   * Instance method to load a font family and track it
-   */
-  async loadFontFamily(font: GoogleWebFontListItemWithAxes): Promise<void> {
-    if (this.loadedFonts.has(font.family)) {
-      return; // Already loaded
+  async acquire(src: FontSource, v: FontVariant): Promise<FontAdapterHandle> {
+    const k = keyOf(v);
+    // already registered
+    const h = this.handles.get(k);
+    if (h) {
+      this.bumpRef(k);
+      this.touch(k);
+      return h;
     }
+    const bytes = await this.resolveBytes(src, k);
+    const handle = await this.adapter.onRegister(bytes, v);
+    this.handles.set(k, handle);
+    this.refs.set(k, 1);
+    this.touch(k);
+    this.evictIfNeeded();
+    return handle;
+  }
 
-    const fontFaces =
+  /** decrement usage; if zero, keep as warm cache until eviction */
+  release(v: FontVariant, opts: { immediate?: boolean } = {}) {
+    const k = keyOf(v);
+    const r = (this.refs.get(k) ?? 0) - 1;
+    if (r > 0) return void this.refs.set(k, r);
+    this.refs.delete(k);
+    if (opts.immediate) this.unregister(k, v);
+    else this.touch(k); // mark cold
+  }
+
+  /** remove from adapter + caches */
+  private unregister(k: Key, v: FontVariant) {
+    const h = this.handles.get(k);
+    if (h) {
+      this.adapter.onUnregister(h, v);
+      this.handles.delete(k);
+    }
+    // keep bytesCache (helps quick re-register); remove via LRU only
+  }
+
+  private async resolveBytes(src: FontSource, k: Key): Promise<ArrayBuffer> {
+    const cached = this.bytesCache.get(k);
+    if (cached) return cached;
+    let bytes: ArrayBuffer;
+    if (src.kind === "buffer") bytes = src.bytes;
+    else if (src.kind === "file") bytes = await src.file.arrayBuffer();
+    else {
+      const res = await fetch(src.url, { cache: "force-cache" });
+      if (!res.ok) throw new Error(`Font fetch failed: ${res.status}`);
+      bytes = await res.arrayBuffer();
+    }
+    this.bytesCache.set(k, bytes);
+    return bytes;
+  }
+
+  private evictIfNeeded() {
+    // Skip eviction if capacity is null (unlimited)
+    if (this.capacity === null) return;
+
+    // evict adapter registrations with ref==0 first
+    while (this.handles.size > this.capacity) {
+      const victim = this.lru.find((k) => !this.refs.has(k));
+      if (!victim) break;
+      // need variant to unregister
+      const [family, w, s, st] = victim.split("__").map((x) => x.split(":")[1]);
+      this.unregister(victim, {
+        family,
+        weight: w,
+        style: s as any,
+        stretch: st,
+      });
+      // optionally also trim bytes cache when very large:
+      // this.bytesCache.delete(victim);
+    }
+  }
+  private touch(k: Key) {
+    const i = this.lru.indexOf(k);
+    if (i >= 0) this.lru.splice(i, 1);
+    this.lru.push(k);
+  }
+  private bumpRef(k: Key) {
+    this.refs.set(k, (this.refs.get(k) ?? 0) + 1);
+  }
+
+  // convenience
+  inUseCount() {
+    return [...this.refs.values()].reduce((a, b) => a + (b > 0 ? 1 : 0), 0);
+  }
+
+  // Google Fonts integration
+  async loadGoogleFont(font: GoogleWebFontListItem): Promise<void> {
+    const variants =
       font.axes && font.axes.length > 0
-        ? createVariableFontFaces(font)
-        : createStaticFontFaces(font);
+        ? createVariableFontVariants(font)
+        : createStaticFontVariants(font);
 
-    // Load all FontFace objects
-    const loadPromises = fontFaces.map((fontFace) => fontFace.load());
-    await Promise.all(loadPromises);
-
-    // Add all loaded fonts to document.fonts
-    fontFaces.forEach((fontFace) => {
-      document.fonts.add(fontFace);
-    });
-
-    // Track loaded fonts
-    this.loadedFonts.set(font.family, fontFaces);
-  }
-
-  /**
-   * Instance method to load multiple font families
-   */
-  async loadFontFamilies(fonts: GoogleWebFontListItem[]): Promise<void> {
-    const loadPromises = fonts.map((font) => this.loadFontFamily(font));
-    await Promise.all(loadPromises);
-  }
-
-  /**
-   * Instance method to check if a font family is loaded
-   */
-  isFontFamilyLoaded(family: string): boolean {
-    return (
-      this.loadedFonts.has(family) || FontFaceManager.isFontFamilyLoaded(family)
+    const loadPromises = variants.map(({ variant, source }) =>
+      this.acquire(source, variant)
     );
+    await Promise.all(loadPromises);
   }
 
-  /**
-   * Gets all loaded font families
-   */
-  getLoadedFontFamilies(): string[] {
-    return Array.from(this.loadedFonts.keys());
+  async loadGoogleFonts(fonts: GoogleWebFontListItem[]): Promise<void> {
+    const loadPromises = fonts.map((font) => this.loadGoogleFont(font));
+    await Promise.all(loadPromises);
   }
 
-  /**
-   * Clears all tracked fonts (doesn't actually unload them)
-   */
-  clear(): void {
-    this.loadedFonts.clear();
+  checkGoogleFont(family: string): boolean | Promise<boolean> {
+    return this.adapter.onCheck?.({ family }) ?? false;
   }
 }
-
-// Export only the class and types
-export { FontFaceManager };

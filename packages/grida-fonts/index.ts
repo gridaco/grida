@@ -1,6 +1,13 @@
 export * from "./google";
 export {
-  FontAxis,
-  GoogleWebFontListItemWithAxes,
-  FontFaceManager,
+  UnifiedFontManager,
+  type FontVariant,
+  type FontSource,
+  type FontAdapter,
+  type FontAdapterHandle,
 } from "./fontface";
+export {
+  FontFaceManager,
+  FontFaceManager as FontFaceManagerDOM,
+  DomFontAdapter,
+} from "./fontface-dom";

@@ -1,206 +1,123 @@
-# @grida/fonts
+# Grida Fonts
 
-Grida Fonts package provides utilities for loading and managing Google Fonts using both traditional stylesheet approach and modern FontFace API.
+A unified font management system that mimics Skia's font collection/font manager approach. Designed for high-performance graphics applications that need to load and manage fonts across different rendering backends.
 
-## Features
+## What it does
 
-- **FontFace API Support**: Modern CSS Font Loading API for better performance and control
-- **Variable Font Support**: Full support for variable fonts with axes (weight, width, slant, etc.)
-- **Width/Stretch Support**: Direct mapping of `wdth` axis values to CSS `font-stretch` percentage values
-- **Slant Support**: Mapping of `slnt` axis values to CSS `font-style: oblique` with degree ranges
-- **Automatic Format Detection**: Automatically detects font format from URL extension (woff2, woff, ttf, otf, eot)
-- **Backward Compatibility**: Traditional stylesheet approach still available
-- **TypeScript Support**: Full type safety with TypeScript
+- **Google Fonts Support**: Loads fonts directly from Google Fonts with full metadata support
+- **Skia-like Font Management**: Mimics Skia's font collection/font manager pattern for consistent font handling
+- **Family-based Loading**: Load fonts by family name, automatically creating the required FontFace/Typeface sets per family
+- **CSS2 API Compatibility**: Generates font configurations that match Google Fonts CSS2 API output
+- **In-Memory Management**: Manages fonts in memory for passing to WASM modules
 
-## Installation
+## When to use it
 
-```bash
-pnpm add @grida/fonts
-```
+- **Canvas/Skia Applications**: When you need font management similar to Skia's approach
+- **WASM Graphics**: When passing fonts to WASM modules for rendering
+- **Google Fonts Integration**: When you need programmatic access to Google Fonts
+- **Cross-Platform Font Handling**: When you need consistent font management across DOM and WASM backends
 
-## Usage
+## Quick Start
 
-### FontFace API (Recommended)
-
-The FontFace API provides better performance and control over font loading:
+### Basic Usage
 
 ```typescript
-import { FontFaceManager, GoogleWebFontListItemWithAxes } from "@grida/fonts";
+import { FontFaceManager } from "@grida/fonts";
 
-// Static methods for simple usage
-await FontFaceManager.loadFontFamily(font);
-await FontFaceManager.loadFontFamilies([font1, font2, font3]);
-const isLoaded = FontFaceManager.isFontFamilyLoaded("Roboto");
-
-// Or create an instance for tracking loaded fonts
-const fontFaceManager = new FontFaceManager();
-
-// Load a single font family
-const font: GoogleWebFontListItemWithAxes = {
+// Load a Google Font family
+const manager = new FontFaceManager();
+await manager.loadGoogleFont({
   family: "Roboto",
-  variants: ["regular", "italic", "700", "700italic"],
+  variants: ["regular", "italic", "700"],
   files: {
     regular: "https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.ttf",
     italic:
       "https://fonts.gstatic.com/s/roboto/v30/KFOkCnqEu92Fr1Mu51xIIzI.ttf",
     "700":
       "https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc9.ttf",
-    "700italic":
-      "https://fonts.gstatic.com/s/roboto/v30/KFOjCnqEu92Fr1Mu51TzBqZ9.ttf",
   },
-  // ... other properties
-};
-
-await fontFaceManager.loadFontFamily(font);
-
-// Load multiple font families
-await fontFaceManager.loadFontFamilies([font1, font2, font3]);
-
-// Check if a font is loaded
-const isLoaded = fontFaceManager.isFontFamilyLoaded("Roboto");
+  // ... other metadata
+});
 ```
 
-### Variable Fonts
-
-For variable fonts with axes:
+### WASM Integration
 
 ```typescript
-const variableFont: GoogleWebFontListItemWithAxes = {
-  family: "Roboto Flex",
-  variants: ["regular"],
-  files: {
-    regular:
-      "https://fonts.gstatic.com/s/robotoflex/v29/NaPccZLOBv5T3oB7Cb4i0wu9TsDOCZRS.ttf",
-  },
-  axes: [
-    { tag: "wght", start: 100, end: 1000 },
-    { tag: "wdth", start: 25, end: 151 },
-    { tag: "slnt", start: -10, end: 0 },
-  ],
-};
+import { UnifiedFontManager } from "@grida/fonts";
 
-const widthVariableFont: GoogleWebFontListItemWithAxes = {
-  family: "Advent Pro",
-  variants: ["regular"],
-  files: {
-    regular:
-      "https://fonts.gstatic.com/s/adventpro/v32/V8mqoQfxVT4Dvddr_yOwrzaFxV7JtdQgFqXdUAQrGp_zgX5sWCpLQyN_TZAs.woff2",
-  },
-  axes: [
-    { tag: "wdth", start: 100, end: 200 },
-    { tag: "wght", start: 100, end: 900 },
-  ],
-};
+// Create custom adapter for your WASM graphics system
+class WasmFontAdapter {
+  async register(bytes: ArrayBuffer, variant) {
+    // Register with your WASM font system
+    const fontId = await yourWasmSystem.loadFont(bytes, variant);
+    return { id: fontId };
+  }
 
-const interFont: GoogleWebFontListItemWithAxes = {
-  family: "Inter",
-  variants: ["regular", "italic"],
-  files: {
-    regular:
-      "https://fonts.gstatic.com/s/inter/v19/UcCo3FwrK3iLTfvlaQc78lA2.ttf",
-    italic:
-      "https://fonts.gstatic.com/s/inter/v19/UcCm3FwrK3iLTcvnYwMZ90A2B58.ttf",
-  },
-  axes: [
-    { tag: "wght", start: 100, end: 900 },
-    { tag: "opsz", start: 14, end: 32 },
-  ],
-};
-
-const fontFaceManager = new FontFaceManager();
-await fontFaceManager.loadFontFamily(variableFont);
-await fontFaceManager.loadFontFamily(widthVariableFont);
-await fontFaceManager.loadFontFamily(interFont);
-```
-
-#### Width/Stretch Support
-
-The font manager directly maps the `wdth` (width) axis values to CSS `font-stretch` percentage values:
-
-- `wdth: 100` → `font-stretch: 100%`
-- `wdth: 125` → `font-stretch: 125%`
-- `wdth: 150` → `font-stretch: 150%`
-- etc.
-
-This allows you to use CSS `font-stretch` property with variable fonts:
-
-```css
-.narrow-text {
-  font-stretch: 75%;
+  unregister(handle, variant) {
+    yourWasmSystem.unloadFont(handle.id);
+  }
 }
 
-.wide-text {
-  font-stretch: 150%;
+const manager = new UnifiedFontManager(new WasmFontAdapter());
+await manager.loadGoogleFont(googleFontData);
+```
+
+### Google Fonts Integration
+
+```typescript
+import { FontFaceManager } from "@grida/fonts";
+
+// Load Google Fonts data
+const response = await fetch("https://fonts.grida.co/webfonts.json");
+const googleFonts = await response.json();
+
+const manager = new FontFaceManager();
+
+// Find and load a font family
+const roboto = googleFonts.items.find((font) => font.family === "Roboto");
+if (roboto) {
+  await manager.loadGoogleFont(roboto);
 }
 ```
 
-#### Slant Support
+## Key Features
 
-The font manager maps the `slnt` (slant) axis values to CSS `font-style: oblique` with degree ranges:
+- **Variable Font Support**: Full support for variable font axes (weight, width, slant)
+- **Reference Counting**: Automatic font lifecycle management
+- **Memory Efficient**: LRU caching with configurable capacity
+- **Type Safe**: Full TypeScript support
+- **Backend Agnostic**: Works with DOM, WASM, or custom rendering systems
 
-- `slnt: -10 to 0` → `font-style: oblique -10deg 0deg`
-- `slnt: 0 to 10` → `font-style: oblique 0deg 10deg`
+## Architecture
 
-This allows you to use CSS `font-style: oblique` property with variable fonts:
+The system provides a unified interface that works across different backends:
 
-```css
-.slanted-text {
-  font-style: oblique -5deg;
-}
-```
+- **DOM Backend**: Uses browser's FontFace API
+- **WASM Backend**: Designed for Canvas/Skia rendering
+- **Custom Backends**: Pluggable adapter system
 
-### React Components
+## API Overview
 
-React components are available in the editor package. For direct usage, you can create your own React wrapper:
+### Core Classes
 
-```tsx
-import { FontFaceManager } from "@grida/fonts/fontface";
+- `FontFaceManager`: DOM-specific manager (easiest to use)
+- `UnifiedFontManager`: Core manager with adapter pattern
+- `DomFontAdapter`: DOM backend adapter
+- `FontAdapter`: Interface for custom backends
 
-function FontFaceProvider({ fonts, children }) {
-  const fontFaceManager = useRef(new FontFaceManager());
+### Main Methods
 
-  useEffect(() => {
-    const loadFonts = async () => {
-      await fontFaceManager.current.loadFontFamilies(fonts);
-    };
-    loadFonts();
-  }, [fonts]);
+- `loadGoogleFont(font)`: Load a Google Font family
+- `loadGoogleFonts(fonts)`: Load multiple font families
+- `acquire(source, variant)`: Load specific font variant
+- `release(variant)`: Release font reference
 
-  return children;
-}
+## Browser Support
 
-function App() {
-  const fonts = [
-    { family: "Roboto" },
-    { family: "Open Sans" },
-    { family: "Inter" },
-  ];
+- **DOM Adapter**: Requires FontFace API (Chrome 35+, Firefox 41+, Safari 10+)
+- **Core Manager**: Works in any JavaScript environment
+- **WASM Adapter**: Depends on your WASM graphics system
 
-  return (
-    <FontFaceProvider fonts={fonts}>
-      <YourApp />
-    </FontFaceProvider>
-  );
-}
-```
+## License
 
-## API Reference
-
-### FontFaceManager
-
-Main class for managing fonts with FontFace API.
-
-#### Static Methods
-
-- `FontFaceManager.loadFontFamily(font: GoogleWebFontListItemWithAxes): Promise<void>`
-- `FontFaceManager.loadFontFamilies(fonts: GoogleWebFontListItemWithAxes[]): Promise<void>`
-- `FontFaceManager.isFontFamilyLoaded(family: string): boolean`
-- `FontFaceManager.unloadFontFamily(family: string): void` (Note: FontFace API doesn't support unloading)
-
-#### Instance Methods
-
-- `loadFontFamily(font: GoogleWebFontListItemWithAxes): Promise<void>`
-- `loadFontFamilies(fonts: GoogleWebFontListItemWithAxes[]): Promise<void>`
-- `isFontFamilyLoaded(family: string): boolean`
-- `getLoadedFontFamilies(): string[]`
-- `clear(): void`
+MIT

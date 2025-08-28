@@ -1,5 +1,5 @@
 /**
- * converts google font family to id
+ * Converts font family to id
  *
  * @example
  * - familyid("Roboto") // "roboto"
@@ -25,6 +25,12 @@ export function svglink(id: string) {
   return `https://fonts.grida.co/svg/${id}.svg`;
 }
 
+export interface FontAxis {
+  tag: string;
+  start: number;
+  end: number;
+}
+
 export type GoogleWebFontListItem = {
   category: string;
   family: string;
@@ -36,6 +42,10 @@ export type GoogleWebFontListItem = {
   version: string;
   lastModified: string;
   menu: string;
+  /**
+   * axes are only available if the list was fetched with vf=true
+   */
+  axes?: FontAxis[];
 };
 
 export type GoogleWebFontList = {
@@ -46,7 +56,7 @@ export type GoogleWebFontList = {
 const WEBFONTS_URL = "https://fonts.grida.co/webfonts.json";
 const WEBFONTS_URL_VF = "https://fonts.grida.co/webfonts-vf.json";
 
-export async function fetchWebfontList(vf?: boolean) {
+export async function fetchWebfontList(vf: boolean = true) {
   return fetch(vf ? WEBFONTS_URL_VF : WEBFONTS_URL).then(
     (r) => r.json() as Promise<GoogleWebFontList>
   );

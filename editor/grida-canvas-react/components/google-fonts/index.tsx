@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
-import { cn } from "@/components/lib/utils";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import * as google from "@grida/fonts/google";
+import { FontFaceManager } from "@grida/fonts";
 
 export function useGoogleFontsList() {
   const [fonts, setFonts] = useState<google.GoogleWebFontListItem[]>([]);
@@ -26,80 +26,84 @@ export function GoogleFontsManager({
 }>) {
   return (
     <GoogleFontsManagerProviderContext.Provider value={{ fonts: fonts }}>
-      {stylesheets && <GoogleFontsStylesheets />}
+      {stylesheets && <GoogleFontsLoader />}
       {children}
     </GoogleFontsManagerProviderContext.Provider>
   );
 }
 
 export function GoogleFontsStylesheets() {
+  // Keep this for backward compatibility, but it now uses the new loader
+  return <GoogleFontsLoader />;
+}
+
+function GoogleFontsLoader() {
   const { fonts } = React.useContext(GoogleFontsManagerProviderContext);
+  const managerRef = useRef<FontFaceManager | null>(null);
+  const loadedFonts = useRef<Set<string>>(new Set());
+  const googleFontsCache = useRef<Map<string, google.GoogleWebFontListItem>>(
+    new Map()
+  );
 
-  // Keep track of injected fonts to avoid re-injecting
-  const injectedFonts = useRef<Set<string>>(new Set());
-
+  // Initialize the font manager
   useEffect(() => {
-    fonts.forEach((font) => {
-      const fontId = `gfm-${google.familyid(font.family)}`;
+    if (!managerRef.current) {
+      managerRef.current = new FontFaceManager();
+    }
+  }, []);
 
-      // Only inject if not already in the document or in the injectedFonts Set
-      if (
-        !document.getElementById(fontId) &&
-        !injectedFonts.current.has(fontId)
-      ) {
-        injectGoogleFontsLink(font.family);
-        injectedFonts.current.add(fontId); // Track this font as injected
+  // Load fonts using the unified font manager
+  useEffect(() => {
+    const loadFonts = async () => {
+      if (!managerRef.current) return;
+
+      const manager = managerRef.current;
+      const fontsToLoad: { family: string }[] = [];
+
+      // Find fonts that haven't been loaded yet
+      fonts.forEach((font) => {
+        if (!loadedFonts.current.has(font.family)) {
+          fontsToLoad.push(font);
+        }
+      });
+
+      if (fontsToLoad.length === 0) return;
+
+      try {
+        // Fetch Google Fonts list if we don't have it cached
+        if (googleFontsCache.current.size === 0) {
+          const googleFontsList = await google.fetchWebfontList();
+          googleFontsList.items.forEach((font) => {
+            googleFontsCache.current.set(font.family, font);
+          });
+        }
+
+        // Load each font that needs to be loaded
+        for (const font of fontsToLoad) {
+          const googleFont = googleFontsCache.current.get(font.family);
+
+          if (googleFont) {
+            await manager.loadGoogleFont(googleFont);
+            loadedFonts.current.add(font.family);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load Google Fonts:", error);
       }
-    });
+    };
 
-    // We won't clean up to avoid unnecessary reflows and blinking
-  }, [fonts]); // Only run effect when fonts array actually changes
+    loadFonts();
+  }, [fonts]);
 
-  // Cleanup only on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      injectedFonts.current.forEach((fontId) => {
-        const link = document.getElementById(fontId);
-        if (link) link.remove();
-      });
-      injectedFonts.current.clear();
+      // The font manager will handle cleanup automatically
+      managerRef.current = null;
+      loadedFonts.current.clear();
+      googleFontsCache.current.clear();
     };
-  }, []); // Empty dependency array means this cleanup runs only on unmount
+  }, []);
 
   return null;
-}
-
-function injectGoogleFontsLink(fontFamily: string): HTMLLinkElement {
-  const id = `gfm-${google.familyid(fontFamily)}`;
-  const existing = document.getElementById(id);
-  if (existing) return existing as HTMLLinkElement;
-
-  // Load the font dynamically using the Google Fonts API
-  const link = document.createElement("link");
-  link.id = id;
-  link.setAttribute("data-gfm", "true");
-  link.setAttribute("data-font-family", fontFamily);
-  link.href = google.csslink({ fontFamily });
-  link.rel = "stylesheet";
-  document.head.appendChild(link);
-
-  return link;
-}
-
-export function GoogleFontsPreview({
-  fontFamily,
-  className,
-}: {
-  fontFamily: string;
-  className?: string;
-}) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      data-font-family={fontFamily}
-      src={google.svglink(google.familyid(fontFamily))}
-      alt={fontFamily}
-      className={cn("dark:invert", className)}
-    />
-  );
 }

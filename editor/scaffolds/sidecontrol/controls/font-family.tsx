@@ -1,4 +1,3 @@
-import { GoogleFontsPreview } from "@/grida-canvas-react/components/google-fonts";
 import {
   ItemRendererProps,
   VirtualizedCombobox,
@@ -10,6 +9,7 @@ import React, { createContext } from "react";
 import { TMixed } from "./utils/types";
 import grida from "@grida/schema";
 import { type GoogleWebFontListItem } from "@grida/fonts/google";
+import * as google from "@grida/fonts/google";
 
 const FontFamilyListContext = createContext<GoogleWebFontListItem[]>([]);
 
@@ -26,6 +26,24 @@ export function FontFamilyListProvider({
 
 function useFontFamilyList() {
   return React.useContext(FontFamilyListContext);
+}
+
+function GoogleFontsPreview({
+  fontFamily,
+  className,
+}: {
+  fontFamily: string;
+  className?: string;
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      data-font-family={fontFamily}
+      src={google.svglink(google.familyid(fontFamily))}
+      alt={fontFamily}
+      className={cn("dark:invert", className)}
+    />
+  );
 }
 
 function Item({ option, selected }: ItemRendererProps) {

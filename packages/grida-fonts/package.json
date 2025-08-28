@@ -3,8 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "tsup index.ts google.ts fontface.ts --format cjs,esm --dts --watch",
-    "build": "tsup index.ts google.ts fontface.ts --format cjs,esm --dts",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsup index.ts google.ts fontface.ts fontface-dom.ts --format cjs,esm --dts --watch",
+    "build": "tsup index.ts google.ts fontface.ts fontface-dom.ts --format cjs,esm --dts",
     "test": "jest",
     "test:watch": "jest --watch"
   },
@@ -29,6 +30,11 @@
       "types": "./dist/fontface.d.ts",
       "import": "./dist/fontface.mjs",
       "require": "./dist/fontface.js"
+    },
+    "./fontface-dom": {
+      "types": "./dist/fontface-dom.d.ts",
+      "import": "./dist/fontface-dom.mjs",
+      "require": "./dist/fontface-dom.js"
     }
   },
   "devDependencies": {
