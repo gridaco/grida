@@ -41,6 +41,7 @@ export namespace sitemap {
     studio: "https://grida.studio",
     corssh: "https://cors.sh",
     blog: "/blog",
+    fonts: "https://fonts.grida.co",
     changelog: "https://x.com/univ___erse",
   };
 
@@ -100,6 +101,11 @@ export namespace sitemap {
       title: "Library",
       href: links.library,
       description: "Free hand picked design resources",
+    } satisfies Item,
+    fonts: {
+      title: "Fonts",
+      href: links.fonts,
+      description: "Open Fonts API",
     } satisfies Item,
     tools: {
       title: "Tools",
