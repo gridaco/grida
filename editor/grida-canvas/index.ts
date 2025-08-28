@@ -2213,11 +2213,18 @@ export namespace editor.api {
     listLoadedFonts(): string[];
 
     /**
-     * Retrieves font metadata and variation axes.
+     * Retrieves font metadata, variation axes and features.
      */
     getFontDetails(
       fontFamily: string
-    ): Promise<{ font: GoogleWebFontListItem; axes: FvarAxes } | null>;
+    ): Promise<
+      | {
+          font: GoogleWebFontListItem;
+          axes: FvarAxes;
+          features: cg.OpenTypeFeature[];
+        }
+      | null
+    >;
   }
 
   export interface IExportPluginActions {

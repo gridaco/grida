@@ -26,10 +26,12 @@ import {
 import type cg from "@grida/cg";
 import { AXES } from "@grida/fonts/k";
 import { ChevronRight } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   Preview,
   type BasicPreview,
   type VariationPreview,
+  type FeaturePreview,
   type PropertyKey,
 } from "./text-details-preview";
 
@@ -386,6 +388,8 @@ interface TextDetailsProps {
       def: number;
     }
   >;
+  fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
+  features?: cg.OpenTypeFeature[];
 
   // Change handlers
   onTextAlignChange?: (value: cg.TextAlign) => void;
@@ -403,6 +407,7 @@ interface TextDetailsProps {
   onTruncateChange?: (value: boolean) => void;
   onFontVariationChange?: (key: string, value: number) => void;
   onFontWeightChange?: (value: number) => void;
+  onFontFeatureChange?: (key: cg.OpenTypeFeature, value: boolean) => void;
 }
 
 export function TextDetails({
@@ -422,6 +427,8 @@ export function TextDetails({
   fontWeight = 400,
   fontFamily,
   axes = {},
+  fontFeatures = {},
+  features = [],
 
   // Change handlers
   onTextAlignChange,
@@ -437,9 +444,10 @@ export function TextDetails({
   onMaxLengthChange,
   onFontVariationChange,
   onFontWeightChange,
+  onFontFeatureChange,
 }: TextDetailsProps) {
   const [hoverPreview, setHoverPreview] = useState<
-    BasicPreview | VariationPreview
+    BasicPreview | VariationPreview | FeaturePreview
   >(null);
 
   const handleHover = (
@@ -466,10 +474,21 @@ export function TextDetails({
     setHoverPreview(null);
   };
 
+  const handleFeatureHover = (feature: cg.OpenTypeFeature) => {
+    setHoverPreview({ feature });
+  };
+
+  const handleFeatureHoverLeave = () => {
+    setHoverPreview(null);
+  };
+
   const handleTruncateToggleChange = (value: string) => {
     const isEnabled = value === "on";
     onTruncateChange?.(isEnabled);
   };
+
+  const hasVariableAxes = Object.keys(axes).length > 0;
+  const hasFeatures = features.length > 0;
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -480,19 +499,27 @@ export function TextDetails({
             <TabsTrigger value="basics" className="text-xs">
               Basics
             </TabsTrigger>
-            <TabsTrigger value="details" className="text-xs" disabled>
+            <TabsTrigger value="details" className="text-xs">
               Details
             </TabsTrigger>
-            <TabsTrigger value="variable" className="text-xs">
-              Variable
-            </TabsTrigger>
+            {hasVariableAxes && (
+              <TabsTrigger value="variable" className="text-xs">
+                Variable
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
         {/* Fixed Preview */}
         <div className="flex-shrink-0 px-2">
           <Preview
-            type={hoverPreview && "axis" in hoverPreview ? "axes" : "basics"}
+            type={
+              hoverPreview && "axis" in hoverPreview
+                ? "axes"
+                : hoverPreview && "feature" in hoverPreview
+                  ? "features"
+                  : "basics"
+            }
             hoverPreview={hoverPreview}
             axes={axes}
             fontVariations={fontVariations}
@@ -657,37 +684,94 @@ export function TextDetails({
             </PropertyLine>
           </TabsContent>
 
-          {/* Details Tab - Disabled for now */}
+          {/* Details Tab */}
           <TabsContent value="details" className="mt-3 px-2 pb-4">
-            <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
-              Details tab is disabled for now
-            </div>
+            {hasFeatures && (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <PropertyLine>
+                    <PropertyLineLabel>Features</PropertyLineLabel>
+                  </PropertyLine>
+                  <div className="space-y-3">
+                    {features.map((feature) => {
+                      const enabled = fontFeatures?.[feature] ?? true;
+                      return (
+                        <div
+                          key={feature}
+                          onPointerEnter={() => handleFeatureHover(feature)}
+                          onPointerLeave={handleFeatureHoverLeave}
+                        >
+                          <PropertyLine>
+                            <PropertyLineLabel>{feature}</PropertyLineLabel>
+                            <Switch
+                              checked={enabled}
+                              onCheckedChange={(checked) =>
+                                onFontFeatureChange?.(feature, checked)
+                              }
+                              aria-label={`Toggle ${feature} feature`}
+                            />
+                          </PropertyLine>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+            {!hasFeatures && (
+              <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
+                No features available
+              </div>
+            )}
           </TabsContent>
 
           {/* Variable Tab */}
-          <TabsContent value="variable" className="mt-3 px-2 pb-4">
-            {Object.entries(axes).map(([key, axis]) => {
-              const label = AXES[key] ?? key;
-              const value = fvar.get(fontVariations, fontWeight, key);
+          {hasVariableAxes && (
+            <TabsContent value="variable" className="mt-3 px-2 pb-4">
+              {Object.entries(axes).map(([key, axis]) => {
+                const label = AXES[key] ?? key;
+                const value = fvar.get(fontVariations, fontWeight, key);
 
-              return (
-                <div
-                  className="space-y-3 pb-6 last:mb-0 transition-all duration-200"
-                  key={key}
-                  onPointerEnter={() => {
-                    handleAxisHover(key);
-                  }}
-                  onPointerLeave={() => {
-                    handleAxisHoverLeave();
-                  }}
-                >
-                  <PropertyLine>
-                    <PropertyLineLabel>{label}</PropertyLineLabel>
-                    <div className="w-16">
-                      <InputPropertyNumber
-                        mode="fixed"
-                        value={value}
-                        onValueCommit={(v) => {
+                return (
+                  <div
+                    className="space-y-3 pb-6 last:mb-0 transition-all duration-200"
+                    key={key}
+                    onPointerEnter={() => {
+                      handleAxisHover(key);
+                    }}
+                    onPointerLeave={() => {
+                      handleAxisHoverLeave();
+                    }}
+                  >
+                    <PropertyLine>
+                      <PropertyLineLabel>{label}</PropertyLineLabel>
+                      <div className="w-16">
+                        <InputPropertyNumber
+                          mode="fixed"
+                          value={value}
+                          onValueCommit={(v) => {
+                            fvar.set(
+                              key,
+                              v,
+                              onFontVariationChange,
+                              onFontWeightChange
+                            );
+                          }}
+                          min={axis.min}
+                          max={axis.max}
+                          step={1}
+                        />
+                      </div>
+                    </PropertyLine>
+                    <div>
+                      <Slider
+                        value={[value]}
+                        max={axis.max}
+                        min={axis.min}
+                        step={1}
+                        className="w-full"
+                        onValueChange={(values) => {
+                          const v = values[0];
                           fvar.set(
                             key,
                             v,
@@ -695,34 +779,13 @@ export function TextDetails({
                             onFontWeightChange
                           );
                         }}
-                        min={axis.min}
-                        max={axis.max}
-                        step={1}
                       />
                     </div>
-                  </PropertyLine>
-                  <div>
-                    <Slider
-                      value={[value]}
-                      max={axis.max}
-                      min={axis.min}
-                      step={1}
-                      className="w-full"
-                      onValueChange={(values) => {
-                        const v = values[0];
-                        fvar.set(
-                          key,
-                          v,
-                          onFontVariationChange,
-                          onFontWeightChange
-                        );
-                      }}
-                    />
                   </div>
-                </div>
-              );
-            })}
-          </TabsContent>
+                );
+              })}
+            </TabsContent>
+          )}
         </div>
       </Tabs>
     </div>

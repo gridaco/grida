@@ -18,7 +18,7 @@ import { EditorFollowPlugin } from "./plugins/follow";
 import type { Grida2D } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
 import * as google from "@grida/fonts/google";
-import { parseFvar, type FvarAxes } from "@grida/fonts/parse";
+import { parseFvar, parseFeatures, type FvarAxes } from "@grida/fonts/parse";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
@@ -121,7 +121,11 @@ export class Editor
 
   private fontDetailsCache = new Map<
     string,
-    { font: google.GoogleWebFontListItem; axes: FvarAxes }
+    {
+      font: google.GoogleWebFontListItem;
+      axes: FvarAxes;
+      features: cg.OpenTypeFeature[];
+    }
   >();
 
   get state(): Readonly<editor.state.IEditorState> {
@@ -2686,7 +2690,14 @@ export class Editor
 
   async getFontDetails(
     fontFamily: string
-  ): Promise<{ font: google.GoogleWebFontListItem; axes: FvarAxes } | null> {
+  ): Promise<
+    | {
+        font: google.GoogleWebFontListItem;
+        axes: FvarAxes;
+        features: cg.OpenTypeFeature[];
+      }
+    | null
+  > {
     if (this.fontDetailsCache.has(fontFamily)) {
       return this.fontDetailsCache.get(fontFamily)!;
     }
@@ -2705,7 +2716,8 @@ export class Editor
     const res = await fetch(url);
     const buffer = await res.arrayBuffer();
     const axes = parseFvar(buffer);
-    const detail = { font: item, axes } as const;
+    const features = parseFeatures(buffer) as cg.OpenTypeFeature[];
+    const detail = { font: item, axes, features } as const;
     this.fontDetailsCache.set(fontFamily, detail);
     return detail;
   }

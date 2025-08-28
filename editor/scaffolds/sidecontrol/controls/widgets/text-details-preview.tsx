@@ -24,6 +24,10 @@ type VariationPreview = {
   axis: string;
 } | null;
 
+type FeaturePreview = {
+  feature: cg.OpenTypeFeature;
+} | null;
+
 interface BasicsPreviewProps {
   style?: React.CSSProperties;
   showPlaceholder?: boolean;
@@ -45,7 +49,7 @@ interface AxesPreviewProps {
 
 interface PreviewProps {
   // Preview state
-  hoverPreview?: BasicPreview | VariationPreview;
+  hoverPreview?: BasicPreview | VariationPreview | FeaturePreview;
 
   // Axes preview props
   axes?: Record<
@@ -61,7 +65,7 @@ interface PreviewProps {
   fontFamily?: string;
 
   // Type indicator
-  type: "basics" | "axes";
+  type: "basics" | "axes" | "features";
 }
 
 const getTextStyle = (
@@ -192,6 +196,49 @@ function AxesPreview({
   );
 }
 
+function FeaturesPreview({
+  fontFamily,
+  fontWeight,
+  hoveredFeature,
+}: {
+  fontFamily?: string;
+  fontWeight?: number;
+  hoveredFeature: cg.OpenTypeFeature | null;
+}) {
+  if (!hoveredFeature) {
+    return (
+      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center">
+        <span className="text-muted-foreground text-sm">Preview</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center gap-8">
+      <div
+        className="text-2xl font-medium"
+        style={{
+          fontFamily,
+          fontWeight,
+          fontFeatureSettings: `"${hoveredFeature}" off`,
+        }}
+      >
+        Ag123456789
+      </div>
+      <div
+        className="text-2xl font-medium"
+        style={{
+          fontFamily,
+          fontWeight,
+          fontFeatureSettings: `"${hoveredFeature}" on`,
+        }}
+      >
+        Ag123456789
+      </div>
+    </div>
+  );
+}
+
 function Preview(props: PreviewProps) {
   if (props.type === "basics") {
     const basicPreview = props.hoverPreview as BasicPreview;
@@ -216,6 +263,15 @@ function Preview(props: PreviewProps) {
         hoveredAxis={axesPreview?.axis ?? null}
       />
     );
+  } else if (props.type === "features") {
+    const featurePreview = props.hoverPreview as FeaturePreview;
+    return (
+      <FeaturesPreview
+        fontFamily={props.fontFamily}
+        fontWeight={props.fontWeight}
+        hoveredFeature={featurePreview?.feature ?? null}
+      />
+    );
   }
   return null;
 }
@@ -224,5 +280,6 @@ export {
   Preview,
   type BasicPreview,
   type VariationPreview,
+  type FeaturePreview,
   type BasicPropertyKey as PropertyKey,
 };

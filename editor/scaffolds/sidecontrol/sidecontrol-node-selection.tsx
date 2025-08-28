@@ -1291,6 +1291,7 @@ function SectionText({ node_id }: { node_id: string }) {
     maxLines,
     maxLength,
     fontVariations,
+    fontFeatures,
   } = useNodeState(node_id, (node) => ({
     text: node.text,
     fontFamily: node.fontFamily,
@@ -1309,21 +1310,29 @@ function SectionText({ node_id }: { node_id: string }) {
     maxLines: node.maxLines,
     maxLength: node.maxLength,
     fontVariations: node.fontVariations,
+    fontFeatures: node.fontFeatures,
   }));
 
   type AxisMap = Record<string, { min: number; max: number; def: number }>;
   const [axes, setAxes] = React.useState<AxisMap>({});
+  const [features, setFeatures] = React.useState<cg.OpenTypeFeature[]>([]);
 
   React.useEffect(() => {
     let canceled = false;
     (async () => {
       if (!fontFamily) {
-        if (!canceled) setAxes({});
+        if (!canceled) {
+          setAxes({});
+          setFeatures([]);
+        }
         return;
       }
       const detail = await instance.getFontDetails(fontFamily);
       if (!detail) {
-        if (!canceled) setAxes({});
+        if (!canceled) {
+          setAxes({});
+          setFeatures([]);
+        }
         return;
       }
       const record: AxisMap = {};
@@ -1331,7 +1340,10 @@ function SectionText({ node_id }: { node_id: string }) {
         const axis = detail.axes[tag];
         record[tag] = axis;
       }
-      if (!canceled) setAxes(record);
+      if (!canceled) {
+        setAxes(record);
+        setFeatures(detail.features as cg.OpenTypeFeature[]);
+      }
     })();
     return () => {
       canceled = true;
@@ -1364,6 +1376,8 @@ function SectionText({ node_id }: { node_id: string }) {
                 fontVariations={fontVariations}
                 fontWeight={fontWeight}
                 fontFamily={fontFamily}
+                fontFeatures={fontFeatures}
+                features={features}
                 onTextTransformChange={actions.textTransform}
                 onTextAlignChange={actions.textAlign}
                 onTextDecorationLineChange={actions.textDecorationLine}
@@ -1380,6 +1394,9 @@ function SectionText({ node_id }: { node_id: string }) {
                 }
                 onFontVariationChange={(key, value) => {
                   actions.fontVariation(key, value);
+                }}
+                onFontFeatureChange={(key, value) => {
+                  actions.fontFeature(key, value);
                 }}
               />
             </DropdownMenuContent>
