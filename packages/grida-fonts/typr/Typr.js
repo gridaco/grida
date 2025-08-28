@@ -335,7 +335,7 @@ Typr["B"] = {
     }
     return s;
   },
-  _tdec: window["TextDecoder"] ? new window["TextDecoder"]() : null,
+  _tdec: typeof TextDecoder !== "undefined" ? new TextDecoder() : null,
   readUTF8: function (buff, p, l) {
     var tdec = Typr["B"]._tdec;
     if (tdec && p == 0 && l == buff.length) return tdec["decode"](buff);
@@ -930,6 +930,10 @@ Typr["T"].CFF = {
     return dict;
   },
 };
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = Typr;
+}
 
 Typr["T"].cmap = {
   parseTab: function (data, offset, length) {
