@@ -12,6 +12,8 @@ describe("fvar parsing", () => {
     const { axes, instances } = parseFvar(buf);
     expect(axes.wght).toMatchObject({ min: 100, max: 1000, def: 400 });
     expect(axes).toHaveProperty("wdth");
+    expect(axes).toHaveProperty("slnt");
+    expect(axes.slnt).toMatchObject({ min: -10, max: 0, def: 0 });
     expect(instances.length).toBeGreaterThan(0);
     expect(instances[0].coordinates).toHaveProperty("wght");
   });

@@ -246,10 +246,8 @@ Typr["T"] = {};
 
 Typr["B"] = {
   readFixed: function (data, o) {
-    return (
-      ((data[o] << 8) | data[o + 1]) +
-      ((data[o + 2] << 8) | data[o + 3]) / (256 * 256 + 4)
-    );
+    var value = Typr["B"].readInt(data, o);
+    return value / 65536;
   },
   readF2dot14: function (data, o) {
     var num = Typr["B"].readShort(data, o);
