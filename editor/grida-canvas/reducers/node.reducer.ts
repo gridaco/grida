@@ -421,6 +421,18 @@ const safe_properties: Partial<
       (draft as UN).fontWeight = value;
     },
   }),
+  fontFeatures: defineNodeProperty<"fontFeatures">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontFeatures = value;
+    },
+  }),
+  fontVariations: defineNodeProperty<"fontVariations">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontVariations = value;
+    },
+  }),
   fontSize: defineNodeProperty<"fontSize">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {

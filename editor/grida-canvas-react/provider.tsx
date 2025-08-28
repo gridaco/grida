@@ -30,7 +30,6 @@ import * as google from "@grida/fonts/google";
 
 type Dispatcher = (action: Action) => void;
 
-
 export function StandaloneDocumentEditor({
   editor,
   children,
@@ -194,6 +193,10 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeFontFamily(node_id, value),
       fontWeight: (value: cg.NFontWeight) =>
         instance.changeTextNodeFontWeight(node_id, value),
+      fontFeature: (key: cg.OpenTypeFeature, value: boolean) =>
+        instance.changeTextNodeFontFeature(node_id, key, value),
+      fontVariation: (key: string, value: number) =>
+        instance.changeTextNodeFontVariation(node_id, key, value),
       fontSize: (change: editor.api.NumberChange) =>
         instance.changeTextNodeFontSize(node_id, change),
       textAlign: (value: cg.TextAlign) =>

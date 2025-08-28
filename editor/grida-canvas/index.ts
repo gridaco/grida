@@ -1664,6 +1664,16 @@ export namespace editor.api {
     ): void;
     changeTextNodeFontFamily(node_id: NodeID, fontFamily: string): void;
     changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
+    changeTextNodeFontFeature(
+      node_id: NodeID,
+      feature: cg.OpenTypeFeature,
+      value: boolean
+    ): void;
+    changeTextNodeFontVariation(
+      node_id: NodeID,
+      key: string,
+      value: number
+    ): void;
     changeTextNodeFontSize(
       node_id: NodeID,
       fontSize: editor.api.NumberChange
@@ -2206,10 +2216,8 @@ export namespace editor.api {
      * Retrieves font metadata and variation axes.
      */
     getFontDetails(
-      fontFamily: string,
-    ): Promise<
-      { font: GoogleWebFontListItem; axes: FvarAxes } | null
-    >;
+      fontFamily: string
+    ): Promise<{ font: GoogleWebFontListItem; axes: FvarAxes } | null>;
   }
 
   export interface IExportPluginActions {

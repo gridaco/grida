@@ -419,10 +419,11 @@ interface TextDetailsProps {
   maxLength?: number | null;
   verticalTrim?: VerticalTrim;
   truncate?: boolean;
+  fontVariations?: Record<string, number>;
+  fontWeight?: number;
   axes?: Record<
     string,
     {
-      value?: number;
       min: number;
       max: number;
       def: number;
@@ -443,9 +444,35 @@ interface TextDetailsProps {
   onMaxLengthChange?: (value: number) => void;
   onVerticalTrimChange?: (value: VerticalTrim) => void;
   onTruncateChange?: (value: boolean) => void;
-  onAxesChange?: (key: string, value: number) => void;
+  onFontVariationChange?: (key: string, value: number) => void;
   onFontWeightChange?: (value: number) => void;
 }
+
+// Wrapper object to handle fontVariations with special "wght" axis handling
+const fvar = {
+  get: (
+    fontVariations: Record<string, number> = {},
+    fontWeight: number | undefined,
+    key: string
+  ): number => {
+    if (key === "wght") {
+      return fontWeight ?? fontVariations[key] ?? 400;
+    }
+    return fontVariations[key] ?? 400;
+  },
+  set: (
+    key: string,
+    value: number,
+    onFontVariationChange?: (key: string, value: number) => void,
+    onFontWeightChange?: (value: number) => void
+  ): void => {
+    if (key === "wght") {
+      onFontWeightChange?.(value);
+    } else {
+      onFontVariationChange?.(key, value);
+    }
+  },
+};
 
 const getTextStyle = (
   hoverPreview: HoverPreview
@@ -519,6 +546,8 @@ export function TextDetails({
   truncate = false,
   maxLines = 1,
   maxLength = null,
+  fontVariations = {},
+  fontWeight = 400,
   axes = {},
 
   // Change handlers
@@ -533,7 +562,7 @@ export function TextDetails({
   onTruncateChange,
   onMaxLinesChange,
   onMaxLengthChange,
-  onAxesChange,
+  onFontVariationChange,
   onFontWeightChange,
 }: TextDetailsProps) {
   const [hoverPreview, setHoverPreview] = useState<HoverPreview>(null);
@@ -749,7 +778,7 @@ export function TextDetails({
           <TabsContent value="variable" className="space-y-4 mt-3 px-2 pb-4">
             {Object.entries(axes).map(([key, axis]) => {
               const label = AXES[key] ?? key;
-              const value = axis.value ?? axis.def;
+              const value = fvar.get(fontVariations, fontWeight, key);
 
               return (
                 <div className="space-y-2" key={key}>
@@ -764,11 +793,12 @@ export function TextDetails({
                         className="w-full"
                         onValueChange={(values) => {
                           const v = values[0];
-                          if (key === "wght") {
-                            onFontWeightChange?.(v);
-                          } else {
-                            onAxesChange?.(key, v);
-                          }
+                          fvar.set(
+                            key,
+                            v,
+                            onFontVariationChange,
+                            onFontWeightChange
+                          );
                         }}
                       />
                     </div>

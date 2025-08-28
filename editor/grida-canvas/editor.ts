@@ -81,7 +81,7 @@ export class Editor
     editor.api.IVectorInterfaceActions,
     editor.api.IFontLoaderActions,
     editor.api.IExportPluginActions
-  {
+{
   private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
@@ -1382,9 +1382,7 @@ export class Editor
     });
   }
 
-  public toggleUnderline(
-    target: "selection" | editor.NodeID = "selection"
-  ) {
+  public toggleUnderline(target: "selection" | editor.NodeID = "selection") {
     const target_ids =
       target === "selection" ? this.mstate.selection : [target];
     target_ids.forEach((node_id) => {
@@ -1395,9 +1393,7 @@ export class Editor
     });
   }
 
-  public toggleLineThrough(
-    target: "selection" | editor.NodeID = "selection"
-  ) {
+  public toggleLineThrough(target: "selection" | editor.NodeID = "selection") {
     const target_ids =
       target === "selection" ? this.mstate.selection : [target];
     target_ids.forEach((node_id) => {
@@ -1841,6 +1837,40 @@ export class Editor
       type: "node/change/*",
       node_id: node_id,
       fontWeight,
+    });
+  }
+  changeTextNodeFontFeature(
+    node_id: editor.NodeID,
+    feature: cg.OpenTypeFeature,
+    value: boolean
+  ): void {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    const features = Object.assign({}, node.fontFeatures ?? {});
+    features[feature] = value;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontFeatures: features,
+    });
+  }
+  changeTextNodeFontVariation(
+    node_id: editor.NodeID,
+    key: string,
+    value: number
+  ): void {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    const variations = Object.assign({}, node.fontVariations ?? {});
+    variations[key] = value;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontVariations: variations,
     });
   }
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
@@ -2655,14 +2685,14 @@ export class Editor
   }
 
   async getFontDetails(
-    fontFamily: string,
+    fontFamily: string
   ): Promise<{ font: google.GoogleWebFontListItem; axes: FvarAxes } | null> {
     if (this.fontDetailsCache.has(fontFamily)) {
       return this.fontDetailsCache.get(fontFamily)!;
     }
 
     let item = this.mstate.webfontlist.items.find(
-      (f) => f.family === fontFamily,
+      (f) => f.family === fontFamily
     );
     if (!item) {
       const list = await google.fetchWebfontList();

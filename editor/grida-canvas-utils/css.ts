@@ -182,6 +182,8 @@ export namespace css {
         fontWeight,
         letterSpacing,
         lineHeight,
+        fontFeatures,
+        fontVariations,
       } = styles as grida.program.nodes.i.ITextStyle;
 
       result = {
@@ -201,6 +203,8 @@ export namespace css {
           fontWeight,
           letterSpacing,
           lineHeight,
+          fontFeatures,
+          fontVariations,
           fill: fill!,
         }),
       };
@@ -258,6 +262,8 @@ export namespace css {
     | "fontWeight"
     | "letterSpacing"
     | "lineHeight"
+    | "fontFeatureSettings"
+    | "fontVariationSettings"
     | "color"
   > {
     const {
@@ -273,6 +279,8 @@ export namespace css {
       fontWeight,
       letterSpacing,
       lineHeight,
+      fontFeatures,
+      fontVariations,
       fill,
     } = style;
 
@@ -303,8 +311,30 @@ export namespace css {
       letterSpacing: letterSpacing,
       fontSize: fontSize,
       fontWeight: fontWeight,
+      fontFeatureSettings: fontFeatures
+        ? toFontFeatureSettings(fontFeatures)
+        : undefined,
+      fontVariationSettings: fontVariations
+        ? toFontVariationSettings(fontVariations)
+        : undefined,
       color: fill ? toFillString(fill) : undefined,
     };
+  }
+
+  function toFontFeatureSettings(
+    features: Partial<Record<cg.OpenTypeFeature, boolean>>
+  ): string {
+    return Object.entries(features)
+      .map(([feature, enabled]) => `"${feature}" ${enabled ? "on" : "off"}`)
+      .join(", ");
+  }
+
+  function toFontVariationSettings(
+    variations: Record<string, number>
+  ): string {
+    return Object.entries(variations)
+      .map(([axis, value]) => `"${axis}" ${value}`)
+      .join(", ");
   }
 
   function boxShadowToCSS(boxShadow: cg.BoxShadow, inset?: boolean): string {

@@ -1290,6 +1290,7 @@ function SectionText({ node_id }: { node_id: string }) {
     textTransform,
     maxLines,
     maxLength,
+    fontVariations,
   } = useNodeState(node_id, (node) => ({
     text: node.text,
     fontFamily: node.fontFamily,
@@ -1307,12 +1308,10 @@ function SectionText({ node_id }: { node_id: string }) {
     textTransform: node.textTransform,
     maxLines: node.maxLines,
     maxLength: node.maxLength,
+    fontVariations: node.fontVariations,
   }));
 
-  type AxisMap = Record<
-    string,
-    { value?: number; min: number; max: number; def: number }
-  >;
+  type AxisMap = Record<string, { min: number; max: number; def: number }>;
   const [axes, setAxes] = React.useState<AxisMap>({});
 
   React.useEffect(() => {
@@ -1330,10 +1329,7 @@ function SectionText({ node_id }: { node_id: string }) {
       const record: AxisMap = {};
       for (const tag of Object.keys(detail.axes)) {
         const axis = detail.axes[tag];
-        record[tag] = {
-          ...axis,
-          value: tag === "wght" ? (fontWeight as number) : axis.def,
-        };
+        record[tag] = axis;
       }
       if (!canceled) setAxes(record);
     })();
@@ -1365,6 +1361,8 @@ function SectionText({ node_id }: { node_id: string }) {
                 textTransform={textTransform}
                 maxLines={maxLines}
                 maxLength={maxLength}
+                fontVariations={fontVariations}
+                fontWeight={fontWeight}
                 onTextTransformChange={actions.textTransform}
                 onTextAlignChange={actions.textAlign}
                 onTextDecorationLineChange={actions.textDecorationLine}
@@ -1379,6 +1377,9 @@ function SectionText({ node_id }: { node_id: string }) {
                 onFontWeightChange={(value) =>
                   actions.fontWeight(value as cg.NFontWeight)
                 }
+                onFontVariationChange={(key, value) => {
+                  actions.fontVariation(key, value);
+                }}
               />
             </DropdownMenuContent>
           </DropdownMenu>
