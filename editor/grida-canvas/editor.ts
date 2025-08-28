@@ -23,6 +23,7 @@ import {
   CanvasWasmPDFExportInterfaceProvider,
   CanvasWasmSVGExportInterfaceProvider,
   CanvasWasmVectorInterfaceProvider,
+  CanvasWasmFontLoaderInterfaceProvider,
 } from "./backends/wasm";
 
 function resolveNumberChangeValue(
@@ -281,6 +282,15 @@ export class Editor
     );
 
     this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
+
+    this._m_font_loader = new CanvasWasmFontLoaderInterfaceProvider(
+      this,
+      surface
+    );
+
+    for (const font of this.mstate.googlefonts) {
+      void this.loadFont(font);
+    }
   }
 
   public archive(): Blob {
