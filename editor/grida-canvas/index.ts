@@ -12,7 +12,7 @@ import type {
   GoogleWebFontList,
   GoogleWebFontListItem,
 } from "@grida/fonts/google";
-import type { FvarAxes } from "@grida/fonts/parse";
+import type { FvarAxes, FvarInstance } from "@grida/fonts/parse";
 import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
@@ -2215,16 +2215,12 @@ export namespace editor.api {
     /**
      * Retrieves font metadata, variation axes and features.
      */
-    getFontDetails(
-      fontFamily: string
-    ): Promise<
-      | {
-          font: GoogleWebFontListItem;
-          axes: FvarAxes;
-          features: cg.OpenTypeFeature[];
-        }
-      | null
-    >;
+    getFontDetails(fontFamily: string): Promise<{
+      font: GoogleWebFontListItem;
+      axes: FvarAxes;
+      instances: FvarInstance[];
+      features: cg.OpenTypeFeature[];
+    } | null>;
   }
 
   export interface IExportPluginActions {

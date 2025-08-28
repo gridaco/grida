@@ -18,7 +18,12 @@ import { EditorFollowPlugin } from "./plugins/follow";
 import type { Grida2D } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
 import * as google from "@grida/fonts/google";
-import { parseFvar, parseFeatures, type FvarAxes } from "@grida/fonts/parse";
+import {
+  parseFvar,
+  parseFeatures,
+  type FvarAxes,
+  type FvarInstance,
+} from "@grida/fonts/parse";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
@@ -124,6 +129,7 @@ export class Editor
     {
       font: google.GoogleWebFontListItem;
       axes: FvarAxes;
+      instances: FvarInstance[];
       features: cg.OpenTypeFeature[];
     }
   >();
@@ -2688,16 +2694,12 @@ export class Editor
     return this.fontLoader.listLoadedFonts();
   }
 
-  async getFontDetails(
-    fontFamily: string
-  ): Promise<
-    | {
-        font: google.GoogleWebFontListItem;
-        axes: FvarAxes;
-        features: cg.OpenTypeFeature[];
-      }
-    | null
-  > {
+  async getFontDetails(fontFamily: string): Promise<{
+    font: google.GoogleWebFontListItem;
+    axes: FvarAxes;
+    instances: FvarInstance[];
+    features: cg.OpenTypeFeature[];
+  } | null> {
     if (this.fontDetailsCache.has(fontFamily)) {
       return this.fontDetailsCache.get(fontFamily)!;
     }
@@ -2715,9 +2717,9 @@ export class Editor
     const url = item.files[item.variants[0]] ?? Object.values(item.files)[0];
     const res = await fetch(url);
     const buffer = await res.arrayBuffer();
-    const axes = parseFvar(buffer);
+    const { axes, instances } = parseFvar(buffer);
     const features = parseFeatures(buffer) as cg.OpenTypeFeature[];
-    const detail = { font: item, axes, features } as const;
+    const detail = { font: item, axes, instances, features } as const;
     this.fontDetailsCache.set(fontFamily, detail);
     return detail;
   }
