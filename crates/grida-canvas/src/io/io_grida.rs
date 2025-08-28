@@ -427,6 +427,11 @@ pub struct JSONTextNode {
     #[serde(rename = "fontWeight", default)]
     pub font_weight: FontWeight,
 
+    #[serde(rename = "fontFeatures", default)]
+    pub font_features: Option<HashMap<String, bool>>,
+    #[serde(rename = "fontVariations", default)]
+    pub font_variations: Option<HashMap<String, f32>>,
+
     #[serde(rename = "textTransform", default)]
     pub text_transform: TextTransform,
 }
@@ -700,6 +705,16 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 letter_spacing: node.letter_spacing,
                 line_height: node.line_height,
                 text_transform: node.text_transform,
+                font_features: node.font_features.map(|ff| {
+                    ff.into_iter()
+                        .map(|(tag, value)| FontFeature { tag, value })
+                        .collect()
+                }),
+                font_variations: node.font_variations.map(|fv| {
+                    fv.into_iter()
+                        .map(|(axis, value)| FontVariation { axis, value })
+                        .collect()
+                }),
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,

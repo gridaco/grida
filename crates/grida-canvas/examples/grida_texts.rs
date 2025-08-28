@@ -28,6 +28,8 @@ async fn demo_texts() -> Scene {
         font_size: 48.0,
         italic: false,                     // TODO: add italic to text style
         font_weight: FontWeight::new(700), // Bold
+        font_features: None,
+        font_variations: None,
         letter_spacing: None,
         line_height: None,
         text_transform: TextTransform::Uppercase,

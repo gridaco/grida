@@ -92,43 +92,16 @@ fn main() {
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
 
         // Create cg TextStyle with specific slant
-        let text_style = TextStyleRec {
-            text_decoration: None,
-            font_family: "Recursive".to_string(),
-            font_size: font_size,
-            font_weight: FontWeight::new(400), // Keep weight constant
-            italic: false,
-            letter_spacing: None,
-            line_height: None,
-            text_transform: cg::cg::types::TextTransform::None,
-        };
+        let mut text_style = TextStyleRec::from_font("Recursive", font_size);
+        text_style.font_weight = FontWeight::new(400);
+        text_style.font_variations = Some(vec![FontVariation {
+            axis: "slnt".to_string(),
+            value: slant as f32,
+        }]);
 
         // Convert to Skia TextStyle using our textstyle() function
         let mut skia_text_style = textstyle(&text_style, &None);
         skia_text_style.set_foreground_paint(&paint);
-
-        // Apply slant variation directly to Skia text style
-        // Create slant variation coordinate
-        let slnt_coord = skia_safe::font_arguments::variation_position::Coordinate {
-            axis: skia_safe::FourByteTag::from(('s', 'l', 'n', 't')),
-            value: slant as f32,
-        };
-
-        // Create variation position with both weight and slant
-        let wght_coord = skia_safe::font_arguments::variation_position::Coordinate {
-            axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
-            value: 400.0, // Keep weight constant
-        };
-
-        let variation_position = skia_safe::font_arguments::VariationPosition {
-            coordinates: &[wght_coord, slnt_coord],
-        };
-
-        let font_args =
-            skia_safe::FontArguments::new().set_variation_design_position(variation_position);
-
-        skia_text_style.set_font_arguments(&font_args);
-
         para_builder.push_style(&skia_text_style);
         let text = format!(
             "The quick brown fox jumps over the lazy dog (slant: {}°)",

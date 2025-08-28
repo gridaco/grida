@@ -1,5 +1,6 @@
 use crate::cg;
 use crate::cg::types::*;
+pub use crate::cg::types::{FontFeature, FontVariation};
 use crate::node::repository::NodeRepository;
 use crate::shape::*;
 use crate::vectornetwork::*;

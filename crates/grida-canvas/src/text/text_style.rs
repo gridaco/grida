@@ -28,11 +28,18 @@ pub fn textstyle(
     );
 
     // [variables]
-
-    // [wght]
-    let wght = var_wght(style.font_weight.value() as f32);
+    let mut coords = vec![var_wght(style.font_weight.value() as f32)];
+    if let Some(vars) = &style.font_variations {
+        for v in vars {
+            let tag = tag_from_str(&v.axis);
+            coords.push(skia_safe::font_arguments::variation_position::Coordinate {
+                axis: tag,
+                value: v.value,
+            });
+        }
+    }
     let variation_position = skia_safe::font_arguments::VariationPosition {
-        coordinates: &[wght],
+        coordinates: coords.as_slice(),
     };
     let font_args =
         skia_safe::FontArguments::new().set_variation_design_position(variation_position);
@@ -49,6 +56,11 @@ pub fn textstyle(
     ts.set_font_families(&[&style.font_family]);
     ts.set_font_arguments(&font_args);
     ts.set_font_style(font_style);
+    if let Some(features) = &style.font_features {
+        for feature in features {
+            ts.add_font_feature(feature.tag.clone(), if feature.value { 1 } else { 0 });
+        }
+    }
     ts
 }
 
@@ -57,4 +69,13 @@ fn var_wght(weight: f32) -> skia_safe::font_arguments::variation_position::Coord
         axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
         value: weight,
     }
+}
+
+fn tag_from_str(tag: &str) -> skia_safe::FourByteTag {
+    let bytes = tag.as_bytes();
+    let b0 = *bytes.get(0).unwrap_or(&b' ');
+    let b1 = *bytes.get(1).unwrap_or(&b' ');
+    let b2 = *bytes.get(2).unwrap_or(&b' ');
+    let b3 = *bytes.get(3).unwrap_or(&b' ');
+    skia_safe::FourByteTag::from((b0 as char, b1 as char, b2 as char, b3 as char))
 }

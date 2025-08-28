@@ -26,6 +26,8 @@ async fn demo_webfonts() -> Scene {
         font_family: "Playfair Display".to_string(),
         font_size: 64.0,
         font_weight: FontWeight::new(700), // Bold
+        font_features: None,
+        font_variations: None,
         letter_spacing: None,
         italic: false,
         line_height: None,
@@ -45,6 +47,8 @@ async fn demo_webfonts() -> Scene {
         font_family: "Playfair Display".to_string(),
         font_size: 14.0,
         font_weight: FontWeight::new(400), // Regular
+        font_features: None,
+        font_variations: None,
         letter_spacing: None,
         italic: false,
         line_height: Some(1.5), // 1.5 line height for better readability
@@ -86,6 +90,8 @@ async fn demo_webfonts() -> Scene {
             font_family: "Albert Sans".to_string(),
             font_size: 24.0,
             font_weight: FontWeight::new(*weight),
+            font_features: None,
+            font_variations: None,
             letter_spacing: None,
             italic: *is_italic,
             line_height: None,

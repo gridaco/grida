@@ -92,39 +92,17 @@ fn main() {
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
 
         // Create cg TextStyle with specific casual value
-        let text_style = TextStyleRec::from_font("Recursive", font_size);
+        let text_style = TextStyleRec {
+            font_variations: Some(vec![FontVariation {
+                axis: "CASL".to_string(),
+                value: casual,
+            }]),
+            ..TextStyleRec::from_font("Recursive", font_size)
+        };
 
         // Convert to Skia TextStyle using our textstyle() function
         let mut skia_text_style = textstyle(&text_style, &None);
         skia_text_style.set_foreground_paint(&paint);
-
-        // Apply casual variation directly to Skia text style
-        // Create casual variation coordinate
-        let casl_coord = skia_safe::font_arguments::variation_position::Coordinate {
-            axis: skia_safe::FourByteTag::from(('C', 'A', 'S', 'L')),
-            value: casual,
-        };
-
-        // Create variation position with weight, slant, and casual
-        let wght_coord = skia_safe::font_arguments::variation_position::Coordinate {
-            axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
-            value: 400.0, // Keep weight constant
-        };
-
-        let slnt_coord = skia_safe::font_arguments::variation_position::Coordinate {
-            axis: skia_safe::FourByteTag::from(('s', 'l', 'n', 't')),
-            value: 0.0, // Keep slant constant (upright)
-        };
-
-        let variation_position = skia_safe::font_arguments::VariationPosition {
-            coordinates: &[wght_coord, slnt_coord, casl_coord],
-        };
-
-        let font_args =
-            skia_safe::FontArguments::new().set_variation_design_position(variation_position);
-
-        skia_text_style.set_font_arguments(&font_args);
-
         para_builder.push_style(&skia_text_style);
         let text = format!(
             "The quick brown fox jumps over the lazy dog (casual: {:.1})",

@@ -572,6 +572,18 @@ impl Default for TextStyleRecBuildContext {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct FontFeature {
+    pub tag: String,
+    pub value: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct FontVariation {
+    pub axis: String,
+    pub value: f32,
+}
+
 /// A set of style properties that can be applied to a text or text span.
 #[derive(Debug, Clone)]
 pub struct TextStyleRec {
@@ -598,6 +610,12 @@ pub struct TextStyleRec {
 
     /// Text transform (e.g. uppercase, lowercase, capitalize)
     pub text_transform: TextTransform,
+
+    /// OpenType font features
+    pub font_features: Option<Vec<FontFeature>>,
+
+    /// Custom font variation axes
+    pub font_variations: Option<Vec<FontVariation>>,
 }
 
 impl TextStyleRec {
@@ -611,6 +629,8 @@ impl TextStyleRec {
             letter_spacing: None,
             line_height: None,
             text_transform: TextTransform::None,
+            font_features: None,
+            font_variations: None,
         }
     }
 }

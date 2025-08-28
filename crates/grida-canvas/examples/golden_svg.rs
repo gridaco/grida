@@ -34,6 +34,8 @@ async fn demo_scene() -> Scene {
         font_family: "".to_string(),
         font_size: 36.0,
         font_weight: FontWeight::new(700),
+        font_features: None,
+        font_variations: None,
         italic: false,
         letter_spacing: None,
         line_height: None,

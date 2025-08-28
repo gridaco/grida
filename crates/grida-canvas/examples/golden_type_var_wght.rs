@@ -95,6 +95,8 @@ fn main() {
             font_family: "Geist".to_string(),
             font_size: font_size,
             font_weight: FontWeight::new(weight),
+            font_features: None,
+            font_variations: None,
             italic: false,
             letter_spacing: None,
             line_height: None,
