@@ -1,10 +1,8 @@
 import type grida from "@grida/schema";
 
-jest.mock(
-  "@grida/cmath",
-  () => ({ __esModule: true, default: {} }),
-  { virtual: true }
-);
+jest.mock("@grida/cmath", () => ({ __esModule: true, default: {} }), {
+  virtual: true,
+});
 jest.mock("color-name", () => ({}), { virtual: true });
 
 import { css } from "./css";
@@ -24,13 +22,13 @@ describe("toReactTextStyle", () => {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
       },
-      fontFeatures: { liga: false, smcp: true },
+      fontFeatures: { liga: false, smpl: true },
       fontVariations: { wght: 700, slnt: 12 },
     };
 
     const result = css.toReactTextStyle(style);
 
-    expect(result.fontFeatureSettings).toBe('"liga" off, "smcp" on');
+    expect(result.fontFeatureSettings).toBe('"liga" off, "smpl" on');
     expect(result.fontVariationSettings).toBe('"wght" 700, "slnt" 12');
   });
 });
