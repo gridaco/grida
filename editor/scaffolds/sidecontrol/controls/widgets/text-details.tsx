@@ -22,6 +22,8 @@ import {
   MinusIcon,
   OverlineIcon,
   StrikethroughIcon,
+  CheckIcon,
+  DashIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
 import { AXES, FEATURES } from "@grida/fonts/k";
@@ -479,8 +481,11 @@ export function TextDetails({
     setHoverPreview(null);
   };
 
-  const handleFeatureHover = (feature: cg.OpenTypeFeature) => {
-    setHoverPreview({ feature });
+  const handleFeatureHover = (
+    feature: cg.OpenTypeFeature,
+    value?: "0" | "1"
+  ) => {
+    setHoverPreview({ feature, value });
   };
 
   const handleFeatureHoverLeave = () => {
@@ -491,6 +496,12 @@ export function TextDetails({
     const isEnabled = value === "on";
     onTruncateChange?.(isEnabled);
   };
+
+  const handleFeatureToggleChange =
+    (feature: cg.OpenTypeFeature) => (value: string) => {
+      const isEnabled = value === "1";
+      onFontFeatureChange?.(feature, isEnabled);
+    };
 
   const hasVariableAxes = Object.keys(axes).length > 0;
   const hasFeatures = features.length > 0;
@@ -701,16 +712,23 @@ export function TextDetails({
                   </PropertyLine>
                   <div>
                     {features.map((feature) => {
-                      const enabled = fontFeatures?.[feature] ?? true;
+                      const enabled = fontFeatures?.[feature];
                       const featureInfo = FEATURES[feature];
                       const label = featureInfo?.name ?? feature;
+                      const featureToggleOptions = [
+                        {
+                          value: "0",
+                          icon: <DashIcon className="size-3" />,
+                          label: "Off",
+                        },
+                        {
+                          value: "1",
+                          icon: <CheckIcon className="size-3" />,
+                          label: "On",
+                        },
+                      ];
                       return (
-                        <div
-                          key={feature}
-                          onPointerEnter={() => handleFeatureHover(feature)}
-                          onPointerLeave={handleFeatureHoverLeave}
-                          className="pb-3 last:pb-0"
-                        >
+                        <div key={feature} className="pb-3 last:pb-0">
                           <PropertyLine>
                             <Tooltip delayDuration={200}>
                               <TooltipTrigger className="text-left">
@@ -722,12 +740,22 @@ export function TextDetails({
                                 <p>{feature}</p>
                               </TooltipContent>
                             </Tooltip>
-                            <Switch
-                              checked={enabled}
-                              onCheckedChange={(checked) =>
-                                onFontFeatureChange?.(feature, checked)
-                              }
-                              aria-label={`Toggle ${label} feature`}
+                            <PropertyEnumToggle
+                              enum={featureToggleOptions}
+                              value={enabled ? "1" : "0"}
+                              className="w-auto"
+                              size="sm"
+                              onValueChange={handleFeatureToggleChange(feature)}
+                              onValueSeeked={(value) => {
+                                if (value) {
+                                  handleFeatureHover(
+                                    feature,
+                                    value as "0" | "1"
+                                  );
+                                } else {
+                                  handleFeatureHoverLeave();
+                                }
+                              }}
                             />
                           </PropertyLine>
                         </div>

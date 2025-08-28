@@ -27,6 +27,7 @@ type VariationPreview = {
 
 type FeaturePreview = {
   feature: cg.OpenTypeFeature;
+  value?: "0" | "1";
 } | null;
 
 interface BasicsPreviewProps {
@@ -212,12 +213,14 @@ function FeaturesPreview({
   hoveredFeature,
   features = [],
   fontFeatures = {},
+  selectedValue,
 }: {
   fontFamily?: string;
   fontWeight?: number;
   hoveredFeature: cg.OpenTypeFeature | null;
   features?: cg.OpenTypeFeature[];
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
+  selectedValue?: "0" | "1";
 }) {
   if (!hoveredFeature) {
     return (
@@ -229,25 +232,16 @@ function FeaturesPreview({
 
   const featureInfo = FEATURES[hoveredFeature];
   const demoText = featureInfo?.demo || "Ag123456789";
+  const isEnabled = selectedValue === "1";
 
   return (
-    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center gap-8 overflow-hidden">
+    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
       <div
         className="text-2xl font-medium overflow-hidden"
         style={{
           fontFamily,
           fontWeight,
-          fontFeatureSettings: `"${hoveredFeature}" off`,
-        }}
-      >
-        {demoText}
-      </div>
-      <div
-        className="text-2xl font-medium overflow-hidden"
-        style={{
-          fontFamily,
-          fontWeight,
-          fontFeatureSettings: `"${hoveredFeature}" on`,
+          fontFeatureSettings: `"${hoveredFeature}" ${isEnabled ? "on" : "off"}`,
         }}
       >
         {demoText}
@@ -289,6 +283,7 @@ function Preview(props: PreviewProps) {
         hoveredFeature={featurePreview?.feature ?? null}
         features={props.features}
         fontFeatures={props.fontFeatures}
+        selectedValue={featurePreview?.value}
       />
     );
   }
