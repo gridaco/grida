@@ -3,6 +3,13 @@ import type { editor } from "..";
 import type { Editor } from "../editor";
 import type { Grida2D } from "@grida/canvas-wasm";
 import type vn from "@grida/vn";
+import {
+  UnifiedFontManager,
+  type FontAdapter,
+  type FontAdapterHandle,
+  type FontVariant,
+} from "@grida/fonts";
+import * as google from "@grida/fonts/google";
 
 export class CanvasWasmGeometryQueryInterfaceProvider
   implements editor.api.IDocumentGeometryInterfaceProvider
@@ -105,14 +112,49 @@ export class CanvasWasmVectorInterfaceProvider
   }
 }
 
+class WasmFontAdapter implements FontAdapter {
+  constructor(private surface: Grida2D) {}
+
+  async onRegister(
+    bytes: ArrayBuffer,
+    v: FontVariant
+  ): Promise<FontAdapterHandle> {
+    this.surface.registerFont(v.family, new Uint8Array(bytes));
+    return { id: v.family };
+  }
+
+  onUnregister(handle: FontAdapterHandle, v: FontVariant): void {
+    void handle;
+    void v;
+  }
+}
+
 export class CanvasWasmFontLoaderInterfaceProvider
   implements editor.api.IDocumentFontLoaderInterfaceProvider
 {
-  constructor(readonly editor: Editor, readonly surface: Grida2D) {}
+  private manager: UnifiedFontManager;
+  private loadedFonts = new Set<string>();
+  private googleFontsCache = new Map<
+    string,
+    google.GoogleWebFontListItem
+  >();
+
+  constructor(readonly editor: Editor, readonly surface: Grida2D) {
+    this.manager = new UnifiedFontManager(new WasmFontAdapter(surface));
+  }
 
   async loadFont(font: { family: string }): Promise<void> {
-    // TODO: integrate with wasm backend font system
-    void font;
-    return;
+    if (this.loadedFonts.has(font.family)) return;
+
+    if (this.googleFontsCache.size === 0) {
+      const list = await google.fetchWebfontList();
+      list.items.forEach((f) => this.googleFontsCache.set(f.family, f));
+    }
+
+    const googleFont = this.googleFontsCache.get(font.family);
+    if (googleFont) {
+      await this.manager.loadGoogleFont(googleFont);
+      this.loadedFonts.add(font.family);
+    }
   }
 }
