@@ -8,6 +8,7 @@ import type cg from "@grida/cg";
 import type { SnapResult } from "@grida/cmath/_snap";
 import type { tokens } from "@grida/tokens";
 import type { NodeProxy } from "./editor";
+import type { GoogleWebFontList } from "@grida/fonts";
 import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
@@ -415,6 +416,19 @@ export namespace editor.state {
      * where transform origin is 0,0
      */
     transform: cmath.Transform;
+  }
+
+  /**
+   * list of webfonts, the list is fetched from the server.
+   * this is a collection of webfonts registry, it does not mean the fonts are used or loaded.
+   */
+  export interface IEditorWebfontListState {
+    /**
+     * @see https://fonts.grida.co
+     * @see https://fonts.grida.co/webfonts-vf.json
+     * @see https://fonts.grida.co/webfonts.json
+     */
+    webfontlist: GoogleWebFontList;
   }
 
   export interface IEditorGoogleFontsState {
@@ -846,6 +860,7 @@ export namespace editor.state {
       editor.state.IViewportTransformState,
       editor.state.IEditorUserClipboardState,
       editor.state.IEditorMultiplayerCursorState,
+      editor.state.IEditorWebfontListState,
       editor.state.IEditorGoogleFontsState,
       editor.state.IEditorFeatureBrushState,
       editor.state.IEditorFeatureRulerState,
@@ -964,6 +979,10 @@ export namespace editor.state {
       surface_measurement_targeting_locked: false,
       surface_measurement_target: undefined,
       googlefonts: s.fonts().map((family) => ({ family })),
+      webfontlist: {
+        kind: "webfonts#webfontList",
+        items: [],
+      },
       brushes: [],
       tool: { type: "cursor" },
       __tool_previous: null,
