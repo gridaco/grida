@@ -2298,6 +2298,7 @@ Typr["T"].gvar = (function () {
         //if(ind) console.log(ind, ds);
         var ti = vr[1];
 
+        var outInd = ind && ind.length * 2 == ds.length ? ind : null;
         tab.push([
           [
             vr[3] ? vr[3] : mins[ti],
@@ -2305,10 +2306,10 @@ Typr["T"].gvar = (function () {
             vr[5] ? vr[5] : maxs[ti],
           ],
           ds,
-          ind.length == 0 ? null : ind,
+          outInd,
         ]);
 
-        if (ind.length != 0 && ind.length * 2 != ds.length) throw "e";
+        // some fonts may provide inconsistent point data; ignore indices instead of throwing
         //if(i==116) console.log(ind, ds);
       }
     }

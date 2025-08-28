@@ -13,4 +13,14 @@ describe("fvar parsing", () => {
     expect(axes.wght).toMatchObject({ min: 100, max: 1000, def: 400 });
     expect(axes).toHaveProperty("wdth");
   });
+
+  it("supports Geist variable font", () => {
+    const p = path.resolve(
+      __dirname,
+      "../../../fixtures/fonts/Geist/Geist-VariableFont_wght.ttf"
+    );
+    const buf = fs.readFileSync(p).buffer;
+    const axes = parseFvar(buf);
+    expect(axes.wght).toMatchObject({ min: 100, max: 900, def: 400 });
+  });
 });

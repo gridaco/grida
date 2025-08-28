@@ -24,6 +24,12 @@ describe("Typr font parsing", () => {
     expect(axes).toEqual(expect.arrayContaining(["wght", "opsz", "wdth"]));
   });
 
+  it("parses Geist variable font", () => {
+    const font = loadFont("Geist/Geist-VariableFont_wght.ttf");
+    const axes = font.fvar[0].map((a: any) => a[0]);
+    expect(axes).toContain("wght");
+  });
+
   it("extracts feature flags", () => {
     const font = loadFont("Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf");
     expect(font.GSUB.liga).toBe(true);
