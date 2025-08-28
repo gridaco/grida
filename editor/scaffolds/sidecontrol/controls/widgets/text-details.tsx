@@ -795,7 +795,7 @@ export function TextDetails({
                       <div className="w-16">
                         <InputPropertyNumber
                           mode="fixed"
-                          value={value}
+                          value={value ?? axis.def}
                           onValueCommit={(v) => {
                             fvar.set(
                               key,
@@ -812,7 +812,7 @@ export function TextDetails({
                     </PropertyLine>
                     <div>
                       <Slider
-                        value={[value]}
+                        value={value ? [value] : [axis.def]}
                         max={axis.max}
                         min={axis.min}
                         step={1}
@@ -845,11 +845,11 @@ const fvar = {
     fontVariations: Record<string, number> = {},
     fontWeight: number | undefined,
     key: string
-  ): number => {
+  ): number | undefined => {
     if (key === "wght") {
-      return fontWeight ?? fontVariations[key] ?? 400;
+      return fontWeight ?? fontVariations[key];
     }
-    return fontVariations[key] ?? 400;
+    return fontVariations[key];
   },
   set: (
     key: string,
