@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Collapsible,
@@ -26,59 +26,15 @@ import {
 import type cg from "@grida/cg";
 import { AXES } from "@grida/fonts/k";
 import { ChevronRight } from "lucide-react";
-
-const PANGRAM_EN = "The Quick Brown Fox Jumps Over The Lazy Dog";
+import {
+  Preview,
+  type BasicPreview,
+  type VariationPreview,
+  type PropertyKey,
+} from "./text-details-preview";
 
 // Type definitions
-
 type VerticalTrim = "all" | "disable-all";
-
-type PropertyKey =
-  | "textAlign"
-  | "textDecorationLine"
-  | "textTransform"
-  | "textDecorationStyle"
-  | "textDecorationSkipInk";
-
-type HoverPreview = {
-  key: PropertyKey;
-  value:
-    | cg.TextAlign
-    | cg.TextDecorationLine
-    | cg.TextTransform
-    | cg.TextDecorationStyle
-    | cg.TextDecorationSkipInkFlag;
-} | null;
-
-interface ParagraphPreviewProps {
-  hoverPreview: HoverPreview;
-}
-
-interface PreviewProps {
-  style?: React.CSSProperties;
-  showPlaceholder?: boolean;
-}
-
-function Preview({ style, showPlaceholder = false }: PreviewProps) {
-  return (
-    <div className="p-4 border rounded-md bg-muted/30 h-32">
-      {style ? (
-        <div className="text-base leading-relaxed" style={style}>
-          {PANGRAM_EN}
-        </div>
-      ) : showPlaceholder ? (
-        <span className="text-muted-foreground text-sm">Preview</span>
-      ) : (
-        <div className="text-base leading-relaxed">{PANGRAM_EN}</div>
-      )}
-    </div>
-  );
-}
-
-function ParagraphPreview({ hoverPreview }: ParagraphPreviewProps) {
-  const style = useMemo(() => getTextStyle(hoverPreview), [hoverPreview]);
-  return <Preview style={style || undefined} showPlaceholder={!style} />;
-}
 
 // Alignment options
 const ALIGNMENT_OPTIONS = [
@@ -421,6 +377,7 @@ interface TextDetailsProps {
   truncate?: boolean;
   fontVariations?: Record<string, number>;
   fontWeight?: number;
+  fontFamily?: string;
   axes?: Record<
     string,
     {
@@ -448,91 +405,6 @@ interface TextDetailsProps {
   onFontWeightChange?: (value: number) => void;
 }
 
-// Wrapper object to handle fontVariations with special "wght" axis handling
-const fvar = {
-  get: (
-    fontVariations: Record<string, number> = {},
-    fontWeight: number | undefined,
-    key: string
-  ): number => {
-    if (key === "wght") {
-      return fontWeight ?? fontVariations[key] ?? 400;
-    }
-    return fontVariations[key] ?? 400;
-  },
-  set: (
-    key: string,
-    value: number,
-    onFontVariationChange?: (key: string, value: number) => void,
-    onFontWeightChange?: (value: number) => void
-  ): void => {
-    if (key === "wght") {
-      onFontWeightChange?.(value);
-    } else {
-      onFontVariationChange?.(key, value);
-    }
-  },
-};
-
-const getTextStyle = (
-  hoverPreview: HoverPreview
-): React.CSSProperties | null => {
-  if (!hoverPreview) return null;
-
-  const style: React.CSSProperties = {};
-
-  switch (hoverPreview.key) {
-    case "textAlign":
-      style.textAlign = hoverPreview.value as cg.TextAlign;
-      break;
-    case "textDecorationLine":
-      switch (hoverPreview.value as cg.TextDecorationLine) {
-        case "underline":
-          style.textDecorationLine = "underline";
-          break;
-        case "overline":
-          style.textDecorationLine = "overline";
-          break;
-        case "line-through":
-          style.textDecorationLine = "line-through";
-          break;
-        case "none":
-          style.textDecorationLine = "none";
-          break;
-      }
-      break;
-    case "textDecorationStyle":
-      // For decoration style preview, we need to combine with existing decoration
-      style.textDecorationLine = "underline";
-      style.textDecorationStyle = hoverPreview.value as cg.TextDecorationStyle;
-      break;
-    case "textDecorationSkipInk":
-      // For skip ink preview, we need to combine with existing decoration
-      style.textDecorationLine = "underline";
-      style.textDecorationSkipInk =
-        (hoverPreview.value as cg.TextDecorationSkipInkFlag) ? "auto" : "none";
-      break;
-    case "textTransform":
-      switch (hoverPreview.value as cg.TextTransform) {
-        case "uppercase":
-          style.textTransform = "uppercase";
-          break;
-        case "lowercase":
-          style.textTransform = "lowercase";
-          break;
-        case "capitalize":
-          style.textTransform = "capitalize";
-          break;
-        case "none":
-          style.textTransform = "none";
-          break;
-      }
-      break;
-  }
-
-  return style;
-};
-
 export function TextDetails({
   // Properties
   textAlign = "left",
@@ -548,6 +420,7 @@ export function TextDetails({
   maxLength = null,
   fontVariations = {},
   fontWeight = 400,
+  fontFamily,
   axes = {},
 
   // Change handlers
@@ -565,7 +438,9 @@ export function TextDetails({
   onFontVariationChange,
   onFontWeightChange,
 }: TextDetailsProps) {
-  const [hoverPreview, setHoverPreview] = useState<HoverPreview>(null);
+  const [hoverPreview, setHoverPreview] = useState<
+    BasicPreview | VariationPreview
+  >(null);
 
   const handleHover = (
     key: PropertyKey,
@@ -580,6 +455,14 @@ export function TextDetails({
   };
 
   const handleHoverLeave = () => {
+    setHoverPreview(null);
+  };
+
+  const handleAxisHover = (axis: string) => {
+    setHoverPreview({ axis });
+  };
+
+  const handleAxisHoverLeave = () => {
     setHoverPreview(null);
   };
 
@@ -608,7 +491,14 @@ export function TextDetails({
 
         {/* Fixed Preview */}
         <div className="flex-shrink-0 px-2">
-          <ParagraphPreview hoverPreview={hoverPreview} />
+          <Preview
+            type={hoverPreview && "axis" in hoverPreview ? "axes" : "basics"}
+            hoverPreview={hoverPreview}
+            axes={axes}
+            fontVariations={fontVariations}
+            fontWeight={fontWeight}
+            fontFamily={fontFamily}
+          />
         </div>
 
         {/* Scrollable Content */}
@@ -775,24 +665,29 @@ export function TextDetails({
           </TabsContent>
 
           {/* Variable Tab */}
-          <TabsContent value="variable" className="space-y-4 mt-3 px-2 pb-4">
+          <TabsContent value="variable" className="mt-3 px-2 pb-4">
             {Object.entries(axes).map(([key, axis]) => {
               const label = AXES[key] ?? key;
               const value = fvar.get(fontVariations, fontWeight, key);
 
               return (
-                <div className="space-y-2" key={key}>
-                  <PropertyLine className="items-center">
+                <div
+                  className="space-y-3 pb-6 last:mb-0 transition-all duration-200"
+                  key={key}
+                  onPointerEnter={() => {
+                    handleAxisHover(key);
+                  }}
+                  onPointerLeave={() => {
+                    handleAxisHoverLeave();
+                  }}
+                >
+                  <PropertyLine>
                     <PropertyLineLabel>{label}</PropertyLineLabel>
-                    <div className="flex-1">
-                      <Slider
-                        value={[value]}
-                        max={axis.max}
-                        min={axis.min}
-                        step={1}
-                        className="w-full"
-                        onValueChange={(values) => {
-                          const v = values[0];
+                    <div className="w-16">
+                      <InputPropertyNumber
+                        mode="fixed"
+                        value={value}
+                        onValueCommit={(v) => {
                           fvar.set(
                             key,
                             v,
@@ -800,9 +695,30 @@ export function TextDetails({
                             onFontWeightChange
                           );
                         }}
+                        min={axis.min}
+                        max={axis.max}
+                        step={1}
                       />
                     </div>
                   </PropertyLine>
+                  <div>
+                    <Slider
+                      value={[value]}
+                      max={axis.max}
+                      min={axis.min}
+                      step={1}
+                      className="w-full"
+                      onValueChange={(values) => {
+                        const v = values[0];
+                        fvar.set(
+                          key,
+                          v,
+                          onFontVariationChange,
+                          onFontWeightChange
+                        );
+                      }}
+                    />
+                  </div>
                 </div>
               );
             })}
@@ -812,3 +728,29 @@ export function TextDetails({
     </div>
   );
 }
+
+// Wrapper object to handle fontVariations with special "wght" axis handling
+const fvar = {
+  get: (
+    fontVariations: Record<string, number> = {},
+    fontWeight: number | undefined,
+    key: string
+  ): number => {
+    if (key === "wght") {
+      return fontWeight ?? fontVariations[key] ?? 400;
+    }
+    return fontVariations[key] ?? 400;
+  },
+  set: (
+    key: string,
+    value: number,
+    onFontVariationChange?: (key: string, value: number) => void,
+    onFontWeightChange?: (value: number) => void
+  ): void => {
+    if (key === "wght") {
+      onFontWeightChange?.(value);
+    } else {
+      onFontVariationChange?.(key, value);
+    }
+  },
+};

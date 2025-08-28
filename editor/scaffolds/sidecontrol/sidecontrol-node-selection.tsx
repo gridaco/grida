@@ -1363,6 +1363,7 @@ function SectionText({ node_id }: { node_id: string }) {
                 maxLength={maxLength}
                 fontVariations={fontVariations}
                 fontWeight={fontWeight}
+                fontFamily={fontFamily}
                 onTextTransformChange={actions.textTransform}
                 onTextAlignChange={actions.textAlign}
                 onTextDecorationLineChange={actions.textDecorationLine}
