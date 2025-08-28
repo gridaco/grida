@@ -50,7 +50,7 @@ interface OpenTypeFeatureInfo {
 
 // OpenType features mapping from docs/reference/open-type-features.md
 export const FEATURES: Record<string, OpenTypeFeatureInfo> = {
-  aalt: { name: "Access All Alternates", demo: "a g y" },
+  aalt: { name: "Access All Alternates", demo: "Abc" },
   abvf: { name: "Above-base Forms", demo: "क + marks" },
   abvm: { name: "Above-base Mark Positioning", demo: "á" },
   abvs: { name: "Above-base Substitutions", demo: "क + marks" },
@@ -62,7 +62,7 @@ export const FEATURES: Record<string, OpenTypeFeatureInfo> = {
   blws: { name: "Below-base Substitutions", demo: "क + nukta" },
   c2pc: { name: "Petite Capitals From Capitals", demo: "ABC" },
   c2sc: { name: "Small Capitals From Capitals", demo: "ABC" },
-  calt: { name: "Contextual Alternates", demo: "th sh" },
+  calt: { name: "Contextual Alternates", demo: "- -> --> = => ==>" },
   case: { name: "Case-sensitive Forms", demo: "(ABC)" },
   ccmp: { name: "Glyph Composition / Decomposition", demo: "á ö" },
   cfar: { name: "Conjunct Form After Ro", demo: "r + क" },
@@ -221,7 +221,7 @@ export const FEATURES: Record<string, OpenTypeFeatureInfo> = {
   numr: { name: "Numerators", demo: "1/2" },
   onum: { name: "Oldstyle Figures", demo: "1234567890" },
   opbd: { name: "Optical Bounds", demo: "AV" },
-  ordn: { name: "Ordinals", demo: "1st 2nd" },
+  ordn: { name: "Ordinals", demo: "No." },
   ornm: { name: "Ornaments", demo: "❦ ✤" },
   palt: { name: "Proportional Alternate Widths", demo: "1234" },
   pcap: { name: "Petite Capitals", demo: "Abc" },
