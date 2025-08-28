@@ -157,4 +157,11 @@ export class CanvasWasmFontLoaderInterfaceProvider
       this.loadedFonts.add(font.family);
     }
   }
+
+  /**
+   * TODO: provide loaded fonts from wasm backend when available.
+   */
+  listLoadedFonts(): string[] {
+    return [];
+  }
 }

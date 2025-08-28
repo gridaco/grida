@@ -1865,6 +1865,13 @@ export namespace editor.api {
      * @param font font descriptor
      */
     loadFont(font: { family: string }): Promise<void>;
+
+    /**
+     * Lists fonts that have been loaded and are available at runtime.
+     * This does not fetch the full webfont list; it only reports fonts
+     * that were explicitly loaded through {@link loadFont}.
+     */
+    listLoadedFonts(): string[];
   }
 
   export interface IDocumentSVGExportInterfaceProvider {
@@ -2181,7 +2188,15 @@ export namespace editor.api {
   }
 
   export interface IFontLoaderActions {
+    /**
+     * Loads the font so that the backend can render it
+     */
     loadFont(font: { family: string }): Promise<void>;
+
+    /**
+     * Lists fonts currently loaded and available to the renderer.
+     */
+    listLoadedFonts(): string[];
   }
 
   export interface IExportPluginActions {

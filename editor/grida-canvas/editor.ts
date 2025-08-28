@@ -2631,6 +2631,11 @@ export class Editor
     if (!this.fontLoader) return;
     await this.fontLoader.loadFont(font);
   }
+
+  listLoadedFonts(): string[] {
+    if (!this.fontLoader) return [];
+    return this.fontLoader.listLoadedFonts();
+  }
   // #endregion IFontLoaderActions implementation
 
   // #region IExportPluginActions implementation

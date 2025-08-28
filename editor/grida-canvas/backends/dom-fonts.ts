@@ -31,4 +31,11 @@ export class DOMFontLoaderInterfaceProvider
       this.loadedFonts.add(font.family);
     }
   }
+
+  /**
+   * Returns a list of fonts that have been loaded via {@link loadFont}.
+   */
+  listLoadedFonts(): string[] {
+    return Array.from(this.loadedFonts);
+  }
 }
