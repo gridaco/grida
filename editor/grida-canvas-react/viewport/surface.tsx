@@ -366,6 +366,15 @@ export function EditorSurface() {
           {content_edit_mode?.type === "vector" && <VectorMeasurementGuide />}
           <SnapGuide />
 
+          <SurfaceGroup>
+            {content_edit_mode?.type === "text" && (
+              <SurfaceTextEditor
+                key="text-editor"
+                node_id={content_edit_mode.node_id}
+              />
+            )}
+          </SurfaceGroup>
+
           <SurfaceGroup
             hidden={
               is_transforming ||
@@ -375,12 +384,6 @@ export function EditorSurface() {
             }
             dontRenderWhenHidden
           >
-            {content_edit_mode?.type === "text" && (
-              <SurfaceTextEditor
-                key="text-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
             {content_edit_mode?.type === "vector" && (
               <SurfaceVectorEditor
                 key="vector-geometry-editor"
