@@ -539,8 +539,17 @@ namespace Typr {
   }
 
   // GSUB Table Types
+  export interface GSUBFeature {
+    tag: string;
+    lookups: number[];
+    uiName?: string;
+    tooltip?: string;
+    sampleText?: string;
+    paramLabels?: string[];
+  }
+
   export interface GSUBTable {
-    [key: string]: boolean;
+    features: Record<string, GSUBFeature>;
   }
 
   // CBLC Table Types
@@ -2300,7 +2309,6 @@ namespace Typr {
       ): any {
         const bin = Typr.B;
         const rU = bin.readUshort;
-        const rI = bin.readUint;
 
         let off = offset;
         const maj = rU(data, off);
@@ -2314,19 +2322,54 @@ namespace Typr {
         const llO = rU(data, off);
         off += 2;
 
-        off = offset + flO;
+        const name = obj.name || {};
 
-        const fmap: any = {};
-        const cnt = rU(data, off);
-        off += 2;
-        for (let i = 0; i < cnt; i++) {
-          const tag = bin.readASCII(data, off, 4);
-          off += 4;
-          const fof = rU(data, off);
-          off += 2;
-          fmap[tag] = true;
+        const flBase = offset + flO;
+        let foff = flBase;
+        const fcnt = rU(data, foff);
+        foff += 2;
+
+        const features: Record<string, any> = {};
+        for (let i = 0; i < fcnt; i++) {
+          const tag = bin.readASCII(data, foff, 4);
+          foff += 4;
+          const fo = rU(data, foff);
+          foff += 2;
+          const rOff = flBase + fo;
+          const pOff = rU(data, rOff);
+          const lcnt = rU(data, rOff + 2);
+          const lookups: number[] = [];
+          let lo = rOff + 4;
+          for (let j = 0; j < lcnt; j++) {
+            lookups.push(rU(data, lo));
+            lo += 2;
+          }
+          const feat: any = { tag, lookups };
+          if (pOff !== 0) {
+            const po = rOff + pOff;
+            if (/^ss\d\d$/i.test(tag)) {
+              const ui = rU(data, po + 2);
+              feat.uiName = name["_" + ui];
+            } else if (/^cv\d\d$/i.test(tag)) {
+              const ui = rU(data, po + 2);
+              const ti = rU(data, po + 4);
+              const si = rU(data, po + 6);
+              const pcnt = rU(data, po + 8);
+              const first = rU(data, po + 10);
+              const labels: string[] = [];
+              for (let k = 0; k < pcnt; k++) {
+                const str = name["_" + (first + k)];
+                if (str) labels.push(str);
+              }
+              feat.uiName = name["_" + ui];
+              feat.tooltip = name["_" + ti];
+              feat.sampleText = name["_" + si];
+              if (labels.length) feat.paramLabels = labels;
+            }
+          }
+          features[tag] = feat;
         }
-        return fmap;
+        return { features };
       },
     } as TableParser;
 

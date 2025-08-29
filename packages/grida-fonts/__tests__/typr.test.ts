@@ -57,8 +57,8 @@ describe("Typr font parsing", () => {
     const font = loadFont(
       "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
     );
-    expect(font.GSUB?.liga).toBe(true);
-    expect(font.GSUB?.ss01).toBe(true);
+    expect(font.GSUB?.features?.liga).toBeDefined();
+    expect(font.GSUB?.features?.ss01?.uiName).toBe("Single-story ‘a’");
   });
 
   it("parses horizontal metrics variation", () => {
