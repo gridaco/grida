@@ -190,11 +190,19 @@ impl Default for StrokeAlign {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Radius {
     pub rx: f32,
     pub ry: f32,
 }
+
+impl Radius {
+    pub fn avg(&self) -> f32 {
+        (self.rx + self.ry) / 2.0
+    }
+}
+
+impl Eq for Radius {}
 
 impl Default for Radius {
     fn default() -> Self {
@@ -246,7 +254,7 @@ impl Into<(f32, f32)> for Radius {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RectangularCornerRadius {
     pub tl: Radius,
     pub tr: Radius,
@@ -285,6 +293,10 @@ impl RectangularCornerRadius {
             && self.tl.rx == self.tr.rx
             && self.tl.rx == self.bl.rx
             && self.tl.rx == self.br.rx
+    }
+
+    pub fn avg(&self) -> f32 {
+        (self.tl.avg() + self.tr.avg() + self.bl.avg() + self.br.avg()) / 4.0
     }
 }
 

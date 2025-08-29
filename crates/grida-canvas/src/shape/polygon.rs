@@ -42,6 +42,7 @@ pub fn build_simple_polygon_path(shape: &SimplePolygonShape) -> skia_safe::Path 
 
 /// Build a [`VectorNetwork`] from the polygon points. Corner radius is ignored
 /// in this conversion; resulting network represents the sharp-corner polygon.
+#[deprecated(note = "use VectorGeometryShape instead")]
 pub fn build_simple_polygon_vector_network(shape: &SimplePolygonShape) -> VectorNetwork {
     let n = shape.points.len();
     assert!(n >= 3);

@@ -1,5 +1,3 @@
-use super::vn::*;
-
 pub struct RectShape {
     /// width of the box
     pub width: f32,
@@ -19,11 +17,5 @@ impl Into<skia_safe::Path> for &RectShape {
         let mut path = skia_safe::Path::new();
         path.add_rect(&rect, None);
         path
-    }
-}
-
-impl Into<VectorNetworkGeometry> for &RectShape {
-    fn into(self) -> VectorNetworkGeometry {
-        VectorNetworkGeometry::from_rect(0.0, 0.0, self.width, self.height)
     }
 }
