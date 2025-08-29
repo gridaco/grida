@@ -22,8 +22,6 @@ import {
   MinusIcon,
   OverlineIcon,
   StrikethroughIcon,
-  CheckIcon,
-  DashIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
 import type { FontFeature } from "@grida/fonts/parse";
@@ -41,6 +39,7 @@ import {
   type FeaturePreview,
   type PropertyKey,
 } from "./text-details-preview";
+import { FontFeatureSettings } from "./text-details-font-feature-settings";
 
 // Type definitions
 type VerticalTrim = "all" | "disable-all";
@@ -740,70 +739,13 @@ export function TextDetails({
           <TabsContent value="details" className="mt-3 px-2 pb-4">
             {hasFeatures && (
               <div className="space-y-4">
-                <div className="space-y-3">
-                  <PropertyLine>
-                    <PropertyLineLabel>Features</PropertyLineLabel>
-                  </PropertyLine>
-                  <div>
-                    {features.map((feature) => {
-                      const tag = feature.tag as cg.OpenTypeFeature;
-                      const enabled = fontFeatures?.[tag];
-                      const label = feature.name || tag;
-                      const sampleText = feature.sampleText;
-                      const featureToggleOptions = [
-                        {
-                          value: "0",
-                          icon: <DashIcon className="size-3" />,
-                          label: "Off",
-                        },
-                        {
-                          value: "1",
-                          icon: <CheckIcon className="size-3" />,
-                          label: "On",
-                        },
-                      ];
-                      return (
-                        <div key={tag} className="pb-3 last:pb-0">
-                          <PropertyLine>
-                            <Tooltip delayDuration={200}>
-                              <TooltipTrigger className="text-left">
-                                <PropertyLineLabel className="w-auto">
-                                  {label}
-                                </PropertyLineLabel>
-                              </TooltipTrigger>
-                            <TooltipContent side="left">
-                              {sampleText ? (
-                                <div className="flex flex-col items-start gap-1">
-                                  <span className="text-xs">{tag}</span>
-                                  <span className="text-sm font-medium">
-                                    {sampleText}
-                                  </span>
-                                </div>
-                              ) : (
-                                tag
-                              )}
-                            </TooltipContent>
-                          </Tooltip>
-                            <PropertyEnumToggle
-                              enum={featureToggleOptions}
-                              value={enabled ? "1" : "0"}
-                              className="w-auto"
-                              size="sm"
-                              onValueChange={handleFeatureToggleChange(tag)}
-                              onValueSeeked={(value) => {
-                                if (value) {
-                                  handleFeatureHover(tag, value as "0" | "1");
-                                } else {
-                                  handleFeatureHoverLeave();
-                                }
-                              }}
-                            />
-                          </PropertyLine>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <FontFeatureSettings
+                  features={features}
+                  fontFeatures={fontFeatures}
+                  onFeatureToggleChange={onFontFeatureChange}
+                  onFeatureHover={handleFeatureHover}
+                  onFeatureHoverLeave={handleFeatureHoverLeave}
+                />
               </div>
             )}
             {!hasFeatures && (
