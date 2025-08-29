@@ -1,6 +1,5 @@
 import React, { useMemo } from "react";
 import type cg from "@grida/cg";
-import { FEATURES } from "@grida/fonts/k";
 import type { FontFeature } from "@grida/fonts/parse";
 import type Typr from "@grida/fonts/typr";
 
@@ -225,9 +224,19 @@ function FeaturesPreview({
     );
   }
 
-  const featureInfo = FEATURES[hoveredFeature];
-  const demoText = featureInfo?.demo || "Ag123456789";
+  const feature = features.find((f) => f.tag === hoveredFeature);
+  const demoText = feature?.sampleText;
   const isEnabled = selectedValue === "1";
+
+  if (!demoText) {
+    return (
+      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
+        <span className="text-muted-foreground text-sm">
+          No Preview Available
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">

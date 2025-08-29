@@ -16,4 +16,3 @@ describe("OpenType feature parsing", () => {
     expect(ss01?.lookupIndices.length).toBeGreaterThan(0);
   });
 });
-

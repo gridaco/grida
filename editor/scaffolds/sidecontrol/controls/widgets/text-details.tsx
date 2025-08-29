@@ -26,7 +26,6 @@ import {
   DashIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
-import { FEATURES } from "@grida/fonts/k";
 import type { FontFeature } from "@grida/fonts/parse";
 import type Typr from "@grida/fonts/typr";
 import { ChevronRight } from "lucide-react";
@@ -749,8 +748,8 @@ export function TextDetails({
                     {features.map((feature) => {
                       const tag = feature.tag as cg.OpenTypeFeature;
                       const enabled = fontFeatures?.[tag];
-                      const featureInfo = FEATURES[tag];
-                      const label = feature.name || featureInfo?.name || tag;
+                      const label = feature.name || tag;
+                      const sampleText = feature.sampleText;
                       const featureToggleOptions = [
                         {
                           value: "0",
@@ -772,8 +771,19 @@ export function TextDetails({
                                   {label}
                                 </PropertyLineLabel>
                               </TooltipTrigger>
-                              <TooltipContent side="left">{tag}</TooltipContent>
-                            </Tooltip>
+                            <TooltipContent side="left">
+                              {sampleText ? (
+                                <div className="flex flex-col items-start gap-1">
+                                  <span className="text-xs">{tag}</span>
+                                  <span className="text-sm font-medium">
+                                    {sampleText}
+                                  </span>
+                                </div>
+                              ) : (
+                                tag
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
                             <PropertyEnumToggle
                               enum={featureToggleOptions}
                               value={enabled ? "1" : "0"}
