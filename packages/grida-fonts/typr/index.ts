@@ -31,6 +31,7 @@ export interface FontData {
   fvar?: FVARTable;
   gvar?: GVARTable;
   avar?: AVARTable;
+  STAT?: STATTable;
   HVAR?: HVARTable;
   [key: string]: any; // Allow dynamic table access
 }
@@ -330,6 +331,61 @@ export interface AVARTable extends Array<number[]> {}
 // HVAR Table Types
 export interface HVARTable extends Array<any> {}
 
+// STAT Table Types
+export interface STATAxisRecord {
+  tag: string;
+  name: string;
+  ordering: number;
+}
+
+export interface STATAxisValueFormat1 {
+  format: 1;
+  axisIndex: number;
+  flags: number;
+  name: string;
+  value: number;
+}
+
+export interface STATAxisValueFormat2 {
+  format: 2;
+  axisIndex: number;
+  flags: number;
+  name: string;
+  nominalValue: number;
+  rangeMinValue: number;
+  rangeMaxValue: number;
+}
+
+export interface STATAxisValueFormat3 {
+  format: 3;
+  axisIndex: number;
+  flags: number;
+  name: string;
+  value: number;
+  linkedValue: number;
+}
+
+export interface STATAxisValueFormat4 {
+  format: 4;
+  flags: number;
+  name: string;
+  axisValues: { axisIndex: number; value: number }[];
+}
+
+export type STATAxisValue =
+  | STATAxisValueFormat1
+  | STATAxisValueFormat2
+  | STATAxisValueFormat3
+  | STATAxisValueFormat4;
+
+export interface STATTable {
+  majorVersion: number;
+  minorVersion: number;
+  designAxes: STATAxisRecord[];
+  axisValues: STATAxisValue[];
+  elidedFallbackNameID?: number;
+}
+
 // Parser Interface Types
 export interface TableParser {
   parseTab: (
@@ -480,6 +536,7 @@ export namespace Typr {
         fvar: T.fvar,
         gvar: T.gvar,
         avar: T.avar,
+        STAT: T.STAT,
         HVAR: T.HVAR,
       };
       const obj: FontData = { _data: data, _index: idx, _offset: offset };
@@ -2758,6 +2815,153 @@ export namespace Typr {
         }
 
         return out;
+      },
+    } as TableParser;
+
+    export const STAT: TableParser = {
+      parseTab: function (
+        data: Uint8Array,
+        offset: number,
+        length: number,
+        font: FontData
+      ): STATTable {
+        const bin = Typr.B;
+        let off = offset;
+
+        const majorVersion = bin.readUshort(data, off);
+        off += 2;
+        const minorVersion = bin.readUshort(data, off);
+        off += 2;
+        const designAxisSize = bin.readUshort(data, off);
+        off += 2;
+        const designAxisCount = bin.readUshort(data, off);
+        off += 2;
+        const designAxesOffset = bin.readUint(data, off);
+        off += 4;
+        const axisValueCount = bin.readUshort(data, off);
+        off += 2;
+        const axisValueOffsetsOffset = bin.readUint(data, off);
+        off += 4;
+        let elidedFallbackNameID: number | undefined;
+        if (majorVersion > 1 || (majorVersion === 1 && minorVersion >= 1)) {
+          elidedFallbackNameID = bin.readUshort(data, off);
+          off += 2;
+        }
+
+        const name = font.name || {};
+
+        const designAxes: STATAxisRecord[] = [];
+        if (designAxisCount > 0) {
+          let aoff = offset + designAxesOffset;
+          for (let i = 0; i < designAxisCount; i++) {
+            const tag = bin.readASCII(data, aoff, 4);
+            const axisNameID = bin.readUshort(data, aoff + 4);
+            const ordering = bin.readUshort(data, aoff + 6);
+            designAxes.push({ tag, name: name["_" + axisNameID], ordering });
+            aoff += designAxisSize;
+          }
+        }
+
+        const valueOffsets: number[] = [];
+        if (axisValueCount > 0) {
+          const arrBase = offset + axisValueOffsetsOffset;
+          let voff = arrBase;
+          for (let i = 0; i < axisValueCount; i++) {
+            const relOff = bin.readUshort(data, voff);
+            valueOffsets.push(arrBase + relOff);
+            voff += 2;
+          }
+        }
+
+        const axisValues: STATAxisValue[] = [];
+        for (const rel of valueOffsets) {
+          let voff = rel;
+          const format = bin.readUshort(data, voff);
+          voff += 2;
+          if (format === 1) {
+            const axisIndex = bin.readUshort(data, voff);
+            voff += 2;
+            const flags = bin.readUshort(data, voff);
+            voff += 2;
+            const valueNameID = bin.readUshort(data, voff);
+            voff += 2;
+            const value = bin.readFixed(data, voff);
+            axisValues.push({
+              format: 1,
+              axisIndex,
+              flags,
+              name: name["_" + valueNameID],
+              value,
+            });
+          } else if (format === 2) {
+            const axisIndex = bin.readUshort(data, voff);
+            voff += 2;
+            const flags = bin.readUshort(data, voff);
+            voff += 2;
+            const valueNameID = bin.readUshort(data, voff);
+            voff += 2;
+            const nominalValue = bin.readFixed(data, voff);
+            voff += 4;
+            const rangeMinValue = bin.readFixed(data, voff);
+            voff += 4;
+            const rangeMaxValue = bin.readFixed(data, voff);
+            axisValues.push({
+              format: 2,
+              axisIndex,
+              flags,
+              name: name["_" + valueNameID],
+              nominalValue,
+              rangeMinValue,
+              rangeMaxValue,
+            });
+          } else if (format === 3) {
+            const axisIndex = bin.readUshort(data, voff);
+            voff += 2;
+            const flags = bin.readUshort(data, voff);
+            voff += 2;
+            const valueNameID = bin.readUshort(data, voff);
+            voff += 2;
+            const value = bin.readFixed(data, voff);
+            voff += 4;
+            const linkedValue = bin.readFixed(data, voff);
+            axisValues.push({
+              format: 3,
+              axisIndex,
+              flags,
+              name: name["_" + valueNameID],
+              value,
+              linkedValue,
+            });
+          } else if (format === 4) {
+            const axisCount = bin.readUshort(data, voff);
+            voff += 2;
+            const flags = bin.readUshort(data, voff);
+            voff += 2;
+            const valueNameID = bin.readUshort(data, voff);
+            voff += 2;
+            const axisValuesArr: { axisIndex: number; value: number }[] = [];
+            for (let i = 0; i < axisCount; i++) {
+              const axisIndex = bin.readUshort(data, voff);
+              const value = bin.readFixed(data, voff + 2);
+              voff += 6;
+              axisValuesArr.push({ axisIndex, value });
+            }
+            axisValues.push({
+              format: 4,
+              flags,
+              name: name["_" + valueNameID],
+              axisValues: axisValuesArr,
+            });
+          }
+        }
+
+        return {
+          majorVersion,
+          minorVersion,
+          designAxes,
+          axisValues,
+          elidedFallbackNameID,
+        };
       },
     } as TableParser;
 
