@@ -332,12 +332,30 @@ export interface AVARTable extends Array<number[]> {}
 export interface HVARTable extends Array<any> {}
 
 // STAT Table Types
+
+/**
+ * https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-records
+ */
 export interface STATAxisRecord {
+  /**
+   * Tag | axisTag | A tag identifying the axis of design variation.
+   */
   tag: string;
+
+  /**
+   * uint16 | axisNameID | The name ID for entries in the 'name' table that provide a display string for this axis.
+   */
   name: string;
+
+  /**
+   * uint16 | axisOrdering | A value that applications can use to determine primary sorting of face names, or for ordering of labels when composing family or face names.
+   */
   ordering: number;
 }
 
+/**
+ * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-1
+ */
 export interface STATAxisValueFormat1 {
   format: 1;
   axisIndex: number;
@@ -346,6 +364,9 @@ export interface STATAxisValueFormat1 {
   value: number;
 }
 
+/**
+ * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-2
+ */
 export interface STATAxisValueFormat2 {
   format: 2;
   axisIndex: number;
@@ -356,6 +377,9 @@ export interface STATAxisValueFormat2 {
   rangeMaxValue: number;
 }
 
+/**
+ * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-3
+ */
 export interface STATAxisValueFormat3 {
   format: 3;
   axisIndex: number;
@@ -365,6 +389,9 @@ export interface STATAxisValueFormat3 {
   linkedValue: number;
 }
 
+/**
+ * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-4
+ */
 export interface STATAxisValueFormat4 {
   format: 4;
   flags: number;
