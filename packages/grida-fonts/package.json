@@ -1,13 +1,12 @@
 {
   "name": "@grida/fonts",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts k.ts --format cjs,esm --dts --watch",
     "build": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts k.ts --format cjs,esm --dts",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "jest"
   },
   "files": [
     "dist"
