@@ -74,17 +74,14 @@ function parseLookupGlyphs(font: any, lookupIndex: number): number[] {
 function parseSingleSubst(data: Uint8Array, offset: number): number[] {
   const bin = Typr.B;
   const format = bin.readUshort(data, offset);
-  if (format === 1) {
-    const covOffset = offset + bin.readUshort(data, offset + 2);
-    const delta = bin.readShort(data, offset + 4);
-    return readCoverage(data, covOffset).map((g) => (g + delta) & 0xffff);
-  } else if (format === 2) {
-    const glyphCount = bin.readUshort(data, offset + 4);
-    const out: number[] = [];
-    for (let i = 0; i < glyphCount; i++) {
-      out.push(bin.readUshort(data, offset + 6 + i * 2));
-    }
-    return out;
+  const covOffset = offset + bin.readUshort(data, offset + 2);
+  // The glyphs returned here should represent the original glyphs that are
+  // affected by the substitution, not the resulting glyphs after applying the
+  // substitution. The coverage table lists the input glyphs for both format 1
+  // and format 2 single substitution subtables, so we can simply read it and
+  // ignore the replacement values.
+  if (format === 1 || format === 2) {
+    return readCoverage(data, covOffset);
   }
   return [];
 }

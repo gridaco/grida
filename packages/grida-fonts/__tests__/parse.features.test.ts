@@ -27,4 +27,15 @@ describe("OpenType feature parsing", () => {
     expect(liga?.glyphs.length).toBeGreaterThan(0);
     expect(liga?.glyphs).toEqual(expect.arrayContaining(["ﬁ"]));
   });
+
+  it("returns original characters for single substitution features", () => {
+    const p = path.resolve(
+      __dirname,
+      "../../../fixtures/fonts/Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
+    );
+    const buf = fs.readFileSync(p).buffer;
+    const features = parseFeatures(buf);
+    const ss01 = features.find((f) => f.tag === "ss01");
+    expect(ss01?.glyphs).toEqual(expect.arrayContaining(["a"]));
+  });
 });
