@@ -206,17 +206,15 @@ function FeaturesPreview({
   fontWeight,
   hoveredFeature,
   features = [],
-  fontFeatures = {},
   selectedValue,
 }: {
   fontFamily?: string;
   fontWeight?: number;
   hoveredFeature: cg.OpenTypeFeature | null;
   features?: FontFeature[];
-  fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
   selectedValue?: "0" | "1";
 }) {
-  if (!hoveredFeature) {
+  if (!hoveredFeature || !selectedValue) {
     return (
       <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
         <span className="text-muted-foreground text-sm">Preview</span>
@@ -226,7 +224,6 @@ function FeaturesPreview({
 
   const feature = features.find((f) => f.tag === hoveredFeature);
   const demoText = feature?.sampleText ?? feature?.glyphs?.join(" ");
-  const isEnabled = selectedValue === "1";
 
   if (!demoText) {
     return (
@@ -238,16 +235,15 @@ function FeaturesPreview({
     );
   }
 
+  const style: React.CSSProperties = {
+    fontFamily,
+    fontWeight,
+    fontFeatureSettings: `"${hoveredFeature}" ${selectedValue}`,
+  };
+
   return (
     <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
-      <div
-        className="text-2xl font-medium overflow-hidden"
-        style={{
-          fontFamily,
-          fontWeight,
-          fontFeatureSettings: `"${hoveredFeature}" ${isEnabled ? "on" : "off"}`,
-        }}
-      >
+      <div className="text-2xl font-medium overflow-hidden" style={style}>
         {demoText}
       </div>
     </div>
@@ -286,7 +282,6 @@ function Preview(props: PreviewProps) {
         fontWeight={props.fontWeight}
         hoveredFeature={featurePreview?.feature ?? null}
         features={props.features}
-        fontFeatures={props.fontFeatures}
         selectedValue={featurePreview?.value}
       />
     );
