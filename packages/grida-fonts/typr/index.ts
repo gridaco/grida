@@ -242,7 +242,7 @@ namespace Typr {
     }
     const fnt = readFont(data, 0, 0, tmap);
     const fvar = fnt["fvar"];
-    if (fvar) {
+    if (fvar && fvar[1] && Array.isArray(fvar[1])) {
       const out: FontData[] = [fnt];
       for (let i = 0; i < fvar[1].length; i++) {
         const fv = fvar[1][i];
@@ -3091,7 +3091,13 @@ namespace Typr {
             const dd = new Array(regs.length);
             dd.fill(0);
             vdata.push(dd);
-            for (let j = 0; j < ixs.length; j++) dd[ixs[j]] = deltaData[j];
+            for (let j = 0; j < ixs.length; j++) {
+              // Safety check: ensure ixs[j] is within bounds of dd array
+              if (ixs[j] < dd.length && j < deltaData.length) {
+                dd[ixs[j]] = deltaData[j];
+              }
+              // If out of bounds, skip this assignment (dd already filled with 0s)
+            }
           }
         }
 
@@ -3121,7 +3127,21 @@ namespace Typr {
           const innerIndex =
             entry &
             ((1 << ((entryFormat & INNER_INDEX_BIT_COUNT_MASK) + 1)) - 1);
-          dfs.push(varStore[outerIndex][innerIndex]);
+
+          // Safety check: ensure outerIndex and innerIndex are within bounds
+          if (
+            outerIndex < varStore.length &&
+            varStore[outerIndex] &&
+            innerIndex < varStore[outerIndex].length
+          ) {
+            dfs.push(varStore[outerIndex][innerIndex]);
+          } else {
+            // If indices are out of bounds, push a default value (array of zeros)
+            // This maintains the expected structure while handling malformed data gracefully
+            const defaultDelta = new Array(regs.length);
+            defaultDelta.fill(0);
+            dfs.push(defaultDelta);
+          }
         }
 
         return [regs, dfs];

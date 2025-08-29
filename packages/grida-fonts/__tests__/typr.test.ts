@@ -252,4 +252,48 @@ describe("Typr font parsing", () => {
     );
     expect(uniqueCoords.size).toBeGreaterThan(1); // Should have at least 2 different coordinate sets
   });
+
+  it("handles AR_One_Sans font without crashing", () => {
+    // This font was causing the "Cannot read properties of undefined (reading '0')" error
+    const font = loadFont("AR_One_Sans/AROneSans-VariableFont_ARRR,wght.ttf");
+
+    // Basic font properties should be parsed
+    expect(font.name).toBeDefined();
+    expect(font["OS/2"]).toBeDefined();
+
+    // The font should parse without throwing errors, even if some tables are malformed
+    expect(() => {
+      // Try to access various tables that might cause issues
+      const _ = font.gvar;
+      const __ = font.HVAR;
+      const ___ = font.fvar;
+    }).not.toThrow();
+  });
+
+  it("handles various fonts with potential malformed tables gracefully", () => {
+    // Test multiple fonts to ensure our safety fixes work broadly
+    const fonts = [
+      "AR_One_Sans/AROneSans-VariableFont_ARRR,wght.ttf",
+      "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf",
+      "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf",
+      "Geist/Geist-VariableFont_wght.ttf",
+    ];
+
+    fonts.forEach((fontPath) => {
+      expect(() => {
+        const font = loadFont(fontPath);
+
+        // Basic validation that font was parsed
+        expect(font).toBeDefined();
+        expect(font.name).toBeDefined();
+
+        // Try to access potentially problematic tables
+        const _ = font.gvar;
+        const __ = font.HVAR;
+        const ___ = font.fvar;
+        const ____ = font.avar;
+        const _____ = font.STAT;
+      }).not.toThrow(`Font ${fontPath} should parse without errors`);
+    });
+  });
 });
