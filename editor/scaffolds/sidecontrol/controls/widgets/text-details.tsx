@@ -120,14 +120,42 @@ const CASE_OPTIONS = [
 
 // Vertical trim options
 const VERTICAL_TRIM_OPTIONS = [
-  { value: "all" as VerticalTrim, label: "All" },
-  { value: "disable-all" as VerticalTrim, label: "Disable All" },
+  {
+    value: "all" as VerticalTrim,
+    icon: (
+      <span
+        className="text-xs"
+        style={{
+          textDecorationLine: "overline underline",
+          textDecorationSkipInk: "none",
+        }}
+      >
+        Ag
+      </span>
+    ),
+    label: "All",
+  },
+  {
+    value: "disable-all" as VerticalTrim,
+    icon: (
+      <span
+        className="text-xs"
+        style={{
+          textDecorationLine: "overline underline",
+          textDecorationSkipInk: "auto",
+        }}
+      >
+        Ag
+      </span>
+    ),
+    label: "Disable All",
+  },
 ];
 
 // Truncate text options
 const TRUNCATE_OPTIONS = [
-  { value: "off", label: "Off" },
-  { value: "on", label: "On" },
+  { value: "off", icon: <MinusIcon className="size-3" />, label: "Off" },
+  { value: "on", icon: <span className="text-xs">A...</span>, label: "On" },
 ];
 
 // Decoration Style options
@@ -512,11 +540,13 @@ export function TextDetails({
             <TabsTrigger value="details" className="text-xs">
               Details
             </TabsTrigger>
-            {hasVariableAxes && (
-              <TabsTrigger value="variable" className="text-xs">
-                Variable
-              </TabsTrigger>
-            )}
+            <TabsTrigger
+              value="variable"
+              className="text-xs"
+              disabled={!hasVariableAxes}
+            >
+              Variable
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -590,8 +620,8 @@ export function TextDetails({
             {/* Decoration Details - Collapsible */}
             <Collapsible className="group/collapsible">
               <CollapsibleTrigger className="w-full flex items-center justify-between">
-                <PropertyLineLabel className="text-left">
-                  More
+                <PropertyLineLabel className="text-left w-auto">
+                  Decoration Details
                 </PropertyLineLabel>
                 <ChevronRight className="h-3 w-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
               </CollapsibleTrigger>
@@ -682,18 +712,29 @@ export function TextDetails({
 
             <Separator />
 
-            {/* Max Length */}
-            <PropertyLine>
-              <PropertyLineLabel>Max Length</PropertyLineLabel>
-              <InputPropertyNumber
-                mode="fixed"
-                value={maxLength ?? undefined}
-                onValueCommit={onMaxLengthChange}
-                min={1}
-                step={1}
-                placeholder="No limit"
-              />
-            </PropertyLine>
+            {/* Custom Section */}
+            <Collapsible className="group/collapsible">
+              <CollapsibleTrigger className="w-full flex items-center justify-between">
+                <PropertyLineLabel className="text-left w-auto">
+                  Custom
+                </PropertyLineLabel>
+                <ChevronRight className="h-3 w-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3 pt-2">
+                {/* Max Length */}
+                <PropertyLine>
+                  <PropertyLineLabel>Max Length</PropertyLineLabel>
+                  <InputPropertyNumber
+                    mode="fixed"
+                    value={maxLength ?? undefined}
+                    onValueCommit={onMaxLengthChange}
+                    min={1}
+                    step={1}
+                    placeholder="No limit"
+                  />
+                </PropertyLine>
+              </CollapsibleContent>
+            </Collapsible>
           </TabsContent>
 
           {/* Details Tab */}
@@ -731,9 +772,7 @@ export function TextDetails({
                                   {label}
                                 </PropertyLineLabel>
                               </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{tag}</p>
-                              </TooltipContent>
+                              <TooltipContent side="left">{tag}</TooltipContent>
                             </Tooltip>
                             <PropertyEnumToggle
                               enum={featureToggleOptions}
@@ -789,7 +828,7 @@ export function TextDetails({
                             {label}
                           </PropertyLineLabel>
                         </TooltipTrigger>
-                        <TooltipContent>{key}</TooltipContent>
+                        <TooltipContent side="left">{key}</TooltipContent>
                       </Tooltip>
                       <div className="w-16">
                         <InputPropertyNumber
