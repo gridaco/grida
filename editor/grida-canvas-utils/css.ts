@@ -184,6 +184,7 @@ export namespace css {
         lineHeight,
         fontFeatures,
         fontVariations,
+        textTransform,
       } = styles as grida.program.nodes.i.ITextStyle;
 
       result = {
@@ -205,6 +206,7 @@ export namespace css {
           lineHeight,
           fontFeatures,
           fontVariations,
+          textTransform,
           fill: fill!,
         }),
       };
@@ -264,6 +266,7 @@ export namespace css {
     | "lineHeight"
     | "fontFeatureSettings"
     | "fontVariationSettings"
+    | "textTransform"
     | "color"
   > {
     const {
@@ -281,6 +284,7 @@ export namespace css {
       lineHeight,
       fontFeatures,
       fontVariations,
+      textTransform,
       fill,
     } = style;
 
@@ -317,6 +321,7 @@ export namespace css {
       fontVariationSettings: fontVariations
         ? toFontVariationSettings(fontVariations)
         : undefined,
+      textTransform: textTransform,
       color: fill ? toFillString(fill) : undefined,
     };
   }
