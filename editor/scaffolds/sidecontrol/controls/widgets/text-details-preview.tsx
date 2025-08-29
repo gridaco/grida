@@ -225,7 +225,7 @@ function FeaturesPreview({
   }
 
   const feature = features.find((f) => f.tag === hoveredFeature);
-  const demoText = feature?.sampleText;
+  const demoText = feature?.sampleText ?? feature?.glyphs?.join(" ");
   const isEnabled = selectedValue === "1";
 
   if (!demoText) {

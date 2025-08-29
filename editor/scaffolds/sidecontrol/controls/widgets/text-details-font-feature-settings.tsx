@@ -200,40 +200,46 @@ export function FontFeatureSettings({
   return (
     <div className="divide-y divide-border">
       {/* Other Features Section */}
-      <div className="py-6 first:pt-0 last:pb-0">
-        <FontFeatureSection
-          title="Features"
-          features={other}
-          fontFeatures={fontFeatures}
-          onFeatureToggleChange={onFeatureToggleChange}
-          onFeatureHover={onFeatureHover}
-          onFeatureHoverLeave={onFeatureHoverLeave}
-        />
-      </div>
+      {other.length > 0 && (
+        <div className="py-6 first:pt-0 last:pb-0">
+          <FontFeatureSection
+            title="Features"
+            features={other}
+            fontFeatures={fontFeatures}
+            onFeatureToggleChange={onFeatureToggleChange}
+            onFeatureHover={onFeatureHover}
+            onFeatureHoverLeave={onFeatureHoverLeave}
+          />
+        </div>
+      )}
 
       {/* Stylistic Sets Section */}
-      <div className="py-6 first:pt-0 last:pb-0">
-        <FontFeatureSection
-          title="Stylistic sets"
-          features={ssxx}
-          fontFeatures={fontFeatures}
-          onFeatureToggleChange={onFeatureToggleChange}
-          onFeatureHover={onFeatureHover}
-          onFeatureHoverLeave={onFeatureHoverLeave}
-        />
-      </div>
+      {ssxx.length > 0 && (
+        <div className="py-6 first:pt-0 last:pb-0">
+          <FontFeatureSection
+            title="Stylistic sets"
+            features={ssxx}
+            fontFeatures={fontFeatures}
+            onFeatureToggleChange={onFeatureToggleChange}
+            onFeatureHover={onFeatureHover}
+            onFeatureHoverLeave={onFeatureHoverLeave}
+          />
+        </div>
+      )}
 
       {/* Numbers Section */}
-      <div className="py-6 first:pt-0 last:pb-0">
-        <FontFeatureSection
-          title="Numbers"
-          features={numbers}
-          fontFeatures={fontFeatures}
-          onFeatureToggleChange={onFeatureToggleChange}
-          onFeatureHover={onFeatureHover}
-          onFeatureHoverLeave={onFeatureHoverLeave}
-        />
-      </div>
+      {numbers.length > 0 && (
+        <div className="py-6 first:pt-0 last:pb-0">
+          <FontFeatureSection
+            title="Numbers"
+            features={numbers}
+            fontFeatures={fontFeatures}
+            onFeatureToggleChange={onFeatureToggleChange}
+            onFeatureHover={onFeatureHover}
+            onFeatureHoverLeave={onFeatureHoverLeave}
+          />
+        </div>
+      )}
     </div>
   );
 }

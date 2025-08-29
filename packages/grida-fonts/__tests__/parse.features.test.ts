@@ -15,4 +15,16 @@ describe("OpenType feature parsing", () => {
     expect(ss01?.name).toBe("Single-story ‘a’");
     expect(ss01?.lookupIndices.length).toBeGreaterThan(0);
   });
+
+  it("extracts glyphs for ligature feature", () => {
+    const p = path.resolve(
+      __dirname,
+      "../../../fixtures/fonts/Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
+    );
+    const buf = fs.readFileSync(p).buffer;
+    const features = parseFeatures(buf);
+    const liga = features.find((f) => f.tag === "liga");
+    expect(liga?.glyphs.length).toBeGreaterThan(0);
+    expect(liga?.glyphs).toEqual(expect.arrayContaining(["ﬁ"]));
+  });
 });
