@@ -27,11 +27,19 @@ const NUMBER_FEATURES = [
   "zero", // Slashed zero
 ] as const;
 
+// Letter case-related OpenType features
+const LETTER_CASE_FEATURES = [
+  "case", // Case sensitive forms
+  "cpsp", // Capital spacing
+] as const;
+
 type NumberFeature = (typeof NUMBER_FEATURES)[number];
+type LetterCaseFeature = (typeof LETTER_CASE_FEATURES)[number];
 
 interface GroupedFeatures {
   ssxx: FontFeature[];
   numbers: FontFeature[];
+  letterCase: FontFeature[];
   other: FontFeature[];
 }
 
@@ -44,6 +52,10 @@ function groupFeatures(features: FontFeature[]): GroupedFeatures {
     NUMBER_FEATURES.includes(feature.tag as NumberFeature)
   );
 
+  const letterCase = features.filter((feature) =>
+    LETTER_CASE_FEATURES.includes(feature.tag as LetterCaseFeature)
+  );
+
   const other = features
     .filter(
       (feature) =>
@@ -51,11 +63,16 @@ function groupFeatures(features: FontFeature[]): GroupedFeatures {
     )
     .filter(
       (feature) => !NUMBER_FEATURES.includes(feature.tag as NumberFeature)
+    )
+    .filter(
+      (feature) =>
+        !LETTER_CASE_FEATURES.includes(feature.tag as LetterCaseFeature)
     );
 
   return {
     ssxx,
     numbers,
+    letterCase,
     other,
   };
 }
@@ -195,7 +212,7 @@ export function FontFeatureSettings({
   onFeatureHoverLeave,
 }: FontFeatureSettingsProps) {
   const groupedFeatures = groupFeatures(features);
-  const { ssxx, numbers, other } = groupedFeatures;
+  const { ssxx, numbers, letterCase, other } = groupedFeatures;
 
   return (
     <div className="divide-y divide-border">
@@ -219,6 +236,20 @@ export function FontFeatureSettings({
           <FontFeatureSection
             title="Stylistic sets"
             features={ssxx}
+            fontFeatures={fontFeatures}
+            onFeatureToggleChange={onFeatureToggleChange}
+            onFeatureHover={onFeatureHover}
+            onFeatureHoverLeave={onFeatureHoverLeave}
+          />
+        </div>
+      )}
+
+      {/* Letter Case Section */}
+      {letterCase.length > 0 && (
+        <div className="py-6 first:pt-0 last:pb-0">
+          <FontFeatureSection
+            title="Letter case"
+            features={letterCase}
             fontFeatures={fontFeatures}
             onFeatureToggleChange={onFeatureToggleChange}
             onFeatureHover={onFeatureHover}

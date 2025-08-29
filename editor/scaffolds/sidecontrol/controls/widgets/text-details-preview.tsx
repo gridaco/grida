@@ -242,8 +242,8 @@ function FeaturesPreview({
   };
 
   return (
-    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
-      <div className="text-2xl font-medium overflow-hidden" style={style}>
+    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-start overflow-hidden">
+      <div className="text-2xl font-medium break-words" style={style}>
         {demoText}
       </div>
     </div>
