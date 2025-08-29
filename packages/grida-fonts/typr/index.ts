@@ -3,474 +3,76 @@
 /// TypeScript version with modern namespace syntax and strong typing
 ///
 
-// Strongly typed interfaces for font parsing
-
-export interface FontData {
-  _data: Uint8Array;
-  _index: number;
-  _offset: number;
-  cmap?: CmapTable;
-  head?: HeadTable;
-  hhea?: HheaTable;
-  maxp?: MaxpTable;
-  hmtx?: HmtxTable;
-  name?: NameTable;
-  "OS/2"?: OS2Table;
-  post?: PostTable;
-  loca?: LocaTable;
-  kern?: KernTable;
-  glyf?: GlyfTable;
-  "CFF "?: CFFTable;
-  GSUB?: GSUBTable;
-  CBLC?: CBLCTable;
-  CBDT?: CBDTTable;
-  "SVG "?: SVGTable;
-  COLR?: COLRTable;
-  CPAL?: CPALTable;
-  sbix?: SBIXTable;
-  fvar?: FVARTable;
-  gvar?: GVARTable;
-  avar?: AVARTable;
-  STAT?: STATTable;
-  HVAR?: HVARTable;
-  [key: string]: any; // Allow dynamic table access
-}
-
-export interface TableMap {
-  [key: number]: any;
-}
-
-// CMAP Table Types
-export interface CmapTable {
-  tables: CmapSubtable[];
-  ids: { [key: string]: number };
-  off: number;
-}
-
-export interface CmapSubtable {
-  format: number;
-  map?: number[];
-  endCount?: number[];
-  startCount?: number[];
-  idDelta?: number[];
-  idRangeOffset?: number[];
-  glyphIdArray?: number[];
-  firstCode?: number;
-  groups?: Uint32Array;
-  searchRange?: number;
-  entrySelector?: number;
-  rangeShift?: number;
-}
-
-// HEAD Table Types
-export interface HeadTable {
-  fontRevision: number;
-  flags: number;
-  unitsPerEm: number;
-  created: number;
-  modified: number;
-  xMin: number;
-  yMin: number;
-  xMax: number;
-  yMax: number;
-  macStyle: number;
-  lowestRecPPEM: number;
-  fontDirectionHint: number;
-  indexToLocFormat: number;
-  glyphDataFormat: number;
-}
-
-// HHEA Table Types
-export interface HheaTable {
-  ascender: number;
-  descender: number;
-  lineGap: number;
-  advanceWidthMax: number;
-  minLeftSideBearing: number;
-  minRightSideBearing: number;
-  xMaxExtent: number;
-  caretSlopeRise: number;
-  caretSlopeRun: number;
-  caretOffset: number;
-  res0: number;
-  res1: number;
-  res2: number;
-  res3: number;
-  metricDataFormat: number;
-  numberOfHMetrics: number;
-}
-
-// HMTX Table Types
-export interface HmtxTable {
-  aWidth: number[];
-  lsBearing: number[];
-}
-
-// MAXP Table Types
-export interface MaxpTable {
-  numGlyphs: number;
-}
-
-// NAME Table Types
-export interface NameTable {
-  copyright?: string;
-  fontFamily?: string;
-  fontSubfamily?: string;
-  ID?: string;
-  fullName?: string;
-  version?: string;
-  postScriptName?: string;
-  trademark?: string;
-  manufacturer?: string;
-  designer?: string;
-  description?: string;
-  urlVendor?: string;
-  urlDesigner?: string;
-  licence?: string;
-  licenceURL?: string;
-  typoFamilyName?: string;
-  typoSubfamilyName?: string;
-  compatibleFull?: string;
-  sampleText?: string;
-  postScriptCID?: string;
-  wwsFamilyName?: string;
-  wwsSubfamilyName?: string;
-  lightPalette?: string;
-  darkPalette?: string;
-  [key: string]: any;
-}
-
-// OS/2 Table Types
-export interface OS2Table {
-  xAvgCharWidth?: number;
-  usWeightClass?: number;
-  usWidthClass?: number;
-  fsType?: number;
-  ySubscriptXSize?: number;
-  ySubscriptYSize?: number;
-  ySubscriptXOffset?: number;
-  ySubscriptYOffset?: number;
-  ySuperscriptXSize?: number;
-  ySuperscriptYSize?: number;
-  ySuperscriptXOffset?: number;
-  ySuperscriptYOffset?: number;
-  yStrikeoutSize?: number;
-  yStrikeoutPosition?: number;
-  sFamilyClass?: number;
-  panose?: number[];
-  ulUnicodeRange1?: number;
-  ulUnicodeRange2?: number;
-  ulUnicodeRange3?: number;
-  ulUnicodeRange4?: number;
-  achVendID?: string;
-  fsSelection?: number;
-  usFirstCharIndex?: number;
-  usLastCharIndex?: number;
-  sTypoAscender?: number;
-  sTypoDescender?: number;
-  sTypoLineGap?: number;
-  usWinAscent?: number;
-  usWinDescent?: number;
-  ulCodePageRange1?: number;
-  ulCodePageRange2?: number;
-  sxHeight?: number;
-  sCapHeight?: number;
-  usDefault?: number;
-  usBreak?: number;
-  usMaxContext?: number;
-  usLowerOpticalPointSize?: number;
-  usUpperOpticalPointSize?: number;
-}
-
-// POST Table Types
-export interface PostTable {
-  version: number;
-  italicAngle: number;
-  underlinePosition: number;
-  underlineThickness: number;
-}
-
-// LOCA Table Types
-export interface LocaTable extends Array<number> {}
-
-// KERN Table Types
-export interface KernTable {
-  glyph1: number[];
-  rval: Array<{
-    glyph2: number[];
-    vals: number[];
-  }>;
-}
-
-// GLYF Table Types
-export interface GlyphContour {
-  endPts: number[];
-  instructions: number[];
-  flags: number[];
-  xs: number[];
-  ys: number[];
-}
-
-export interface GlyphComponent {
-  glyphIndex: number;
-  m: {
-    a: number;
-    b: number;
-    c: number;
-    d: number;
-    tx: number;
-    ty: number;
-  };
-  p1: number;
-  p2: number;
-}
-
-export interface Glyph {
-  noc: number; // number of contours
-  xMin: number;
-  yMin: number;
-  xMax: number;
-  yMax: number;
-  endPts?: number[];
-  instructions?: number[];
-  flags?: number[];
-  xs?: number[];
-  ys?: number[];
-  parts?: GlyphComponent[];
-  instr?: number[];
-}
-
-export interface GlyfTable extends Array<Glyph | null> {}
-
-// CFF Table Types
-export interface CFFTable {
-  version?: number;
-  Notice?: string;
-  FullName?: string;
-  FamilyName?: string;
-  Weight?: number;
-  FontBBox?: number[];
-  BlueValues?: number[];
-  OtherBlues?: number[];
-  FamilyBlues?: number[];
-  FamilyOtherBlues?: number[];
-  StdHW?: number;
-  StdVW?: number;
-  UniqueID?: number;
-  XUID?: number[];
-  charset?: number[];
-  Encoding?: any;
-  CharStrings?: Uint8Array[];
-  Private?: any;
-  Subrs?: Uint8Array[];
-  defaultWidthX?: number;
-  nominalWidthX?: number;
-  Bias?: number;
-  ROS?: any;
-  FDArray?: any[];
-  FDSelect?: number[];
-  [key: string]: any;
-}
-
-// GSUB Table Types
-export interface GSUBTable {
-  [key: string]: boolean;
-}
-
-// CBLC Table Types
-export interface CBLCTable extends Array<[number, number, number, number[]]> {}
-
-// CBDT Table Types
-export interface CBDTTable extends Uint8Array {}
-
-// SVG Table Types
-export interface SVGTable {
-  entries: { [key: number]: number };
-  svgs: string[];
-}
-
-// COLR Table Types
-export interface COLRTable
-  extends Array<{ [key: string]: [number, number] } | number[]> {}
-
-// CPAL Table Types
-export interface CPALTable extends Uint8Array {}
-
-// SBIX Table Types
-export interface SBIXTable extends Array<Uint8Array | null> {}
-
-// FVAR Table Types
-export interface FVARAxis {
-  tag: string;
-  min: number;
-  def: number;
-  max: number;
-  flg: number;
-  name: string;
-}
-
-export interface FVARInstance {
-  name: string;
-  flg: number;
-  crd: number[];
-  pnid: number | null;
-}
-
-export interface FVARTable extends Array<FVARAxis[] | FVARInstance[]> {
-  0: FVARAxis[];
-  1: FVARInstance[];
-}
-
-// GVAR Table Types
-export interface GVARTable
-  extends Array<Array<[number[][], number[], number[] | null]>> {}
-
-// AVAR Table Types
-export interface AVARTable extends Array<number[]> {}
-
-// HVAR Table Types
-export interface HVARTable extends Array<any> {}
-
-// STAT Table Types
-
-/**
- * https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-records
- */
-export interface STATAxisRecord {
-  /**
-   * Tag | axisTag | A tag identifying the axis of design variation.
-   */
-  tag: string;
-
-  /**
-   * uint16 | axisNameID | The name ID for entries in the 'name' table that provide a display string for this axis.
-   */
-  name: string;
-
-  /**
-   * uint16 | axisOrdering | A value that applications can use to determine primary sorting of face names, or for ordering of labels when composing family or face names.
-   */
-  ordering: number;
-}
-
-/**
- * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-1
- */
-export interface STATAxisValueFormat1 {
-  format: 1;
-  axisIndex: number;
-  flags: number;
-  name: string;
-  value: number;
-}
-
-/**
- * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-2
- */
-export interface STATAxisValueFormat2 {
-  format: 2;
-  axisIndex: number;
-  flags: number;
-  name: string;
-  nominalValue: number;
-  rangeMinValue: number;
-  rangeMaxValue: number;
-}
-
-/**
- * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-3
- */
-export interface STATAxisValueFormat3 {
-  format: 3;
-  axisIndex: number;
-  flags: number;
-  name: string;
-  value: number;
-  linkedValue: number;
-}
-
-/**
- * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-4
- */
-export interface STATAxisValueFormat4 {
-  format: 4;
-  flags: number;
-  name: string;
-  axisValues: { axisIndex: number; value: number }[];
-}
-
-export type STATAxisValue =
-  | STATAxisValueFormat1
-  | STATAxisValueFormat2
-  | STATAxisValueFormat3
-  | STATAxisValueFormat4;
-
-export interface STATTable {
-  majorVersion: number;
-  minorVersion: number;
-  designAxes: STATAxisRecord[];
-  axisValues: STATAxisValue[];
-  elidedFallbackNameID?: number;
-}
-
 // Parser Interface Types
-export interface TableParser {
+interface TableParser {
   parseTab: (
     data: Uint8Array,
     offset: number,
     length: number,
-    font?: FontData
+    font?: Typr.FontData
   ) => any;
 }
 
-export interface NameTableParser extends TableParser {
+interface NameTableParser extends TableParser {
   selectOne: (obj: any) => any;
 }
 
-export interface OS2TableParser extends TableParser {
+interface OS2TableParser extends TableParser {
   version0: (data: Uint8Array, offset: number, obj: any) => number;
   version1: (data: Uint8Array, offset: number, obj: any) => number;
   version2: (data: Uint8Array, offset: number, obj: any) => number;
   version5: (data: Uint8Array, offset: number, obj: any) => number;
 }
 
-export interface KernTableParser extends TableParser {
+interface KernTableParser extends TableParser {
   parseV1: (
     data: Uint8Array,
     offset: number,
     length: number,
-    font: FontData
+    font: Typr.FontData
   ) => any;
   readFormat0: (data: Uint8Array, offset: number, map: any) => number;
 }
 
-export interface CFFTableParser extends TableParser {
+interface CFFTableParser extends TableParser {
   readIndex: (data: Uint8Array, offset: number, inds: number[]) => number;
   readDict: (data: Uint8Array, offset: number, end: number) => any;
   readSubrs: (data: Uint8Array, offset: number, obj: any) => void;
   readBytes: (data: Uint8Array, offset: number) => Uint8Array[];
   _readFDict: (data: Uint8Array, dict: any, ss: string[]) => void;
   readCharset: (data: Uint8Array, offset: number, num: number) => number[];
-  glyphByUnicode: (cff: CFFTable, code: number) => number;
-  glyphBySE: (cff: CFFTable, charcode: number) => number;
+  glyphByUnicode: (cff: Typr.CFFTable, code: number) => number;
+  glyphBySE: (cff: Typr.CFFTable, charcode: number) => number;
   tableSE: number[];
   getCharString: (data: Uint8Array, offset: number, o: any) => void;
   readCharString: (data: Uint8Array, offset: number, length: number) => any[];
 }
 
-export interface CmapTableParser extends TableParser {
-  parse0: (data: Uint8Array, offset: number, obj: CmapSubtable) => CmapSubtable;
-  parse4: (data: Uint8Array, offset: number, obj: CmapSubtable) => CmapSubtable;
-  parse6: (data: Uint8Array, offset: number, obj: CmapSubtable) => CmapSubtable;
+interface CmapTableParser extends TableParser {
+  parse0: (
+    data: Uint8Array,
+    offset: number,
+    obj: Typr.CmapSubtable
+  ) => Typr.CmapSubtable;
+  parse4: (
+    data: Uint8Array,
+    offset: number,
+    obj: Typr.CmapSubtable
+  ) => Typr.CmapSubtable;
+  parse6: (
+    data: Uint8Array,
+    offset: number,
+    obj: Typr.CmapSubtable
+  ) => Typr.CmapSubtable;
   parse12: (
     data: Uint8Array,
     offset: number,
-    obj: CmapSubtable
-  ) => CmapSubtable;
+    obj: Typr.CmapSubtable
+  ) => Typr.CmapSubtable;
 }
 
 // Binary reader types
-export interface BinaryReader {
+interface BinaryReader {
   readFixed: (data: Uint8Array, offset: number) => number;
   readF2dot14: (data: Uint8Array, offset: number) => number;
   readInt: (buff: Uint8Array, offset: number) => number;
@@ -504,7 +106,7 @@ export interface BinaryReader {
 }
 
 // Modern TypeScript namespace
-export namespace Typr {
+namespace Typr {
   // Find table function
   export function findTable(
     data: Uint8Array,
@@ -665,6 +267,417 @@ export namespace Typr {
     }
 
     return [fnt];
+  }
+
+  // Types
+
+  export interface FontData {
+    _data: Uint8Array;
+    _index: number;
+    _offset: number;
+    cmap?: CmapTable;
+    head?: HeadTable;
+    hhea?: HheaTable;
+    maxp?: MaxpTable;
+    hmtx?: HmtxTable;
+    name?: NameTable;
+    "OS/2"?: OS2Table;
+    post?: PostTable;
+    loca?: LocaTable;
+    kern?: KernTable;
+    glyf?: GlyfTable;
+    "CFF "?: CFFTable;
+    GSUB?: GSUBTable;
+    CBLC?: CBLCTable;
+    CBDT?: CBDTTable;
+    "SVG "?: SVGTable;
+    COLR?: COLRTable;
+    CPAL?: CPALTable;
+    sbix?: SBIXTable;
+    fvar?: FVARTable;
+    gvar?: GVARTable;
+    avar?: AVARTable;
+    STAT?: STATTable;
+    HVAR?: HVARTable;
+    [key: string]: any; // Allow dynamic table access
+  }
+
+  export interface TableMap {
+    [key: number]: any;
+  }
+
+  // CMAP Table Types
+  export interface CmapTable {
+    tables: CmapSubtable[];
+    ids: { [key: string]: number };
+    off: number;
+  }
+
+  export interface CmapSubtable {
+    format: number;
+    map?: number[];
+    endCount?: number[];
+    startCount?: number[];
+    idDelta?: number[];
+    idRangeOffset?: number[];
+    glyphIdArray?: number[];
+    firstCode?: number;
+    groups?: Uint32Array;
+    searchRange?: number;
+    entrySelector?: number;
+    rangeShift?: number;
+  }
+
+  // HEAD Table Types
+  export interface HeadTable {
+    fontRevision: number;
+    flags: number;
+    unitsPerEm: number;
+    created: number;
+    modified: number;
+    xMin: number;
+    yMin: number;
+    xMax: number;
+    yMax: number;
+    macStyle: number;
+    lowestRecPPEM: number;
+    fontDirectionHint: number;
+    indexToLocFormat: number;
+    glyphDataFormat: number;
+  }
+
+  // HHEA Table Types
+  export interface HheaTable {
+    ascender: number;
+    descender: number;
+    lineGap: number;
+    advanceWidthMax: number;
+    minLeftSideBearing: number;
+    minRightSideBearing: number;
+    xMaxExtent: number;
+    caretSlopeRise: number;
+    caretSlopeRun: number;
+    caretOffset: number;
+    res0: number;
+    res1: number;
+    res2: number;
+    res3: number;
+    metricDataFormat: number;
+    numberOfHMetrics: number;
+  }
+
+  // HMTX Table Types
+  export interface HmtxTable {
+    aWidth: number[];
+    lsBearing: number[];
+  }
+
+  // MAXP Table Types
+  export interface MaxpTable {
+    numGlyphs: number;
+  }
+
+  // NAME Table Types
+  export interface NameTable {
+    copyright?: string;
+    fontFamily?: string;
+    fontSubfamily?: string;
+    ID?: string;
+    fullName?: string;
+    version?: string;
+    postScriptName?: string;
+    trademark?: string;
+    manufacturer?: string;
+    designer?: string;
+    description?: string;
+    urlVendor?: string;
+    urlDesigner?: string;
+    licence?: string;
+    licenceURL?: string;
+    typoFamilyName?: string;
+    typoSubfamilyName?: string;
+    compatibleFull?: string;
+    sampleText?: string;
+    postScriptCID?: string;
+    wwsFamilyName?: string;
+    wwsSubfamilyName?: string;
+    lightPalette?: string;
+    darkPalette?: string;
+    [key: string]: any;
+  }
+
+  // OS/2 Table Types
+  export interface OS2Table {
+    xAvgCharWidth?: number;
+    usWeightClass?: number;
+    usWidthClass?: number;
+    fsType?: number;
+    ySubscriptXSize?: number;
+    ySubscriptYSize?: number;
+    ySubscriptXOffset?: number;
+    ySubscriptYOffset?: number;
+    ySuperscriptXSize?: number;
+    ySuperscriptYSize?: number;
+    ySuperscriptXOffset?: number;
+    ySuperscriptYOffset?: number;
+    yStrikeoutSize?: number;
+    yStrikeoutPosition?: number;
+    sFamilyClass?: number;
+    panose?: number[];
+    ulUnicodeRange1?: number;
+    ulUnicodeRange2?: number;
+    ulUnicodeRange3?: number;
+    ulUnicodeRange4?: number;
+    achVendID?: string;
+    fsSelection?: number;
+    usFirstCharIndex?: number;
+    usLastCharIndex?: number;
+    sTypoAscender?: number;
+    sTypoDescender?: number;
+    sTypoLineGap?: number;
+    usWinAscent?: number;
+    usWinDescent?: number;
+    ulCodePageRange1?: number;
+    ulCodePageRange2?: number;
+    sxHeight?: number;
+    sCapHeight?: number;
+    usDefault?: number;
+    usBreak?: number;
+    usMaxContext?: number;
+    usLowerOpticalPointSize?: number;
+    usUpperOpticalPointSize?: number;
+  }
+
+  // POST Table Types
+  export interface PostTable {
+    version: number;
+    italicAngle: number;
+    underlinePosition: number;
+    underlineThickness: number;
+  }
+
+  // LOCA Table Types
+  export interface LocaTable extends Array<number> {}
+
+  // KERN Table Types
+  export interface KernTable {
+    glyph1: number[];
+    rval: Array<{
+      glyph2: number[];
+      vals: number[];
+    }>;
+  }
+
+  // GLYF Table Types
+  export interface GlyphContour {
+    endPts: number[];
+    instructions: number[];
+    flags: number[];
+    xs: number[];
+    ys: number[];
+  }
+
+  export interface GlyphComponent {
+    glyphIndex: number;
+    m: {
+      a: number;
+      b: number;
+      c: number;
+      d: number;
+      tx: number;
+      ty: number;
+    };
+    p1: number;
+    p2: number;
+  }
+
+  export interface Glyph {
+    noc: number; // number of contours
+    xMin: number;
+    yMin: number;
+    xMax: number;
+    yMax: number;
+    endPts?: number[];
+    instructions?: number[];
+    flags?: number[];
+    xs?: number[];
+    ys?: number[];
+    parts?: GlyphComponent[];
+    instr?: number[];
+  }
+
+  export interface GlyfTable extends Array<Glyph | null> {}
+
+  // CFF Table Types
+  export interface CFFTable {
+    version?: number;
+    Notice?: string;
+    FullName?: string;
+    FamilyName?: string;
+    Weight?: number;
+    FontBBox?: number[];
+    BlueValues?: number[];
+    OtherBlues?: number[];
+    FamilyBlues?: number[];
+    FamilyOtherBlues?: number[];
+    StdHW?: number;
+    StdVW?: number;
+    UniqueID?: number;
+    XUID?: number[];
+    charset?: number[];
+    Encoding?: any;
+    CharStrings?: Uint8Array[];
+    Private?: any;
+    Subrs?: Uint8Array[];
+    defaultWidthX?: number;
+    nominalWidthX?: number;
+    Bias?: number;
+    ROS?: any;
+    FDArray?: any[];
+    FDSelect?: number[];
+    [key: string]: any;
+  }
+
+  // GSUB Table Types
+  export interface GSUBTable {
+    [key: string]: boolean;
+  }
+
+  // CBLC Table Types
+  export interface CBLCTable
+    extends Array<[number, number, number, number[]]> {}
+
+  // CBDT Table Types
+  export interface CBDTTable extends Uint8Array {}
+
+  // SVG Table Types
+  export interface SVGTable {
+    entries: { [key: number]: number };
+    svgs: string[];
+  }
+
+  // COLR Table Types
+  export interface COLRTable
+    extends Array<{ [key: string]: [number, number] } | number[]> {}
+
+  // CPAL Table Types
+  export interface CPALTable extends Uint8Array {}
+
+  // SBIX Table Types
+  export interface SBIXTable extends Array<Uint8Array | null> {}
+
+  // FVAR Table Types
+  export interface FVARAxis {
+    tag: string;
+    min: number;
+    def: number;
+    max: number;
+    flg: number;
+    name: string;
+  }
+
+  export interface FVARInstance {
+    name: string;
+    flg: number;
+    crd: number[];
+    pnid: number | null;
+  }
+
+  export interface FVARTable extends Array<FVARAxis[] | FVARInstance[]> {
+    0: FVARAxis[];
+    1: FVARInstance[];
+  }
+
+  // GVAR Table Types
+  export interface GVARTable
+    extends Array<Array<[number[][], number[], number[] | null]>> {}
+
+  // AVAR Table Types
+  export interface AVARTable extends Array<number[]> {}
+
+  // HVAR Table Types
+  export interface HVARTable extends Array<any> {}
+
+  // STAT Table Types
+
+  /**
+   * https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-records
+   */
+  export interface STATAxisRecord {
+    /**
+     * Tag | axisTag | A tag identifying the axis of design variation.
+     */
+    tag: string;
+
+    /**
+     * uint16 | axisNameID | The name ID for entries in the 'name' table that provide a display string for this axis.
+     */
+    name: string;
+
+    /**
+     * uint16 | axisOrdering | A value that applications can use to determine primary sorting of face names, or for ordering of labels when composing family or face names.
+     */
+    ordering: number;
+  }
+
+  /**
+   * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-1
+   */
+  export interface STATAxisValueFormat1 {
+    format: 1;
+    axisIndex: number;
+    flags: number;
+    name: string;
+    value: number;
+  }
+
+  /**
+   * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-2
+   */
+  export interface STATAxisValueFormat2 {
+    format: 2;
+    axisIndex: number;
+    flags: number;
+    name: string;
+    nominalValue: number;
+    rangeMinValue: number;
+    rangeMaxValue: number;
+  }
+
+  /**
+   * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-3
+   */
+  export interface STATAxisValueFormat3 {
+    format: 3;
+    axisIndex: number;
+    flags: number;
+    name: string;
+    value: number;
+    linkedValue: number;
+  }
+
+  /**
+   * @see https://learn.microsoft.com/en-us/typography/opentype/spec/stat#axis-value-table-format-4
+   */
+  export interface STATAxisValueFormat4 {
+    format: 4;
+    flags: number;
+    name: string;
+    axisValues: { axisIndex: number; value: number }[];
+  }
+
+  export type STATAxisValue =
+    | STATAxisValueFormat1
+    | STATAxisValueFormat2
+    | STATAxisValueFormat3
+    | STATAxisValueFormat4;
+
+  export interface STATTable {
+    majorVersion: number;
+    minorVersion: number;
+    designAxes: STATAxisRecord[];
+    axisValues: STATAxisValue[];
+    elidedFallbackNameID?: number;
   }
 
   // Binary reader namespace
@@ -3116,3 +3129,5 @@ export namespace Typr {
     } as TableParser;
   }
 }
+
+export default Typr;

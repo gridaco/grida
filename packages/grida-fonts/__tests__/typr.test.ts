@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-import { Typr } from "../typr";
+import Typr from "../typr";
 
 const loadFont = (relPath: string) => {
   const p = path.resolve(__dirname, "../../../fixtures/fonts", relPath);

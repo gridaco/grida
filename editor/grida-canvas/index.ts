@@ -12,7 +12,7 @@ import type {
   GoogleWebFontList,
   GoogleWebFontListItem,
 } from "@grida/fonts/google";
-import type { FvarAxes, FvarInstance } from "@grida/fonts/parse";
+import type { FvarAxes, FvarInstance, FontFeature } from "@grida/fonts/parse";
 import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
@@ -2219,7 +2219,7 @@ export namespace editor.api {
       font: GoogleWebFontListItem;
       axes: FvarAxes;
       instances: FvarInstance[];
-      features: cg.OpenTypeFeature[];
+      features: FontFeature[];
     } | null>;
   }
 

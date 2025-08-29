@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-
 import {
   SidebarMenuSectionContent,
   SidebarSection,
@@ -38,6 +37,7 @@ import {
   PositioningConstraintsControl,
   PositioningModeControl,
 } from "./controls/positioning";
+import type { FontFeature } from "@grida/fonts/parse";
 import { RotateControl } from "./controls/rotate";
 import { TextAlignVerticalControl } from "./controls/text-align-vertical";
 import { LetterSpacingControl } from "./controls/letter-spacing";
@@ -110,6 +110,7 @@ import {
   MixedPropertiesEditor,
 } from "@/grida-canvas-react/use-mixed-properties";
 import { editor } from "@/grida-canvas";
+import type Typr from "@grida/fonts/typr";
 
 function Align() {
   const editor = useCurrentEditor();
@@ -1313,16 +1314,18 @@ function SectionText({ node_id }: { node_id: string }) {
     fontFeatures: node.fontFeatures,
   }));
 
-  type AxisMap = Record<string, { min: number; max: number; def: number }>;
-  const [axes, setAxes] = React.useState<AxisMap>({});
-  const [features, setFeatures] = React.useState<cg.OpenTypeFeature[]>([]);
+  type AxisMap = Record<string, Typr.FVARAxis>;
+  const [axes, setAxes] = React.useState<
+    Record<string, Typr.FVARAxis> | undefined
+  >();
+  const [features, setFeatures] = React.useState<FontFeature[]>([]);
 
   React.useEffect(() => {
     let canceled = false;
     (async () => {
       if (!fontFamily) {
         if (!canceled) {
-          setAxes({});
+          setAxes(undefined);
           setFeatures([]);
         }
         return;
@@ -1330,7 +1333,7 @@ function SectionText({ node_id }: { node_id: string }) {
       const detail = await instance.getFontDetails(fontFamily);
       if (!detail) {
         if (!canceled) {
-          setAxes({});
+          setAxes(undefined);
           setFeatures([]);
         }
         return;
@@ -1342,7 +1345,7 @@ function SectionText({ node_id }: { node_id: string }) {
       }
       if (!canceled) {
         setAxes(record);
-        setFeatures(detail.features as cg.OpenTypeFeature[]);
+        setFeatures(detail.features);
       }
     })();
     return () => {

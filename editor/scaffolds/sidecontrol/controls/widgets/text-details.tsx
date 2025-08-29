@@ -26,9 +26,10 @@ import {
   DashIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
-import { AXES, FEATURES } from "@grida/fonts/k";
+import { FEATURES } from "@grida/fonts/k";
+import type { FontFeature } from "@grida/fonts/parse";
+import type Typr from "@grida/fonts/typr";
 import { ChevronRight } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -387,16 +388,9 @@ interface TextDetailsProps {
   fontVariations?: Record<string, number>;
   fontWeight?: number;
   fontFamily?: string;
-  axes?: Record<
-    string,
-    {
-      min: number;
-      max: number;
-      def: number;
-    }
-  >;
+  axes?: Record<string, Typr.FVARAxis>;
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
-  features?: cg.OpenTypeFeature[];
+  features?: FontFeature[];
 
   // Change handlers
   onTextAlignChange?: (value: cg.TextAlign) => void;
@@ -433,7 +427,7 @@ export function TextDetails({
   fontVariations = {},
   fontWeight = 400,
   fontFamily,
-  axes = {},
+  axes,
   fontFeatures = {},
   features = [],
 
@@ -503,7 +497,7 @@ export function TextDetails({
       onFontFeatureChange?.(feature, isEnabled);
     };
 
-  const hasVariableAxes = Object.keys(axes).length > 0;
+  const hasVariableAxes = axes && Object.keys(axes).length > 0;
   const hasFeatures = features.length > 0;
 
   return (
@@ -712,9 +706,10 @@ export function TextDetails({
                   </PropertyLine>
                   <div>
                     {features.map((feature) => {
-                      const enabled = fontFeatures?.[feature];
-                      const featureInfo = FEATURES[feature];
-                      const label = featureInfo?.name ?? feature;
+                      const tag = feature.tag as cg.OpenTypeFeature;
+                      const enabled = fontFeatures?.[tag];
+                      const featureInfo = FEATURES[tag];
+                      const label = feature.name || featureInfo?.name || tag;
                       const featureToggleOptions = [
                         {
                           value: "0",
@@ -728,7 +723,7 @@ export function TextDetails({
                         },
                       ];
                       return (
-                        <div key={feature} className="pb-3 last:pb-0">
+                        <div key={tag} className="pb-3 last:pb-0">
                           <PropertyLine>
                             <Tooltip delayDuration={200}>
                               <TooltipTrigger className="text-left">
@@ -737,7 +732,7 @@ export function TextDetails({
                                 </PropertyLineLabel>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>{feature}</p>
+                                <p>{tag}</p>
                               </TooltipContent>
                             </Tooltip>
                             <PropertyEnumToggle
@@ -745,13 +740,10 @@ export function TextDetails({
                               value={enabled ? "1" : "0"}
                               className="w-auto"
                               size="sm"
-                              onValueChange={handleFeatureToggleChange(feature)}
+                              onValueChange={handleFeatureToggleChange(tag)}
                               onValueSeeked={(value) => {
                                 if (value) {
-                                  handleFeatureHover(
-                                    feature,
-                                    value as "0" | "1"
-                                  );
+                                  handleFeatureHover(tag, value as "0" | "1");
                                 } else {
                                   handleFeatureHoverLeave();
                                 }
@@ -776,7 +768,7 @@ export function TextDetails({
           {hasVariableAxes && (
             <TabsContent value="variable" className="mt-3 px-2 pb-4">
               {Object.entries(axes).map(([key, axis]) => {
-                const label = AXES[key] ?? key;
+                const label = axis.name ?? key;
                 const value = fvar.get(fontVariations, fontWeight, key);
 
                 return (
@@ -791,7 +783,14 @@ export function TextDetails({
                     }}
                   >
                     <PropertyLine>
-                      <PropertyLineLabel>{label}</PropertyLineLabel>
+                      <Tooltip delayDuration={200}>
+                        <TooltipTrigger className="text-left">
+                          <PropertyLineLabel className="w-auto">
+                            {label}
+                          </PropertyLineLabel>
+                        </TooltipTrigger>
+                        <TooltipContent>{key}</TooltipContent>
+                      </Tooltip>
                       <div className="w-16">
                         <InputPropertyNumber
                           mode="fixed"

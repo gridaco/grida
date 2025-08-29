@@ -15,13 +15,13 @@ describe("fvar parsing", () => {
       max: 1000,
       def: 400,
       name: "Weight",
-      flags: 0,
+      flg: 0,
     });
     expect(axes.wdth.name).toBe("Width");
     expect(instances.length).toBeGreaterThan(0);
     expect(instances[0]).toMatchObject({
       name: "Thin",
-      flags: 0,
+      flg: 0,
       postscriptName: "RobotoFlex-Thin",
     });
     expect(instances[0].coordinates).toHaveProperty("wght");
@@ -39,7 +39,7 @@ describe("fvar parsing", () => {
       max: 900,
       def: 400,
       name: "Weight",
-      flags: 0,
+      flg: 0,
     });
     expect(instances[0].postscriptName).toBe("Geist-Thin");
   });

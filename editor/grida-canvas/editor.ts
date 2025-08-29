@@ -23,6 +23,7 @@ import {
   parseFeatures,
   type FvarAxes,
   type FvarInstance,
+  type FontFeature,
 } from "@grida/fonts/parse";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
@@ -130,7 +131,7 @@ export class Editor
       font: google.GoogleWebFontListItem;
       axes: FvarAxes;
       instances: FvarInstance[];
-      features: cg.OpenTypeFeature[];
+      features: FontFeature[];
     }
   >();
 
@@ -2698,7 +2699,7 @@ export class Editor
     font: google.GoogleWebFontListItem;
     axes: FvarAxes;
     instances: FvarInstance[];
-    features: cg.OpenTypeFeature[];
+    features: FontFeature[];
   } | null> {
     if (this.fontDetailsCache.has(fontFamily)) {
       return this.fontDetailsCache.get(fontFamily)!;
@@ -2718,7 +2719,7 @@ export class Editor
     const res = await fetch(url);
     const buffer = await res.arrayBuffer();
     const { axes, instances } = parseFvar(buffer);
-    const features = parseFeatures(buffer) as cg.OpenTypeFeature[];
+    const features = parseFeatures(buffer);
     const detail = { font: item, axes, instances, features } as const;
     this.fontDetailsCache.set(fontFamily, detail);
     return detail;

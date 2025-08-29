@@ -10,7 +10,11 @@ describe("OpenType feature parsing", () => {
     );
     const buf = fs.readFileSync(p).buffer;
     const features = parseFeatures(buf);
-    expect(features).toContain("aalt");
+    expect(features).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tag: "aalt" }),
+      ])
+    );
   });
 });
 

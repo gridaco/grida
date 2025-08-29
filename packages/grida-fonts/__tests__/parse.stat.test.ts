@@ -11,11 +11,15 @@ describe("STAT parsing", () => {
     const buf = fs.readFileSync(p).buffer;
     const stat = parseStat(buf);
     const opsz = stat.axes.find((a) => a.tag === "opsz");
-    expect(opsz?.values.map((v) => v.value)).toEqual(
-      expect.arrayContaining([8, 9, 10])
-    );
+    expect(
+      opsz?.values.map((v) =>
+        "value" in v ? v.value : (v as any).nominalValue
+      )
+    ).toEqual(expect.arrayContaining([8, 9, 10]));
     const wght = stat.axes.find((a) => a.tag === "wght");
-    const boldMap = wght?.values.find((v) => v.linkedValue === 700);
+    const boldMap = wght?.values.find(
+      (v) => "linkedValue" in v && v.linkedValue === 700
+    ) as any;
     expect(boldMap?.value).toBe(400);
   });
 });

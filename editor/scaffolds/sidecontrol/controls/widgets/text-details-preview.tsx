@@ -1,6 +1,8 @@
 import React, { useMemo } from "react";
 import type cg from "@grida/cg";
 import { FEATURES } from "@grida/fonts/k";
+import type { FontFeature } from "@grida/fonts/parse";
+import type Typr from "@grida/fonts/typr";
 
 const PANGRAM_EN = "The Quick Brown Fox Jumps Over The Lazy Dog";
 
@@ -54,20 +56,13 @@ interface PreviewProps {
   hoverPreview?: BasicPreview | VariationPreview | FeaturePreview;
 
   // Axes preview props
-  axes?: Record<
-    string,
-    {
-      min: number;
-      max: number;
-      def: number;
-    }
-  >;
+  axes?: Record<string, Typr.FVARAxis>;
   fontVariations?: Record<string, number>;
   fontWeight?: number;
   fontFamily?: string;
 
   // Features preview props
-  features?: cg.OpenTypeFeature[];
+  features?: FontFeature[];
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
 
   // Type indicator
@@ -218,7 +213,7 @@ function FeaturesPreview({
   fontFamily?: string;
   fontWeight?: number;
   hoveredFeature: cg.OpenTypeFeature | null;
-  features?: cg.OpenTypeFeature[];
+  features?: FontFeature[];
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
   selectedValue?: "0" | "1";
 }) {
