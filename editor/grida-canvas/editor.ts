@@ -20,6 +20,7 @@ import vn from "@grida/vn";
 import * as google from "@grida/fonts/google";
 import type { FvarAxes, FvarInstance, FontFeature } from "@grida/fonts/parse";
 import { FontParserWorker } from "@grida/fonts/parser/worker";
+import { DocumentFontManager } from "./font-manager";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
@@ -116,6 +117,7 @@ export class Editor
   }
 
   _m_font_loader: editor.api.IDocumentFontLoaderInterfaceProvider | null = null;
+  private _fontManager: DocumentFontManager;
   private get fontLoader() {
     return this._m_font_loader;
   }
@@ -206,10 +208,7 @@ export class Editor
     }
 
     this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
-    // load initial fonts
-    for (const font of this.mstate.googlefonts) {
-      this.loadFont(font);
-    }
+    this._fontManager = new DocumentFontManager(this);
     onCreate?.(this);
   }
 
@@ -305,10 +304,6 @@ export class Editor
       this,
       surface
     );
-
-    for (const font of this.mstate.googlefonts) {
-      void this.loadFont(font);
-    }
   }
 
   public archive(): Blob {
