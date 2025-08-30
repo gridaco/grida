@@ -183,7 +183,7 @@ function EditorPanel() {
     document,
     document_ctx,
     history,
-    googlefonts,
+    fontkeys: googlefonts,
     user_clipboard,
     ...state_without_document
   } = state;
@@ -218,17 +218,16 @@ function EditModePanel() {
 
 function FontsPanel() {
   const editor = useCurrentEditor();
-  const state = useEditorState(editor, (state) => state);
-  const fonts = useEditorState(editor, (state) => state.webfontlist.items);
-  const { googlefonts } = state;
+  const { fontkeys, webfontlist } = useEditorState(editor, (state) => ({
+    webfontlist: state.webfontlist,
+    fontkeys: state.fontkeys,
+  }));
 
   return (
     <JSONContent
       value={{
-        // used fonts
-        fonts: googlefonts,
-        // all fonts
-        registry: fonts,
+        fontkeys: fontkeys,
+        webfontlist: webfontlist,
       }}
     />
   );

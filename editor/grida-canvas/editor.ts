@@ -407,7 +407,7 @@ export class Editor
       type: "insert",
       ...payload,
     });
-    for (const font of this.mstate.googlefonts) {
+    for (const font of this.mstate.fontkeys) {
       this.loadFont(font);
     }
   }

@@ -1,4 +1,5 @@
 import type { Editor } from "./editor";
+import type { editor } from ".";
 
 /**
  * Observes editor state and ensures required fonts are loaded
@@ -6,22 +7,18 @@ import type { Editor } from "./editor";
  */
 export class DocumentFontManager {
   constructor(private editor: Editor) {
-    // load fonts present in initial state
-    this.sync();
-
     // watch for font registry changes
     this.editor.subscribeWithSelector(
-      (state) => state.googlefonts.map((f) => f.family),
-      () => {
-        this.sync();
+      (state) => state.fontkeys,
+      (_, v) => {
+        this.sync(v);
       }
     );
   }
 
-  private sync() {
+  private sync(keys: editor.state.FontKey[]) {
     const loaded = new Set(this.editor.listLoadedFonts());
-    const fonts = this.editor.getSnapshot().googlefonts;
-    for (const { family } of fonts) {
+    for (const { family } of keys) {
       if (loaded.has(family)) continue;
       void this.editor.loadFont({ family });
     }
