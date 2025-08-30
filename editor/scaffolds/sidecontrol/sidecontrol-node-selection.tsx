@@ -790,7 +790,6 @@ function ModeNodeProperties({
     active: node.active,
     locked: node.locked,
     component_id: node.component_id,
-    properties: node.properties,
     src: node.src,
     type: node.type,
     blendMode: node.blendMode,
@@ -828,7 +827,6 @@ function ModeNodeProperties({
     userdata: node.userdata,
   }));
 
-  const computed = useComputedNode(node_id);
   const {
     id,
     name,
@@ -932,30 +930,9 @@ function ModeNodeProperties({
           />
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection
-        hidden={config.props === "off" || !is_templateinstance}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-
-        {node.properties && Object.keys(node.properties).length ? (
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropsControl
-              properties={node.properties}
-              props={computed.props || {}}
-              onValueChange={actions.value}
-            />
-          </SidebarMenuSectionContent>
-        ) : (
-          <SidebarMenuSectionContent className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              No properties defined
-            </p>
-          </SidebarMenuSectionContent>
-        )}
-      </SidebarSection>
+      {config.props !== "off" && is_templateinstance && (
+        <SectionProps node_id={node_id} />
+      )}
 
       <SidebarSection hidden={!is_stylable} className="border-b pb-4">
         <SidebarSectionHeaderItem>
@@ -1521,6 +1498,35 @@ function SectionDimension({ node_id }: { node_id: string }) {
           />
         </PropertyLine>
       </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function SectionProps({ node_id }: { node_id: string }) {
+  const actions = useNodeActions(node_id)!;
+  const { properties } = useNodeState(node_id, (node) => ({
+    properties: node.properties,
+  }));
+  const computed = useComputedNode(node_id);
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      {properties && Object.keys(properties).length ? (
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropsControl
+            properties={properties}
+            props={computed.props || {}}
+            onValueChange={actions.value}
+          />
+        </SidebarMenuSectionContent>
+      ) : (
+        <SidebarMenuSectionContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">No properties defined</p>
+        </SidebarMenuSectionContent>
+      )}
     </SidebarSection>
   );
 }
