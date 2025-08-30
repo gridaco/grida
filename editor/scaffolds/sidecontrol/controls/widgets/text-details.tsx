@@ -409,7 +409,6 @@ interface TextDetailsProps {
   maxLines?: number | null;
   maxLength?: number | null;
   verticalTrim?: VerticalTrim;
-  truncate?: boolean;
   fontVariations?: Record<string, number>;
   fontWeight?: number;
   fontFamily?: string;
@@ -428,7 +427,6 @@ interface TextDetailsProps {
   onMaxLinesChange?: (value: number) => void;
   onMaxLengthChange?: (value: number) => void;
   onVerticalTrimChange?: (value: VerticalTrim) => void;
-  onTruncateChange?: (value: boolean) => void;
   onFontVariationChange?: (key: string, value: number) => void;
   onFontWeightChange?: (value: number) => void;
   onFontFeatureChange?: (key: cg.OpenTypeFeature, value: boolean) => void;
@@ -444,8 +442,7 @@ export function TextDetails({
   textDecorationSkipInk = true,
   textTransform = "none",
   verticalTrim = "all",
-  truncate = false,
-  maxLines = 1,
+  maxLines = 0,
   maxLength = null,
   fontVariations = {},
   fontWeight = 400,
@@ -461,7 +458,6 @@ export function TextDetails({
   onTextDecorationSkipInkChange,
   onTextTransformChange,
   onVerticalTrimChange,
-  onTruncateChange,
   onMaxLinesChange,
   onMaxLengthChange,
   onFontVariationChange,
@@ -472,6 +468,8 @@ export function TextDetails({
   const [hoverPreview, setHoverPreview] = useState<
     BasicPreview | VariationPreview | FeaturePreview
   >(null);
+
+  const truncate = !!maxLines && maxLines > 0;
 
   const handleHover = (
     key: PropertyKey,
@@ -510,7 +508,12 @@ export function TextDetails({
 
   const handleTruncateToggleChange = (value: string) => {
     const isEnabled = value === "on";
-    onTruncateChange?.(isEnabled);
+    const next = isEnabled
+      ? maxLines && maxLines > 0
+        ? maxLines
+        : 2
+      : 0;
+    onMaxLinesChange?.(next);
   };
 
   const handleFeatureToggleChange =
@@ -699,7 +702,7 @@ export function TextDetails({
                   onValueCommit={onMaxLinesChange}
                   min={1}
                   step={1}
-                  placeholder="1"
+                  placeholder="2"
                 />
               </PropertyLine>
             )}

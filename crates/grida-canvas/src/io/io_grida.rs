@@ -400,6 +400,8 @@ pub struct JSONTextNode {
     pub base: JSONUnknownNodeProperties,
 
     pub text: String,
+    #[serde(rename = "maxLines", default)]
+    pub max_lines: Option<usize>,
     #[serde(rename = "textAlign", default)]
     pub text_align: TextAlign,
     #[serde(rename = "textAlignVertical", default)]
@@ -687,7 +689,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 node.base.rotation,
             ),
             width,
-            max_lines: None,
+            max_lines: node.max_lines,
             ellipsis: None,
             text: node.text,
             text_style: TextStyleRec {
