@@ -5,7 +5,9 @@ use skia_safe::textlayout::{
     ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection, TypefaceFontProvider,
 };
 use skia_safe::{surfaces, Color, FontMgr, Paint, Point};
-use std::fs;
+
+#[path = "../tests/fonts.rs"]
+mod fonts;
 
 fn main() {
     // Create a surface to accommodate all the casual rows
@@ -22,11 +24,7 @@ fn main() {
 
     // Load the Recursive variable font
     let font_mgr = FontMgr::new();
-    let recursive_font_data = fs::read(
-        "../../fixtures/fonts/Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf",
-    )
-    .unwrap();
-    let base_typeface = font_mgr.new_from_data(&recursive_font_data, None).unwrap();
+    let base_typeface = font_mgr.new_from_data(fonts::RECURSIVE_VF, None).unwrap();
 
     // Define the casual values we want to demonstrate (0 to 1 in 0.1 increments)
     // CASL axis typically ranges from 0 (linear) to 1 (casual)

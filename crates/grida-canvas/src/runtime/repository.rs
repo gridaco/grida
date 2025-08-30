@@ -246,11 +246,14 @@ impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
 }
 
 #[cfg(test)]
+#[path = "../../tests/fonts.rs"]
+mod test_fonts;
+
+#[cfg(test)]
 mod tests {
+    use super::test_fonts as fonts;
     use super::*;
     use skia_safe::surfaces;
-    use std::fs;
-    use std::path::Path;
 
     #[test]
     fn image_repository_basic() {
@@ -278,12 +281,8 @@ mod tests {
     fn variation_design_parameters_for_family_with_roboto_flex() {
         let mut repo = FontRepository::new();
 
-        // Load the Roboto Flex font file
-        let font_path = Path::new("../../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf");
-        let font_bytes = fs::read(font_path).expect("Failed to read Roboto Flex font file");
-
         // Add the font to the repository
-        repo.add(&font_bytes, "Roboto Flex");
+        repo.add(fonts::ROBOTO_FLEX_VF, "Roboto Flex");
 
         // Test that the font was added successfully
         assert_eq!(repo.family_count(), 1);
@@ -390,12 +389,8 @@ mod tests {
     fn variation_design_parameters_for_family_style_with_roboto_flex() {
         let mut repo = FontRepository::new();
 
-        // Load the Roboto Flex font file
-        let font_path = Path::new("../../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf");
-        let font_bytes = fs::read(font_path).expect("Failed to read Roboto Flex font file");
-
         // Add the font to the repository
-        repo.add(&font_bytes, "Roboto Flex");
+        repo.add(fonts::ROBOTO_FLEX_VF, "Roboto Flex");
 
         // Test with different font styles
         let styles = vec![

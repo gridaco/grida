@@ -5,7 +5,8 @@ use skia_safe::textlayout::{
     ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection, TypefaceFontProvider,
 };
 use skia_safe::{surfaces, Color, FontMgr, Paint, Point};
-use std::fs;
+
+use cg::fonts::geist::geist_bytes;
 
 fn main() {
     // Create a surface to accommodate all the decoration examples
@@ -22,8 +23,7 @@ fn main() {
 
     // Load the Geist variable font
     let font_mgr = FontMgr::new();
-    let geist_font_data = fs::read("fonts/Geist/Geist-VariableFont_wght.ttf").unwrap();
-    let base_typeface = font_mgr.new_from_data(&geist_font_data, None).unwrap();
+    let base_typeface = font_mgr.new_from_data(geist_bytes(), None).unwrap();
 
     // Create a paragraph style
     let mut paragraph_style = ParagraphStyle::new();

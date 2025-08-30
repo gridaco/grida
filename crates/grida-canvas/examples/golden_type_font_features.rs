@@ -5,7 +5,8 @@ use skia_safe::textlayout::{
     TypefaceFontProvider,
 };
 use skia_safe::{surfaces, Color, FontMgr, Paint, Point};
-use std::fs;
+
+use cg::fonts::geist::geist_bytes;
 
 fn main() {
     // Create a larger surface to accommodate all the font feature demonstrations
@@ -19,9 +20,7 @@ fn main() {
 
     // Load the Geist variable font which has excellent OpenType feature support
     let font_mgr = FontMgr::new();
-    let geist_font_data =
-        fs::read("../../fixtures/fonts/Geist/Geist-VariableFont_wght.ttf").unwrap();
-    let geist_typeface = font_mgr.new_from_data(&geist_font_data, None).unwrap();
+    let geist_typeface = font_mgr.new_from_data(geist_bytes(), None).unwrap();
 
     let mut paragraph_style = ParagraphStyle::new();
     paragraph_style.set_text_direction(TextDirection::LTR);

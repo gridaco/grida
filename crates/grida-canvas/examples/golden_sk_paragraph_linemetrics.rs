@@ -1,7 +1,7 @@
 use skia_safe::textlayout::*;
 use skia_safe::{surfaces, Color, FontMgr, Paint, PaintStyle, Point};
 
-static GEIST_VARIABLE_TTF: &[u8] = include_bytes!("../fonts/Geist/Geist-VariableFont_wght.ttf");
+use cg::fonts::geist::geist_bytes;
 
 /// Configuration for paragraph styling
 #[derive(Debug, Clone)]
@@ -156,7 +156,7 @@ fn main() {
 
     // Create font manager and load the Geist font
     let font_mgr = FontMgr::new();
-    let typeface = font_mgr.new_from_data(GEIST_VARIABLE_TTF, None).unwrap();
+    let typeface = font_mgr.new_from_data(geist_bytes(), None).unwrap();
 
     // Create font collection and add the Geist font
     let mut font_collection = FontCollection::new();

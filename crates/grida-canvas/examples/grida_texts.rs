@@ -6,6 +6,9 @@ use cg::resource::FontLoader;
 use cg::window;
 use math2::transform::AffineTransform;
 
+#[path = "../tests/fonts.rs"]
+mod fonts;
+
 const LOREM: &str = r#"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed leo quis orci porta auctor eget nec dui. Nullam egestas tempus sapien quis venenatis. Nullam placerat, elit eu aliquet luctus, risus elit sodales elit, eu iaculis ante lacus nec lacus. Vestibulum eget dolor at orci iaculis malesuada. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Quisque cursus tincidunt accumsan. In hac habitasse platea dictumst. Etiam ultricies laoreet ipsum id pulvinar. Aenean fermentum gravida nisi, et congue lectus interdum et. Cras pellentesque scelerisque quam, ut mollis ligula aliquet ut.
 
 Maecenas convallis nisl non porta consectetur. Nulla scelerisque urna ut massa condimentum hendrerit. Cras eu orci malesuada, ornare est ut, viverra libero. Praesent at turpis ultrices, eleifend leo id, gravida lorem. Aenean eu nunc ac orci aliquam ultricies. Suspendisse mi est, convallis et tincidunt nec, iaculis nec metus. Vestibulum vitae metus nisi. Etiam felis mauris, ullamcorper sed aliquet eu, porttitor eu magna. Vestibulum vel mattis purus, vitae semper tortor. Etiam vestibulum ex id risus viverra vulputate. Aenean euismod lectus tortor, vitae interdum erat blandit sed. Vestibulum accumsan massa vehicula tellus efficitur vehicula. Donec accumsan eget purus sed condimentum. Nunc tempor imperdiet odio a molestie. Phasellus velit nulla, volutpat ac ipsum id, iaculis pretium ipsum.
@@ -13,6 +16,12 @@ Maecenas convallis nisl non porta consectetur. Nulla scelerisque urna ut massa c
 Cras ac justo iaculis, sollicitudin nisl vel, maximus turpis. Nulla sed nunc elit. Maecenas ultricies auctor mi quis semper. Suspendisse eget rhoncus enim. Morbi tincidunt, urna sed dapibus consequat, ex lorem scelerisque risus, vel auctor libero dui eu diam. Aliquam a rutrum risus. Nunc facilisis, est a rutrum commodo, eros ipsum pulvinar enim, sit amet elementum est dolor quis mi. Nam aliquet, massa eget vestibulum tincidunt, tortor leo dictum arcu, quis eleifend felis ligula in odio. Nullam pharetra mauris ac tortor pharetra ultricies. Aenean in dictum lorem, eu vestibulum libero. Praesent efficitur pretium magna, nec tristique urna condimentum vitae. Aliquam eu nibh quis urna rhoncus porta. Duis lacus leo, tempus ut urna sit amet, dignissim consectetur lorem. Duis luctus scelerisque ultricies. Quisque pharetra feugiat metus in tempor."#;
 
 const LOREM_SHORT: &str = r#"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed leo quis orci porta auctor eget nec dui. Nullam egestas tempus sapien quis venenatis. Nullam placerat, elit eu aliquet luctus, risus elit sodales elit, eu iaculis ante lacus nec lacus. Vestibulum eget dolor at orci iaculis malesuada. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Quisque cursus tincidunt accumsan. In hac habitasse platea dictumst. Etiam ultricies laoreet ipsum id pulvinar. Aenean fermentum gravida nisi, et congue lectus interdum et. Cras pellentesque scelerisque quam, ut mollis ligula aliquet ut."#;
+
+fn write_temp_font(name: &str, data: &[u8]) -> String {
+    let path = std::env::temp_dir().join(format!("{}_fixture.ttf", name));
+    std::fs::write(&path, data).expect("write temp font");
+    path.to_string_lossy().into_owned()
+}
 
 async fn demo_texts() -> Scene {
     let nf = NodeFactory::new();
@@ -127,8 +136,8 @@ async fn demo_texts() -> Scene {
 #[tokio::main]
 async fn main() {
     let scene = demo_texts().await;
-    let caveat_font_path = "../../fixtures/fonts/Caveat/Caveat-VariableFont_wght.ttf".to_string();
-    let vt323_font_path = "../../fixtures/fonts/VT323/VT323-Regular.ttf".to_string();
+    let caveat_font_path = write_temp_font("Caveat", fonts::CAVEAT_VF);
+    let vt323_font_path = write_temp_font("VT323", fonts::VT323_REGULAR);
 
     window::run_demo_window_with(scene, move |_renderer, _img_tx, font_tx, proxy| {
         println!("📝 Loading fonts asynchronously...");

@@ -29,3 +29,13 @@ Fonts downloaded from Google Fonts. For variable fonts, only the VF file is kept
 
 - Geist
 - GeistMono
+
+## Used in Rust tests and examples
+
+The following fonts are embedded with `include_bytes!` and used only for testing and example binaries:
+
+- Caveat
+- Bungee
+- Recursive
+- VT323
+- Roboto Flex

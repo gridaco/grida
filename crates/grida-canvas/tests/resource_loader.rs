@@ -4,6 +4,8 @@ use cg::resource::ResourceLoader;
 
 use std::path::PathBuf;
 
+mod fonts;
+
 fn fixture_path(name: &str) -> String {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures")
@@ -12,14 +14,22 @@ fn fixture_path(name: &str) -> String {
         .to_string()
 }
 
+fn write_temp_font(name: &str, data: &[u8]) -> PathBuf {
+    let path = std::env::temp_dir().join(format!("{}_fixture.ttf", name));
+    std::fs::write(&path, data).expect("write temp font");
+    path
+}
+
 #[test]
 fn font_loader_simple_load_unload() {
     futures::executor::block_on(async {
         let mut loader = FontLoader::new_simple();
-        let path = fixture_path("fonts/Caveat/Caveat-VariableFont_wght.ttf");
-        let data = loader.load("Caveat", &path).await;
+        let path = write_temp_font("Caveat", fonts::CAVEAT_VF);
+        let path_str = path.to_string_lossy().to_string();
+        let data = loader.load("Caveat", &path_str).await;
         assert!(data.is_some());
         loader.unload("Caveat").await;
+        std::fs::remove_file(path).ok();
     });
 }
 
