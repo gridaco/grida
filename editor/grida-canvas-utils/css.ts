@@ -51,7 +51,8 @@ export namespace css {
       Partial<grida.program.nodes.i.IComputedTextNodeStyle> &
       Partial<grida.program.nodes.i.IPadding> &
       Partial<grida.program.nodes.i.IEffects> &
-      Partial<grida.program.nodes.i.IFlexContainer>,
+      Partial<grida.program.nodes.i.IFlexContainer> &
+      Partial<{ maxLines?: number | null }>,
     config: {
       hasTextStyle: boolean;
       fill: "color" | "background" | "fill" | "none";
@@ -88,6 +89,8 @@ export namespace css {
       crossAxisAlignment,
       mainAxisGap,
       crossAxisGap,
+      //
+      maxLines,
       //
       cursor,
       //
@@ -206,10 +209,17 @@ export namespace css {
           lineHeight,
           fontFeatures,
           fontVariations,
-          textTransform,
-          fill: fill!,
-        }),
-      };
+        textTransform,
+        fill: fill!,
+      }),
+    };
+  }
+
+    if (config.hasTextStyle && maxLines && maxLines > 0) {
+      result.display = "-webkit-box";
+      (result as any).WebkitLineClamp = maxLines;
+      (result as any).WebkitBoxOrient = "vertical";
+      result.overflow = "hidden";
     }
 
     return result;

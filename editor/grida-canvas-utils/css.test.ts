@@ -54,3 +54,33 @@ describe("toReactTextStyle", () => {
     expect(result.textTransform).toBe("uppercase");
   });
 });
+
+describe("toReactCSSProperties", () => {
+  it("applies maxLines with line clamp styles", () => {
+    const styles = {
+      textAlign: "left",
+      textAlignVertical: "top",
+      textDecorationLine: "none",
+      fontFamily: "Inter",
+      fontSize: 16,
+      fontWeight: 400,
+      letterSpacing: 0,
+      lineHeight: 16,
+      fill: {
+        type: "solid",
+        color: { r: 0, g: 0, b: 0, a: 1 },
+      },
+      maxLines: 2,
+    } as any;
+
+    const result = css.toReactCSSProperties(styles, {
+      hasTextStyle: true,
+      fill: "color",
+    });
+
+    expect(result.display).toBe("-webkit-box");
+    expect((result as any).WebkitLineClamp).toBe(2);
+    expect((result as any).WebkitBoxOrient).toBe("vertical");
+    expect(result.overflow).toBe("hidden");
+  });
+});
