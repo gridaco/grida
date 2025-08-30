@@ -4,7 +4,7 @@ use skia_safe::{
 };
 
 use crate::cache::mipmap::{ImageMipmaps, MipmapConfig};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Generic repository trait for storing resources keyed by an identifier.
 pub trait ResourceRepository<T> {
@@ -114,11 +114,15 @@ impl ResourceRepository<ImageMipmaps> for ImageRepository {
     }
 }
 
-/// A repository for managing fonts.
+/// A repository for managing fonts and their availability state.
 #[derive(Clone)]
 pub struct FontRepository {
     provider: TypefaceFontProvider,
     fonts: HashMap<String, Vec<Vec<u8>>>,
+    /// Fonts that have been requested but not yet provided.
+    missing: HashSet<String>,
+    /// All font families referenced by the current document.
+    requested: HashSet<String>,
     generation: usize,
 }
 
@@ -127,6 +131,8 @@ impl FontRepository {
         Self {
             provider: TypefaceFontProvider::new(),
             fonts: HashMap::new(),
+            missing: HashSet::new(),
+            requested: HashSet::new(),
             generation: 0,
         }
     }
@@ -139,6 +145,7 @@ impl FontRepository {
         }
 
         family_fonts.push(bytes);
+        self.missing.remove(&family);
         self.generation += 1;
     }
 
@@ -153,6 +160,7 @@ impl FontRepository {
         }
 
         family_fonts.push(bytes.to_vec());
+        self.missing.remove(family);
         self.generation += 1;
     }
 
@@ -176,6 +184,50 @@ impl FontRepository {
 
     pub fn get_family_fonts(&self, family: &str) -> Option<&Vec<Vec<u8>>> {
         self.fonts.get(family)
+    }
+
+    /// Mark a font family as missing. This is used when the runtime encounters
+    /// a font that is referenced but not yet registered.
+    pub fn mark_missing(&mut self, family: &str) {
+        self.requested.insert(family.to_string());
+        if !self.fonts.contains_key(family) {
+            self.missing.insert(family.to_string());
+        }
+    }
+
+    /// Returns `true` if there are any unresolved font families.
+    pub fn has_missing(&self) -> bool {
+        !self.missing.is_empty()
+    }
+
+    /// List all font families that have been requested but not provided.
+    pub fn missing_families(&self) -> Vec<String> {
+        self.missing.iter().cloned().collect()
+    }
+
+    /// List all font families that are referenced by the current document.
+    pub fn requested_families(&self) -> Vec<String> {
+        self.requested.iter().cloned().collect()
+    }
+
+    /// Set the collection of font families referenced by the document. This will
+    /// recompute the missing set based on available fonts.
+    pub fn set_requested_families<I>(&mut self, families: I)
+    where
+        I: IntoIterator<Item = String>,
+    {
+        self.requested = families.into_iter().collect();
+        self.missing = self
+            .requested
+            .iter()
+            .filter(|f| !self.fonts.contains_key(*f))
+            .cloned()
+            .collect();
+    }
+
+    /// List all registered font families.
+    pub fn available_families(&self) -> Vec<String> {
+        self.fonts.keys().cloned().collect()
     }
 
     /// get Variable Axes for a family
@@ -212,7 +264,8 @@ impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
                 self.provider.register_typeface(tf, Some(id.as_str()));
             }
         }
-        self.fonts.insert(id, item);
+        self.fonts.insert(id.clone(), item);
+        self.missing.remove(&id);
         self.generation += 1;
     }
 
@@ -275,6 +328,19 @@ mod tests {
         assert_eq!(repo.len(), 1);
         repo.remove(&"f1".to_string());
         assert!(repo.is_empty());
+    }
+
+    #[test]
+    fn font_repository_tracks_missing_fonts() {
+        let mut repo = FontRepository::new();
+        repo.mark_missing("Bungee");
+        assert!(repo.has_missing());
+        assert_eq!(repo.missing_families(), vec!["Bungee".to_string()]);
+
+        // Registering the font should clear it from the missing set
+        repo.add(fonts::BUNGEE_REGULAR, "Bungee");
+        assert!(!repo.has_missing());
+        assert_eq!(repo.available_families(), vec!["Bungee".to_string()]);
     }
 
     #[test]

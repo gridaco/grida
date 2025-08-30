@@ -42,6 +42,11 @@ type ExportAsImage = {
   constraints: ExportConstraints;
 };
 
+export type FontKey = {
+  family: string;
+  // Future properties will allow precise font identification and partial fetching.
+};
+
 type VectorNetworkVertex = Vector2;
 type VectorNetworkSegment = {
   a: number;
@@ -203,6 +208,28 @@ export class Grida2D {
     this.module._register_font(this.appptr, fptr, flen - 1, ptr, len);
     this.module._deallocate(fptr, flen);
     this.module._deallocate(ptr, len);
+  }
+
+  hasMissingFonts(): boolean {
+    return this.module._has_missing_fonts(this.appptr);
+  }
+
+  listMissingFonts(): FontKey[] {
+    const ptr = this.module._list_missing_fonts(this.appptr);
+    if (ptr === 0) return [];
+    const str = this.module.UTF8ToString(ptr);
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
+    return JSON.parse(str);
+  }
+
+  listAvailableFonts(): FontKey[] {
+    const ptr = this.module._list_available_fonts(this.appptr);
+    if (ptr === 0) return [];
+    const str = this.module.UTF8ToString(ptr);
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
+    return JSON.parse(str);
   }
 
   /**

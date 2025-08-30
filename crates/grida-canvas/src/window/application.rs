@@ -538,6 +538,22 @@ impl UnknownTargetApplication {
         self.process_font_queue();
     }
 
+    pub fn has_missing_fonts(&self) -> bool {
+        self.renderer.fonts.borrow().has_missing()
+    }
+
+    pub fn list_missing_fonts(&self) -> Vec<String> {
+        self.renderer.fonts.borrow().missing_families()
+    }
+
+    pub fn list_available_fonts(&self) -> Vec<String> {
+        self.renderer.fonts.borrow().available_families()
+    }
+
+    pub fn report_missing_font(&mut self, family: &str) {
+        self.renderer.fonts.borrow_mut().mark_missing(family);
+    }
+
     /// Perform a redraw and print diagnostic information.
     pub(crate) fn redraw(&mut self) {
         let now = self.clock.now() + self.last_frame_time.elapsed().as_secs_f64() * 1000.0;

@@ -94,6 +94,9 @@ declare namespace createGridaCanvas {
       data_ptr: number,
       data_len: number
     ): void;
+    _has_missing_fonts(state: GridaCanvasWebGlApplicationPtr): boolean;
+    _list_missing_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
+    _list_available_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
     _set_main_camera_transform(
       state: GridaCanvasWebGlApplicationPtr,
       a: number,

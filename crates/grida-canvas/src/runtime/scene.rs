@@ -1,6 +1,6 @@
 use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
 use crate::cg::types::*;
-use crate::node::schema::*;
+use crate::node::{repository::NodeRepository, schema::*};
 use crate::painter::layer::Layer;
 use crate::painter::Painter;
 use crate::runtime::counter::FrameCounter;
@@ -19,6 +19,7 @@ use skia_safe::{
     surfaces, Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface,
 };
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -39,6 +40,40 @@ impl Default for RendererOptions {
             font_fallback: false,
         }
     }
+}
+
+fn collect_scene_font_families(scene: &Scene) -> HashSet<String> {
+    fn walk(id: &NodeId, repo: &NodeRepository, set: &mut HashSet<String>) {
+        if let Some(node) = repo.get(id) {
+            match node {
+                Node::TextSpan(n) => {
+                    set.insert(n.text_style.font_family.clone());
+                }
+                Node::Group(n) => {
+                    for child in &n.children {
+                        walk(child, repo, set);
+                    }
+                }
+                Node::Container(n) => {
+                    for child in &n.children {
+                        walk(child, repo, set);
+                    }
+                }
+                Node::BooleanOperation(n) => {
+                    for child in &n.children {
+                        walk(child, repo, set);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let mut set = HashSet::new();
+    for id in &scene.children {
+        walk(id, &scene.nodes, &mut set);
+    }
+    set
 }
 
 /// Type alias for tile information in frame planning
@@ -276,8 +311,13 @@ impl Renderer {
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
         self.scene_cache = cache::scene::SceneCache::new();
-        let fonts = self.fonts.borrow().clone();
-        self.scene_cache.update_geometry(&scene, &fonts);
+        let requested = collect_scene_font_families(&scene);
+        {
+            let mut fonts_repo = self.fonts.borrow_mut();
+            fonts_repo.set_requested_families(requested.into_iter());
+            let fonts_clone = fonts_repo.clone();
+            self.scene_cache.update_geometry(&scene, &fonts_clone);
+        }
         self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);
         self.queue_stable();
@@ -687,6 +727,42 @@ mod tests {
         // no scene loaded so geometry cache is empty
         let pic = renderer.with_recording_cached(&"missing".to_string(), |_| {});
         assert!(pic.is_none());
+
+        renderer.free();
+    }
+
+    #[test]
+    fn renderer_tracks_missing_fonts_from_scene() {
+        let nf = NodeFactory::new();
+        let mut repo = NodeRepository::new();
+
+        let mut text = nf.create_text_span_node();
+        text.text_style.font_family = "MissingFont".into();
+        let text_id = repo.insert(Node::TextSpan(text));
+
+        let scene = Scene {
+            id: "scene".into(),
+            name: "test".into(),
+            children: vec![text_id],
+            nodes: repo,
+            background_color: None,
+        };
+
+        let mut renderer = Renderer::new(
+            Backend::new_from_raster(100, 100),
+            None,
+            Camera2D::new(Size {
+                width: 100.0,
+                height: 100.0,
+            }),
+        );
+        renderer.load_scene(scene);
+
+        assert!(renderer.fonts.borrow().has_missing());
+        assert_eq!(
+            renderer.fonts.borrow().missing_families(),
+            vec!["MissingFont".to_string()]
+        );
 
         renderer.free();
     }

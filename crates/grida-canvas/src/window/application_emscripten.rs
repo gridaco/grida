@@ -1,3 +1,4 @@
+use crate::io::io_grida::JSONVectorNetwork;
 use crate::resource::font_loader::FontMessage;
 use crate::resource::image_loader::ImageMessage;
 use crate::runtime::camera::Camera2D;
@@ -9,7 +10,6 @@ use crate::window::command::ApplicationCommand;
 use crate::window::state::{self, GpuState, SurfaceState};
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
-use crate::io::io_grida::JSONVectorNetwork;
 
 #[cfg(target_os = "emscripten")]
 use crate::os::emscripten::*;
@@ -239,6 +239,18 @@ impl EmscriptenApplication {
     /// hit test. Should be called whenever the pointer moves.
     pub fn pointer_move(&mut self, x: f32, y: f32) {
         self.base.pointer_move(x, y);
+    }
+
+    pub fn has_missing_fonts(&self) -> bool {
+        self.base.has_missing_fonts()
+    }
+
+    pub fn list_missing_fonts(&self) -> Vec<String> {
+        self.base.list_missing_fonts()
+    }
+
+    pub fn list_available_fonts(&self) -> Vec<String> {
+        self.base.list_available_fonts()
     }
 
     /// Register font data with the renderer.

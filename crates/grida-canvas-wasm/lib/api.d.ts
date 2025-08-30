@@ -30,6 +30,11 @@ export type Rectangle = {
   height: number;
 };
 
+export type FontKey = {
+  family: string;
+  // Future properties will allow precise font identification and partial fetching.
+};
+
 export type Image = TODO;
 export type Math2D = TODO;
 export type Color = TODO;
@@ -163,6 +168,21 @@ export interface Grida2DScene extends Grida2DRuntime {
    * @param data - Raw font bytes.
    */
   registerFont(family: string, data: Uint8Array): void;
+
+  /**
+   * @returns true if the scene references fonts that are not yet registered.
+   */
+  hasMissingFonts(): boolean;
+
+  /**
+   * Fonts referenced in the scene that are not yet registered.
+   */
+  listMissingFonts(): FontKey[];
+
+  /**
+   * Fonts currently available in the runtime.
+   */
+  listAvailableFonts(): FontKey[];
 
   /**
    * @privateRemarks
