@@ -24,8 +24,6 @@ import {
   StrikethroughIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
-import type { FontFeature } from "@grida/fonts/parse";
-import type Typr from "@grida/fonts/typr";
 import { ChevronRight } from "lucide-react";
 import {
   Tooltip,
@@ -40,6 +38,7 @@ import {
   type PropertyKey,
 } from "./text-details-preview";
 import { FontFeatureSettings } from "./text-details-font-feature-settings";
+import { useCurrentFont } from "../context/font";
 
 // Type definitions
 type VerticalTrim = "all" | "disable-all";
@@ -414,9 +413,7 @@ interface TextDetailsProps {
   fontVariations?: Record<string, number>;
   fontWeight?: number;
   fontFamily?: string;
-  axes?: Record<string, Typr.FVARAxis>;
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
-  features?: FontFeature[];
 
   // Change handlers
   onTextAlignChange?: (value: cg.TextAlign) => void;
@@ -453,9 +450,7 @@ export function TextDetails({
   fontVariations = {},
   fontWeight = 400,
   fontFamily,
-  axes,
   fontFeatures = {},
-  features = [],
 
   // Change handlers
   onTextAlignChange,
@@ -473,6 +468,7 @@ export function TextDetails({
   onFontWeightChange,
   onFontFeatureChange,
 }: TextDetailsProps) {
+  const { axes, features } = useCurrentFont();
   const [hoverPreview, setHoverPreview] = useState<
     BasicPreview | VariationPreview | FeaturePreview
   >(null);

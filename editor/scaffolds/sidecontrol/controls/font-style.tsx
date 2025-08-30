@@ -2,7 +2,7 @@ import React from "react";
 import type cg from "@grida/cg";
 import { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
-import type { FvarInstance } from "@grida/fonts/parse";
+import { useCurrentFont } from "./context/font";
 
 type NFontWeight = cg.NFontWeight;
 
@@ -41,13 +41,12 @@ const FALLBACK_ENUM = [
  */
 export function FontStyleControl({
   value,
-  instances,
   onValueChange,
 }: {
   value?: TMixed<NFontWeight>;
-  instances?: FvarInstance[];
   onValueChange?: (value: NFontWeight) => void;
 }) {
+  const { instances } = useCurrentFont();
   const enums = React.useMemo(() => {
     if (instances && instances.length > 0) {
       const mapped = instances

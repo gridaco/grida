@@ -37,7 +37,6 @@ import {
   PositioningConstraintsControl,
   PositioningModeControl,
 } from "./controls/positioning";
-import type { FontFeature, FvarInstance } from "@grida/fonts/parse";
 import { RotateControl } from "./controls/rotate";
 import { TextAlignVerticalControl } from "./controls/text-align-vertical";
 import { LetterSpacingControl } from "./controls/letter-spacing";
@@ -110,7 +109,7 @@ import {
   MixedPropertiesEditor,
 } from "@/grida-canvas-react/use-mixed-properties";
 import { editor } from "@/grida-canvas";
-import type Typr from "@grida/fonts/typr";
+import { CurrentFontProvider } from "./controls/context/font";
 
 function Align() {
   const editor = useCurrentEditor();
@@ -300,29 +299,6 @@ function ModeMixedNodeProperties({
     userdata,
   } = properties;
 
-  const instance = useCurrentEditor();
-  const [fontInstances, setFontInstances] = React.useState<FvarInstance[]>([]);
-
-  React.useEffect(() => {
-    let canceled = false;
-    (async () => {
-      const family = fontFamily?.value;
-      if (!family) {
-        if (!canceled) setFontInstances([]);
-        return;
-      }
-      const detail = await instance.getFontDetails(family);
-      if (!detail) {
-        if (!canceled) setFontInstances([]);
-        return;
-      }
-      if (!canceled) setFontInstances(detail.instances);
-    })();
-    return () => {
-      canceled = true;
-    };
-  }, [instance, fontFamily?.value]);
-
   const sid = ids.join(",");
   // const is_root = ids.length === 0 && scene.children.includes(ids[0]); // assuming when root is selected, only root is selected
   const types = new Set(nodes.map((n) => n.type));
@@ -465,76 +441,80 @@ function ModeMixedNodeProperties({
             </SidebarMenuSectionContent>
           )}
         </SidebarSection> */}
-      <SidebarSection
-        hidden={config.text === "off" || !types.has("text")}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Value</PropertyLineLabel>
-            <StringValueControl disabled value={"multiple"} />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Font</PropertyLineLabel>
-            <div className="flex-1">
-              <FontFamilyControl
-                value={fontFamily?.value}
-                onValueChange={change.fontFamily}
-              />
-            </div>
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Style</PropertyLineLabel>
-            <FontStyleControl
-              value={fontWeight?.value}
-              instances={fontInstances}
-              onValueChange={change.fontWeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Size</PropertyLineLabel>
-            <FontSizeControl
-              value={fontSize?.value}
-              onValueCommit={change.fontSize}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Line</PropertyLineLabel>
-            <LineHeightControl
-              value={lineHeight?.value}
-              onValueCommit={change.lineHeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Letter</PropertyLineLabel>
-            <LetterSpacingControl
-              value={letterSpacing?.value}
-              onValueCommit={change.letterSpacing}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Align</PropertyLineLabel>
-            <TextAlignControl
-              value={textAlign?.value}
-              onValueChange={change.textAlign}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel></PropertyLineLabel>
-            <TextAlignVerticalControl
-              value={textAlignVertical?.value}
-              onValueChange={change.textAlignVertical}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Max Length</PropertyLineLabel>
-            <MaxlengthControl disabled placeholder={"multiple"} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {config.text !== "off" && types.has("text") && (
+        <CurrentFontProvider
+          fontFamily={
+            typeof fontFamily?.value === "string" ? fontFamily.value : undefined
+          }
+        >
+          <SidebarSection className="border-b pb-4">
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuSectionContent className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Value</PropertyLineLabel>
+                <StringValueControl disabled value={"multiple"} />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Font</PropertyLineLabel>
+                <div className="flex-1">
+                  <FontFamilyControl
+                    value={fontFamily?.value}
+                    onValueChange={change.fontFamily}
+                  />
+                </div>
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Style</PropertyLineLabel>
+                <FontStyleControl
+                  value={fontWeight?.value}
+                  onValueChange={change.fontWeight}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Size</PropertyLineLabel>
+                <FontSizeControl
+                  value={fontSize?.value}
+                  onValueCommit={change.fontSize}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Line</PropertyLineLabel>
+                <LineHeightControl
+                  value={lineHeight?.value}
+                  onValueCommit={change.lineHeight}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Letter</PropertyLineLabel>
+                <LetterSpacingControl
+                  value={letterSpacing?.value}
+                  onValueCommit={change.letterSpacing}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Align</PropertyLineLabel>
+                <TextAlignControl
+                  value={textAlign?.value}
+                  onValueChange={change.textAlign}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel></PropertyLineLabel>
+                <TextAlignVerticalControl
+                  value={textAlignVertical?.value}
+                  onValueChange={change.textAlignVertical}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Max Length</PropertyLineLabel>
+                <MaxlengthControl disabled placeholder={"multiple"} />
+              </PropertyLine>
+            </SidebarMenuSectionContent>
+          </SidebarSection>
+        </CurrentFontProvider>
+      )}
       <SidebarSection
         hidden={config.image === "off" || !types.has("image")}
         className="border-b pb-4"
@@ -1296,8 +1276,6 @@ function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
 
 function SectionText({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
-  const computed = useComputedNode(node_id);
-  const instance = useCurrentEditor();
   const {
     text,
     fontFamily,
@@ -1338,162 +1316,121 @@ function SectionText({ node_id }: { node_id: string }) {
     fontFeatures: node.fontFeatures,
   }));
 
-  type AxisMap = Record<string, Typr.FVARAxis>;
-  const [axes, setAxes] = React.useState<
-    Record<string, Typr.FVARAxis> | undefined
-  >();
-  const [features, setFeatures] = React.useState<FontFeature[]>([]);
-  const [instances, setInstances] = React.useState<FvarInstance[]>([]);
-
-  React.useEffect(() => {
-    let canceled = false;
-    (async () => {
-      if (!fontFamily) {
-        if (!canceled) {
-          setAxes(undefined);
-          setFeatures([]);
-          setInstances([]);
-        }
-        return;
-      }
-      const detail = await instance.getFontDetails(fontFamily);
-      if (!detail) {
-        if (!canceled) {
-          setAxes(undefined);
-          setFeatures([]);
-          setInstances([]);
-        }
-        return;
-      }
-      const record: AxisMap = {};
-      for (const tag of Object.keys(detail.axes)) {
-        const axis = detail.axes[tag];
-        record[tag] = axis;
-      }
-      if (!canceled) {
-        setAxes(record);
-        setFeatures(detail.features);
-        setInstances(detail.instances);
-      }
-    })();
-    return () => {
-      canceled = true;
-    };
-  }, [instance, fontFamily, fontWeight]);
-
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
-        <SidebarSectionHeaderActions>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="xs">
-                <MixerVerticalIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="p-0 w-64 h-[500px]">
-              <TextDetails
-                axes={axes}
-                textAlign={textAlign}
-                textDecorationLine={textDecorationLine}
-                textDecorationStyle={textDecorationStyle ?? undefined}
-                textDecorationThickness={textDecorationThickness ?? undefined}
-                textDecorationColor={textDecorationColor ?? undefined}
-                textDecorationSkipInk={textDecorationSkipInk ?? undefined}
-                textTransform={textTransform}
-                maxLines={maxLines}
-                maxLength={maxLength}
-                fontVariations={fontVariations}
-                fontWeight={fontWeight}
-                fontFamily={fontFamily}
-                fontFeatures={fontFeatures}
-                features={features}
-                onTextTransformChange={actions.textTransform}
-                onTextAlignChange={actions.textAlign}
-                onTextDecorationLineChange={actions.textDecorationLine}
-                onTextDecorationStyleChange={actions.textDecorationStyle}
-                onTextDecorationThicknessChange={
-                  actions.textDecorationThickness
-                }
-                onTextDecorationColorChange={actions.textDecorationColor}
-                onTextDecorationSkipInkChange={actions.textDecorationSkipInk}
-                onMaxLinesChange={actions.maxLines}
-                onMaxLengthChange={actions.maxLength}
-                onFontWeightChange={(value) =>
-                  actions.fontWeight(value as cg.NFontWeight)
-                }
-                onFontVariationChange={(key, value) => {
-                  actions.fontVariation(key, value);
-                }}
-                onFontFeatureChange={(key, value) => {
-                  actions.fontFeature(key, value);
-                }}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </SidebarSectionHeaderActions>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Value</PropertyLineLabel>
-          <StringValueControl
-            value={text}
-            maxlength={maxLength}
-            onValueChange={(value) => actions.text(value ?? null)}
-          />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Font</PropertyLineLabel>
-          <div className="flex-1">
-            <FontFamilyControl
-              value={fontFamily}
-              onValueChange={actions.fontFamily}
+    <CurrentFontProvider fontFamily={fontFamily}>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderActions>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="xs">
+                  <MixerVerticalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="p-0 w-64 h-[500px]">
+                <TextDetails
+                  textAlign={textAlign}
+                  textDecorationLine={textDecorationLine}
+                  textDecorationStyle={textDecorationStyle ?? undefined}
+                  textDecorationThickness={textDecorationThickness ?? undefined}
+                  textDecorationColor={textDecorationColor ?? undefined}
+                  textDecorationSkipInk={textDecorationSkipInk ?? undefined}
+                  textTransform={textTransform}
+                  maxLines={maxLines}
+                  maxLength={maxLength}
+                  fontVariations={fontVariations}
+                  fontWeight={fontWeight}
+                  fontFamily={fontFamily}
+                  fontFeatures={fontFeatures}
+                  onTextTransformChange={actions.textTransform}
+                  onTextAlignChange={actions.textAlign}
+                  onTextDecorationLineChange={actions.textDecorationLine}
+                  onTextDecorationStyleChange={actions.textDecorationStyle}
+                  onTextDecorationThicknessChange={
+                    actions.textDecorationThickness
+                  }
+                  onTextDecorationColorChange={actions.textDecorationColor}
+                  onTextDecorationSkipInkChange={actions.textDecorationSkipInk}
+                  onMaxLinesChange={actions.maxLines}
+                  onMaxLengthChange={actions.maxLength}
+                  onFontWeightChange={(value) =>
+                    actions.fontWeight(value as cg.NFontWeight)
+                  }
+                  onFontVariationChange={(key, value) => {
+                    actions.fontVariation(key, value);
+                  }}
+                  onFontFeatureChange={(key, value) => {
+                    actions.fontFeature(key, value);
+                  }}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarSectionHeaderActions>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Value</PropertyLineLabel>
+            <StringValueControl
+              value={text}
+              maxlength={maxLength}
+              onValueChange={(value) => actions.text(value ?? null)}
             />
-          </div>
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Style</PropertyLineLabel>
-          <FontStyleControl
-            value={fontWeight}
-            instances={instances}
-            onValueChange={actions.fontWeight}
-          />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Size</PropertyLineLabel>
-          <FontSizeControl value={fontSize} onValueCommit={actions.fontSize} />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Line</PropertyLineLabel>
-          <LineHeightControl
-            value={lineHeight}
-            onValueCommit={actions.lineHeight}
-          />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Letter</PropertyLineLabel>
-          <LetterSpacingControl
-            value={letterSpacing}
-            onValueCommit={actions.letterSpacing}
-          />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Align</PropertyLineLabel>
-          <TextAlignControl
-            value={textAlign}
-            onValueChange={actions.textAlign}
-          />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel></PropertyLineLabel>
-          <TextAlignVerticalControl
-            value={textAlignVertical}
-            onValueChange={actions.textAlignVertical}
-          />
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Font</PropertyLineLabel>
+            <div className="flex-1">
+              <FontFamilyControl
+                value={fontFamily}
+                onValueChange={actions.fontFamily}
+              />
+            </div>
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Style</PropertyLineLabel>
+            <FontStyleControl
+              value={fontWeight}
+              onValueChange={actions.fontWeight}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Size</PropertyLineLabel>
+            <FontSizeControl
+              value={fontSize}
+              onValueCommit={actions.fontSize}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Line</PropertyLineLabel>
+            <LineHeightControl
+              value={lineHeight}
+              onValueCommit={actions.lineHeight}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Letter</PropertyLineLabel>
+            <LetterSpacingControl
+              value={letterSpacing}
+              onValueCommit={actions.letterSpacing}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Align</PropertyLineLabel>
+            <TextAlignControl
+              value={textAlign}
+              onValueChange={actions.textAlign}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel></PropertyLineLabel>
+            <TextAlignVerticalControl
+              value={textAlignVertical}
+              onValueChange={actions.textAlignVertical}
+            />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+    </CurrentFontProvider>
   );
 }
 
