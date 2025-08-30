@@ -1,10 +1,11 @@
 import React from "react";
 import type cg from "@grida/cg";
-import { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
 import { useCurrentFont } from "./context/font";
 
-type NFontWeight = cg.NFontWeight;
+export type FontStyleChange =
+  | { type: "instance"; name: string }
+  | { type: "values"; values: Record<string, number> };
 
 /**
  * Font Style (Variation Instance) Control Component
@@ -23,44 +24,58 @@ type NFontWeight = cg.NFontWeight;
  * parser that can extract STAT axis information and fvar instances from OpenType fonts.
  *
  * Usage:
- * - Pass parsed font style data (STAT axis values, fvar instances) as props
  * - Handle style selection changes through the provided callbacks
  * - Ensure your font parser provides the necessary data structure this component expects
+ * - The component is purely driven by the font context and will automatically deselect
+ *   when the current font variations don't match any instance exactly
  */
 export function FontStyleControl({
-  value,
   onValueChange,
 }: {
-  value?: TMixed<NFontWeight>;
-  onValueChange?: (value: NFontWeight) => void;
+  onValueChange?: (change: FontStyleChange) => void;
 }) {
-  const { instances, weights } = useCurrentFont();
+  const { instances, weights, matchingInstanceName, currentFontVariations } =
+    useCurrentFont();
   const enums = React.useMemo(() => {
     if (instances && instances.length > 0) {
-      const mapped = instances
-        .map((inst) => {
-          const wght = inst.coordinates["wght"];
-          if (typeof wght !== "number") return null;
-          return { value: wght.toString(), label: inst.name };
-        })
-        .filter(Boolean) as { value: string; label: string }[];
+      const mapped = instances.map((inst) => ({
+        value: inst.name,
+        label: inst.name,
+      }));
       if (mapped.length > 0) return mapped;
     }
     return weights;
   }, [instances, weights]);
 
-  const valueString = typeof value === "number" ? value.toString() : value;
-  const isCustom =
-    typeof value === "number" && !enums.some((e) => e.value === valueString);
+  // Show custom placeholder when there's no exact match but we have instances
+  const isCustom = instances && instances.length > 0 && !matchingInstanceName;
+
+  // Create informative custom placeholder with actual variation values
+  const customPlaceholder = React.useMemo(() => {
+    if (!isCustom || !currentFontVariations) return undefined;
+
+    const variations = Object.entries(currentFontVariations)
+      .map(([axis, value]) => `${axis}: ${value}`)
+      .join(", ");
+
+    return variations || "Custom";
+  }, [isCustom, currentFontVariations]);
 
   return (
     <PropertyEnum
-      value={isCustom ? undefined : valueString}
-      placeholder={isCustom ? `wght: ${valueString?.toString()}` : undefined}
+      value={matchingInstanceName || ""}
+      placeholder={customPlaceholder}
       enum={enums}
       disabled={enums.length === 0}
       onValueChange={(v) => {
-        onValueChange?.(parseInt(v) as NFontWeight);
+        if (instances && instances.length > 0) {
+          onValueChange?.({ type: "instance", name: v });
+        } else {
+          onValueChange?.({
+            type: "values",
+            values: { wght: parseInt(v) },
+          });
+        }
       }}
     />
   );

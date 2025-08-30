@@ -10,7 +10,7 @@ import {
 } from "@/components/sidebar";
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
-import { FontStyleControl } from "./controls/font-style";
+import { FontStyleControl, type FontStyleChange } from "./controls/font-style";
 import { OpacityControl } from "./controls/opacity";
 import { HrefControl } from "./controls/href";
 import {
@@ -109,7 +109,50 @@ import {
   MixedPropertiesEditor,
 } from "@/grida-canvas-react/use-mixed-properties";
 import { editor } from "@/grida-canvas";
-import { CurrentFontProvider } from "./controls/context/font";
+import { CurrentFontProvider, useCurrentFont } from "./controls/context/font";
+import type { TMixed } from "./controls/utils/types";
+
+function FontStyleControlConnected({
+  value,
+  onWeightChange,
+  onVariationChange,
+}: {
+  value?: TMixed<cg.NFontWeight>;
+  onWeightChange: (v: cg.NFontWeight) => void;
+  onVariationChange: (axis: string, value: number) => void;
+}) {
+  const { instances } = useCurrentFont();
+
+  const handleChange = React.useCallback(
+    (change: FontStyleChange) => {
+      if (change.type === "instance") {
+        const inst = instances.find((i) => i.name === change.name);
+        if (inst) {
+          if (typeof inst.coordinates.wght === "number") {
+            onWeightChange(inst.coordinates.wght as cg.NFontWeight);
+          }
+          Object.entries(inst.coordinates).forEach(([k, v]) => {
+            if (k !== "wght") {
+              onVariationChange(k, v);
+            }
+          });
+        }
+      } else {
+        if (typeof change.values.wght === "number") {
+          onWeightChange(change.values.wght as cg.NFontWeight);
+        }
+        Object.entries(change.values).forEach(([k, v]) => {
+          if (k !== "wght") {
+            onVariationChange(k, v);
+          }
+        });
+      }
+    },
+    [instances, onWeightChange, onVariationChange]
+  );
+
+  return <FontStyleControl onValueChange={handleChange} />;
+}
 
 function Align() {
   const editor = useCurrentEditor();
@@ -273,6 +316,7 @@ function ModeMixedNodeProperties({
     fit,
     fontFamily,
     fontWeight,
+    fontVariations,
     fontSize,
     lineHeight,
     letterSpacing,
@@ -446,6 +490,14 @@ function ModeMixedNodeProperties({
           fontFamily={
             typeof fontFamily?.value === "string" ? fontFamily.value : undefined
           }
+          fontWeight={
+            typeof fontWeight?.value === "number" ? fontWeight.value : undefined
+          }
+          fontVariations={
+            typeof fontVariations?.value === "object"
+              ? (fontVariations.value as Record<string, number>)
+              : undefined
+          }
         >
           <SidebarSection className="border-b pb-4">
             <SidebarSectionHeaderItem>
@@ -467,9 +519,10 @@ function ModeMixedNodeProperties({
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel>Style</PropertyLineLabel>
-                <FontStyleControl
+                <FontStyleControlConnected
                   value={fontWeight?.value}
-                  onValueChange={change.fontWeight}
+                  onWeightChange={change.fontWeight}
+                  onVariationChange={change.fontVariation}
                 />
               </PropertyLine>
               <PropertyLine>
@@ -1317,7 +1370,11 @@ function SectionText({ node_id }: { node_id: string }) {
   }));
 
   return (
-    <CurrentFontProvider fontFamily={fontFamily}>
+    <CurrentFontProvider
+      fontFamily={fontFamily}
+      fontWeight={fontWeight}
+      fontVariations={fontVariations}
+    >
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
@@ -1388,9 +1445,10 @@ function SectionText({ node_id }: { node_id: string }) {
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Style</PropertyLineLabel>
-            <FontStyleControl
+            <FontStyleControlConnected
               value={fontWeight}
-              onValueChange={actions.fontWeight}
+              onWeightChange={actions.fontWeight}
+              onVariationChange={actions.fontVariation}
             />
           </PropertyLine>
           <PropertyLine>
