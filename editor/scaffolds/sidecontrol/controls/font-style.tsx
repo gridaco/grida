@@ -6,18 +6,6 @@ import { useCurrentFont } from "./context/font";
 
 type NFontWeight = cg.NFontWeight;
 
-const FALLBACK_ENUM = [
-  { value: "100", label: "Thin" },
-  { value: "200", label: "Extra Light" },
-  { value: "300", label: "Light" },
-  { value: "400", label: "Regular" },
-  { value: "500", label: "Medium" },
-  { value: "600", label: "Semi Bold" },
-  { value: "700", label: "Bold" },
-  { value: "800", label: "Extra Bold" },
-  { value: "900", label: "Black" },
-];
-
 /**
  * Font Style (Variation Instance) Control Component
  *
@@ -46,7 +34,7 @@ export function FontStyleControl({
   value?: TMixed<NFontWeight>;
   onValueChange?: (value: NFontWeight) => void;
 }) {
-  const { instances } = useCurrentFont();
+  const { instances, weights } = useCurrentFont();
   const enums = React.useMemo(() => {
     if (instances && instances.length > 0) {
       const mapped = instances
@@ -58,8 +46,8 @@ export function FontStyleControl({
         .filter(Boolean) as { value: string; label: string }[];
       if (mapped.length > 0) return mapped;
     }
-    return FALLBACK_ENUM;
-  }, [instances]);
+    return weights;
+  }, [instances, weights]);
 
   const valueString = typeof value === "number" ? value.toString() : value;
   const isCustom =
@@ -70,6 +58,7 @@ export function FontStyleControl({
       value={isCustom ? undefined : valueString}
       placeholder={isCustom ? `wght: ${valueString?.toString()}` : undefined}
       enum={enums}
+      disabled={enums.length === 0}
       onValueChange={(v) => {
         onValueChange?.(parseInt(v) as NFontWeight);
       }}
