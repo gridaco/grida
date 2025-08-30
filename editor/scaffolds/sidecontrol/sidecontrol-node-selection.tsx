@@ -10,7 +10,7 @@ import {
 } from "@/components/sidebar";
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
-import { FontWeightControl } from "./controls/font-weight";
+import { FontStyleControl } from "./controls/font-style";
 import { OpacityControl } from "./controls/opacity";
 import { HrefControl } from "./controls/href";
 import {
@@ -37,7 +37,7 @@ import {
   PositioningConstraintsControl,
   PositioningModeControl,
 } from "./controls/positioning";
-import type { FontFeature } from "@grida/fonts/parse";
+import type { FontFeature, FvarInstance } from "@grida/fonts/parse";
 import { RotateControl } from "./controls/rotate";
 import { TextAlignVerticalControl } from "./controls/text-align-vertical";
 import { LetterSpacingControl } from "./controls/letter-spacing";
@@ -300,6 +300,29 @@ function ModeMixedNodeProperties({
     userdata,
   } = properties;
 
+  const instance = useCurrentEditor();
+  const [fontInstances, setFontInstances] = React.useState<FvarInstance[]>([]);
+
+  React.useEffect(() => {
+    let canceled = false;
+    (async () => {
+      const family = fontFamily?.value;
+      if (!family) {
+        if (!canceled) setFontInstances([]);
+        return;
+      }
+      const detail = await instance.getFontDetails(family);
+      if (!detail) {
+        if (!canceled) setFontInstances([]);
+        return;
+      }
+      if (!canceled) setFontInstances(detail.instances);
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [instance, fontFamily?.value]);
+
   const sid = ids.join(",");
   // const is_root = ids.length === 0 && scene.children.includes(ids[0]); // assuming when root is selected, only root is selected
   const types = new Set(nodes.map((n) => n.type));
@@ -464,9 +487,10 @@ function ModeMixedNodeProperties({
             </div>
           </PropertyLine>
           <PropertyLine>
-            <PropertyLineLabel>Weight</PropertyLineLabel>
-            <FontWeightControl
+            <PropertyLineLabel>Style</PropertyLineLabel>
+            <FontStyleControl
               value={fontWeight?.value}
+              instances={fontInstances}
               onValueChange={change.fontWeight}
             />
           </PropertyLine>
@@ -1319,6 +1343,7 @@ function SectionText({ node_id }: { node_id: string }) {
     Record<string, Typr.FVARAxis> | undefined
   >();
   const [features, setFeatures] = React.useState<FontFeature[]>([]);
+  const [instances, setInstances] = React.useState<FvarInstance[]>([]);
 
   React.useEffect(() => {
     let canceled = false;
@@ -1327,6 +1352,7 @@ function SectionText({ node_id }: { node_id: string }) {
         if (!canceled) {
           setAxes(undefined);
           setFeatures([]);
+          setInstances([]);
         }
         return;
       }
@@ -1335,6 +1361,7 @@ function SectionText({ node_id }: { node_id: string }) {
         if (!canceled) {
           setAxes(undefined);
           setFeatures([]);
+          setInstances([]);
         }
         return;
       }
@@ -1346,6 +1373,7 @@ function SectionText({ node_id }: { node_id: string }) {
       if (!canceled) {
         setAxes(record);
         setFeatures(detail.features);
+        setInstances(detail.instances);
       }
     })();
     return () => {
@@ -1425,9 +1453,10 @@ function SectionText({ node_id }: { node_id: string }) {
           </div>
         </PropertyLine>
         <PropertyLine>
-          <PropertyLineLabel>Weight</PropertyLineLabel>
-          <FontWeightControl
+          <PropertyLineLabel>Style</PropertyLineLabel>
+          <FontStyleControl
             value={fontWeight}
+            instances={instances}
             onValueChange={actions.fontWeight}
           />
         </PropertyLine>
