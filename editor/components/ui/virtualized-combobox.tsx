@@ -15,6 +15,7 @@ import { cn } from "@/components/lib/utils";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import * as React from "react";
+import { useValueSeekedSelector } from "@/hooks/use-value-seeked-selector";
 
 export interface ItemRendererProps {
   option: Option;
@@ -33,6 +34,7 @@ interface VirtualizedCommandProps {
   selectedOption: string;
   onSelectOption?: (option: string) => void;
   renderer?: (props: ItemRendererProps) => React.ReactNode;
+  onValueSeeked?: (option: string | null) => void;
 }
 
 function DefaultRenderer({
@@ -59,10 +61,13 @@ const VirtualizedCommand = ({
   selectedOption,
   onSelectOption,
   renderer = DefaultRenderer,
+  onValueSeeked,
 }: VirtualizedCommandProps) => {
   const [filteredOptions, setFilteredOptions] =
     React.useState<Option[]>(options);
-  const parentRef = React.useRef(null);
+
+  const parentRef = React.useRef<HTMLDivElement>(null);
+  const { sync } = useValueSeekedSelector(parentRef, onValueSeeked, "selected");
 
   const virtualizer = useVirtualizer({
     count: filteredOptions.length,
@@ -90,14 +95,8 @@ const VirtualizedCommand = ({
     );
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    // if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-    //   event.preventDefault();
-    // }
-  };
-
   return (
-    <Command shouldFilter={false} onKeyDown={handleKeyDown}>
+    <Command shouldFilter={false} onKeyDown={sync} onPointerMove={sync}>
       <CommandInput onValueChange={handleSearch} placeholder={placeholder} />
       <CommandEmpty>No item found.</CommandEmpty>
       <CommandGroup
@@ -157,6 +156,7 @@ interface VirtualizedComboboxProps {
   align?: "start" | "center" | "end";
   alignOffset?: number;
   renderer?: (props: ItemRendererProps) => React.ReactNode;
+  onValueSeeked?: (value: string | null) => void;
   className?: string;
 }
 
@@ -171,6 +171,7 @@ export function VirtualizedCombobox({
   align,
   alignOffset,
   renderer,
+  onValueSeeked,
   className,
 }: VirtualizedComboboxProps) {
   const [open, setOpen] = React.useState<boolean>(false);
@@ -203,6 +204,7 @@ export function VirtualizedCombobox({
           placeholder={placeholder}
           selectedOption={value ?? ""}
           renderer={renderer}
+          onValueSeeked={onValueSeeked}
           onSelectOption={(currentValue) => {
             onValueChange?.(currentValue === value ? "" : currentValue);
             setOpen(false);

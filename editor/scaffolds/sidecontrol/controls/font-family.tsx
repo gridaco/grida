@@ -60,9 +60,11 @@ function Item({ option, selected }: ItemRendererProps) {
 export function FontFamilyControl({
   value,
   onValueChange,
+  onValueSeeked,
 }: {
   value?: TMixed<string>;
   onValueChange?: (value: string) => void;
+  onValueSeeked?: (value: string | null) => void;
 }) {
   const list = useFontFamilyList();
 
@@ -73,6 +75,7 @@ export function FontFamilyControl({
       value={mixed ? "" : value}
       placeholder={mixed ? "mixed" : "Font"}
       onValueChange={onValueChange}
+      onValueSeeked={onValueSeeked}
       renderer={Item}
       options={list.map((i) => i.family)}
       side="right"
