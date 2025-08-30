@@ -1526,7 +1526,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         // font family specific hook
         if (action.type === "node/change/fontFamily") {
           if (action.fontFamily) {
-            draft.fontkeys.push({ family: action.fontFamily });
+            draft.fontdescriptions.push({ family: action.fontFamily });
           }
         }
       });

@@ -432,14 +432,20 @@ export namespace editor.state {
     webfontlist: GoogleWebFontList;
   }
 
-  export type FontKey = { family: string };
+  /**
+   * a font description, this is used to describe a font family.
+   */
+  export type FontDescription = {
+    family: string;
+    // TODO: more properties will be added
+  };
 
   /**
    * list of font keys, this soley indicates which fonts are used and "should" be loaded.
    * does not mean the fonts are loaded / loading
    */
-  export interface IEditorFontKeysState {
-    fontkeys: FontKey[];
+  export interface IEditorFontDescriptionsState {
+    fontdescriptions: FontDescription[];
   }
 
   export interface IEditorFeatureBrushState {
@@ -868,7 +874,7 @@ export namespace editor.state {
       editor.state.IEditorUserClipboardState,
       editor.state.IEditorMultiplayerCursorState,
       editor.state.IEditorWebfontListState,
-      editor.state.IEditorFontKeysState,
+      editor.state.IEditorFontDescriptionsState,
       editor.state.IEditorFeatureBrushState,
       editor.state.IEditorFeatureRulerState,
       editor.state.IEditorFeaturePixelGridState,
@@ -985,7 +991,7 @@ export namespace editor.state {
       surface_measurement_targeting: "off",
       surface_measurement_targeting_locked: false,
       surface_measurement_target: undefined,
-      fontkeys: s.fonts().map((family) => ({ family })),
+      fontdescriptions: s.fonts().map((family) => ({ family })),
       webfontlist: {
         kind: "webfonts#webfontList",
         items: [],
