@@ -13,6 +13,7 @@ import {
 import { ArrowLeftIcon, OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { previewlink } from "@/lib/internal/url";
+import { DarwinSidebarHeaderDragArea } from "@/host/desktop";
 import Link from "next/link";
 
 type Params = { org: string; proj: string };
@@ -31,7 +32,8 @@ export default async function Layout({
       <div className="flex flex-1 overflow-y-auto">
         <div className="h-full flex flex-1 w-full">
           <Sidebar>
-            <SidebarHeader>
+            <DarwinSidebarHeaderDragArea />
+            <SidebarHeader className="desktop-drag-area">
               <SidebarMenu>
                 <Link href={`/${org}/${proj}`}>
                   <SidebarMenuItem>

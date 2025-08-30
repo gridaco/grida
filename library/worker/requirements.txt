@@ -3,6 +3,6 @@ click
 tqdm
 cairosvg
 pillow
-pylette
+pylette==4.4.0
 python-dotenv
 supabase

@@ -86,6 +86,12 @@ export default function Footer() {
                   Tools
                 </Link>
                 <Link
+                  href={sitemap.links.fonts}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Grida Fonts
+                </Link>
+                <Link
                   href={sitemap.links.ai_models}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
