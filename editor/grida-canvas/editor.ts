@@ -18,12 +18,8 @@ import { EditorFollowPlugin } from "./plugins/follow";
 import type { Grida2D } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
 import * as google from "@grida/fonts/google";
-import {
-  Parser,
-  type FvarAxes,
-  type FvarInstance,
-  type FontFeature,
-} from "@grida/fonts/parse";
+import type { FvarAxes, FvarInstance, FontFeature } from "@grida/fonts/parse";
+import { FontParserWorker } from "@grida/fonts/parser/worker";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
@@ -122,6 +118,11 @@ export class Editor
   _m_font_loader: editor.api.IDocumentFontLoaderInterfaceProvider | null = null;
   private get fontLoader() {
     return this._m_font_loader;
+  }
+
+  private fontParserWorker: FontParserWorker | null = null;
+  private getParserWorker() {
+    return (this.fontParserWorker ??= new FontParserWorker());
   }
 
   private fontDetailsCache = new Map<
@@ -2717,10 +2718,13 @@ export class Editor
     const url = item.files[item.variants[0]] ?? Object.values(item.files)[0];
     const res = await fetch(url);
     const buffer = await res.arrayBuffer();
-    const parser = new Parser(buffer);
-    const { axes, instances } = parser.fvar();
-    const features = parser.features();
-    const detail = { font: item, axes, instances, features } as const;
+    const { fvar, features } = await this.getParserWorker().details(buffer);
+    const detail = {
+      font: item,
+      axes: fvar.axes,
+      instances: fvar.instances,
+      features,
+    } as const;
     this.fontDetailsCache.set(fontFamily, detail);
     return detail;
   }

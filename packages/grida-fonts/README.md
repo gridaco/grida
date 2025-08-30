@@ -80,6 +80,22 @@ if (roboto) {
 }
 ```
 
+### Parsing Fonts in a Web Worker
+
+```typescript
+import { FontParserWorker } from "@grida/fonts/parser/worker";
+
+const worker = new FontParserWorker();
+const response = await fetch("/fonts/Roboto-Regular.ttf");
+const buffer = await response.arrayBuffer();
+
+// Parse full font data without blocking the UI
+const font = await worker.parse(buffer);
+console.log(font);
+
+await worker.terminate();
+```
+
 ## Key Features
 
 - **Variable Font Support**: Full support for variable font axes (weight, width, slant)

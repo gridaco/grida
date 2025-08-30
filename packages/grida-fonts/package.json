@@ -4,8 +4,8 @@
   "private": false,
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "dev": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts k.ts --format cjs,esm --dts --watch",
-    "build": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts k.ts --format cjs,esm --dts",
+    "dev": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts --watch",
+    "build": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts",
     "test": "jest"
   },
   "files": [
@@ -41,6 +41,11 @@
       "types": "./dist/parse/index.d.ts",
       "import": "./dist/parse/index.mjs",
       "require": "./dist/parse/index.js"
+    },
+    "./parser/worker": {
+      "types": "./dist/parser-worker/index.d.ts",
+      "import": "./dist/parser-worker/index.mjs",
+      "require": "./dist/parser-worker/index.js"
     },
     "./k": {
       "types": "./dist/k.d.ts",
