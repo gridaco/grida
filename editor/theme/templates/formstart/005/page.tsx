@@ -293,7 +293,7 @@ _005.definition = {
       fontSize: 24,
       textAlign: "left",
       textAlignVertical: "top",
-      textDecoration: "none",
+      textDecorationLine: "none",
       text: factory.createPropertyAccessExpression(["props", "title"]),
       zIndex: 0,
     },

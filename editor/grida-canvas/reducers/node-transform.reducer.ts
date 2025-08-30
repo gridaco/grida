@@ -128,6 +128,8 @@ export default function nodeTransformReducer(
         const _draft = draft as grida.program.nodes.i.ICSSDimension &
           grida.program.nodes.i.IPositioning;
 
+        const heightWasNumber = typeof _draft.height === "number";
+
         if (_draft.position === "absolute") {
           _draft.left = cmath.quantize(scaled.x, 1);
           _draft.top = cmath.quantize(scaled.y, 1);
@@ -137,7 +139,11 @@ export default function nodeTransformReducer(
         if (draft.type === "line") {
           _draft.height = 0;
         } else {
-          _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
+          const preserveAutoHeight =
+            draft.type === "text" && !heightWasNumber && movement[1] === 0;
+          if (!preserveAutoHeight) {
+            _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
+          }
         }
 
         return;

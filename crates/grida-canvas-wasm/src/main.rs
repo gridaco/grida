@@ -2,6 +2,7 @@
 
 use cg::window::application::ApplicationApi;
 use cg::window::application_emscripten::EmscriptenApplication;
+use serde::Serialize;
 use std::boxed::Box;
 
 #[no_mangle]
@@ -26,6 +27,14 @@ pub unsafe fn __str_from_ptr_len(ptr: *const u8, len: usize) -> Option<String> {
 
     let slice = std::slice::from_raw_parts(ptr, len);
     std::str::from_utf8(slice).ok().map(|s| s.to_string())
+}
+
+#[derive(Serialize)]
+pub struct FontKey {
+    /// CSS font-family name.
+    pub family: String,
+    // In the future, additional properties will precisely describe the font to enable
+    // partial fetching and more accurate identification.
 }
 
 #[no_mangle]
@@ -101,6 +110,71 @@ pub unsafe extern "C" fn pointer_move(app: *mut EmscriptenApplication, x: f32, y
     if let Some(app) = app.as_mut() {
         app.pointer_move(x, y);
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn register_font(
+    app: *mut EmscriptenApplication,
+    family_ptr: *const u8,
+    family_len: usize,
+    data_ptr: *const u8,
+    data_len: usize,
+) {
+    if let Some(app) = app.as_mut() {
+        if let Some(family) = __str_from_ptr_len(family_ptr, family_len) {
+            let data = std::slice::from_raw_parts(data_ptr, data_len);
+            app.add_font(&family, data);
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn has_missing_fonts(app: *mut EmscriptenApplication) -> bool {
+    if let Some(app) = app.as_ref() {
+        app.has_missing_fonts()
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn list_missing_fonts(app: *mut EmscriptenApplication) -> *const u8 {
+    use serde_json;
+    use std::ffi::CString;
+
+    if let Some(app) = app.as_ref() {
+        let fonts = app
+            .list_missing_fonts()
+            .into_iter()
+            .map(|family| FontKey { family })
+            .collect::<Vec<FontKey>>();
+        if let Ok(json) = serde_json::to_string(&fonts) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn list_available_fonts(app: *mut EmscriptenApplication) -> *const u8 {
+    use serde_json;
+    use std::ffi::CString;
+
+    if let Some(app) = app.as_ref() {
+        let fonts = app
+            .list_available_fonts()
+            .into_iter()
+            .map(|family| FontKey { family })
+            .collect::<Vec<FontKey>>();
+        if let Ok(json) = serde_json::to_string(&fonts) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
+    }
+    std::ptr::null()
 }
 
 #[no_mangle]
@@ -251,6 +325,30 @@ pub unsafe extern "C" fn export_node_as(
         std::ptr::copy_nonoverlapping(data.as_ptr(), out.add(4), data_len);
 
         return out;
+    }
+
+    std::ptr::null()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn to_vector_network(
+    app: *mut EmscriptenApplication,
+    id_ptr: *const u8,
+    id_len: usize,
+) -> *const u8 {
+    use serde_json;
+    use std::ffi::CString;
+
+    let (Some(app), Some(id)) = (app.as_mut(), __str_from_ptr_len(id_ptr, id_len)) else {
+        return std::ptr::null();
+    };
+
+    if let Some(vn) = app.to_vector_network(&id) {
+        if let Ok(json) = serde_json::to_string(&vn) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
     }
 
     std::ptr::null()

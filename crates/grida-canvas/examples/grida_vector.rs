@@ -25,7 +25,7 @@ async fn demo_vectors() -> Scene {
 
     {
         {
-            let vector_node_1_tri_open = VectorNode {
+            let vector_node_1_tri_open = VectorNodeRec {
                 id: "1".to_string(),
                 name: Some("triangle open".to_string()),
                 active: true,
@@ -65,7 +65,7 @@ async fn demo_vectors() -> Scene {
         }
 
         {
-            let vector_node_2_tri_closed = VectorNode {
+            let vector_node_2_tri_closed = VectorNodeRec {
                 id: "2".to_string(),
                 name: Some("triangle closed".to_string()),
                 active: true,
@@ -112,7 +112,7 @@ async fn demo_vectors() -> Scene {
 
         //
         {
-            let vector_node_3 = VectorNode {
+            let vector_node_3 = VectorNodeRec {
                 id: "3".to_string(),
                 name: Some("Vector 2".to_string()),
                 active: true,
@@ -161,7 +161,7 @@ async fn demo_vectors() -> Scene {
         }
 
         {
-            let vector_node_4 = VectorNode {
+            let vector_node_4 = VectorNodeRec {
                 id: "vector_3".to_string(),
                 name: Some("Vector 3".to_string()),
                 active: true,
@@ -208,7 +208,7 @@ async fn demo_vectors() -> Scene {
 
         // FIXME: not working
         {
-            let vector_node_1_5 = VectorNode {
+            let vector_node_1_5 = VectorNodeRec {
                 id: "1_5".to_string(),
                 name: Some("Vector 1_5".to_string()),
                 active: true,
@@ -265,7 +265,7 @@ async fn demo_vectors() -> Scene {
     {
         // Simple curve (S-shape)
         {
-            let vector_node_5 = VectorNode {
+            let vector_node_5 = VectorNodeRec {
                 id: "5".to_string(),
                 name: Some("S-curve".to_string()),
                 active: true,
@@ -308,7 +308,7 @@ async fn demo_vectors() -> Scene {
     {
         // Filled triangle
         {
-            let vector_node_6 = VectorNode {
+            let vector_node_6 = VectorNodeRec {
                 id: "6".to_string(),
                 name: Some("filled triangle".to_string()),
                 active: true,
@@ -365,7 +365,7 @@ async fn demo_vectors() -> Scene {
 
         // Filled rectangle
         {
-            let vector_node_7 = VectorNode {
+            let vector_node_7 = VectorNodeRec {
                 id: "7".to_string(),
                 name: Some("filled rectangle".to_string()),
                 active: true,

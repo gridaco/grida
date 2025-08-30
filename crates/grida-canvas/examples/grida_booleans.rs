@@ -55,10 +55,6 @@ async fn demo_booleans() -> Scene {
         let mut text = nf.create_text_span_node();
         text.name = Some("Description".to_string());
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0); // Moved text up slightly
-        text.size = Size {
-            width: 500.0, // Increased width for better text display
-            height: 20.0,
-        };
         text.text = "Union (A ∪ B): Combines two shapes into one".to_string();
         text.text_style.font_size = 16.0;
         text.fill = Paint::Solid(SolidPaint {
@@ -67,7 +63,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNodeRec {
             id: "bool_union_1".to_string(),
             name: Some("Union Operation".to_string()),
             active: true,
@@ -137,10 +133,6 @@ async fn demo_booleans() -> Scene {
         let mut text = nf.create_text_span_node();
         text.name = Some("Description".to_string());
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
-        text.size = Size {
-            width: 500.0,
-            height: 20.0,
-        };
         text.text = "Intersection (A ∩ B): Shows only the overlapping area".to_string();
         text.text_style.font_size = 16.0;
         text.fill = Paint::Solid(SolidPaint {
@@ -149,7 +141,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNodeRec {
             id: "bool_intersection_1".to_string(),
             name: Some("Intersection Operation".to_string()),
             active: true,
@@ -219,10 +211,6 @@ async fn demo_booleans() -> Scene {
         let mut text = nf.create_text_span_node();
         text.name = Some("Description".to_string());
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
-        text.size = Size {
-            width: 500.0,
-            height: 20.0,
-        };
         text.text = "Difference (A - B): Removes the second shape from the first".to_string();
         text.text_style.font_size = 16.0;
         text.fill = Paint::Solid(SolidPaint {
@@ -231,7 +219,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNodeRec {
             id: "bool_difference_1".to_string(),
             name: Some("Difference Operation".to_string()),
             active: true,
@@ -301,10 +289,6 @@ async fn demo_booleans() -> Scene {
         let mut text = nf.create_text_span_node();
         text.name = Some("Description".to_string());
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
-        text.size = Size {
-            width: 500.0,
-            height: 20.0,
-        };
         text.text = "XOR (A ⊕ B): Shows areas that don't overlap".to_string();
         text.text_style.font_size = 16.0;
         text.fill = Paint::Solid(SolidPaint {
@@ -313,7 +297,7 @@ async fn demo_booleans() -> Scene {
         });
 
         // Create boolean operation
-        let bool_node = BooleanPathOperationNode {
+        let bool_node = BooleanPathOperationNodeRec {
             id: "bool_xor_1".to_string(),
             name: Some("XOR Operation".to_string()),
             active: true,

@@ -1,14 +1,13 @@
 {
   "name": "@grida/fonts",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "scripts": {
-    "dev": "tsup index.ts google.ts --format cjs,esm --dts --watch",
-    "build": "tsup index.ts google.ts --format cjs,esm --dts"
+    "typecheck": "tsc --noEmit",
+    "dev": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts --watch",
+    "build": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts",
+    "test": "jest"
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -22,9 +21,39 @@
       "types": "./dist/google.d.ts",
       "import": "./dist/google.mjs",
       "require": "./dist/google.js"
+    },
+    "./fontface": {
+      "types": "./dist/fontface.d.ts",
+      "import": "./dist/fontface.mjs",
+      "require": "./dist/fontface.js"
+    },
+    "./fontface-dom": {
+      "types": "./dist/fontface-dom.d.ts",
+      "import": "./dist/fontface-dom.mjs",
+      "require": "./dist/fontface-dom.js"
+    },
+    "./typr": {
+      "types": "./dist/typr/index.d.ts",
+      "import": "./dist/typr/index.mjs",
+      "require": "./dist/typr/index.js"
+    },
+    "./parse": {
+      "types": "./dist/parse/index.d.ts",
+      "import": "./dist/parse/index.mjs",
+      "require": "./dist/parse/index.js"
+    },
+    "./parser/worker": {
+      "types": "./dist/parser-worker/index.d.ts",
+      "import": "./dist/parser-worker/index.mjs",
+      "require": "./dist/parser-worker/index.js"
+    },
+    "./k": {
+      "types": "./dist/k.d.ts",
+      "import": "./dist/k.mjs",
+      "require": "./dist/k.js"
     }
   },
-  "jest": {
-    "preset": "ts-jest"
+  "devDependencies": {
+    "@types/node": "^22.15.28"
   }
 }

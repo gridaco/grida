@@ -1,5 +1,3 @@
-import { GoogleFontsPreview } from "@/grida-canvas-react/components/google-fonts";
-import { fonts } from "@/grida-canvas/k/fonts.min";
 import {
   ItemRendererProps,
   VirtualizedCombobox,
@@ -10,18 +8,15 @@ import { CheckIcon } from "@radix-ui/react-icons";
 import React, { createContext } from "react";
 import { TMixed } from "./utils/types";
 import grida from "@grida/schema";
+import { type GoogleWebFontListItem } from "@grida/fonts/google";
+import * as google from "@grida/fonts/google";
 
-interface FontFamilyInfo {
-  family: string;
-  provider: "fonts.google.com";
-}
-
-const FontFamilyListContext = createContext<FontFamilyInfo[]>(fonts);
+const FontFamilyListContext = createContext<GoogleWebFontListItem[]>([]);
 
 export function FontFamilyListProvider({
   children,
   fonts,
-}: React.PropsWithChildren<{ fonts: FontFamilyInfo[] }>) {
+}: React.PropsWithChildren<{ fonts: GoogleWebFontListItem[] }>) {
   return (
     <FontFamilyListContext.Provider value={fonts}>
       {children}
@@ -33,13 +28,31 @@ function useFontFamilyList() {
   return React.useContext(FontFamilyListContext);
 }
 
+function GoogleFontsPreview({
+  fontFamily,
+  className,
+}: {
+  fontFamily: string;
+  className?: string;
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      data-font-family={fontFamily}
+      src={google.svglink(google.familyid(fontFamily))}
+      alt={fontFamily}
+      className={cn("dark:invert", className)}
+    />
+  );
+}
+
 function Item({ option, selected }: ItemRendererProps) {
   return (
     <>
       <CheckIcon
         className={cn("size-4 min-w-4", selected ? "opacity-100" : "opacity-0")}
       />
-      <GoogleFontsPreview fontFamily={option.value} className="h-3" />
+      <GoogleFontsPreview fontFamily={option.value} className="h-5" />
     </>
   );
 }
@@ -47,11 +60,14 @@ function Item({ option, selected }: ItemRendererProps) {
 export function FontFamilyControl({
   value,
   onValueChange,
+  onValueSeeked,
 }: {
   value?: TMixed<string>;
   onValueChange?: (value: string) => void;
+  onValueSeeked?: (value: string | null) => void;
 }) {
   const list = useFontFamilyList();
+  const options = React.useMemo(() => list.map((i) => i.family), [list]);
 
   const mixed = value === grida.mixed;
 
@@ -60,8 +76,9 @@ export function FontFamilyControl({
       value={mixed ? "" : value}
       placeholder={mixed ? "mixed" : "Font"}
       onValueChange={onValueChange}
+      onValueSeeked={onValueSeeked}
       renderer={Item}
-      options={list.map((i) => i.family)}
+      options={options}
       side="right"
       align="start"
       className={cn(

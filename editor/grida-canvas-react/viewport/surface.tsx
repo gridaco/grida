@@ -366,6 +366,15 @@ export function EditorSurface() {
           {content_edit_mode?.type === "vector" && <VectorMeasurementGuide />}
           <SnapGuide />
 
+          <SurfaceGroup>
+            {content_edit_mode?.type === "text" && (
+              <SurfaceTextEditor
+                key="text-editor"
+                node_id={content_edit_mode.node_id}
+              />
+            )}
+          </SurfaceGroup>
+
           <SurfaceGroup
             hidden={
               is_transforming ||
@@ -375,12 +384,6 @@ export function EditorSurface() {
             }
             dontRenderWhenHidden
           >
-            {content_edit_mode?.type === "text" && (
-              <SurfaceTextEditor
-                key="text-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
             {content_edit_mode?.type === "vector" && (
               <SurfaceVectorEditor
                 key="vector-geometry-editor"
@@ -1247,6 +1250,8 @@ function LayerOverlayResizeHandle({
 }) {
   const editor = useCurrentEditor();
 
+  const zIndex = ["n", "e", "s", "w"].includes(anchor) ? 12 : 11;
+
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
       event.preventDefault();
@@ -1257,7 +1262,7 @@ function LayerOverlayResizeHandle({
     },
   });
 
-  return <Knob size={size} {...bind()} anchor={anchor} />;
+  return <Knob size={size} {...bind()} anchor={anchor} zIndex={zIndex} />;
 }
 
 function NetworkOverlay({ transform }: { transform: cmath.Transform }) {

@@ -15,6 +15,7 @@ import { v4 } from "uuid";
 
 export type ReducerContext = {
   geometry: editor.api.IDocumentGeometryQuery;
+  vector?: editor.api.IVectorInterfaceActions;
   viewport: {
     width: number;
     height: number;
@@ -65,6 +66,12 @@ export default function reducer<S extends editor.state.IEditorState>(
         draft.scene_id = scene;
         // 2. clear scene-specific state
         Object.assign(draft, editor.state.__RESET_SCENE_STATE);
+      });
+    }
+    case "webfonts/list/load": {
+      const { webfontlist } = action;
+      return produce(state, (draft: Draft<S>) => {
+        draft.webfontlist = webfontlist;
       });
     }
     case "scenes/new": {

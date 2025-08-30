@@ -19,15 +19,18 @@ export function PropertyLine({
   children,
   className,
   hidden,
+  disabled,
 }: React.PropsWithChildren<{
   className?: string;
   hidden?: boolean;
+  disabled?: boolean;
 }>) {
   return (
     <div
       data-hidden={hidden}
+      data-disabled={disabled}
       className={cn(
-        "group flex items-start justify-between max-w-full data-[hidden='true']:hidden",
+        "group flex items-start justify-between max-w-full data-[hidden='true']:hidden data-[disabled='true']:opacity-50 data-[disabled='true']:pointer-events-none data-[disabled='true']:cursor-not-allowed",
         className
       )}
     >
@@ -36,9 +39,17 @@ export function PropertyLine({
   );
 }
 
-export function PropertyLineLabel({ children }: React.PropsWithChildren<{}>) {
+export function PropertyLineLabel({
+  children,
+  className,
+}: React.ComponentProps<"label">) {
   return (
-    <Label className="text-[11px] text-muted-foreground h-6 min-w-16 w-16 flex items-center me-4 overflow-hidden">
+    <Label
+      className={cn(
+        "text-[11px] text-muted-foreground h-6 min-w-16 w-16 flex items-center me-4",
+        className
+      )}
+    >
       <span className="text-ellipsis overflow-hidden">{children}</span>
     </Label>
   );
@@ -176,6 +187,7 @@ export function PropertyEnumToggle<T extends string>({
   enum: enums,
   value,
   onValueChange,
+  onValueSeeked,
   ...props
 }: Omit<
   React.ComponentProps<typeof ToggleGroup>,
@@ -184,6 +196,7 @@ export function PropertyEnumToggle<T extends string>({
   enum: EnumItem<T>[];
   value?: TMixed<T>;
   onValueChange?: (value: T) => void;
+  onValueSeeked?: (value: T | null) => void;
 }) {
   const mixed = value === grida.mixed;
 
@@ -208,6 +221,8 @@ export function PropertyEnumToggle<T extends string>({
             value={value}
             title={label}
             disabled={disabled}
+            onMouseEnter={() => onValueSeeked?.(value as T)}
+            onMouseLeave={() => onValueSeeked?.(null)}
           >
             {icon}
           </ToggleGroupItem>

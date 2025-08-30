@@ -1,3 +1,4 @@
+use crate::io::io_grida::JSONVectorNetwork;
 use crate::resource::font_loader::FontMessage;
 use crate::resource::image_loader::ImageMessage;
 use crate::runtime::camera::Camera2D;
@@ -134,6 +135,10 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.export_node_as(id, format)
     }
 
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+        self.base.to_vector_network(id)
+    }
+
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
         self.base.runtime_renderer_set_cache_tile(cache);
     }
@@ -234,5 +239,31 @@ impl EmscriptenApplication {
     /// hit test. Should be called whenever the pointer moves.
     pub fn pointer_move(&mut self, x: f32, y: f32) {
         self.base.pointer_move(x, y);
+    }
+
+    pub fn has_missing_fonts(&self) -> bool {
+        self.base.has_missing_fonts()
+    }
+
+    pub fn list_missing_fonts(&self) -> Vec<String> {
+        self.base.list_missing_fonts()
+    }
+
+    pub fn list_available_fonts(&self) -> Vec<String> {
+        self.base.list_available_fonts()
+    }
+
+    /// Register font data with the renderer.
+    ///
+    /// Since wasm binaries cannot access network resources directly, font
+    /// files must be fetched by the host environment and provided as raw
+    /// bytes.  This method allows those bytes to be registered under the given
+    /// family name so that subsequent text layout can resolve the typeface.
+    pub fn add_font(&mut self, family: &str, data: &[u8]) {
+        self.base.renderer.add_font(family, data);
+        // Newly registered fonts may affect cached text layout; invalidate any
+        // existing cache so that the renderer re-computes geometry using the
+        // new typeface.
+        self.base.renderer.invalidate_cache();
     }
 }

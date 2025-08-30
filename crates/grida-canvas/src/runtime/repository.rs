@@ -4,7 +4,7 @@ use skia_safe::{
 };
 
 use crate::cache::mipmap::{ImageMipmaps, MipmapConfig};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Generic repository trait for storing resources keyed by an identifier.
 pub trait ResourceRepository<T> {
@@ -114,10 +114,15 @@ impl ResourceRepository<ImageMipmaps> for ImageRepository {
     }
 }
 
-/// A repository for managing fonts.
+/// A repository for managing fonts and their availability state.
+#[derive(Clone)]
 pub struct FontRepository {
     provider: TypefaceFontProvider,
     fonts: HashMap<String, Vec<Vec<u8>>>,
+    /// Fonts that have been requested but not yet provided.
+    missing: HashSet<String>,
+    /// All font families referenced by the current document.
+    requested: HashSet<String>,
     generation: usize,
 }
 
@@ -126,6 +131,8 @@ impl FontRepository {
         Self {
             provider: TypefaceFontProvider::new(),
             fonts: HashMap::new(),
+            missing: HashSet::new(),
+            requested: HashSet::new(),
             generation: 0,
         }
     }
@@ -138,6 +145,7 @@ impl FontRepository {
         }
 
         family_fonts.push(bytes);
+        self.missing.remove(&family);
         self.generation += 1;
     }
 
@@ -152,6 +160,7 @@ impl FontRepository {
         }
 
         family_fonts.push(bytes.to_vec());
+        self.missing.remove(family);
         self.generation += 1;
     }
 
@@ -176,6 +185,73 @@ impl FontRepository {
     pub fn get_family_fonts(&self, family: &str) -> Option<&Vec<Vec<u8>>> {
         self.fonts.get(family)
     }
+
+    /// Mark a font family as missing. This is used when the runtime encounters
+    /// a font that is referenced but not yet registered.
+    pub fn mark_missing(&mut self, family: &str) {
+        self.requested.insert(family.to_string());
+        if !self.fonts.contains_key(family) {
+            self.missing.insert(family.to_string());
+        }
+    }
+
+    /// Returns `true` if there are any unresolved font families.
+    pub fn has_missing(&self) -> bool {
+        !self.missing.is_empty()
+    }
+
+    /// List all font families that have been requested but not provided.
+    pub fn missing_families(&self) -> Vec<String> {
+        self.missing.iter().cloned().collect()
+    }
+
+    /// List all font families that are referenced by the current document.
+    pub fn requested_families(&self) -> Vec<String> {
+        self.requested.iter().cloned().collect()
+    }
+
+    /// Set the collection of font families referenced by the document. This will
+    /// recompute the missing set based on available fonts.
+    pub fn set_requested_families<I>(&mut self, families: I)
+    where
+        I: IntoIterator<Item = String>,
+    {
+        self.requested = families.into_iter().collect();
+        self.missing = self
+            .requested
+            .iter()
+            .filter(|f| !self.fonts.contains_key(*f))
+            .cloned()
+            .collect();
+    }
+
+    /// List all registered font families.
+    pub fn available_families(&self) -> Vec<String> {
+        self.fonts.keys().cloned().collect()
+    }
+
+    /// get Variable Axes for a family
+    ///
+    /// [More about variable axes](https://grida.co/docs/reference/open-type-variable-axes)
+    pub fn variation_design_parameters_for_family(
+        &self,
+        family: &str,
+    ) -> Option<Vec<skia_safe::font_parameters::variation::Axis>> {
+        self.variation_design_parameters_for_family_style(family, skia_safe::FontStyle::default())
+    }
+
+    /// get Variable Axes for a family and style
+    ///
+    /// [More about variable axes](https://grida.co/docs/reference/open-type-variable-axes)
+    pub fn variation_design_parameters_for_family_style(
+        &self,
+        family: &str,
+        style: skia_safe::FontStyle,
+    ) -> Option<Vec<skia_safe::font_parameters::variation::Axis>> {
+        // get typeface by family name
+        let typeface = self.provider.match_family_style(family, style)?;
+        typeface.variation_design_parameters()
+    }
 }
 
 impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
@@ -188,7 +264,8 @@ impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
                 self.provider.register_typeface(tf, Some(id.as_str()));
             }
         }
-        self.fonts.insert(id, item);
+        self.fonts.insert(id.clone(), item);
+        self.missing.remove(&id);
         self.generation += 1;
     }
 
@@ -222,7 +299,12 @@ impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
 }
 
 #[cfg(test)]
+#[path = "../../tests/fonts.rs"]
+mod test_fonts;
+
+#[cfg(test)]
 mod tests {
+    use super::test_fonts as fonts;
     use super::*;
     use skia_safe::surfaces;
 
@@ -246,5 +328,200 @@ mod tests {
         assert_eq!(repo.len(), 1);
         repo.remove(&"f1".to_string());
         assert!(repo.is_empty());
+    }
+
+    #[test]
+    fn font_repository_tracks_missing_fonts() {
+        let mut repo = FontRepository::new();
+        repo.mark_missing("Bungee");
+        assert!(repo.has_missing());
+        assert_eq!(repo.missing_families(), vec!["Bungee".to_string()]);
+
+        // Registering the font should clear it from the missing set
+        repo.add(fonts::BUNGEE_REGULAR, "Bungee");
+        assert!(!repo.has_missing());
+        assert_eq!(repo.available_families(), vec!["Bungee".to_string()]);
+    }
+
+    #[test]
+    fn variation_design_parameters_for_family_with_roboto_flex() {
+        let mut repo = FontRepository::new();
+
+        // Add the font to the repository
+        repo.add(fonts::ROBOTO_FLEX_VF, "Roboto Flex");
+
+        // Test that the font was added successfully
+        assert_eq!(repo.family_count(), 1);
+        assert_eq!(repo.total_font_count(), 1);
+        assert!(repo.get_family_fonts("Roboto Flex").is_some());
+
+        // Test variation design parameters
+        let variation_params = repo.variation_design_parameters_for_family("Roboto Flex");
+        assert!(
+            variation_params.is_some(),
+            "Should return variation parameters for Roboto Flex"
+        );
+
+        let params = variation_params.unwrap();
+        assert!(!params.is_empty(), "Roboto Flex should have variation axes");
+
+        // Verify specific axes that Roboto Flex should have
+        let axis_tags: Vec<String> = params.iter().map(|axis| axis.tag.to_string()).collect();
+
+        // Create a mapping from numeric tag values to expected tag names
+        // These are the actual numeric representations found in the Roboto Flex font
+        let tag_mapping = [
+            ("1869640570", "opsz"),     // optical size
+            ("2003265652", "XTRA"),     // x-transparency
+            ("1196572996", "GRAD"),     // grade
+            ("2003072104", "YOPQ"),     // y-opacity
+            ("1936486004", "slnt"),     // slant
+            ("1481592913", "XOPQ"),     // x-opacity
+            ("1498370129", "YTAS"),     // y-ascender
+            ("1481921089", "YTDE"),     // y-descender
+            ("1498699075", "YTFI"),     // y-figure
+            ("1498696771", "YTLC"),     // y-lowercase
+            ("1498693971", "unknown1"), // unknown axis
+            ("1498694725", "YTUC"),     // y-uppercase
+            ("1498695241", "unknown2"), // unknown axis
+        ];
+
+        // Check that we have the expected number of axes (Roboto Flex has 13 axes)
+        assert_eq!(
+            params.len(),
+            13,
+            "Roboto Flex should have 13 variation axes, found: {}",
+            params.len()
+        );
+
+        // Verify that we have the expected axes by checking their numeric representations
+        for (numeric_tag, expected_name) in tag_mapping {
+            assert!(
+                axis_tags.contains(&numeric_tag.to_string()),
+                "Roboto Flex should have '{}' axis (tag: {}), found: {:?}",
+                expected_name,
+                numeric_tag,
+                axis_tags
+            );
+        }
+
+        // Test specific axis properties
+        for axis in &params {
+            let tag_str = axis.tag.to_string();
+            match tag_str.as_str() {
+                "1869640570" => {
+                    // opsz - optical size
+                    // Optical size axis should have reasonable min/max values
+                    assert!(axis.min >= 8.0, "Optical size min should be >= 8");
+                    assert!(axis.max <= 144.0, "Optical size max should be <= 144");
+                    assert!(
+                        axis.def >= axis.min && axis.def <= axis.max,
+                        "Default optical size should be within range"
+                    );
+                }
+                "1936486004" => {
+                    // slnt - slant
+                    // Slant axis should have reasonable min/max values (typically -15 to 0)
+                    assert!(axis.min >= -15.0, "Slant min should be >= -15");
+                    assert!(axis.max <= 0.0, "Slant max should be <= 0");
+                    assert!(
+                        axis.def >= axis.min && axis.def <= axis.max,
+                        "Default slant should be within range"
+                    );
+                }
+                "1196572996" => {
+                    // GRAD - grade
+                    // Grade axis should have reasonable min/max values
+                    assert!(axis.min >= -200.0, "Grade min should be >= -200");
+                    assert!(axis.max <= 200.0, "Grade max should be <= 200");
+                    assert!(
+                        axis.def >= axis.min && axis.def <= axis.max,
+                        "Default grade should be within range"
+                    );
+                }
+                _ => {
+                    // For other axes, just verify they have valid ranges
+                    assert!(axis.min <= axis.max, "Axis min should be <= max");
+                    assert!(
+                        axis.def >= axis.min && axis.def <= axis.max,
+                        "Default should be within range"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn variation_design_parameters_for_family_style_with_roboto_flex() {
+        let mut repo = FontRepository::new();
+
+        // Add the font to the repository
+        repo.add(fonts::ROBOTO_FLEX_VF, "Roboto Flex");
+
+        // Test with different font styles
+        let styles = vec![
+            skia_safe::FontStyle::normal(),
+            skia_safe::FontStyle::bold(),
+            skia_safe::FontStyle::italic(),
+            skia_safe::FontStyle::bold_italic(),
+        ];
+
+        for style in styles {
+            let variation_params =
+                repo.variation_design_parameters_for_family_style("Roboto Flex", style);
+            assert!(
+                variation_params.is_some(),
+                "Should return variation parameters for style {:?}",
+                style
+            );
+
+            let params = variation_params.unwrap();
+            assert!(
+                !params.is_empty(),
+                "Roboto Flex should have variation axes for style {:?}",
+                style
+            );
+
+            // Verify that all axes have valid ranges
+            for axis in &params {
+                assert!(
+                    axis.min <= axis.max,
+                    "Axis min should be <= max for style {:?}",
+                    style
+                );
+                assert!(
+                    axis.def >= axis.min && axis.def <= axis.max,
+                    "Default should be within range for style {:?}",
+                    style
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn variation_design_parameters_for_nonexistent_family() {
+        let repo = FontRepository::new();
+
+        // Test with a family that doesn't exist
+        let variation_params = repo.variation_design_parameters_for_family("Nonexistent Font");
+        assert!(
+            variation_params.is_none(),
+            "Should return None for nonexistent font family"
+        );
+    }
+
+    #[test]
+    fn variation_design_parameters_for_family_with_non_variable_font() {
+        let mut repo = FontRepository::new();
+
+        // Create a simple test font (this won't be a real font, but tests the behavior)
+        let fake_font_bytes = vec![0u8; 1000]; // This won't be a valid font, but tests the method
+
+        repo.add(&fake_font_bytes, "Fake Font");
+
+        // The method should handle invalid fonts gracefully
+        let _variation_params = repo.variation_design_parameters_for_family("Fake Font");
+        // This might return None or an empty vector depending on how Skia handles invalid fonts
+        // We just test that it doesn't panic
     }
 }

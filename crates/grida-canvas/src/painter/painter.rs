@@ -3,7 +3,7 @@ use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
 use super::shadow;
 use crate::cache::geometry::GeometryCache;
-use crate::cache::{paragraph::ParagraphCache, vector_path::VectorPathCache};
+use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
@@ -22,29 +22,25 @@ pub struct Painter<'a> {
     canvas: &'a skia_safe::Canvas,
     fonts: Rc<RefCell<FontRepository>>,
     images: Rc<RefCell<ImageRepository>>,
-    paragraph_cache: RefCell<ParagraphCache>,
     path_cache: RefCell<VectorPathCache>,
+    scene_cache: Option<&'a SceneCache>,
 }
 
 impl<'a> Painter<'a> {
-    /// Create a new Painter for the given canvas
-    pub fn new(
+    /// Create a new Painter that uses the SceneCache's paragraph cache
+    pub fn new_with_scene_cache(
         canvas: &'a skia_safe::Canvas,
         fonts: Rc<RefCell<FontRepository>>,
         images: Rc<RefCell<ImageRepository>>,
+        scene_cache: &'a SceneCache,
     ) -> Self {
         Self {
             canvas,
             fonts,
             images,
-            paragraph_cache: RefCell::new(ParagraphCache::new()),
             path_cache: RefCell::new(VectorPathCache::new()),
+            scene_cache: Some(scene_cache), // Store reference to scene cache
         }
-    }
-
-    #[cfg(test)]
-    pub fn paragraph_cache(&self) -> &RefCell<ParagraphCache> {
-        &self.paragraph_cache
     }
 
     #[cfg(test)]
@@ -177,22 +173,38 @@ impl<'a> Painter<'a> {
         &self,
         id: &NodeId,
         text: &str,
-        size: &Size,
+        width: &Option<f32>,
+        max_lines: &Option<usize>,
+        ellipsis: &Option<String>,
         fill: &Paint,
         align: &TextAlign,
-        valign: &TextAlignVertical,
-        style: &TextStyle,
-    ) -> Rc<textlayout::Paragraph> {
-        self.paragraph_cache.borrow_mut().get_or_create(
+        // TODO: vertical align shall be computed on our end, since sk paragraph does not have a concept of "vertical align"
+        _valign: &TextAlignVertical,
+        style: &TextStyleRec,
+    ) -> Rc<RefCell<textlayout::Paragraph>> {
+        let scene_cache = self
+            .scene_cache
+            .expect("Painter must have scene_cache for text rendering");
+        let paragraph_rc = scene_cache.paragraph.borrow_mut().get_or_create(
             id,
             text,
-            size,
             fill,
             align,
-            valign,
             style,
+            max_lines,
+            ellipsis,
             &self.fonts.borrow(),
-        )
+        );
+
+        // Always apply layout - either with specified width or intrinsic width
+        let layout_width = width.unwrap_or_else(|| {
+            let mut para_ref = paragraph_rc.borrow_mut();
+            para_ref.layout(f32::INFINITY);
+            para_ref.max_intrinsic_width()
+        });
+        paragraph_rc.borrow_mut().layout(layout_width);
+
+        paragraph_rc
     }
 
     /// Determine the transformation matrix for an [`ImagePaint`].
@@ -398,22 +410,57 @@ impl<'a> Painter<'a> {
         &self,
         id: &NodeId,
         text: &str,
-        size: &Size,
+        width: &Option<f32>,
+        max_lines: &Option<usize>,
+        ellipsis: &Option<String>,
         fill: &Paint,
         text_align: &TextAlign,
         text_align_vertical: &TextAlignVertical,
-        text_style: &TextStyle,
+        text_style: &TextStyleRec,
     ) {
         let paragraph = self.cached_paragraph(
             id,
             text,
-            size,
+            width,
+            max_lines,
+            ellipsis,
             fill,
             text_align,
             text_align_vertical,
             text_style,
         );
-        paragraph.paint(self.canvas, Point::new(0.0, 0.0));
+
+        // NOTE: we should be relying on paragraph.paint() to support the decorations.
+        // the current model does not support custom paint + decorations. - the decorations will be supported manually, in the future, after then, we will completely drop the paragraph.paint()
+        // see: https://github.com/gridaco/grida/issues/416
+
+        // If the fill is a gradient, we need the final layout size to resolve
+        // the shader. Measure the laid-out paragraph and draw glyphs manually
+        // with the resolved paint.
+        match fill {
+            Paint::LinearGradient(_)
+            | Paint::RadialGradient(_)
+            | Paint::SweepGradient(_)
+            | Paint::DiamondGradient(_) => {
+                let size = {
+                    let para = paragraph.borrow();
+                    (para.max_width(), para.height())
+                };
+                let paint = cvt::sk_paint(fill, 1.0, size);
+                paragraph.borrow_mut().visit(|_, info| {
+                    if let Some(info) = info {
+                        self.canvas.draw_glyphs_at(
+                            info.glyphs(),
+                            info.positions(),
+                            info.origin(),
+                            info.font(),
+                            &paint,
+                        );
+                    }
+                });
+            }
+            _ => paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0)),
+        }
     }
 
     /// Draw a single [`PainterPictureLayer`].
@@ -451,38 +498,38 @@ impl<'a> Painter<'a> {
                 });
             }
             PainterPictureLayer::Text(text_layer) => {
-                self.with_transform(&text_layer.base.transform.matrix, || {
-                    let shape = &text_layer.shape;
-                    let effect_ref = &text_layer.effects;
-                    let clip_path = &text_layer.base.clip_path;
-                    let draw_content = || {
-                        self.with_opacity(text_layer.base.opacity, || {
-                            self.draw_text_span(
-                                &text_layer.base.id,
-                                &text_layer.text,
-                                &Size {
-                                    width: shape.rect.width(),
-                                    height: shape.rect.height(),
-                                },
-                                // TODO: support multiple fills for text
-                                match text_layer.fills.first() {
-                                    Some(f) => f,
-                                    None => return,
-                                },
-                                &text_layer.text_align,
-                                &text_layer.text_align_vertical,
-                                &text_layer.text_style,
-                            );
-                        });
-                    };
-                    if let Some(clip) = clip_path {
-                        self.canvas.save();
-                        self.canvas.clip_path(clip, None, true);
-                        self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                        self.canvas.restore();
-                    } else {
-                        self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                    }
+                self.with_blendmode(text_layer.base.blend_mode, || {
+                    self.with_transform(&text_layer.base.transform.matrix, || {
+                        let _effect_ref = &text_layer.effects;
+                        let clip_path = &text_layer.base.clip_path;
+                        let draw_content = || {
+                            self.with_opacity(text_layer.base.opacity, || {
+                                self.draw_text_span(
+                                    &text_layer.base.id,
+                                    &text_layer.text,
+                                    &text_layer.width,
+                                    &text_layer.max_lines,
+                                    &text_layer.ellipsis,
+                                    // TODO: support multiple fills for text
+                                    match text_layer.fills.first() {
+                                        Some(f) => f,
+                                        None => return,
+                                    },
+                                    &text_layer.text_align,
+                                    &text_layer.text_align_vertical,
+                                    &text_layer.text_style,
+                                );
+                            });
+                        };
+                        if let Some(clip) = clip_path {
+                            self.canvas.save();
+                            self.canvas.clip_path(clip, None, true);
+                            draw_content();
+                            self.canvas.restore();
+                        } else {
+                            draw_content();
+                        }
+                    });
                 });
             }
             PainterPictureLayer::Vector(vector_layer) => {
@@ -557,7 +604,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a RectangleNode, respecting its transform, effect, fill, stroke, blend mode, opacity
-    pub fn draw_rect_node(&self, node: &RectangleNode) {
+    pub fn draw_rect_node(&self, node: &RectangleNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Rectangle(node.clone()));
             self.painter
@@ -579,7 +626,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw an ImageNode, respecting transform, effect, rounded corners, blend mode, opacity
-    pub fn draw_image_node(&self, node: &ImageNode) -> bool {
+    pub fn draw_image_node(&self, node: &ImageNodeRec) -> bool {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Image(node.clone()));
 
@@ -611,7 +658,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw an EllipseNode
-    pub fn draw_ellipse_node(&self, node: &EllipseNode) {
+    pub fn draw_ellipse_node(&self, node: &EllipseNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Ellipse(node.clone()));
             self.painter
@@ -633,7 +680,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a LineNode
-    pub fn draw_line_node(&self, node: &LineNode) {
+    pub fn draw_line_node(&self, node: &LineNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Line(node.clone()));
 
@@ -654,7 +701,7 @@ impl<'a> NodePainter<'a> {
         });
     }
 
-    pub fn draw_vector_node(&self, node: &VectorNode) {
+    pub fn draw_vector_node(&self, node: &VectorNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
             let shape = PainterShape::from_path(path);
@@ -679,7 +726,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a PathNode (SVG path data)
-    pub fn draw_path_node(&self, node: &SVGPathNode) {
+    pub fn draw_path_node(&self, node: &SVGPathNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = self.painter.cached_path(&node.id, &node.data);
             let shape = PainterShape::from_path((*path).clone());
@@ -704,7 +751,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
-    pub fn draw_polygon_node(&self, node: &PolygonNode) {
+    pub fn draw_polygon_node(&self, node: &PolygonNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
             let shape = PainterShape::from_path(path.clone());
@@ -727,10 +774,10 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a RegularPolygonNode by converting to a PolygonNode
-    pub fn draw_regular_polygon_node(&self, node: &RegularPolygonNode) {
+    pub fn draw_regular_polygon_node(&self, node: &RegularPolygonNodeRec) {
         let points = node.to_points();
 
-        let polygon = PolygonNode {
+        let polygon = PolygonNodeRec {
             id: node.id.clone(),
             name: node.name.clone(),
             active: node.active,
@@ -751,10 +798,10 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a RegularStarPolygonNode by converting to a PolygonNode
-    pub fn draw_regular_star_polygon_node(&self, node: &RegularStarPolygonNode) {
+    pub fn draw_regular_star_polygon_node(&self, node: &RegularStarPolygonNodeRec) {
         let points = node.to_points();
 
-        let polygon = PolygonNode {
+        let polygon = PolygonNodeRec {
             id: node.id.clone(),
             name: node.name.clone(),
             active: node.active,
@@ -775,14 +822,16 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a TextSpanNode (simple text block)
-    pub fn draw_text_span_node(&self, node: &TextSpanNode) {
+    pub fn draw_text_span_node(&self, node: &TextSpanNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             self.painter.with_opacity(node.opacity, || {
                 self.painter.with_blendmode(node.blend_mode, || {
                     self.painter.draw_text_span(
                         &node.id,
                         &node.text,
-                        &node.size,
+                        &node.width,
+                        &node.max_lines,
+                        &node.ellipsis,
                         &node.fill,
                         &node.text_align,
                         &node.text_align_vertical,
@@ -796,7 +845,7 @@ impl<'a> NodePainter<'a> {
     /// Draw a ContainerNode (background + stroke + children)
     pub fn draw_container_node_recursively(
         &self,
-        node: &ContainerNode,
+        node: &ContainerNodeRec,
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
@@ -840,7 +889,7 @@ impl<'a> NodePainter<'a> {
         });
     }
 
-    pub fn draw_error_node(&self, node: &ErrorNode) {
+    pub fn draw_error_node(&self, node: &ErrorNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Error(node.clone()));
 
@@ -865,7 +914,7 @@ impl<'a> NodePainter<'a> {
     /// Draw a GroupNode: no shape of its own, only children, but apply transform + opacity
     pub fn draw_group_node_recursively(
         &self,
-        node: &GroupNode,
+        node: &GroupNodeRec,
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
@@ -882,7 +931,7 @@ impl<'a> NodePainter<'a> {
 
     pub fn draw_boolean_operation_node_recursively(
         &self,
-        node: &BooleanPathOperationNode,
+        node: &BooleanPathOperationNodeRec,
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
@@ -967,30 +1016,4 @@ impl<'a> NodePainter<'a> {
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
         }
     }
-}
-
-pub(crate) fn make_textstyle(text_style: &TextStyle) -> skia_safe::textlayout::TextStyle {
-    let mut ts = skia_safe::textlayout::TextStyle::new();
-    ts.set_font_size(text_style.font_size);
-    if let Some(letter_spacing) = text_style.letter_spacing {
-        ts.set_letter_spacing(letter_spacing);
-    }
-    if let Some(line_height) = text_style.line_height {
-        ts.set_height(line_height);
-    }
-    let mut decor = skia_safe::textlayout::Decoration::default();
-    decor.ty = text_style.text_decoration.into();
-    ts.set_decoration(&decor);
-    ts.set_font_families(&[&text_style.font_family]);
-    let font_style = skia_safe::FontStyle::new(
-        skia_safe::font_style::Weight::from(text_style.font_weight.value() as i32),
-        skia_safe::font_style::Width::NORMAL,
-        if text_style.italic {
-            skia_safe::font_style::Slant::Italic
-        } else {
-            skia_safe::font_style::Slant::Upright
-        },
-    );
-    ts.set_font_style(font_style);
-    ts
 }

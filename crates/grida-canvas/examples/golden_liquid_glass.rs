@@ -28,7 +28,7 @@ struct LiquidGlassEffect {
     radius: f32,
 }
 
-static BACKGROUND: &[u8] = include_bytes!("../../fixtures/images/stripes.png");
+static BACKGROUND: &[u8] = include_bytes!("../../../fixtures/images/stripes.png");
 
 // 1. background image
 // 2. forground glass shape 300x100 rounded rect

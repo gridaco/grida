@@ -1352,10 +1352,25 @@ export namespace grida.program.nodes {
      * a set of properties that can be either applied to a text or textspan
      */
     export interface ITextStyle {
-      textDecoration: cg.TextDecoration;
       fontFamily?: string;
       fontSize: number;
       fontWeight: cg.NFontWeight;
+      /**
+       * OpenType features
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-feature-settings
+       */
+      fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
+      /**
+       * custom font variations
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-variation-settings
+       */
+      fontVariations?: Record<string, number>;
+      textDecorationLine: cg.TextDecorationLine;
+      textDecorationStyle?: cg.TextDecorationStyle | null;
+      textDecorationColor?: cg.TextDecorationColorValue | null;
+      textDecorationSkipInk?: cg.TextDecorationSkipInkFlag | null;
+      textDecorationThickness?: cg.TextDecorationThicknessPercentage | null;
+      textTransform?: cg.TextTransform;
       /**
        * @default 0
        */
@@ -1509,6 +1524,8 @@ export namespace grida.program.nodes {
       i.ITextNodeStyle,
       i.ITextValue {
     readonly type: "text";
+
+    maxLines?: number | null;
     // textAutoResize: "none" | "width" | "height" | "auto";
   }
 
@@ -1519,6 +1536,7 @@ export namespace grida.program.nodes {
       i.IComputedTextValue & i.IComputedTextNodeStyle
     > {
     readonly type: "text";
+    maxLines?: number | null;
   }
 
   export interface ImageNode

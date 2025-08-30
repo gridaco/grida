@@ -49,8 +49,8 @@ impl NodeFactory {
     }
 
     /// Creates a new rectangle node with default values
-    pub fn create_rectangle_node(&self) -> RectangleNode {
-        RectangleNode {
+    pub fn create_rectangle_node(&self) -> RectangleNodeRec {
+        RectangleNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -69,8 +69,8 @@ impl NodeFactory {
     }
 
     /// Creates a new ellipse node with default values
-    pub fn create_ellipse_node(&self) -> EllipseNode {
-        EllipseNode {
+    pub fn create_ellipse_node(&self) -> EllipseNodeRec {
+        EllipseNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -92,8 +92,8 @@ impl NodeFactory {
     }
 
     /// Creates a new line node with default values
-    pub fn create_line_node(&self) -> LineNode {
-        LineNode {
+    pub fn create_line_node(&self) -> LineNodeRec {
+        LineNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -113,27 +113,17 @@ impl NodeFactory {
     }
 
     /// Creates a new text span node with default values
-    pub fn create_text_span_node(&self) -> TextSpanNode {
-        TextSpanNode {
+    pub fn create_text_span_node(&self) -> TextSpanNodeRec {
+        TextSpanNodeRec {
             id: self.id(),
             name: None,
             active: true,
             transform: AffineTransform::identity(),
-            size: Size {
-                width: Self::DEFAULT_SIZE.width,
-                height: 20.0,
-            },
+            width: None,
+            max_lines: None,
+            ellipsis: None,
             text: String::new(),
-            text_style: TextStyle {
-                text_decoration: TextDecoration::None,
-                font_family: String::from("Geist"),
-                font_size: 16.0,
-                font_weight: FontWeight::default(),
-                italic: false,
-                letter_spacing: None,
-                line_height: None,
-                text_transform: TextTransform::None,
-            },
+            text_style: TextStyleRec::from_font("Geist", 16.0),
             text_align: TextAlign::Left,
             text_align_vertical: TextAlignVertical::Top,
             fill: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
@@ -147,8 +137,8 @@ impl NodeFactory {
     }
 
     /// Creates a new group node with default values
-    pub fn create_group_node(&self) -> GroupNode {
-        GroupNode {
+    pub fn create_group_node(&self) -> GroupNodeRec {
+        GroupNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -160,8 +150,8 @@ impl NodeFactory {
     }
 
     /// Creates a new container node with default values
-    pub fn create_container_node(&self) -> ContainerNode {
-        ContainerNode {
+    pub fn create_container_node(&self) -> ContainerNodeRec {
+        ContainerNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -182,8 +172,8 @@ impl NodeFactory {
     }
 
     /// Creates a new path node with default values
-    pub fn create_path_node(&self) -> SVGPathNode {
-        SVGPathNode {
+    pub fn create_path_node(&self) -> SVGPathNodeRec {
+        SVGPathNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -201,8 +191,8 @@ impl NodeFactory {
     }
 
     /// Creates a new regular polygon node with default values
-    pub fn create_regular_polygon_node(&self) -> RegularPolygonNode {
-        RegularPolygonNode {
+    pub fn create_regular_polygon_node(&self) -> RegularPolygonNodeRec {
+        RegularPolygonNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -221,8 +211,8 @@ impl NodeFactory {
         }
     }
 
-    pub fn create_regular_star_polygon_node(&self) -> RegularStarPolygonNode {
-        RegularStarPolygonNode {
+    pub fn create_regular_star_polygon_node(&self) -> RegularStarPolygonNodeRec {
+        RegularStarPolygonNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -242,8 +232,8 @@ impl NodeFactory {
         }
     }
 
-    pub fn create_polygon_node(&self) -> PolygonNode {
-        PolygonNode {
+    pub fn create_polygon_node(&self) -> PolygonNodeRec {
+        PolygonNodeRec {
             id: self.id(),
             name: None,
             active: true,
@@ -262,8 +252,8 @@ impl NodeFactory {
     }
 
     /// Creates a new image node with default values
-    pub fn create_image_node(&self) -> ImageNode {
-        ImageNode {
+    pub fn create_image_node(&self) -> ImageNodeRec {
+        ImageNodeRec {
             id: self.id(),
             name: None,
             active: true,
