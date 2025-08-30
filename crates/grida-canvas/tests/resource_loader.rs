@@ -16,7 +16,7 @@ fn fixture_path(name: &str) -> String {
 fn font_loader_simple_load_unload() {
     futures::executor::block_on(async {
         let mut loader = FontLoader::new_simple();
-        let path = fixture_path("fonts/Caveat-VariableFont_wght.ttf");
+        let path = fixture_path("fonts/Caveat/Caveat-VariableFont_wght.ttf");
         let data = loader.load("Caveat", &path).await;
         assert!(data.is_some());
         loader.unload("Caveat").await;
