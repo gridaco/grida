@@ -63,8 +63,16 @@ const VirtualizedCommand = ({
   renderer = DefaultRenderer,
   onValueSeeked,
 }: VirtualizedCommandProps) => {
-  const [filteredOptions, setFilteredOptions] =
-    React.useState<Option[]>(options);
+  const [search, setSearch] = React.useState("");
+
+  const filteredOptions = React.useMemo(() => {
+    const query = search.toLowerCase();
+    return query
+      ? options.filter((option) =>
+          option.value.toLowerCase().includes(query)
+        )
+      : options;
+  }, [options, search]);
 
   const parentRef = React.useRef<HTMLDivElement>(null);
   const { sync } = useValueSeekedSelector(parentRef, onValueSeeked, "selected");
@@ -78,7 +86,7 @@ const VirtualizedCommand = ({
 
   const virtualOptions = virtualizer.getVirtualItems();
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const selectedIndex = filteredOptions.findIndex(
       (option) => option.value === selectedOption
     );
@@ -87,12 +95,8 @@ const VirtualizedCommand = ({
     }
   }, [selectedOption, filteredOptions, virtualizer]);
 
-  const handleSearch = (search: string) => {
-    setFilteredOptions(
-      options.filter((option) =>
-        option.value.toLowerCase().includes(search.toLowerCase() ?? [])
-      )
-    );
+  const handleSearch = (value: string) => {
+    setSearch(value);
   };
 
   return (
@@ -175,6 +179,10 @@ export function VirtualizedCombobox({
   className,
 }: VirtualizedComboboxProps) {
   const [open, setOpen] = React.useState<boolean>(false);
+  const optionItems = React.useMemo(
+    () => options.map((option) => ({ value: option, label: option })),
+    [options]
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -200,7 +208,7 @@ export function VirtualizedCombobox({
       >
         <VirtualizedCommand
           height={height}
-          options={options.map((option) => ({ value: option, label: option }))}
+          options={optionItems}
           placeholder={placeholder}
           selectedOption={value ?? ""}
           renderer={renderer}

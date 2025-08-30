@@ -67,6 +67,7 @@ export function FontFamilyControl({
   onValueSeeked?: (value: string | null) => void;
 }) {
   const list = useFontFamilyList();
+  const options = React.useMemo(() => list.map((i) => i.family), [list]);
 
   const mixed = value === grida.mixed;
 
@@ -77,7 +78,7 @@ export function FontFamilyControl({
       onValueChange={onValueChange}
       onValueSeeked={onValueSeeked}
       renderer={Item}
-      options={list.map((i) => i.family)}
+      options={options}
       side="right"
       align="start"
       className={cn(
