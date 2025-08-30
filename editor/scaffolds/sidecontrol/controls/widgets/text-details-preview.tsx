@@ -31,11 +31,6 @@ type FeaturePreview = {
   value?: "0" | "1";
 } | null;
 
-interface BasicsPreviewProps {
-  style?: React.CSSProperties;
-  showPlaceholder?: boolean;
-}
-
 interface AxesPreviewProps {
   axes: Record<
     string,
@@ -127,23 +122,15 @@ const getTextStyle = (
   return style;
 };
 
-function BasicsPreview({ style, showPlaceholder = false }: BasicsPreviewProps) {
+function BasicsPreview({ style }: { style?: React.CSSProperties }) {
   return (
     <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-start overflow-hidden">
-      {style ? (
-        <div
-          className="text-base leading-relaxed overflow-hidden text-ellipsis"
-          style={style}
-        >
-          {PANGRAM_EN}
-        </div>
-      ) : showPlaceholder ? (
-        <span className="text-muted-foreground text-sm">Preview</span>
-      ) : (
-        <div className="text-base leading-relaxed overflow-hidden text-ellipsis">
-          {PANGRAM_EN}
-        </div>
-      )}
+      <div
+        className="text-base leading-relaxed overflow-hidden text-ellipsis"
+        style={style}
+      >
+        {PANGRAM_EN}
+      </div>
     </div>
   );
 }
@@ -157,16 +144,8 @@ function AxesPreview({
 }: AxesPreviewProps & {
   hoveredAxis: string | null;
 }) {
-  if (!hoveredAxis) {
-    return (
-      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
-        <span className="text-muted-foreground text-sm">Preview</span>
-      </div>
-    );
-  }
-
-  const axis = axes[hoveredAxis];
-  if (!axis) return null;
+  const axis = axes[hoveredAxis!];
+  if (!hoveredAxis || !axis) return null;
 
   return (
     <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center gap-8 overflow-hidden">
@@ -214,26 +193,12 @@ function FeaturesPreview({
   features?: FontFeature[];
   selectedValue?: "0" | "1";
 }) {
-  if (!hoveredFeature || !selectedValue) {
-    return (
-      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
-        <span className="text-muted-foreground text-sm">Preview</span>
-      </div>
-    );
-  }
+  if (!hoveredFeature || !selectedValue) return null;
 
   const feature = features.find((f) => f.tag === hoveredFeature);
   const demoText = feature?.sampleText ?? feature?.glyphs?.join(" ");
 
-  if (!demoText) {
-    return (
-      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-center overflow-hidden">
-        <span className="text-muted-foreground text-sm">
-          No Preview Available
-        </span>
-      </div>
-    );
-  }
+  if (!demoText) return null;
 
   const style: React.CSSProperties = {
     fontFamily,
@@ -251,18 +216,41 @@ function FeaturesPreview({
 }
 
 function Preview(props: PreviewProps) {
+  // Check if we have data to show
+  let hasData = false;
+
+  if (props.type === "basics") {
+    hasData = !!props.hoverPreview;
+  } else if (props.type === "axes") {
+    const axesPreview = props.hoverPreview as VariationPreview;
+    hasData = !!axesPreview?.axis && !!props.axes?.[axesPreview.axis];
+  } else if (props.type === "features") {
+    const featurePreview = props.hoverPreview as FeaturePreview;
+    if (featurePreview?.feature && featurePreview?.value) {
+      const feature = props.features?.find(
+        (f) => f.tag === featurePreview.feature
+      );
+      hasData = !!(feature?.sampleText ?? feature?.glyphs?.join(" "));
+    }
+  }
+
+  // Show placeholder if no data
+  if (!hasData) {
+    return (
+      <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-start overflow-hidden">
+        <span className="text-muted-foreground text-sm">Preview</span>
+      </div>
+    );
+  }
+
+  // Render specific preview components
   if (props.type === "basics") {
     const basicPreview = props.hoverPreview as BasicPreview;
     const style = useMemo(
       () => getTextStyle(basicPreview || null),
       [basicPreview]
     );
-    return (
-      <BasicsPreview
-        style={style || undefined}
-        showPlaceholder={!basicPreview}
-      />
-    );
+    return <BasicsPreview style={style || undefined} />;
   } else if (props.type === "axes") {
     const axesPreview = props.hoverPreview as VariationPreview;
     return (
