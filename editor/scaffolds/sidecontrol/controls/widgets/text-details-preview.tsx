@@ -129,7 +129,7 @@ const getTextStyle = (
 
 function BasicsPreview({ style, showPlaceholder = false }: BasicsPreviewProps) {
   return (
-    <div className="p-4 border rounded-md bg-muted/30 h-32 overflow-hidden">
+    <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-start overflow-hidden">
       {style ? (
         <div
           className="text-base leading-relaxed overflow-hidden text-ellipsis"
