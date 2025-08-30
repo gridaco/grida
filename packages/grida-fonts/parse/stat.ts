@@ -17,6 +17,10 @@ export interface StatData {
 
 export function parseStat(buffer: ArrayBuffer): StatData {
   const [font] = Typr.parse(buffer);
+  return parseStatTable(font);
+}
+
+export function parseStatTable(font: any): StatData {
   const stat = font.STAT as Typr.STATTable | undefined;
   const axes: StatAxis[] = [];
   const combinations: StatCombination[] = [];

@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { parseFvar } from "../parse/fvar";
+import { Parser } from "../parse";
 
 describe("fvar parsing", () => {
   it("extracts variation axes and instances", () => {
@@ -9,7 +9,8 @@ describe("fvar parsing", () => {
       "../../../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf"
     );
     const buf = fs.readFileSync(p).buffer;
-    const { axes, instances } = parseFvar(buf);
+    const parser = new Parser(buf);
+    const { axes, instances } = parser.fvar();
     expect(axes.wght).toMatchObject({
       min: 100,
       max: 1000,
@@ -33,7 +34,8 @@ describe("fvar parsing", () => {
       "../../../fixtures/fonts/Geist/Geist-VariableFont_wght.ttf"
     );
     const buf = fs.readFileSync(p).buffer;
-    const { axes, instances } = parseFvar(buf);
+    const parser = new Parser(buf);
+    const { axes, instances } = parser.fvar();
     expect(axes.wght).toMatchObject({
       min: 100,
       max: 900,

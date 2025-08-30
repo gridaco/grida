@@ -13,6 +13,10 @@ export interface FontFeature {
 
 export function parseFeatures(buffer: ArrayBuffer): FontFeature[] {
   const [font] = Typr.parse(buffer);
+  return parseFeaturesTable(font);
+}
+
+export function parseFeaturesTable(font: any): FontFeature[] {
   const gsub = font.GSUB as any;
   if (!gsub || !gsub.features) return [];
   const glyphMap = buildGlyphMap(font);

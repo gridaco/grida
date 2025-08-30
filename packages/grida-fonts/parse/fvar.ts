@@ -14,6 +14,10 @@ export interface FvarData {
 
 export function parseFvar(buffer: ArrayBuffer): FvarData {
   const [font] = Typr.parse(buffer);
+  return parseFvarTable(font);
+}
+
+export function parseFvarTable(font: any): FvarData {
   const axes: FvarAxes = {};
   const instances: FvarInstance[] = [];
   const fvar = font.fvar;

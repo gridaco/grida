@@ -19,8 +19,7 @@ import type { Grida2D } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
 import * as google from "@grida/fonts/google";
 import {
-  parseFvar,
-  parseFeatures,
+  Parser,
   type FvarAxes,
   type FvarInstance,
   type FontFeature,
@@ -2718,8 +2717,9 @@ export class Editor
     const url = item.files[item.variants[0]] ?? Object.values(item.files)[0];
     const res = await fetch(url);
     const buffer = await res.arrayBuffer();
-    const { axes, instances } = parseFvar(buffer);
-    const features = parseFeatures(buffer);
+    const parser = new Parser(buffer);
+    const { axes, instances } = parser.fvar();
+    const features = parser.features();
     const detail = { font: item, axes, instances, features } as const;
     this.fontDetailsCache.set(fontFamily, detail);
     return detail;
