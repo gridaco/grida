@@ -20,18 +20,36 @@ Fonts downloaded from Google Fonts. For variable fonts, only the VF file is kept
 | PT Serif    | No       | 4      |            | Serif font family with Regular, Bold, Italic, and BoldItalic | https://fonts.google.com/specimen/PT+Serif    |
 | Recursive   | Yes      | -      | fvar, GSUB | Highly customizable variable font with multiple axes         | https://fonts.google.com/specimen/Recursive   |
 | Roboto Flex | Yes      | -      | fvar       | Flexible variable font with extensive customization options  | https://fonts.google.com/specimen/Roboto+Flex |
+| Unifont     | No       | 1      |            | Bitmap font covering entire Basic Multilingual Plane (BMP)   | https://unifoundry.com/unifont/               |
 | VT323       | No       | 1      |            | Monospace font with retro terminal/console appearance        | https://fonts.google.com/specimen/VT323       |
 
-**Minimal Build:**
+## Build Configurations
 
-- Allerta
+| Build Type | Fonts            | Description                                         |
+| ---------- | ---------------- | --------------------------------------------------- |
+| Minimal    | Allerta          | Smallest font for basic testing (16kb)              |
+| Geist      | Geist, GeistMono | Standard fonts for UI and web applications          |
+| Inter      | Inter            | Modern sans-serif designed for computer screens     |
+| Technical  | Unifont          | Bitmap font for Unicode testing and debugging (5mb) |
 
-**Default Build:**
+## Helpful Links
 
-- Geist
-- GeistMono
+### Font Testing & Development Tools
 
-## Used in Rust tests and examples
+- [FontForge](https://fontforge.org/) - Open source font editor for visually testing and editing fonts
+- [FontDrop](https://fontdrop.info/) - Online font inspector and validator
+- [Font Squirrel Webfont Generator](https://www.fontsquirrel.com/tools/webfont-generator) - Convert fonts to web formats
+- [Google Fonts](https://fonts.google.com/) - Source for most fonts in this collection
+
+### Font Analysis Tools
+
+- [FontTools](https://fonttools.readthedocs.io/) - Python library for manipulating font files
+- [TTX](https://fonttools.readthedocs.io/en/latest/ttx.html) - Font file format converter and inspector
+- [Font Bakery](https://fontbakery.readthedocs.io/) - Font quality assurance tool
+
+## Internal
+
+**Used in Rust tests and examples**
 
 The following fonts are embedded with `include_bytes!` and used only for testing and example binaries:
 
@@ -40,3 +58,4 @@ The following fonts are embedded with `include_bytes!` and used only for testing
 - Recursive
 - VT323
 - Roboto Flex
+- Unifont
