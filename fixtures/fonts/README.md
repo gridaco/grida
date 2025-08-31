@@ -46,6 +46,7 @@ Fonts downloaded from Google Fonts. For variable fonts, only the VF file is kept
 - [FontTools](https://fonttools.readthedocs.io/) - Python library for manipulating font files
 - [TTX](https://fonttools.readthedocs.io/en/latest/ttx.html) - Font file format converter and inspector
 - [Font Bakery](https://fontbakery.readthedocs.io/) - Font quality assurance tool
+- [axis-praxis](https://www.axis-praxis.org/samsa/) - Varialbe font inspector
 
 ## Internal
 
