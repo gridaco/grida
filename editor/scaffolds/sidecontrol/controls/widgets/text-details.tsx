@@ -416,6 +416,10 @@ interface TextDetailsProps {
   fontWeight?: number;
   fontFamily?: string;
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
+  /**
+   * required for opsz display
+   */
+  fontSize: number;
 
   // Change handlers
   onTextAlignChange?: (value: cg.TextAlign) => void;
@@ -451,6 +455,7 @@ export function TextDetails({
   fontVariations = {},
   fontOpticalSizing = "auto",
   fontWeight = 400,
+  fontSize,
   fontFamily,
   fontFeatures = {},
 
@@ -757,101 +762,29 @@ export function TextDetails({
                 .sort(axes_ux_sort)
                 .map(([key, axis]) => {
                   const label = axis.name ?? key;
+                  if (key === "opsz") {
+                    return (
+                      <OpticalSizeAxis
+                        key={key}
+                        label={label}
+                        axis={axis}
+                        fontSize={fontSize}
+                        fontOpticalSizing={fontOpticalSizing}
+                        onFontOpticalSizingChange={onFontOpticalSizingChange}
+                        onFontVariationChange={onFontVariationChange}
+                        onFontWeightChange={onFontWeightChange}
+                        onHover={() => handleAxisHover(key)}
+                        onHoverLeave={handleAxisHoverLeave}
+                      />
+                    );
+                  }
+
                   const value = fvar.get(
                     fontVariations,
                     fontWeight,
                     fontOpticalSizing,
                     key
                   );
-
-                  if (key === "opsz") {
-                    const isAuto = fontOpticalSizing === "auto";
-                    return (
-                      <div
-                        className="space-y-3 pb-6 last:mb-0 transition-all duration-200"
-                        key={key}
-                        onPointerEnter={() => {
-                          handleAxisHover(key);
-                        }}
-                        onPointerLeave={() => {
-                          handleAxisHoverLeave();
-                        }}
-                      >
-                        <PropertyLine>
-                          <Tooltip delayDuration={200}>
-                            <TooltipTrigger className="text-left">
-                              <PropertyLineLabel className="w-auto">
-                                {label}
-                              </PropertyLineLabel>
-                            </TooltipTrigger>
-                            <TooltipContent side="left">{key}</TooltipContent>
-                          </Tooltip>
-                          <div className="w-16">
-                            <InputPropertyNumber
-                              mode="fixed"
-                              value={
-                                typeof fontOpticalSizing === "number"
-                                  ? fontOpticalSizing
-                                  : axis.def
-                              }
-                              onValueCommit={(v) => {
-                                fvar.set(
-                                  key,
-                                  v,
-                                  onFontVariationChange,
-                                  onFontWeightChange,
-                                  onFontOpticalSizingChange
-                                );
-                              }}
-                              min={axis.min}
-                              max={axis.max}
-                              step={1}
-                              disabled={isAuto}
-                            />
-                          </div>
-                        </PropertyLine>
-                        <div>
-                          <FontVariableAxisSlider
-                            value={
-                              typeof fontOpticalSizing === "number"
-                                ? fontOpticalSizing
-                                : undefined
-                            }
-                            defaultValue={axis.def}
-                            max={axis.max}
-                            min={axis.min}
-                            step={1}
-                            marks={[axis.def]}
-                            className="w-full"
-                            disabled={isAuto}
-                            onValueChange={(value) => {
-                              fvar.set(
-                                key,
-                                value,
-                                onFontVariationChange,
-                                onFontWeightChange,
-                                onFontOpticalSizingChange
-                              );
-                            }}
-                          />
-                        </div>
-                        <div className="flex items-center gap-1 pt-1">
-                          <Checkbox
-                            id="opsz-auto"
-                            checked={isAuto}
-                            onCheckedChange={(checked) => {
-                              onFontOpticalSizingChange?.(
-                                checked ? "auto" : axis.def
-                              );
-                            }}
-                          />
-                          <label htmlFor="opsz-auto" className="text-xs">
-                            Set optical size automatically
-                          </label>
-                        </div>
-                      </div>
-                    );
-                  }
 
                   return (
                     <div
@@ -924,6 +857,103 @@ export function TextDetails({
   );
 }
 
+interface OpticalSizeAxisProps {
+  label: string;
+  axis: any;
+  fontSize: number;
+  fontOpticalSizing: cg.OpticalSizing;
+  onFontOpticalSizingChange?: (value: cg.OpticalSizing) => void;
+  onFontVariationChange?: (key: string, value: number) => void;
+  onFontWeightChange?: (value: number) => void;
+  onHover: () => void;
+  onHoverLeave: () => void;
+}
+
+function OpticalSizeAxis({
+  label,
+  axis,
+  fontSize,
+  fontOpticalSizing,
+  onFontOpticalSizingChange,
+  onFontVariationChange,
+  onFontWeightChange,
+  onHover,
+  onHoverLeave,
+}: OpticalSizeAxisProps) {
+  const isAuto = fontOpticalSizing === "auto";
+  const autoValue = Math.min(Math.max(fontSize, axis.min), axis.max);
+  const current =
+    typeof fontOpticalSizing === "number" ? fontOpticalSizing : autoValue;
+
+  return (
+    <div
+      className="space-y-3 pb-6 last:mb-0 transition-all duration-200"
+      onPointerEnter={onHover}
+      onPointerLeave={onHoverLeave}
+    >
+      <PropertyLine>
+        <Tooltip delayDuration={200}>
+          <TooltipTrigger className="text-left">
+            <PropertyLineLabel className="w-auto">{label}</PropertyLineLabel>
+          </TooltipTrigger>
+          <TooltipContent side="left">opsz</TooltipContent>
+        </Tooltip>
+        <div className="w-16">
+          <InputPropertyNumber
+            mode="fixed"
+            value={current}
+            onValueCommit={(v) => {
+              fvar.set(
+                "opsz",
+                v,
+                onFontVariationChange,
+                onFontWeightChange,
+                onFontOpticalSizingChange
+              );
+            }}
+            min={axis.min}
+            max={axis.max}
+            step={1}
+            disabled={isAuto}
+          />
+        </div>
+      </PropertyLine>
+      <div>
+        <FontVariableAxisSlider
+          value={current}
+          defaultValue={axis.def}
+          max={axis.max}
+          min={axis.min}
+          step={1}
+          marks={[axis.def]}
+          className="w-full"
+          onValueChange={(value) => {
+            fvar.set(
+              "opsz",
+              value,
+              onFontVariationChange,
+              onFontWeightChange,
+              onFontOpticalSizingChange
+            );
+          }}
+        />
+      </div>
+      <div className="flex items-center gap-1 pt-1">
+        <Checkbox
+          id="opsz-auto"
+          checked={isAuto}
+          onCheckedChange={(checked) => {
+            onFontOpticalSizingChange?.(checked ? "auto" : autoValue);
+          }}
+        />
+        <label htmlFor="opsz-auto" className="text-xs">
+          Set optical size automatically
+        </label>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Sorts font variation axes for optimal UX display order.
  * Places "opsz" (optical sizing) last since it has additional controls.
@@ -936,7 +966,9 @@ const axes_ux_sort = ([a]: [string, any], [b]: [string, any]): number => {
   return a.localeCompare(b);
 };
 
-// Wrapper object to handle fontVariations with special "wght" axis handling
+/**
+ * Wrapper object to handle fontVariations with special "wght" and "opsz" axis handling
+ */
 const fvar = {
   get: (
     fontVariations: Record<string, number> = {},

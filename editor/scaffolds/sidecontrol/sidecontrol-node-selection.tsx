@@ -1322,27 +1322,30 @@ function SectionText({ node_id }: { node_id: string }) {
     fontVariations,
     fontFeatures,
     fontOpticalSizing,
-  } = useNodeState(node_id, (node) => ({
-    text: node.text,
-    fontFamily: node.fontFamily,
-    fontWeight: node.fontWeight,
-    fontSize: node.fontSize,
-    lineHeight: node.lineHeight,
-    letterSpacing: node.letterSpacing,
-    textAlign: node.textAlign,
-    textAlignVertical: node.textAlignVertical,
-    textDecorationLine: node.textDecorationLine,
-    textDecorationStyle: node.textDecorationStyle,
-    textDecorationColor: node.textDecorationColor,
-    textDecorationSkipInk: node.textDecorationSkipInk,
-    textDecorationThickness: node.textDecorationThickness,
-    textTransform: node.textTransform,
-    maxLines: node.maxLines,
-    maxLength: node.maxLength,
-    fontVariations: node.fontVariations,
-    fontFeatures: node.fontFeatures,
-    fontOpticalSizing: node.fontOpticalSizing,
-  }));
+  } = useNodeState(node_id, (_node) => {
+    const node = _node as grida.program.nodes.TextNode;
+    return {
+      text: node.text,
+      fontFamily: node.fontFamily,
+      fontWeight: node.fontWeight,
+      fontSize: node.fontSize,
+      lineHeight: node.lineHeight,
+      letterSpacing: node.letterSpacing,
+      textAlign: node.textAlign,
+      textAlignVertical: node.textAlignVertical,
+      textDecorationLine: node.textDecorationLine,
+      textDecorationStyle: node.textDecorationStyle,
+      textDecorationColor: node.textDecorationColor,
+      textDecorationSkipInk: node.textDecorationSkipInk,
+      textDecorationThickness: node.textDecorationThickness,
+      textTransform: node.textTransform,
+      maxLines: node.maxLines,
+      maxLength: node.maxLength,
+      fontVariations: node.fontVariations,
+      fontFeatures: node.fontFeatures,
+      fontOpticalSizing: node.fontOpticalSizing,
+    };
+  });
 
   return (
     <CurrentFontProvider
@@ -1374,6 +1377,7 @@ function SectionText({ node_id }: { node_id: string }) {
                   fontVariations={fontVariations}
                   fontOpticalSizing={fontOpticalSizing}
                   fontWeight={fontWeight}
+                  fontSize={fontSize}
                   fontFamily={fontFamily}
                   fontFeatures={fontFeatures}
                   onTextTransformChange={actions.textTransform}
