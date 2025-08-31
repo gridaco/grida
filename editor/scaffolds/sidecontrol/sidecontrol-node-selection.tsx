@@ -116,10 +116,12 @@ function FontStyleControlConnected({
   value,
   onWeightChange,
   onVariationChange,
+  onInstanceChange,
 }: {
   value?: TMixed<cg.NFontWeight>;
   onWeightChange: (v: cg.NFontWeight) => void;
   onVariationChange: (axis: string, value: number) => void;
+  onInstanceChange: (coordinates: Record<string, number>) => void;
 }) {
   const { instances } = useCurrentFont();
 
@@ -128,14 +130,7 @@ function FontStyleControlConnected({
       if (change.type === "instance") {
         const inst = instances.find((i) => i.name === change.name);
         if (inst) {
-          if (typeof inst.coordinates.wght === "number") {
-            onWeightChange(inst.coordinates.wght as cg.NFontWeight);
-          }
-          Object.entries(inst.coordinates).forEach(([k, v]) => {
-            if (k !== "wght") {
-              onVariationChange(k, v);
-            }
-          });
+          onInstanceChange(inst.coordinates);
         }
       } else {
         if (typeof change.values.wght === "number") {
@@ -148,7 +143,7 @@ function FontStyleControlConnected({
         });
       }
     },
-    [instances, onWeightChange, onVariationChange]
+    [instances, onInstanceChange, onWeightChange, onVariationChange]
   );
 
   return <FontStyleControl onValueChange={handleChange} />;
@@ -523,6 +518,7 @@ function ModeMixedNodeProperties({
                   value={fontWeight?.value}
                   onWeightChange={change.fontWeight}
                   onVariationChange={change.fontVariation}
+                  onInstanceChange={change.fontVariationInstance}
                 />
               </PropertyLine>
               <PropertyLine>
@@ -1426,6 +1422,7 @@ function SectionText({ node_id }: { node_id: string }) {
               value={fontWeight}
               onWeightChange={actions.fontWeight}
               onVariationChange={actions.fontVariation}
+              onInstanceChange={actions.fontVariationInstance}
             />
           </PropertyLine>
           <PropertyLine>

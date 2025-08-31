@@ -197,6 +197,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeFontFeature(node_id, key, value),
       fontVariation: (key: string, value: number) =>
         instance.changeTextNodeFontVariation(node_id, key, value),
+      fontVariationInstance: (coordinates: Record<string, number>) =>
+        instance.changeTextNodeFontVariationInstance(node_id, coordinates),
       fontSize: (change: editor.api.NumberChange) =>
         instance.changeTextNodeFontSize(node_id, change),
       textAlign: (value: cg.TextAlign) =>

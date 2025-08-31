@@ -1879,6 +1879,21 @@ export class Editor
       fontVariations: variations,
     });
   }
+
+  changeTextNodeFontVariationInstance(
+    node_id: editor.NodeID,
+    coordinates: Record<string, number>
+  ): void {
+    const { wght, ...rest } = coordinates;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontWeight: typeof wght === "number" ? (wght as cg.NFontWeight) : undefined,
+      fontVariations:
+        Object.keys(rest).length > 0 ? (rest as Record<string, number>) : undefined,
+    });
+  }
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
     try {
       const value = resolveNumberChangeValue(
@@ -2690,6 +2705,11 @@ export class Editor
     return this.fontLoader.listLoadedFonts();
   }
 
+  /**
+   * @deprecated TODO:
+   * 1. need a different pipeline
+   * 2. need to load all files
+   */
   async getFontDetails(fontFamily: string): Promise<{
     font: google.GoogleWebFontListItem;
     axes: FvarAxes;
@@ -2700,19 +2720,13 @@ export class Editor
       return this.fontDetailsCache.get(fontFamily)!;
     }
 
-    let item = this.mstate.webfontlist.items.find(
+    const item = this.mstate.webfontlist.items.find(
       (f) => f.family === fontFamily
     );
-    if (!item) {
-      const list = await google.fetchWebfontList();
-      this.dispatch({ type: "webfonts/list/load", webfontlist: list });
-      item = list.items.find((f) => f.family === fontFamily);
-      if (!item) return null;
-    }
+    if (!item) return null;
 
     const url = item.files[item.variants[0]] ?? Object.values(item.files)[0];
-    const res = await fetch(url);
-    const buffer = await res.arrayBuffer();
+    const buffer = await fetch(url).then((r) => r.arrayBuffer());
     const { fvar, features } = await this.getParserWorker().details(buffer);
     const detail = {
       font: item,

@@ -144,6 +144,18 @@ export function useMixedProperties(ids: string[]) {
     [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontVariation]
   );
 
+  const fontVariationInstance = useCallback(
+    (coordinates: Record<string, number>) => {
+      mixedProperties.fontWeight?.ids.forEach((id) => {
+        instance.changeTextNodeFontVariationInstance(id, coordinates);
+      });
+    },
+    [
+      mixedProperties.fontWeight?.ids,
+      instance.changeTextNodeFontVariationInstance,
+    ]
+  );
+
   const fontSize = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.fontSize?.ids.forEach((id) => {
@@ -311,6 +323,7 @@ export function useMixedProperties(ids: string[]) {
       fontWeight,
       fontFamily,
       fontVariation,
+      fontVariationInstance,
       fontSize,
       lineHeight,
       letterSpacing,
@@ -341,6 +354,7 @@ export function useMixedProperties(ids: string[]) {
       fontWeight,
       fontFamily,
       fontVariation,
+      fontVariationInstance,
       fontSize,
       lineHeight,
       letterSpacing,
