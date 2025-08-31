@@ -118,6 +118,26 @@ export namespace editor.config {
   }
 
   /**
+   * TODO: implement this
+   */
+  export interface IEditorRenderingConfig {
+    /**
+     * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-synthesis
+     */
+    font_synthesis: {
+      /**
+       * renderer allows fake italic
+       */
+      faux_italic: boolean;
+
+      /**
+       * renderer allows fake weight
+       */
+      faux_weight: boolean;
+    };
+  }
+
+  /**
    * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
    *
    * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
