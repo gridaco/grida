@@ -8,6 +8,7 @@ Fonts downloaded from Google Fonts. For variable fonts, only the VF file is kept
 
 | family      | variable | static | test       | description                                                  | url                                           |
 | ----------- | -------- | ------ | ---------- | ------------------------------------------------------------ | --------------------------------------------- |
+| Adobe Blank | No       | 1      |            | Special-purpose font for testing, forces CSS "no fallback"   | https://github.com/adobe-fonts/adobe-blank    |
 | Allerta     | No       | 1      |            | Its the smallest one available. (16kb)                       | https://fonts.google.com/specimen/Allerta     |
 | AR One Sans | Yes      | -      |            | Modern Arabic variable font with excellent readability       | https://fonts.google.com/specimen/AR+One+Sans |
 | Bungee      | No       | 1      |            | Bold display font with strong geometric characteristics      | https://fonts.google.com/specimen/Bungee      |
