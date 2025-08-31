@@ -68,9 +68,7 @@ const VirtualizedCommand = ({
   const filteredOptions = React.useMemo(() => {
     const query = search.toLowerCase();
     return query
-      ? options.filter((option) =>
-          option.value.toLowerCase().includes(query)
-        )
+      ? options.filter((option) => option.value.toLowerCase().includes(query))
       : options;
   }, [options, search]);
 
