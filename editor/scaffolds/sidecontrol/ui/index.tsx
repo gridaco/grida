@@ -15,6 +15,8 @@ import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
 import type { TMixed } from "../controls/utils/types";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+export { useSliderValue } from "./use-slider-value";
+
 export function PropertyLine({
   children,
   className,

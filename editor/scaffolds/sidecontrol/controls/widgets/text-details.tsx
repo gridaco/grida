@@ -39,6 +39,7 @@ import {
 } from "./text-details-preview";
 import { FontFeatureSettings } from "./text-details-font-feature-settings";
 import { useCurrentFont } from "../context/font";
+import { FontVariableAxisSlider } from "../font-variable-axis";
 
 // Type definitions
 type VerticalTrim = "all" | "disable-all";
@@ -508,19 +509,9 @@ export function TextDetails({
 
   const handleTruncateToggleChange = (value: string) => {
     const isEnabled = value === "on";
-    const next = isEnabled
-      ? maxLines && maxLines > 0
-        ? maxLines
-        : 2
-      : 0;
+    const next = isEnabled ? (maxLines && maxLines > 0 ? maxLines : 2) : 0;
     onMaxLinesChange?.(next);
   };
-
-  const handleFeatureToggleChange =
-    (feature: cg.OpenTypeFeature) => (value: string) => {
-      const isEnabled = value === "1";
-      onFontFeatureChange?.(feature, isEnabled);
-    };
 
   const hasVariableAxes = axes && Object.keys(axes).length > 0;
   const hasFeatures = features.length > 0;
@@ -800,14 +791,16 @@ export function TextDetails({
                       </div>
                     </PropertyLine>
                     <div>
-                      <Slider
-                        value={value ? [value] : [axis.def]}
+                      <FontVariableAxisSlider
+                        value={value}
+                        defaultValue={axis.def}
                         max={axis.max}
                         min={axis.min}
                         step={1}
+                        marks={[axis.def]}
                         className="w-full"
-                        onValueChange={(values) => {
-                          const v = values[0];
+                        onValueChange={(value) => {
+                          const v = value;
                           fvar.set(
                             key,
                             v,
