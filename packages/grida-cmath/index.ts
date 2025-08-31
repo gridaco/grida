@@ -7009,6 +7009,121 @@ namespace cmath {
       // If no decimal part remains, return integer form; otherwise use toFixed
       return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(precision);
     }
+
+    export namespace gradient {
+      /**
+       * Control points defining a gradient in normalized space.
+       *
+       * The points `A`, `B`, and `C` correspond to the gradient handle
+       * positions and are defined in a unit square where the top-left is (0,0)
+       * and the bottom-right is (1,1).
+       */
+      export interface ControlPoints {
+        A: cmath.Vector2;
+        B: cmath.Vector2;
+        C: cmath.Vector2;
+      }
+
+      /**
+       * Supported gradient paint types.
+       */
+      export type GradientType =
+        | "linear_gradient"
+        | "radial_gradient"
+        | "sweep_gradient"
+        | "diamond_gradient";
+
+      /**
+       * Returns the canonical control points for a gradient type.
+       *
+       * These points define the identity transform for the gradient.
+       */
+      export function baseControlPoints(type: GradientType): ControlPoints {
+        if (type === "linear_gradient") {
+          return {
+            A: [0, 0.5],
+            B: [1, 0.5],
+            C: [0, 1],
+          };
+        }
+        return {
+          A: [0.5, 0.5],
+          B: [1, 0.5],
+          C: [0.5, 1],
+        };
+      }
+
+      /**
+       * Computes an affine transform matrix that maps the canonical control
+       * points of a gradient to the provided control points.
+       */
+      export function transformFromControlPoints(
+        points: ControlPoints,
+        type: GradientType
+      ): cmath.Transform {
+        const base = baseControlPoints(type);
+
+        if (type === "linear_gradient") {
+          const dx = points.B[0] - points.A[0];
+          const dy = points.B[1] - points.A[1];
+          const len = Math.hypot(dx, dy) || 1e-6;
+          const cos = dx / len;
+          const sin = dy / len;
+
+          const a = cos * len;
+          const d = sin * len;
+          const b = -sin;
+          const e = cos;
+          const tx = points.A[0] - b * 0.5;
+          const ty = points.A[1] - e * 0.5;
+
+          return [
+            [a, b, tx],
+            [d, e, ty],
+          ];
+        }
+
+        const dx = points.B[0] - points.A[0];
+        const dy = points.B[1] - points.A[1];
+        const len = Math.hypot(dx, dy) || 1e-6;
+        const perpX = -dy / len;
+        const perpY = dx / len;
+
+        const cRelX = points.C[0] - points.A[0];
+        const cRelY = points.C[1] - points.A[1];
+        const cPerpDist = cRelX * perpX + cRelY * perpY;
+
+        const constrainedC: cmath.Vector2 = [
+          points.A[0] + perpX * cPerpDist,
+          points.A[1] + perpY * cPerpDist,
+        ];
+
+        const u1 = base.B[0] - base.A[0];
+        const u2 = base.B[1] - base.A[1];
+        const v1 = base.C[0] - base.A[0];
+        const v2 = base.C[1] - base.A[1];
+
+        const p1 = points.B[0] - points.A[0];
+        const p2 = points.B[1] - points.A[1];
+        const q1 = constrainedC[0] - points.A[0];
+        const q2 = constrainedC[1] - points.A[1];
+
+        const det = u1 * v2 - u2 * v1 || 1e-6;
+
+        const a = (p1 * v2 - q1 * u2) / det;
+        const b = (q1 * u1 - p1 * v1) / det;
+        const d = (p2 * v2 - q2 * u2) / det;
+        const e = (q2 * u1 - p2 * v1) / det;
+
+        const tx = points.A[0] - a * base.A[0] - b * base.A[1];
+        const ty = points.A[1] - d * base.A[0] - e * base.A[1];
+
+        return [
+          [a, b, tx],
+          [d, e, ty],
+        ];
+      }
+    }
   }
 
   export namespace polygon {
