@@ -68,6 +68,18 @@ Documentation files are located in the `./docs` directory.
 
 This directory contains the docs as-is, the deployment of the docs are handled by [apps/docs](./apps/docs). A docusaurus project that syncs the docs content to its directory. When writing docs, the root `./docs` directory is the source of truth.
 
+| directory                             | name          | description                                                      | active |
+| ------------------------------------- | ------------- | ---------------------------------------------------------------- | ------ |
+| [/docs/wg](./docs/wg)                 | working group | working group documents, architecture documents, todo list, etc  | yes    |
+| [/docs/reference](./docs/reference)   | reference     | glossary and references (technical documents)                    | yes    |
+| [/docs/math](./docs/math)             | math          | Math reference, used for internal docs referencing               | yes    |
+| [/docs/platform](./docs/platform)     | platform      | Grida Platform (API/Spec) documents                              | yes    |
+| [/docs/editor](./docs/editor)         | editor        | Grida Editor - User Documentation                                | yes    |
+| [/docs/canvas](./docs/canvas)         | canvas        | Grida Canvas SDK - User Documentation                            | no     |
+| [/docs/cli](./docs/cli)               | cli           | Grida CLI - User Documentation                                   | yes    |
+| [/docs/together](./docs/together)     | together      | Contributing, Support, Community, etc                            | yes    |
+| [/docs/with-figma](./docs/with-figma) | with-figma    | Grida with Figma - Grida <-> Figma compatilibity and user guides | yes    |
+
 ## `/crates/*`
 
 Importance: **High**
