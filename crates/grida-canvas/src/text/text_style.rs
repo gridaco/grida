@@ -29,6 +29,11 @@ pub fn textstyle(
 
     // [variables]
     let mut coords = vec![var_wght(style.font_weight.value() as f32)];
+    match style.font_optical_sizing {
+        OpticalSizing::Auto => coords.push(var_opsz(style.font_size)),
+        OpticalSizing::Fixed(v) => coords.push(var_opsz(v)),
+        OpticalSizing::None => {}
+    }
     if let Some(vars) = &style.font_variations {
         for v in vars {
             let tag = tag_from_str(&v.axis);
@@ -68,6 +73,13 @@ fn var_wght(weight: f32) -> skia_safe::font_arguments::variation_position::Coord
     skia_safe::font_arguments::variation_position::Coordinate {
         axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
         value: weight,
+    }
+}
+
+fn var_opsz(opsz: f32) -> skia_safe::font_arguments::variation_position::Coordinate {
+    skia_safe::font_arguments::variation_position::Coordinate {
+        axis: skia_safe::FourByteTag::from(('o', 'p', 's', 'z')),
+        value: opsz,
     }
 }
 

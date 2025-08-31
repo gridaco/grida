@@ -596,6 +596,22 @@ pub struct FontVariation {
     pub value: f32,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum OpticalSizing {
+    #[serde(rename = "auto")]
+    Auto,
+    #[serde(rename = "none")]
+    None,
+    Fixed(f32),
+}
+
+impl Default for OpticalSizing {
+    fn default() -> Self {
+        OpticalSizing::Auto
+    }
+}
+
 /// A set of style properties that can be applied to a text or text span.
 #[derive(Debug, Clone)]
 pub struct TextStyleRec {
@@ -623,6 +639,9 @@ pub struct TextStyleRec {
     /// Text transform (e.g. uppercase, lowercase, capitalize)
     pub text_transform: TextTransform,
 
+    /// Font optical sizing
+    pub font_optical_sizing: OpticalSizing,
+
     /// OpenType font features
     pub font_features: Option<Vec<FontFeature>>,
 
@@ -641,6 +660,7 @@ impl TextStyleRec {
             letter_spacing: None,
             line_height: None,
             text_transform: TextTransform::None,
+            font_optical_sizing: OpticalSizing::Auto,
             font_features: None,
             font_variations: None,
         }

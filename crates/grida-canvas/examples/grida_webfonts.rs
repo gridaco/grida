@@ -28,6 +28,7 @@ async fn demo_webfonts() -> Scene {
         font_weight: FontWeight::new(700), // Bold
         font_features: None,
         font_variations: None,
+        font_optical_sizing: Default::default(),
         letter_spacing: None,
         italic: false,
         line_height: None,
@@ -49,6 +50,7 @@ async fn demo_webfonts() -> Scene {
         font_weight: FontWeight::new(400), // Regular
         font_features: None,
         font_variations: None,
+        font_optical_sizing: Default::default(),
         letter_spacing: None,
         italic: false,
         line_height: Some(1.5), // 1.5 line height for better readability
@@ -92,6 +94,7 @@ async fn demo_webfonts() -> Scene {
             font_weight: FontWeight::new(*weight),
             font_features: None,
             font_variations: None,
+            font_optical_sizing: Default::default(),
             letter_spacing: None,
             italic: *is_italic,
             line_height: None,

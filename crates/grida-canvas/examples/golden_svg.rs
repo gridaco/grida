@@ -36,6 +36,7 @@ async fn demo_scene() -> Scene {
         font_weight: FontWeight::new(700),
         font_features: None,
         font_variations: None,
+        font_optical_sizing: Default::default(),
         italic: false,
         letter_spacing: None,
         line_height: None,

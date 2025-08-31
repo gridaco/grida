@@ -531,6 +531,17 @@ export namespace cg {
   export type NFontWeight = 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
 
   /**
+   * Optical sizing modes
+   *
+   * - `"auto"` links optical size to `fontSize`
+   * - `"none"` disables optical sizing
+   * - `number` sets a fixed optical size value
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-optical-sizing
+   */
+  export type OpticalSizing = "auto" | "none" | number;
+
+  /**
    * @see https://api.flutter.dev/flutter/painting/Axis.html
    */
   export type Axis = "horizontal" | "vertical";

@@ -904,6 +904,7 @@ impl FigmaConverter {
                     .clone()
                     .unwrap_or_else(|| "Inter".to_string()),
                 font_size: style.font_size.unwrap_or(14.0) as f32,
+                font_optical_sizing: OpticalSizing::Auto,
                 font_features: None,
                 font_variations: None,
                 font_weight: FontWeight::new(style.font_weight.unwrap_or(400.0) as u32),

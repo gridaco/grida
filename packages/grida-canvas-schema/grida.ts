@@ -1363,8 +1363,9 @@ export namespace grida.program.nodes {
       /**
        * custom font variations
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-variation-settings
-       */
+      */
       fontVariations?: Record<string, number>;
+      fontOpticalSizing?: cg.OpticalSizing;
       textDecorationLine: cg.TextDecorationLine;
       textDecorationStyle?: cg.TextDecorationStyle | null;
       textDecorationColor?: cg.TextDecorationColorValue | null;

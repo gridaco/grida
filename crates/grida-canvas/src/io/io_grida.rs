@@ -434,6 +434,9 @@ pub struct JSONTextNode {
     #[serde(rename = "fontVariations", default)]
     pub font_variations: Option<HashMap<String, f32>>,
 
+    #[serde(rename = "fontOpticalSizing", default)]
+    pub font_optical_sizing: Option<OpticalSizing>,
+
     #[serde(rename = "textTransform", default)]
     pub text_transform: TextTransform,
 }
@@ -717,6 +720,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                         .map(|(axis, value)| FontVariation { axis, value })
                         .collect()
                 }),
+                font_optical_sizing: node.font_optical_sizing.unwrap_or_default(),
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,
