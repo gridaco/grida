@@ -16,6 +16,7 @@ import { WorkbenchUI } from "@/components/workbench";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useValueSeekedSelector } from "@/hooks/use-value-seeked-selector";
+import { useAutoFocusSelect } from "@/hooks/use-auto-focus-select";
 import { cn } from "@/components/lib/utils";
 import { TMixed } from "./utils/types";
 import grida from "@grida/schema";
@@ -89,16 +90,29 @@ function FontFamilyCommand({
   onSelectFontFamily?: (fontFamily: string) => void;
   onValueSeeked?: (fontFamily: string | null) => void;
 }) {
-  const [search, setSearch] = React.useState("");
+  const {
+    value: displayValue,
+    query,
+    handleInputChange,
+    handleFocus,
+    handleBlur,
+    handleKeyDown,
+  } = useAutoFocusSelect({
+    initialValue: selectedFontFamily,
+    autoFocus: true,
+    onQueryChange: (query) => {
+      // This will be handled by the CommandInput's onValueChange
+    },
+  });
 
   const filteredFontFamilies = React.useMemo(() => {
-    const query = search.toLowerCase();
-    return query
+    const searchQuery = query?.toLowerCase() || "";
+    return searchQuery
       ? fontFamilies.filter((fontFamily) =>
-          fontFamily.toLowerCase().includes(query)
+          fontFamily.toLowerCase().includes(searchQuery)
         )
       : fontFamilies;
-  }, [fontFamilies, search]);
+  }, [fontFamilies, query]);
 
   const parentRef = React.useRef<HTMLDivElement>(null);
   const { sync } = useValueSeekedSelector(parentRef, onValueSeeked, "selected");
@@ -122,12 +136,19 @@ function FontFamilyCommand({
   }, [selectedFontFamily, filteredFontFamilies, virtualizer]);
 
   const handleSearch = (value: string) => {
-    setSearch(value);
+    handleInputChange(value);
   };
 
   return (
     <Command shouldFilter={false} onKeyDown={sync} onPointerMove={sync}>
-      <CommandInput onValueChange={handleSearch} placeholder={placeholder} />
+      <CommandInput
+        value={displayValue}
+        onValueChange={handleSearch}
+        placeholder={placeholder}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+      />
       <CommandEmpty>No font found.</CommandEmpty>
       <CommandGroup
         ref={parentRef}
