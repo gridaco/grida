@@ -32,6 +32,30 @@ describe("toReactTextStyle", () => {
     expect(result.fontVariationSettings).toBe('"wght" 700, "slnt" 12');
   });
 
+  it("handles font optical sizing", () => {
+    const style: grida.program.nodes.i.IComputedTextNodeStyle = {
+      textAlign: "left",
+      textAlignVertical: "top",
+      textDecorationLine: "none",
+      fontFamily: "Inter",
+      fontSize: 16,
+      fontWeight: 400,
+      letterSpacing: 0,
+      lineHeight: 16,
+      fill: {
+        type: "solid",
+        color: { r: 0, g: 0, b: 0, a: 1 },
+      },
+      fontOpticalSizing: 12,
+      fontVariations: { wght: 500 },
+    };
+
+    const result = css.toReactTextStyle(style);
+
+    expect(result.fontOpticalSizing).toBe("none");
+    expect(result.fontVariationSettings).toBe('"wght" 500, "opsz" 12');
+  });
+
   it("maps textTransform to CSS property", () => {
     const style: grida.program.nodes.i.IComputedTextNodeStyle = {
       textAlign: "left",

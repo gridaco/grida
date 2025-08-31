@@ -73,6 +73,7 @@ export default function initialNode(
         textDecorationLine: "none",
         fontFamily: "Geist",
         fontWeight: 400,
+        fontOpticalSizing: "auto",
         fontSize: 14,
         fill: black,
         width: "auto",

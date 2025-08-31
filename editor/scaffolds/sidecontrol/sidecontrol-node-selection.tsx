@@ -1321,6 +1321,7 @@ function SectionText({ node_id }: { node_id: string }) {
     maxLength,
     fontVariations,
     fontFeatures,
+    fontOpticalSizing,
   } = useNodeState(node_id, (node) => ({
     text: node.text,
     fontFamily: node.fontFamily,
@@ -1340,6 +1341,7 @@ function SectionText({ node_id }: { node_id: string }) {
     maxLength: node.maxLength,
     fontVariations: node.fontVariations,
     fontFeatures: node.fontFeatures,
+    fontOpticalSizing: node.fontOpticalSizing,
   }));
 
   return (
@@ -1370,6 +1372,7 @@ function SectionText({ node_id }: { node_id: string }) {
                   maxLines={maxLines}
                   maxLength={maxLength}
                   fontVariations={fontVariations}
+                  fontOpticalSizing={fontOpticalSizing}
                   fontWeight={fontWeight}
                   fontFamily={fontFamily}
                   fontFeatures={fontFeatures}
@@ -1390,6 +1393,7 @@ function SectionText({ node_id }: { node_id: string }) {
                   onFontVariationChange={(key, value) => {
                     actions.fontVariation(key, value);
                   }}
+                  onFontOpticalSizingChange={actions.fontOpticalSizing}
                   onFontFeatureChange={(key, value) => {
                     actions.fontFeature(key, value);
                   }}

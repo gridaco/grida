@@ -434,8 +434,12 @@ pub struct JSONTextNode {
     #[serde(rename = "fontVariations", default)]
     pub font_variations: Option<HashMap<String, f32>>,
 
-    #[serde(rename = "fontOpticalSizing", default)]
-    pub font_optical_sizing: Option<OpticalSizing>,
+    #[serde(
+        rename = "fontOpticalSizing",
+        default,
+        deserialize_with = "de_optical_sizing"
+    )]
+    pub font_optical_sizing: OpticalSizing,
 
     #[serde(rename = "textTransform", default)]
     pub text_transform: TextTransform,
@@ -720,7 +724,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                         .map(|(axis, value)| FontVariation { axis, value })
                         .collect()
                 }),
-                font_optical_sizing: node.font_optical_sizing.unwrap_or_default(),
+                font_optical_sizing: node.font_optical_sizing,
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,
@@ -1097,6 +1101,29 @@ where
     }
 }
 
+// https://github.com/serde-rs/json/issues/1284
+fn de_optical_sizing<'de, D>(deserializer: D) -> Result<OpticalSizing, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Value = Deserialize::deserialize(deserializer)?;
+    match value {
+        Value::String(s) => match s.as_str() {
+            "auto" => Ok(OpticalSizing::Auto),
+            "none" => Ok(OpticalSizing::None),
+            _ => Ok(OpticalSizing::Auto), // Fallback to Auto for invalid strings
+        },
+        Value::Number(n) => {
+            if let Some(f) = n.as_f64() {
+                Ok(OpticalSizing::Fixed(f as f32))
+            } else {
+                Ok(OpticalSizing::Auto) // Fallback to Auto for invalid numbers
+            }
+        }
+        _ => Ok(OpticalSizing::Auto), // Fallback to Auto for other types
+    }
+}
+
 fn merge_corner_radius(
     corner_radius: Option<f32>,
     corner_radius_top_left: Option<Radius>,
@@ -1355,6 +1382,142 @@ mod tests {
                 assert_eq!(rect.base.height, CSSDimension::Auto);
             }
             _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn test_font_optical_sizing_parsing() {
+        // Test "auto" case
+        let json_auto = r#"{
+            "id": "text-1",
+            "type": "text",
+            "text": "Test",
+            "left": 0,
+            "top": 0,
+            "fontOpticalSizing": "auto"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json_auto).expect("Failed to parse 'auto'");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, OpticalSizing::Auto));
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test "none" case
+        let json_none = r#"{
+            "id": "text-2",
+            "type": "text",
+            "text": "Test",
+            "left": 0,
+            "top": 0,
+            "fontOpticalSizing": "none"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json_none).expect("Failed to parse 'none'");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, OpticalSizing::None));
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test numeric case
+        let json_fixed = r#"{
+            "id": "text-3",
+            "type": "text",
+            "text": "Test",
+            "left": 0,
+            "top": 0,
+            "fontOpticalSizing": 16.5
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json_fixed).expect("Failed to parse numeric");
+        if let JSONNode::Text(text) = node {
+            match text.font_optical_sizing {
+                OpticalSizing::Fixed(value) => assert_eq!(value, 16.5),
+                _ => panic!("Expected Fixed variant"),
+            }
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test invalid string fallback to Auto (via serde default)
+        let json_invalid = r#"{
+            "id": "text-4",
+            "type": "text",
+            "text": "Test",
+            "left": 0,
+            "top": 0,
+            "fontOpticalSizing": "invalid_value"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json_invalid).expect("Failed to parse invalid");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, OpticalSizing::Auto));
+        } else {
+            panic!("Expected Text node");
+        }
+    }
+
+    #[test]
+    fn test_font_optical_sizing_all_variants() {
+        // Test "none" variant
+        let json_none = r#"{
+            "id": "text-1",
+            "name": "text",
+            "type": "text",
+            "text": "Text",
+            "left": 100,
+            "top": 100,
+            "fontOpticalSizing": "none"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json_none).expect("Failed to parse 'none' variant");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, OpticalSizing::None));
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test numeric variant
+        let json_fixed = r#"{
+            "id": "text-2",
+            "name": "text",
+            "type": "text",
+            "text": "Text",
+            "left": 100,
+            "top": 100,
+            "fontOpticalSizing": 16.5
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json_fixed).expect("Failed to parse numeric variant");
+        if let JSONNode::Text(text) = node {
+            match text.font_optical_sizing {
+                OpticalSizing::Fixed(value) => assert_eq!(value, 16.5),
+                _ => panic!("Expected Fixed variant"),
+            }
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test default value (when fontOpticalSizing is not specified)
+        let json_default = r#"{
+            "id": "text-3",
+            "name": "text",
+            "type": "text",
+            "text": "Text",
+            "left": 100,
+            "top": 100
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json_default).expect("Failed to parse default variant");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, OpticalSizing::Auto));
+        } else {
+            panic!("Expected Text node");
         }
     }
 }

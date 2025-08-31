@@ -433,6 +433,12 @@ const safe_properties: Partial<
       (draft as UN).fontVariations = value;
     },
   }),
+  fontOpticalSizing: defineNodeProperty<"fontOpticalSizing">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontOpticalSizing = value;
+    },
+  }),
   fontSize: defineNodeProperty<"fontSize">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {

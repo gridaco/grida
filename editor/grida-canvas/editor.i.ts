@@ -1703,6 +1703,10 @@ export namespace editor.api {
       key: string,
       value: number
     ): void;
+    changeTextNodeFontOpticalSizing(
+      node_id: NodeID,
+      fontOpticalSizing: cg.OpticalSizing
+    ): void;
     changeTextNodeFontSize(
       node_id: NodeID,
       fontSize: editor.api.NumberChange

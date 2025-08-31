@@ -38,7 +38,7 @@
   - [x] `slnt`
   - [ ] `ital`
   - [x] `opsz`
-    - [ ] `opsz: auto`
+    - [x] `opsz: auto`
   - [x] `casl`
   - [x] [`crsv`](https://fonts.google.com/knowledge/glossary/cursive_axis)
   - [x] [`MONO`](https://fonts.google.com/knowledge/glossary/monospace_axis) Monospace axis

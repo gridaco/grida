@@ -1880,6 +1880,17 @@ export class Editor
     });
   }
 
+  changeTextNodeFontOpticalSizing(
+    node_id: editor.NodeID,
+    fontOpticalSizing: cg.OpticalSizing
+  ): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontOpticalSizing,
+    });
+  }
+
   changeTextNodeFontVariationInstance(
     node_id: editor.NodeID,
     coordinates: Record<string, number>

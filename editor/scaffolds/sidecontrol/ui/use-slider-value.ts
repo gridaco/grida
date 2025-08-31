@@ -58,6 +58,7 @@ export function useSliderValue({
   onValueChange,
   onValueCommit,
   snapThreshold,
+  disabled,
 }: {
   min: number;
   max: number;
@@ -68,11 +69,14 @@ export function useSliderValue({
   onValueChange?: (value: number) => void;
   onValueCommit?: (value: number) => void;
   snapThreshold?: number;
+  disabled?: boolean;
 }) {
   const [value, setValue] = React.useState(initialValue ?? defaultValue ?? min);
 
   const handleValueChange = React.useCallback(
     (newValue: number[]) => {
+      if (disabled) return;
+
       const rawValue = newValue[0];
       const snappedValue = findClosestMark(
         rawValue,
@@ -90,11 +94,13 @@ export function useSliderValue({
       setValue(clampedValue);
       onValueChange?.(clampedValue);
     },
-    [marks, min, max, snapThreshold, step, onValueChange]
+    [marks, min, max, snapThreshold, step, onValueChange, disabled]
   );
 
   const handleValueCommit = React.useCallback(
     (newValue: number[]) => {
+      if (disabled) return;
+
       const rawValue = newValue[0];
       const snappedValue = findClosestMark(
         rawValue,
@@ -112,7 +118,7 @@ export function useSliderValue({
       setValue(clampedValue);
       onValueCommit?.(clampedValue);
     },
-    [marks, min, max, snapThreshold, step, onValueCommit]
+    [marks, min, max, snapThreshold, step, onValueCommit, disabled]
   );
 
   // Update internal value when prop changes
@@ -126,6 +132,7 @@ export function useSliderValue({
     value: [value],
     onValueChange: handleValueChange,
     onValueCommit: handleValueCommit,
+    isSnapped: marks?.includes(value) ?? false,
   };
 }
 

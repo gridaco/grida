@@ -187,6 +187,7 @@ export namespace css {
         lineHeight,
         fontFeatures,
         fontVariations,
+        fontOpticalSizing,
         textTransform,
       } = styles as grida.program.nodes.i.ITextStyle;
 
@@ -209,11 +210,12 @@ export namespace css {
           lineHeight,
           fontFeatures,
           fontVariations,
-        textTransform,
-        fill: fill!,
-      }),
-    };
-  }
+          fontOpticalSizing,
+          textTransform,
+          fill: fill!,
+        }),
+      };
+    }
 
     if (config.hasTextStyle && maxLines && maxLines > 0) {
       result.display = "-webkit-box";
@@ -274,6 +276,7 @@ export namespace css {
     | "fontWeight"
     | "letterSpacing"
     | "lineHeight"
+    | "fontOpticalSizing"
     | "fontFeatureSettings"
     | "fontVariationSettings"
     | "textTransform"
@@ -294,9 +297,15 @@ export namespace css {
       lineHeight,
       fontFeatures,
       fontVariations,
+      fontOpticalSizing,
       textTransform,
       fill,
     } = style;
+
+    let fvs = fontVariations ? { ...fontVariations } : undefined;
+    if (typeof fontOpticalSizing === "number") {
+      fvs = { ...(fvs ?? {}), opsz: fontOpticalSizing };
+    }
 
     return {
       textAlign: textAlign,
@@ -325,11 +334,15 @@ export namespace css {
       letterSpacing: letterSpacing,
       fontSize: fontSize,
       fontWeight: fontWeight,
+      fontOpticalSizing:
+        typeof fontOpticalSizing === "number"
+          ? "none"
+          : fontOpticalSizing,
       fontFeatureSettings: fontFeatures
         ? toFontFeatureSettings(fontFeatures)
         : undefined,
-      fontVariationSettings: fontVariations
-        ? toFontVariationSettings(fontVariations)
+      fontVariationSettings: fvs
+        ? toFontVariationSettings(fvs)
         : undefined,
       textTransform: textTransform,
       color: fill ? toFillString(fill) : undefined,

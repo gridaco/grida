@@ -596,12 +596,9 @@ pub struct FontVariation {
     pub value: f32,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
-#[serde(untagged)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OpticalSizing {
-    #[serde(rename = "auto")]
     Auto,
-    #[serde(rename = "none")]
     None,
     Fixed(f32),
 }

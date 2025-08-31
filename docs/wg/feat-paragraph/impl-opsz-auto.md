@@ -1,8 +1,8 @@
 # Paragraph - `opsz: auto`
 
-| feature id  | status        | description                                       |
-| ----------- | ------------- | ------------------------------------------------- |
-| `opsz-auto` | not supported | support optical size auto like major browser does |
+| feature id  | status    | description                                       |
+| ----------- | --------- | ------------------------------------------------- |
+| `opsz-auto` | supported | support optical size auto like major browser does |
 
 ---
 
