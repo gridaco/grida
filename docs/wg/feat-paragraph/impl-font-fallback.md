@@ -65,7 +65,36 @@ impl Interface {
 
 ## Implementation - Level 2
 
-Level 2 involves the engine detecting missing glyphs and exposing APIs to the editor/frontend to identify which characters require additional font loading. It resolves all fallback fonts explicitly before passing the text to Skia. This approach implies persistence, as the fallback information needs to be stored in the design document. The benefit is that designs render identically across platforms as long as the fallback set remains stable.
+Level 2 introduces a CSS-inspired `unicode-range` style fallback control, allowing clients to specify fallback fonts with fine-grained control over which Unicode ranges they cover. This approach provides more precise fallback behavior than Level 1 by enabling selective font usage based on character ranges, improving rendering consistency and reducing unnecessary font loading.
+
+### Goal
+
+**Unicode-range style fallback** - exposes APIs for clients to specify fallback fonts along with the Unicode ranges they cover. This allows the engine to apply fallback fonts only to characters within specified ranges, improving control and efficiency.
+
+**Technical Requirements:**
+
+- Support for specifying Unicode ranges per fallback font
+- Improved fallback resolution based on character code points
+- Still relies on Skia's Paragraph engine for rendering
+
+```rust
+/// Font fallback manager for Level 2 implementation
+/// Provides Unicode-range based fallback control
+impl Interface {
+    // ... existing Level 1 methods ...
+
+    /// Set fallback fonts with associated Unicode ranges
+    /// Each font is mapped to one or more Unicode ranges it covers
+    pub fn set_fallback_fonts_with_unicode_ranges(&mut self, font_ranges: Vec<(String, Vec<UnicodeRange>)>);
+
+    /// Get the current fallback fonts along with their Unicode ranges
+    pub fn get_fallback_fonts_with_unicode_ranges(&self) -> Vec<(String, Vec<UnicodeRange>)>;
+}
+```
+
+## Implementation - Level 3
+
+Level 3 involves the engine detecting missing glyphs and exposing APIs to the editor/frontend to identify which characters require additional font loading. It resolves all fallback fonts explicitly before passing the text to Skia. This approach implies persistence, as the fallback information needs to be stored in the design document. The benefit is that designs render identically across platforms as long as the fallback set remains stable.
 
 ### Goal
 
@@ -78,7 +107,7 @@ Level 2 involves the engine detecting missing glyphs and exposing APIs to the ed
 - Abandoning Skia's Paragraph engine (major architectural change)
 
 ```rust
-/// Font fallback manager for Level 2 implementation
+/// Font fallback manager for Level 3 implementation
 /// Provides advanced glyph analysis and explicit font resolution
 impl Interface {
     // ... existing Level 1 methods ...
@@ -99,16 +128,21 @@ impl Interface {
 
 ## Implementation - Status
 
-**Level 1**: ✅ **Implemented** - Currently in production with soft fallback support
-**Level 2**: ❌ **Not planned** - Would require abandoning Skia's Paragraph engine
+**Level 1**: ✅ **Implemented** - Currently in production with soft fallback support  
+**Level 2**: ❌ **Not yet implemented** - Planned Unicode-range style fallback control  
+**Level 3**: ❌ **Not planned** - Would require abandoning Skia's Paragraph engine
 
 ### Current Limitations
 
-The soft fallback approach works well for most use cases but has some limitations:
+The soft fallback approach (Level 1) works well for most use cases but has some limitations:
 
 1. **CJK Font Inconsistency**: When mixing Hangul with Kanji/Hanzi, fallback may be inconsistent across text runs
 2. **Font Coverage Assumptions**: Relies on font CMAP tables without precise character verification
 3. **Bundle Size Trade-offs**: WASM bundle uses Geist instead of Inter to reduce size, but loses Greek script support
+
+Level 2 aims to address some of these issues by allowing more precise fallback control via Unicode ranges, but it is not yet implemented.
+
+Level 3 would provide full explicit fallback control with glyph analysis but requires major architectural changes.
 
 ### Future Considerations
 
@@ -118,6 +152,8 @@ Implementing precise, explicit font fallback would require:
 - Character-by-character font support verification
 - Major architectural changes to move away from Skia's Paragraph engine
 - This will be revisited in the future when the benefits outweigh the implementation complexity
+
+Level 2 fallback control based on Unicode ranges is planned to improve fallback precision and efficiency without abandoning Skia.
 
 ## See Also
 
