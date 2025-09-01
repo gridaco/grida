@@ -1,8 +1,8 @@
 # Paragraph - `font-fallback`
 
-| feature id      | status        | description                                              |
-| --------------- | ------------- | -------------------------------------------------------- |
-| `font-fallback` | not supported | support font fallback in both implicit and explicit mode |
+| feature id      | status               | description                                              |
+| --------------- | -------------------- | -------------------------------------------------------- |
+| `font-fallback` | implemented, level-1 | support font fallback in both implicit and explicit mode |
 
 Font fallback is a mechanism used to ensure that text is displayed correctly even when the primary font does not contain glyphs for certain characters. When rendering text, the system first attempts to use the specified primary font. If the font lacks glyphs for some characters, the fallback mechanism searches through a list of alternative fonts to find one that supports those missing glyphs. This process can be implicit, where the system automatically selects fallback fonts based on language and script, or explicit, where specific fallback fonts are provided. The goal is to provide seamless text rendering without visual gaps or missing characters, maintaining the intended appearance and readability across diverse languages and symbols.
 
@@ -10,7 +10,30 @@ Font fallback is a mechanism used to ensure that text is displayed correctly eve
 
 ## Implementation - Level 1
 
-Level 1 exposes a dedicated option for fallback order and blindly passes the specified fonts to Skia. Skia handles the fallback internally, which works well with wide coverage fonts such as Noto Sans CJK. This is the initial supported level.
+Level 1 exposes a dedicated option for fallback order and blindly passes the specified fonts to Skia. Skia handles the fallback internally, which works well with wide coverage fonts such as Noto Sans CJK. This is the **currently implemented** level.
+
+### Current Implementation
+
+**Default Fonts:**
+
+- **Editor**: Inter (supports Latin, Greek, and Cyrillic scripts)
+- **WASM Bundle**: Geist and Geist Mono (embedded to reduce bundle size)
+  - Note: Geist does not support Greek script
+- **CJK Fallback**: Noto Sans KR, Noto Sans JP, and Noto Sans SC/TC/HK
+
+**Implementation Details:**
+The current fallback implementation is a "soft fallback" that relies on Skia's Paragraph engine. It does not perform precise character-by-character font support verification, which means:
+
+- Fallback works well for most common cases
+- CJK fonts may have inconsistent fallback behavior across text runs
+- Some characters may fall back to different fonts within the same text, leading to visual inconsistencies
+
+**Limitations:**
+
+- No ICU + Harfbuzz integration for precise Unicode range checking
+- CMAP table references are not verified character-by-character
+- CJK font fallback can be inconsistent when mixing scripts (e.g., Hangul + Kanji/Hanzi)
+- Noto Sans KR has wider coverage than other CJK fonts, which can cause unexpected fallback behavior
 
 ### Goal
 
@@ -32,11 +55,11 @@ impl Interface {
 
     /// Set the default fallback fonts by their family names
     /// These fonts will be used in order when primary font lacks glyphs
-    pub fn set_default_fallback_fonts(&mut self, font_names: Vec<String>);
+    pub fn set_user_fallback_fonts(&mut self, font_names: Vec<String>);
 
     /// Get the current default fallback fonts by their family names
     /// Returns the ordered list of fallback fonts
-    pub fn get_default_fallback_fonts(&self) -> Vec<String>;
+    pub fn get_user_fallback_fonts(&self) -> Vec<String>;
 }
 ```
 
@@ -47,6 +70,12 @@ Level 2 involves the engine detecting missing glyphs and exposing APIs to the ed
 ### Goal
 
 **Explicit fallback** - exposes full APIs for testing and resolving text/font relationships in an explicit manner. This approach aims to provide the capability for clients to specify the exact fonts for missing characters, ensuring a persistent storage model that maintains design consistency across different environments.
+
+**Technical Requirements:**
+
+- ICU + Harfbuzz integration for precise Unicode range checking
+- Character-by-character font support verification
+- Abandoning Skia's Paragraph engine (major architectural change)
 
 ```rust
 /// Font fallback manager for Level 2 implementation
@@ -70,7 +99,25 @@ impl Interface {
 
 ## Implementation - Status
 
-Level 1 will be supported. Level 2 is not planned.
+**Level 1**: ✅ **Implemented** - Currently in production with soft fallback support
+**Level 2**: ❌ **Not planned** - Would require abandoning Skia's Paragraph engine
+
+### Current Limitations
+
+The soft fallback approach works well for most use cases but has some limitations:
+
+1. **CJK Font Inconsistency**: When mixing Hangul with Kanji/Hanzi, fallback may be inconsistent across text runs
+2. **Font Coverage Assumptions**: Relies on font CMAP tables without precise character verification
+3. **Bundle Size Trade-offs**: WASM bundle uses Geist instead of Inter to reduce size, but loses Greek script support
+
+### Future Considerations
+
+Implementing precise, explicit font fallback would require:
+
+- ICU + Harfbuzz integration
+- Character-by-character font support verification
+- Major architectural changes to move away from Skia's Paragraph engine
+- This will be revisited in the future when the benefits outweigh the implementation complexity
 
 ## See Also
 
