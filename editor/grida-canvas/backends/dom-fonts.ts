@@ -5,8 +5,8 @@ import type { Editor } from "../editor";
 /**
  * DOM specific font loader that registers loaded fonts to document.fonts
  */
-export class DOMFontLoaderInterfaceProvider
-  implements editor.api.IDocumentFontLoaderInterfaceProvider
+export class DOMFontManagerAgentInterfaceProvider
+  implements editor.api.IDocumentFontManagerAgentInterfaceProvider
 {
   private manager: FontFaceManager;
   private loadedFonts = new Set<string>();
@@ -29,5 +29,9 @@ export class DOMFontLoaderInterfaceProvider
    */
   listLoadedFonts(): string[] {
     return Array.from(this.loadedFonts);
+  }
+
+  setFallbackFonts(fonts: string[]): void {
+    // TODO: implement explicit font fallback management.
   }
 }

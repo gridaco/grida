@@ -128,8 +128,8 @@ class WasmFontAdapter implements FontAdapter {
   }
 }
 
-export class CanvasWasmFontLoaderInterfaceProvider
-  implements editor.api.IDocumentFontLoaderInterfaceProvider
+export class CanvasWasmFontManagerAgentInterfaceProvider
+  implements editor.api.IDocumentFontManagerAgentInterfaceProvider
 {
   private manager: UnifiedFontManager;
   private loadedFonts = new Set<string>();
@@ -155,5 +155,9 @@ export class CanvasWasmFontLoaderInterfaceProvider
    */
   listLoadedFonts(): string[] {
     return Array.from(this.loadedFonts);
+  }
+
+  setFallbackFonts(fonts: string[]): void {
+    this.surface.setFallbackFonts(fonts);
   }
 }

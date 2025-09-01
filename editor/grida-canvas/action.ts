@@ -12,10 +12,11 @@ export type Action =
   | EditorAction
   | EditorUndoAction
   | EditorRedoAction
-  | EditorClipAction
-  | EditorWebfontListLoadAction;
+  | EditorClipAction;
 
-export type InternalAction = __InternalResetAction;
+export type InternalAction =
+  | __InternalResetAction
+  | __InternalWebfontListLoadAction;
 
 export type EditorAction =
   | EditorConfigAction
@@ -169,6 +170,14 @@ export interface __InternalResetAction {
   state: editor.state.IEditorState;
 }
 
+/**
+ * load webfont list
+ */
+export interface __InternalWebfontListLoadAction {
+  type: "__internal/webfonts#webfontList";
+  webfontlist: GoogleWebFontList;
+}
+
 export interface LoadSceneAction {
   type: "load";
   scene: string;
@@ -237,14 +246,6 @@ export type EditorClipAction = {
   type: "clip/color";
   color: cg.RGBA8888;
 };
-
-/**
- * load webfont list
- */
-export interface EditorWebfontListLoadAction {
-  type: "webfonts/list/load";
-  webfontlist: GoogleWebFontList;
-}
 
 // #region copy cut paste
 export type EditorCopyCutPasteAction =

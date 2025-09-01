@@ -1,6 +1,6 @@
 import produce from "immer";
 import { Action, editor } from ".";
-import reducer from "./reducers";
+import reducer, { _internal_reducer } from "./reducers";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
 import cg from "@grida/cg";
@@ -11,7 +11,7 @@ import cmath from "@grida/cmath";
 import assert from "assert";
 import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
-import { TCanvasEventTargetDragGestureState } from "./action";
+import { InternalAction, TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
@@ -27,7 +27,7 @@ import {
   CanvasWasmPDFExportInterfaceProvider,
   CanvasWasmSVGExportInterfaceProvider,
   CanvasWasmVectorInterfaceProvider,
-  CanvasWasmFontLoaderInterfaceProvider,
+  CanvasWasmFontManagerAgentInterfaceProvider,
 } from "./backends/wasm";
 
 function resolveNumberChangeValue(
@@ -116,11 +116,13 @@ export class Editor
     return this._m_vector;
   }
 
-  _m_font_loader: editor.api.IDocumentFontLoaderInterfaceProvider | null = null;
-  private _fontManager: DocumentFontManager;
+  _m_font_loader: editor.api.IDocumentFontManagerAgentInterfaceProvider | null =
+    null;
   private get fontLoader() {
     return this._m_font_loader;
   }
+
+  private readonly _fontManager: DocumentFontManager;
 
   private fontParserWorker: FontParserWorker | null = null;
   private getParserWorker() {
@@ -167,7 +169,7 @@ export class Editor
       export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
       export_as_svg?: WithEditorInstance<editor.api.IDocumentSVGExportInterfaceProvider>;
       vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
-      fonts?: WithEditorInstance<editor.api.IDocumentFontLoaderInterfaceProvider>;
+      fonts?: WithEditorInstance<editor.api.IDocumentFontManagerAgentInterfaceProvider>;
     };
   }) {
     this.backend = backend;
@@ -209,7 +211,26 @@ export class Editor
 
     this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
     this._fontManager = new DocumentFontManager(this);
+
+    this._do_legacy_warmup();
     onCreate?.(this);
+
+    this.log("editor instantiated");
+  }
+
+  /**
+   * legacy warmup - ideally, this should be called externally, or once internallu,
+   * but as we allow dynamic surface binding, this proccess shall be duplicated once surface binded as well.
+   */
+  private _do_legacy_warmup() {
+    // warm up
+    google.fetchWebfontList().then((webfontlist) => {
+      this.__internal_dispatch({
+        type: "__internal/webfonts#webfontList",
+        webfontlist,
+      });
+      void this.loadPlatformDefaultFonts();
+    });
   }
 
   private _locked: boolean = false;
@@ -264,7 +285,7 @@ export class Editor
     key: string | undefined = undefined,
     force: boolean = false
   ): number {
-    this.dispatch(
+    this.__internal_dispatch(
       {
         type: "__internal/reset",
         key,
@@ -276,6 +297,7 @@ export class Editor
   }
 
   public bind(surface: Grida2D) {
+    this.log("bind surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");
     //
     this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
@@ -300,10 +322,12 @@ export class Editor
 
     this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
 
-    this._m_font_loader = new CanvasWasmFontLoaderInterfaceProvider(
+    this._m_font_loader = new CanvasWasmFontManagerAgentInterfaceProvider(
       this,
       surface
     );
+
+    this._do_legacy_warmup();
   }
 
   public archive(): Blob {
@@ -433,6 +457,14 @@ export class Editor
     this.mstate = produce(this.mstate, reducer);
     this._tid++;
     this.listeners.forEach((l) => l?.(this));
+  }
+
+  private __internal_dispatch(action: InternalAction, force: boolean = false) {
+    if (this._locked && !force) return;
+    this.mstate = _internal_reducer(this.mstate, action);
+
+    this._tid++;
+    this.listeners.forEach((l) => l(this, action));
   }
 
   public dispatch(action: Action, force: boolean = false) {
@@ -1900,9 +1932,12 @@ export class Editor
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontWeight: typeof wght === "number" ? (wght as cg.NFontWeight) : undefined,
+      fontWeight:
+        typeof wght === "number" ? (wght as cg.NFontWeight) : undefined,
       fontVariations:
-        Object.keys(rest).length > 0 ? (rest as Record<string, number>) : undefined,
+        Object.keys(rest).length > 0
+          ? (rest as Record<string, number>)
+          : undefined,
     });
   }
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
@@ -2714,6 +2749,17 @@ export class Editor
   listLoadedFonts(): string[] {
     if (!this.fontLoader) return [];
     return this.fontLoader.listLoadedFonts();
+  }
+
+  async loadPlatformDefaultFonts(): Promise<void> {
+    const fonts: string[] = Array.from(
+      editor.config.fonts.DEFAULT_FONT_FALLBACK_SET
+    );
+
+    if (this.fontLoader) {
+      void Promise.all(fonts.map((family) => this.loadFont({ family })));
+      void this.fontLoader.setFallbackFonts(fonts);
+    }
   }
 
   /**

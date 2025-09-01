@@ -179,8 +179,17 @@ export namespace editor.config {
       "Noto Sans JP" as keyof typeof PLATFORM_FONTS;
     export const DEFAULT_FONT_FALLBACK_CN =
       "Noto Sans SC" as keyof typeof PLATFORM_FONTS;
+
     // export const DEFAULT_FONT_FALLBACK_TW = "Noto Sans TC";
     // export const DEFAULT_FONT_FALLBACK_HK = "Noto Sans HK";
+    export const DEFAULT_FONT_FALLBACK_SET = new Set([
+      DEFAULT_FONT_FALLBACK_LATN,
+      DEFAULT_FONT_FALLBACK_CYRL,
+      DEFAULT_FONT_FALLBACK_GREK,
+      DEFAULT_FONT_FALLBACK_KR,
+      DEFAULT_FONT_FALLBACK_JP,
+      DEFAULT_FONT_FALLBACK_CN,
+    ]);
 
     // Hebrew
     // export const DEFAULT_FONT_FALLBACK_HE = "Noto Sans Hebrew";
@@ -1971,7 +1980,10 @@ export namespace editor.api {
     ): Promise<Uint8Array>;
   }
 
-  export interface IDocumentFontLoaderInterfaceProvider {
+  /**
+   * Agent interface that is responsible for resolving, managing and caching fonts.
+   */
+  export interface IDocumentFontManagerAgentInterfaceProvider {
     /**
      * loads the font so that the backend can render it
      * @param font font descriptor
@@ -1984,6 +1996,12 @@ export namespace editor.api {
      * that were explicitly loaded through {@link loadFont}.
      */
     listLoadedFonts(): string[];
+
+    /**
+     * Sets the default fallback fonts.
+     * @param fonts
+     */
+    setFallbackFonts(fonts: string[]): void;
   }
 
   export interface IDocumentSVGExportInterfaceProvider {
@@ -2309,6 +2327,11 @@ export namespace editor.api {
      * Lists fonts currently loaded and available to the renderer.
      */
     listLoadedFonts(): string[];
+
+    /**
+     * Loads platform default fonts and configures renderer fallback order.
+     */
+    loadPlatformDefaultFonts(): Promise<void>;
 
     /**
      * Retrieves font metadata, variation axes and features.
