@@ -8,7 +8,7 @@ use skia_safe::{Font, FontMgr};
 /// always rendered with a valid typeface we embed a lightweight font at
 /// build time.
 static GEIST_MONO_VARIABLE_TTF: &[u8] =
-    include_bytes!("../../fonts/GeistMono/GeistMono-VariableFont_wght.ttf");
+    include_bytes!("../../assets/fonts/GeistMono/GeistMono-VariableFont_wght.ttf");
 
 /// Return the raw bytes of the embedded GeistMono font.
 pub fn geistmono_bytes() -> &'static [u8] {

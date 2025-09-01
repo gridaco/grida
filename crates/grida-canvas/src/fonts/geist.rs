@@ -7,7 +7,8 @@ use skia_safe::{Font, FontMgr};
 /// system fonts are not available.  To ensure that devtools overlays are
 /// always rendered with a valid typeface we embed a lightweight font at
 /// build time.
-static GEIST_VARIABLE_TTF: &[u8] = include_bytes!("../../fonts/Geist/Geist-VariableFont_wght.ttf");
+static GEIST_VARIABLE_TTF: &[u8] =
+    include_bytes!("../../assets/fonts/Geist/Geist-VariableFont_wght.ttf");
 
 /// Return the raw bytes of the embedded GeistMono font.
 pub fn geist_bytes() -> &'static [u8] {
