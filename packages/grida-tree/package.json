@@ -5,7 +5,13 @@
   "scripts": {
     "test": "jest"
   },
+  "dependencies": {
+    "@grida/cmath": "workspace:*"
+  },
   "jest": {
-    "preset": "ts-jest"
+    "preset": "ts-jest",
+    "moduleNameMapper": {
+      "^@grida/cmath$": "<rootDir>/../grida-cmath"
+    }
   }
 }
