@@ -574,12 +574,15 @@ impl FontWeight {
 pub struct TextStyleRecBuildContext {
     /// The color of the text. this is used as fallback for [Decoration::text_decoration_color].
     pub color: CGColor,
+    /// List of font families to use as fallbacks when the primary font is missing.
+    pub user_fallback_fonts: Vec<String>,
 }
 
 impl Default for TextStyleRecBuildContext {
     fn default() -> Self {
         Self {
             color: CGColor::TRANSPARENT,
+            user_fallback_fonts: Vec::new(),
         }
     }
 }

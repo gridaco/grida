@@ -97,6 +97,12 @@ declare namespace createGridaCanvas {
     _has_missing_fonts(state: GridaCanvasWebGlApplicationPtr): boolean;
     _list_missing_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
     _list_available_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
+    _set_default_fallback_fonts(
+      state: GridaCanvasWebGlApplicationPtr,
+      ptr: number,
+      len: number
+    ): void;
+    _get_default_fallback_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
     _set_main_camera_transform(
       state: GridaCanvasWebGlApplicationPtr,
       a: number,

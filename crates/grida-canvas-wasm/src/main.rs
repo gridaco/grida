@@ -178,6 +178,38 @@ pub unsafe extern "C" fn list_available_fonts(app: *mut EmscriptenApplication) -
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn set_default_fallback_fonts(
+    app: *mut EmscriptenApplication,
+    ptr: *const u8,
+    len: usize,
+) {
+    use serde_json;
+    if let Some(app) = app.as_mut() {
+        if let Some(json) = __str_from_ptr_len(ptr, len) {
+            if let Ok(fonts) = serde_json::from_str::<Vec<String>>(&json) {
+                app.set_default_fallback_fonts(fonts);
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn get_default_fallback_fonts(app: *mut EmscriptenApplication) -> *const u8 {
+    use serde_json;
+    use std::ffi::CString;
+
+    if let Some(app) = app.as_ref() {
+        let fonts = app.get_default_fallback_fonts();
+        if let Ok(json) = serde_json::to_string(&fonts) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn command(app: *mut EmscriptenApplication, id: u32, a: f32, b: f32) {
     use cg::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {

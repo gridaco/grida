@@ -550,6 +550,18 @@ impl UnknownTargetApplication {
         self.renderer.fonts.borrow().available_families()
     }
 
+    pub fn set_default_fallback_fonts(&mut self, fonts: Vec<String>) {
+        self.renderer
+            .fonts
+            .borrow_mut()
+            .set_user_fallback_families(fonts);
+        self.renderer.invalidate_cache();
+    }
+
+    pub fn get_default_fallback_fonts(&self) -> Vec<String> {
+        self.renderer.fonts.borrow().user_fallback_families()
+    }
+
     pub fn report_missing_font(&mut self, family: &str) {
         self.renderer.fonts.borrow_mut().mark_missing(family);
     }

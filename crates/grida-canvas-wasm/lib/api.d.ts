@@ -185,6 +185,16 @@ export interface Grida2DScene extends Grida2DRuntime {
   listAvailableFonts(): FontKey[];
 
   /**
+   * Set the default fallback font families. Order matters.
+   */
+  setFallbackFonts(fonts: string[]): void;
+
+  /**
+   * Get the current default fallback font families.
+   */
+  getFallbackFonts(): string[];
+
+  /**
    * @privateRemarks
    * @see https://developer.mozilla.org/en-US/docs/Web/API/Document/fonts
    */

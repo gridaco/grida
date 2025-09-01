@@ -232,6 +232,22 @@ export class Grida2D {
     return JSON.parse(str);
   }
 
+  setFallbackFonts(fonts: string[]) {
+    const json = JSON.stringify(fonts);
+    const [ptr, len] = this._alloc_string(json);
+    this.module._set_default_fallback_fonts(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  getFallbackFonts(): string[] {
+    const ptr = this.module._get_default_fallback_fonts(this.appptr);
+    if (ptr === 0) return [];
+    const str = this.module.UTF8ToString(ptr);
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
+    return JSON.parse(str);
+  }
+
   /**
    * Tick the application clock.
    * bind this to requestAnimationFrame loop or similar

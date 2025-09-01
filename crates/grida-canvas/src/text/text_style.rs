@@ -58,7 +58,12 @@ pub fn textstyle(
         ts.set_height(line_height);
     }
     ts.set_decoration(&decoration);
-    ts.set_font_families(&[&style.font_family]);
+    let mut families: Vec<&str> = Vec::with_capacity(1 + ctx.user_fallback_fonts.len());
+    families.push(&style.font_family);
+    for f in &ctx.user_fallback_fonts {
+        families.push(f.as_str());
+    }
+    ts.set_font_families(&families);
     ts.set_font_arguments(&font_args);
     ts.set_font_style(font_style);
     if let Some(features) = &style.font_features {

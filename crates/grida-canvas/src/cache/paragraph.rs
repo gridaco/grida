@@ -97,6 +97,7 @@ impl ParagraphCache {
 
         let ctx = TextStyleRecBuildContext {
             color: fill.solid_color().unwrap_or(CGColor::TRANSPARENT),
+            user_fallback_fonts: fonts.user_fallback_families(),
         };
         let mut para_builder =
             textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());

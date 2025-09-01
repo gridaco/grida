@@ -124,6 +124,8 @@ pub struct FontRepository {
     /// All font families referenced by the current document.
     requested: HashSet<String>,
     generation: usize,
+    /// Default fallback font family names in priority order.
+    user_fallback_fonts: Vec<String>,
 }
 
 impl FontRepository {
@@ -134,6 +136,7 @@ impl FontRepository {
             missing: HashSet::new(),
             requested: HashSet::new(),
             generation: 0,
+            user_fallback_fonts: Vec::new(),
         }
     }
 
@@ -228,6 +231,18 @@ impl FontRepository {
     /// List all registered font families.
     pub fn available_families(&self) -> Vec<String> {
         self.fonts.keys().cloned().collect()
+    }
+
+    /// Set default fallback font families. The order determines priority.
+    pub fn set_user_fallback_families(&mut self, families: Vec<String>) {
+        self.user_fallback_fonts = families;
+        // Changing fallbacks may affect text layout caching.
+        self.generation += 1;
+    }
+
+    /// Get the currently configured fallback font families.
+    pub fn user_fallback_families(&self) -> Vec<String> {
+        self.user_fallback_fonts.clone()
     }
 
     /// get Variable Axes for a family

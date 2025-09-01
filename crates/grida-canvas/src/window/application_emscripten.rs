@@ -253,6 +253,14 @@ impl EmscriptenApplication {
         self.base.list_available_fonts()
     }
 
+    pub fn set_default_fallback_fonts(&mut self, fonts: Vec<String>) {
+        self.base.set_default_fallback_fonts(fonts);
+    }
+
+    pub fn get_default_fallback_fonts(&self) -> Vec<String> {
+        self.base.get_default_fallback_fonts()
+    }
+
     /// Register font data with the renderer.
     ///
     /// Since wasm binaries cannot access network resources directly, font
