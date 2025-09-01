@@ -138,6 +138,71 @@ export namespace editor.config {
   }
 
   /**
+   * {@link https://grida.co/docs/editor/canvas-languages-and-fonts.md | languages and fonts}
+   */
+  export namespace fonts {
+    export const DEFAULT_FONT_FAMILY = "Inter";
+    export const DEFAULT_FONT_WEIGHT = 400;
+    export const DEFAULT_FONT_SIZE = 14;
+
+    const PLATFORM_FONTS = {
+      Inter: {
+        family: "Inter",
+        scripts: ["latn", "cyrl", "grek"],
+      },
+      Noto_Sans_KR: {
+        family: "Noto Sans KR",
+        scripts: ["latn", "hang", "kana", "hani", "grek", "cyrl"],
+      },
+      Noto_Sans_JP: {
+        family: "Noto Sans JP",
+        scripts: ["latn", "kana", "hani", "cyrl", "grek"],
+      },
+      Noto_Sans_SC: {
+        family: "Noto Sans SC",
+        scripts: ["latn", "hani", "kana", "cyrl", "grek"],
+      },
+    };
+
+    // latin / cyrl
+    export const DEFAULT_FONT_FALLBACK_LATN =
+      "Inter" as keyof typeof PLATFORM_FONTS;
+    export const DEFAULT_FONT_FALLBACK_CYRL =
+      "Inter" as keyof typeof PLATFORM_FONTS;
+    export const DEFAULT_FONT_FALLBACK_GREK =
+      "Inter" as keyof typeof PLATFORM_FONTS;
+
+    // CJK
+    export const DEFAULT_FONT_FALLBACK_KR =
+      "Noto Sans KR" as keyof typeof PLATFORM_FONTS;
+    export const DEFAULT_FONT_FALLBACK_JP =
+      "Noto Sans JP" as keyof typeof PLATFORM_FONTS;
+    export const DEFAULT_FONT_FALLBACK_CN =
+      "Noto Sans SC" as keyof typeof PLATFORM_FONTS;
+    // export const DEFAULT_FONT_FALLBACK_TW = "Noto Sans TC";
+    // export const DEFAULT_FONT_FALLBACK_HK = "Noto Sans HK";
+
+    // Hebrew
+    // export const DEFAULT_FONT_FALLBACK_HE = "Noto Sans Hebrew";
+
+    /**
+     * this does not indicates the "language", rather a script tag specified by the font.
+     * there is no short way to map the language-font, this is good enough for embedding purposes.
+     * e.g. `latn` also may or may not include Vietnamese, etc.
+     *
+     * this is level 1 implementation of font-fallback, see {@link https://grida.co/docs/wg/feat-paragraph/impl-font-fallback | wg font-fallback}
+     */
+    export const DEFAULT_FONT_SCRIPTS = [
+      "latn",
+      "cyrl",
+      "grek",
+      "hang",
+      "kana",
+      "hani",
+    ];
+  }
+
+  /**
    * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
    *
    * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.

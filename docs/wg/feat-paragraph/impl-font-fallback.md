@@ -71,3 +71,7 @@ impl Interface {
 ## Implementation - Status
 
 Level 1 will be supported. Level 2 is not planned.
+
+## See Also
+
+- [Grida Canvas Editor Default Fonts](../../editor/canvas-languages-and-fonts.md)
