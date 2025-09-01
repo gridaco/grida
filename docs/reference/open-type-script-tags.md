@@ -108,17 +108,3 @@ The following demographic data represents native speakers and total users of eac
 - **International Organization for Standardization (ISO)**: Script and language codes
 
 _Note: Population figures are estimates and may vary due to different counting methodologies, language definitions, and the dynamic nature of language use. Some scripts serve multiple languages, and individual language statistics may not directly correlate with script usage statistics._
-
-## Officially Supported by Grida
-
-| Script              | Support Level | Default Font | Tags                    | Note                                                          |
-| ------------------- | ------------- | ------------ | ----------------------- | ------------------------------------------------------------- |
-| Universal-Inter     | `prod`        | Inter        | `latn`, `cyrl`, `greek` | Default global script, supported universally.                 |
-| Universal-Latin     | `prod`        | Inter, Geist | `latn`, `cyrl`          | Default global script, supported universally.                 |
-| Emoji               | `planned`     | -            | -                       | -                                                             |
-| Korean              | `dev`         | Noto Sans KR | `hang`                  | Fully supported with fallback to Noto Sans KR.                |
-| Japanese (Kanji)    | `dev`         | Noto Sans JP | `hani`                  | Officially supported universal core (Han ideographs).         |
-| Japanese (Hiragana) | `covered`     | Noto Sans JP | `hira`                  | Provided through Noto Sans JP, but not separately guaranteed. |
-| Japanese (Katakana) | `covered`     | Noto Sans JP | `kana`                  | Provided through Noto Sans JP, but not separately guaranteed. |
-
-_Note: **Grida** adopts the same fallback values as Figma to ensure consistency across desktop and web, while the web (browsers) normally uses platform-specific system fonts but is normalized here for clarity._
