@@ -1,8 +1,6 @@
 use skia_safe::textlayout::*;
 use skia_safe::{surfaces, Color, FontMgr, Paint, PaintStyle, Point};
 
-use cg::fonts::geist::geist_bytes;
-
 /// Configuration for paragraph styling
 #[derive(Debug, Clone)]
 pub struct ParagraphConfig {
@@ -156,7 +154,9 @@ fn main() {
 
     // Create font manager and load the Geist font
     let font_mgr = FontMgr::new();
-    let typeface = font_mgr.new_from_data(geist_bytes(), None).unwrap();
+    let typeface = font_mgr
+        .new_from_data(cg::fonts::embedded::geist::BYTES, None)
+        .unwrap();
 
     // Create font collection and add the Geist font
     let mut font_collection = FontCollection::new();

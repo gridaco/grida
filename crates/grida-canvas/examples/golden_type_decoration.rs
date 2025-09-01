@@ -6,8 +6,6 @@ use skia_safe::textlayout::{
 };
 use skia_safe::{surfaces, Color, FontMgr, Paint, Point};
 
-use cg::fonts::geist::geist_bytes;
-
 fn main() {
     // Create a surface to accommodate all the decoration examples
     let mut surface = surfaces::raster_n32_premul((1200, 2200)).unwrap();
@@ -23,7 +21,9 @@ fn main() {
 
     // Load the Geist variable font
     let font_mgr = FontMgr::new();
-    let base_typeface = font_mgr.new_from_data(geist_bytes(), None).unwrap();
+    let base_typeface = font_mgr
+        .new_from_data(cg::fonts::embedded::geist::BYTES, None)
+        .unwrap();
 
     // Create a paragraph style
     let mut paragraph_style = ParagraphStyle::new();

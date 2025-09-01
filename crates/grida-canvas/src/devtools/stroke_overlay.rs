@@ -1,7 +1,6 @@
 use crate::cache::scene::SceneCache;
 use crate::devtools::text_overlay;
 
-use crate::fonts::geistmono::sk_font_geistmono;
 use crate::node::schema::NodeId;
 use crate::painter::layer::Layer;
 use crate::runtime::camera::Camera2D;
@@ -25,7 +24,7 @@ impl Default for StrokeOverlayStyle {
 }
 
 thread_local! {
-    static FONT: Font = sk_font_geistmono(20.0);
+    static FONT: Font = Font::new(crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES), 20.0);
 }
 
 pub struct StrokeOverlay;

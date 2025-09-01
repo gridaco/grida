@@ -1,4 +1,4 @@
-use cg::{cg::types::*, fonts::geist::*};
+use cg::cg::types::*;
 use skia_safe::{surfaces, Color, Font, FontMgr, Paint, Rect};
 
 fn main() {
@@ -133,7 +133,7 @@ fn main() {
     let corner_radius = 8.0;
 
     // Load Geist font
-    let font_data = geist_bytes();
+    let font_data = cg::fonts::embedded::geist::BYTES;
     let font_mgr = FontMgr::new();
     let typeface = font_mgr.new_from_data(font_data, None).unwrap();
 
