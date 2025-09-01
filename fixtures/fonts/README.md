@@ -68,3 +68,9 @@ The following fonts are embedded with `include_bytes!` and used only for testing
 - VT323
 - Roboto Flex
 - Unifont
+
+## See also
+
+- [Grida Fonts](https://fonts.grida.co/)
+- [Grida Fonts Repo](https://github.com/gridaco/fonts)
+- [AppleColorEmoji (subset for testing)](../apple-emoji-linux)
