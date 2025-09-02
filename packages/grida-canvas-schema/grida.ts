@@ -948,7 +948,7 @@ export namespace grida.program.nodes {
       /**
        * force the id for instanciation (optional)
        */
-      _$id?: string;
+      readonly _$id?: string;
     } & T;
 
   type __base_scene_node_properties =
