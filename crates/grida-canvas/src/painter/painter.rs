@@ -49,7 +49,7 @@ impl<'a> Painter<'a> {
     }
 
     /// Create a NodePainter that uses this Painter for its operations
-    pub fn node_painter(&self) -> NodePainter {
+    pub fn node_painter(&self) -> NodePainter<'_> {
         NodePainter::new(self)
     }
 

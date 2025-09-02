@@ -1178,7 +1178,6 @@ fn merge_effects(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
 
     #[test]
     fn deserialize_boolean_operation_node() {

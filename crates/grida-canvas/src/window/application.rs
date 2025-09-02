@@ -506,7 +506,7 @@ impl UnknownTargetApplication {
         println!("✅ Font repository information printed");
     }
 
-    fn get_hit_tester(&mut self) -> crate::hittest::HitTester {
+    fn get_hit_tester(&mut self) -> crate::hittest::HitTester<'_> {
         crate::hittest::HitTester::new(self.renderer.get_cache())
     }
 
