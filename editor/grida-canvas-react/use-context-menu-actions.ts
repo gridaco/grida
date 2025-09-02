@@ -14,6 +14,7 @@ export interface ContextMenuAction {
 type ContextMenuActionType =
   | "copy"
   | "paste"
+  | "copyAsPNG"
   | "bringToFront"
   | "sendToBack"
   | "groupWithContainer"
@@ -102,6 +103,12 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       paste: {
         label: "Paste",
         onSelect: handlePaste,
+      },
+      copyAsPNG: {
+        label: "Copy as PNG",
+        shortcut: "⇧⌘C",
+        disabled: backend !== "canvas" || !hasSelection,
+        onSelect: () => editor.a11yCopyAsImage("png"),
       },
       bringToFront: {
         label: "Bring to front",
@@ -192,6 +199,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       hasSelection,
       canFlatten,
       targetSingleOrSelection,
+      backend,
     ]
   );
 }

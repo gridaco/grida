@@ -2,3 +2,4 @@
 - [re-ordering properties](./property-re-order.md)
 - [hide and show right inspection panel](./right-inspector-panel-show-hide.md)
 - [vector network editor](./vector-network-editor.md)
+- [copy selection as PNG](./copy-as-png.md)
