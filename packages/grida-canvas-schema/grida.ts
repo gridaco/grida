@@ -2179,6 +2179,9 @@ export namespace grida.program.nodes {
       );
       // @ts-expect-error
       delete prototype.id;
+      // remove internal ids to ensure new insertions generate fresh ids
+      // @ts-expect-error
+      delete prototype._$id;
 
       // Handle children recursively, if the node has children
       if ("children" in node && Array.isArray(node.children)) {
