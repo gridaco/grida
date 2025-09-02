@@ -8,6 +8,13 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -22,6 +29,10 @@ import { TMixed } from "./utils/types";
 import grida from "@grida/schema";
 import { type GoogleWebFontListItem } from "@grida/fonts/google";
 import * as google from "@grida/fonts/google";
+import {
+  useCurrentEditor,
+  useEditorState as useCanvasEditorState,
+} from "@/grida-canvas-react";
 
 const FontFamilyListContext = createContext<GoogleWebFontListItem[]>([]);
 
@@ -77,14 +88,16 @@ function FontFamilyItem({
 
 function FontFamilyCommand({
   height,
-  fontFamilies,
+  fonts,
+  usedFonts,
   placeholder,
   selectedFontFamily,
   onSelectFontFamily,
   onValueSeeked,
 }: {
   height: string | number;
-  fontFamilies: string[];
+  fonts: GoogleWebFontListItem[];
+  usedFonts: string[];
   placeholder: string;
   selectedFontFamily: string;
   onSelectFontFamily?: (fontFamily: string) => void;
@@ -105,14 +118,38 @@ function FontFamilyCommand({
     },
   });
 
+  const [category, setCategory] = React.useState<
+    "all-fonts" | "with-axes" | "non-variable" | "used-in-document"
+  >("all-fonts");
+
+  const categoryFilteredFontFamilies = React.useMemo(() => {
+    switch (category) {
+      case "with-axes":
+        return fonts
+          .filter((f) => f.axes && f.axes.length > 0)
+          .map((f) => f.family);
+      case "non-variable":
+        return fonts
+          .filter((f) => !f.axes || f.axes.length === 0)
+          .map((f) => f.family);
+      case "used-in-document":
+        return fonts
+          .filter((f) => usedFonts.includes(f.family))
+          .map((f) => f.family);
+      case "all-fonts":
+      default:
+        return fonts.map((f) => f.family);
+    }
+  }, [fonts, usedFonts, category]);
+
   const filteredFontFamilies = React.useMemo(() => {
     const searchQuery = query?.toLowerCase() || "";
     return searchQuery
-      ? fontFamilies.filter((fontFamily) =>
+      ? categoryFilteredFontFamilies.filter((fontFamily) =>
           fontFamily.toLowerCase().includes(searchQuery)
         )
-      : fontFamilies;
-  }, [fontFamilies, query]);
+      : categoryFilteredFontFamilies;
+  }, [categoryFilteredFontFamilies, query]);
 
   const parentRef = React.useRef<HTMLDivElement>(null);
   const { sync } = useValueSeekedSelector(parentRef, onValueSeeked, "selected");
@@ -149,6 +186,24 @@ function FontFamilyCommand({
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
       />
+      <div className="border-b p-1">
+        <Select value={category} onValueChange={setCategory as any}>
+          <SelectTrigger
+            className={cn(
+              WorkbenchUI.selectVariants({ variant: "trigger", size: "sm" }),
+              "w-full"
+            )}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all-fonts">All fonts</SelectItem>
+            <SelectItem value="with-axes">Variable fonts</SelectItem>
+            <SelectItem value="non-variable">Non variable fonts</SelectItem>
+            <SelectItem value="used-in-document">In this file</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <CommandEmpty>No font found.</CommandEmpty>
       <CommandGroup
         ref={parentRef}
@@ -206,7 +261,10 @@ export function FontFamilyControl({
   onValueSeeked?: (value: string | null) => void;
 }) {
   const list = useFontFamilyList();
-  const fontFamilies = React.useMemo(() => list.map((i) => i.family), [list]);
+  const editor = useCurrentEditor();
+  const usedFonts = useCanvasEditorState(editor, (state) =>
+    state.fontdescriptions.map((f) => f.family)
+  );
   const mixed = value === grida.mixed;
   const [open, setOpen] = React.useState<boolean>(false);
 
@@ -231,7 +289,8 @@ export function FontFamilyControl({
       <PopoverContent className="p-0" side="right" align="start">
         <FontFamilyCommand
           height="400px"
-          fontFamilies={fontFamilies}
+          fonts={list}
+          usedFonts={usedFonts}
           placeholder="Font"
           selectedFontFamily={mixed ? "" : value || ""}
           onValueSeeked={onValueSeeked}
