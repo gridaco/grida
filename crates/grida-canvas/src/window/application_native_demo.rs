@@ -34,7 +34,7 @@ where
         rx,
         font_rx,
         crate::runtime::scene::RendererOptions {
-            font_fallback: true,
+            use_embedded_fonts: true,
         },
     );
     let proxy = el.create_proxy();

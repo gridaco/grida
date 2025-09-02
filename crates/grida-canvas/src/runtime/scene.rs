@@ -30,14 +30,14 @@ pub type RequestRedrawCallback = Arc<dyn Fn()>;
 /// Options controlling renderer behaviour.
 #[derive(Clone, Copy)]
 pub struct RendererOptions {
-    /// When true, built-in fonts will be registered as fallbacks.
-    pub font_fallback: bool,
+    /// When true, embedded fonts will be registered.
+    pub use_embedded_fonts: bool,
 }
 
 impl Default for RendererOptions {
     fn default() -> Self {
         Self {
-            font_fallback: false,
+            use_embedded_fonts: false,
         }
     }
 }
@@ -177,15 +177,8 @@ impl Renderer {
         options: RendererOptions,
     ) -> Self {
         let mut font_repository = FontRepository::new();
-        if options.font_fallback {
-            font_repository.add(
-                crate::fonts::embedded::geist::BYTES,
-                crate::fonts::embedded::geist::FAMILY,
-            );
-            font_repository.add(
-                crate::fonts::embedded::geistmono::BYTES,
-                crate::fonts::embedded::geistmono::FAMILY,
-            );
+        if options.use_embedded_fonts {
+            font_repository.register_embedded_fonts();
         }
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();

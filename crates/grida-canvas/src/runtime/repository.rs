@@ -167,6 +167,18 @@ impl FontRepository {
         self.generation += 1;
     }
 
+    /// Register the built-in embedded fonts bundled with the renderer.
+    pub fn register_embedded_fonts(&mut self) {
+        self.add(
+            crate::fonts::embedded::geist::BYTES,
+            crate::fonts::embedded::geist::FAMILY,
+        );
+        self.add(
+            crate::fonts::embedded::geistmono::BYTES,
+            crate::fonts::embedded::geistmono::FAMILY,
+        );
+    }
+
     pub fn font_collection(&self) -> FontCollection {
         let mut collection = FontCollection::new();
         collection.set_asset_font_manager(Some(self.provider.clone().into()));

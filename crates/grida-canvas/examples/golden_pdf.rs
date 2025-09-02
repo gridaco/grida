@@ -339,7 +339,7 @@ async fn main() {
         None,
         Camera2D::new_from_bounds(Rectangle::from_xywh(0.0, 0.0, scene_width, scene_height)),
         RendererOptions {
-            font_fallback: true,
+            use_embedded_fonts: true,
         },
     );
     renderer.load_scene(scene);

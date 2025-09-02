@@ -41,14 +41,12 @@ pub struct FontKey {
 pub extern "C" fn init(
     width: i32,
     height: i32,
-    cfg_font_fallback: bool,
+    use_embedded_fonts: bool,
 ) -> Box<EmscriptenApplication> {
     EmscriptenApplication::new(
         width,
         height,
-        cg::runtime::scene::RendererOptions {
-            font_fallback: cfg_font_fallback,
-        },
+        cg::runtime::scene::RendererOptions { use_embedded_fonts },
     )
 }
 

@@ -77,10 +77,10 @@ export default async function init(
 
 interface CreateWebGLCanvasSurfaceOptions {
   /**
-   * when true, built-in fonts will be used for text rendering, even if the font family and style does not match.
+   * when true, embedded fonts will be registered and used for text rendering.
    * @default true
    */
-  fontFallback?: boolean;
+  use_embedded_fonts?: boolean;
 }
 
 class ApplicationFactory {
@@ -92,7 +92,7 @@ class ApplicationFactory {
 
   createWebGLCanvasSurface(
     canvas: HTMLCanvasElement,
-    options: CreateWebGLCanvasSurfaceOptions = { fontFallback: true }
+    options: CreateWebGLCanvasSurfaceOptions = { use_embedded_fonts: true }
   ) {
     const context = canvas.getContext("webgl2", {
       antialias: true,
@@ -112,7 +112,7 @@ class ApplicationFactory {
     const ptr = this.module._init(
       canvas.width,
       canvas.height,
-      options.fontFallback
+      options.use_embedded_fonts
     );
     const _ = new Grida2D(this.module, ptr);
     _.resize(canvas.width, canvas.height);

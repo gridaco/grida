@@ -242,7 +242,7 @@ fn main() {
             height: 600.0,
         }),
         RendererOptions {
-            font_fallback: true,
+            use_embedded_fonts: true,
         },
     );
 
