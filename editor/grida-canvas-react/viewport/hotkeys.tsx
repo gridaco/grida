@@ -58,6 +58,11 @@ export const keybindings_sheet = [
     keys: ["meta+c"],
   },
   {
+    name: "copy as png",
+    description: "Copy selection as PNG",
+    keys: ["meta+shift+c"],
+  },
+  {
     name: "paste",
     description: "Paste from the clipboard",
     keys: ["meta+v"],
@@ -757,6 +762,24 @@ export function useEditorHotKeys() {
     enableOnContentEditable: false,
     enableOnFormTags: false,
   });
+
+  useHotkeys(
+    "meta+shift+c, ctrl+shift+c",
+    () => {
+      if (editor.backend === "canvas") {
+        const task = editor.a11yCopyAsImage("png");
+        toast.promise(task, {
+          success: "Copied as PNG",
+          error: "Failed to copy as PNG",
+        });
+      }
+    },
+    {
+      preventDefault: true,
+      enableOnContentEditable: false,
+      enableOnFormTags: false,
+    }
+  );
 
   // paste is handled via data transfer
   // useHotkeys("paste, meta+v, ctrl+v", () => editor.a11yPaste(), {

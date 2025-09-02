@@ -12,3 +12,4 @@
 | Text tool            | T         |
 | Cursor (Select) tool | V         |
 | Lasso tool           | Q         |
+| Copy as PNG          | Cmd + Shift + C |

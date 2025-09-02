@@ -54,6 +54,14 @@ function ContextMenuContent() {
     <_ContextMenuContent className="w-52">
       <ActionItem action={actions.copy} />
       <ActionItem action={actions.paste} />
+      <ContextMenuSub>
+        <ContextMenuSubTrigger className="text-xs">
+          Copy/Paste as...
+        </ContextMenuSubTrigger>
+        <ContextMenuSubContent>
+          <ActionItem action={actions.copyAsPNG} />
+        </ContextMenuSubContent>
+      </ContextMenuSub>
       <ContextMenuSeparator />
       <ActionItem action={actions.bringToFront} />
       <ActionItem action={actions.sendToBack} />

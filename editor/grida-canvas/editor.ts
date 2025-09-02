@@ -801,6 +801,35 @@ export class Editor
     });
   }
 
+  public async writeClipboardMedia(
+    target: "selection" | editor.NodeID,
+    format: "png"
+  ): Promise<boolean> {
+    assert(this.backend === "canvas", "Editor is not using canvas backend");
+    const ids = target === "selection" ? this.mstate.selection : [target];
+    if (ids.length === 0) return false;
+    const id = ids[0];
+    const data = await this.exportNodeAs(id, "PNG");
+    const blob = new Blob([data], { type: "image/png" });
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    return true;
+  }
+
+  public async a11yCopyAsImage(format: "png"): Promise<boolean> {
+    if (this.mstate.content_edit_mode?.type === "vector") {
+      const { selected_vertices, selected_segments, selected_tangents } =
+        this.mstate.content_edit_mode.selection;
+      const hasSelection =
+        selected_vertices.length > 0 ||
+        selected_segments.length > 0 ||
+        selected_tangents.length > 0;
+      if (!hasSelection) return false;
+    } else {
+      if (this.mstate.selection.length === 0) return false;
+    }
+    return await this.writeClipboardMedia("selection", format);
+  }
+
   public a11yCopy() {
     if (this.mstate.content_edit_mode?.type === "vector") {
       const { selected_vertices, selected_segments, selected_tangents } =
