@@ -107,6 +107,26 @@ This method is similar to how major design tools like Figma render emojis in a c
 
 ---
 
+### Alternative Strategy: Using Real Fonts
+
+While this document focuses on the placeholder approach (substituting emoji with images or widgets at layout/render time), another viable option is to "bake" emoji images directly into a real font file (such as TTF or OTF), using PNG glyph tables (e.g., `sbix`, `CBDT/CBLC`). This approach allows emoji images to be treated as true glyphs by the text engine.
+
+- For **static emoji sets without fallback requirements**, using placeholders is an excellent and simple choice. It's flexible, easy to implement, and works well for branded or custom emoji sets where you want to fully control rendering.
+- For cases where **font fallback semantics matter**—for example, when users want to switch to Noto Emoji or another system font, and _not_ see the custom fallback—using a real font is more beneficial. This is because the font integrates with SkParagraph's shaping, selection, and fallback mechanisms, and respects user/system font preferences and fallback order.
+
+#### Pros & Cons
+
+- **Placeholder approach:**
+  - Pros: Simple and flexible (can use widgets or images), easy to update or swap emoji sets, supports dynamic/remote sets, avoids font building complexity.
+  - Cons: Lacks font fallback semantics; requires extra work to support correct cursoring, selection, and accessibility; not "real text" from the text engine's perspective.
+- **Real font approach:**
+  - Pros: Integrates seamlessly with text engines, shaping, selection, accessibility, and font fallback order; emoji are treated as real glyphs.
+  - Cons: More complex to build (requires creating TTF/OTF with PNG tables, either at runtime or prebuilt); dynamic (runtime) font baking is possible but adds significant engineering complexity; less flexible for dynamic/remote emoji sets.
+
+Building real fonts dynamically (e.g., runtime "shard fonts" for custom emoji) is possible, but adds complexity and performance considerations. The placeholder approach avoids this, at the cost of not being "real text" to the text engine.
+
+> **Note for Grida platform:** The Grida team has not yet decided which strategy (placeholder vs. baked font) to adopt. This document keeps the main focus on the placeholder method for now, but acknowledges the real font path as a strong alternative for future consideration.
+
 ## Minimal Example
 
 Here's a practical example of how you could implement the `emoji-placeholder` feature:
