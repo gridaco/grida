@@ -1,8 +1,8 @@
 # Paragraph - `opsz: auto`
 
-| feature id  | status    | description                                       |
-| ----------- | --------- | ------------------------------------------------- |
-| `opsz-auto` | supported | support optical size auto like major browser does |
+| feature id  | status    | description                                       | PRs                                               |
+| ----------- | --------- | ------------------------------------------------- | ------------------------------------------------- |
+| `opsz-auto` | supported | support optical size auto like major browser does | [#415](https://github.com/gridaco/grida/pull/415) |
 
 ---
 
