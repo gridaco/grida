@@ -111,6 +111,8 @@ This method is similar to how major design tools like Figma render emojis in a c
 
 While this document focuses on the placeholder approach (substituting emoji with images or widgets at layout/render time), another viable option is to "bake" emoji images directly into a real font file (such as TTF or OTF), using PNG glyph tables (e.g., `sbix`, `CBDT/CBLC`). This approach allows emoji images to be treated as true glyphs by the text engine.
 
+> **See also:** [fontgen](../feat-fontgen/index.md) - Grida's font generation feature for creating custom fonts with embedded emoji and glyphs.
+
 - For **static emoji sets without fallback requirements**, using placeholders is an excellent and simple choice. It's flexible, easy to implement, and works well for branded or custom emoji sets where you want to fully control rendering.
 - For cases where **font fallback semantics matter**—for example, when users want to switch to Noto Emoji or another system font, and _not_ see the custom fallback—using a real font is more beneficial. This is because the font integrates with SkParagraph's shaping, selection, and fallback mechanisms, and respects user/system font preferences and fallback order.
 
