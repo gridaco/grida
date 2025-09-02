@@ -1,0 +1,37 @@
+[package]
+name = "grida-canvas-fontgen"
+version = "0.1.0"
+edition = "2021"
+description = "Font generation utilities for Grida Canvas, specializing in PNG to font conversion"
+license = "MIT"
+repository = "https://github.com/grida-ai/grida"
+
+[lib]
+name = "grida_canvas_fontgen"
+
+[dependencies]
+# Core dependencies
+png = "0.18.0"
+write-fonts = "0.42.0"
+read-fonts = "0.34.0"
+ttf-parser = "0.25.1"
+skia-safe = { version = "0.87.0", features = ["gpu", "gl", "textlayout", "pdf", "svg"] }
+
+# Utilities
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[example]]
+name = "golden_type_emoji_fontgen"
+required-features = []
+
+[[bin]]
+name = "font_validator"
+path = "src/bin/font_validator.rs"
+
+[[bench]]
+name = "font_generation_bench"
+harness = false

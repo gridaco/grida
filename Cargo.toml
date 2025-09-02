@@ -1,7 +1,8 @@
 [workspace]
 resolver = "3"
 members = [
-  "crates/grida-canvas",
+  "crates/grida-canvas", 
+  "crates/grida-canvas-fontgen",
   "crates/grida-canvas-wasm",
   "crates/math2",
 ]
