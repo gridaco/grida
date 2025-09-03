@@ -24,6 +24,12 @@ This document proposes a high-level architecture for resource management.
 
 ---
 
+## Related Features
+
+- **[Fast Hashing - `hash-nch`](../feat-hash-nch/index.md):** Content-addressed storage using fast non-cryptographic hashing for resource identity and deduplication.
+
+---
+
 ## 1. Levels of Support
 
 ### Level 1 — Basic Mode
@@ -37,7 +43,7 @@ Designed for quick delivery. May use more memory than needed, with limited evict
 
 - **ByteStore:**
 
-  - Store blobs by SHA-256 hash.
+  - Store blobs by content hash (see [Fast Hashing - `hash-nch`](../feat-hash-nch/index.md)).
   - Fixed memory budget is RECOMMENDED, but eviction MAY be skipped.
 
 - **Fonts:**
@@ -73,7 +79,7 @@ A production-grade design, with proper caching, eviction, and memory pressure ha
 
 - **ByteStore:**
 
-  - Use SHA-256 hashes.
+  - Use content hashes (see [Fast Hashing - `hash-nch`](../feat-hash-nch/index.md)).
   - Implement LRU (or similar) with configurable budget.
   - Support pin/unpin.
   - Provide `createUrl(bytes) → mem://...` and `revokeUrl(url)` APIs.
