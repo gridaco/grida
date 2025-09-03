@@ -20,8 +20,8 @@ use std::rc::Rc;
 /// with proper effect ordering and a layer‐blur/backdrop‐blur pipeline.
 pub struct Painter<'a> {
     canvas: &'a skia_safe::Canvas,
-    fonts: Rc<RefCell<FontRepository>>,
-    images: Rc<RefCell<ImageRepository>>,
+    fonts: &'a FontRepository,
+    images: &'a ImageRepository,
     path_cache: RefCell<VectorPathCache>,
     scene_cache: Option<&'a SceneCache>,
 }
@@ -30,8 +30,8 @@ impl<'a> Painter<'a> {
     /// Create a new Painter that uses the SceneCache's paragraph cache
     pub fn new_with_scene_cache(
         canvas: &'a skia_safe::Canvas,
-        fonts: Rc<RefCell<FontRepository>>,
-        images: Rc<RefCell<ImageRepository>>,
+        fonts: &'a FontRepository,
+        images: &'a ImageRepository,
         scene_cache: &'a SceneCache,
     ) -> Self {
         Self {
@@ -186,14 +186,7 @@ impl<'a> Painter<'a> {
             .scene_cache
             .expect("Painter must have scene_cache for text rendering");
         let paragraph_rc = scene_cache.paragraph.borrow_mut().get_or_create(
-            id,
-            text,
-            fill,
-            align,
-            style,
-            max_lines,
-            ellipsis,
-            &self.fonts.borrow(),
+            id, text, fill, align, style, max_lines, ellipsis, self.fonts,
         );
 
         // Always apply layout - either with specified width or intrinsic width
@@ -239,10 +232,11 @@ impl<'a> Painter<'a> {
         let canvas = self.canvas;
         let (fill_paint, image, image_params) = match fill {
             Paint::Image(image_paint) => {
-                let images = self.images.borrow();
-                if let Some(image) =
-                    images.get_by_size(&image_paint.hash, shape.rect.width(), shape.rect.height())
-                {
+                if let Some(image) = self.images.get_by_size(
+                    &image_paint.hash,
+                    shape.rect.width(),
+                    shape.rect.height(),
+                ) {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
                     (paint, Some(image.clone()), Some(image_paint.clone()))
@@ -333,10 +327,11 @@ impl<'a> Painter<'a> {
         // Draw the stroke using the generated geometry
         match stroke {
             Paint::Image(image_paint) => {
-                let images = self.images.borrow();
-                if let Some(image) =
-                    images.get_by_size(&image_paint.hash, shape.rect.width(), shape.rect.height())
-                {
+                if let Some(image) = self.images.get_by_size(
+                    &image_paint.hash,
+                    shape.rect.width(),
+                    shape.rect.height(),
+                ) {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
 

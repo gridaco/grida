@@ -7,6 +7,7 @@ use crate::runtime::counter::FrameCounter;
 use crate::sk;
 use crate::{
     cache,
+    resources::Resources,
     runtime::{
         camera::Camera2D,
         config::RuntimeRendererConfig,
@@ -18,9 +19,7 @@ use math2::{self, rect, region};
 use skia_safe::{
     surfaces, Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface,
 };
-use std::cell::RefCell;
 use std::collections::HashSet;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -149,8 +148,9 @@ pub struct Renderer {
     pub scene: Option<Scene>,
     scene_cache: cache::scene::SceneCache,
     pub camera: Camera2D,
-    pub images: Rc<RefCell<ImageRepository>>,
-    pub fonts: Rc<RefCell<FontRepository>>,
+    pub resources: Resources,
+    pub images: ImageRepository,
+    pub fonts: FontRepository,
     /// when called, the host will request a redraw in os-specific way
     request_redraw: Option<RequestRedrawCallback>,
     /// frame counter for managing render queue
@@ -180,13 +180,12 @@ impl Renderer {
         if options.use_embedded_fonts {
             font_repository.register_embedded_fonts();
         }
-        let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
-        let image_repository = Rc::new(RefCell::new(image_repository));
         Self {
             backend,
             scene: None,
             camera,
+            resources: Resources::new(),
             images: image_repository,
             fonts: font_repository,
             scene_cache: cache::scene::SceneCache::new(),
@@ -214,17 +213,30 @@ impl Renderer {
     }
 
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
-        self.fonts
-            .borrow_mut()
-            .insert(family.to_string(), bytes.to_vec());
+        let rid = format!("res://fonts/{}", family);
+        self.resources.insert(&rid, bytes.to_vec());
+        self.fonts.add(bytes, family);
     }
 
-    /// Create an image from raw encoded bytes.
-    pub fn add_image(&self, src: String, bytes: &[u8]) {
+    /// Create an image from raw encoded bytes and return its content hash.
+    pub fn add_image_with_hash(&mut self, hash: String, bytes: &[u8]) {
+        let rid = format!("res://images/{}", hash);
+        self.resources.insert(&rid, bytes.to_vec());
         let data = skia_safe::Data::new_copy(bytes);
         if let Some(image) = Image::from_encoded(data) {
-            self.images.borrow_mut().insert(src, image);
+            self.images.insert(hash, image);
         }
+    }
+
+    pub fn add_image(&mut self, bytes: &[u8]) -> String {
+        use seahash::SeaHasher;
+        use std::hash::Hasher;
+        let mut hasher = SeaHasher::new();
+        hasher.write(bytes);
+        let hash = hasher.finish();
+        let hash_str = format!("{:016x}", hash);
+        self.add_image_with_hash(hash_str.clone(), bytes);
+        hash_str
     }
 
     /// Enable or disable the image tile cache.
@@ -312,9 +324,8 @@ impl Renderer {
         self.scene_cache = cache::scene::SceneCache::new();
         let requested = collect_scene_font_families(&scene);
         {
-            let mut fonts_repo = self.fonts.borrow_mut();
-            fonts_repo.set_requested_families(requested.into_iter());
-            let fonts_clone = fonts_repo.clone();
+            self.fonts.set_requested_families(requested.into_iter());
+            let fonts_clone = self.fonts.clone();
             self.scene_cache.update_geometry(&scene, &fonts_clone);
         }
         self.scene_cache.update_layers(&scene);
@@ -370,12 +381,8 @@ impl Renderer {
             bounds.y + bounds.height,
         );
         let canvas = recorder.begin_recording(sk_bounds, None);
-        let painter = Painter::new_with_scene_cache(
-            canvas,
-            self.fonts.clone(),
-            self.images.clone(),
-            &self.scene_cache,
-        );
+        let painter =
+            Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
         draw(&painter);
         recorder.finish_recording_as_picture(None)
     }
@@ -599,12 +606,8 @@ impl Renderer {
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
         // draw picture regions
-        let painter = Painter::new_with_scene_cache(
-            canvas,
-            self.fonts.clone(),
-            self.images.clone(),
-            &self.scene_cache,
-        );
+        let painter =
+            Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
         for (_region, indices) in &plan.regions {
             for idx in indices {
                 if let Some(layer) = self.scene_cache.layers.layers.get(*idx) {
@@ -757,9 +760,9 @@ mod tests {
         );
         renderer.load_scene(scene);
 
-        assert!(renderer.fonts.borrow().has_missing());
+        assert!(renderer.fonts.has_missing());
         assert_eq!(
-            renderer.fonts.borrow().missing_families(),
+            renderer.fonts.missing_families(),
             vec!["MissingFont".to_string()]
         );
 

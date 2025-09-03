@@ -22,7 +22,7 @@ impl FontUsageStore {
         }
     }
 
-    pub fn register_font(
+    pub fn add_font(
         &mut self,
         family: String,
         postscript_name: Option<String>,

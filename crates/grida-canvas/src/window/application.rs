@@ -5,7 +5,7 @@ use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
 use crate::io::io_grida::JSONVectorNetwork;
 use crate::node::schema::*;
-use crate::resource::{FontMessage, ImageMessage};
+use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
@@ -443,7 +443,8 @@ impl UnknownTargetApplication {
     fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
-            self.renderer.add_image(msg.src.clone(), &msg.data);
+            self.renderer
+                .add_image_with_hash(msg.src.clone(), &msg.data);
             println!("📝 Registered image with renderer: {}", msg.src);
             updated = true;
         }
@@ -479,7 +480,7 @@ impl UnknownTargetApplication {
     }
 
     fn print_font_repository_info(&self) {
-        let font_repo = self.renderer.fonts.borrow();
+        let font_repo = &self.renderer.fonts;
         let family_count = font_repo.family_count();
         let total_font_count = font_repo.total_font_count();
 
@@ -539,31 +540,28 @@ impl UnknownTargetApplication {
     }
 
     pub fn has_missing_fonts(&self) -> bool {
-        self.renderer.fonts.borrow().has_missing()
+        self.renderer.fonts.has_missing()
     }
 
     pub fn list_missing_fonts(&self) -> Vec<String> {
-        self.renderer.fonts.borrow().missing_families()
+        self.renderer.fonts.missing_families()
     }
 
     pub fn list_available_fonts(&self) -> Vec<String> {
-        self.renderer.fonts.borrow().available_families()
+        self.renderer.fonts.available_families()
     }
 
     pub fn set_default_fallback_fonts(&mut self, fonts: Vec<String>) {
-        self.renderer
-            .fonts
-            .borrow_mut()
-            .set_user_fallback_families(fonts);
+        self.renderer.fonts.set_user_fallback_families(fonts);
         self.renderer.invalidate_cache();
     }
 
     pub fn get_default_fallback_fonts(&self) -> Vec<String> {
-        self.renderer.fonts.borrow().user_fallback_families()
+        self.renderer.fonts.user_fallback_families()
     }
 
     pub fn report_missing_font(&mut self, family: &str) {
-        self.renderer.fonts.borrow_mut().mark_missing(family);
+        self.renderer.fonts.mark_missing(family);
     }
 
     /// Perform a redraw and print diagnostic information.
@@ -597,7 +595,7 @@ impl UnknownTargetApplication {
 
         let __total_frame_time = __frame_start.elapsed();
         let stat_string = format!(
-            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use)",
+            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | res: {} | img: {} | fnt: {}",
             1.0 / __total_frame_time.as_secs_f64(),
             __total_frame_time.as_secs_f64() * 1000.0,
             stats.total_duration.as_secs_f64() * 1000.0,
@@ -612,6 +610,9 @@ impl UnknownTargetApplication {
             stats.draw.cache_geometry_size,
             stats.draw.tiles_total,
             stats.draw.tiles_used,
+            self.renderer.resources.len(),
+            self.renderer.images.len(),
+            self.renderer.fonts.len(),
         );
 
         self.verbose(&stat_string);

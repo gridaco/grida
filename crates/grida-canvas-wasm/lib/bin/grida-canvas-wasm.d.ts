@@ -87,13 +87,18 @@ declare namespace createGridaCanvas {
       x: number,
       y: number
     ): void;
-    _register_font(
+    _add_font(
       state: GridaCanvasWebGlApplicationPtr,
       family_ptr: number,
       family_len: number,
       data_ptr: number,
       data_len: number
     ): void;
+    _add_image(
+      state: GridaCanvasWebGlApplicationPtr,
+      data_ptr: number,
+      data_len: number
+    ): Ptr;
     _has_missing_fonts(state: GridaCanvasWebGlApplicationPtr): boolean;
     _list_missing_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
     _list_available_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;

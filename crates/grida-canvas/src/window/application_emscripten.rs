@@ -1,6 +1,5 @@
 use crate::io::io_grida::JSONVectorNetwork;
-use crate::resource::font_loader::FontMessage;
-use crate::resource::image_loader::ImageMessage;
+use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
 use crate::runtime::scene::RendererOptions;
@@ -273,5 +272,10 @@ impl EmscriptenApplication {
         // existing cache so that the renderer re-computes geometry using the
         // new typeface.
         self.base.renderer.invalidate_cache();
+    }
+
+    /// Register an image with the renderer and return its hash.
+    pub fn add_image(&mut self, data: &[u8]) -> String {
+        self.base.renderer.add_image(data)
     }
 }

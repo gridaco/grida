@@ -1,9 +1,7 @@
 use super::application::HostEvent;
 use super::application_native::NativeApplication;
 use crate::node::schema::*;
-use crate::resource::font_loader::FontLoader;
-use crate::resource::font_loader::FontMessage;
-use crate::resource::image_loader::{load_scene_images, ImageLoader, ImageMessage};
+use crate::resources::{load_scene_images, FontMessage, ImageMessage};
 use crate::runtime::scene::{Backend, Renderer};
 use futures::channel::mpsc;
 
@@ -42,14 +40,13 @@ where
     app.app.renderer.backend = Backend::GL(app.app.state.surface_mut_ptr());
 
     println!("📸 Initializing image loader...");
-    let mut image_loader = ImageLoader::new_lifecycle(tx.clone(), proxy.clone());
-    let _font_loader = FontLoader::new_lifecycle(font_tx.clone(), proxy.clone());
-
     println!("🔄 Starting to load scene images in background...");
     let scene_clone = scene.clone();
+    let tx_clone = tx.clone();
+    let proxy_clone = proxy.clone();
     std::thread::spawn(move || {
         futures::executor::block_on(async move {
-            load_scene_images(&mut image_loader, &scene_clone).await;
+            load_scene_images(&scene_clone, tx_clone, proxy_clone).await;
             println!("✅ Scene images loading completed in background");
         });
     });

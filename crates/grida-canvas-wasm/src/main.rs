@@ -4,6 +4,7 @@ use cg::window::application::ApplicationApi;
 use cg::window::application_emscripten::EmscriptenApplication;
 use serde::Serialize;
 use std::boxed::Box;
+use std::ffi::CString;
 
 #[no_mangle]
 pub extern "C" fn allocate(len: usize) -> *mut u8 {
@@ -111,7 +112,7 @@ pub unsafe extern "C" fn pointer_move(app: *mut EmscriptenApplication, x: f32, y
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn register_font(
+pub unsafe extern "C" fn add_font(
     app: *mut EmscriptenApplication,
     family_ptr: *const u8,
     family_len: usize,
@@ -124,6 +125,22 @@ pub unsafe extern "C" fn register_font(
             app.add_font(&family, data);
         }
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn add_image(
+    app: *mut EmscriptenApplication,
+    data_ptr: *const u8,
+    data_len: usize,
+) -> *const u8 {
+    if let Some(app) = app.as_mut() {
+        let data = std::slice::from_raw_parts(data_ptr, data_len);
+        let hash = app.add_image(data);
+        if let Ok(cstr) = CString::new(hash) {
+            return cstr.into_raw() as *const u8;
+        }
+    }
+    std::ptr::null()
 }
 
 #[no_mangle]

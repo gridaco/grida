@@ -1,6 +1,6 @@
 use crate::node::schema::Size;
 use crate::os::winit::{winit_window, WinitResult};
-use crate::resource::{FontMessage, ImageMessage};
+use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
 use crate::window::application::ApplicationApi;

@@ -200,14 +200,26 @@ export class Grida2D {
    * @param family - CSS font-family name for the typeface.
    * @param data - Raw font file bytes (e.g. TTF/OTF).
    */
-  registerFont(family: string, data: Uint8Array) {
+  addFont(family: string, data: Uint8Array) {
     const [fptr, flen] = this._alloc_string(family);
     const len = data.length;
     const ptr = this.module._allocate(len);
     this.module.HEAPU8.set(data, ptr);
-    this.module._register_font(this.appptr, fptr, flen - 1, ptr, len);
+    this.module._add_font(this.appptr, fptr, flen - 1, ptr, len);
     this.module._deallocate(fptr, flen);
     this.module._deallocate(ptr, len);
+  }
+
+  addImage(data: Uint8Array): string {
+    const len = data.length;
+    const ptr = this.module._allocate(len);
+    this.module.HEAPU8.set(data, ptr);
+    const out = this.module._add_image(this.appptr, ptr, len);
+    this.module._deallocate(ptr, len);
+    const hash = this.module.UTF8ToString(out);
+    const hlen = this.module.lengthBytesUTF8(hash) + 1;
+    this._free_string(out, hlen);
+    return hash;
   }
 
   hasMissingFonts(): boolean {

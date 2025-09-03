@@ -118,7 +118,7 @@ class WasmFontAdapter implements FontAdapter {
     bytes: ArrayBuffer,
     v: FontVariant
   ): Promise<FontAdapterHandle> {
-    this.surface.registerFont(v.family, new Uint8Array(bytes));
+    this.surface.addFont(v.family, new Uint8Array(bytes));
     return { id: v.family };
   }
 

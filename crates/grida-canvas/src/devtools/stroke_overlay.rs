@@ -35,7 +35,7 @@ impl StrokeOverlay {
         nodes: &[NodeId],
         camera: &Camera2D,
         cache: &SceneCache,
-        _fonts: &std::cell::RefCell<FontRepository>,
+        _fonts: &FontRepository,
         style: Option<&StrokeOverlayStyle>,
     ) {
         let style = style.cloned().unwrap_or_default();

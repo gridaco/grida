@@ -249,14 +249,8 @@ impl FigmaConverter {
         self.font_store.get_discovered_fonts()
     }
 
-    fn register_font(
-        &mut self,
-        family: String,
-        postscript_name: Option<String>,
-        style: Option<String>,
-    ) {
-        self.font_store
-            .register_font(family, postscript_name, style);
+    fn add_font(&mut self, family: String, postscript_name: Option<String>, style: Option<String>) {
+        self.font_store.add_font(family, postscript_name, style);
     }
 
     /// Convert Figma's relative transform matrix to AffineTransform
@@ -858,7 +852,7 @@ impl FigmaConverter {
 
         // Register the font family and postscript name if they exist
         if let Some(font_family) = &style.font_family {
-            self.register_font(
+            self.add_font(
                 font_family.clone(),
                 style.font_post_script_name.clone(),
                 style.font_style.clone(),

@@ -2,8 +2,9 @@ use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
-use cg::resource::FontLoader;
+use cg::resources::{load_font, FontMessage};
 use cg::window;
+use cg::window::application::HostEvent;
 use math2::transform::AffineTransform;
 
 #[path = "../tests/fonts.rs"]
@@ -145,11 +146,26 @@ async fn main() {
         let caveat_path = caveat_font_path.clone();
         let vt323_path = vt323_font_path.clone();
         tokio::spawn(async move {
-            let mut loader = FontLoader::new_lifecycle(font_tx, proxy);
-            loader.load_font("Caveat", &caveat_path).await;
-            println!("✅ Font loaded: Caveat");
-            loader.load_font("VT323", &vt323_path).await;
-            println!("✅ Font loaded: VT323");
+            if let Ok(data) = load_font(&caveat_path).await {
+                let msg = FontMessage {
+                    family: "Caveat".to_string(),
+                    style: None,
+                    data: data.clone(),
+                };
+                let _ = font_tx.unbounded_send(msg.clone());
+                let _ = proxy.send_event(HostEvent::FontLoaded(msg));
+                println!("✅ Font loaded: Caveat");
+            }
+            if let Ok(data) = load_font(&vt323_path).await {
+                let msg = FontMessage {
+                    family: "VT323".to_string(),
+                    style: None,
+                    data: data.clone(),
+                };
+                let _ = font_tx.unbounded_send(msg.clone());
+                let _ = proxy.send_event(HostEvent::FontLoaded(msg));
+                println!("✅ Font loaded: VT323");
+            }
         });
     })
     .await;

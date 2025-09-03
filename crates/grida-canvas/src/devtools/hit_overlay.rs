@@ -52,7 +52,7 @@ impl HitOverlay {
         focus: Option<&NodeId>,
         camera: &Camera2D,
         cache: &SceneCache,
-        fonts: &std::cell::RefCell<FontRepository>,
+        fonts: &FontRepository,
     ) {
         // Render hit if present
         if let Some(id) = hit {
