@@ -272,6 +272,17 @@ export namespace editor.config {
     ignores_locked: true,
   };
 
+  /**
+   * Specialized hit testing configuration for measurement targeting.
+   *
+   * Measurement needs to include root containers in the result so we
+   * override the default behaviour that ignores roots with children.
+   */
+  export const MEASUREMENT_HIT_TESTING_CONFIG: Partial<state.HitTestingConfig> =
+    {
+      ignores_root_with_children: false,
+    };
+
   export const DEFAULT_GESTURE_MODIFIERS: state.GestureModifiers = {
     translate_with_hierarchy_change: "on",
     translate_with_clone: "off",

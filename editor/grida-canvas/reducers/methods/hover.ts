@@ -1,5 +1,5 @@
 import type { Draft } from "immer";
-import type { editor } from "@/grida-canvas";
+import { editor } from "@/grida-canvas";
 import { getRayTarget } from "../tools/target";
 
 export function self_updateSurfaceHoverState<
@@ -19,7 +19,13 @@ export function self_updateSurfaceHoverState<
   }
 
   const target = getRayTarget(draft.hits, {
-    config: draft.pointer_hit_testing_config,
+    config:
+      draft.surface_measurement_targeting === "on"
+        ? {
+            ...draft.pointer_hit_testing_config,
+            ...editor.config.MEASUREMENT_HIT_TESTING_CONFIG,
+          }
+        : draft.pointer_hit_testing_config,
     context: draft,
   });
 
