@@ -7,7 +7,7 @@ use crate::runtime::counter::FrameCounter;
 use crate::sk;
 use crate::{
     cache,
-    resources::Resources,
+    resources::{self, Resources},
     runtime::{
         camera::Camera2D,
         config::RuntimeRendererConfig,
@@ -218,24 +218,15 @@ impl Renderer {
         self.fonts.add(bytes, family);
     }
 
-    /// Create an image from raw encoded bytes and return its content hash.
-    pub fn add_image_with_hash(&mut self, hash: String, bytes: &[u8]) {
-        let rid = format!("res://images/{}", hash);
+    pub fn add_image(&mut self, bytes: &[u8]) -> String {
+        let hash = resources::hash_bytes(bytes);
+        let hash_str = format!("{:016x}", hash);
+        let rid = format!("res://images/{}", hash_str);
         self.resources.insert(&rid, bytes.to_vec());
         let data = skia_safe::Data::new_copy(bytes);
         if let Some(image) = Image::from_encoded(data) {
-            self.images.insert(hash, image);
+            self.images.insert(hash_str.clone(), image);
         }
-    }
-
-    pub fn add_image(&mut self, bytes: &[u8]) -> String {
-        use seahash::SeaHasher;
-        use std::hash::Hasher;
-        let mut hasher = SeaHasher::new();
-        hasher.write(bytes);
-        let hash = hasher.finish();
-        let hash_str = format!("{:016x}", hash);
-        self.add_image_with_hash(hash_str.clone(), bytes);
         hash_str
     }
 

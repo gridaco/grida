@@ -70,7 +70,7 @@ impl Resources {
     }
 }
 
-fn hash_bytes(bytes: &[u8]) -> u64 {
+pub fn hash_bytes(bytes: &[u8]) -> u64 {
     let mut hasher = SeaHasher::new();
     hasher.write(bytes);
     hasher.finish()
