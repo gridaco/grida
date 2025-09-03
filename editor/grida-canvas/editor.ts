@@ -1719,10 +1719,20 @@ export class Editor
   }
   changeNodeCornerRadius(node_id: string, cornerRadius: cg.CornerRadius) {
     if (typeof cornerRadius === "number") {
+      // When a uniform corner radius is applied after using individual corner
+      // values, the individual corner properties may still remain on the node
+      // (e.g. cornerRadiusBottomLeft). Since the renderer prioritizes the
+      // per-corner properties, the final value may appear reverted. To ensure
+      // consistency, update all four corner values together when the uniform
+      // radius is set.
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
         cornerRadius,
+        cornerRadiusTopLeft: cornerRadius,
+        cornerRadiusTopRight: cornerRadius,
+        cornerRadiusBottomRight: cornerRadius,
+        cornerRadiusBottomLeft: cornerRadius,
       });
     } else {
       this.dispatch({
