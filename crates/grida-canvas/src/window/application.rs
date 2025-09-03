@@ -197,7 +197,8 @@ impl ApplicationApi for UnknownTargetApplication {
                 return true;
             }
             ApplicationCommand::TryCopyAsPNG => {
-                if let Some(id) = self.devtools_selection.clone() {
+                if let Some(id) = self.devtools_selection.as_ref() {
+                    let id = id.clone();
                     let exported = self.export_node_as(&id, ExportAs::png());
                     if let Some(exported) = exported {
                         self.clipboard.set_data(exported.data().to_vec());

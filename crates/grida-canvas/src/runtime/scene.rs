@@ -314,11 +314,8 @@ impl Renderer {
     pub fn load_scene(&mut self, scene: Scene) {
         self.scene_cache = cache::scene::SceneCache::new();
         let requested = collect_scene_font_families(&scene);
-        {
-            self.fonts.set_requested_families(requested.into_iter());
-            let fonts_clone = self.fonts.clone();
-            self.scene_cache.update_geometry(&scene, &fonts_clone);
-        }
+        self.fonts.set_requested_families(requested.into_iter());
+        self.scene_cache.update_geometry(&scene, &self.fonts);
         self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);
         self.queue_stable();

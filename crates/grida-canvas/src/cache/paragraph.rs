@@ -19,13 +19,13 @@ pub struct ParagraphCacheEntry {
 
 #[derive(Default, Debug, Clone)]
 pub struct ParagraphCache {
-    entries: Rc<RefCell<HashMap<NodeId, ParagraphCacheEntry>>>,
+    entries: HashMap<NodeId, ParagraphCacheEntry>,
 }
 
 impl ParagraphCache {
     pub fn new() -> Self {
         Self {
-            entries: Rc::new(RefCell::new(HashMap::new())),
+            entries: HashMap::new(),
         }
     }
 
@@ -50,7 +50,7 @@ impl ParagraphCache {
     }
 
     pub fn get(&self, id: &NodeId) -> Option<ParagraphCacheEntry> {
-        self.entries.borrow().get(id).cloned()
+        self.entries.get(id).cloned()
     }
 
     pub fn get_or_create(
@@ -66,7 +66,7 @@ impl ParagraphCache {
     ) -> Rc<RefCell<textlayout::Paragraph>> {
         let fonts_gen = fonts.generation();
         let hash = Self::shape_key(text, style, align, max_lines);
-        if let Some(entry) = self.entries.borrow().get(id) {
+        if let Some(entry) = self.entries.get(id) {
             if entry.hash == hash && entry.font_generation == fonts_gen {
                 return entry.paragraph.clone();
             }
@@ -114,7 +114,7 @@ impl ParagraphCache {
 
         // Store the paragraph for future use
         let paragraph_rc = Rc::new(RefCell::new(paragraph));
-        self.entries.borrow_mut().insert(
+        self.entries.insert(
             id.clone(),
             ParagraphCacheEntry {
                 hash,
@@ -127,10 +127,10 @@ impl ParagraphCache {
     }
 
     pub fn invalidate(&mut self) {
-        self.entries.borrow_mut().clear();
+        self.entries.clear();
     }
 
     pub fn len(&self) -> usize {
-        self.entries.borrow().len()
+        self.entries.len()
     }
 }
