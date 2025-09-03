@@ -402,6 +402,7 @@ pub struct ContainerNodeRec {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+    /// TODO: this shall better be explicitly named as "clip_content" or "clip_children" (as it shall not clip its own render bounds - e.g. outsides stroke)
     pub clip: bool,
 }
 

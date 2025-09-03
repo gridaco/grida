@@ -1,6 +1,7 @@
 use cg::cg::types::*;
 use cg::export::{export_node_as, ExportAs};
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use cg::runtime::repository::FontRepository;
 use math2::transform::AffineTransform;
 
 #[test]
@@ -37,7 +38,8 @@ fn test_pdf_export() {
 
     // Test PDF export
     let pdf_format = ExportAs::pdf();
-    let result = export_node_as(&scene, &geometry_cache, &rect_id, pdf_format);
+    let fonts = FontRepository::new();
+    let result = export_node_as(&scene, &geometry_cache, &fonts, &rect_id, pdf_format);
 
     // Verify that we got a PDF result
     assert!(result.is_some());

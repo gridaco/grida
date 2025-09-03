@@ -3,6 +3,7 @@ use crate::{
     node::schema::Scene,
     runtime::{
         camera::Camera2D,
+        repository::FontRepository,
         scene::{Backend, Renderer},
     },
 };
@@ -11,6 +12,7 @@ use skia_safe::{svg, Rect as SkRect};
 
 pub fn export_node_as_svg(
     scene: &Scene,
+    fonts: &FontRepository,
     rect: Rectangle,
     _options: ExportAsSVG,
 ) -> Option<Exported> {
@@ -31,6 +33,7 @@ pub fn export_node_as_svg(
         camera,
     );
 
+    renderer.fonts = fonts.clone();
     renderer.load_scene(scene.clone());
 
     renderer.render_to_canvas(&canvas, width, height);

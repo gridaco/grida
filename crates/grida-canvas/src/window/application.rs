@@ -256,7 +256,13 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported> {
         if let Some(scene) = self.renderer.scene.as_ref() {
-            return export_node_as(scene, &self.renderer.get_cache().geometry, id, format);
+            return export_node_as(
+                scene,
+                &self.renderer.get_cache().geometry,
+                &self.renderer.fonts,
+                id,
+                format,
+            );
         }
         return None;
     }
