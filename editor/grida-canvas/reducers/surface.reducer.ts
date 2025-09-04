@@ -255,26 +255,24 @@ function __self_before_exit_content_edit_mode(
     case "vector": {
       // optimize the vector network before exiting the mode.
       self_optimizeVectorNetwork(draft);
+
+      const current = dq.__getNodeById(
+        draft,
+        mode.node_id
+      ) as grida.program.nodes.VectorNode;
+
+      // auto remove the node when the vector network is effectively empty
+      if (
+        current.vectorNetwork.segments.length < 1 ||
+        current.vectorNetwork.vertices.length < 2
+      ) {
+        self_try_remove_node(draft, mode.node_id);
+        break;
+      }
+
       // restore the original node if no changes were made.
       __try_restore_vector_mode_original_node(draft, mode);
 
-      {
-        if (!mode.original) return;
-
-        const current = dq.__getNodeById(
-          draft,
-          mode.node_id
-        ) as grida.program.nodes.VectorNode;
-
-        const dirty = !equal(
-          mode.initial_vector_network,
-          current.vectorNetwork
-        );
-        if (dirty) return;
-
-        draft.document.nodes[mode.node_id] =
-          mode.original as grida.program.nodes.Node;
-      }
       break;
     }
     case "text": {
