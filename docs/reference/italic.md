@@ -158,6 +158,12 @@ Correct setting of these bits is critical for operating systems and applications
 
 ---
 
+### 6. Real-World Example Fonts
+
+For comprehensive examples of italic font scenarios with real-world test cases, see [Italic Fonts](./italic-fonts.md) which provides a detailed reference table with concrete examples from the Google Fonts registry.
+
+---
+
 ## 6. Mixed Scripts and Fallback Considerations
 
 - Italic styles vary significantly across scripts; many non-Latin scripts lack dedicated italic forms.
