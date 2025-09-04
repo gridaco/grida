@@ -849,11 +849,35 @@ impl<'a> NodePainter<'a> {
             self.painter.with_opacity(node.opacity, || {
                 let shape = build_shape(&IntrinsicSizeNode::Container(node.clone()));
 
-                // Draw effects first (if any) - these won't be clipped
+                // Draw effects, fills, children (with optional clipping), then strokes last
                 self.painter
                     .draw_shape_with_effects(&node.effects, &shape, || {
                         self.painter.with_blendmode(node.blend_mode, || {
+                            // Paint fills first
                             self.painter.draw_fills(&shape, &node.fills);
+
+                            // Children are drawn next; if `clip` is enabled we push
+                            // a clip region for the container's shape so that
+                            // descendants are clipped but the container's own stroke
+                            // remains unaffected.
+                            if node.clip {
+                                self.painter.with_clip(&shape, || {
+                                    for child_id in &node.children {
+                                        if let Some(child) = repository.get(child_id) {
+                                            self.draw_node_recursively(child, repository, cache);
+                                        }
+                                    }
+                                });
+                            } else {
+                                for child_id in &node.children {
+                                    if let Some(child) = repository.get(child_id) {
+                                        self.draw_node_recursively(child, repository, cache);
+                                    }
+                                }
+                            }
+
+                            // Finally paint the stroke so it is not clipped by the
+                            // container's own clip and always renders above children.
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
@@ -863,24 +887,6 @@ impl<'a> NodePainter<'a> {
                             );
                         });
                     });
-
-                // Draw children with clipping if enabled
-                if node.clip {
-                    self.painter.with_clip(&shape, || {
-                        for child_id in &node.children {
-                            if let Some(child) = repository.get(child_id) {
-                                self.draw_node_recursively(child, repository, cache);
-                            }
-                        }
-                    });
-                } else {
-                    // Draw children without clipping
-                    for child_id in &node.children {
-                        if let Some(child) = repository.get(child_id) {
-                            self.draw_node_recursively(child, repository, cache);
-                        }
-                    }
-                }
             });
         });
     }
