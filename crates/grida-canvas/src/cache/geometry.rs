@@ -584,7 +584,7 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
         Node::Vector(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
-            n.stroke_align,
+            n.get_stroke_align(),
             &n.effects,
         ),
         Node::Image(n) => compute_render_bounds_from_style(

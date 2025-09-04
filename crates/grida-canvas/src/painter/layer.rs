@@ -544,7 +544,7 @@ impl LayerList {
                         fills: n.fill.clone().into_iter().collect(),
                         vector: n.network.clone(),
                         stroke_width: n.stroke_width,
-                        stroke_align: n.stroke_align,
+                        stroke_align: n.get_stroke_align(),
                         stroke_width_profile: n.stroke_width_profile.clone(),
                     }))
                 }

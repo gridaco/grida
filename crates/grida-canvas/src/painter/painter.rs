@@ -699,6 +699,7 @@ impl<'a> NodePainter<'a> {
     pub fn draw_vector_node(&self, node: &VectorNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
+            let stroke_align = node.get_stroke_align();
             let shape = PainterShape::from_path(path);
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
@@ -711,7 +712,7 @@ impl<'a> NodePainter<'a> {
                                 &shape,
                                 &node.strokes,
                                 node.stroke_width,
-                                node.stroke_align,
+                                stroke_align,
                                 node.stroke_dash_array.as_ref(),
                             );
                         });

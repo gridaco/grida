@@ -819,6 +819,8 @@ pub struct VectorNodeRec {
     pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub stroke_width_profile: Option<cg::varwidth::VarWidthProfile>,
+    /// Requested stroke alignment. For open paths, `Inside` and `Outside`
+    /// alignments are treated as `Center`.
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
@@ -835,6 +837,18 @@ impl VectorNodeRec {
             path
         } else {
             build_corner_radius_path(&path, self.corner_radius)
+        }
+    }
+
+    /// Returns the effective stroke alignment for rendering. Open paths do not
+    /// support `Inside` or `Outside` stroke alignments, so those cases fall back
+    /// to `Center` to ensure the stroke remains visible.
+    pub fn get_stroke_align(&self) -> StrokeAlign {
+        let path: skia_safe::Path = self.network.clone().into();
+        if path.is_empty() || !path.is_last_contour_closed() {
+            StrokeAlign::Center
+        } else {
+            self.stroke_align
         }
     }
 }
