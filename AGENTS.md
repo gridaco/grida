@@ -182,6 +182,9 @@ turbo test
 # run tests for packages
 turbo test --filter='./packages/*'
 
+# build packages (required for typecheck for its dependants)
+turbo build --filter='./packages/*'
+
 # run tests except for rust crates
 turbo test --filter='!./crates/*'
 
