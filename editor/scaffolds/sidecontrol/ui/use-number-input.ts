@@ -161,7 +161,7 @@ export function useNumberInput({
   const [internalValue, setInternalValue] = useState<string | number>(
     mixed ? "mixed" : formatValueWithSuffix(value ?? "", suffix, scale, step)
   );
-  const lastCommittedRef = useRef<number | undefined>();
+  const lastCommittedRef = useRef<number | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync internal state with external value
@@ -252,16 +252,7 @@ export function useNumberInput({
       }
       onBlur?.(e);
     },
-    [
-      commitOnBlur,
-      mixed,
-      value,
-      suffix,
-      scale,
-      step,
-      type,
-      handleCommit,
-    ]
+    [commitOnBlur, mixed, value, suffix, scale, step, type, handleCommit]
   );
 
   const handleKeyDown = useCallback(
@@ -410,15 +401,7 @@ export function useNumberInput({
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown, true);
     };
-  }, [
-    commitOnBlur,
-    mixed,
-    internalValue,
-    type,
-    suffix,
-    scale,
-    handleCommit,
-  ]);
+  }, [commitOnBlur, mixed, internalValue, type, suffix, scale, handleCommit]);
 
   return {
     // State
