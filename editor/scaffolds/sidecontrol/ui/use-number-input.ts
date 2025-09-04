@@ -118,6 +118,8 @@ type UseNumberInputProps = {
   suffix?: string;
   /** Optional scale factor for display (e.g., 100 for percentages: 0.01 -> 1%) */
   scale?: number;
+  /** Whether to commit the value when input loses focus */
+  commitOnBlur?: boolean;
 };
 
 /**
@@ -129,7 +131,7 @@ type UseNumberInputProps = {
  * - Value synchronization
  * - Arrow key handling
  * - Value commit logic
- * - Focus/blur behavior
+ * - Focus/blur behavior with optional commit on blur
  * - Mixed value support
  * - Min/max constraints
  * - Step precision handling with smart formatting
@@ -153,6 +155,7 @@ export function useNumberInput({
   onValueCommit,
   suffix,
   scale,
+  commitOnBlur = true,
 }: UseNumberInputProps) {
   const mixed = value === grida.mixed;
   const [internalValue, setInternalValue] = useState<string | number>(
@@ -209,15 +212,42 @@ export function useNumberInput({
       e: React.FocusEvent<HTMLInputElement>,
       onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void
     ) => {
-      // Reset to initial value on blur
-      setInternalValue(
-        mixed
-          ? "mixed"
-          : formatValueWithSuffix(value ?? "", suffix, scale, step)
-      );
+      if (commitOnBlur && !mixed) {
+        const currentValue = parseValueWithScaling(
+          String(e.currentTarget.value),
+          type,
+          suffix,
+          scale
+        );
+        if (!isNaN(currentValue)) {
+          handleCommit(currentValue);
+          setInternalValue(
+            formatValueWithSuffix(currentValue, suffix, scale, step)
+          );
+        } else {
+          setInternalValue(
+            formatValueWithSuffix(value ?? "", suffix, scale, step)
+          );
+        }
+      } else {
+        setInternalValue(
+          mixed
+            ? "mixed"
+            : formatValueWithSuffix(value ?? "", suffix, scale, step)
+        );
+      }
       onBlur?.(e);
     },
-    [mixed, value, suffix, scale, step]
+    [
+      commitOnBlur,
+      mixed,
+      value,
+      suffix,
+      scale,
+      step,
+      type,
+      handleCommit,
+    ]
   );
 
   const handleKeyDown = useCallback(

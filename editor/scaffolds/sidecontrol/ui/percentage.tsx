@@ -22,6 +22,8 @@ type PercentagePropertyControlProps = Omit<
   min?: number;
   /** Maximum allowed value */
   max?: number;
+  /** Whether to commit the value when input loses focus */
+  commitOnBlur?: boolean;
 } & (
     | {
         /** Mode for handling value changes with delta support */
@@ -57,9 +59,9 @@ type PercentagePropertyControlProps = Omit<
  * - Two operation modes:
  *   - "auto": Reports changes as deltas (e.g., {type: "delta", value: 1})
  *   - "fixed": Reports changes as absolute values (e.g., 101)
- * - Value commit on Enter or arrow keys
+ * - Value commit on Enter, blur, or arrow keys
  * - ESC to cancel and blur
- * - Reset to initial value on blur
+ * - Blur commit can be disabled
  * - Mixed value state support
  * - Floating point precision handling
  * - Automatic "%" suffix display
@@ -71,7 +73,7 @@ type PercentagePropertyControlProps = Omit<
  *    - Arrow keys: Updates and commits in one operation
  *    - Enter: Commits current value and blurs
  *    - ESC: Cancels changes and blur
- *    - Blur without commit: Resets to initial value
+ *    - Blur: Commits by default (reverts if commitOnBlur is false)
  *
  * 2. Arrow Key Behavior:
  *    - Works on current input value, not just committed value
@@ -83,7 +85,7 @@ type PercentagePropertyControlProps = Omit<
  * 3. Value Commit Triggers:
  *    - Enter key (commits and blurs)
  *    - Arrow Up/Down keys (commits)
- *    - Blur (if value was changed)
+ *    - Blur (if enabled)
  *
  * 4. Mode Differences:
  *    - "auto": Reports changes as deltas (useful for relative adjustments)
@@ -140,6 +142,7 @@ export default function InputPropertyPercentage({
   autoSelect = true,
   min,
   max,
+  commitOnBlur = true,
   appearance,
   ...props
 }: PercentagePropertyControlProps & {
@@ -162,6 +165,7 @@ export default function InputPropertyPercentage({
     mode,
     onValueChange,
     onValueCommit,
+    commitOnBlur,
     suffix: "%",
     scale: 100,
   });
