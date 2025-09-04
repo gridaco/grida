@@ -88,6 +88,9 @@ impl ParagraphCache {
         let mut paragraph_style = textlayout::ParagraphStyle::new();
         paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
         paragraph_style.set_text_align(align.clone().into());
+        // Disable Skia's rounding hack to prevent fractional width truncation
+        // that causes unwanted line breaks in width: auto scenarios
+        paragraph_style.set_apply_rounding_hack(false);
 
         // Set max lines if specified
         if let Some(max_lines) = max_lines {

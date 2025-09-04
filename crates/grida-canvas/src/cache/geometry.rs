@@ -278,7 +278,9 @@ impl GeometryCache {
                     para_ref.layout(f32::INFINITY);
                     let intrinsic_width = para_ref.max_intrinsic_width();
 
-                    // Re-layout with the measured width
+                    // Re-layout with the intrinsic width
+                    // Note: The paragraph style should have set_apply_rounding_hack(false)
+                    // to prevent fractional width truncation that causes line breaking
                     para_ref.layout(intrinsic_width);
                     intrinsic_width
                 } else {
