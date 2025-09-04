@@ -983,6 +983,10 @@ function SelectionGroupOverlay({
         transform={style}
         zIndex={10}
       >
+        <LayerOverlayResizeSide anchor="n" selection={ids} />
+        <LayerOverlayResizeSide anchor="s" selection={ids} />
+        <LayerOverlayResizeSide anchor="e" selection={ids} />
+        <LayerOverlayResizeSide anchor="w" selection={ids} />
         <LayerOverlayResizeHandle anchor="n" selection={ids} />
         <LayerOverlayResizeHandle anchor="s" selection={ids} />
         <LayerOverlayResizeHandle anchor="e" selection={ids} />
@@ -1096,11 +1100,17 @@ function NodeOverlay({
               <>
                 {node.type === "line" ? (
                   <>
+                    <LayerOverlayResizeSide anchor="e" selection={node_id} />
+                    <LayerOverlayResizeSide anchor="w" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="e" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="w" selection={node_id} />
                   </>
                 ) : (
                   <>
+                    <LayerOverlayResizeSide anchor="n" selection={node_id} />
+                    <LayerOverlayResizeSide anchor="s" selection={node_id} />
+                    <LayerOverlayResizeSide anchor="e" selection={node_id} />
+                    <LayerOverlayResizeSide anchor="w" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="n" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="s" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="e" selection={node_id} />
@@ -1263,6 +1273,61 @@ function LayerOverlayResizeHandle({
   });
 
   return <Knob size={size} {...bind()} anchor={anchor} zIndex={zIndex} />;
+}
+
+function LayerOverlayResizeSide({
+  selection,
+  anchor,
+  thickness = 8,
+}: {
+  selection: string | string[];
+  anchor: "n" | "e" | "s" | "w";
+  thickness?: number;
+}) {
+  const editor = useCurrentEditor();
+
+  const bind = useSurfaceGesture({
+    onPointerDown: ({ event }) => {
+      event.preventDefault();
+    },
+    onDragStart: ({ event }) => {
+      event.preventDefault();
+      editor.startScaleGesture(selection, anchor);
+    },
+  });
+
+  const offset = thickness / 2;
+
+  const positionalStyle: React.CSSProperties =
+    anchor === "n" || anchor === "s"
+      ? {
+          left: 0,
+          right: 0,
+          height: thickness,
+          top: anchor === "n" ? -offset : undefined,
+          bottom: anchor === "s" ? -offset : undefined,
+        }
+      : {
+          top: 0,
+          bottom: 0,
+          width: thickness,
+          left: anchor === "w" ? -offset : undefined,
+          right: anchor === "e" ? -offset : undefined,
+        };
+
+  return (
+    <div
+      {...bind()}
+      style={{
+        position: "absolute",
+        background: "transparent",
+        cursor: cursors.resize_handle_cursor_map[anchor],
+        touchAction: "none",
+        zIndex: 10,
+        ...positionalStyle,
+      }}
+    />
+  );
 }
 
 function NetworkOverlay({ transform }: { transform: cmath.Transform }) {
