@@ -94,6 +94,77 @@ pub enum BooleanPathOperation {
     Xor, // A ⊕ B
 }
 
+/// # Clipping Model (Single `clip` flag — **clips content only**)
+///
+/// This module uses a **single clipping switch**, exposed as `clip` on container-like nodes
+/// (currently `ContainerNodeRec`). The semantics are intentionally **content-only clipping**
+/// (a.k.a. *overflow clip*):
+///
+/// - When `clip == true`, the runtime **pushes a clip region** equal to the node's own
+///   geometry (its rounded-rect path derived from `size` and `corner_radius`) **before painting
+///   descendants**, and **pops** it after the descendants are painted.
+/// - This clip affects **only the node's children and any drawing that occurs *as part of
+///   child painting***. It is **not** a mask for the node's own border/stroke or its
+///   outer effects.
+///
+/// ## What is clipped vs. not clipped
+///
+/// **Clipped by `clip` (content-only):**
+/// - All **descendant nodes** (children, grandchildren, …) drawn while the clip is active.
+/// - Any content the container delegates to children (e.g., embedded images, text nodes).
+///
+/// **Not clipped by `clip` (content-only):**
+/// - The container’s **own stroke/border** (including `stroke_align: Outside/Center/Inside`).
+///   The stroke is painted **after** children and may extend outside the content region.
+/// - The container’s **outer effects** such as **drop shadows** applied via `LayerEffects`.
+/// - The container’s **outline/focus rings/debug handles** (if any).
+///
+/// > Rationale: This mirrors typical "overflow: hidden" semantics in UI frameworks where
+/// > the clip is a **descendant clip**, not a **self-mask**. It yields the common “card”
+/// > behavior: an image child is clipped to rounded corners, while the card’s border and
+/// > drop shadow remain crisp and uncut.
+///
+/// ## Paint Order (normative for containers)
+///
+/// Implementers should adhere to the following order to guarantee predictable results:
+///
+/// 1. Establish transforms / local coordinate space.
+/// 2. Paint the container **background/fills** (they naturally fit within the shape).
+/// 3. If `clip == true`: **push content clip** using the container’s rounded-rect path.
+/// 4. **Paint children** (all descendants paint under the active clip).
+/// 5. If `clip == true`: **pop content clip**.
+/// 6. Paint the container’s **stroke/border** (may extend outside; not affected by `clip`).
+/// 7. Paint **outer effects** (e.g., drop shadows, outlines, overlays).
+///
+/// ## Interaction with `LayerEffects`
+///
+/// - **DropShadow**: treated as an **outer effect** for the container; it is **not** masked by
+///   the `clip` (content-only). Shadow extents may lie outside the container’s bounds.
+/// - **InnerShadow**: always constrained by the container’s **shape**; independent of `clip`.
+/// - **LayerBlur**: blurs the container’s **composited layer** (background + children as painted).
+///   Since children were already clipped (if `clip == true`), the blur kernel may **bleed outside**
+///   the shape; that bleed is **not** additionally masked by `clip`.
+/// - **BackdropBlur**: samples content **behind** the container and is **masked to the
+///   container’s shape** (not to the content clip). It does not depend on `clip`.
+///
+/// ## Stroke alignment
+///
+/// Support for `StrokeAlign::{Inside, Center, Outside}` affects only where the stroke pixels land.
+/// The `clip` flag (content-only) **does not** trim any outside/center/inside portions of the
+/// container’s own stroke. Descendants remain clipped as described above.
+///
+/// ## Future extension (non-normative)
+///
+/// Some products need a **shape clip** (self + children), analogous to CSS `clip-path` / SVG
+/// `clipPath`. If ever introduced, it should be a **separate attribute** from `clip` to avoid
+/// breaking existing content-only behavior.
+///
+/// ### Mapping to other ecosystems (informative)
+/// - HTML/CSS `overflow: hidden` → `clip` (content-only)
+/// - CSS `clip-path` / SVG `clipPath` → (potential future **shape clip**, not implemented)
+/// - Flutter `Clip*` wrapping a subtree → (potential future **shape clip**, not implemented)
+pub type ContainerClipFlag = bool;
+
 /// Blend modes for compositing layers, compatible with Skia and SVG/CSS.
 ///
 /// - SVG: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/mix-blend-mode

@@ -402,8 +402,20 @@ pub struct ContainerNodeRec {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
-    /// TODO: this shall better be explicitly named as "clip_content" or "clip_children" (as it shall not clip its own render bounds - e.g. outsides stroke)
-    pub clip: bool,
+    /// Content-only clipping switch.
+    ///
+    /// When `true`, a clip region equal to this container's own rounded-rect shape is pushed
+    /// **before painting descendants**, constraining all child rendering. The container's **own**
+    /// stroke/border and outer effects are **not clipped** by this flag and are painted after
+    /// the clip is popped.
+    ///
+    /// - Clips: children/descendants.
+    /// - Does **not** clip: this node’s stroke/border (including outside-aligned strokes),
+    ///   outlines, drop shadows. (Inner shadows remain bounded to the shape by definition.)
+    ///
+    /// This flag is intentionally equivalent to an **overflow/content** clip.
+    /// If a future “shape clip (self + children)” is added, it will be modeled as a separate attribute.
+    pub clip: ContainerClipFlag,
 }
 
 impl ContainerNodeRec {
