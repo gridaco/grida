@@ -66,6 +66,7 @@ import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
 import { useFollowPlugin } from "../plugins/use-follow";
 import { SurfaceVariableWidthEditor } from "./ui/surface-varwidth-editor";
+import { MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE } from "../ui-config";
 
 const DRAG_THRESHOLD = 2;
 
@@ -1078,6 +1079,10 @@ function NodeOverlay({
     height: size[1] * scaleY,
   };
 
+  const show_corner_radius_handle =
+    measurement_rect.width >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE &&
+    measurement_rect.height >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE;
+
   {
     /* TODO: resize for bitmap is not supported */
   }
@@ -1123,9 +1128,13 @@ function NodeOverlay({
                 )}
               </>
             )}
-            {supports.cornerRadius(node.type, { backend }) &&
+            {show_corner_radius_handle &&
+              supports.cornerRadius(node.type, { backend }) &&
               !supports.children(node.type, { backend }) && (
-                <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
+                <NodeOverlayRectangularCornerRadiusHandle
+                  anchor="se"
+                  node_id={node_id}
+                />
               )}
             <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
             <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
@@ -1146,7 +1155,7 @@ function NodeOverlay({
   );
 }
 
-function NodeOverlayCornerRadiusHandle({
+function NodeOverlayRectangularCornerRadiusHandle({
   node_id,
   anchor,
   size = 8,
