@@ -302,6 +302,46 @@ async fn demo_vectors() -> Scene {
             ids.push(vector_node_5.id.clone());
             repository.insert(Node::Vector(vector_node_5));
         }
+
+        // Single-segment 90-degree straight line
+        {
+            let vector_node_5_5 = VectorNodeRec {
+                id: "5_5".to_string(),
+                name: Some("90deg line".to_string()),
+                active: true,
+                transform: AffineTransform::new(
+                    start_x + spacing * 1.0,
+                    base_y + spacing * 1.0,
+                    0.0,
+                ),
+                fill: None,
+                network: VectorNetwork {
+                    vertices: vec![(0.0, 0.0), (100.0, 0.0)],
+                    segments: vec![VectorNetworkSegment {
+                        a: 0,
+                        b: 1,
+                        ta: None,
+                        tb: None,
+                    }],
+                    regions: vec![],
+                },
+                corner_radius: 0.0,
+                strokes: vec![Paint::Solid(SolidPaint {
+                    color: CGColor(0, 100, 255, 255),
+                    opacity: 1.0,
+                })],
+                stroke_width: 3.0,
+                stroke_width_profile: None,
+                stroke_align: StrokeAlign::Center,
+                stroke_dash_array: None,
+                opacity: 1.0,
+                blend_mode: BlendMode::default(),
+                effects: LayerEffects::new_empty(),
+            };
+
+            ids.push(vector_node_5_5.id.clone());
+            repository.insert(Node::Vector(vector_node_5_5));
+        }
     }
 
     // row 3 - shapes with fills
