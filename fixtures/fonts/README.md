@@ -18,6 +18,7 @@ Fonts downloaded from Google Fonts. For variable fonts, only the VF file is kept
 | Geo              | No       | 2      |            | Geometric sans-serif with Regular and Italic variants                        | https://fonts.google.com/specimen/Geo                   |
 | Geist            | Yes      | -      |            | Modern system font designed for UI and web applications                      | https://fonts.google.com/specimen/Geist                 |
 | Inter            | Yes      | -      |            | Modern sans-serif designed for computer screens                              | https://fonts.google.com/specimen/Inter                 |
+| Molle            | No       | 1      |            | Italic-only font family, rare example of single italic variant               | https://fonts.google.com/specimen/Molle                 |
 | Noto Sans        | Yes      | -      |            | Universal sans-serif font supporting Latin, Greek, and Cyrillic              | https://fonts.google.com/specimen/Noto+Sans             |
 | Noto Sans JP     | Yes      | -      |            | Japanese variant of Noto Sans with full Japanese character support           | https://fonts.google.com/specimen/Noto+Sans+JP          |
 | Noto Sans KR     | Yes      | -      |            | Korean variant of Noto Sans with full Korean character support               | https://fonts.google.com/specimen/Noto+Sans+KR          |
