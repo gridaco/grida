@@ -660,7 +660,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             ),
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
-            stroke_width: 0.0,
+            stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             blend_mode: node.base.blend_mode,
