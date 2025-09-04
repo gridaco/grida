@@ -630,7 +630,9 @@ impl LayerList {
         scene_cache: &SceneCache,
     ) -> Option<Path> {
         let mut clip_shapes = Vec::new();
-        let mut current_id = Some(node_id.clone());
+        // Start from the parent of the current node so that a node's own
+        // `clip` property only affects its descendants and not itself.
+        let mut current_id = scene_cache.geometry().get_parent(node_id);
 
         let current_world = scene_cache
             .geometry()
