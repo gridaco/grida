@@ -592,7 +592,7 @@ function __self_evt_on_drag(
         break;
       }
       case "curve": {
-        cem_vector.on_drag_gesture_curve(draft);
+        cem_vector.on_drag_gesture_curve(draft, context);
         break;
       }
       case "curve-a": {

@@ -112,8 +112,8 @@ export function on_pointer_move(
       draft,
       node_id
     ) as grida.program.nodes.VectorNode;
-    const { left: nx, top: ny } = node;
-    const n_offset: cmath.Vector2 = [nx!, ny!];
+    const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+    const n_offset: cmath.Vector2 = [rect.x, rect.y];
     const { vertices } = node.vectorNetwork;
     const a = vertices[a_point];
 
@@ -475,7 +475,10 @@ export function on_path_drag_start(
 /**
  * Handles curve gesture during drag
  */
-export function on_drag_gesture_curve(draft: editor.state.IEditorState) {
+export function on_drag_gesture_curve(
+  draft: editor.state.IEditorState,
+  context: ReducerContext
+) {
   assert(draft.content_edit_mode?.type === "vector");
   assert(draft.gesture.type === "curve");
   const { node_id, segment, initial, control, invert } = draft.gesture;
@@ -489,13 +492,17 @@ export function on_drag_gesture_curve(draft: editor.state.IEditorState) {
   const { vectorNetwork } = node;
   const vne = new vn.VectorNetworkEditor(vectorNetwork);
 
+  const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+  const node_pos_abs: cmath.Vector2 = [rect.x, rect.y];
+
   const vertex_index = vne.segments[segment][control === "ta" ? "a" : "b"];
   const vertex_local = vne.vertices[vertex_index];
-  const node_pos: cmath.Vector2 = [node.left!, node.top!];
-  const vertex_abs = cmath.vector2.add(vertex_local, node_pos);
+  const vertex_abs = cmath.vector2.add(vertex_local, node_pos_abs);
   const agent_initial = cmath.vector2.add(vertex_abs, initial);
 
-  const anchor_points = vne.vertices.map((v) => cmath.vector2.add(v, node_pos));
+  const anchor_points = vne.vertices.map((v) =>
+    cmath.vector2.add(v, node_pos_abs)
+  );
   const scene = draft.document.scenes[draft.scene_id!];
 
   const { tarnslate_with_axis_lock, translate_with_force_disable_snap } =
