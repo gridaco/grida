@@ -155,6 +155,7 @@ export default function InputPropertyPercentage({
     handleBlur,
     handleKeyDown,
     handleChange,
+    inputRef,
   } = useNumberInput({
     type,
     value,
@@ -183,6 +184,7 @@ export default function InputPropertyPercentage({
         className
       )}
       value={internalValue}
+      ref={inputRef}
       onFocus={(e) => handleFocus(e, props.onFocus)}
       onBlur={(e) => handleBlur(e, props.onBlur)}
       onKeyDown={(e) => handleKeyDown(e, onKeyDown)}

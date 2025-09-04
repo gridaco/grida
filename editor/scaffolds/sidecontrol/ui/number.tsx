@@ -147,6 +147,7 @@ export default function InputPropertyNumber({
     handleBlur,
     handleKeyDown,
     handleChange,
+    inputRef,
   } = useNumberInput({
     type,
     value,
@@ -160,16 +161,13 @@ export default function InputPropertyNumber({
     commitOnBlur,
   });
 
-  // Create a ref for the input element
-  const inputRef = React.useRef<HTMLInputElement>(null);
-
   // Track focus state for data-focus attribute
   const [isFocused, setIsFocused] = React.useState(false);
 
   // Handle container click to focus the input
   const handleContainerClick = React.useCallback(() => {
     inputRef.current?.focus();
-  }, []);
+  }, [inputRef]);
 
   // Handle container pointer down to focus the input
   const handleContainerPointerDown = React.useCallback(
@@ -179,7 +177,7 @@ export default function InputPropertyNumber({
         inputRef.current?.focus();
       }
     },
-    []
+    [inputRef]
   );
 
   // Custom focus handler to track focus state

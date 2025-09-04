@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { TMixed } from "../controls/utils/types";
 import type { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
@@ -161,13 +161,25 @@ export function useNumberInput({
   const [internalValue, setInternalValue] = useState<string | number>(
     mixed ? "mixed" : formatValueWithSuffix(value ?? "", suffix, scale, step)
   );
+  const lastCommittedRef = useRef<number | undefined>();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync internal state with external value
   useEffect(() => {
     setInternalValue(
       mixed ? "mixed" : formatValueWithSuffix(value ?? "", suffix, scale, step)
     );
-  }, [value, mixed, suffix, scale, step]);
+    if (typeof value === "number" && !mixed) {
+      const rounded = roundToStep(value, step);
+      const clamped = Math.min(
+        Math.max(rounded, min ?? -Infinity),
+        max ?? Infinity
+      );
+      lastCommittedRef.current = clamped;
+    } else {
+      lastCommittedRef.current = undefined;
+    }
+  }, [value, mixed, suffix, scale, step, min, max]);
 
   const handleCommit = useCallback(
     (newValue: number) => {
@@ -176,6 +188,8 @@ export function useNumberInput({
         Math.max(roundedValue, min ?? -Infinity),
         max ?? Infinity
       );
+      if (lastCommittedRef.current === clampedValue) return;
+      lastCommittedRef.current = clampedValue;
 
       switch (mode) {
         case "auto":
@@ -371,6 +385,41 @@ export function useNumberInput({
     [type, mode, onValueChange, suffix, scale]
   );
 
+  // Global pointer down listener to commit pending changes when the input is
+  // removed before blur can occur (e.g., selection change destroys the element).
+  useEffect(() => {
+    if (!commitOnBlur || mixed) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      const el = inputRef.current;
+      if (!el) return;
+      if (el.contains(e.target as Node)) return;
+
+      const currentValue = parseValueWithScaling(
+        String(internalValue),
+        type,
+        suffix,
+        scale
+      );
+      if (!isNaN(currentValue)) {
+        handleCommit(currentValue);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+    };
+  }, [
+    commitOnBlur,
+    mixed,
+    internalValue,
+    type,
+    suffix,
+    scale,
+    handleCommit,
+  ]);
+
   return {
     // State
     internalValue,
@@ -381,6 +430,9 @@ export function useNumberInput({
     handleBlur,
     handleKeyDown,
     handleChange,
+
+    // Refs
+    inputRef,
 
     // Computed values
     inputType: mixed ? "text" : suffix ? "text" : "number",
