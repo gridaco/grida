@@ -1,36 +1,67 @@
+use cg::cg::types::*;
+use cg::vectornetwork::vn_painter::*;
 use cg::vectornetwork::*;
-use skia_safe::{surfaces, Color, Paint};
+use skia_safe::{surfaces, Color};
+use std::f32::consts::PI;
 
 fn main() {
-    // Create a simple line using VectorNetwork
-    let line = VectorNetwork {
-        vertices: vec![(100.0, 100.0), (300.0, 300.0)],
-        segments: vec![VectorNetworkSegment {
-            a: 0,
-            b: 1,
-            ta: None,
-            tb: None,
-        }],
-        regions: vec![],
-    };
-
-    let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");
+    let mut surface = surfaces::raster_n32_premul((600, 600)).expect("surface");
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    // Convert VectorNetwork to Skia Path using the Into trait
-    let path: skia_safe::Path = line.into();
+    // Create multiple lines with different angles
+    let num_lines = 10;
+    let line_length = 400.0; // Even longer lines
+    let start_x = 50.0; // Moved to top-left
+    let start_y = 50.0; // Moved to top-left
+    let y_spacing = 15.0; // Much tighter vertical spacing
 
-    let mut stroke_paint = Paint::default();
-    stroke_paint.set_anti_alias(true);
-    stroke_paint.set_color(Color::RED);
-    stroke_paint.set_style(skia_safe::PaintStyle::Stroke);
-    stroke_paint.set_stroke_width(3.0);
-    canvas.draw_path(&path, &stroke_paint);
+    for i in 0..num_lines {
+        let angle_degrees = (i as f32) * 90.0 / ((num_lines - 1) as f32); // 0 to exactly 90 degrees
+        let angle_radians = angle_degrees * PI / 180.0;
+
+        // Calculate line endpoints
+        let x1 = start_x;
+        let y1 = start_y + (i as f32) * y_spacing;
+        let x2 = x1 + angle_radians.cos() * line_length;
+        let y2 = y1 + angle_radians.sin() * line_length;
+
+        // Create a VectorNetwork for this line
+        let line = VectorNetwork {
+            vertices: vec![(x1, y1), (x2, y2)],
+            segments: vec![VectorNetworkSegment {
+                a: 0,
+                b: 1,
+                ta: None,
+                tb: None,
+            }],
+            regions: vec![],
+        };
+
+        // Use different colors based on angle - create RGB color from angle
+        let normalized_angle = angle_degrees / 90.0; // 0.0 to 1.0
+        let red = (255.0 * (1.0 - normalized_angle)) as u8;
+        let green = (255.0 * normalized_angle) as u8;
+        let blue = 0u8;
+        let color = CGColor(red, green, blue, 255);
+
+        // Create stroke options for VNPainter
+        let stroke_options = StrokeOptions {
+            width: 5.0, // Increased stroke width for visibility
+            align: cg::cg::types::StrokeAlign::Center,
+            color,
+            width_profile: None,
+        };
+
+        // Use VNPainter to render the line
+        let painter = VNPainter::new(canvas);
+        painter.draw(&line, &[], Some(&stroke_options));
+    }
 
     let image = surface.image_snapshot();
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     std::fs::write("goldens/vector_line.png", data.as_bytes()).unwrap();
+    println!("Image saved with {} lines and a test rectangle", num_lines);
 }
