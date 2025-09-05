@@ -537,6 +537,10 @@ export namespace iofigma {
                   : fixedheight,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               //
+              stroke: first_visible_stroke
+                ? paint(first_visible_stroke)
+                : undefined,
+              strokeWidth: strokeWeight ?? 0,
               border:
                 first_visible_stroke?.type === "SOLID"
                   ? {

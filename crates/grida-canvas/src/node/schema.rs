@@ -1295,6 +1295,14 @@ pub struct TextNodeRec {
     pub text: String,
     pub font_size: f32,
     pub fill: Paint,
+    /// Optional stroke paint for outlining text.
+    /// Currently supports only a single stroke paint.
+    pub stroke: Option<Paint>,
+    /// Stroke width in logical pixels. Set to `0.0` to disable.
+    pub stroke_width: f32,
+    /// Stroke alignment relative to the text glyph outlines.
+    /// Only `Center` alignment is honored for now.
+    pub stroke_align: StrokeAlign,
     pub opacity: f32,
     pub blend_mode: BlendMode,
 }

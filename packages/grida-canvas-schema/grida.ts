@@ -1244,9 +1244,6 @@ export namespace grida.program.nodes {
 
     /**
      * Node that supports stroke with color - such as rectangle, ellipse, etc.
-     *
-     * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
-     *
      */
     export interface IStroke {
       stroke?: cg.Paint;
@@ -1270,6 +1267,21 @@ export namespace grida.program.nodes {
        * @default "butt"
        */
       strokeCap: cg.StrokeCap;
+    }
+
+    /**
+     * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
+     */
+    export interface ITextStroke {
+      stroke?: cg.Paint;
+      /**
+       * stroke width - 0 or greater
+       */
+      strokeWidth?: number;
+      /**
+       * stroke alignment - takes effect when stroke is set
+       */
+      strokeAlign?: cg.StrokeAlign;
     }
 
     export interface ICSSBorder {
@@ -1363,7 +1375,7 @@ export namespace grida.program.nodes {
       /**
        * custom font variations
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-variation-settings
-      */
+       */
       fontVariations?: Record<string, number>;
       fontOpticalSizing?: cg.OpticalSizing;
       textDecorationLine: cg.TextDecorationLine;
@@ -1523,7 +1535,8 @@ export namespace grida.program.nodes {
       i.IHrefable,
       i.IMouseCursor,
       i.ITextNodeStyle,
-      i.ITextValue {
+      i.ITextValue,
+      i.ITextStroke {
     readonly type: "text";
 
     maxLines?: number | null;

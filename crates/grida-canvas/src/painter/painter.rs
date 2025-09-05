@@ -409,6 +409,10 @@ impl<'a> Painter<'a> {
         max_lines: &Option<usize>,
         ellipsis: &Option<String>,
         fill: &Paint,
+        stroke: Option<&Paint>,
+        stroke_width: f32,
+        // TODO: support stroke align
+        _stroke_align: &StrokeAlign,
         text_align: &TextAlign,
         text_align_vertical: &TextAlignVertical,
         text_style: &TextStyleRec,
@@ -455,6 +459,31 @@ impl<'a> Painter<'a> {
                 });
             }
             _ => paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0)),
+        }
+
+        // Draw stroke if provided and width is positive
+        if stroke_width > 0.0 {
+            if let Some(stroke_paint_def) = stroke {
+                let size = {
+                    let para = paragraph.borrow();
+                    (para.max_width(), para.height())
+                };
+                let mut stroke_paint = cvt::sk_paint(stroke_paint_def, 1.0, size);
+                stroke_paint.set_style(skia_safe::paint::Style::Stroke);
+                stroke_paint.set_stroke_width(stroke_width);
+                // Currently only center align is supported; other alignments are ignored.
+                paragraph.borrow_mut().visit(|_, info| {
+                    if let Some(info) = info {
+                        self.canvas.draw_glyphs_at(
+                            info.glyphs(),
+                            info.positions(),
+                            info.origin(),
+                            info.font(),
+                            &stroke_paint,
+                        );
+                    }
+                });
+            }
         }
     }
 
@@ -510,6 +539,9 @@ impl<'a> Painter<'a> {
                                         Some(f) => f,
                                         None => return,
                                     },
+                                    text_layer.strokes.first(),
+                                    text_layer.stroke_width,
+                                    &text_layer.stroke_align,
                                     &text_layer.text_align,
                                     &text_layer.text_align_vertical,
                                     &text_layer.text_style,
@@ -829,6 +861,9 @@ impl<'a> NodePainter<'a> {
                         &node.max_lines,
                         &node.ellipsis,
                         &node.fill,
+                        node.stroke.as_ref(),
+                        node.stroke_width.unwrap_or(0.0),
+                        &node.stroke_align,
                         &node.text_align,
                         &node.text_align_vertical,
                         &node.text_style,

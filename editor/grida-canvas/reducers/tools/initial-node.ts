@@ -80,6 +80,8 @@ export default function initialNode(
         width: "auto",
         height: "auto",
         text: "Text",
+        stroke: undefined,
+        strokeWidth: 0,
         ...seed,
       } satisfies grida.program.nodes.TextNode;
     }

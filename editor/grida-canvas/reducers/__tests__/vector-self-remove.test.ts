@@ -4,20 +4,7 @@ jest.mock("@/grida-canvas", () => ({
 
 jest.mock("@grida/cmath", () => ({}), { virtual: true });
 jest.mock("@grida/schema", () => ({}), { virtual: true });
-jest.mock(
-  "@grida/vn",
-  () => ({
-    VectorNetworkEditor: class {
-      constructor(net: any) {
-        this.net = net;
-      }
-      optimize() {
-        return this.net;
-      }
-    },
-  }),
-  { virtual: true }
-);
+jest.mock("@grida/vn", () => ({}), { virtual: true });
 
 jest.mock("../methods", () => ({
   self_optimizeVectorNetwork: jest.fn(),
