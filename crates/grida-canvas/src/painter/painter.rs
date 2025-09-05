@@ -2,6 +2,7 @@ use super::cvt;
 use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
 use super::shadow;
+use super::text_stroke;
 use crate::cache::geometry::GeometryCache;
 use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
 use crate::cg::types::*;
@@ -411,8 +412,7 @@ impl<'a> Painter<'a> {
         fill: &Paint,
         stroke: Option<&Paint>,
         stroke_width: f32,
-        // TODO: support stroke align
-        _stroke_align: &StrokeAlign,
+        stroke_align: &StrokeAlign,
         text_align: &TextAlign,
         text_align_vertical: &TextAlignVertical,
         text_style: &TextStyleRec,
@@ -428,6 +428,31 @@ impl<'a> Painter<'a> {
             text_align_vertical,
             text_style,
         );
+        // Measure laid-out paragraph size once for gradient resolution and stroke handling.
+        let layout_size = {
+            let para = paragraph.borrow();
+            (para.max_width(), para.height())
+        };
+
+        // For outside strokes we can draw the stroke beforehand with a fast path.
+        if stroke_width > 0.0 && matches!(stroke_align, StrokeAlign::Outside) {
+            if let Some(stroke_paint_def) = stroke {
+                paragraph.borrow_mut().visit(|_, info| {
+                    if let Some(info) = info {
+                        text_stroke::draw_text_stroke_outside_fast_pre(
+                            self.canvas,
+                            info.glyphs(),
+                            info.positions(),
+                            info.origin(),
+                            info.font(),
+                            stroke_paint_def,
+                            stroke_width,
+                            layout_size,
+                        );
+                    }
+                });
+            }
+        }
 
         // NOTE: we should be relying on paragraph.paint() to support the decorations.
         // the current model does not support custom paint + decorations. - the decorations will be supported manually, in the future, after then, we will completely drop the paragraph.paint()
@@ -441,11 +466,7 @@ impl<'a> Painter<'a> {
             | Paint::RadialGradient(_)
             | Paint::SweepGradient(_)
             | Paint::DiamondGradient(_) => {
-                let size = {
-                    let para = paragraph.borrow();
-                    (para.max_width(), para.height())
-                };
-                let paint = cvt::sk_paint(fill, 1.0, size);
+                let paint = cvt::sk_paint(fill, 1.0, layout_size);
                 paragraph.borrow_mut().visit(|_, info| {
                     if let Some(info) = info {
                         self.canvas.draw_glyphs_at(
@@ -461,25 +482,20 @@ impl<'a> Painter<'a> {
             _ => paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0)),
         }
 
-        // Draw stroke if provided and width is positive
-        if stroke_width > 0.0 {
+        // Draw stroke for non-outside alignments after the fill
+        if stroke_width > 0.0 && !matches!(stroke_align, StrokeAlign::Outside) {
             if let Some(stroke_paint_def) = stroke {
-                let size = {
-                    let para = paragraph.borrow();
-                    (para.max_width(), para.height())
-                };
-                let mut stroke_paint = cvt::sk_paint(stroke_paint_def, 1.0, size);
-                stroke_paint.set_style(skia_safe::paint::Style::Stroke);
-                stroke_paint.set_stroke_width(stroke_width);
-                // Currently only center align is supported; other alignments are ignored.
                 paragraph.borrow_mut().visit(|_, info| {
                     if let Some(info) = info {
-                        self.canvas.draw_glyphs_at(
+                        text_stroke::draw_text_stroke(
+                            self.canvas,
                             info.glyphs(),
                             info.positions(),
                             info.origin(),
                             info.font(),
-                            &stroke_paint,
+                            stroke_paint_def,
+                            stroke_width,
+                            *stroke_align,
                         );
                     }
                 });
