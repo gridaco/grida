@@ -376,7 +376,7 @@ fn select_face(cap: &ItalicCapabilityMap, w: u16, s: u16, style: Style) -> FaceS
 
 This pipeline yields a compact, deterministic **Italic Capability Map** suitable for both editor UI and runtime selection while respecting the project policy to **ignore oblique** for italic decisions.
 
-## Parser Configuration
+### Parser Configuration
 
 **User Font Style Trust:**  
 The parser supports a `trust_user_font_style` configuration option (default: `true`) that controls whether to trust explicit user declarations of font style. When enabled, `user_font_style` declarations take highest priority and bypass all other detection logic. This is useful for:
@@ -387,7 +387,7 @@ The parser supports a `trust_user_font_style` configuration option (default: `tr
 
 When `trust_user_font_style` is `false`, the parser ignores user declarations and relies solely on font table analysis.
 
-## Name-based Parsing Policy
+### Name-based Parsing Policy
 
 **Parser vs. Frontend Policy:**  
 Name-based parsing is **disabled in the core parser** for decision logic, but remains **enabled in the UX/frontend layer** to provide user-facing style hints. This separation reflects the fact that name-based detection is not 100% reliable and has clear limitations (e.g., it only works consistently in English). The parser enforces strict, table-driven rules, while the frontend may surface name-based cues as optional hints for designers.
@@ -447,6 +447,49 @@ flowchart TD
     P2["Only drive axes if single VF"]
   end
 ```
+
+## Implementation Phases
+
+Given the complexity of implementing the full italic detection pipeline, we propose a phased approach:
+
+### Level 1 (MVP - Trustworthy Font Providers)
+
+**Goal:** Make italic detection work reliably with trustworthy font providers (Google Fonts, Adobe Fonts, etc.)
+
+**Features:**
+
+- ✅ **User font style declaration** (highest priority)
+- ✅ **OS/2 ITALIC bit detection** (bit 0)
+- ✅ **Variable font `ital` axis** with default/instance detection
+- ✅ **Family Aggregation & Selection Flow**
+
+**Excluded:**
+
+- ❌ **Parser configuration** (`trust_user_font_style` => always trust)
+- ❌ **Scenario 3-1: VF with `slnt` axis & italic instances** (requires name-based detection via `fvar.instances`)
+- ❌ Name-based parsing logic
+- ❌ STAT table analysis
+- ❌ PostScript name fallbacks
+- ❌ Complex edge case handling
+
+**Target:** 99%+ accuracy with well-formed fonts from reputable providers.
+
+### Level 2+ (Full Implementation)
+
+**Goal:** Handle any fonts, including malformed ones and user-uploaded custom fonts.
+
+**Additional Features:**
+
+- ✅ **Parser configuration** (`trust_user_font_style` => configurable)
+- ✅ **Scenario 3-1: VF with `slnt` axis & italic instances** (Recursive, Roboto Flex)
+- ✅ **STAT table analysis** for style mappings
+- ✅ **Name-based parsing** as fallback (with warnings)
+- ✅ **PostScript name analysis** for instance detection
+- ✅ **Complex edge case handling** (mis-flagged fonts, ambiguous OS/2 combinations)
+- ✅ **Advanced validation & diagnostics**
+- ✅ **CJK and mixed-script fallback handling**
+
+**Target:** 99%+ accuracy across all font types and sources.
 
 ## See also
 
