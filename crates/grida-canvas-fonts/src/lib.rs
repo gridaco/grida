@@ -1,6 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use ttf_parser::{Face, Tag};
+use ttf_parser::{
+    Face, Tag, gsub,
+    opentype_layout::{Coverage, LookupSubtable},
+};
 
 /// Represents a single variation axis from the `fvar` table.
 #[derive(Debug, Clone)]
@@ -59,6 +62,18 @@ pub struct StatData {
     pub elided_fallback_name: Option<String>,
 }
 
+/// Represents a font feature parsed from the `GSUB` table.
+#[derive(Debug, Clone, Default)]
+pub struct FontFeature {
+    pub tag: String,
+    pub name: String,
+    pub tooltip: Option<String>,
+    pub sample_text: Option<String>,
+    pub glyphs: Vec<String>,
+    pub param_labels: Vec<String>,
+    pub lookup_indices: Vec<u16>,
+}
+
 /// Font metadata parser backed by `ttf-parser`.
 pub struct Parser<'a> {
     face: Face<'a>,
@@ -87,6 +102,15 @@ impl<'a> Parser<'a> {
             None => return StatData::default(),
         };
         parse_stat(&self.face, table)
+    }
+
+    /// Parses the `GSUB` table to extract available font features.
+    pub fn ffeatures(&self) -> Vec<FontFeature> {
+        let data = match self.face.raw_face().table(Tag::from_bytes(b"GSUB")) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+        parse_features(&self.face, data)
     }
 }
 
@@ -245,6 +269,193 @@ fn parse_stat(face: &Face<'_>, data: &[u8]) -> StatData {
         combinations,
         elided_fallback_name,
     }
+}
+
+fn parse_features(face: &Face<'_>, data: &[u8]) -> Vec<FontFeature> {
+    if data.len() < 10 {
+        return Vec::new();
+    }
+    let feature_list_offset = be_u16(data, 6) as usize;
+    let lookup_list_offset = be_u16(data, 8) as usize;
+
+    let glyph_map = build_glyph_map(face);
+
+    if feature_list_offset >= data.len() {
+        return Vec::new();
+    }
+    let fl_base = feature_list_offset;
+    let feature_count = be_u16(data, fl_base) as usize;
+    let mut features: Vec<FontFeature> = Vec::new();
+
+    for i in 0..feature_count {
+        let rec_off = fl_base + 2 + i * 6;
+        if rec_off + 6 > data.len() {
+            break;
+        }
+        let tag = tag_to_string(&data[rec_off..rec_off + 4]);
+        let feature_off = fl_base + be_u16(data, rec_off + 4) as usize;
+        if feature_off + 4 > data.len() {
+            continue;
+        }
+        let params_offset = be_u16(data, feature_off) as usize;
+        let lookup_count = be_u16(data, feature_off + 2) as usize;
+        let mut lookup_indices = Vec::new();
+        for j in 0..lookup_count {
+            let li_off = feature_off + 4 + j * 2;
+            if li_off + 2 > data.len() {
+                break;
+            }
+            lookup_indices.push(be_u16(data, li_off));
+        }
+
+        let mut name = None;
+        let mut tooltip = None;
+        let mut sample_text = None;
+        let mut param_labels: Vec<String> = Vec::new();
+        if params_offset != 0 && feature_off + params_offset + 2 <= data.len() {
+            let po = feature_off + params_offset;
+            if tag.starts_with("ss") {
+                if po + 6 <= data.len() {
+                    let ui = be_u16(data, po + 2);
+                    let sample = be_u16(data, po + 4);
+                    name = lookup_name(face, ui);
+                    sample_text = lookup_name(face, sample);
+                }
+            } else if tag.starts_with("cv") {
+                if po + 12 <= data.len() {
+                    let ui = be_u16(data, po + 2);
+                    let ti = be_u16(data, po + 4);
+                    let si = be_u16(data, po + 6);
+                    let pcnt = be_u16(data, po + 8) as usize;
+                    let first = be_u16(data, po + 10);
+                    name = lookup_name(face, ui);
+                    tooltip = lookup_name(face, ti);
+                    sample_text = lookup_name(face, si);
+                    for k in 0..pcnt {
+                        if let Some(label) = lookup_name(face, first + k as u16) {
+                            param_labels.push(label);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut glyph_set: HashSet<u16> = HashSet::new();
+        for &lookup_index in &lookup_indices {
+            glyph_set.extend(parse_lookup_glyphs(data, lookup_list_offset, lookup_index));
+        }
+        let glyphs: Vec<String> = glyph_set
+            .into_iter()
+            .filter_map(|gid| glyph_map.get(&gid).copied())
+            .map(|c| c.to_string())
+            .collect();
+
+        let feature_name = name.clone().unwrap_or_else(|| tag.clone());
+        features.push(FontFeature {
+            tag: tag.clone(),
+            name: feature_name,
+            tooltip,
+            sample_text,
+            glyphs,
+            param_labels,
+            lookup_indices,
+        });
+    }
+
+    features
+}
+
+fn parse_lookup_glyphs(data: &[u8], lookup_list_offset: usize, lookup_index: u16) -> Vec<u16> {
+    let mut glyphs = Vec::new();
+    let ll_offset = lookup_list_offset;
+    if ll_offset + 2 > data.len() {
+        return glyphs;
+    }
+    let lookup_count = be_u16(data, ll_offset);
+    if lookup_index as usize >= lookup_count as usize {
+        return glyphs;
+    }
+    let lookup_offset_pos = ll_offset + 2 + lookup_index as usize * 2;
+    if lookup_offset_pos + 2 > data.len() {
+        return glyphs;
+    }
+    let lookup_offset = ll_offset + be_u16(data, lookup_offset_pos) as usize;
+    if lookup_offset + 6 > data.len() {
+        return glyphs;
+    }
+    let lookup_type = be_u16(data, lookup_offset);
+    let sub_count = be_u16(data, lookup_offset + 4) as usize;
+    for i in 0..sub_count {
+        let sub_off_pos = lookup_offset + 6 + i * 2;
+        if sub_off_pos + 2 > data.len() {
+            break;
+        }
+        let sub_off = lookup_offset + be_u16(data, sub_off_pos) as usize;
+        if sub_off > data.len() {
+            continue;
+        }
+        if let Some(subtable) = gsub::SubstitutionSubtable::parse(&data[sub_off..], lookup_type) {
+            match subtable {
+                gsub::SubstitutionSubtable::Single(s) => {
+                    glyphs.extend(coverage_glyphs(s.coverage()));
+                }
+                gsub::SubstitutionSubtable::Ligature(l) => {
+                    let sets = l.ligature_sets;
+                    for si in 0..sets.len() {
+                        if let Some(set) = sets.get(si) {
+                            for li in 0..set.len() {
+                                if let Some(lig) = set.get(li) {
+                                    glyphs.push(lig.glyph.0);
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    glyphs
+}
+
+fn coverage_glyphs(cov: Coverage) -> Vec<u16> {
+    match cov {
+        Coverage::Format1 { glyphs } => (0..glyphs.len())
+            .filter_map(|i| glyphs.get(i))
+            .map(|g| g.0)
+            .collect(),
+        Coverage::Format2 { records } => {
+            let mut res = Vec::new();
+            for i in 0..records.len() {
+                if let Some(rec) = records.get(i) {
+                    for g in rec.start.0..=rec.end.0 {
+                        res.push(g);
+                    }
+                }
+            }
+            res
+        }
+    }
+}
+
+fn build_glyph_map(face: &Face<'_>) -> HashMap<u16, char> {
+    let mut map = HashMap::new();
+    if let Some(cmap) = face.tables().cmap {
+        for sub in cmap.subtables.into_iter() {
+            if sub.is_unicode() {
+                sub.codepoints(|cp| {
+                    if let Some(gid) = sub.glyph_index(cp) {
+                        if gid.0 != 0 && !map.contains_key(&gid.0) {
+                            if let Some(ch) = char::from_u32(cp) {
+                                map.insert(gid.0, ch);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+    map
 }
 
 fn lookup_name(face: &Face<'_>, id: u16) -> Option<String> {
