@@ -66,6 +66,14 @@ pub fn draw_text_stroke(
 /// Because this relies on painting order it is not suitable for vector
 /// exporting or baking to outlines; those use cases require a separate pipeline
 /// that computes proper stroke geometry.
+///
+/// ## ⚠️ Note
+///
+/// This method draws the stroke *before* the fill. When the fill is
+/// transparent or omitted, the stroke will take over the visuals. We have not
+/// yet established a policy on whether this behaviour is desirable, so this
+/// function may be dropped or limited to very specific scenarios in the
+/// future.
 pub fn draw_text_stroke_outside_fast_pre(
     canvas: &Canvas,
     glyphs: &[GlyphId],
