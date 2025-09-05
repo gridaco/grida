@@ -322,7 +322,7 @@ impl ApplicationApi for UnknownTargetApplication {
     fn load_scene_json(&mut self, json: &str) {
         use crate::io::io_grida;
 
-        let Ok(file) = io_grida::parse(json) else {
+        let Ok(mut file) = io_grida::parse(json) else {
             let err = io_grida::parse(json).unwrap_err();
             eprintln!("failed to parse scene json: {}", err);
             return;
@@ -344,13 +344,13 @@ impl ApplicationApi for UnknownTargetApplication {
                 .unwrap_or_else(|| "scene".to_string())
         });
 
-        if let Some(scene) = file.document.scenes.get(&scene_id) {
+        if let Some(scene) = file.document.scenes.remove(&scene_id) {
             let scene = crate::node::schema::Scene {
                 id: scene_id,
-                name: scene.name.clone(),
-                children: scene.children.clone(),
+                name: scene.name,
+                children: scene.children,
                 nodes,
-                background_color: scene.background_color.clone().map(Into::into),
+                background_color: scene.background_color.map(Into::into),
             };
             self.renderer.load_scene(scene);
         }
