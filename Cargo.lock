@@ -1066,6 +1066,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "grida-canvas-fonts"
+version = "0.1.0"
+dependencies = [
+ "ttf-parser",
+]
+
+[[package]]
 name = "grida-canvas-wasm"
 version = "0.0.0"
 dependencies = [
