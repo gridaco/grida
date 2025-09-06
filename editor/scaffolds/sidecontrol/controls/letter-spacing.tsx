@@ -17,7 +17,6 @@ export function LetterSpacingControl({
       type="integer"
       value={value}
       placeholder="inherit"
-      min={0}
       step={1}
       onValueChange={onValueChange}
       onValueCommit={onValueCommit}
