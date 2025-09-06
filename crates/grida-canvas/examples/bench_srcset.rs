@@ -134,7 +134,7 @@ impl ImageBenchmark {
 
 fn main() {
     // Check if image exists
-    let image_path = "../fixtures/images/4k.jpg";
+    let image_path = "../../fixtures/images/4k.jpg";
     if !Path::new(image_path).exists() {
         println!(
             "Error: {} not found. Please place a 4K image named '4k.jpg' in the fixtures directory.",

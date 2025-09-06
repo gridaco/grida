@@ -51,7 +51,8 @@ export namespace css {
       Partial<grida.program.nodes.i.IComputedTextNodeStyle> &
       Partial<grida.program.nodes.i.IPadding> &
       Partial<grida.program.nodes.i.IEffects> &
-      Partial<grida.program.nodes.i.IFlexContainer>,
+      Partial<grida.program.nodes.i.IFlexContainer> &
+      Partial<{ maxLines?: number | null }>,
     config: {
       hasTextStyle: boolean;
       fill: "color" | "background" | "fill" | "none";
@@ -88,6 +89,8 @@ export namespace css {
       crossAxisAlignment,
       mainAxisGap,
       crossAxisGap,
+      //
+      maxLines,
       //
       cursor,
       //
@@ -172,12 +175,20 @@ export namespace css {
       const { textAlign, textAlignVertical } =
         styles as Partial<grida.program.nodes.i.ITextNodeStyle>;
       const {
-        textDecoration,
+        textDecorationLine,
+        textDecorationStyle,
+        textDecorationThickness,
+        textDecorationColor,
+        textDecorationSkipInk,
         fontFamily,
         fontSize,
         fontWeight,
         letterSpacing,
         lineHeight,
+        fontFeatures,
+        fontVariations,
+        fontOpticalSizing,
+        textTransform,
       } = styles as grida.program.nodes.i.ITextStyle;
 
       result = {
@@ -187,15 +198,30 @@ export namespace css {
           textAlign: textAlign ?? "left",
           textAlignVertical: textAlignVertical ?? "top",
           // text span style
-          textDecoration,
+          textDecorationLine,
+          textDecorationStyle,
+          textDecorationThickness,
+          textDecorationColor,
+          textDecorationSkipInk,
           fontFamily,
           fontSize,
           fontWeight,
           letterSpacing,
           lineHeight,
+          fontFeatures,
+          fontVariations,
+          fontOpticalSizing,
+          textTransform,
           fill: fill!,
         }),
       };
+    }
+
+    if (config.hasTextStyle && maxLines && maxLines > 0) {
+      result.display = "-webkit-box";
+      (result as any).WebkitLineClamp = maxLines;
+      (result as any).WebkitBoxOrient = "vertical";
+      result.overflow = "hidden";
     }
 
     return result;
@@ -240,38 +266,103 @@ export namespace css {
     | "textAlign"
     | "alignContent"
     | "textDecoration"
+    | "textDecorationLine"
+    | "textDecorationStyle"
+    | "textDecorationThickness"
+    | "textDecorationColor"
+    | "textDecorationSkipInk"
     | "fontFamily"
     | "fontSize"
     | "fontWeight"
     | "letterSpacing"
     | "lineHeight"
+    | "fontOpticalSizing"
+    | "fontFeatureSettings"
+    | "fontVariationSettings"
+    | "textTransform"
     | "color"
   > {
     const {
       textAlign,
       textAlignVertical,
-      textDecoration,
+      textDecorationLine,
+      textDecorationStyle,
+      textDecorationThickness,
+      textDecorationColor,
+      textDecorationSkipInk,
       fontFamily,
       fontSize,
       fontWeight,
       letterSpacing,
       lineHeight,
+      fontFeatures,
+      fontVariations,
+      fontOpticalSizing,
+      textTransform,
       fill,
     } = style;
+
+    let fvs = fontVariations ? { ...fontVariations } : undefined;
+    if (typeof fontOpticalSizing === "number") {
+      fvs = { ...(fvs ?? {}), opsz: fontOpticalSizing };
+    }
 
     return {
       textAlign: textAlign,
       alignContent: textAlignVertical
         ? text_align_vertical_to_css_align_content[textAlignVertical]
         : undefined,
-      textDecoration: textDecoration,
+      textDecorationLine: textDecorationLine,
+      textDecorationStyle: textDecorationStyle ?? undefined,
+      textDecorationThickness:
+        typeof textDecorationThickness === "number"
+          ? textDecorationThickness
+          : textDecorationThickness === "auto"
+          ? "auto"
+          : undefined,
+      textDecorationColor: textDecorationColor
+        ? toRGBAString(textDecorationColor)
+        : undefined,
+      textDecorationSkipInk:
+        typeof textDecorationSkipInk === "boolean"
+          ? textDecorationSkipInk
+            ? "auto"
+            : "none"
+          : undefined,
       fontFamily: fontFamily,
       lineHeight: lineHeight ?? "normal",
       letterSpacing: letterSpacing,
       fontSize: fontSize,
       fontWeight: fontWeight,
+      fontOpticalSizing:
+        typeof fontOpticalSizing === "number"
+          ? "none"
+          : fontOpticalSizing,
+      fontFeatureSettings: fontFeatures
+        ? toFontFeatureSettings(fontFeatures)
+        : undefined,
+      fontVariationSettings: fvs
+        ? toFontVariationSettings(fvs)
+        : undefined,
+      textTransform: textTransform,
       color: fill ? toFillString(fill) : undefined,
     };
+  }
+
+  function toFontFeatureSettings(
+    features: Partial<Record<cg.OpenTypeFeature, boolean>>
+  ): string {
+    return Object.entries(features)
+      .map(([feature, enabled]) => `"${feature}" ${enabled ? "on" : "off"}`)
+      .join(", ");
+  }
+
+  function toFontVariationSettings(
+    variations: Record<string, number>
+  ): string {
+    return Object.entries(variations)
+      .map(([axis, value]) => `"${axis}" ${value}`)
+      .join(", ");
   }
 
   function boxShadowToCSS(boxShadow: cg.BoxShadow, inset?: boolean): string {

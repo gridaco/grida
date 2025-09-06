@@ -37,7 +37,7 @@ function CanvasContent({
     if (rendererRef.current) {
       onMount?.(rendererRef.current);
     }
-  }, [rendererRef.current, onMount]);
+  }, [rendererRef.current]);
 
   useLayoutEffect(() => {
     if (rendererRef.current) {

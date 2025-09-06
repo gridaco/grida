@@ -2,6 +2,16 @@ use super::gradient;
 use crate::cg::types::*;
 use skia_safe;
 
+pub fn sk_solid_paint(paint: impl Into<SolidPaint>) -> skia_safe::Paint {
+    let p: SolidPaint = paint.into();
+    let mut skia_paint = skia_safe::Paint::default();
+    skia_paint.set_anti_alias(true);
+    let CGColor(r, g, b, a) = p.color;
+    let final_alpha = (a as f32 * p.opacity) as u8;
+    skia_paint.set_color(skia_safe::Color::from_argb(final_alpha, r, g, b));
+    skia_paint
+}
+
 pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Paint {
     let mut skia_paint = skia_safe::Paint::default();
     skia_paint.set_anti_alias(true);

@@ -1,4 +1,4 @@
-use math2::{plot_distribution_geometry, DistributionGeometry1D, Range, SnapProjectionPoint};
+use math2::{plot_distribution_geometry, Range, SnapProjectionPoint};
 
 fn range(a: f32, b: f32) -> Range {
     [a, b]

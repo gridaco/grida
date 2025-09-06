@@ -1,6 +1,7 @@
 import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import nid from "./id";
+import { editor } from "@/grida-canvas/editor.i";
 
 export const gray: cg.Paint = {
   type: "solid",
@@ -70,14 +71,17 @@ export default function initialNode(
         type: "text",
         textAlign: "left",
         textAlignVertical: "top",
-        textDecoration: "none",
-        fontFamily: "Inter",
-        fontWeight: 400,
-        fontSize: 14,
+        textDecorationLine: "none",
+        fontFamily: editor.config.fonts.DEFAULT_FONT_FAMILY,
+        fontWeight: editor.config.fonts.DEFAULT_FONT_WEIGHT,
+        fontSize: editor.config.fonts.DEFAULT_FONT_SIZE,
+        fontOpticalSizing: "auto",
         fill: black,
         width: "auto",
         height: "auto",
         text: "Text",
+        stroke: undefined,
+        strokeWidth: 0,
         ...seed,
       } satisfies grida.program.nodes.TextNode;
     }

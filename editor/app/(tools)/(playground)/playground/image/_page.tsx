@@ -43,10 +43,10 @@ import {
   EditorSurface,
   AutoInitialFitTransformer,
   useCurrentEditor,
+  useEditorState,
 } from "@/grida-canvas-react";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
-import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
@@ -199,7 +199,8 @@ function SidebarLeft() {
 }
 
 function SidebarRight() {
-  const fonts = useGoogleFontsList();
+  const editor = useCurrentEditor();
+  const fonts = useEditorState(editor, (state) => state.webfontlist.items);
 
   return (
     <Sidebar side="right" variant="floating">

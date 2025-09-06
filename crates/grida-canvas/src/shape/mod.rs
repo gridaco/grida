@@ -4,11 +4,13 @@ pub mod ellipse_ring;
 pub mod ellipse_ring_sector;
 pub mod ellipse_sector;
 pub mod polygon;
+pub mod rect;
 pub mod regular_polygon;
 pub mod regular_star;
 pub mod rrect;
 pub mod stroke;
 pub mod stroke_varwidth;
+pub mod vector;
 
 pub use corner::*;
 pub use ellipse::*;
@@ -16,11 +18,13 @@ pub use ellipse_ring::*;
 pub use ellipse_ring_sector::*;
 pub use ellipse_sector::*;
 pub use polygon::*;
+pub use rect::*;
 pub use regular_polygon::*;
 pub use regular_star::*;
 pub use rrect::*;
 pub use stroke::*;
 pub use stroke_varwidth::*;
+pub use vector::*;
 
 use crate::vectornetwork::*;
 

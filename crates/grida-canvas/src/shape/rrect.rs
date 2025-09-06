@@ -1,5 +1,6 @@
 use super::vn::{VectorNetwork, VectorNetworkSegment};
 use crate::cg::types::*;
+use math2::KAPPA;
 
 pub struct RRectShape {
     /// width of the box
@@ -39,9 +40,8 @@ pub fn build_rrect_path(shape: &RRectShape) -> skia_safe::Path {
 /// The network is constructed with segments in clockwise order starting from
 /// the top edge. Each corner is approximated with a single cubic Bézier curve
 /// using the KAPPA constant.
+#[deprecated(note = "use VectorGeometryShape instead")]
 pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
-    const KAPPA: f32 = 0.5522847498307936;
-
     let w = shape.width;
     let h = shape.height;
     let tl = shape.corner_radius.tl;

@@ -1,6 +1,6 @@
 use math2::{
     axis_locked_by_dominance, movement_normalize, snap1d, snap2d_axis_aligned, AxisAlignedPoint,
-    Snap1DResult, Snap2DAxisConfig,
+    Snap2DAxisConfig,
 };
 
 #[test]

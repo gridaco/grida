@@ -135,6 +135,39 @@ export function useMixedProperties(ids: string[]) {
     [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontWeight]
   );
 
+  const fontOpticalSizing = useCallback(
+    (value: cg.OpticalSizing) => {
+      mixedProperties.fontOpticalSizing?.ids.forEach((id) => {
+        instance.changeTextNodeFontOpticalSizing(id, value);
+      });
+    },
+    [
+      mixedProperties.fontOpticalSizing?.ids,
+      instance.changeTextNodeFontOpticalSizing,
+    ]
+  );
+
+  const fontVariation = useCallback(
+    (key: string, value: number) => {
+      mixedProperties.fontWeight?.ids.forEach((id) => {
+        instance.changeTextNodeFontVariation(id, key, value);
+      });
+    },
+    [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontVariation]
+  );
+
+  const fontVariationInstance = useCallback(
+    (coordinates: Record<string, number>) => {
+      mixedProperties.fontWeight?.ids.forEach((id) => {
+        instance.changeTextNodeFontVariationInstance(id, coordinates);
+      });
+    },
+    [
+      mixedProperties.fontWeight?.ids,
+      instance.changeTextNodeFontVariationInstance,
+    ]
+  );
+
   const fontSize = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.fontSize?.ids.forEach((id) => {
@@ -299,8 +332,11 @@ export function useMixedProperties(ids: string[]) {
       width,
       height,
       positioningMode,
-      fontWeight,
       fontFamily,
+      fontWeight,
+      fontOpticalSizing,
+      fontVariation,
+      fontVariationInstance,
       fontSize,
       lineHeight,
       letterSpacing,
@@ -328,8 +364,11 @@ export function useMixedProperties(ids: string[]) {
       width,
       height,
       positioningMode,
-      fontWeight,
       fontFamily,
+      fontWeight,
+      fontOpticalSizing,
+      fontVariation,
+      fontVariationInstance,
       fontSize,
       lineHeight,
       letterSpacing,

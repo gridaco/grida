@@ -26,16 +26,16 @@ async fn demo_scene() -> Scene {
     let mut title_text = nf.create_text_span_node();
     title_text.name = Some("Title".to_string());
     title_text.transform = AffineTransform::new(50.0, 50.0, 0.0);
-    title_text.size = Size {
-        width: 700.0,
-        height: 60.0,
-    };
+    title_text.width = Some(700.0);
     title_text.text = "Grida Canvas PDF Demo".to_string();
-    title_text.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
+    title_text.text_style = TextStyleRec {
+        text_decoration: None,
         font_family: "".to_string(),
         font_size: 36.0,
         font_weight: FontWeight::new(700),
+        font_features: None,
+        font_variations: None,
+        font_optical_sizing: Default::default(),
         italic: false,
         letter_spacing: None,
         line_height: None,
@@ -54,17 +54,17 @@ async fn demo_scene() -> Scene {
     let mut subtitle_text = nf.create_text_span_node();
     subtitle_text.name = Some("Subtitle".to_string());
     subtitle_text.transform = AffineTransform::new(50.0, 120.0, 0.0);
-    subtitle_text.size = Size {
-        width: 700.0,
-        height: 40.0,
-    };
+    subtitle_text.width = Some(700.0);
     subtitle_text.text =
         "Rich content demonstration with shapes, gradients, and effects".to_string();
-    subtitle_text.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
+    subtitle_text.text_style = TextStyleRec {
+        text_decoration: None,
         font_family: "".to_string(),
         font_size: 18.0,
-        font_weight: FontWeight::new(400),
+        font_weight: FontWeight::default(),
+        font_features: None,
+        font_variations: None,
+        font_optical_sizing: Default::default(),
         italic: true,
         letter_spacing: None,
         line_height: None,
@@ -283,16 +283,16 @@ async fn demo_scene() -> Scene {
     let mut description_text = nf.create_text_span_node();
     description_text.name = Some("Description".to_string());
     description_text.transform = AffineTransform::new(50.0, 550.0, 0.0);
-    description_text.size = Size {
-        width: 700.0,
-        height: 40.0,
-    };
+    description_text.width = Some(700.0);
     description_text.text = "This PDF demonstrates various rendering capabilities including gradients, shapes, text, and effects.".to_string();
-    description_text.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
+    description_text.text_style = TextStyleRec {
+        text_decoration: None,
         font_family: "".to_string(),
         font_size: 14.0,
         font_weight: FontWeight::new(400),
+        font_features: None,
+        font_variations: None,
+        font_optical_sizing: Default::default(),
         italic: false,
         letter_spacing: None,
         line_height: None,
@@ -339,7 +339,7 @@ async fn main() {
         None,
         Camera2D::new_from_bounds(Rectangle::from_xywh(0.0, 0.0, scene_width, scene_height)),
         RendererOptions {
-            font_fallback: true,
+            use_embedded_fonts: true,
         },
     );
     renderer.load_scene(scene);

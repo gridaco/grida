@@ -21,6 +21,7 @@ This document lists all implemented features including the ones that are not yet
 | copy                    | copy the current selection              | `meta+c`                   | `ctrl+c`                | canvas |
 | paste                   | paste from the clipboard                | `meta+v`                   | `ctrl+v`                | canvas |
 | toggle bold             | toggle bold style                       | `meta+b`                   | `ctrl+b`                | canvas |
+| toggle underline        | toggle underline style                  | `meta+u`                   | `ctrl+u`                | canvas |
 | toggle active           | toggle active state for the selection   | `meta+shift+h`             | `ctrl+shift+h`          | canvas |
 | toggle locked           | toggle locked state for the selection   | `meta+shift+l`             | `ctrl+shift+l`          | canvas |
 | select parent           | select the parent of the current node   | `shift+enter`              | `shift+enter`           | canvas |

@@ -1,0 +1,7 @@
+[package]
+name = "grida-canvas-fonts"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ttf-parser = "0.25"

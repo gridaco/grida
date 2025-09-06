@@ -116,6 +116,7 @@ const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
     "ellipse",
     "polygon",
     "star",
+    "text",
     "component",
     "instance",
     "boolean",

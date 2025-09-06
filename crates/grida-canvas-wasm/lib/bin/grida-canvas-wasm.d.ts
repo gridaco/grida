@@ -58,7 +58,7 @@ declare namespace createGridaCanvas {
     _init(
       width: number,
       height: number,
-      cfg_font_fallback: boolean
+      use_embedded_fonts: boolean
     ): GridaCanvasWebGlApplicationPtr;
 
     // ====================================================================================================
@@ -87,6 +87,27 @@ declare namespace createGridaCanvas {
       x: number,
       y: number
     ): void;
+    _add_font(
+      state: GridaCanvasWebGlApplicationPtr,
+      family_ptr: number,
+      family_len: number,
+      data_ptr: number,
+      data_len: number
+    ): void;
+    _add_image(
+      state: GridaCanvasWebGlApplicationPtr,
+      data_ptr: number,
+      data_len: number
+    ): Ptr;
+    _has_missing_fonts(state: GridaCanvasWebGlApplicationPtr): boolean;
+    _list_missing_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
+    _list_available_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
+    _set_default_fallback_fonts(
+      state: GridaCanvasWebGlApplicationPtr,
+      ptr: number,
+      len: number
+    ): void;
+    _get_default_fallback_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
     _set_main_camera_transform(
       state: GridaCanvasWebGlApplicationPtr,
       a: number,
@@ -125,6 +146,12 @@ declare namespace createGridaCanvas {
       id_len: number,
       fmt_ptr: number,
       fmt_len: number
+    ): Ptr;
+
+    _to_vector_network(
+      state: GridaCanvasWebGlApplicationPtr,
+      id_ptr: number,
+      id_len: number
     ): Ptr;
 
     _command(

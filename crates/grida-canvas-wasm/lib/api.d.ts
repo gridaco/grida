@@ -30,6 +30,11 @@ export type Rectangle = {
   height: number;
 };
 
+export type FontKey = {
+  family: string;
+  // Future properties will allow precise font identification and partial fetching.
+};
+
 export type Image = TODO;
 export type Math2D = TODO;
 export type Color = TODO;
@@ -156,7 +161,38 @@ export interface Grida2DScene extends Grida2DRuntime {
   importNode(node: TODO): TODO;
 
   loadImage(url: string): Promise<Image>;
-  registerImage(image: Image): TODO;
+  addImage(data: Uint8Array): string;
+  /**
+   * Register a font with the renderer.
+   * @param family - CSS font-family name.
+   * @param data - Raw font bytes.
+   */
+  addFont(family: string, data: Uint8Array): void;
+
+  /**
+   * @returns true if the scene references fonts that are not yet registered.
+   */
+  hasMissingFonts(): boolean;
+
+  /**
+   * Fonts referenced in the scene that are not yet registered.
+   */
+  listMissingFonts(): FontKey[];
+
+  /**
+   * Fonts currently available in the runtime.
+   */
+  listAvailableFonts(): FontKey[];
+
+  /**
+   * Set the default fallback font families. Order matters.
+   */
+  setFallbackFonts(fonts: string[]): void;
+
+  /**
+   * Get the current default fallback font families.
+   */
+  getFallbackFonts(): string[];
 
   /**
    * @privateRemarks

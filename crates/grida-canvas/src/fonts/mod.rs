@@ -1,2 +1,1 @@
-pub mod geist;
-pub mod geistmono;
+pub mod embedded;

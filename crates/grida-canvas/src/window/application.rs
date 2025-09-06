@@ -3,8 +3,9 @@ use crate::devtools::{
 };
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
-use crate::node::schema::Scene;
-use crate::resource::{FontMessage, ImageMessage};
+use crate::io::io_grida::JSONVectorNetwork;
+use crate::node::schema::*;
+use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
@@ -37,6 +38,7 @@ pub trait ApplicationApi {
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork>;
 
     /// Enable or disable caching of raster tiles.
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool);
@@ -195,7 +197,8 @@ impl ApplicationApi for UnknownTargetApplication {
                 return true;
             }
             ApplicationCommand::TryCopyAsPNG => {
-                if let Some(id) = self.devtools_selection.clone() {
+                if let Some(id) = self.devtools_selection.as_ref() {
+                    let id = id.clone();
                     let exported = self.export_node_as(&id, ExportAs::png());
                     if let Some(exported) = exported {
                         self.clipboard.set_data(exported.data().to_vec());
@@ -253,9 +256,33 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported> {
         if let Some(scene) = self.renderer.scene.as_ref() {
-            return export_node_as(scene, &self.renderer.get_cache().geometry, id, format);
+            return export_node_as(
+                scene,
+                &self.renderer.get_cache().geometry,
+                &self.renderer.fonts,
+                id,
+                format,
+            );
         }
         return None;
+    }
+
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            if let Some(node) = scene.nodes.get(&id.to_string()) {
+                let vn = match node {
+                    Node::Rectangle(n) => Some(n.to_vector_network()),
+                    Node::Ellipse(n) => Some(n.to_vector_network()),
+                    Node::Polygon(n) => Some(n.to_vector_network()),
+                    Node::RegularPolygon(n) => Some(n.to_vector_network()),
+                    Node::RegularStarPolygon(n) => Some(n.to_vector_network()),
+                    Node::Vector(n) => Some(n.network.clone()),
+                    _ => None,
+                };
+                return vn.map(|v| v.into());
+            }
+        }
+        None
     }
 
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
@@ -295,7 +322,7 @@ impl ApplicationApi for UnknownTargetApplication {
     fn load_scene_json(&mut self, json: &str) {
         use crate::io::io_grida;
 
-        let Ok(file) = io_grida::parse(json) else {
+        let Ok(mut file) = io_grida::parse(json) else {
             let err = io_grida::parse(json).unwrap_err();
             eprintln!("failed to parse scene json: {}", err);
             return;
@@ -317,13 +344,13 @@ impl ApplicationApi for UnknownTargetApplication {
                 .unwrap_or_else(|| "scene".to_string())
         });
 
-        if let Some(scene) = file.document.scenes.get(&scene_id) {
+        if let Some(scene) = file.document.scenes.remove(&scene_id) {
             let scene = crate::node::schema::Scene {
                 id: scene_id,
-                name: scene.name.clone(),
-                children: scene.children.clone(),
+                name: scene.name,
+                children: scene.children,
                 nodes,
-                background_color: scene.background_color.clone().map(Into::into),
+                background_color: scene.background_color.map(Into::into),
             };
             self.renderer.load_scene(scene);
         }
@@ -423,8 +450,8 @@ impl UnknownTargetApplication {
     fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
-            self.renderer.add_image(msg.src.clone(), &msg.data);
-            println!("📝 Registered image with renderer: {}", msg.src);
+            let hash = self.renderer.add_image(&msg.data);
+            println!("📝 Registered image with renderer: {}", hash);
             updated = true;
         }
         if updated {
@@ -459,7 +486,7 @@ impl UnknownTargetApplication {
     }
 
     fn print_font_repository_info(&self) {
-        let font_repo = self.renderer.fonts.borrow();
+        let font_repo = &self.renderer.fonts;
         let family_count = font_repo.family_count();
         let total_font_count = font_repo.total_font_count();
 
@@ -486,7 +513,7 @@ impl UnknownTargetApplication {
         println!("✅ Font repository information printed");
     }
 
-    fn get_hit_tester(&mut self) -> crate::hittest::HitTester {
+    fn get_hit_tester(&mut self) -> crate::hittest::HitTester<'_> {
         crate::hittest::HitTester::new(self.renderer.get_cache())
     }
 
@@ -516,6 +543,31 @@ impl UnknownTargetApplication {
     pub(crate) fn resource_loaded(&mut self) {
         self.process_image_queue();
         self.process_font_queue();
+    }
+
+    pub fn has_missing_fonts(&self) -> bool {
+        self.renderer.fonts.has_missing()
+    }
+
+    pub fn list_missing_fonts(&self) -> Vec<String> {
+        self.renderer.fonts.missing_families()
+    }
+
+    pub fn list_available_fonts(&self) -> Vec<String> {
+        self.renderer.fonts.available_families()
+    }
+
+    pub fn set_default_fallback_fonts(&mut self, fonts: Vec<String>) {
+        self.renderer.fonts.set_user_fallback_families(fonts);
+        self.renderer.invalidate_cache();
+    }
+
+    pub fn get_default_fallback_fonts(&self) -> Vec<String> {
+        self.renderer.fonts.user_fallback_families()
+    }
+
+    pub fn report_missing_font(&mut self, family: &str) {
+        self.renderer.fonts.mark_missing(family);
     }
 
     /// Perform a redraw and print diagnostic information.
@@ -549,7 +601,7 @@ impl UnknownTargetApplication {
 
         let __total_frame_time = __frame_start.elapsed();
         let stat_string = format!(
-            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use)",
+            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | res: {} | img: {} | fnt: {}",
             1.0 / __total_frame_time.as_secs_f64(),
             __total_frame_time.as_secs_f64() * 1000.0,
             stats.total_duration.as_secs_f64() * 1000.0,
@@ -564,6 +616,9 @@ impl UnknownTargetApplication {
             stats.draw.cache_geometry_size,
             stats.draw.tiles_total,
             stats.draw.tiles_used,
+            self.renderer.resources.len(),
+            self.renderer.images.len(),
+            self.renderer.fonts.len(),
         );
 
         self.verbose(&stat_string);
