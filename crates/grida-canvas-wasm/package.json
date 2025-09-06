@@ -19,7 +19,9 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "serve": "serve -p 4020"
+    "serve": "serve -p 4020",
+    "prepack": "just build",
+    "prepublishOnly": "[ $(du -sk lib 2>/dev/null | cut -f1) -lt 15360 ]"
   },
   "files": [
     "dist"
