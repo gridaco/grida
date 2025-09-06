@@ -105,7 +105,7 @@ export namespace sitemap {
     fonts: {
       title: "Fonts",
       href: links.fonts,
-      description: "Open Fonts API",
+      description: "Open fonts for commercial use",
     } satisfies Item,
     tools: {
       title: "Tools",
