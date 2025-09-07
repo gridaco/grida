@@ -10,6 +10,7 @@ pub use index::ResourceIndex;
 use crate::cg::types::Paint;
 use crate::node::schema::Scene;
 use crate::window::application::HostEvent;
+#[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 
 #[cfg(not(target_arch = "wasm32"))]

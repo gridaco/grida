@@ -447,6 +447,7 @@ impl UnknownTargetApplication {
         // );
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
@@ -459,6 +460,7 @@ impl UnknownTargetApplication {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn process_font_queue(&mut self) {
         let mut updated = false;
         let mut font_count = 0;
@@ -540,6 +542,7 @@ impl UnknownTargetApplication {
         self.hit_test_result = new_hit_result;
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn resource_loaded(&mut self) {
         self.process_image_queue();
         self.process_font_queue();

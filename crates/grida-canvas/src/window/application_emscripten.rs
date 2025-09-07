@@ -213,12 +213,12 @@ impl EmscriptenApplication {
         let base = UnknownTargetApplication::new(
             state, backend, camera, 120, image_rx, font_rx, None, options,
         );
-        let app = Box::new(Self { base });
+        let _app = Box::new(Self { base });
 
         #[cfg(target_os = "emscripten")]
         unsafe {
             // Register the animation frame callback with the leaked pointer.
-            let app_ptr = Box::into_raw(app);
+            let app_ptr = Box::into_raw(_app);
             emscripten_request_animation_frame_loop(
                 Some(request_animation_frame_callback),
                 app_ptr as *mut _,
@@ -227,7 +227,7 @@ impl EmscriptenApplication {
             return Box::from_raw(app_ptr);
         }
 
-        app
+        unreachable!("emscipten cannot be initialized on native")
     }
 
     pub fn redraw(&mut self) {
