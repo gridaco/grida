@@ -57,7 +57,7 @@ When dealing with italic styles in font families, there are four common scenario
    This scenario involves a single variable font file that could theoretically support axes such as 'ital' (italic) or 'slnt' (slant) for smooth interpolation between upright and italic styles. However, no examples of this scenario were found in the 2025 Google Fonts registry.
 
    - 3-1. **One family, one variable font with italic instances (exceptional case)**  
-      This is an exceptional scenario where a single variable font supports the `slnt` axis and has explicit italic instances defined in `fvar.instances` (like Recursive and Roboto Flex). These fonts are not flagged as "italic" by OS/2 flags, but they support `slnt` axis with explicit italic instances. Detection relies on PostScript names in `fvar.instances` rather than reliable table sources, making this a unique case that requires special handling in font parsing logic.
+      This is an exceptional scenario where a single variable font supports the `slnt` axis and has explicit italic instances defined in `fvar.instances` (like Recursive and Roboto Flex). These fonts are not flagged as "italic" by OS/2 flags, but they support `slnt` axis with explicit italic instances. Detection relies on PostScript names in the name table (derived from `fvar.instances` analysis) rather than reliable table sources, making this a unique case that requires special handling in font parsing logic.
 
 4. **One family, two variable fonts (Roman VF + Italic VF)**  
    Some font families provide two separate variable fonts: one for the Roman (upright) style and another for the Italic style (like Inter and Noto Sans). This setup allows switching between these variable fonts depending on the style requested, combining the benefits of variable fonts with distinct design differences between Roman and Italic.
@@ -192,15 +192,16 @@ For each face (file) discovered in a family, extract and normalize:
 - `post.italicAngle`: numeric (hint only; not a decision source)
 - `STAT`: Axis/AxisValue descriptors and style name mappings
 - `fvar.instances`: list of named instances (axis → value map + style names)
-- `user_font_style`: optional explicit user declaration (equivalent to CSS `@font-face { font-style: italic }`)
+- `user_font_style_italic`: optional explicit user declaration that this face is italic (equivalent to CSS `@font-face { font-style: italic }`)
 
 ### Truth Signals & Priority (per face)
 
 **We classify a face as `Italic` only through the following ordered signals (first match wins):**
 
-0. **User font style declaration** → `Italic` (if `user_font_style` is provided and indicates italic)  
+0. **User font style declaration** → `Italic` (if `user_font_style_italic` is `Some(true)`)  
    Rationale: explicit user declaration takes highest priority. Equivalent to CSS `@font-face { font-style: italic }`.  
-   Use cases: custom uploaded fonts with user configuration, trustworthy providers (e.g., Google Fonts API providing files by variant).
+   Use cases: custom uploaded fonts with user configuration, trustworthy providers (e.g., Google Fonts API providing files by variant).  
+   Note: Users should only set this to `true` when confident the face is italic. If unsure, leave as `None` for automatic detection.
 
 1. **OS/2 ITALIC bit (bit 0) = 1** → `Italic`  
    Rationale: primary cross‑platform indicator used by engines.
@@ -379,13 +380,15 @@ This pipeline yields a compact, deterministic **Italic Capability Map** suitable
 ### Parser Configuration
 
 **User Font Style Trust:**  
-The parser supports a `trust_user_font_style` configuration option (default: `true`) that controls whether to trust explicit user declarations of font style. When enabled, `user_font_style` declarations take highest priority and bypass all other detection logic. This is useful for:
+The parser supports a `trust_user_font_style` configuration option (default: `true`) that controls whether to trust explicit user declarations of font style. When enabled, `user_font_style_italic` declarations take highest priority and bypass all other detection logic. This is useful for:
 
 - **Custom uploaded fonts** where users explicitly configure style information
 - **Trustworthy providers** like Google Fonts API that provide files by variant with reliable metadata
 - **Controlled environments** where user input is validated and trusted
 
 When `trust_user_font_style` is `false`, the parser ignores user declarations and relies solely on font table analysis.
+
+**Semantic Clarity:** The `user_font_style_italic` field uses `Option<bool>` instead of an enum to avoid semantic confusion. Users should only set this to `Some(true)` when they're confident the face is italic. If unsure, they should leave it as `None` to let the system detect it automatically. This prevents the confusion that would arise from users passing "normal" when they're uncertain.
 
 ### Name-based Parsing Policy
 
@@ -461,16 +464,19 @@ Given the complexity of implementing the full italic detection pipeline, we prop
 - ✅ **User font style declaration** (highest priority)
 - ✅ **OS/2 ITALIC bit detection** (bit 0)
 - ✅ **Variable font `ital` axis** with default/instance detection
+- ✅ **Scenario 3-1: VF with `slnt` axis & italic instances** (requires italic-named instances via name table)
+- ✅ **Variable font `slnt` axis** with permissive detection (any font with slnt axis)
+- ✅ **Advanced `slnt` axis detection** (comprehensive name table analysis for italic instances)
+- ✅ **`fvar.instances` parsing** for variable font instance detection and analysis
 - ✅ **Family Aggregation & Selection Flow**
 
 **Excluded:**
 
 - ❌ **Parser configuration** (`trust_user_font_style` => always trust)
-- ❌ **Scenario 3-1: VF with `slnt` axis & italic instances** (requires name-based detection via `fvar.instances`)
-- ❌ Name-based parsing logic
-- ❌ STAT table analysis
-- ❌ PostScript name fallbacks
-- ❌ Complex edge case handling
+- ❌ **Complex name-based parsing logic** (simplified name-based fallback only)
+- ❌ **STAT table analysis**
+- ❌ **PostScript name fallbacks**
+- ❌ **Complex edge case handling**
 
 **Target:** 99%+ accuracy with well-formed fonts from reputable providers.
 
@@ -481,10 +487,10 @@ Given the complexity of implementing the full italic detection pipeline, we prop
 **Additional Features:**
 
 - ✅ **Parser configuration** (`trust_user_font_style` => configurable)
-- ✅ **Scenario 3-1: VF with `slnt` axis & italic instances** (Recursive, Roboto Flex)
 - ✅ **STAT table analysis** for style mappings
-- ✅ **Name-based parsing** as fallback (with warnings)
+- ✅ **Advanced name-based parsing** with comprehensive fallbacks (all name table entries)
 - ✅ **PostScript name analysis** for instance detection
+- ✅ **Advanced `fvar.instances` analysis** for complex edge cases and malformed fonts
 - ✅ **Complex edge case handling** (mis-flagged fonts, ambiguous OS/2 combinations)
 - ✅ **Advanced validation & diagnostics**
 - ✅ **CJK and mixed-script fallback handling**

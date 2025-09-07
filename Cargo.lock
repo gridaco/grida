@@ -1069,6 +1069,8 @@ dependencies = [
 name = "grida-canvas-fonts"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "ttf-parser",
 ]
 
