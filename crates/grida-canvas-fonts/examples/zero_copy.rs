@@ -1,8 +1,12 @@
 use grida_canvas_fonts::parse_ui::*;
 
-/// Test that demonstrates both copy and zero-copy APIs work
-#[test]
-fn test_dual_api_demo() {
+/// Example that demonstrates both copy and zero-copy APIs work
+fn main() {
+    dual_api_demo();
+    memory_efficiency_comparison();
+}
+
+fn dual_api_demo() {
     let parser = UIFontParser::new();
 
     // Create some dummy font data
@@ -35,9 +39,8 @@ fn test_dual_api_demo() {
     assert_eq!(font_data[0], 0x00);
 }
 
-/// Test that demonstrates the memory efficiency difference
-#[test]
-fn test_memory_efficiency_comparison() {
+/// Example that demonstrates the memory efficiency difference
+fn memory_efficiency_comparison() {
     let parser = UIFontParser::new();
 
     // Create a large font data array

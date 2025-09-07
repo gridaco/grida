@@ -2349,6 +2349,12 @@ export namespace editor.api {
      */
     getFontDetails(fontFamily: string): Promise<{
       font: GoogleWebFontListItem;
+      faces: Array<{
+        variant: string;
+        axes: FvarAxes;
+        instances: FvarInstance[];
+        features: FontFeature[];
+      }>;
       axes: FvarAxes;
       instances: FvarInstance[];
       features: FontFeature[];

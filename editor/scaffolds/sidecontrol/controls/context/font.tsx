@@ -2,6 +2,7 @@ import React from "react";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import type { FvarInstance, FontFeature } from "@grida/fonts/parse";
 import type Typr from "@grida/fonts/typr";
+import { parseVariant } from "@grida/fonts/fontface";
 
 const DEFAULT_WEIGHTS = [
   { value: "100", label: "Thin" },
@@ -114,28 +115,38 @@ export function CurrentFontProvider({
         return;
       }
 
-      // Extract weight information from wght axis and instances
-      const weights: Array<{ value: string; label: string }> = [];
+      const weightMap = new Map<string, string>();
 
-      // Add weights from instances first (these are named instances)
-      if (detail.instances && detail.instances.length > 0) {
-        const wghtInstances = detail.instances
-          .map((inst) => {
-            const wght = inst.coordinates["wght"];
-            if (typeof wght !== "number") return null;
-            return { value: wght.toString(), label: inst.name };
-          })
-          .filter(Boolean) as Array<{ value: string; label: string }>;
-
-        if (wghtInstances.length > 0) {
-          weights.push(...wghtInstances);
+      // Collect weights from instances (named styles)
+      for (const inst of detail.instances ?? []) {
+        const wght = inst.coordinates["wght"];
+        if (typeof wght === "number") {
+          weightMap.set(wght.toString(), inst.name);
         }
       }
 
-      // If no instances or no wght instances, and fallbackWeights is true, add default weights
-      if (weights.length === 0 && fallbackWeights) {
-        weights.push(...DEFAULT_WEIGHTS);
+      // Collect weights from available variants
+      for (const variant of detail.font.variants) {
+        const v = parseVariant(variant, detail.font.family);
+        const value = String(v.weight ?? "");
+        if (value && !weightMap.has(value)) {
+          const label =
+            DEFAULT_WEIGHTS.find((w) => w.value === value)?.label || variant;
+          weightMap.set(value, label);
+        }
       }
+
+      // Fallback to default weights if nothing was resolved
+      if (weightMap.size === 0 && fallbackWeights) {
+        for (const w of DEFAULT_WEIGHTS) {
+          weightMap.set(w.value, w.label);
+        }
+      }
+
+      const weights = Array.from(weightMap, ([value, label]) => ({
+        value,
+        label,
+      })).sort((a, b) => Number(a.value) - Number(b.value));
 
       if (!canceled) {
         setValue((prev) => ({

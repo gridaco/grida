@@ -133,6 +133,12 @@ export class Editor
     string,
     {
       font: google.GoogleWebFontListItem;
+      faces: Array<{
+        variant: string;
+        axes: FvarAxes;
+        instances: FvarInstance[];
+        features: FontFeature[];
+      }>;
       axes: FvarAxes;
       instances: FvarInstance[];
       features: FontFeature[];
@@ -2802,12 +2808,18 @@ export class Editor
   }
 
   /**
-   * @deprecated TODO:
-   * 1. need a different pipeline
-   * 2. need to load all files
+   * Loads all font faces for a given family and extracts details once every
+   * face is available. This method fetches all font files first and then runs
+   * analysis to avoid progressive parsing.
    */
   async getFontDetails(fontFamily: string): Promise<{
     font: google.GoogleWebFontListItem;
+    faces: Array<{
+      variant: string;
+      axes: FvarAxes;
+      instances: FvarInstance[];
+      features: FontFeature[];
+    }>;
     axes: FvarAxes;
     instances: FvarInstance[];
     features: FontFeature[];
@@ -2821,13 +2833,61 @@ export class Editor
     );
     if (!item) return null;
 
-    const url = item.files[item.variants[0]] ?? Object.values(item.files)[0];
-    const buffer = await fetch(url).then((r) => r.arrayBuffer());
-    const { fvar, features } = await this.getParserWorker().details(buffer);
-    const detail = {
-      font: item,
+    const files = Object.entries(item.files);
+
+    // Load all font buffers non-progressively
+    const buffers = await Promise.all(
+      files.map(([, url]) => fetch(url).then((r) => r.arrayBuffer()))
+    );
+
+    // Parse each buffer once all fonts are loaded
+    const parsed = await Promise.all(
+      buffers.map((buf) => this.getParserWorker().details(buf))
+    );
+
+    const faces = parsed.map(({ fvar, features }, i) => ({
+      variant: files[i][0],
       axes: fvar.axes,
       instances: fvar.instances,
+      features,
+    }));
+
+    // Merge axes
+    const axes: FvarAxes = {};
+    for (const face of faces) {
+      Object.assign(axes, face.axes);
+    }
+
+    // Merge instances, deduplicating by name and coordinates
+    const instances: FvarInstance[] = [];
+    const instSeen = new Set<string>();
+    for (const face of faces) {
+      for (const inst of face.instances) {
+        const key = inst.name + JSON.stringify(inst.coordinates);
+        if (!instSeen.has(key)) {
+          instSeen.add(key);
+          instances.push(inst);
+        }
+      }
+    }
+
+    // Merge features, deduplicating by tag
+    const features: FontFeature[] = [];
+    const featureSeen = new Set<string>();
+    for (const face of faces) {
+      for (const feat of face.features) {
+        if (!featureSeen.has(feat.tag)) {
+          featureSeen.add(feat.tag);
+          features.push(feat);
+        }
+      }
+    }
+
+    const detail = {
+      font: item,
+      faces,
+      axes,
+      instances,
       features,
     } as const;
     this.fontDetailsCache.set(fontFamily, detail);

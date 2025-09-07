@@ -1,8 +1,8 @@
 use grida_canvas_fonts::parse_ui::*;
 
-/// Simple demonstration that zero-copy UIFontFace works correctly
+/// Test that zero-copy UIFontFace works correctly
 #[test]
-fn test_zero_copy_demo() {
+fn test_zero_copy_functionality() {
     let parser = UIFontParser::new();
 
     // Create some dummy font data
@@ -28,9 +28,9 @@ fn test_zero_copy_demo() {
     assert_eq!(font_data[0], 0x00);
 }
 
-/// Test that demonstrates the memory efficiency of zero-copy approach
+/// Test that verifies the memory efficiency of zero-copy approach
 #[test]
-fn test_memory_efficiency_demo() {
+fn test_memory_efficiency() {
     // Create a large font data array
     let large_font_data = vec![0u8; 1024 * 1024]; // 1MB of data
 

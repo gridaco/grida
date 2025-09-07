@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use ttf_parser::{Face, Tag, name_id};
+use ttf_parser::{name_id, Face, Tag};
 
 fn font_path(rel: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -9,7 +9,12 @@ fn font_path(rel: &str) -> PathBuf {
         .join(rel)
 }
 
-#[test]
+fn main() {
+    explore_roboto_flex_comprehensive();
+    test_roboto_flex_italic_detection_scenarios();
+    test_roboto_flex_name_table_analysis();
+}
+
 fn explore_roboto_flex_comprehensive() {
     let path = font_path(
         "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf",
@@ -263,7 +268,6 @@ fn explore_roboto_flex_comprehensive() {
     println!("6. Potential enhancement: Use STAT table and name table italic instances");
 }
 
-#[test]
 fn test_roboto_flex_italic_detection_scenarios() {
     let path = font_path(
         "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf",
@@ -322,7 +326,6 @@ fn test_roboto_flex_italic_detection_scenarios() {
     }
 }
 
-#[test]
 fn test_roboto_flex_name_table_analysis() {
     let path = font_path(
         "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf",
