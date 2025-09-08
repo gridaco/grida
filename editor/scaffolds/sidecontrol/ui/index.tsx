@@ -4,6 +4,9 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
+  SelectGroup,
+  SelectSeparator,
+  SelectLabel,
   SelectValue,
 } from "@/components/ui-editor/select";
 import { Separator } from "@/components/ui/separator";
@@ -151,14 +154,23 @@ export function PropertyEnum<T extends string>({
   tabIndex,
   ...props
 }: Omit<React.ComponentProps<typeof Select>, "value" | "onValueChange"> & {
-  enum: EnumItem<T>[];
+  enum: EnumItem<T>[] | EnumItem<T>[][];
   value?: TMixed<T>;
   placeholder?: string;
   onValueChange?: (value: T) => void;
   tabIndex?: number;
 }) {
   const mixed = value === grida.mixed;
-  const hasIcon = enums.some((e) => typeof e !== "string" && e.icon);
+
+  // Check if enums is grouped (array of arrays)
+  const isGrouped = Array.isArray(enums[0]);
+
+  // Flatten all enum items to check for icons
+  const allEnums = isGrouped
+    ? (enums as EnumItem<T>[][]).flat()
+    : (enums as EnumItem<T>[]);
+  const hasIcon = allEnums.some((e) => typeof e !== "string" && e.icon);
+
   return (
     <Select value={mixed ? undefined : value} {...props}>
       <SelectTrigger
@@ -168,18 +180,40 @@ export function PropertyEnum<T extends string>({
         <SelectValue placeholder={mixed ? "mixed" : placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {enums.map((e) => {
-          const value = typeof e === "string" ? e : e.value;
-          const label = typeof e === "string" ? e : e.label;
-          const icon = typeof e === "string" ? undefined : e.icon;
-          const disabled = typeof e === "string" ? false : e.disabled;
-          return (
-            <SelectItem key={value} value={value} disabled={disabled}>
-              {hasIcon && icon && <>{icon}</>}
-              {label ?? value}
-            </SelectItem>
-          );
-        })}
+        {isGrouped
+          ? // Render grouped enum items with separators
+            (enums as EnumItem<T>[][]).flatMap((group, groupIndex) => [
+              // Add separator before each group except the first
+              ...(groupIndex > 0
+                ? [<SelectSeparator key={`sep-${groupIndex}`} />]
+                : []),
+              // Add all items in the group
+              ...group.map((e) => {
+                const value = typeof e === "string" ? e : e.value;
+                const label = typeof e === "string" ? e : e.label;
+                const icon = typeof e === "string" ? undefined : e.icon;
+                const disabled = typeof e === "string" ? false : e.disabled;
+                return (
+                  <SelectItem key={value} value={value} disabled={disabled}>
+                    {hasIcon && icon && <>{icon}</>}
+                    {label ?? value}
+                  </SelectItem>
+                );
+              }),
+            ])
+          : // Render flat enum items
+            (enums as EnumItem<T>[]).map((e) => {
+              const value = typeof e === "string" ? e : e.value;
+              const label = typeof e === "string" ? e : e.label;
+              const icon = typeof e === "string" ? undefined : e.icon;
+              const disabled = typeof e === "string" ? false : e.disabled;
+              return (
+                <SelectItem key={value} value={value} disabled={disabled}>
+                  {hasIcon && icon && <>{icon}</>}
+                  {label ?? value}
+                </SelectItem>
+              );
+            })}
       </SelectContent>
     </Select>
   );
