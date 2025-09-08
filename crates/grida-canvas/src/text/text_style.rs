@@ -55,35 +55,32 @@ pub fn textstyle(
         ts.set_letter_spacing(letter_spacing);
     }
 
-    // always override
+    /// skia will not support 0.0 or below 0.001
+    /// https://github.com/rust-skia/rust-skia/issues/1203
+    const MIN_LINE_HEIGHT_FACTOR: f32 = 0.01;
     match style.line_height {
         TextLineHeight::Normal => {
+            ts.set_height_override(false);
             // CSS `line-height: normal`
             // → use font metrics; don't set height; don't override.
-            ts.set_height_override(false);
-            // skia treats 0 as "unset"
-            ts.set_height(0.0);
+            // convention: -1 as "unset" (not required)
+            ts.set_height(-1.0);
         }
         TextLineHeight::Fixed(px) => {
-            // CSS `line-height: 12px` (absolute)
-            // Skia expects a multiplier, so convert: factor = px / fontSize
-            let fs = style.font_size.max(f32::EPSILON); // avoid div-by-zero
-            let factor = (px / fs)
-                // skia will not support 0.0 or below 0.001
-                // https://github.com/rust-skia/rust-skia/issues/1203
-                .max(0.001);
-            ts.set_height(factor);
             ts.set_height_override(true); // force exact spacing (even < metrics)
+                                          // CSS `line-height: 12px` (absolute)
+                                          // Skia expects a multiplier, so convert: factor = px / fontSize
+
+            let fs = style.font_size.max(f32::EPSILON); // avoid div-by-zero
+            let factor = (px / fs).max(MIN_LINE_HEIGHT_FACTOR);
+            ts.set_height(factor);
         }
         TextLineHeight::Factor(mult) => {
-            // CSS `line-height: 120%`
-            // Percent is already a factor of font size.
-            let factor = (mult)
-                // skia will not support 0.0 or below 0.001
-                // https://github.com/rust-skia/rust-skia/issues/1203
-                .max(0.001);
-            ts.set_height(factor);
             ts.set_height_override(true); // force exact spacing
+                                          // CSS `line-height: 120%`
+                                          // Percent is already a factor of font size.
+            let factor = (mult).max(MIN_LINE_HEIGHT_FACTOR);
+            ts.set_height(factor);
         }
     }
     ts.set_decoration(&decoration);
