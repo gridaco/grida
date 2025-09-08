@@ -31,7 +31,7 @@ async fn demo_webfonts() -> Scene {
         font_variations: None,
         font_optical_sizing: Default::default(),
         letter_spacing: Default::default(),
-        italic: false,
+        font_style_italic: false,
         line_height: Default::default(),
         text_transform: TextTransform::None,
     };
@@ -53,7 +53,7 @@ async fn demo_webfonts() -> Scene {
         font_variations: None,
         font_optical_sizing: Default::default(),
         letter_spacing: Default::default(),
-        italic: false,
+        font_style_italic: false,
         line_height: TextLineHeight::Fixed(1.5),
         text_transform: TextTransform::None,
     };
@@ -97,7 +97,7 @@ async fn demo_webfonts() -> Scene {
             font_variations: None,
             font_optical_sizing: Default::default(),
             letter_spacing: Default::default(),
-            italic: *is_italic,
+            font_style_italic: *is_italic,
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };

@@ -729,7 +729,7 @@ pub struct TextStyleRec {
     pub font_weight: FontWeight,
 
     /// Font italic style.
-    pub italic: bool,
+    pub font_style_italic: bool,
 
     /// Additional spacing between characters, in logical pixels.  
     /// Default is `0.0`.
@@ -758,7 +758,7 @@ impl TextStyleRec {
             font_family: font.to_string(),
             font_size: size,
             font_weight: Default::default(),
-            italic: false,
+            font_style_italic: false,
             letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,

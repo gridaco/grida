@@ -318,7 +318,7 @@ fn draw_text_example(
         font_features: None,
         font_variations: None,
         font_optical_sizing: optical_sizing,
-        italic: false,
+        font_style_italic: false,
         letter_spacing: Default::default(),
         line_height: Default::default(),
         text_transform: cg::cg::types::TextTransform::None,

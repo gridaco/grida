@@ -428,6 +428,8 @@ pub struct JSONTextNode {
     pub font_family: Option<String>,
     #[serde(rename = "fontWeight", default)]
     pub font_weight: FontWeight,
+    #[serde(rename = "fontStyleItalic", default)]
+    pub font_style_italic: bool,
 
     #[serde(rename = "fontFeatures", default)]
     pub font_features: Option<HashMap<String, bool>>,
@@ -710,7 +712,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 font_family: node.font_family.unwrap_or_else(|| "".to_string()),
                 font_size: node.font_size.unwrap_or(14.0),
                 font_weight: node.font_weight,
-                italic: false,
+                font_style_italic: node.font_style_italic,
                 letter_spacing: node
                     .letter_spacing
                     .map(TextLetterSpacing::Factor)

@@ -81,6 +81,8 @@ export default function initialNode(
         height: "auto",
         text: "Text",
         stroke: undefined,
+        letterSpacing: 0,
+        lineHeight: undefined, // normal
         strokeWidth: 0,
         ...seed,
       } satisfies grida.program.nodes.TextNode;

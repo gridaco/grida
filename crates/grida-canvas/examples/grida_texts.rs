@@ -36,7 +36,7 @@ async fn demo_texts() -> Scene {
         text_decoration: None,
         font_family: "Geist".to_string(),
         font_size: 48.0,
-        italic: false,                     // TODO: add italic to text style
+        font_style_italic: false,          // TODO: add italic to text style
         font_weight: FontWeight::new(700), // Bold
         font_features: None,
         font_variations: None,

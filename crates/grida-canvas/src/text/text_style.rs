@@ -20,7 +20,7 @@ pub fn textstyle(
     let font_style = skia_safe::FontStyle::new(
         skia_safe::font_style::Weight::from(style.font_weight.value() as i32),
         skia_safe::font_style::Width::NORMAL,
-        if style.italic {
+        if style.font_style_italic {
             skia_safe::font_style::Slant::Italic
         } else {
             skia_safe::font_style::Slant::Upright

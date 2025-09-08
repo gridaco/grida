@@ -3,7 +3,18 @@ import type { TMixed } from "../controls/utils/types";
 import type { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 
-// Helper function to handle floating point precision
+/**
+ * Rounds a number to match the precision of the given step value.
+ *
+ * @param value - The number to round
+ * @param step - The step value to match precision with
+ * @returns The rounded number with precision matching the step
+ *
+ * @example
+ * roundToStep(1.234, 0.1) // Returns 1.2
+ * roundToStep(1.234, 1)   // Returns 1
+ * roundToStep(1.234, 0.01) // Returns 1.23
+ */
 const roundToStep = (value: number, step: number): number => {
   // Count decimal places in step
   const stepDecimals = step.toString().split(".")[1]?.length || 0;
@@ -11,7 +22,18 @@ const roundToStep = (value: number, step: number): number => {
   return Number(value.toFixed(stepDecimals));
 };
 
-// Helper function to format value with proper precision based on step
+/**
+ * Formats a number with precision matching the step value and removes trailing zeros.
+ *
+ * @param value - The number to format
+ * @param step - The step value to determine precision
+ * @returns Formatted string with appropriate precision
+ *
+ * @example
+ * formatValueWithPrecision(5.00, 1)   // Returns "5"
+ * formatValueWithPrecision(5.10, 0.1) // Returns "5.1"
+ * formatValueWithPrecision(5.12, 0.01) // Returns "5.12"
+ */
 const formatValueWithPrecision = (value: number, step: number): string => {
   // Count decimal places in step
   const stepDecimals = step.toString().split(".")[1]?.length || 0;
@@ -28,13 +50,26 @@ const formatValueWithPrecision = (value: number, step: number): string => {
   return formatted.replace(/\.?0+$/, "");
 };
 
-// Helper function to parse value with suffix
+/**
+ * Parses a string value into a number, handling optional suffix removal.
+ * Returns NaN for empty or invalid values instead of 0 to prevent unwanted commits.
+ *
+ * @param value - The string value to parse
+ * @param type - Whether to parse as integer or number
+ * @param suffix - Optional suffix to remove (e.g., "%", "px")
+ * @returns Parsed number or NaN if invalid/empty
+ *
+ * @example
+ * parseValueWithSuffix("123%", "number", "%") // Returns 123
+ * parseValueWithSuffix("", "number")          // Returns NaN
+ * parseValueWithSuffix("abc", "number")       // Returns NaN
+ */
 const parseValueWithSuffix = (
   value: string,
   type: "integer" | "number",
   suffix?: string
 ): number => {
-  if (!value) return 0;
+  if (!value) return NaN;
 
   // Remove suffix if present
   let cleanValue = value;
@@ -43,12 +78,26 @@ const parseValueWithSuffix = (
   }
 
   // Parse the numeric value
-  return type === "integer"
-    ? parseInt(cleanValue)
-    : parseFloat(cleanValue) || 0;
+  const parsed =
+    type === "integer" ? parseInt(cleanValue) : parseFloat(cleanValue);
+
+  return isNaN(parsed) ? NaN : parsed;
 };
 
-// Helper function to format value with suffix and precision
+/**
+ * Formats a value for display with optional suffix, scaling, and precision.
+ *
+ * @param value - The value to format (number, string, or "mixed")
+ * @param suffix - Optional suffix to append (e.g., "%", "px")
+ * @param scale - Optional scale factor for display (e.g., 100 for percentages)
+ * @param step - Optional step value to determine precision
+ * @returns Formatted string for display
+ *
+ * @example
+ * formatValueWithSuffix(0.5, "%", 100, 0.1) // Returns "50%"
+ * formatValueWithSuffix("mixed")            // Returns "mixed"
+ * formatValueWithSuffix("")                 // Returns ""
+ */
 const formatValueWithSuffix = (
   value: string | number,
   suffix?: string,
@@ -74,7 +123,19 @@ const formatValueWithSuffix = (
   return suffix ? `${formattedValue}${suffix}` : formattedValue;
 };
 
-// Helper function to parse value with scaling
+/**
+ * Parses a string value into a number with optional suffix removal and inverse scaling.
+ *
+ * @param value - The string value to parse
+ * @param type - Whether to parse as integer or number
+ * @param suffix - Optional suffix to remove (e.g., "%", "px")
+ * @param scale - Optional scale factor for inverse scaling (e.g., 100 for percentages)
+ * @returns Parsed number with inverse scaling applied, or NaN if invalid
+ *
+ * @example
+ * parseValueWithScaling("50%", "number", "%", 100) // Returns 0.5
+ * parseValueWithScaling("123", "number", undefined, 100) // Returns 1.23
+ */
 const parseValueWithScaling = (
   value: string,
   type: "integer" | "number",
@@ -123,25 +184,82 @@ type UseNumberInputProps = {
 };
 
 /**
- * Custom hook for managing number input state and behavior.
+ * Custom hook for managing number input state and behavior with comprehensive safety checks.
  *
- * Extracts all the logic from InputPropertyNumber component while maintaining
- * all the original behavior including:
- * - Internal state management
- * - Value synchronization
- * - Arrow key handling
- * - Value commit logic
- * - Focus/blur behavior with optional commit on blur
- * - Mixed value support
- * - Min/max constraints
- * - Step precision handling with smart formatting
- * - Suffix support for formatting and parsing
- * - Value scaling for display (e.g., percentages: 0.01 -> 1%)
+ * ## Features
+ * - **Internal state management**: Maintains internal value separate from external value
+ * - **Value synchronization**: Syncs with external value changes while preserving user input
+ * - **Arrow key handling**: Increment/decrement with step precision and min/max constraints
+ * - **Safe commit logic**: Prevents unwanted commits with multiple safety checks
+ * - **Focus/blur behavior**: Optional commit on blur with safety validation
+ * - **Mixed value support**: Handles "mixed" state for multiple selected values
+ * - **Min/max constraints**: Enforces value bounds with proper clamping
+ * - **Step precision handling**: Smart formatting based on step value
+ * - **Suffix support**: Handles display suffixes (%, px, etc.) with proper parsing
+ * - **Value scaling**: Supports display scaling (e.g., percentages: 0.01 -> 1%)
  *
- * Smart Formatting:
+ * ## Safety Features
+ * - **NaN Prevention**: Empty/invalid inputs return NaN instead of 0 to prevent unwanted commits
+ * - **Focus Validation**: Only commits values when input is actually focused (unless forced)
+ * - **Dirty State Check**: Only commits values that differ from the last committed value
+ * - **Global Pointer Safety**: Handles cases where input is destroyed before blur
+ *
+ * ## Smart Formatting
  * - Respects step precision (step=1 shows integers, step=0.1 shows 1 decimal)
  * - Removes unnecessary trailing zeros (5.00 -> 5, 5.10 -> 5.1)
  * - Maintains proper precision based on step value
+ *
+ * ## Usage Examples
+ * ```tsx
+ * // Basic number input
+ * const { internalValue, handleChange, handleKeyDown, handleFocus, handleBlur } = useNumberInput({
+ *   value: 42,
+ *   onValueCommit: (value) => console.log('Committed:', value)
+ * });
+ *
+ * // Percentage input with scaling
+ * const percentageInput = useNumberInput({
+ *   value: 0.5,
+ *   suffix: '%',
+ *   scale: 100,
+ *   step: 0.1,
+ *   onValueCommit: (value) => setPercentage(value) // value will be 0.5, display shows 50%
+ * });
+ *
+ * // Integer input with constraints
+ * const ageInput = useNumberInput({
+ *   type: 'integer',
+ *   value: 25,
+ *   min: 0,
+ *   max: 120,
+ *   step: 1
+ * });
+ * ```
+ *
+ * ## Commit Scenarios
+ * 1. **Blur Events**: Commits if value is dirty and valid (forceCommit=true)
+ * 2. **Enter/Tab Keys**: Commits if value is valid (forceCommit=true)
+ * 3. **Global Pointer Down**: Commits only if focused and dirty (no forceCommit)
+ * 4. **Arrow Keys**: Commits immediately with delta changes
+ *
+ * ## Error Handling & Edge Cases
+ * - **Empty Input**: Returns NaN instead of 0 to prevent unwanted commits
+ * - **Invalid Input**: Returns NaN and skips commit to preserve existing value
+ * - **Mixed Values**: Handles "mixed" state gracefully without committing
+ * - **Focus Loss**: Safely handles cases where input is destroyed before blur
+ * - **Value Constraints**: Automatically clamps values to min/max bounds
+ * - **Precision Loss**: Rounds values to match step precision to avoid floating point errors
+ * - **Suffix Parsing**: Safely handles malformed suffix inputs
+ * - **Scaling Edge Cases**: Handles zero scale values and extreme scaling factors
+ *
+ * ## Performance Considerations
+ * - Uses `useCallback` for all event handlers to prevent unnecessary re-renders
+ * - Minimal re-renders through careful dependency management
+ * - Efficient parsing with early returns for edge cases
+ * - Global event listener cleanup to prevent memory leaks
+ *
+ * @param props - Configuration object for the number input
+ * @returns Object containing state, event handlers, and computed values
  */
 export function useNumberInput({
   type = "number",
@@ -207,6 +325,44 @@ export function useNumberInput({
     [step, min, max, mode, onValueCommit]
   );
 
+  /**
+   * Safe commit function that includes comprehensive safety checks for all commit scenarios.
+   *
+   * This function prevents unwanted commits by validating:
+   * 1. Value validity (not NaN)
+   * 2. Focus state (unless forced)
+   * 3. Dirty state (value has actually changed)
+   *
+   * @param valueToCommit - The numeric value to commit
+   * @param forceCommit - Whether to bypass focus check (used for blur/Enter events)
+   * @returns true if commit was successful, false if skipped due to safety checks
+   *
+   * @example
+   * // Normal commit (requires focus)
+   * safeCommit(42) // Only commits if input is focused and value is dirty
+   *
+   * // Forced commit (bypasses focus check)
+   * safeCommit(42, true) // Commits if value is dirty, regardless of focus
+   */
+  const safeCommit = useCallback(
+    (valueToCommit: number, forceCommit: boolean = false) => {
+      // Safety check 0: Don't commit NaN values (empty/invalid input)
+      if (isNaN(valueToCommit)) return false;
+
+      // Safety check 1: Only commit if the input is focused (unless forced)
+      if (!forceCommit && !isFocusedRef.current) return false;
+
+      // Safety check 2: Only commit if the value is "dirty" (different from last committed)
+      const lastCommitted = lastCommittedRef.current;
+      if (lastCommitted !== undefined && valueToCommit === lastCommitted)
+        return false;
+
+      handleCommit(valueToCommit);
+      return true;
+    },
+    [handleCommit]
+  );
+
   const handleFocus = useCallback(
     (
       e: React.FocusEvent<HTMLInputElement>,
@@ -237,10 +393,17 @@ export function useNumberInput({
           scale
         );
         if (!isNaN(currentValue)) {
-          handleCommit(currentValue);
-          setInternalValue(
-            formatValueWithSuffix(currentValue, suffix, scale, step)
-          );
+          // Use safe commit with forceCommit=true for blur events
+          const committed = safeCommit(currentValue, true);
+          if (committed) {
+            setInternalValue(
+              formatValueWithSuffix(currentValue, suffix, scale, step)
+            );
+          } else {
+            setInternalValue(
+              formatValueWithSuffix(value ?? "", suffix, scale, step)
+            );
+          }
         } else {
           setInternalValue(
             formatValueWithSuffix(value ?? "", suffix, scale, step)
@@ -255,7 +418,7 @@ export function useNumberInput({
       }
       onBlur?.(e);
     },
-    [commitOnBlur, mixed, value, suffix, scale, step, type, handleCommit]
+    [commitOnBlur, mixed, value, suffix, scale, step, type, safeCommit]
   );
 
   const handleKeyDown = useCallback(
@@ -313,35 +476,19 @@ export function useNumberInput({
         return;
       }
 
-      switch (mode) {
-        case "auto":
-          if (e.key === "Enter" || e.key === "Tab") {
-            const currentValue = parseValueWithScaling(
-              String(internalValue),
-              type,
-              suffix,
-              scale
-            );
-            if (!isNaN(currentValue)) {
-              handleCommit(currentValue);
-            }
-            e.currentTarget.blur();
-          }
-          break;
-        case "fixed":
-          if (e.key === "Enter" || e.key === "Tab") {
-            const currentValue = parseValueWithScaling(
-              String(internalValue),
-              type,
-              suffix,
-              scale
-            );
-            if (!isNaN(currentValue)) {
-              handleCommit(currentValue);
-            }
-            e.currentTarget.blur();
-          }
-          break;
+      // Handle Enter/Tab keys for both modes (same logic)
+      if (e.key === "Enter" || e.key === "Tab") {
+        const currentValue = parseValueWithScaling(
+          String(internalValue),
+          type,
+          suffix,
+          scale
+        );
+        if (!isNaN(currentValue)) {
+          // Use safe commit with forceCommit=true for Enter/Tab keys
+          safeCommit(currentValue, true);
+        }
+        e.currentTarget.blur();
       }
     },
     [
@@ -353,6 +500,7 @@ export function useNumberInput({
       mode,
       onValueChange,
       handleCommit,
+      safeCommit,
       suffix,
       scale,
     ]
@@ -381,9 +529,7 @@ export function useNumberInput({
 
   // Global pointer down listener to commit pending changes when the input is
   // removed before blur can occur (e.g., selection change destroys the element).
-  // Only triggers if:
-  // 1. The input is currently focused
-  // 2. The value is "dirty" (different from the last committed value)
+  // Uses safe commit which includes safety checks for focus and dirty state.
   useEffect(() => {
     if (!commitOnBlur || mixed) return;
 
@@ -391,9 +537,6 @@ export function useNumberInput({
       const el = inputRef.current;
       if (!el) return;
       if (el.contains(e.target as Node)) return;
-
-      // Safety check 1: Only trigger if the input is currently focused
-      if (!isFocusedRef.current) return;
 
       const currentValue = parseValueWithScaling(
         String(internalValue),
@@ -403,34 +546,39 @@ export function useNumberInput({
       );
       if (isNaN(currentValue)) return;
 
-      // Safety check 2: Only trigger if the value is "dirty" (different from last committed)
-      const lastCommitted = lastCommittedRef.current;
-      if (lastCommitted !== undefined && currentValue === lastCommitted) return;
-
-      handleCommit(currentValue);
+      // Use safe commit (no forceCommit for pointer down - relies on focus check)
+      safeCommit(currentValue);
     };
 
     window.addEventListener("pointerdown", handlePointerDown, true);
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown, true);
     };
-  }, [commitOnBlur, mixed, internalValue, type, suffix, scale, handleCommit]);
+  }, [commitOnBlur, mixed, internalValue, type, suffix, scale, safeCommit]);
 
   return {
     // State
+    /** Current internal value (string or number) - may differ from external value during editing */
     internalValue,
+    /** Whether the current value represents a "mixed" state (multiple selected values) */
     mixed,
 
     // Event handlers
+    /** Focus event handler with optional auto-select behavior */
     handleFocus,
+    /** Blur event handler with optional commit on blur and safety checks */
     handleBlur,
+    /** Key down event handler supporting arrow keys, Enter, Tab, and Escape */
     handleKeyDown,
+    /** Change event handler for input value changes during typing */
     handleChange,
 
     // Refs
+    /** Ref to the input element for direct DOM access */
     inputRef,
 
     // Computed values
+    /** Input type attribute - "text" for mixed/suffixed values, "number" for pure numbers */
     inputType: mixed ? "text" : suffix ? "text" : "number",
   };
 }

@@ -1945,6 +1945,8 @@ export class Editor
       fontPostscriptName:
         match.instance?.postscriptName || match.face.postscriptName,
       fontWeight: match.instance?.coordinates?.wght,
+      // TODO: should prevent optical sizing auto => fixed
+      // (if the next value === auto's expected value && prev value is auto, keep auto) => the change style does not change the size, so the logic can be even simpler.
       fontOpticalSizing: match.instance?.coordinates?.opsz,
       fontVariations: match.instance?.coordinates,
       // TODO: clean the invalid features by face change.

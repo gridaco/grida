@@ -98,7 +98,7 @@ fn main() {
             font_features: None,
             font_variations: None,
             font_optical_sizing: Default::default(),
-            italic: false,
+            font_style_italic: false,
             letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
