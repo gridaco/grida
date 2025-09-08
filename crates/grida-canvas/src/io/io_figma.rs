@@ -894,7 +894,10 @@ impl FigmaConverter {
                 font_features: None,
                 font_variations: None,
                 font_weight: FontWeight::new(style.font_weight.unwrap_or(400.0) as u32),
-                letter_spacing: style.letter_spacing.map(|v| v as f32),
+                letter_spacing: style
+                    .letter_spacing
+                    .map(|v| TextLetterSpacing::Factor(v as f32))
+                    .unwrap_or_default(),
                 italic: style.italic.unwrap_or(false),
                 line_height: style
                     .line_height_px

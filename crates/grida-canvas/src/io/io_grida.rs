@@ -711,10 +711,13 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 font_size: node.font_size.unwrap_or(14.0),
                 font_weight: node.font_weight,
                 italic: false,
-                letter_spacing: node.letter_spacing,
+                letter_spacing: node
+                    .letter_spacing
+                    .map(TextLetterSpacing::Factor)
+                    .unwrap_or_default(),
                 line_height: node
                     .line_height
-                    .map(|v| TextLineHeight::Factor(v))
+                    .map(TextLineHeight::Factor)
                     .unwrap_or_default(),
                 text_transform: node.text_transform,
                 font_features: node.font_features.map(|ff| {

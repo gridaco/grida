@@ -699,6 +699,21 @@ impl Default for TextLineHeight {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum TextLetterSpacing {
+    /// Fixed value in px.
+    Fixed(f32),
+    /// em Factor value (percentage) relative to font size.
+    /// 1 = 100% / 1em
+    Factor(f32),
+}
+
+impl Default for TextLetterSpacing {
+    fn default() -> Self {
+        TextLetterSpacing::Fixed(0.0)
+    }
+}
+
 /// A set of style properties that can be applied to a text or text span.
 #[derive(Debug, Clone)]
 pub struct TextStyleRec {
@@ -718,7 +733,7 @@ pub struct TextStyleRec {
 
     /// Additional spacing between characters, in logical pixels.  
     /// Default is `0.0`.
-    pub letter_spacing: Option<f32>,
+    pub letter_spacing: TextLetterSpacing,
 
     /// Line height
     pub line_height: TextLineHeight,
@@ -744,7 +759,7 @@ impl TextStyleRec {
             font_size: size,
             font_weight: Default::default(),
             italic: false,
-            letter_spacing: None,
+            letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
             font_optical_sizing: OpticalSizing::Auto,

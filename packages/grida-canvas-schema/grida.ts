@@ -1408,12 +1408,19 @@ export namespace grida.program.nodes {
       // #endregion decorations
 
       textTransform?: cg.TextTransform;
+
       /**
+       * letter-spacing in em (percentage) value
+       *
+       * @example 1 = 100% / 1em
        * @default 0
        */
       letterSpacing?: number;
+
       /**
        * line-height in percentage value only. 0% ~
+       * @example undefined = "normal"
+       * @example 1 = 100% / 1em
        * @min 0
        */
       lineHeight?: number;

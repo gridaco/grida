@@ -108,7 +108,7 @@ fn main() {
             font_variations: None,
             font_optical_sizing: Default::default(),
             italic: false,
-            letter_spacing: None,
+            letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -159,7 +159,7 @@ fn main() {
             font_variations: None,
             font_optical_sizing: Default::default(),
             italic: false,
-            letter_spacing: None,
+            letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -210,7 +210,7 @@ fn main() {
             font_variations: None,
             font_optical_sizing: Default::default(),
             italic: false,
-            letter_spacing: None,
+            letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -265,7 +265,7 @@ fn main() {
             font_variations: None,
             font_optical_sizing: Default::default(),
             italic: false,
-            letter_spacing: None,
+            letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -314,7 +314,7 @@ fn main() {
             font_variations: None,
             font_optical_sizing: Default::default(),
             italic: false,
-            letter_spacing: None,
+            letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -382,7 +382,7 @@ fn main() {
             font_variations: None,
             font_optical_sizing: Default::default(),
             italic: false,
-            letter_spacing: None,
+            letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -436,7 +436,7 @@ fn main() {
             font_variations: None,
             font_optical_sizing: Default::default(),
             italic: false,
-            letter_spacing: None,
+            letter_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };

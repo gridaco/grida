@@ -51,7 +51,16 @@ pub fn textstyle(
 
     //
     ts.set_font_size(style.font_size);
-    if let Some(letter_spacing) = style.letter_spacing {
+
+    // if non-zero
+
+    // map
+    let letter_spacing = match style.letter_spacing {
+        TextLetterSpacing::Fixed(px) => px,
+        TextLetterSpacing::Factor(factor) => factor * style.font_size,
+    };
+
+    if letter_spacing != 0.0 {
         ts.set_letter_spacing(letter_spacing);
     }
 

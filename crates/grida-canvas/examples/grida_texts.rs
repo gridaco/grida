@@ -41,7 +41,7 @@ async fn demo_texts() -> Scene {
         font_features: None,
         font_variations: None,
         font_optical_sizing: Default::default(),
-        letter_spacing: None,
+        letter_spacing: Default::default(),
         line_height: Default::default(),
         text_transform: TextTransform::Uppercase,
     };
