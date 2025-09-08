@@ -1,194 +1,109 @@
 import React from "react";
 import { useCurrentEditor } from "@/grida-canvas-react";
-import type { FvarInstance, FontFeature } from "@grida/fonts/parse";
+import type { FontFeature } from "@grida/fonts/parse";
 import type Typr from "@grida/fonts/typr";
-import { parseVariant } from "@grida/fonts/fontface";
+import { editor } from "@/grida-canvas";
 
-const DEFAULT_WEIGHTS = [
-  { value: "100", label: "Thin" },
-  { value: "200", label: "Extra Light" },
-  { value: "300", label: "Light" },
-  { value: "400", label: "Regular" },
-  { value: "500", label: "Medium" },
-  { value: "600", label: "Semi Bold" },
-  { value: "700", label: "Bold" },
-  { value: "800", label: "Extra Bold" },
-  { value: "900", label: "Black" },
-];
+type CurrentFontStyle = {
+  /**
+   * the postscript name of the current font style, either instance.postscriptName (variable) or face.postscriptName (static)
+   */
+  postscriptName?: string;
 
-interface CurrentFontContextValue {
-  axes?: Record<string, Typr.FVARAxis>;
-  features: FontFeature[];
-  instances: FvarInstance[];
-  weights: Array<{ value: string; label: string }>;
-  matchingInstanceName?: string;
-  currentFontVariations?: Record<string, number>;
+  /**
+   * axes defined by the face (ttf)
+   */
+  faceAxes?: Record<string, Typr.FVARAxis>;
+
+  /**
+   * features defined by the face (ttf)
+   */
+  faceFeatures: FontFeature[] | undefined;
+};
+
+interface CurrentFontState {
+  family: string;
+  styles: Array<editor.font.FontStyleInstance>;
+  description: CurrentFontDescription;
+  currentStyle: CurrentFontStyle;
 }
 
-const CurrentFontContext = React.createContext<CurrentFontContextValue>({
-  axes: undefined,
-  features: [],
-  instances: [],
-  weights: [],
-});
+interface CurrentFontDescription {
+  fontPostscriptName?: string;
+  fontWeight?: number;
+  fontVariations?: Record<string, number>;
+}
 
-/**
- * Get the exact matching instance from a list of instances based on current values
- * @param instances - Array of font variation instances
- * @param values - Current font variation values
- * @returns The matching instance if found, undefined otherwise
- */
-function getMatchingInstance(
-  instances: FvarInstance[],
-  values: Record<string, number>
-): FvarInstance | undefined {
-  if (!instances || instances.length === 0) return undefined;
-
-  return instances.find((inst) => {
-    // Check if all coordinates in the instance match the current values exactly
-    const instanceCoords = inst.coordinates;
-
-    // First, check if all instance coordinates are present in current values
-    for (const [axis, value] of Object.entries(instanceCoords)) {
-      if (values[axis] !== value) {
-        return false;
-      }
+type CurrentFontContextValue =
+  | {
+      type: "loading";
     }
+  | { type: "ready"; state: CurrentFontState };
 
-    // Then, check if all current values are present in instance coordinates
-    // This ensures we don't match when current values have additional axes
-    for (const [axis, value] of Object.entries(values)) {
-      if (instanceCoords[axis] !== value) {
-        return false;
-      }
-    }
+const CurrentFontContext = React.createContext<CurrentFontContextValue | null>(
+  null
+);
 
-    return true;
-  });
+interface CurrentFontProviderProps {
+  fontFamily: string;
+
+  /**
+   * the current partial values of text style, responsible for matching the font face
+   */
+  description: CurrentFontDescription;
+}
+
+function useFontDetails(fontFamily: string) {
+  const editor = useCurrentEditor();
+
+  const [font, setFont] = React.useState<editor.font.UIFontFamily | null>(null);
+
+  React.useEffect(() => {
+    setFont(null);
+    editor
+      .getFontDetails(fontFamily)
+      .then((detail) => {
+        setFont(detail);
+      })
+      .catch(() => {
+        setFont(null);
+      });
+  }, [editor, fontFamily]);
+
+  return font;
 }
 
 export function CurrentFontProvider({
   fontFamily,
-  fontWeight,
-  fontVariations,
-  fallbackWeights = false,
+  description,
   children,
-}: React.PropsWithChildren<{
-  fontFamily?: string;
-  fontWeight?: number;
-  fontVariations?: Record<string, number>;
-  fallbackWeights?: boolean;
-}>) {
+}: React.PropsWithChildren<CurrentFontProviderProps>) {
   const editor = useCurrentEditor();
-  const [value, setValue] = React.useState<CurrentFontContextValue>({
-    axes: undefined,
-    features: [],
-    instances: [],
-    weights: [],
-    matchingInstanceName: undefined,
-  });
+  const font = useFontDetails(fontFamily);
 
-  React.useEffect(() => {
-    let canceled = false;
-    (async () => {
-      if (!fontFamily) {
-        if (!canceled) {
-          setValue({
-            axes: undefined,
-            features: [],
-            instances: [],
-            weights: [],
-          });
-        }
-        return;
-      }
-      const detail = await editor.getFontDetails(fontFamily);
-      if (!detail) {
-        if (!canceled) {
-          setValue({
-            axes: undefined,
-            features: [],
-            instances: [],
-            weights: [],
-          });
-        }
-        return;
-      }
+  const ctx: CurrentFontContextValue = React.useMemo(() => {
+    if (!font) return { type: "loading" };
 
-      const weightMap = new Map<string, string>();
+    const match = editor.matchFontFace(font.family, description);
 
-      // Collect weights from instances (named styles)
-      for (const inst of detail.instances ?? []) {
-        const wght = inst.coordinates["wght"];
-        if (typeof wght === "number") {
-          weightMap.set(wght.toString(), inst.name);
-        }
-      }
-
-      // Collect weights from available variants
-      for (const variant of detail.font.variants) {
-        const v = parseVariant(variant, detail.font.family);
-        const value = String(v.weight ?? "");
-        if (value && !weightMap.has(value)) {
-          const label =
-            DEFAULT_WEIGHTS.find((w) => w.value === value)?.label || variant;
-          weightMap.set(value, label);
-        }
-      }
-
-      // Fallback to default weights if nothing was resolved
-      if (weightMap.size === 0 && fallbackWeights) {
-        for (const w of DEFAULT_WEIGHTS) {
-          weightMap.set(w.value, w.label);
-        }
-      }
-
-      const weights = Array.from(weightMap, ([value, label]) => ({
-        value,
-        label,
-      })).sort((a, b) => Number(a.value) - Number(b.value));
-
-      if (!canceled) {
-        setValue((prev) => ({
-          axes: detail.axes,
-          features: detail.features,
-          instances: detail.instances,
-          weights,
-          matchingInstanceName: prev.matchingInstanceName,
-        }));
-      }
-    })();
-    return () => {
-      canceled = true;
-    };
-  }, [editor, fontFamily, fallbackWeights]);
-
-  const matchingInstanceName = React.useMemo(() => {
-    if (!value.instances || value.instances.length === 0) return undefined;
-    const current: Record<string, number> = {
-      ...(fontVariations || {}),
-    };
-    if (typeof fontWeight === "number") {
-      current["wght"] = fontWeight;
-    }
-    const matched = getMatchingInstance(value.instances, current);
-    return matched?.name;
-  }, [value.instances, fontWeight, fontVariations]);
-
-  const currentFontVariations = React.useMemo(() => {
-    const current: Record<string, number> = {
-      ...(fontVariations || {}),
-    };
-    if (typeof fontWeight === "number") {
-      current["wght"] = fontWeight;
-    }
-    return Object.keys(current).length > 0 ? current : undefined;
-  }, [fontWeight, fontVariations]);
-
-  const ctx = React.useMemo(
-    () => ({ ...value, matchingInstanceName, currentFontVariations }),
-    [value, matchingInstanceName, currentFontVariations]
-  );
+    return {
+      type: "ready",
+      state: {
+        family: font.family,
+        description: {
+          fontVariations: description.fontVariations,
+          fontWeight: description.fontWeight,
+        },
+        styles: font.styles,
+        currentStyle: {
+          faceAxes: match?.face?.axes,
+          faceFeatures: match?.face?.features,
+          postscriptName:
+            match?.instance?.postscriptName || match?.face?.postscriptName,
+        },
+      } satisfies CurrentFontState,
+    } satisfies CurrentFontContextValue;
+  }, [font, description]);
 
   return (
     <CurrentFontContext.Provider value={ctx}>
@@ -197,6 +112,23 @@ export function CurrentFontProvider({
   );
 }
 
-export function useCurrentFont() {
-  return React.useContext(CurrentFontContext);
+export function useCurrentFontFamily() {
+  const ctx = React.useContext(CurrentFontContext);
+  if (!ctx) {
+    throw new Error(
+      "useCurrentFontFamily must be used within a CurrentFontProvider"
+    );
+  }
+  return ctx;
+}
+
+export function useCurrentFontFace():
+  | { type: "loading" }
+  | { type: "ready"; state: CurrentFontStyle } {
+  const f = useCurrentFontFamily();
+
+  if (f.type === "loading") return { type: "loading" };
+  else {
+    return { type: "ready", state: f.state.currentStyle };
+  }
 }

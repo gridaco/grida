@@ -17,9 +17,9 @@ export class DOMFontManagerAgentInterfaceProvider
 
   async loadFont(font: { family: string }): Promise<void> {
     if (this.loadedFonts.has(font.family)) return;
-    const detail = await this.editor.getFontDetails(font.family);
-    if (detail) {
-      await this.manager.loadGoogleFont(detail.font);
+    const item = await this.editor.getFontItem(font.family);
+    if (item) {
+      await this.manager.loadGoogleFont(item);
       this.loadedFonts.add(font.family);
     }
   }

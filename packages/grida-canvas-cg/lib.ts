@@ -531,6 +531,11 @@ export namespace cg {
   export type NFontWeight = 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
 
   /**
+   * css font-style values
+   */
+  export type CSSFontStyle = "normal" | "italic" | "oblique";
+
+  /**
    * Optical sizing modes
    *
    * - `"auto"` links optical size to `fontSize`

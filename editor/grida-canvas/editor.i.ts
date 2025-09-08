@@ -325,6 +325,140 @@ export namespace editor.config {
   };
 }
 
+export namespace editor.font {
+  interface UIFontFamilyAxis {
+    tag: string;
+    min: number;
+    max: number;
+  }
+
+  /**
+   * UIFontData is a reliable data container, that is per-ttf, processed through ttf-parser
+   */
+  export type UIFontData = {
+    postscriptName: string;
+    axes: FvarAxes;
+    instances: FvarInstance[];
+    features: FontFeature[];
+    italic: boolean;
+  };
+
+  export type UIFontFamily = {
+    /**
+     * the name of the font family, non-normalized
+     */
+    family: string;
+
+    /**
+     * the axis is present when the font is a variable font
+     * the axes defines the shared AND all-available axes
+     *
+     * if the user's input is invalid, and if the givven list of ttf does not share the same axes, this will only contain the shared axes, with the same spec (min/max)
+     * this axes does not include the `def` (default) as it is expected to have different default value per ttf.
+     */
+    axes?: UIFontFamilyAxis[];
+
+    types: UIFontData[];
+
+    styles: FontStyleInstance[];
+  };
+
+  export type UIVendorGoogleFontFamily = UIFontFamily & {
+    variants: string[];
+    files: {
+      [key: string]: string;
+    };
+    subsets: string[];
+  };
+
+  /**
+   * if from a variable font, this describes a single instance of a fvar.instances
+   * if from a static font, this describes a single face of a font family
+   */
+  export type FontStyleInstance = {
+    name: string;
+    postscriptName: string;
+    /**
+     * if the face is italic (by OS/2 or by vendor specified)
+     */
+    italic?: boolean;
+  };
+
+  /**
+   * map styles for static or VF fonts.
+   *
+   * style = static font face or VF instance
+   */
+  export function mapStyles(
+    types: editor.font.UIFontData[]
+  ): FontStyleInstance[] {
+    return types.flatMap((typeface) => {
+      if (typeface.instances) {
+        return typeface.instances.map((instance) => ({
+          name: instance.name,
+          // TODO: verify postscriptName is always present in instance - then remove fallback.
+          postscriptName: instance.postscriptName || instance.name,
+          italic: typeface.italic,
+        }));
+      } else {
+        return [
+          {
+            name: typeface.postscriptName,
+            postscriptName: typeface.postscriptName,
+            italic: typeface.italic,
+          },
+        ];
+      }
+    });
+  }
+
+  /**
+   * Get the exact matching instance from a list of instances based on current values
+   * @param instances - Array of font variation instances
+   * @param axesValues - Current font variation values
+   * @returns The matching instance if found, undefined otherwise
+   */
+  export function matchFvarInstance(
+    instances: FvarInstance[],
+    context: {
+      postscriptName?: string;
+      axesValues: Record<string, number>;
+    }
+  ): FvarInstance | undefined {
+    if (!instances || instances.length === 0) return undefined;
+
+    const { postscriptName, axesValues } = context;
+
+    const by_name = instances.find(
+      (inst) => inst.postscriptName === postscriptName
+    );
+
+    if (by_name) return by_name;
+
+    return instances.find((inst) => {
+      // Check if all coordinates in the instance match the current values exactly
+      const instanceCoords = inst.coordinates;
+
+      // First, check if all instance coordinates are present in current values
+      for (const [axis, value] of Object.entries(instanceCoords)) {
+        if (axesValues[axis] !== value) {
+          return false;
+        }
+      }
+
+      // Then, check if all current values are present in instance coordinates
+      // This ensures we don't match when current values have additional axes
+      for (const [axis, value] of Object.entries(axesValues)) {
+        if (instanceCoords[axis] !== value) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+}
+
 export namespace editor.state {
   /**
    * used for "repeated duplicate", where accumulating the delta between the original and the clone, forwarding that delta to the next clone.
@@ -1654,6 +1788,11 @@ export namespace editor.api {
     }
   }
 
+  export type FontStyleChangeDescription = {
+    fontFamily: string;
+    fontPostscriptName: string;
+  };
+
   export type TChange<T> =
     | {
         type: "set";
@@ -1778,6 +1917,24 @@ export namespace editor.api {
     ): void;
     changeTextNodeFontFamily(node_id: NodeID, fontFamily: string): void;
     changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
+
+    /**
+     * use when font style change or family change
+     *
+     * | property              | operation        | notes |
+     * |-----------------------|------------------|-------|
+     * | `fontFamily`          | validate & set   | validate if the requested family / postscript is registered and ready to use, else reject |
+     * | `fontPostscriptName`  | set              | |
+     * | `fontStyleItalic`     | set              | |
+     * | `fontWeight`          | set              | |
+     * | `fontOpticalSizing`   | set              | |
+     * | `fontVariations`      | update / clean   | if instance change, remove not-defined variations |
+     * | `fontFeatures`        | clean            | if instance change, remove not-def features |
+     */
+    changeTextNodeFontStyle(
+      node_id: NodeID,
+      fontStyleDescription: editor.api.FontStyleChangeDescription
+    ): void;
     changeTextNodeFontFeature(
       node_id: NodeID,
       feature: cg.OpenTypeFeature,
@@ -2347,18 +2504,9 @@ export namespace editor.api {
     /**
      * Retrieves font metadata, variation axes and features.
      */
-    getFontDetails(fontFamily: string): Promise<{
-      font: GoogleWebFontListItem;
-      faces: Array<{
-        variant: string;
-        axes: FvarAxes;
-        instances: FvarInstance[];
-        features: FontFeature[];
-      }>;
-      axes: FvarAxes;
-      instances: FvarInstance[];
-      features: FontFeature[];
-    } | null>;
+    getFontDetails(
+      fontFamily: string
+    ): Promise<editor.font.UIFontFamily | null>;
   }
 
   export interface IExportPluginActions {

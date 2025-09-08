@@ -32,10 +32,12 @@ self.onmessage = (ev: MessageEvent<RequestMessage>) => {
         fvar: FvarData;
         features: FontFeature[];
         stat: StatData;
+        postscriptName?: string;
       } = {
         fvar: parser.fvar(),
         features: parser.features(),
         stat: parser.stat(),
+        postscriptName: parser.postscriptName(),
       };
       self.postMessage({ id, result });
       return;

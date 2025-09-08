@@ -39,7 +39,7 @@ import {
   type PropertyKey,
 } from "./text-details-preview";
 import { FontFeatureSettings } from "./text-details-font-feature-settings";
-import { useCurrentFont } from "../context/font";
+import { useCurrentFontFace } from "../context/font";
 import { FontVariableAxisSlider } from "../font-variable-axis";
 
 // Type definitions
@@ -475,10 +475,16 @@ export function TextDetails({
   onFontWeightChange,
   onFontFeatureChange,
 }: TextDetailsProps) {
-  const { axes, features } = useCurrentFont();
+  const face = useCurrentFontFace();
   const [hoverPreview, setHoverPreview] = useState<
     BasicPreview | VariationPreview | FeaturePreview
   >(null);
+
+  if (face.type === "loading") {
+    return null;
+  }
+
+  const { faceAxes: axes, faceFeatures: features = [] } = face.state;
 
   const truncate = !!maxLines && maxLines > 0;
 

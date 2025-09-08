@@ -415,6 +415,18 @@ const safe_properties: Partial<
       (draft as UN).textTransform = value;
     },
   }),
+  fontStyleItalic: defineNodeProperty<"fontStyleItalic">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontStyleItalic = value;
+    },
+  }),
+  fontPostscriptName: defineNodeProperty<"fontPostscriptName">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontPostscriptName = value;
+    },
+  }),
   fontWeight: defineNodeProperty<"fontWeight">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {

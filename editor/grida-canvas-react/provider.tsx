@@ -192,6 +192,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeFontOpticalSizing(node_id, value),
       fontVariationInstance: (coordinates: Record<string, number>) =>
         instance.changeTextNodeFontVariationInstance(node_id, coordinates),
+      fontStyle: (change: editor.api.FontStyleChangeDescription) =>
+        instance.changeTextNodeFontStyle(node_id, change),
       fontSize: (change: editor.api.NumberChange) =>
         instance.changeTextNodeFontSize(node_id, change),
       textAlign: (value: cg.TextAlign) =>

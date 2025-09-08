@@ -1,11 +1,15 @@
-import React from "react";
-import type cg from "@grida/cg";
-import { PropertyEnum } from "../ui";
-import { useCurrentFont } from "./context/font";
+import React, { useMemo } from "react";
+import { PropertyEnum, EnumItem } from "../ui";
+import { useCurrentFontFamily } from "./context/font";
 
-export type FontStyleChange =
-  | { type: "instance"; name: string }
-  | { type: "values"; values: Record<string, number> };
+function placeholder(description?: {
+  fontVariations?: Record<string, number>;
+  fontWeight?: number;
+}) {
+  return Object.entries(description?.fontVariations || {})
+    .map(([axis, value]) => `${axis}: ${value}`)
+    .join(", ");
+}
 
 /**
  * Font Style (Variation Instance) Control Component
@@ -32,51 +36,58 @@ export type FontStyleChange =
 export function FontStyleControl({
   onValueChange,
 }: {
-  onValueChange?: (change: FontStyleChange) => void;
+  onValueChange?: (postscriptName: string) => void;
 }) {
-  const { instances, weights, matchingInstanceName, currentFontVariations } =
-    useCurrentFont();
-  const enums = React.useMemo(() => {
-    if (instances && instances.length > 0) {
-      const mapped = instances.map((inst) => ({
-        value: inst.name,
-        label: inst.name,
-      }));
-      if (mapped.length > 0) return mapped;
+  const f = useCurrentFontFamily();
+
+  const { styles, currentStyle, description } =
+    f.type === "ready"
+      ? f.state
+      : {
+          styles: [],
+          currentStyle: { postscriptName: "" },
+          description: { fontVariations: {}, fontWeight: 0 },
+        };
+
+  // Group styles by italic variants
+  const options: EnumItem<string>[][] = useMemo(() => {
+    const options: EnumItem<string>[][] = [];
+    // Separate styles into italic and non-italic groups
+    const g_romans = styles.filter((style) => !style.italic);
+    const g_italics = styles.filter((style) => style.italic);
+
+    // Add regular styles group if there are any
+    if (g_romans.length > 0) {
+      options.push(
+        g_romans.map((v) => ({
+          value: v.postscriptName,
+          label: v.name,
+        }))
+      );
     }
-    return weights;
-  }, [instances, weights]);
 
-  // Show custom placeholder when there's no exact match but we have instances
-  const isCustom = instances && instances.length > 0 && !matchingInstanceName;
+    // Add italic styles group if there are any
+    if (g_italics.length > 0) {
+      options.push(
+        g_italics.map((v) => ({
+          value: v.postscriptName,
+          label: v.name,
+        }))
+      );
+    }
+    return options;
+  }, [styles]);
 
-  // Create informative custom placeholder with actual variation values
-  const customPlaceholder = React.useMemo(() => {
-    if (!isCustom || !currentFontVariations) return undefined;
-
-    const variations = Object.entries(currentFontVariations)
-      .map(([axis, value]) => `${axis}: ${value}`)
-      .join(", ");
-
-    return variations || "Custom";
-  }, [isCustom, currentFontVariations]);
+  const value = currentStyle.postscriptName || "";
+  const disabled = styles.length === 0;
 
   return (
     <PropertyEnum
-      value={matchingInstanceName || ""}
-      placeholder={customPlaceholder}
-      enum={enums}
-      disabled={enums.length === 0}
-      onValueChange={(v) => {
-        if (instances && instances.length > 0) {
-          onValueChange?.({ type: "instance", name: v });
-        } else {
-          onValueChange?.({
-            type: "values",
-            values: { wght: parseInt(v) },
-          });
-        }
-      }}
+      value={value}
+      placeholder={placeholder(description)}
+      enum={options}
+      disabled={disabled}
+      onValueChange={onValueChange}
     />
   );
 }

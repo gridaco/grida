@@ -1366,7 +1366,9 @@ export namespace grida.program.nodes {
     export interface ITextStyle {
       fontFamily?: string;
       fontSize: number;
-      fontWeight: cg.NFontWeight;
+      fontWeight: cg.NFontWeight | number;
+      fontOpticalSizing?: cg.OpticalSizing;
+
       /**
        * OpenType features
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-feature-settings
@@ -1377,12 +1379,34 @@ export namespace grida.program.nodes {
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-variation-settings
        */
       fontVariations?: Record<string, number>;
-      fontOpticalSizing?: cg.OpticalSizing;
+
+      // #region semantics
+      /**
+       * if the font face is italic (or italic style is requested)
+       * this depends on how editor reloves the font.
+       *
+       * best practice is to set this true, only the font is italic. (defined by OS/2 fsSelection)
+       * in a variable font scenario, this can be set true, even if fsSelection is not set to italic.
+       *
+       * if the used fvar.instance is semantically italic, this can be set true.
+       */
+      fontStyleItalic?: boolean;
+      /**
+       * [font post script name]
+       * the post script name is a unique identifier for a font face scoped by the family.
+       * this value is parsed from the ttf file itself.
+       */
+      fontPostscriptName?: string;
+      // #endregion semantics
+
+      // #region decorations
       textDecorationLine: cg.TextDecorationLine;
       textDecorationStyle?: cg.TextDecorationStyle | null;
       textDecorationColor?: cg.TextDecorationColorValue | null;
       textDecorationSkipInk?: cg.TextDecorationSkipInkFlag | null;
       textDecorationThickness?: cg.TextDecorationThicknessPercentage | null;
+      // #endregion decorations
+
       textTransform?: cg.TextTransform;
       /**
        * @default 0

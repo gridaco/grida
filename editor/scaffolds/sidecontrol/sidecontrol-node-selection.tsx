@@ -10,7 +10,7 @@ import {
 } from "@/components/sidebar";
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
-import { FontStyleControl, type FontStyleChange } from "./controls/font-style";
+import { FontStyleControl } from "./controls/font-style";
 import { OpacityControl } from "./controls/opacity";
 import { HrefControl } from "./controls/href";
 import {
@@ -109,41 +109,27 @@ import {
   MixedPropertiesEditor,
 } from "@/grida-canvas-react/use-mixed-properties";
 import { editor } from "@/grida-canvas";
-import { CurrentFontProvider, useCurrentFont } from "./controls/context/font";
-import type { TMixed } from "./controls/utils/types";
+import {
+  CurrentFontProvider,
+  useCurrentFontFamily,
+} from "./controls/context/font";
 
-function FontStyleControlConnected({
-  value,
-  onWeightChange,
-  onVariationChange,
-  onInstanceChange,
-}: {
-  value?: TMixed<cg.NFontWeight>;
-  onWeightChange: (v: cg.NFontWeight) => void;
-  onVariationChange: (axis: string, value: number) => void;
-  onInstanceChange: (coordinates: Record<string, number>) => void;
-}) {
-  const { instances } = useCurrentFont();
+function FontStyleControlScaffold({ selection }: { selection: string[] }) {
+  const editor = useCurrentEditor();
+  const f = useCurrentFontFamily();
+  const styles = f.type === "ready" ? f.state.styles : [];
+  const fontFamily = f.type === "ready" ? f.state.family : "";
 
   const handleChange = React.useCallback(
-    (change: FontStyleChange) => {
-      if (change.type === "instance") {
-        const inst = instances.find((i) => i.name === change.name);
-        if (inst) {
-          onInstanceChange(inst.coordinates);
-        }
-      } else {
-        if (typeof change.values.wght === "number") {
-          onWeightChange(change.values.wght as cg.NFontWeight);
-        }
-        Object.entries(change.values).forEach(([k, v]) => {
-          if (k !== "wght") {
-            onVariationChange(k, v);
-          }
+    (postscriptName: string) => {
+      selection.forEach((id) => {
+        editor.changeTextNodeFontStyle(id, {
+          fontFamily: fontFamily,
+          fontPostscriptName: postscriptName,
         });
-      }
+      });
     },
-    [instances, onInstanceChange, onWeightChange, onVariationChange]
+    [fontFamily, styles]
   );
 
   return <FontStyleControl onValueChange={handleChange} />;
@@ -282,7 +268,6 @@ function ModeMixedNodeProperties({
   ids: string[];
   config?: ControlsConfig;
 }) {
-  const scene = useCurrentSceneState();
   const backend = useBackendState();
   const mp = useMixedProperties(ids);
   const { nodes, properties, actions: change } = mp;
@@ -290,52 +275,50 @@ function ModeMixedNodeProperties({
     name,
     active,
     locked,
-    component_id,
-    style,
-    type,
-    // properties,
     opacity,
     cornerRadius,
-    rotation,
     fill,
     stroke,
     strokeWidth,
     strokeCap,
-    position,
     width,
     height,
-    left,
-    top,
-    right,
-    bottom,
     fit,
     fontFamily,
     fontWeight,
+    fontPostscriptName,
+    fontOpticalSizing,
     fontVariations,
     fontSize,
     lineHeight,
     letterSpacing,
     textAlign,
     textAlignVertical,
-    maxLength,
-
-    //
-    border,
-    //
-    padding,
 
     //
     layout,
     direction,
     mainAxisAlignment,
     crossAxisAlignment,
-    mainAxisGap,
-    crossAxisGap,
     //
     cursor,
 
-    // x
-    userdata,
+    // component_id,
+    // style,
+    // type,
+    // properties,
+    // position,
+    // rotation,
+    // left,
+    // top,
+    // right,
+    // bottom,
+    // maxLength,
+    // border,
+    // padding,
+    // mainAxisGap,
+    // crossAxisGap,
+    // userdata,
   } = properties;
 
   const sid = ids.join(",");
@@ -483,16 +466,22 @@ function ModeMixedNodeProperties({
       {config.text !== "off" && types.has("text") && (
         <CurrentFontProvider
           fontFamily={
-            typeof fontFamily?.value === "string" ? fontFamily.value : undefined
+            typeof fontFamily?.value === "string" ? fontFamily.value : ""
           }
-          fontWeight={
-            typeof fontWeight?.value === "number" ? fontWeight.value : undefined
-          }
-          fontVariations={
-            typeof fontVariations?.value === "object"
-              ? (fontVariations.value as Record<string, number>)
-              : undefined
-          }
+          description={{
+            fontPostscriptName:
+              typeof fontPostscriptName?.value === "string"
+                ? fontPostscriptName.value
+                : undefined,
+            fontWeight:
+              typeof fontWeight?.value === "number"
+                ? fontWeight.value
+                : undefined,
+            fontVariations:
+              typeof fontVariations?.value === "object"
+                ? (fontVariations.value as Record<string, number>)
+                : undefined,
+          }}
         >
           <SidebarSection className="border-b pb-4">
             <SidebarSectionHeaderItem>
@@ -514,12 +503,7 @@ function ModeMixedNodeProperties({
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel>Style</PropertyLineLabel>
-                <FontStyleControlConnected
-                  value={fontWeight?.value}
-                  onWeightChange={change.fontWeight}
-                  onVariationChange={change.fontVariation}
-                  onInstanceChange={change.fontVariationInstance}
-                />
+                <FontStyleControlScaffold selection={ids} />
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel>Size</PropertyLineLabel>
@@ -1319,6 +1303,7 @@ function SectionText({ node_id }: { node_id: string }) {
     textTransform,
     maxLines,
     maxLength,
+    fontPostscriptName,
     fontVariations,
     fontFeatures,
     fontOpticalSizing,
@@ -1341,6 +1326,7 @@ function SectionText({ node_id }: { node_id: string }) {
       textTransform: node.textTransform,
       maxLines: node.maxLines,
       maxLength: node.maxLength,
+      fontPostscriptName: node.fontPostscriptName,
       fontVariations: node.fontVariations,
       fontFeatures: node.fontFeatures,
       fontOpticalSizing: node.fontOpticalSizing,
@@ -1349,9 +1335,12 @@ function SectionText({ node_id }: { node_id: string }) {
 
   return (
     <CurrentFontProvider
-      fontFamily={fontFamily}
-      fontWeight={fontWeight}
-      fontVariations={fontVariations}
+      fontFamily={fontFamily ?? ""}
+      description={{
+        fontPostscriptName,
+        fontWeight,
+        fontVariations,
+      }}
     >
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
@@ -1426,12 +1415,7 @@ function SectionText({ node_id }: { node_id: string }) {
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Style</PropertyLineLabel>
-            <FontStyleControlConnected
-              value={fontWeight}
-              onWeightChange={actions.fontWeight}
-              onVariationChange={actions.fontVariation}
-              onInstanceChange={actions.fontVariationInstance}
-            />
+            <FontStyleControlScaffold selection={[node_id]} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Size</PropertyLineLabel>

@@ -129,22 +129,6 @@ export class Editor
     return (this.fontParserWorker ??= new FontParserWorker());
   }
 
-  private fontDetailsCache = new Map<
-    string,
-    {
-      font: google.GoogleWebFontListItem;
-      faces: Array<{
-        variant: string;
-        axes: FvarAxes;
-        instances: FvarInstance[];
-        features: FontFeature[];
-      }>;
-      axes: FvarAxes;
-      instances: FvarInstance[];
-      features: FontFeature[];
-    }
-  >();
-
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
@@ -1922,6 +1906,66 @@ export class Editor
       fontWeight,
     });
   }
+
+  changeTextNodeFontStyle(
+    node_id: string,
+    fontStyleDescription: editor.api.FontStyleChangeDescription
+  ) {
+    const { fontFamily, fontPostscriptName } = fontStyleDescription;
+
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+
+    const prev_family = node.fontFamily;
+    const prev = {
+      fontPostscriptName: node.fontPostscriptName,
+      fontWeight: node.fontWeight,
+      fontVariations: node.fontVariations,
+      fontFeatures: node.fontFeatures,
+      fontOpticalSizing: node.fontOpticalSizing,
+      fontStyleItalic: node.fontStyleItalic,
+    } as const;
+
+    const match = this.matchFontFace(fontFamily, {
+      fontPostscriptName,
+      fontWeight: prev.fontWeight,
+      fontVariations: prev.fontVariations,
+    });
+
+    // reject
+    if (!match) {
+      this.log("matching font face not found", fontFamily, fontPostscriptName);
+      return;
+    }
+
+    const next_family = fontFamily;
+    const next = {
+      ...prev,
+      fontPostscriptName:
+        match.instance?.postscriptName || match.face.postscriptName,
+      fontWeight: match.instance?.coordinates?.wght,
+      fontOpticalSizing: match.instance?.coordinates?.opsz,
+      // fontVariations: match.axes,
+      // fontFeatures: match.features,
+      fontStyleItalic: match.face.italic,
+    } as const;
+
+    console.log("next", next);
+
+    this.dispatch({
+      type: "node/change/fontFamily",
+      node_id: node_id,
+      fontFamily: next_family,
+    });
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      ...next,
+    });
+  }
+
   changeTextNodeFontFeature(
     node_id: editor.NodeID,
     feature: cg.OpenTypeFeature,
@@ -1968,6 +2012,7 @@ export class Editor
     });
   }
 
+  // FIXME: remove me
   changeTextNodeFontVariationInstance(
     node_id: editor.NodeID,
     coordinates: Record<string, number>
@@ -2786,6 +2831,9 @@ export class Editor
   // #endregion IVectorInterfaceActions implementation
 
   // #region IFontLoaderActions implementation
+
+  private __font_details_cache = new Map<string, editor.font.UIFontFamily>();
+
   async loadFont(font: { family: string }): Promise<void> {
     if (!this.fontLoader) return;
     await this.fontLoader.loadFont(font);
@@ -2807,30 +2855,26 @@ export class Editor
     }
   }
 
+  getFontItem(fontFamily: string): google.GoogleWebFontListItem | null {
+    const item: google.GoogleWebFontListItem | undefined =
+      this.mstate.webfontlist.items.find((f) => f.family === fontFamily);
+    if (!item) return null;
+    return item;
+  }
+
   /**
    * Loads all font faces for a given family and extracts details once every
    * face is available. This method fetches all font files first and then runs
    * analysis to avoid progressive parsing.
    */
-  async getFontDetails(fontFamily: string): Promise<{
-    font: google.GoogleWebFontListItem;
-    faces: Array<{
-      variant: string;
-      axes: FvarAxes;
-      instances: FvarInstance[];
-      features: FontFeature[];
-    }>;
-    axes: FvarAxes;
-    instances: FvarInstance[];
-    features: FontFeature[];
-  } | null> {
-    if (this.fontDetailsCache.has(fontFamily)) {
-      return this.fontDetailsCache.get(fontFamily)!;
+  async getFontDetails(
+    fontFamily: string
+  ): Promise<editor.font.UIFontFamily | null> {
+    if (this.__font_details_cache.has(fontFamily)) {
+      return this.__font_details_cache.get(fontFamily)!;
     }
 
-    const item = this.mstate.webfontlist.items.find(
-      (f) => f.family === fontFamily
-    );
+    const item = this.getFontItem(fontFamily);
     if (!item) return null;
 
     const files = Object.entries(item.files);
@@ -2845,54 +2889,75 @@ export class Editor
       buffers.map((buf) => this.getParserWorker().details(buf))
     );
 
-    const faces = parsed.map(({ fvar, features }, i) => ({
-      variant: files[i][0],
-      axes: fvar.axes,
-      instances: fvar.instances,
-      features,
-    }));
-
-    // Merge axes
-    const axes: FvarAxes = {};
-    for (const face of faces) {
-      Object.assign(axes, face.axes);
-    }
-
-    // Merge instances, deduplicating by name and coordinates
-    const instances: FvarInstance[] = [];
-    const instSeen = new Set<string>();
-    for (const face of faces) {
-      for (const inst of face.instances) {
-        const key = inst.name + JSON.stringify(inst.coordinates);
-        if (!instSeen.has(key)) {
-          instSeen.add(key);
-          instances.push(inst);
-        }
+    const faces: editor.font.UIFontData[] = parsed.map(
+      ({ fvar, features, postscriptName }, i) => {
+        fvar.axes;
+        // TODO: will be removed
+        const variant = files[i][0];
+        const italic = variant.toLowerCase().includes("italic");
+        return {
+          italic,
+          postscriptName: postscriptName ?? "",
+          axes: fvar.axes,
+          instances: fvar.instances,
+          features,
+        } satisfies editor.font.UIFontData;
       }
-    }
+    );
 
-    // Merge features, deduplicating by tag
-    const features: FontFeature[] = [];
-    const featureSeen = new Set<string>();
-    for (const face of faces) {
-      for (const feat of face.features) {
-        if (!featureSeen.has(feat.tag)) {
-          featureSeen.add(feat.tag);
-          features.push(feat);
-        }
-      }
-    }
-
-    const detail = {
-      font: item,
-      faces,
-      axes,
-      instances,
-      features,
-    } as const;
-    this.fontDetailsCache.set(fontFamily, detail);
+    const detail: editor.font.UIFontFamily = {
+      family: fontFamily,
+      axes: item.axes?.map((axis) => ({
+        tag: axis.tag,
+        min: axis.start,
+        max: axis.end,
+      })),
+      types: faces,
+      styles: editor.font.mapStyles(faces),
+    } satisfies editor.font.UIFontFamily;
+    this.__font_details_cache.set(fontFamily, detail);
     return detail;
   }
+
+  public matchFontFace(
+    fontFamily: string,
+    description: {
+      fontPostscriptName?: string;
+      fontWeight?: number;
+      fontVariations?: Record<string, number>;
+    }
+  ): { face: editor.font.UIFontData; instance: FvarInstance | null } | null {
+    const font = this.__font_details_cache.get(fontFamily);
+    if (!font) {
+      this.log("font not found", fontFamily);
+      return null;
+    }
+
+    // match with fvar.instances
+    for (const face of font.types) {
+      // try to match with fvar.instances
+      const matched = editor.font.matchFvarInstance(face.instances, {
+        postscriptName: description.fontPostscriptName,
+        axesValues: description.fontVariations ?? {},
+      });
+
+      if (matched) return { face, instance: matched };
+    }
+
+    // match with static postscriptName
+    for (const face of font.types) {
+      if (face.postscriptName === description.fontPostscriptName) {
+        return { face, instance: null };
+      }
+    }
+    // const matchedDetails = font.types.find(
+    //   (typeface) => typeface.postscriptName === matched?.postscriptName
+    // );
+
+    // return matchedDetails ?? null;
+    return null;
+  }
+
   // #endregion IFontLoaderActions implementation
 
   // #region IExportPluginActions implementation

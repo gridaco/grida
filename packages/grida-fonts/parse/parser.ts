@@ -11,6 +11,7 @@ export class Parser {
   private _fvar?: FvarData;
   private _features?: FontFeature[];
   private _stat?: StatData;
+  private _postscriptName?: string;
 
   constructor(buffer: ArrayBuffer) {
     [this.font] = Typr.parse(buffer);
@@ -44,5 +45,15 @@ export class Parser {
       this._stat = parseStatTable(this.font);
     }
     return this._stat;
+  }
+
+  /**
+   * Returns PostScript name from the name table.
+   */
+  postscriptName(): string | undefined {
+    if (this._postscriptName === undefined) {
+      this._postscriptName = this.font.name?.postScriptName;
+    }
+    return this._postscriptName;
   }
 }
