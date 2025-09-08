@@ -1946,12 +1946,11 @@ export class Editor
         match.instance?.postscriptName || match.face.postscriptName,
       fontWeight: match.instance?.coordinates?.wght,
       fontOpticalSizing: match.instance?.coordinates?.opsz,
-      // fontVariations: match.axes,
+      fontVariations: match.instance?.coordinates,
+      // TODO: clean the invalid features by face change.
       // fontFeatures: match.features,
       fontStyleItalic: match.face.italic,
     } as const;
-
-    console.log("next", next);
 
     this.dispatch({
       type: "node/change/fontFamily",
