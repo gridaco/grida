@@ -21,7 +21,7 @@
 //! ```
 
 use cg::helpers::webfont_helper::{find_font_files, load_webfonts_metadata};
-use cg::resources::{load_font, load_scene_images, FontMessage, ImageMessage};
+use cg::resources::{load_font, load_scene_images, FontMessage};
 use cg::window;
 use cg::window::application::HostEvent;
 use cg::{io::io_figma::FigmaConverter, node::schema::Scene};
