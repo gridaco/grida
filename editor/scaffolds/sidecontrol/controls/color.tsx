@@ -7,7 +7,6 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/components/lib/utils";
 import { ColorPicker } from "./color-picker";
-import { css } from "@/grida-canvas-utils/css";
 import HexValueInput from "./utils/hex";
 
 type RGBA = { r: number; g: number; b: number; a: number };
@@ -20,8 +19,10 @@ export type RGBAColorControlProps = {
 export function RGBAColorControl({
   value = { r: 0, g: 0, b: 0, a: 0 },
   onValueChange,
+  disabled,
 }: {
   value?: RGBA;
+  disabled?: boolean;
   onValueChange?: (value: RGBA) => void;
 }) {
   return (
@@ -32,13 +33,14 @@ export function RGBAColorControl({
           WorkbenchUI.inputVariants({ size: "xs", variant: "paint-container" })
         )}
       >
-        <PopoverTrigger>
+        <PopoverTrigger disabled={disabled}>
           <RGBAChip rgba={value} className="rounded-sm" />
         </PopoverTrigger>
 
         {/* <span className="ms-2">#{css.rgbaToHex(value)}</span> */}
         <HexValueInput
           className="border-none outline-none w-full h-full ps-2 text-xs"
+          disabled={disabled}
           value={{
             r: value.r,
             g: value.g,

@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::shape::*;
-use skia_safe::{self as sk, surfaces};
+use skia_safe::surfaces;
 
 // **Light**
 // Adjust the angle and intensity of the light illuminating your glass frames to change where the highlight appears on the frame’s edge.
@@ -12,7 +12,7 @@ use skia_safe::{self as sk, surfaces};
 // Increase dispersion to add a hint of chromatic aberration at the edge of your glass frames. This works best in combination with refraction.
 // **Frost**
 // Adjust the amount of background blur present on your glass frames to help glass elements stand out on busy backgrounds to provide better contrast.
-
+#[allow(dead_code)]
 struct LiquidGlassEffect {
     /// The intensity of specular highlights. Must be between 0 and 1. Higher values create brighter highlights.
     light_intensity: f32,
@@ -28,13 +28,13 @@ struct LiquidGlassEffect {
     radius: f32,
 }
 
-static BACKGROUND: &[u8] = include_bytes!("../../fixtures/images/stripes.png");
+static _BACKGROUND: &[u8] = include_bytes!("../../../fixtures/images/stripes.png");
 
 // 1. background image
 // 2. forground glass shape 300x100 rounded rect
 // 3. glass effect on glass shape
 fn main() {
-    let effect = LiquidGlassEffect {
+    let _effect = LiquidGlassEffect {
         light_intensity: 0.5,
         light_angle: 45.0,
         refraction: 0.5,
@@ -43,7 +43,7 @@ fn main() {
         radius: 10.0,
     };
 
-    let shape: RRectShape = RRectShape {
+    let _shape: RRectShape = RRectShape {
         width: 300.0,
         height: 100.0,
         corner_radius: RectangularCornerRadius::circular(10.0),
@@ -51,5 +51,5 @@ fn main() {
 
     let (width, height) = (400, 400);
     let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
-    let canvas = surface.canvas();
+    let _canvas = surface.canvas();
 }

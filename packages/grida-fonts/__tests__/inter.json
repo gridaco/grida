@@ -1,0 +1,34 @@
+{
+  "family": "Inter",
+  "variants": ["regular", "italic"],
+  "subsets": [
+    "cyrillic",
+    "cyrillic-ext",
+    "greek",
+    "greek-ext",
+    "latin",
+    "latin-ext",
+    "vietnamese"
+  ],
+  "version": "v19",
+  "lastModified": "2025-05-29",
+  "files": {
+    "regular": "https://fonts.gstatic.com/s/inter/v19/UcCo3FwrK3iLTfvlaQc78lA2.ttf",
+    "italic": "https://fonts.gstatic.com/s/inter/v19/UcCm3FwrK3iLTcvnYwMZ90A2B58.ttf"
+  },
+  "category": "sans-serif",
+  "kind": "webfonts#webfont",
+  "menu": "https://fonts.gstatic.com/s/inter/v19/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZlhjQ.ttf",
+  "axes": [
+    {
+      "tag": "opsz",
+      "start": 14,
+      "end": 32
+    },
+    {
+      "tag": "wght",
+      "start": 100,
+      "end": 900
+    }
+  ]
+}

@@ -130,21 +130,9 @@ async fn demo_basic() -> Scene {
     let mut text_span_node = nf.create_text_span_node();
     text_span_node.name = Some("Test Text".to_string());
     text_span_node.transform = AffineTransform::new(300.0, 300.0, 0.0);
-    text_span_node.size = Size {
-        width: 300.0,
-        height: 200.0,
-    };
+    text_span_node.width = Some(300.0);
     text_span_node.text = "Grida Canvas SKIA Bindings Backend".to_string();
-    text_span_node.text_style = TextStyle {
-        text_decoration: TextDecoration::LineThrough,
-        font_family: font_caveat_family.clone(),
-        font_size: 32.0,
-        font_weight: FontWeight::new(900),
-        italic: false,
-        letter_spacing: None,
-        line_height: None,
-        text_transform: TextTransform::None,
-    };
+    text_span_node.text_style = TextStyleRec::from_font(font_caveat_family.as_str(), 32.0);
     text_span_node.text_align = TextAlign::Center;
     text_span_node.text_align_vertical = TextAlignVertical::Center;
     text_span_node.stroke = Some(Paint::Solid(SolidPaint {

@@ -1,6 +1,7 @@
 use cg::cache::scene::SceneCache;
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
 use cg::painter::layer::Layer;
+use cg::runtime::repository::FontRepository;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
 
@@ -36,7 +37,8 @@ fn layers_in_rect_include_partially_visible_nested() {
     };
 
     let mut cache = SceneCache::new();
-    cache.update_geometry(&scene);
+    let fonts = FontRepository::new();
+    cache.update_geometry(&scene, &fonts);
     cache.update_layers(&scene);
 
     // Query area partially overlapping the rectangle only

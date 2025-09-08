@@ -10,6 +10,18 @@ pub struct VectorNetworkSegment {
     pub tb: Option<(f32, f32)>,
 }
 
+impl VectorNetworkSegment {
+    /// straight line segment between two vertex indices
+    pub fn ab(a: usize, b: usize) -> Self {
+        Self {
+            a,
+            b,
+            ta: None,
+            tb: None,
+        }
+    }
+}
+
 /// A sequence of segment indices that form a closed contour (loop).
 ///
 /// Each `VectorNetworkLoop` corresponds to a single closed ring in the
@@ -79,18 +91,6 @@ pub struct VectorNetworkRegion {
     pub fills: Option<Vec<Paint>>,
 }
 
-/// A vector network geometry is a collection of vertices and segments.
-///
-/// This is a low-level representation of a vector network that can be used
-/// to create a vector network.
-///
-/// It is used to create a vector network from a set of vertices and segments.
-#[derive(Debug, Clone)]
-pub struct VectorNetworkGeometry {
-    pub vertices: Vec<(f32, f32)>,
-    pub segments: Vec<VectorNetworkSegment>,
-}
-
 #[derive(Debug, Clone)]
 pub struct PiecewiseVectorNetworkGeometry {
     /// Array of unique vertex positions in 2D space.
@@ -129,7 +129,7 @@ impl PiecewiseVectorNetworkGeometry {
     /// # Example
     ///
     /// ```rust
-    /// use grida_canvas::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+    /// use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
     ///
     /// // Valid geometry - will succeed
     /// let geometry = PiecewiseVectorNetworkGeometry::new(
@@ -181,7 +181,7 @@ impl PiecewiseVectorNetworkGeometry {
     /// # Example
     ///
     /// ```rust
-    /// use grida_canvas::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+    /// use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
     ///
     /// let geometry = PiecewiseVectorNetworkGeometry {
     ///     vertices: vec![(0.0, 0.0), (100.0, 0.0), (200.0, 100.0)],
@@ -264,15 +264,6 @@ pub struct VectorNetwork {
     pub vertices: Vec<(f32, f32)>,
     pub segments: Vec<VectorNetworkSegment>,
     pub regions: Vec<VectorNetworkRegion>,
-}
-
-impl Into<VectorNetworkGeometry> for VectorNetwork {
-    fn into(self) -> VectorNetworkGeometry {
-        VectorNetworkGeometry {
-            vertices: self.vertices,
-            segments: self.segments,
-        }
-    }
 }
 
 fn is_zero(tangent: (f32, f32)) -> bool {

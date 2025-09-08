@@ -1,3 +1,4 @@
+import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 
 export namespace prototypes {
@@ -92,12 +93,12 @@ export namespace prototypes {
     style: {},
     fontSize: 16,
     fontWeight: 400,
-    fontFamily: "Arial",
+    fontFamily: editor.config.fonts.DEFAULT_FONT_FAMILY,
     textAlign: "left",
     textAlignVertical: "top",
-    lineHeight: 1.5,
+    lineHeight: 1.2,
     letterSpacing: 0,
-    textDecoration: "none",
+    textDecorationLine: "none",
   } satisfies grida.program.nodes.NodePrototype;
 
   export const image = {
@@ -172,12 +173,12 @@ export namespace prototypes {
           color: { r: 255, g: 255, b: 255, a: 1 },
         },
         fontWeight: 400,
-        fontFamily: "Arial",
+        fontFamily: editor.config.fonts.DEFAULT_FONT_FAMILY,
         textAlign: "center",
         textAlignVertical: "center",
-        lineHeight: 1.5,
+        lineHeight: 1.2,
         letterSpacing: 0,
-        textDecoration: "none",
+        textDecorationLine: "none",
       },
     ],
   } satisfies grida.program.nodes.NodePrototype;

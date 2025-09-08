@@ -1,6 +1,6 @@
 import produce from "immer";
 import { Action, editor } from ".";
-import reducer from "./reducers";
+import reducer, { _internal_reducer } from "./reducers";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
 import cg from "@grida/cg";
@@ -11,17 +11,23 @@ import cmath from "@grida/cmath";
 import assert from "assert";
 import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
-import { TCanvasEventTargetDragGestureState } from "./action";
+import { InternalAction, TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
 import type { Grida2D } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
+import * as google from "@grida/fonts/google";
+import type { FvarAxes, FvarInstance, FontFeature } from "@grida/fonts/parse";
+import { FontParserWorker } from "@grida/fonts/parser/worker";
+import { DocumentFontManager } from "./font-manager";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
   CanvasWasmPDFExportInterfaceProvider,
   CanvasWasmSVGExportInterfaceProvider,
+  CanvasWasmVectorInterfaceProvider,
+  CanvasWasmFontManagerAgentInterfaceProvider,
 } from "./backends/wasm";
 
 function resolveNumberChangeValue(
@@ -74,6 +80,8 @@ export class Editor
     editor.api.ICameraActions,
     editor.api.IEventTargetActions,
     editor.api.IFollowPluginActions,
+    editor.api.IVectorInterfaceActions,
+    editor.api.IFontLoaderActions,
     editor.api.IExportPluginActions
 {
   private readonly __pointer_move_throttle_ms: number = 30;
@@ -101,6 +109,24 @@ export class Editor
   _m_exporter_svg: editor.api.IDocumentSVGExportInterfaceProvider | null = null;
   private get exporterSvg() {
     return this._m_exporter_svg;
+  }
+
+  _m_vector: editor.api.IDocumentVectorInterfaceProvider | null = null;
+  private get vectorProvider() {
+    return this._m_vector;
+  }
+
+  _m_font_loader: editor.api.IDocumentFontManagerAgentInterfaceProvider | null =
+    null;
+  private get fontLoader() {
+    return this._m_font_loader;
+  }
+
+  private readonly _fontManager: DocumentFontManager;
+
+  private fontParserWorker: FontParserWorker | null = null;
+  private getParserWorker() {
+    return (this.fontParserWorker ??= new FontParserWorker());
   }
 
   get state(): Readonly<editor.state.IEditorState> {
@@ -132,6 +158,8 @@ export class Editor
       export_as_image?: WithEditorInstance<editor.api.IDocumentImageExportInterfaceProvider>;
       export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
       export_as_svg?: WithEditorInstance<editor.api.IDocumentSVGExportInterfaceProvider>;
+      vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
+      fonts?: WithEditorInstance<editor.api.IDocumentFontManagerAgentInterfaceProvider>;
     };
   }) {
     this.backend = backend;
@@ -163,8 +191,36 @@ export class Editor
       );
     }
 
+    if (plugins?.vector) {
+      this._m_vector = resolveWithEditorInstance(this, plugins.vector);
+    }
+
+    if (plugins?.fonts) {
+      this._m_font_loader = resolveWithEditorInstance(this, plugins.fonts);
+    }
+
     this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
+    this._fontManager = new DocumentFontManager(this);
+
+    this._do_legacy_warmup();
     onCreate?.(this);
+
+    this.log("editor instantiated");
+  }
+
+  /**
+   * legacy warmup - ideally, this should be called externally, or once internallu,
+   * but as we allow dynamic surface binding, this proccess shall be duplicated once surface binded as well.
+   */
+  private _do_legacy_warmup() {
+    // warm up
+    google.fetchWebfontList().then((webfontlist) => {
+      this.__internal_dispatch({
+        type: "__internal/webfonts#webfontList",
+        webfontlist,
+      });
+      void this.loadPlatformDefaultFonts();
+    });
   }
 
   private _locked: boolean = false;
@@ -219,7 +275,7 @@ export class Editor
     key: string | undefined = undefined,
     force: boolean = false
   ): number {
-    this.dispatch(
+    this.__internal_dispatch(
       {
         type: "__internal/reset",
         key,
@@ -231,6 +287,7 @@ export class Editor
   }
 
   public bind(surface: Grida2D) {
+    this.log("bind surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");
     //
     this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
@@ -252,6 +309,15 @@ export class Editor
       this,
       surface
     );
+
+    this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
+
+    this._m_font_loader = new CanvasWasmFontManagerAgentInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._do_legacy_warmup();
   }
 
   public archive(): Blob {
@@ -355,6 +421,9 @@ export class Editor
       type: "insert",
       ...payload,
     });
+    for (const font of this.mstate.fontdescriptions) {
+      this.loadFont(font);
+    }
   }
 
   public __get_node_siblings(node_id: string): string[] {
@@ -380,10 +449,19 @@ export class Editor
     this.listeners.forEach((l) => l?.(this));
   }
 
+  private __internal_dispatch(action: InternalAction, force: boolean = false) {
+    if (this._locked && !force) return;
+    this.mstate = _internal_reducer(this.mstate, action);
+
+    this._tid++;
+    this.listeners.forEach((l) => l(this, action));
+  }
+
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
     this.mstate = reducer(this.mstate, action, {
       geometry: this,
+      vector: this,
       viewport: {
         width: this.viewport.size.width,
         height: this.viewport.size.height,
@@ -399,6 +477,7 @@ export class Editor
       (state, action) =>
         reducer(state, action, {
           geometry: this,
+          vector: this,
           viewport: {
             width: this.viewport.size.width,
             height: this.viewport.size.height,
@@ -1114,6 +1193,10 @@ export class Editor
         text: "",
         width: "auto",
         height: "auto",
+        fill: {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+        },
       },
     });
 
@@ -1356,6 +1439,28 @@ export class Editor
     });
   }
 
+  public toggleUnderline(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.dispatch({
+        type: "node/toggle/underline",
+        node_id,
+      });
+    });
+  }
+
+  public toggleLineThrough(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.dispatch({
+        type: "node/toggle/line-through",
+        node_id,
+      });
+    });
+  }
+
   public setOpacity(
     target: "selection" | editor.NodeID = "selection",
     opacity: number
@@ -1482,6 +1587,18 @@ export class Editor
   toggleNodeBold(node_id: string) {
     this.dispatch({
       type: "node/toggle/bold",
+      node_id: node_id,
+    });
+  }
+  toggleNodeUnderline(node_id: string) {
+    this.dispatch({
+      type: "node/toggle/underline",
+      node_id: node_id,
+    });
+  }
+  toggleNodeLineThrough(node_id: string) {
+    this.dispatch({
+      type: "node/toggle/line-through",
       node_id: node_id,
     });
   }
@@ -1778,12 +1895,138 @@ export class Editor
       node_id: node_id,
       fontFamily,
     });
+    if (fontFamily) {
+      void this.loadFont({ family: fontFamily });
+    }
   }
   changeTextNodeFontWeight(node_id: string, fontWeight: cg.NFontWeight) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       fontWeight,
+    });
+  }
+
+  changeTextNodeFontStyle(
+    node_id: string,
+    fontStyleDescription: editor.api.FontStyleChangeDescription
+  ) {
+    const { fontFamily, fontPostscriptName } = fontStyleDescription;
+
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+
+    const prev_family = node.fontFamily;
+    const prev = {
+      fontPostscriptName: node.fontPostscriptName,
+      fontWeight: node.fontWeight,
+      fontVariations: node.fontVariations,
+      fontFeatures: node.fontFeatures,
+      fontOpticalSizing: node.fontOpticalSizing,
+      fontStyleItalic: node.fontStyleItalic,
+    } as const;
+
+    const match = this.matchFontFace(fontFamily, {
+      fontPostscriptName,
+      fontWeight: prev.fontWeight,
+      fontVariations: prev.fontVariations,
+    });
+
+    // reject
+    if (!match) {
+      this.log("matching font face not found", fontFamily, fontPostscriptName);
+      return;
+    }
+
+    const next_family = fontFamily;
+    const next = {
+      ...prev,
+      fontPostscriptName:
+        match.instance?.postscriptName || match.face.postscriptName,
+      fontWeight: match.instance?.coordinates?.wght,
+      fontOpticalSizing: match.instance?.coordinates?.opsz,
+      fontVariations: match.instance?.coordinates,
+      // TODO: clean the invalid features by face change.
+      // fontFeatures: match.features,
+      fontStyleItalic: match.face.italic,
+    } as const;
+
+    this.dispatch({
+      type: "node/change/fontFamily",
+      node_id: node_id,
+      fontFamily: next_family,
+    });
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      ...next,
+    });
+  }
+
+  changeTextNodeFontFeature(
+    node_id: editor.NodeID,
+    feature: cg.OpenTypeFeature,
+    value: boolean
+  ): void {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    const features = Object.assign({}, node.fontFeatures ?? {});
+    features[feature] = value;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontFeatures: features,
+    });
+  }
+  changeTextNodeFontVariation(
+    node_id: editor.NodeID,
+    key: string,
+    value: number
+  ): void {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    const variations = Object.assign({}, node.fontVariations ?? {});
+    variations[key] = value;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontVariations: variations,
+    });
+  }
+
+  changeTextNodeFontOpticalSizing(
+    node_id: editor.NodeID,
+    fontOpticalSizing: cg.OpticalSizing
+  ): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontOpticalSizing,
+    });
+  }
+
+  // FIXME: remove me
+  changeTextNodeFontVariationInstance(
+    node_id: editor.NodeID,
+    coordinates: Record<string, number>
+  ): void {
+    const { wght, ...rest } = coordinates;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontWeight:
+        typeof wght === "number" ? (wght as cg.NFontWeight) : undefined,
+      fontVariations:
+        Object.keys(rest).length > 0
+          ? (rest as Record<string, number>)
+          : undefined,
     });
   }
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
@@ -1811,6 +2054,7 @@ export class Editor
       textAlign,
     });
   }
+
   changeTextNodeTextAlignVertical(
     node_id: string,
     textAlignVertical: cg.TextAlignVertical
@@ -1819,6 +2063,75 @@ export class Editor
       type: "node/change/*",
       node_id: node_id,
       textAlignVertical,
+    });
+  }
+
+  changeTextNodeTextTransform(
+    node_id: string,
+    textTransform: cg.TextTransform
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textTransform,
+    });
+  }
+
+  changeTextNodeTextDecorationLine(
+    node_id: string,
+    textDecorationLine: cg.TextDecorationLine
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationLine: textDecorationLine,
+    });
+  }
+
+  changeTextNodeTextDecorationStyle(
+    node_id: string,
+    textDecorationStyle: cg.TextDecorationStyle
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationStyle,
+    });
+  }
+
+  changeTextNodeTextDecorationThickness(
+    node_id: string,
+    textDecorationThickness: cg.TextDecorationThicknessPercentage
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationThickness,
+    });
+  }
+
+  changeTextNodeTextDecorationColor(
+    node_id: string,
+    textDecorationColor: cg.TextDecorationColor
+  ) {
+    const value =
+      textDecorationColor === "currentcolor" ? null : textDecorationColor;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationColor: value,
+    });
+  }
+
+  changeTextNodeTextDecorationSkipInk(
+    node_id: string,
+    textDecorationSkipInk: cg.TextDecorationSkipInkFlag
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationSkipInk,
     });
   }
 
@@ -1877,6 +2190,14 @@ export class Editor
       type: "node/change/*",
       node_id: node_id,
       maxLength,
+    });
+  }
+
+  changeTextNodeMaxLines(node_id: string, maxLines: number | null): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      maxLines,
     });
   }
 
@@ -2498,6 +2819,145 @@ export class Editor
     this.__pligin_follow.unfollow();
   }
   // #endregion IFollowPluginActions implementation
+
+  // #region IVectorInterfaceActions implementation
+  toVectorNetwork(node_id: string): vn.VectorNetwork | null {
+    if (!this.vectorProvider) {
+      throw new Error("Vector interface provider is not bound");
+    }
+    return this.vectorProvider.toVectorNetwork(node_id);
+  }
+  // #endregion IVectorInterfaceActions implementation
+
+  // #region IFontLoaderActions implementation
+
+  private __font_details_cache = new Map<string, editor.font.UIFontFamily>();
+
+  async loadFont(font: { family: string }): Promise<void> {
+    if (!this.fontLoader) return;
+    await this.fontLoader.loadFont(font);
+  }
+
+  listLoadedFonts(): string[] {
+    if (!this.fontLoader) return [];
+    return this.fontLoader.listLoadedFonts();
+  }
+
+  async loadPlatformDefaultFonts(): Promise<void> {
+    const fonts: string[] = Array.from(
+      editor.config.fonts.DEFAULT_FONT_FALLBACK_SET
+    );
+
+    if (this.fontLoader) {
+      void Promise.all(fonts.map((family) => this.loadFont({ family })));
+      void this.fontLoader.setFallbackFonts(fonts);
+    }
+  }
+
+  getFontItem(fontFamily: string): google.GoogleWebFontListItem | null {
+    const item: google.GoogleWebFontListItem | undefined =
+      this.mstate.webfontlist.items.find((f) => f.family === fontFamily);
+    if (!item) return null;
+    return item;
+  }
+
+  /**
+   * Loads all font faces for a given family and extracts details once every
+   * face is available. This method fetches all font files first and then runs
+   * analysis to avoid progressive parsing.
+   */
+  async getFontDetails(
+    fontFamily: string
+  ): Promise<editor.font.UIFontFamily | null> {
+    if (this.__font_details_cache.has(fontFamily)) {
+      return this.__font_details_cache.get(fontFamily)!;
+    }
+
+    const item = this.getFontItem(fontFamily);
+    if (!item) return null;
+
+    const files = Object.entries(item.files);
+
+    // Load all font buffers non-progressively
+    const buffers = await Promise.all(
+      files.map(([, url]) => fetch(url).then((r) => r.arrayBuffer()))
+    );
+
+    // Parse each buffer once all fonts are loaded
+    const parsed = await Promise.all(
+      buffers.map((buf) => this.getParserWorker().details(buf))
+    );
+
+    const faces: editor.font.UIFontData[] = parsed.map(
+      ({ fvar, features, postscriptName }, i) => {
+        fvar.axes;
+        // TODO: will be removed
+        const variant = files[i][0];
+        const italic = variant.toLowerCase().includes("italic");
+        return {
+          italic,
+          postscriptName: postscriptName ?? "",
+          axes: fvar.axes,
+          instances: fvar.instances,
+          features,
+        } satisfies editor.font.UIFontData;
+      }
+    );
+
+    const detail: editor.font.UIFontFamily = {
+      family: fontFamily,
+      axes: item.axes?.map((axis) => ({
+        tag: axis.tag,
+        min: axis.start,
+        max: axis.end,
+      })),
+      types: faces,
+      styles: editor.font.mapStyles(faces),
+    } satisfies editor.font.UIFontFamily;
+    this.__font_details_cache.set(fontFamily, detail);
+    return detail;
+  }
+
+  public matchFontFace(
+    fontFamily: string,
+    description: {
+      fontPostscriptName?: string;
+      fontWeight?: number;
+      fontVariations?: Record<string, number>;
+    }
+  ): { face: editor.font.UIFontData; instance: FvarInstance | null } | null {
+    const font = this.__font_details_cache.get(fontFamily);
+    if (!font) {
+      this.log("font not found", fontFamily);
+      return null;
+    }
+
+    // match with fvar.instances
+    for (const face of font.types) {
+      // try to match with fvar.instances
+      const matched = editor.font.matchFvarInstance(face.instances, {
+        postscriptName: description.fontPostscriptName,
+        axesValues: description.fontVariations ?? {},
+      });
+
+      if (matched) return { face, instance: matched };
+    }
+
+    // match with static postscriptName
+    for (const face of font.types) {
+      if (face.postscriptName === description.fontPostscriptName) {
+        return { face, instance: null };
+      }
+    }
+    // const matchedDetails = font.types.find(
+    //   (typeface) => typeface.postscriptName === matched?.postscriptName
+    // );
+
+    // return matchedDetails ?? null;
+    return null;
+  }
+
+  // #endregion IFontLoaderActions implementation
 
   // #region IExportPluginActions implementation
   exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;

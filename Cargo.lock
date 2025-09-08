@@ -366,6 +366,7 @@ dependencies = [
  "raw-window-handle",
  "reqwest",
  "rstar",
+ "seahash",
  "serde",
  "serde_json",
  "skia-safe",
@@ -1062,6 +1063,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c4ee00b289aba7a9e5306d57c2d05499b2e5dc427f84ac708bd2c090212cf3e"
 dependencies = [
  "gl_generator",
+]
+
+[[package]]
+name = "grida-canvas-fonts"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "ttf-parser",
 ]
 
 [[package]]
@@ -2490,6 +2500,12 @@ dependencies = [
  "smithay-client-toolkit",
  "tiny-skia",
 ]
+
+[[package]]
+name = "seahash"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 
 [[package]]
 name = "security-framework"

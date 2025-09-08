@@ -15,6 +15,7 @@ import { cn } from "@/components/lib/utils";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import * as React from "react";
+import { useValueSeekedSelector } from "@/hooks/use-value-seeked-selector";
 
 export interface ItemRendererProps {
   option: Option;
@@ -33,6 +34,7 @@ interface VirtualizedCommandProps {
   selectedOption: string;
   onSelectOption?: (option: string) => void;
   renderer?: (props: ItemRendererProps) => React.ReactNode;
+  onValueSeeked?: (option: string | null) => void;
 }
 
 function DefaultRenderer({
@@ -59,10 +61,19 @@ const VirtualizedCommand = ({
   selectedOption,
   onSelectOption,
   renderer = DefaultRenderer,
+  onValueSeeked,
 }: VirtualizedCommandProps) => {
-  const [filteredOptions, setFilteredOptions] =
-    React.useState<Option[]>(options);
-  const parentRef = React.useRef(null);
+  const [search, setSearch] = React.useState("");
+
+  const filteredOptions = React.useMemo(() => {
+    const query = search.toLowerCase();
+    return query
+      ? options.filter((option) => option.value.toLowerCase().includes(query))
+      : options;
+  }, [options, search]);
+
+  const parentRef = React.useRef<HTMLDivElement>(null);
+  const { sync } = useValueSeekedSelector(parentRef, onValueSeeked, "selected");
 
   const virtualizer = useVirtualizer({
     count: filteredOptions.length,
@@ -73,7 +84,7 @@ const VirtualizedCommand = ({
 
   const virtualOptions = virtualizer.getVirtualItems();
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const selectedIndex = filteredOptions.findIndex(
       (option) => option.value === selectedOption
     );
@@ -82,22 +93,12 @@ const VirtualizedCommand = ({
     }
   }, [selectedOption, filteredOptions, virtualizer]);
 
-  const handleSearch = (search: string) => {
-    setFilteredOptions(
-      options.filter((option) =>
-        option.value.toLowerCase().includes(search.toLowerCase() ?? [])
-      )
-    );
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    // if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-    //   event.preventDefault();
-    // }
+  const handleSearch = (value: string) => {
+    setSearch(value);
   };
 
   return (
-    <Command shouldFilter={false} onKeyDown={handleKeyDown}>
+    <Command shouldFilter={false} onKeyDown={sync} onPointerMove={sync}>
       <CommandInput onValueChange={handleSearch} placeholder={placeholder} />
       <CommandEmpty>No item found.</CommandEmpty>
       <CommandGroup
@@ -157,6 +158,7 @@ interface VirtualizedComboboxProps {
   align?: "start" | "center" | "end";
   alignOffset?: number;
   renderer?: (props: ItemRendererProps) => React.ReactNode;
+  onValueSeeked?: (value: string | null) => void;
   className?: string;
 }
 
@@ -171,9 +173,14 @@ export function VirtualizedCombobox({
   align,
   alignOffset,
   renderer,
+  onValueSeeked,
   className,
 }: VirtualizedComboboxProps) {
   const [open, setOpen] = React.useState<boolean>(false);
+  const optionItems = React.useMemo(
+    () => options.map((option) => ({ value: option, label: option })),
+    [options]
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -199,10 +206,11 @@ export function VirtualizedCombobox({
       >
         <VirtualizedCommand
           height={height}
-          options={options.map((option) => ({ value: option, label: option }))}
+          options={optionItems}
           placeholder={placeholder}
           selectedOption={value ?? ""}
           renderer={renderer}
+          onValueSeeked={onValueSeeked}
           onSelectOption={(currentValue) => {
             onValueChange?.(currentValue === value ? "" : currentValue);
             setOpen(false);

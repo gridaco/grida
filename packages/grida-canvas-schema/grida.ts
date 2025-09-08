@@ -1244,9 +1244,6 @@ export namespace grida.program.nodes {
 
     /**
      * Node that supports stroke with color - such as rectangle, ellipse, etc.
-     *
-     * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
-     *
      */
     export interface IStroke {
       stroke?: cg.Paint;
@@ -1270,6 +1267,21 @@ export namespace grida.program.nodes {
        * @default "butt"
        */
       strokeCap: cg.StrokeCap;
+    }
+
+    /**
+     * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
+     */
+    export interface ITextStroke {
+      stroke?: cg.Paint;
+      /**
+       * stroke width - 0 or greater
+       */
+      strokeWidth?: number;
+      /**
+       * stroke alignment - takes effect when stroke is set
+       */
+      strokeAlign?: cg.StrokeAlign;
     }
 
     export interface ICSSBorder {
@@ -1352,16 +1364,57 @@ export namespace grida.program.nodes {
      * a set of properties that can be either applied to a text or textspan
      */
     export interface ITextStyle {
-      textDecoration: cg.TextDecoration;
       fontFamily?: string;
       fontSize: number;
-      fontWeight: cg.NFontWeight;
+      fontWeight: cg.NFontWeight | number;
+      fontOpticalSizing?: cg.OpticalSizing;
+
+      /**
+       * OpenType features
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-feature-settings
+       */
+      fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
+      /**
+       * custom font variations
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-variation-settings
+       */
+      fontVariations?: Record<string, number>;
+
+      // #region semantics
+      /**
+       * if the font face is italic (or italic style is requested)
+       * this depends on how editor reloves the font.
+       *
+       * best practice is to set this true, only the font is italic. (defined by OS/2 fsSelection)
+       * in a variable font scenario, this can be set true, even if fsSelection is not set to italic.
+       *
+       * if the used fvar.instance is semantically italic, this can be set true.
+       */
+      fontStyleItalic?: boolean;
+      /**
+       * [font post script name]
+       * the post script name is a unique identifier for a font face scoped by the family.
+       * this value is parsed from the ttf file itself.
+       */
+      fontPostscriptName?: string;
+      // #endregion semantics
+
+      // #region decorations
+      textDecorationLine: cg.TextDecorationLine;
+      textDecorationStyle?: cg.TextDecorationStyle | null;
+      textDecorationColor?: cg.TextDecorationColorValue | null;
+      textDecorationSkipInk?: cg.TextDecorationSkipInkFlag | null;
+      textDecorationThickness?: cg.TextDecorationThicknessPercentage | null;
+      // #endregion decorations
+
+      textTransform?: cg.TextTransform;
       /**
        * @default 0
        */
       letterSpacing?: number;
       /**
-       * @deprecated
+       * line-height in percentage value only. 0% ~
+       * @min 0
        */
       lineHeight?: number;
     }
@@ -1507,8 +1560,11 @@ export namespace grida.program.nodes {
       i.IHrefable,
       i.IMouseCursor,
       i.ITextNodeStyle,
-      i.ITextValue {
+      i.ITextValue,
+      i.ITextStroke {
     readonly type: "text";
+
+    maxLines?: number | null;
     // textAutoResize: "none" | "width" | "height" | "auto";
   }
 
@@ -1519,6 +1575,7 @@ export namespace grida.program.nodes {
       i.IComputedTextValue & i.IComputedTextNodeStyle
     > {
     readonly type: "text";
+    maxLines?: number | null;
   }
 
   export interface ImageNode

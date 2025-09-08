@@ -16,6 +16,11 @@ export interface GridaCanvasModuleInitOptions {
   locateFile(file: string, version: string): string;
 }
 
+// ====================================================================================================
+// TYPES
+// ====================================================================================================
+
+type Vector2 = [number, number];
 type Transform2D = [[number, number, number], [number, number, number]];
 type Rectangle = {
   x: number;
@@ -37,6 +42,25 @@ type ExportAsImage = {
   constraints: ExportConstraints;
 };
 
+export type FontKey = {
+  family: string;
+  // Future properties will allow precise font identification and partial fetching.
+};
+
+type VectorNetworkVertex = Vector2;
+type VectorNetworkSegment = {
+  a: number;
+  b: number;
+  ta: Vector2;
+  tb: Vector2;
+};
+interface VectorNetwork {
+  vertices: VectorNetworkVertex[];
+  segments: VectorNetworkSegment[];
+}
+
+// ====================================================================================================
+
 export default async function init(
   opts?: GridaCanvasModuleInitOptions
 ): Promise<ApplicationFactory> {
@@ -53,10 +77,10 @@ export default async function init(
 
 interface CreateWebGLCanvasSurfaceOptions {
   /**
-   * when true, built-in fonts will be used for text rendering, even if the font family and style does not match.
+   * when true, embedded fonts will be registered and used for text rendering.
    * @default true
    */
-  fontFallback?: boolean;
+  use_embedded_fonts?: boolean;
 }
 
 class ApplicationFactory {
@@ -68,7 +92,7 @@ class ApplicationFactory {
 
   createWebGLCanvasSurface(
     canvas: HTMLCanvasElement,
-    options: CreateWebGLCanvasSurfaceOptions = { fontFallback: true }
+    options: CreateWebGLCanvasSurfaceOptions = { use_embedded_fonts: true }
   ) {
     const context = canvas.getContext("webgl2", {
       antialias: true,
@@ -88,7 +112,7 @@ class ApplicationFactory {
     const ptr = this.module._init(
       canvas.width,
       canvas.height,
-      options.fontFallback
+      options.use_embedded_fonts
     );
     const _ = new Grida2D(this.module, ptr);
     _.resize(canvas.width, canvas.height);
@@ -168,6 +192,75 @@ export class Grida2D {
   }
 
   /**
+   * Register a font with the renderer.
+   *
+   * The wasm module cannot fetch font files directly from the network, so the
+   * host environment must fetch the font bytes and pass them here.
+   *
+   * @param family - CSS font-family name for the typeface.
+   * @param data - Raw font file bytes (e.g. TTF/OTF).
+   */
+  addFont(family: string, data: Uint8Array) {
+    const [fptr, flen] = this._alloc_string(family);
+    const len = data.length;
+    const ptr = this.module._allocate(len);
+    this.module.HEAPU8.set(data, ptr);
+    this.module._add_font(this.appptr, fptr, flen - 1, ptr, len);
+    this.module._deallocate(fptr, flen);
+    this.module._deallocate(ptr, len);
+  }
+
+  addImage(data: Uint8Array): string {
+    const len = data.length;
+    const ptr = this.module._allocate(len);
+    this.module.HEAPU8.set(data, ptr);
+    const out = this.module._add_image(this.appptr, ptr, len);
+    this.module._deallocate(ptr, len);
+    const hash = this.module.UTF8ToString(out);
+    const hlen = this.module.lengthBytesUTF8(hash) + 1;
+    this._free_string(out, hlen);
+    return hash;
+  }
+
+  hasMissingFonts(): boolean {
+    return this.module._has_missing_fonts(this.appptr);
+  }
+
+  listMissingFonts(): FontKey[] {
+    const ptr = this.module._list_missing_fonts(this.appptr);
+    if (ptr === 0) return [];
+    const str = this.module.UTF8ToString(ptr);
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
+    return JSON.parse(str);
+  }
+
+  listAvailableFonts(): FontKey[] {
+    const ptr = this.module._list_available_fonts(this.appptr);
+    if (ptr === 0) return [];
+    const str = this.module.UTF8ToString(ptr);
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
+    return JSON.parse(str);
+  }
+
+  setFallbackFonts(fonts: string[]) {
+    const json = JSON.stringify(fonts);
+    const [ptr, len] = this._alloc_string(json);
+    this.module._set_default_fallback_fonts(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  getFallbackFonts(): string[] {
+    const ptr = this.module._get_default_fallback_fonts(this.appptr);
+    if (ptr === 0) return [];
+    const str = this.module.UTF8ToString(ptr);
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
+    return JSON.parse(str);
+  }
+
+  /**
    * Tick the application clock.
    * bind this to requestAnimationFrame loop or similar
    * @param time - The time in milliseconds. use performance.now()
@@ -208,7 +301,8 @@ export class Grida2D {
       return null;
     }
     const str = this.module.UTF8ToString(ptr);
-    // TODO: free ptr
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
     return str;
   }
 
@@ -218,7 +312,8 @@ export class Grida2D {
       return [];
     }
     const str = this.module.UTF8ToString(ptr);
-    // TODO: free ptr
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
     return JSON.parse(str);
   }
 
@@ -234,7 +329,8 @@ export class Grida2D {
       return [];
     }
     const str = this.module.UTF8ToString(ptr);
-    // TODO: free ptr
+    const len = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(ptr, len);
     return JSON.parse(str);
   }
 
@@ -255,6 +351,24 @@ export class Grida2D {
     this.module._deallocate(outptr, 4 * 4);
 
     return utils.rect_from_vec4(rect);
+  }
+
+  /**
+   * @deprecated not fully implemented yet
+   */
+  toVectorNetwork(id: string): VectorNetwork | null {
+    const [ptr, len] = this._alloc_string(id);
+    const outptr = this.module._to_vector_network(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+
+    if (outptr === 0) {
+      return null;
+    }
+
+    const str = this.module.UTF8ToString(outptr);
+    const outlen = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(outptr, outlen);
+    return JSON.parse(str);
   }
 
   exportNodeAs(

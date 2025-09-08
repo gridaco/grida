@@ -25,7 +25,6 @@ describe("splitSegment", () => {
     ]);
     const editor = new vn.VectorNetworkEditor(base);
     const newIndex = editor.splitSegment(
-      0,
       { segment: 0, t: 0.5 },
       { preserveZero: false }
     );
@@ -61,7 +60,6 @@ describe("splitSegment", () => {
 
     // Split at 25% along the segment
     const newIndex = editor.splitSegment(
-      0,
       { segment: 0, t: 0.25 },
       { preserveZero: false }
     );
@@ -105,7 +103,6 @@ describe("splitSegment", () => {
 
     // Split at middle
     const newIndex = editor.splitSegment(
-      0,
       { segment: 0, t: 0.5 },
       { preserveZero: false }
     );
@@ -144,7 +141,7 @@ describe("splitSegment", () => {
     const originalBBox = editor.getBBox();
 
     // Split the first segment at t=0.5
-    editor.splitSegment(0, { segment: 0, t: 0.5 }, { preserveZero: false });
+    editor.splitSegment({ segment: 0, t: 0.5 }, { preserveZero: false });
 
     // Get new bounding box
     const newBBox = editor.getBBox();
@@ -165,8 +162,8 @@ describe("splitSegment", () => {
     const originalBBox = editor.getBBox();
 
     // Split multiple segments at different positions
-    editor.splitSegment(0, { segment: 0, t: 0.3 }); // Split first segment at 30%
-    editor.splitSegment(2, { segment: 2, t: 0.7 }); // Split third segment at 70%
+    editor.splitSegment({ segment: 0, t: 0.3 }); // Split first segment at 30%
+    editor.splitSegment({ segment: 2, t: 0.7 }); // Split third segment at 70%
 
     // Get new bounding box
     const newBBox = editor.getBBox();
@@ -190,7 +187,7 @@ describe("splitSegment", () => {
     const editor = new vn.VectorNetworkEditor(base);
 
     // Test splitting at t=0 (should create a zero-length first segment)
-    const index0 = editor.splitSegment(0, { segment: 0, t: 0 });
+    const index0 = editor.splitSegment({ segment: 0, t: 0 });
     expect(index0).toBe(2);
     expect(editor.vertices[index0]).toEqual([0, 0]);
     expect(editor.segments[0].a).toBe(0);
@@ -204,7 +201,7 @@ describe("splitSegment", () => {
       [10, 0],
     ]);
     const editor2 = new vn.VectorNetworkEditor(base2);
-    const index1 = editor2.splitSegment(0, { segment: 0, t: 1 });
+    const index1 = editor2.splitSegment({ segment: 0, t: 1 });
     expect(index1).toBe(2);
     expect(editor2.vertices[index1]).toEqual([10, 0]);
     expect(editor2.segments[0].a).toBe(0);
@@ -226,7 +223,7 @@ describe("splitSegment", () => {
     editor.updateTangent(0, "tb", [-1, 1]);
 
     // Split the segment
-    const newIndex = editor.splitSegment(0, { segment: 0, t: 0.6 });
+    const newIndex = editor.splitSegment({ segment: 0, t: 0.6 });
 
     // Verify tangent continuity at the split point
     const firstSegment = editor.segments[0];
@@ -272,11 +269,11 @@ describe("splitSegment", () => {
     const editor = new vn.VectorNetworkEditor(base);
 
     expect(() => {
-      editor.splitSegment(-1, { segment: -1, t: 0.5 });
+      editor.splitSegment({ segment: -1, t: 0.5 });
     }).toThrow("Invalid segment index: -1");
 
     expect(() => {
-      editor.splitSegment(5, { segment: 5, t: 0.5 });
+      editor.splitSegment({ segment: 5, t: 0.5 });
     }).toThrow("Invalid segment index: 5");
   });
 
@@ -288,10 +285,8 @@ describe("splitSegment", () => {
     const editor = new vn.VectorNetworkEditor(base);
 
     expect(() => {
-      editor.splitSegment(0, { segment: 1, t: 0.5 });
-    }).toThrow(
-      "PointOnSegment segment index (1) does not match segment index (0)"
-    );
+      editor.splitSegment({ segment: 1, t: 0.5 });
+    }).toThrow("Invalid segment index: 1");
   });
 
   test("splits quarter arc correctly", () => {
@@ -318,7 +313,6 @@ describe("splitSegment", () => {
 
     // Split at middle (t=0.5)
     const newIndex = editor.splitSegment(
-      0,
       { segment: 0, t: 0.5 },
       { preserveZero: false }
     );
@@ -351,7 +345,6 @@ describe("splitSegment", () => {
 
     // Split the first segment (quarter circle) at middle
     const newIndex = editor.splitSegment(
-      0,
       { segment: 0, t: 0.5 },
       { preserveZero: false }
     );
@@ -376,7 +369,6 @@ describe("splitSegment", () => {
 
       // Split with preserveZero = true
       const newIndex = editor.splitSegment(
-        0,
         { segment: 0, t: 0.5 },
         { preserveZero: true }
       );
@@ -412,7 +404,6 @@ describe("splitSegment", () => {
 
       // Split with preserveZero = false (default behavior)
       const newIndex = editor.splitSegment(
-        0,
         { segment: 0, t: 0.5 },
         { preserveZero: false }
       );
@@ -444,7 +435,6 @@ describe("splitSegment", () => {
 
       // Split with preserveZero = true, but should still use de Casteljau since original has non-zero tangents
       const newIndex = editor.splitSegment(
-        0,
         { segment: 0, t: 0.5 },
         { preserveZero: true }
       );
@@ -469,7 +459,6 @@ describe("splitSegment", () => {
 
       // Split at 25% with preserveZero = true
       const newIndex = editor.splitSegment(
-        0,
         { segment: 0, t: 0.25 },
         { preserveZero: true }
       );
@@ -498,7 +487,6 @@ describe("splitSegment", () => {
 
       // Split at t=0 with preserveZero = true
       const index0 = editor.splitSegment(
-        0,
         { segment: 0, t: 0 },
         { preserveZero: true }
       );
@@ -516,7 +504,6 @@ describe("splitSegment", () => {
       ]);
       const editor2 = new vn.VectorNetworkEditor(base2);
       const index1 = editor2.splitSegment(
-        0,
         { segment: 0, t: 1 },
         { preserveZero: true }
       );

@@ -1,8 +1,10 @@
 use crate::cg::types::*;
-use crate::node::schema::{NodeId, Size};
-use crate::painter::{cvt, make_textstyle};
+use crate::node::schema::NodeId;
+use crate::painter::cvt;
 use crate::runtime::repository::FontRepository;
+use crate::text::text_style::textstyle;
 use skia_safe::textlayout;
+use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -12,10 +14,10 @@ use std::rc::Rc;
 pub struct ParagraphCacheEntry {
     pub hash: u64,
     pub font_generation: usize,
-    pub paragraph: Rc<textlayout::Paragraph>,
+    pub paragraph: Rc<RefCell<textlayout::Paragraph>>,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct ParagraphCache {
     entries: HashMap<NodeId, ParagraphCacheEntry>,
 }
@@ -27,75 +29,104 @@ impl ParagraphCache {
         }
     }
 
-    fn text_hash(
+    fn shape_key(
         text: &str,
-        style: &TextStyle,
+        style: &TextStyleRec,
         align: &TextAlign,
-        valign: &TextAlignVertical,
-        size: &Size,
+        max_lines: &Option<usize>,
     ) -> u64 {
         let mut h = DefaultHasher::new();
         text.hash(&mut h);
-        style.text_decoration.hash(&mut h);
         style.font_family.hash(&mut h);
         style.font_size.to_bits().hash(&mut h);
         style.font_weight.0.hash(&mut h);
         style.italic.hash(&mut h);
         style.letter_spacing.map(|v| v.to_bits()).hash(&mut h);
-        style.line_height.map(|v| v.to_bits()).hash(&mut h);
+        // style.line_height.map(|v| v.to_bits()).hash(&mut h); // TODO: hash line height
         style.text_transform.hash(&mut h);
         (*align as u8).hash(&mut h);
-        (*valign as u8).hash(&mut h);
-        size.width.to_bits().hash(&mut h);
-        size.height.to_bits().hash(&mut h);
+        max_lines.hash(&mut h);
         h.finish()
+    }
+
+    pub fn get(&self, id: &NodeId) -> Option<ParagraphCacheEntry> {
+        self.entries.get(id).cloned()
     }
 
     pub fn get_or_create(
         &mut self,
         id: &NodeId,
         text: &str,
-        size: &Size,
         fill: &Paint,
         align: &TextAlign,
-        valign: &TextAlignVertical,
-        style: &TextStyle,
+        style: &TextStyleRec,
+        max_lines: &Option<usize>,
+        ellipsis: &Option<String>,
         fonts: &FontRepository,
-    ) -> Rc<textlayout::Paragraph> {
+    ) -> Rc<RefCell<textlayout::Paragraph>> {
         let fonts_gen = fonts.generation();
-        let hash = Self::text_hash(text, style, align, valign, size);
+        let hash = Self::shape_key(text, style, align, max_lines);
         if let Some(entry) = self.entries.get(id) {
             if entry.hash == hash && entry.font_generation == fonts_gen {
                 return entry.paragraph.clone();
             }
         }
-        let fill_paint = cvt::sk_paint(fill, 1.0, (size.width, size.height));
+
+        // Build the paragraph (expensive operation)
+        // Only resolve a paint when it's a solid color; gradient paints
+        // require the final layout size and are handled during draw.
+        let fill_paint = if matches!(fill, Paint::Solid(_)) {
+            Some(cvt::sk_paint(
+                fill,
+                1.0,
+                // size is not relevant for solid colors
+                (0.0, 0.0),
+            ))
+        } else {
+            None
+        };
         let mut paragraph_style = textlayout::ParagraphStyle::new();
         paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
         paragraph_style.set_text_align(align.clone().into());
+        // Disable Skia's rounding hack to prevent fractional width truncation
+        // that causes unwanted line breaks in width: auto scenarios
+        paragraph_style.set_apply_rounding_hack(false);
 
+        // Set max lines if specified
+        if let Some(max_lines) = max_lines {
+            paragraph_style.set_max_lines(*max_lines);
+            paragraph_style.set_ellipsis(ellipsis.as_ref().unwrap_or(&"...".to_string()));
+        }
+
+        let ctx = TextStyleRecBuildContext {
+            color: fill.solid_color().unwrap_or(CGColor::TRANSPARENT),
+            user_fallback_fonts: fonts.user_fallback_families(),
+        };
         let mut para_builder =
             textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
-        let mut ts = make_textstyle(style);
-        ts.set_foreground_paint(&fill_paint);
+        let mut ts = textstyle(style, &Some(ctx));
+        if let Some(ref paint) = fill_paint {
+            ts.set_foreground_paint(paint);
+        }
         para_builder.push_style(&ts);
         let transformed_text =
             crate::text::text_transform::transform_text(text, style.text_transform);
         para_builder.add_text(&transformed_text);
-        let mut paragraph = para_builder.build();
+        let paragraph: skia_safe::textlayout::Paragraph = para_builder.build();
         para_builder.pop();
-        paragraph.layout(size.width);
 
-        let rc = Rc::new(paragraph);
+        // Store the paragraph for future use
+        let paragraph_rc = Rc::new(RefCell::new(paragraph));
         self.entries.insert(
             id.clone(),
             ParagraphCacheEntry {
                 hash,
                 font_generation: fonts_gen,
-                paragraph: rc.clone(),
+                paragraph: paragraph_rc.clone(),
             },
         );
-        rc
+
+        paragraph_rc
     }
 
     pub fn invalidate(&mut self) {
@@ -104,9 +135,5 @@ impl ParagraphCache {
 
     pub fn len(&self) -> usize {
         self.entries.len()
-    }
-
-    pub fn get(&self, id: &NodeId) -> Option<&ParagraphCacheEntry> {
-        self.entries.get(id)
     }
 }

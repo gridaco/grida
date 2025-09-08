@@ -6,6 +6,8 @@ import type {
   TemplateEditorSetTemplatePropsAction,
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
+  NodeToggleUnderlineAction,
+  NodeToggleLineThroughAction,
   EditorSelectGradientStopAction,
   EditorVectorBendOrClearCornerAction,
   EditorVariableWidthSelectStopAction,
@@ -1124,8 +1126,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "split-segment": {
       return produce(state, (draft) => {
         const { node_id } = action.target;
-        const vertex = (action as any).target.vertex;
-        const segment = (action as any).target.segment;
         const node = dq.__getNodeById(draft, node_id);
 
         switch (action.type) {
@@ -1134,7 +1134,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.selection = [node_id];
             const next = reduceVectorContentSelection(
               draft.content_edit_mode.selection,
-              { type: "vertex", index: vertex, additive: action.additive }
+              {
+                type: "vertex",
+                index: action.target.vertex,
+                additive: action.additive,
+              }
             );
             draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
@@ -1154,16 +1158,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             assert(node.type === "vector");
 
             self_updateVectorNodeVectorNetwork(node, (vne) => {
-              vne.deleteVertex(vertex);
+              vne.deleteVertex(action.target.vertex);
             });
 
             if (draft.content_edit_mode?.type === "vector") {
               if (
                 draft.content_edit_mode.selection.selected_vertices.includes(
-                  vertex
+                  action.target.vertex
                 ) ||
                 draft.content_edit_mode.selection.selected_tangents.some(
-                  ([v]) => v === vertex
+                  ([v]) => v === action.target.vertex
                 )
               ) {
                 // clear the selection as deleted
@@ -1182,7 +1186,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.selection = [node_id];
             const next = reduceVectorContentSelection(
               draft.content_edit_mode.selection,
-              { type: "segment", index: segment, additive: action.additive }
+              {
+                type: "segment",
+                index: action.target.segment,
+                additive: action.additive,
+              }
             );
             draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
@@ -1205,7 +1213,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               draft.content_edit_mode.selection,
               {
                 type: "tangent",
-                index: [vertex, action.target.tangent],
+                index: [action.target.vertex, action.target.tangent],
                 additive: action.additive,
               }
             );
@@ -1224,7 +1232,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
             self_updateVectorNodeVectorNetwork(node, (vne) => {
               const point = action.target.tangent === 0 ? "a" : "b";
-              for (const si of vne.findSegments(vertex, point)) {
+              for (const si of vne.findSegments(action.target.vertex, point)) {
                 const control = action.target.tangent === 0 ? "ta" : "tb";
                 vne.deleteTangent(si, control);
               }
@@ -1233,7 +1241,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             if (draft.content_edit_mode?.type === "vector") {
               draft.content_edit_mode.selection.selected_tangents =
                 draft.content_edit_mode.selection.selected_tangents.filter(
-                  ([v, t]) => !(v === vertex && t === action.target.tangent)
+                  ([v, t]) =>
+                    !(v === action.target.vertex && t === action.target.tangent)
                 );
               draft.content_edit_mode.a_point = null;
             }
@@ -1244,7 +1253,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
             self_updateVectorNodeVectorNetwork(node, (vne) => {
               const bb_a = vne.getBBox();
-              vne.translateVertex(vertex, action.delta);
+              vne.translateVertex(action.target.vertex, action.delta);
               const bb_b = vne.getBBox();
               const delta_vec: cmath.Vector2 = [
                 bb_b.x - bb_a.x,
@@ -1258,7 +1267,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             assert(node.type === "vector");
             self_updateVectorNodeVectorNetwork(node, (vne) => {
               const bb_a = vne.getBBox();
-              vne.translateSegment(segment, action.delta);
+              vne.translateSegment(action.target.segment, action.delta);
               const bb_b = vne.getBBox();
               const delta_vec: cmath.Vector2 = [
                 bb_b.x - bb_a.x,
@@ -1271,7 +1280,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "bend-segment": {
             assert(node.type === "vector");
             self_updateVectorNodeVectorNetwork(node, (vne) => {
-              vne.bendSegment(segment, action.ca, action.cb, action.frozen);
+              vne.bendSegment(
+                action.target.segment,
+                action.ca,
+                action.cb,
+                action.frozen
+              );
             });
             break;
           }
@@ -1279,7 +1293,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             assert(node.type === "vector");
 
             self_updateVectorNodeVectorNetwork(node, (vne) => {
-              vne.deleteSegment(segment);
+              vne.deleteSegment(action.target.segment);
             });
 
             if (draft.content_edit_mode?.type === "vector") {
@@ -1296,7 +1310,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           case "split-segment": {
             if (node.type === "vector") {
               const newIndex = self_updateVectorNodeVectorNetwork(node, (vne) =>
-                vne.splitSegment(segment, action.target.point)
+                vne.splitSegment(action.target.point)
               );
 
               if (draft.content_edit_mode?.type === "vector") {
@@ -1524,7 +1538,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         // font family specific hook
         if (action.type === "node/change/fontFamily") {
           if (action.fontFamily) {
-            draft.googlefonts.push({ family: action.fontFamily });
+            draft.fontdescriptions.push({ family: action.fontFamily });
           }
         }
       });
@@ -1543,6 +1557,31 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         } else {
           node.fontWeight = 700;
         }
+      });
+      //
+    }
+    //
+    case "node/toggle/underline": {
+      return produce(state, (draft) => {
+        const { node_id } = <NodeToggleUnderlineAction>action;
+        const node = dq.__getNodeById(draft, node_id);
+        assert(node, `node not found with node_id: "${node_id}"`);
+        if (node.type !== "text") return;
+
+        const isUnderline = node.textDecorationLine === "underline";
+        node.textDecorationLine = isUnderline ? "none" : "underline";
+      });
+      //
+    }
+    case "node/toggle/line-through": {
+      return produce(state, (draft) => {
+        const { node_id } = <NodeToggleLineThroughAction>action;
+        const node = dq.__getNodeById(draft, node_id);
+        assert(node, `node not found with node_id: "${node_id}"`);
+        if (node.type !== "text") return;
+
+        const isLineThrough = node.textDecorationLine === "line-through";
+        node.textDecorationLine = isLineThrough ? "none" : "line-through";
       });
       //
     }

@@ -1,0 +1,110 @@
+# Grida Canvas WASM Build System
+# Unified build system for all WASM build configurations
+
+# Default recipe - shows available commands
+default:
+    @echo "🚀 Grida Canvas WASM Build System"
+    @echo ""
+    @echo "Available commands:"
+    @echo "  just dev                - Development build (debug mode + copy + package)"
+    @echo "  just build              - Production build (optimized + copy + package)"
+    @echo "  just package            - Build package with pnpm"
+    @echo "  just clean              - Clean all build artifacts"
+    @echo "  just info               - Show build information"
+    @echo ""
+    @echo "Examples:"
+    @echo "  just build                         # Production build (includes copy & package)"
+    @echo "  just dev                           # Development build (includes copy & package)"
+    @echo "  just clean && just build           # Clean and production build"
+
+# Development build (debug mode)
+dev:
+    @just _build_wasm32_unknown_emscripten_debug
+    @echo "📁 Copying debug WASM artifacts to lib/bin..."
+    @mkdir -p lib/bin
+    @cp ../../target/wasm32-unknown-emscripten/debug/*.js lib/bin/ 2>/dev/null || echo "No .js files found in debug"
+    @cp ../../target/wasm32-unknown-emscripten/debug/*.wasm lib/bin/ 2>/dev/null || echo "No .wasm files found in debug"
+    @echo "✅ Debug artifacts copied to lib/bin/"
+    @just package
+
+# Production build (optimized release)
+build:
+    @just _build_wasm32_unknown_emscripten_release
+    @echo "📁 Copying release WASM artifacts to lib/bin..."
+    @mkdir -p lib/bin
+    @cp ../../target/wasm32-unknown-emscripten/release/*.js lib/bin/ 2>/dev/null || echo "No .js files found in release"
+    @cp ../../target/wasm32-unknown-emscripten/release/*.wasm lib/bin/ 2>/dev/null || echo "No .wasm files found in release"
+    @echo "✅ Release artifacts copied to lib/bin/"
+    @just package
+
+# Clean build artifacts
+clean:
+    @echo "🧹 Cleaning build artifacts..."
+    cargo clean
+    @echo "✅ Clean completed!"
+
+
+# Build package with pnpm
+package:
+    @echo "📦 Building package with pnpm..."
+    @pnpm --filter @grida/canvas-wasm build
+    @echo "✅ Package build completed!"
+
+
+# Show build information
+info:
+    @echo "📊 Grida Canvas WASM Build Information"
+    @echo ""
+    @echo "Build Scripts:"
+    @echo "  Development: just dev             (~100MB, debug mode)"
+    @echo "  Production:  just build           (~10MB, optimized)"
+    @echo ""
+    @echo "Output Locations:"
+    @echo "  Development: ../../target/wasm32-unknown-emscripten/debug/deps/grida_canvas_wasm.wasm"
+    @echo "  Production: ../../target/wasm32-unknown-emscripten/release/deps/grida_canvas_wasm.wasm"
+    @echo ""
+    @echo "Environment Requirements:"
+    @echo "  - Emscripten SDK (emsdk)"
+    @echo "  - Rust (latest stable)"
+    @echo "  - Git (for submodules)"
+    @echo ""
+    @echo "Configuration:"
+    @echo "  - Linker arguments configured in .cargo/config.toml"
+    @echo "  - ERROR_ON_UNDEFINED_SYMBOLS=0 (allow undefined symbols)"
+    @echo "  - ENVIRONMENT=web (web environment)"
+    @echo "  - MAX_WEBGL_VERSION=2 (WebGL2 support)"
+    @echo "  - ALLOW_MEMORY_GROWTH=1 (dynamic memory growth)"
+    @echo "  - MODULARIZE=1 (modular output)"
+    @echo "  - EXPORT_NAME=createGridaCanvas (export function name)"
+    @echo "  - EXPORTED_RUNTIME_METHODS (GL, UTF8, HEAP functions)"
+
+# Internal recipe: Build WASM (debug mode)
+_build_wasm32_unknown_emscripten_debug:
+    @echo "🔨 Building for wasm32-unknown-emscripten target..."
+    @source ../../third_party/externals/emsdk/emsdk_env.sh && \
+        export CC=emcc && \
+        export CXX=em++ && \
+        export AR=emar && \
+        time cargo build --target wasm32-unknown-emscripten
+    @echo "✅ Build completed successfully!"
+    @echo "📁 Output file: ../../target/wasm32-unknown-emscripten/debug/grida_canvas_wasm.wasm"
+    @echo "🎉 Grida Canvas WASM is ready for use!"
+
+# Internal recipe: Build WASM (release mode)
+_build_wasm32_unknown_emscripten_release:
+    @echo "🔨 Building for wasm32-unknown-emscripten target (Production Mode)..."
+    @source ../../third_party/externals/emsdk/emsdk_env.sh && \
+        export CC=emcc && \
+        export CXX=em++ && \
+        export AR=emar && \
+        time cargo build --release --target wasm32-unknown-emscripten
+    @echo "✅ Production build completed successfully!"
+    @echo "📁 Output file: ../../target/wasm32-unknown-emscripten/release/grida_canvas_wasm.wasm"
+    @echo "⚡ Production optimizations applied:"
+    @echo "   - Release mode compilation"
+    @echo "   - O3 optimization level"
+    @echo "   - Aggressive variable elimination"
+    @echo "   - No debugging symbols"
+    @echo "🎉 Grida Canvas WASM (Production) is ready!"
+    @echo "💡 This build is optimized for production use"
+    @echo "🚀 Use this for deployment and production applications"

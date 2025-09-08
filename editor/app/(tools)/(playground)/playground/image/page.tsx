@@ -1,13 +1,13 @@
+"use client";
+
 import React from "react";
-import { type Metadata } from "next";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import ImagePlayground from "./_page";
+import dynamic from "next/dynamic";
 
-export const metadata: Metadata = {
-  title: "Image Playground",
-  description: "Playground for generating images",
-};
+const ImagePlayground = dynamic(() => import("./_page"), {
+  ssr: false,
+});
 
 export default function ImagePlaygroundPage() {
   return (

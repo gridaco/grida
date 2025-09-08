@@ -46,6 +46,15 @@ pub fn build_star_points(shape: &RegularStarShape) -> Vec<CGPoint> {
     points
 }
 
+impl Into<SimplePolygonShape> for RegularStarShape {
+    fn into(self) -> SimplePolygonShape {
+        SimplePolygonShape {
+            points: build_star_points(&self),
+            corner_radius: self.corner_radius,
+        }
+    }
+}
+
 pub fn build_star_path(shape: &RegularStarShape) -> skia_safe::Path {
     let points = build_star_points(shape);
 
@@ -59,6 +68,7 @@ pub fn build_star_path(shape: &RegularStarShape) -> skia_safe::Path {
     })
 }
 
+#[deprecated(note = "use VectorGeometryShape instead")]
 pub fn build_star_vector_network(shape: &RegularStarShape) -> VectorNetwork {
     let points = build_star_points(shape);
     if points.is_empty() {
