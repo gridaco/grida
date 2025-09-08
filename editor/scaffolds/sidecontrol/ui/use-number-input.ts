@@ -163,6 +163,7 @@ export function useNumberInput({
   );
   const lastCommittedRef = useRef<number | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isFocusedRef = useRef<boolean>(false);
 
   // Sync internal state with external value
   useEffect(() => {
@@ -211,6 +212,7 @@ export function useNumberInput({
       e: React.FocusEvent<HTMLInputElement>,
       onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void
     ) => {
+      isFocusedRef.current = true;
       if (autoSelect && !mixed) {
         requestAnimationFrame(() => {
           e.target.select();
@@ -226,6 +228,7 @@ export function useNumberInput({
       e: React.FocusEvent<HTMLInputElement>,
       onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void
     ) => {
+      isFocusedRef.current = false;
       if (commitOnBlur && !mixed) {
         const currentValue = parseValueWithScaling(
           String(e.currentTarget.value),
@@ -378,6 +381,9 @@ export function useNumberInput({
 
   // Global pointer down listener to commit pending changes when the input is
   // removed before blur can occur (e.g., selection change destroys the element).
+  // Only triggers if:
+  // 1. The input is currently focused
+  // 2. The value is "dirty" (different from the last committed value)
   useEffect(() => {
     if (!commitOnBlur || mixed) return;
 
@@ -386,15 +392,22 @@ export function useNumberInput({
       if (!el) return;
       if (el.contains(e.target as Node)) return;
 
+      // Safety check 1: Only trigger if the input is currently focused
+      if (!isFocusedRef.current) return;
+
       const currentValue = parseValueWithScaling(
         String(internalValue),
         type,
         suffix,
         scale
       );
-      if (!isNaN(currentValue)) {
-        handleCommit(currentValue);
-      }
+      if (isNaN(currentValue)) return;
+
+      // Safety check 2: Only trigger if the value is "dirty" (different from last committed)
+      const lastCommitted = lastCommittedRef.current;
+      if (lastCommitted !== undefined && currentValue === lastCommitted) return;
+
+      handleCommit(currentValue);
     };
 
     window.addEventListener("pointerdown", handlePointerDown, true);
