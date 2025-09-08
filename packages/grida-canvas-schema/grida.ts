@@ -1413,7 +1413,8 @@ export namespace grida.program.nodes {
        */
       letterSpacing?: number;
       /**
-       * @deprecated
+       * line-height in percentage value only. 0% ~
+       * @min 0
        */
       lineHeight?: number;
     }

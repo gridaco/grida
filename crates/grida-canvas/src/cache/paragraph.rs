@@ -42,7 +42,7 @@ impl ParagraphCache {
         style.font_weight.0.hash(&mut h);
         style.italic.hash(&mut h);
         style.letter_spacing.map(|v| v.to_bits()).hash(&mut h);
-        style.line_height.map(|v| v.to_bits()).hash(&mut h);
+        // style.line_height.map(|v| v.to_bits()).hash(&mut h); // TODO: hash line height
         style.text_transform.hash(&mut h);
         (*align as u8).hash(&mut h);
         max_lines.hash(&mut h);

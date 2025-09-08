@@ -32,7 +32,7 @@ async fn demo_webfonts() -> Scene {
         font_optical_sizing: Default::default(),
         letter_spacing: None,
         italic: false,
-        line_height: None,
+        line_height: Default::default(),
         text_transform: TextTransform::None,
     };
     heading_node.text_align = TextAlign::Left;
@@ -54,7 +54,7 @@ async fn demo_webfonts() -> Scene {
         font_optical_sizing: Default::default(),
         letter_spacing: None,
         italic: false,
-        line_height: Some(1.5), // 1.5 line height for better readability
+        line_height: TextLineHeight::Fixed(1.5),
         text_transform: TextTransform::None,
     };
     description_node.text_align = TextAlign::Left;
@@ -98,7 +98,7 @@ async fn demo_webfonts() -> Scene {
             font_optical_sizing: Default::default(),
             letter_spacing: None,
             italic: *is_italic,
-            line_height: None,
+            line_height: Default::default(),
             text_transform: TextTransform::None,
         };
         text_node.text_align = TextAlign::Left;

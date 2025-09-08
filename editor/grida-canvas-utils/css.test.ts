@@ -16,8 +16,6 @@ describe("toReactTextStyle", () => {
       fontFamily: "Inter",
       fontSize: 16,
       fontWeight: 400,
-      letterSpacing: 0,
-      lineHeight: 16,
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
@@ -40,8 +38,6 @@ describe("toReactTextStyle", () => {
       fontFamily: "Inter",
       fontSize: 16,
       fontWeight: 400,
-      letterSpacing: 0,
-      lineHeight: 16,
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
@@ -64,8 +60,6 @@ describe("toReactTextStyle", () => {
       fontFamily: "Inter",
       fontSize: 16,
       fontWeight: 400,
-      letterSpacing: 0,
-      lineHeight: 16,
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
@@ -88,8 +82,6 @@ describe("toReactCSSProperties", () => {
       fontFamily: "Inter",
       fontSize: 16,
       fontWeight: 400,
-      letterSpacing: 0,
-      lineHeight: 16,
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },

@@ -465,10 +465,19 @@ impl LayerList {
                         .unwrap_or_else(|| Rectangle {
                             x: n.x(),
                             y: n.y(),
+                            // FIXME: organize pipline, use real values.
                             width: n.width.unwrap_or(100.0),
-                            height: n.text_style.font_size
-                                * n.text_style.line_height.unwrap_or(1.2)
-                                * 2.0,
+                            height: (n.text_style.font_size
+                                * match n.text_style.line_height {
+                                    // validate: is this the right logic?
+                                    TextLineHeight::Fixed(height) => {
+                                        height / n.text_style.font_size
+                                    }
+                                    TextLineHeight::Factor(factor) => factor,
+                                    TextLineHeight::Normal => 1.2,
+                                }
+                                * 2.0)
+                                .max(0.0),
                         });
 
                     let shape = PainterShape::from_rect(skia_safe::Rect::from_xywh(

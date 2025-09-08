@@ -100,7 +100,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             italic: false,
             letter_spacing: None,
-            line_height: None,
+            line_height: Default::default(),
             text_transform: cg::cg::types::TextTransform::None,
         };
 

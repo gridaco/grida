@@ -683,6 +683,22 @@ impl Default for OpticalSizing {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum TextLineHeight {
+    /// Normal (unset, no override)
+    Normal,
+    /// px value
+    Fixed(f32),
+    /// multiplier factor
+    Factor(f32),
+}
+
+impl Default for TextLineHeight {
+    fn default() -> Self {
+        TextLineHeight::Normal
+    }
+}
+
 /// A set of style properties that can be applied to a text or text span.
 #[derive(Debug, Clone)]
 pub struct TextStyleRec {
@@ -705,7 +721,7 @@ pub struct TextStyleRec {
     pub letter_spacing: Option<f32>,
 
     /// Line height
-    pub line_height: Option<f32>,
+    pub line_height: TextLineHeight,
 
     /// Text transform (e.g. uppercase, lowercase, capitalize)
     pub text_transform: TextTransform,
@@ -726,10 +742,10 @@ impl TextStyleRec {
             text_decoration: None,
             font_family: font.to_string(),
             font_size: size,
-            font_weight: FontWeight::default(),
+            font_weight: Default::default(),
             italic: false,
             letter_spacing: None,
-            line_height: None,
+            line_height: Default::default(),
             text_transform: TextTransform::None,
             font_optical_sizing: OpticalSizing::Auto,
             font_features: None,

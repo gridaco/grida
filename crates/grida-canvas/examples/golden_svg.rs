@@ -39,7 +39,7 @@ async fn demo_scene() -> Scene {
         font_optical_sizing: Default::default(),
         italic: false,
         letter_spacing: None,
-        line_height: None,
+        line_height: Default::default(),
         text_transform: TextTransform::None,
     };
     title_text.text_align = TextAlign::Center;

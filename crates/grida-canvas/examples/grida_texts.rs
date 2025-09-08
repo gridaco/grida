@@ -42,7 +42,7 @@ async fn demo_texts() -> Scene {
         font_variations: None,
         font_optical_sizing: Default::default(),
         letter_spacing: None,
-        line_height: None,
+        line_height: Default::default(),
         text_transform: TextTransform::Uppercase,
     };
     word_text_node.stroke = Some(Paint::Solid(SolidPaint {

@@ -320,7 +320,7 @@ fn draw_text_example(
         font_optical_sizing: optical_sizing,
         italic: false,
         letter_spacing: None,
-        line_height: None,
+        line_height: Default::default(),
         text_transform: cg::cg::types::TextTransform::None,
     };
 

@@ -54,8 +54,37 @@ pub fn textstyle(
     if let Some(letter_spacing) = style.letter_spacing {
         ts.set_letter_spacing(letter_spacing);
     }
-    if let Some(line_height) = style.line_height {
-        ts.set_height(line_height);
+
+    // always override
+    match style.line_height {
+        TextLineHeight::Normal => {
+            // CSS `line-height: normal`
+            // → use font metrics; don't set height; don't override.
+            ts.set_height_override(false);
+            // skia treats 0 as "unset"
+            ts.set_height(0.0);
+        }
+        TextLineHeight::Fixed(px) => {
+            // CSS `line-height: 12px` (absolute)
+            // Skia expects a multiplier, so convert: factor = px / fontSize
+            let fs = style.font_size.max(f32::EPSILON); // avoid div-by-zero
+            let factor = (px / fs)
+                // skia will not support 0.0 or below 0.001
+                // https://github.com/rust-skia/rust-skia/issues/1203
+                .max(0.001);
+            ts.set_height(factor);
+            ts.set_height_override(true); // force exact spacing (even < metrics)
+        }
+        TextLineHeight::Factor(mult) => {
+            // CSS `line-height: 120%`
+            // Percent is already a factor of font size.
+            let factor = (mult)
+                // skia will not support 0.0 or below 0.001
+                // https://github.com/rust-skia/rust-skia/issues/1203
+                .max(0.001);
+            ts.set_height(factor);
+            ts.set_height_override(true); // force exact spacing
+        }
     }
     ts.set_decoration(&decoration);
     let mut families: Vec<&str> = Vec::with_capacity(1 + ctx.user_fallback_fonts.len());
