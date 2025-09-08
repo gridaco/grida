@@ -293,8 +293,13 @@ impl GeometryCache {
 
                 // Get the measured bounds
                 let para_ref = paragraph.borrow();
-                let measured_width = para_ref.max_width();
-                let measured_height = para_ref.height();
+
+                /// TODO:
+                /// this is to handle the known issue, where if the text's width/height is set 0, it will be invisible due to our picture recording.
+                /// this should be cleanly removed, to even support 0 value to be visible.
+                const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
+                let measured_width = para_ref.max_width().max(MIN_SIZE_DIRTY_HACK);
+                let measured_height = para_ref.height().max(MIN_SIZE_DIRTY_HACK);
 
                 // Create intrinsic bounds (starting at origin, like other nodes)
                 let intrinsic_bounds = Rectangle {
