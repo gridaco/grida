@@ -714,6 +714,21 @@ impl Default for TextLetterSpacing {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum TextWordSpacing {
+    /// Fixed value in px.
+    Fixed(f32),
+    /// em Factor value (percentage) relative to font size.
+    /// 1 = 100% / 1em
+    Factor(f32),
+}
+
+impl Default for TextWordSpacing {
+    fn default() -> Self {
+        TextWordSpacing::Fixed(0.0)
+    }
+}
+
 /// A set of style properties that can be applied to a text or text span.
 #[derive(Debug, Clone)]
 pub struct TextStyleRec {
@@ -731,9 +746,13 @@ pub struct TextStyleRec {
     /// Font italic style.
     pub font_style_italic: bool,
 
-    /// Additional spacing between characters, in logical pixels.  
+    /// Additional spacing between characters, in logical pixels.
     /// Default is `0.0`.
     pub letter_spacing: TextLetterSpacing,
+
+    /// Additional spacing between words, in logical pixels.
+    /// Default is `0.0`.
+    pub word_spacing: TextWordSpacing,
 
     /// Line height
     pub line_height: TextLineHeight,
@@ -760,6 +779,7 @@ impl TextStyleRec {
             font_weight: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
             font_optical_sizing: OpticalSizing::Auto,

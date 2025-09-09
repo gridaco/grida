@@ -109,6 +109,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -160,6 +161,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -211,6 +213,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -266,6 +269,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -315,6 +319,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -383,6 +388,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };
@@ -437,6 +443,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
         };

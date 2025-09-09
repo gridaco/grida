@@ -38,6 +38,7 @@ async fn demo_scene() -> Scene {
         font_optical_sizing: Default::default(),
         font_style_italic: false,
         letter_spacing: Default::default(),
+        word_spacing: Default::default(),
         line_height: Default::default(),
         text_transform: TextTransform::None,
     };
@@ -67,6 +68,7 @@ async fn demo_scene() -> Scene {
         font_optical_sizing: Default::default(),
         font_style_italic: true,
         letter_spacing: Default::default(),
+        word_spacing: Default::default(),
         line_height: Default::default(),
         text_transform: TextTransform::None,
     };
@@ -295,6 +297,7 @@ async fn demo_scene() -> Scene {
         font_optical_sizing: Default::default(),
         font_style_italic: false,
         letter_spacing: Default::default(),
+        word_spacing: Default::default(),
         line_height: Default::default(),
         text_transform: TextTransform::None,
     };

@@ -64,6 +64,15 @@ pub fn textstyle(
         ts.set_letter_spacing(letter_spacing);
     }
 
+    let word_spacing = match style.word_spacing {
+        TextWordSpacing::Fixed(px) => px,
+        TextWordSpacing::Factor(factor) => factor * style.font_size,
+    };
+
+    if word_spacing != 0.0 {
+        ts.set_word_spacing(word_spacing);
+    }
+
     /// skia will not support 0.0 or below 0.001
     /// https://github.com/rust-skia/rust-skia/issues/1203
     const MIN_LINE_HEIGHT_FACTOR: f32 = 0.01;

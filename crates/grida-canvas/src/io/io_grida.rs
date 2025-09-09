@@ -422,6 +422,8 @@ pub struct JSONTextNode {
     pub line_height: Option<f32>,
     #[serde(rename = "letterSpacing", default)]
     pub letter_spacing: Option<f32>,
+    #[serde(rename = "wordSpacing", default)]
+    pub word_spacing: Option<f32>,
     #[serde(rename = "fontSize", default)]
     pub font_size: Option<f32>,
     #[serde(rename = "fontFamily", default)]
@@ -716,6 +718,10 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 letter_spacing: node
                     .letter_spacing
                     .map(TextLetterSpacing::Factor)
+                    .unwrap_or_default(),
+                word_spacing: node
+                    .word_spacing
+                    .map(TextWordSpacing::Factor)
                     .unwrap_or_default(),
                 line_height: node
                     .line_height

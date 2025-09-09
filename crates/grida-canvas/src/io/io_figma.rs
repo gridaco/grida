@@ -898,6 +898,7 @@ impl FigmaConverter {
                     .letter_spacing
                     .map(|v| TextLetterSpacing::Factor(v as f32))
                     .unwrap_or_default(),
+                word_spacing: Default::default(),
                 font_style_italic: style.italic.unwrap_or(false),
                 line_height: style
                     .line_height_px

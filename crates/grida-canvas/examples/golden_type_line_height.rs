@@ -90,6 +90,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: TextLineHeight::Normal,
             text_transform: TextTransform::None,
         };
@@ -115,6 +116,7 @@ fn main() {
             font_optical_sizing: Default::default(),
             font_style_italic: false,
             letter_spacing: Default::default(),
+            word_spacing: Default::default(),
             line_height: line_height,
             text_transform: TextTransform::None,
         };
