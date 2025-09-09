@@ -231,7 +231,14 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write("goldens/sk_paragraph_linemetrics.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/sk_paragraph_linemetrics.png"
+        ),
+        data.as_bytes(),
+    )
+    .unwrap();
 
     println!("Test completed! Check goldens/sk_paragraph_linemetrics.png for the result.");
     println!("The demo shows how the function works with different font sizes and line heights:");

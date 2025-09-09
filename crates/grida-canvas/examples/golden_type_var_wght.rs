@@ -129,7 +129,11 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     let bytes = data.as_bytes();
-    std::fs::write("goldens/type_var_wght.png", bytes).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/type_var_wght.png"),
+        bytes,
+    )
+    .unwrap();
 
     println!("Variable font weight demo saved to goldens/type_var_wght.png");
 }

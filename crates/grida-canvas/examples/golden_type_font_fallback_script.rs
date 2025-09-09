@@ -272,7 +272,10 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     std::fs::write(
-        "goldens/golden_type_font_fallback_script.png",
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/golden_type_font_fallback_script.png"
+        ),
         data.as_bytes(),
     )
     .unwrap();

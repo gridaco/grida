@@ -347,7 +347,8 @@ async fn main() {
     );
     renderer.load_scene(scene);
 
-    let mut file = File::create("goldens/pdf.pdf").expect("failed to create pdf");
+    let mut file = File::create(concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/pdf.pdf"))
+        .expect("failed to create pdf");
     let doc = pdf::new_document(&mut file, None);
     let mut page = doc.begin_page(SkSize::new(width, height), None);
     let canvas = page.canvas();

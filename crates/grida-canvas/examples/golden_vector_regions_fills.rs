@@ -192,5 +192,12 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/vector_regions_fills.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/vector_regions_fills.png"
+        ),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

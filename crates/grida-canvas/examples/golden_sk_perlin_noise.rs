@@ -40,7 +40,11 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write("goldens/sk_perlin_noise.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/sk_perlin_noise.png"),
+        data.as_bytes(),
+    )
+    .unwrap();
 }
 
 fn draw_fractal_perlin_noise(canvas: &skia_safe::Canvas, x: f32, y: f32, width: f32, height: f32) {

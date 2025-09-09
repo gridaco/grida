@@ -20,7 +20,8 @@ fn main() {
 
     // Finish drawing and write the SVG data to a file
     let data = canvas.end();
-    let mut file = File::create("goldens/sksvg.svg").expect("failed to create svg");
+    let mut file = File::create(concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/sksvg.svg"))
+        .expect("failed to create svg");
     file.write_all(data.as_bytes())
         .expect("failed to write svg");
 }

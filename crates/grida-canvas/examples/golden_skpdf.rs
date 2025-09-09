@@ -3,7 +3,8 @@ use std::fs::File;
 
 fn main() {
     // Create a pdf file writer
-    let mut file = File::create("goldens/skpdf.pdf").expect("failed to create pdf");
+    let mut file = File::create(concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/skpdf.pdf"))
+        .expect("failed to create pdf");
 
     // Create a new PDF document with default metadata
     let doc = pdf::new_document(&mut file, None);

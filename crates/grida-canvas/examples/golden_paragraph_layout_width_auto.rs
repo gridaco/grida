@@ -296,7 +296,14 @@ fn generate_golden_image() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write("goldens/paragraph_layout_width_auto.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/paragraph_layout_width_auto.png"
+        ),
+        data.as_bytes(),
+    )
+    .unwrap();
 
     println!("✅ Golden image saved to: goldens/paragraph_layout_width_auto.png");
     println!("   Red boxes show the intrinsic width boundaries");

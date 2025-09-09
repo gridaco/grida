@@ -62,6 +62,10 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/vector_line.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/vector_line.png"),
+        data.as_bytes(),
+    )
+    .unwrap();
     println!("Image saved with {} lines and a test rectangle", num_lines);
 }

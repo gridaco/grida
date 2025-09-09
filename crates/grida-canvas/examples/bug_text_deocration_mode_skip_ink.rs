@@ -81,7 +81,10 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     std::fs::write(
-        "goldens/bug_text_decoration_mode_skip_ink.png",
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/bug_text_decoration_mode_skip_ink.png"
+        ),
         data.as_bytes(),
     )
     .unwrap();

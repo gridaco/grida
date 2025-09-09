@@ -31,6 +31,9 @@ fn main() {
     let data = image_snapshot
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("Failed to encode image");
-    std::fs::write("goldens/progressive_blur.png", data.as_bytes())
-        .expect("Failed to write output file");
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/progressive_blur.png"),
+        data.as_bytes(),
+    )
+    .expect("Failed to write output file");
 }

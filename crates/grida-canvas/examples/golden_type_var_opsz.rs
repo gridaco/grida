@@ -269,7 +269,11 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     let bytes = data.as_bytes();
-    std::fs::write("goldens/type_var_opsz.png", bytes).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/type_var_opsz.png"),
+        bytes,
+    )
+    .unwrap();
 
     println!("Optical sizing demo saved to goldens/type_var_opsz.png");
 }

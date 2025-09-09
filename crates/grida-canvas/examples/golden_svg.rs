@@ -328,7 +328,8 @@ async fn main() {
     renderer.render_to_canvas(&canvas, width, height);
 
     let data = canvas.end();
-    let mut file = File::create("goldens/svg.svg").expect("failed to create svg");
+    let mut file = File::create(concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/svg.svg"))
+        .expect("failed to create svg");
     file.write_all(data.as_bytes())
         .expect("failed to write svg");
 

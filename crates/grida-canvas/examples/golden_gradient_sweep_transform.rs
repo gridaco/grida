@@ -129,5 +129,12 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write("goldens/gradient_sweep_transform.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/gradient_sweep_transform.png"
+        ),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

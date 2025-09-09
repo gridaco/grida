@@ -86,5 +86,9 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     let bytes = data.as_bytes();
-    std::fs::write("goldens/fonts.png", bytes).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/fonts.png"),
+        bytes,
+    )
+    .unwrap();
 }
