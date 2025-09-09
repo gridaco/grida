@@ -4,21 +4,17 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectGroup,
   SelectSeparator,
-  SelectLabel,
   SelectValue,
 } from "@/components/ui-editor/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkbenchUI } from "@/components/workbench";
-import grida from "@grida/schema";
 import { cn } from "@/components/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
 import type { TMixed } from "../controls/utils/types";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-export { useSliderValue } from "./use-slider-value";
+import grida from "@grida/schema";
 
 export function PropertyLine({
   children,

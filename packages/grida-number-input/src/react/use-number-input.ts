@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { TMixed } from "../controls/utils/types";
-import type { editor } from "@/grida-canvas";
-import grida from "@grida/schema";
+
+// Local type definitions (duplicated to avoid external dependencies)
+type TMixed<T, MIXED = "mixed"> = T | MIXED;
+
+type NumberChange = {
+  type: "set" | "delta";
+  value: number;
+};
 
 /**
  * Rounds a number to match the precision of the given step value.
@@ -152,11 +157,11 @@ const parseValueWithScaling = (
   return parsedValue;
 };
 
-type UseNumberInputProps = {
+type UseNumberInputProps<MIXED = "mixed"> = {
   /** Type of number input - 'integer' for whole numbers, 'number' for decimals */
   type?: "integer" | "number";
-  /** The current value of the input. Can be a number, empty string, or 'mixed' */
-  value?: TMixed<number | "">;
+  /** The current value of the input. Can be a number, empty string, or mixed value */
+  value?: TMixed<number | "", MIXED>;
   /** Step size for increment/decrement operations */
   step?: number;
   /** Whether to automatically select all text when the input is focused */
@@ -168,19 +173,17 @@ type UseNumberInputProps = {
   /** Mode for handling value changes */
   mode?: "auto" | "fixed";
   /** Callback when value changes during typing or arrow key navigation */
-  onValueChange?:
-    | ((change: editor.api.NumberChange) => void)
-    | ((value: number) => void);
+  onValueChange?: ((change: NumberChange) => void) | ((value: number) => void);
   /** Callback when value is committed (Enter key or arrow keys) */
-  onValueCommit?:
-    | ((change: editor.api.NumberChange) => void)
-    | ((value: number) => void);
+  onValueCommit?: ((change: NumberChange) => void) | ((value: number) => void);
   /** Optional suffix to append to the displayed value (e.g., "%", "px") */
   suffix?: string;
   /** Optional scale factor for display (e.g., 100 for percentages: 0.01 -> 1%) */
   scale?: number;
   /** Whether to commit the value when input loses focus */
   commitOnBlur?: boolean;
+  /** The mixed value symbol/identifier - can be any unique value like a symbol */
+  mixed?: MIXED;
 };
 
 /**
@@ -234,6 +237,12 @@ type UseNumberInputProps = {
  *   max: 120,
  *   step: 1
  * });
+ *
+ * // With custom mixed value (e.g., using a symbol)
+ * const customMixedInput = useNumberInput<symbol>({
+ *   value: someValue,
+ *   mixed: Symbol('mixed') // or any unique identifier
+ * });
  * ```
  *
  * ## Commit Scenarios
@@ -259,9 +268,10 @@ type UseNumberInputProps = {
  * - Global event listener cleanup to prevent memory leaks
  *
  * @param props - Configuration object for the number input
+ * @param props.mixed - The mixed value symbol/identifier (defaults to "mixed")
  * @returns Object containing state, event handlers, and computed values
  */
-export function useNumberInput({
+export function useNumberInput<MIXED = "mixed">({
   type = "number",
   value,
   step = 1,
@@ -274,10 +284,13 @@ export function useNumberInput({
   suffix,
   scale,
   commitOnBlur = true,
-}: UseNumberInputProps) {
-  const mixed = value === grida.mixed;
+  mixed: mixedValue = "mixed" as MIXED,
+}: UseNumberInputProps<MIXED>) {
+  const mixed = value === mixedValue;
   const [internalValue, setInternalValue] = useState<string | number>(
-    mixed ? "mixed" : formatValueWithSuffix(value ?? "", suffix, scale, step)
+    mixed
+      ? "mixed"
+      : formatValueWithSuffix((value as number | "") ?? "", suffix, scale, step)
   );
   const lastCommittedRef = useRef<number | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -286,7 +299,14 @@ export function useNumberInput({
   // Sync internal state with external value
   useEffect(() => {
     setInternalValue(
-      mixed ? "mixed" : formatValueWithSuffix(value ?? "", suffix, scale, step)
+      mixed
+        ? "mixed"
+        : formatValueWithSuffix(
+            (value as number | "") ?? "",
+            suffix,
+            scale,
+            step
+          )
     );
     if (typeof value === "number" && !mixed) {
       const rounded = roundToStep(value, step);
@@ -312,7 +332,7 @@ export function useNumberInput({
 
       switch (mode) {
         case "auto":
-          (onValueCommit as (change: editor.api.NumberChange) => void)?.({
+          (onValueCommit as (change: NumberChange) => void)?.({
             type: "set",
             value: clampedValue,
           });
@@ -401,19 +421,34 @@ export function useNumberInput({
             );
           } else {
             setInternalValue(
-              formatValueWithSuffix(value ?? "", suffix, scale, step)
+              formatValueWithSuffix(
+                (value as number | "") ?? "",
+                suffix,
+                scale,
+                step
+              )
             );
           }
         } else {
           setInternalValue(
-            formatValueWithSuffix(value ?? "", suffix, scale, step)
+            formatValueWithSuffix(
+              (value as number | "") ?? "",
+              suffix,
+              scale,
+              step
+            )
           );
         }
       } else {
         setInternalValue(
           mixed
             ? "mixed"
-            : formatValueWithSuffix(value ?? "", suffix, scale, step)
+            : formatValueWithSuffix(
+                (value as number | "") ?? "",
+                suffix,
+                scale,
+                step
+              )
         );
       }
       onBlur?.(e);
@@ -461,7 +496,7 @@ export function useNumberInput({
           );
           switch (mode) {
             case "auto":
-              (onValueChange as (change: editor.api.NumberChange) => void)?.({
+              (onValueChange as (change: NumberChange) => void)?.({
                 type: "delta",
                 value: delta,
               });
@@ -514,7 +549,7 @@ export function useNumberInput({
 
       switch (mode) {
         case "auto":
-          (onValueChange as (change: editor.api.NumberChange) => void)?.({
+          (onValueChange as (change: NumberChange) => void)?.({
             type: "set",
             value,
           });

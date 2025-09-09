@@ -4,7 +4,7 @@ import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
 import type { TMixed } from "../controls/utils/types";
 import type { editor } from "@/grida-canvas";
-import { useNumberInput } from "./use-number-input";
+import { useNumberInput } from "@grida/number-input/react";
 
 type PercentagePropertyControlProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,

@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect } from "react";
 type RGB = { r: number; g: number; b: number };
 type RGBA = { r: number; g: number; b: number; a: number };
 
+// TODO: move under @grida/number-input/react
 export default function HexValueInput<T extends RGB | RGBA>({
   className,
   value: initialValue,
