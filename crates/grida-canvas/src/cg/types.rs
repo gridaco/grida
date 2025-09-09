@@ -671,15 +671,15 @@ pub struct FontVariation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum OpticalSizing {
+pub enum FontOpticalSizing {
     Auto,
     None,
     Fixed(f32),
 }
 
-impl Default for OpticalSizing {
+impl Default for FontOpticalSizing {
     fn default() -> Self {
-        OpticalSizing::Auto
+        FontOpticalSizing::Auto
     }
 }
 
@@ -761,7 +761,7 @@ pub struct TextStyleRec {
     pub text_transform: TextTransform,
 
     /// Font optical sizing
-    pub font_optical_sizing: OpticalSizing,
+    pub font_optical_sizing: FontOpticalSizing,
 
     /// OpenType font features
     pub font_features: Option<Vec<FontFeature>>,
@@ -782,7 +782,7 @@ impl TextStyleRec {
             word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
-            font_optical_sizing: OpticalSizing::Auto,
+            font_optical_sizing: FontOpticalSizing::Auto,
             font_features: None,
             font_variations: None,
         }

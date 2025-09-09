@@ -87,37 +87,37 @@ fn main() {
     let small_text_examples = vec![
         (
             "Auto",
-            OpticalSizing::Auto,
+            FontOpticalSizing::Auto,
             "The quick brown fox jumps over the lazy dog (Auto)",
         ),
         (
             "None",
-            OpticalSizing::None,
+            FontOpticalSizing::None,
             "The quick brown fox jumps over the lazy dog (None)",
         ),
         (
             "Fixed (14) - Default",
-            OpticalSizing::Fixed(14.0),
+            FontOpticalSizing::Fixed(14.0),
             "The quick brown fox jumps over the lazy dog (Fixed 14 - Default)",
         ),
         (
             "Fixed (8)",
-            OpticalSizing::Fixed(8.0),
+            FontOpticalSizing::Fixed(8.0),
             "The quick brown fox jumps over the lazy dog (Fixed 8)",
         ),
         (
             "Fixed (12)",
-            OpticalSizing::Fixed(12.0),
+            FontOpticalSizing::Fixed(12.0),
             "The quick brown fox jumps over the lazy dog (Fixed 12)",
         ),
         (
             "Fixed (16)",
-            OpticalSizing::Fixed(16.0),
+            FontOpticalSizing::Fixed(16.0),
             "The quick brown fox jumps over the lazy dog (Fixed 16)",
         ),
         (
             "Fixed (144)",
-            OpticalSizing::Fixed(144.0),
+            FontOpticalSizing::Fixed(144.0),
             "The quick brown fox jumps over the lazy dog (Fixed 144)",
         ),
     ];
@@ -153,26 +153,34 @@ fn main() {
 
     // Large text with different optical sizing modes
     let large_text_examples = vec![
-        ("Auto", OpticalSizing::Auto, "The quick brown fox (Auto)"),
-        ("None", OpticalSizing::None, "The quick brown fox (None)"),
+        (
+            "Auto",
+            FontOpticalSizing::Auto,
+            "The quick brown fox (Auto)",
+        ),
+        (
+            "None",
+            FontOpticalSizing::None,
+            "The quick brown fox (None)",
+        ),
         (
             "Fixed (14) - Default",
-            OpticalSizing::Fixed(14.0),
+            FontOpticalSizing::Fixed(14.0),
             "The quick brown fox (Fixed 14 - Default)",
         ),
         (
             "Fixed (48)",
-            OpticalSizing::Fixed(48.0),
+            FontOpticalSizing::Fixed(48.0),
             "The quick brown fox (Fixed 48)",
         ),
         (
             "Fixed (72)",
-            OpticalSizing::Fixed(72.0),
+            FontOpticalSizing::Fixed(72.0),
             "The quick brown fox (Fixed 72)",
         ),
         (
             "Fixed (144)",
-            OpticalSizing::Fixed(144.0),
+            FontOpticalSizing::Fixed(144.0),
             "The quick brown fox (Fixed 144)",
         ),
     ];
@@ -210,32 +218,32 @@ fn main() {
     let out_of_range_examples = vec![
         (
             "Fixed (8) - Min",
-            OpticalSizing::Fixed(8.0),
+            FontOpticalSizing::Fixed(8.0),
             "The quick brown fox jumps over the lazy dog (Fixed 8 - Min)",
         ),
         (
             "Fixed (1) - Below min (8)",
-            OpticalSizing::Fixed(1.0),
+            FontOpticalSizing::Fixed(1.0),
             "The quick brown fox jumps over the lazy dog (Fixed 1 - Below min 8)",
         ),
         (
             "Fixed (0) - Way below min (8)",
-            OpticalSizing::Fixed(0.0),
+            FontOpticalSizing::Fixed(0.0),
             "The quick brown fox jumps over the lazy dog (Fixed 0 - Way below min 8)",
         ),
         (
             "Fixed (144) - Max",
-            OpticalSizing::Fixed(144.0),
+            FontOpticalSizing::Fixed(144.0),
             "The quick brown fox jumps over the lazy dog (Fixed 144 - Max)",
         ),
         (
             "Fixed (200) - Above max (144)",
-            OpticalSizing::Fixed(200.0),
+            FontOpticalSizing::Fixed(200.0),
             "The quick brown fox jumps over the lazy dog (Fixed 200 - Above max 144)",
         ),
         (
             "Fixed (400) - Way above max (144)",
-            OpticalSizing::Fixed(400.0),
+            FontOpticalSizing::Fixed(400.0),
             "The quick brown fox jumps over the lazy dog (Fixed 400 - Way above max 144)",
         ),
     ];
@@ -294,7 +302,7 @@ fn draw_text_example(
     paint: &Paint,
     text: &str,
     font_size: f32,
-    optical_sizing: OpticalSizing,
+    optical_sizing: FontOpticalSizing,
     x: f32,
     y: f32,
 ) {

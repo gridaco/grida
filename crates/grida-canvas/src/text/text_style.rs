@@ -30,9 +30,9 @@ pub fn textstyle(
     // [variables]
     let mut coords = vec![var_wght(style.font_weight.value() as f32)];
     match style.font_optical_sizing {
-        OpticalSizing::Auto => coords.push(var_opsz(style.font_size)),
-        OpticalSizing::Fixed(v) => coords.push(var_opsz(v)),
-        OpticalSizing::None => {}
+        FontOpticalSizing::Auto => coords.push(var_opsz(style.font_size)),
+        FontOpticalSizing::Fixed(v) => coords.push(var_opsz(v)),
+        FontOpticalSizing::None => {}
     }
     if let Some(vars) = &style.font_variations {
         for v in vars {
