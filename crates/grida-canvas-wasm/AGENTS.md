@@ -191,3 +191,58 @@ For production deployment:
 3. **Dependency Management**: Automatic dependency checking and environment setup
 4. **Consistent Output**: Standardized success messages and error handling
 5. **Extensibility**: Easy to add new build configurations or commands
+
+## Troubleshooting / Building WASM locally (vanilla way)
+
+> follow this if you can't use justfile or os-specific trouble shooting.
+
+The WASM build targets `wasm32-unknown-emscripten` and requires the Emscripten SDK.
+The steps below were tested on a fresh Ubuntu container and produced
+`lib/bin/grida_canvas_wasm.wasm` and `lib/bin/grida-canvas-wasm.js`.
+
+1. **Fetch submodules and install build tools**
+
+   ```bash
+   git submodule update --init --recursive
+   rustup target add wasm32-unknown-emscripten
+   pnpm install
+   ```
+
+2. **Install and activate Emscripten**
+
+   ```bash
+   cd third_party/externals/emsdk
+   ./emsdk install latest
+   ./emsdk activate latest
+   cd -
+   ```
+
+3. **(Ubuntu only) provide missing locale headers**
+   Some Ubuntu images lack `xlocale.h` which breaks the Skia build. A simple shim fixes it:
+
+   ```bash
+   cat <<'SHIM' | sudo tee /usr/include/xlocale.h
+   #include <locale.h>
+   #define strtoll_l(nptr,endptr,base,loc) strtoll((nptr),(endptr),(base))
+   #define strtoull_l(nptr,endptr,base,loc) strtoull((nptr),(endptr),(base))
+   SHIM
+   ```
+
+4. **Build the crate**
+
+   ```bash
+   cd crates/grida-canvas-wasm
+   source ../../third_party/externals/emsdk/emsdk_env.sh
+   export CC=emcc CXX=em++ AR=emar
+   cargo build --release --target wasm32-unknown-emscripten
+   ```
+
+5. **Copy artifacts and package**
+   ```bash
+   mkdir -p lib/bin
+   cp ../../target/wasm32-unknown-emscripten/release/*.js lib/bin/
+   cp ../../target/wasm32-unknown-emscripten/release/*.wasm lib/bin/
+   pnpm --filter @grida/canvas-wasm build
+   ```
+
+After these steps the compiled module is ready in `lib/bin/` for consumption or publishing.
