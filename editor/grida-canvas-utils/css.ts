@@ -275,6 +275,7 @@ export namespace css {
     | "fontSize"
     | "fontWeight"
     | "letterSpacing"
+    | "wordSpacing"
     | "lineHeight"
     | "fontOpticalSizing"
     | "fontFeatureSettings"
@@ -294,6 +295,7 @@ export namespace css {
       fontSize,
       fontWeight,
       letterSpacing,
+      wordSpacing,
       lineHeight,
       fontFeatures,
       fontVariations,
@@ -318,8 +320,8 @@ export namespace css {
         typeof textDecorationThickness === "number"
           ? textDecorationThickness
           : textDecorationThickness === "auto"
-          ? "auto"
-          : undefined,
+            ? "auto"
+            : undefined,
       textDecorationColor: textDecorationColor
         ? toRGBAString(textDecorationColor)
         : undefined,
@@ -330,20 +332,20 @@ export namespace css {
             : "none"
           : undefined,
       fontFamily: fontFamily,
-      lineHeight: lineHeight ?? "normal",
-      letterSpacing: letterSpacing,
+      lineHeight:
+        typeof lineHeight === "number" ? `${lineHeight * 100}%` : "normal",
+      letterSpacing:
+        typeof letterSpacing === "number" ? `${letterSpacing}em` : undefined,
+      wordSpacing:
+        typeof wordSpacing === "number" ? `${wordSpacing}em` : undefined,
       fontSize: fontSize,
       fontWeight: fontWeight,
       fontOpticalSizing:
-        typeof fontOpticalSizing === "number"
-          ? "none"
-          : fontOpticalSizing,
+        typeof fontOpticalSizing === "number" ? "none" : fontOpticalSizing,
       fontFeatureSettings: fontFeatures
         ? toFontFeatureSettings(fontFeatures)
         : undefined,
-      fontVariationSettings: fvs
-        ? toFontVariationSettings(fvs)
-        : undefined,
+      fontVariationSettings: fvs ? toFontVariationSettings(fvs) : undefined,
       textTransform: textTransform,
       color: fill ? toFillString(fill) : undefined,
     };
@@ -357,9 +359,7 @@ export namespace css {
       .join(", ");
   }
 
-  function toFontVariationSettings(
-    variations: Record<string, number>
-  ): string {
+  function toFontVariationSettings(variations: Record<string, number>): string {
     return Object.entries(variations)
       .map(([axis, value]) => `"${axis}" ${value}`)
       .join(", ");
