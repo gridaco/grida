@@ -2001,6 +2001,10 @@ export namespace editor.api {
       node_id: NodeID,
       letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
     ): void;
+    changeTextNodeWordSpacing(
+      node_id: NodeID,
+      wordSpacing: TChange<grida.program.nodes.TextNode["wordSpacing"]>
+    ): void;
     changeTextNodeMaxlength(
       node_id: NodeID,
       maxlength: number | undefined

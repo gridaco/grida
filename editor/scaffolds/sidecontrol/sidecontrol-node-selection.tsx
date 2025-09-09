@@ -1307,6 +1307,7 @@ function SectionText({ node_id }: { node_id: string }) {
     fontSize,
     lineHeight,
     letterSpacing,
+    wordSpacing,
     textAlign,
     textAlignVertical,
     textDecorationLine,
@@ -1330,6 +1331,7 @@ function SectionText({ node_id }: { node_id: string }) {
       fontSize: node.fontSize,
       lineHeight: node.lineHeight,
       letterSpacing: node.letterSpacing,
+      wordSpacing: node.wordSpacing,
       textAlign: node.textAlign,
       textAlignVertical: node.textAlignVertical,
       textDecorationLine: node.textDecorationLine,
@@ -1383,6 +1385,7 @@ function SectionText({ node_id }: { node_id: string }) {
                   fontSize={fontSize}
                   fontFamily={fontFamily}
                   fontFeatures={fontFeatures}
+                  wordSpacing={wordSpacing}
                   onTextTransformChange={actions.textTransform}
                   onTextAlignChange={actions.textAlign}
                   onTextDecorationLineChange={actions.textDecorationLine}
@@ -1404,6 +1407,7 @@ function SectionText({ node_id }: { node_id: string }) {
                   onFontFeatureChange={(key, value) => {
                     actions.fontFeature(key, value);
                   }}
+                  onWordSpacingChange={actions.wordSpacing}
                 />
               </DropdownMenuContent>
             </DropdownMenu>

@@ -469,6 +469,12 @@ const safe_properties: Partial<
       (draft as UN).letterSpacing = value;
     },
   }),
+  wordSpacing: defineNodeProperty<"wordSpacing">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).wordSpacing = value;
+    },
+  }),
   maxLength: defineNodeProperty<"maxLength">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {

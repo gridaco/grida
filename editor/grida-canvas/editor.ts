@@ -2187,6 +2187,35 @@ export class Editor
     }
   }
 
+  changeTextNodeWordSpacing(
+    node_id: string,
+    wordSpacing: editor.api.TChange<
+      grida.program.nodes.TextNode["wordSpacing"]
+    >
+  ) {
+    try {
+      let value: number | undefined;
+      if (wordSpacing.value === undefined) {
+        value = undefined;
+      } else {
+        value = resolveNumberChangeValue(
+          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+          "wordSpacing",
+          wordSpacing as editor.api.NumberChange
+        );
+      }
+
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        wordSpacing: value,
+      });
+    } catch (e) {
+      reportError(e);
+      return;
+    }
+  }
+
   changeTextNodeMaxlength(node_id: string, maxLength: number | undefined) {
     this.dispatch({
       type: "node/change/*",

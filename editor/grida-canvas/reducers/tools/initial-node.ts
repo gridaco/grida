@@ -80,6 +80,7 @@ export default function initialNode(
         letterSpacing: 0,
         lineHeight: undefined, // normal
         strokeWidth: 0,
+        wordSpacing: 0,
         ...seed,
       } satisfies grida.program.nodes.TextNode;
     }

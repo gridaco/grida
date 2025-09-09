@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { PropertyLine, PropertyLineLabel, PropertyEnumToggle } from "../../ui";
 import InputPropertyNumber from "../../ui/number";
 import { RGBAColorControl } from "../color";
+import { WordSpacingControl } from "../word-spacing";
 import {
   TextAlignLeftIcon,
   TextAlignCenterIcon,
@@ -24,6 +25,7 @@ import {
   StrikethroughIcon,
 } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
+import type { editor } from "@/grida-canvas";
 import { ChevronRight } from "lucide-react";
 import {
   Tooltip,
@@ -41,6 +43,7 @@ import {
 import { FontFeatureSettings } from "./text-details-font-feature-settings";
 import { useCurrentFontFace } from "../context/font";
 import { FontVariableAxisSlider } from "../font-variable-axis";
+import { PropertyLineLabelWithNumberGesture } from "../../ui/label-with-number-gesture";
 
 // Type definitions
 type VerticalTrim = "all" | "disable-all";
@@ -415,6 +418,7 @@ interface TextDetailsProps {
   fontOpticalSizing?: cg.OpticalSizing;
   fontWeight?: number;
   fontFamily?: string;
+  wordSpacing?: number;
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
   /**
    * required for opsz display
@@ -438,6 +442,7 @@ interface TextDetailsProps {
   onFontOpticalSizingChange?: (value: cg.OpticalSizing) => void;
   onFontWeightChange?: (value: number) => void;
   onFontFeatureChange?: (key: cg.OpenTypeFeature, value: boolean) => void;
+  onWordSpacingChange?: (change: editor.api.NumberChange) => void;
 }
 
 export function TextDetails({
@@ -457,6 +462,7 @@ export function TextDetails({
   fontWeight = 400,
   fontSize,
   fontFamily,
+  wordSpacing = 0,
   fontFeatures = {},
 
   // Change handlers
@@ -474,6 +480,7 @@ export function TextDetails({
   onFontOpticalSizingChange,
   onFontWeightChange,
   onFontFeatureChange,
+  onWordSpacingChange,
 }: TextDetailsProps) {
   const face = useCurrentFontFace();
   const [hoverPreview, setHoverPreview] = useState<
@@ -713,6 +720,24 @@ export function TextDetails({
                 />
               </PropertyLine>
             )}
+
+            <Separator />
+
+            {/* Word Spacing */}
+            <div className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabelWithNumberGesture
+                  step={0.01}
+                  onValueChange={onWordSpacingChange}
+                >
+                  Word Spacing
+                </PropertyLineLabelWithNumberGesture>
+                <WordSpacingControl
+                  value={wordSpacing}
+                  onValueCommit={onWordSpacingChange}
+                />
+              </PropertyLine>
+            </div>
 
             <Separator />
 

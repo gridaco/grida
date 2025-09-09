@@ -194,6 +194,17 @@ export function useMixedProperties(ids: string[]) {
     [mixedProperties.letterSpacing?.ids, instance.changeTextNodeLetterSpacing]
   );
 
+  const wordSpacing = useCallback(
+    (
+      change: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
+    ) => {
+      mixedProperties.wordSpacing?.ids.forEach((id) => {
+        instance.changeTextNodeWordSpacing(id, change);
+      });
+    },
+    [mixedProperties.wordSpacing?.ids, instance.changeTextNodeWordSpacing]
+  );
+
   const textAlign = useCallback(
     (value: cg.TextAlign) => {
       mixedProperties.textAlign?.ids.forEach((id) => {
@@ -337,6 +348,7 @@ export function useMixedProperties(ids: string[]) {
       fontSize,
       lineHeight,
       letterSpacing,
+      wordSpacing,
       textAlign,
       textAlignVertical,
       fit,
@@ -369,6 +381,7 @@ export function useMixedProperties(ids: string[]) {
       fontSize,
       lineHeight,
       letterSpacing,
+      wordSpacing,
       textAlign,
       textAlignVertical,
       fit,

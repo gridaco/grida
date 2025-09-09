@@ -219,6 +219,11 @@ export function useNodeActions(node_id: string | undefined) {
           grida.program.nodes.TextNode["letterSpacing"]
         >
       ) => instance.changeTextNodeLetterSpacing(node_id, change),
+      wordSpacing: (
+        change: editor.api.TChange<
+          grida.program.nodes.TextNode["wordSpacing"]
+        >
+      ) => instance.changeTextNodeWordSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
         instance.changeTextNodeMaxlength(node_id, value),
       maxLines: (value: number | null) =>

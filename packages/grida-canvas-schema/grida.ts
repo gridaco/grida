@@ -1418,6 +1418,14 @@ export namespace grida.program.nodes {
       letterSpacing?: number;
 
       /**
+       * word-spacing in em (percentage) value
+       *
+       * @example 1 = 100% / 1em
+       * @default 0
+       */
+      wordSpacing?: number;
+
+      /**
        * line-height in percentage value only. 0% ~
        * @example undefined = "normal"
        * @example 1 = 100% / 1em
