@@ -132,35 +132,55 @@ export function ExportNodeControl({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="left" align="start" collisionPadding={16}>
-          <DropdownMenuLabel>
-            <Badge variant="outline" className="text-xs">
-              BETA
-            </Badge>
-            <br />
-            <div className="w-40">
-              <small className="leading-tight font-normal text-muted-foreground">
-                &quot;Export as&quot; is currently in beta and may produce
-                inconsistent outputs.
-              </small>
-            </div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => onExport("PNG")}>
+          {editor.backend === "dom" && (
+            <>
+              <DropdownMenuLabel>
+                <Badge variant="outline" className="text-xs">
+                  BETA
+                </Badge>
+                <br />
+                <div className="w-40">
+                  <small className="leading-tight font-normal text-muted-foreground">
+                    &quot;Export as&quot; is currently in beta and may produce
+                    inconsistent outputs.
+                  </small>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+            </>
+          )}
+
+          <DropdownMenuItem
+            className="text-xs"
+            onSelect={() => onExport("PNG")}
+          >
             PNG
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onExport("JPEG")}>
+          <DropdownMenuItem
+            className="text-xs"
+            onSelect={() => onExport("JPEG")}
+          >
             JPEG
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onExport("SVG")}>
+          <DropdownMenuItem
+            className="text-xs"
+            onSelect={() => onExport("SVG")}
+          >
             SVG
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onExport("PDF")}>
+          <DropdownMenuItem
+            className="text-xs"
+            onSelect={() => onExport("PDF")}
+          >
             PDF
           </DropdownMenuItem>
           {editor.backend === "dom" && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={advancedExportDialog.openDialog}>
+              <DropdownMenuItem
+                className="text-xs"
+                onSelect={advancedExportDialog.openDialog}
+              >
                 <CodeIcon className="size-3.5" />
                 Advanced
               </DropdownMenuItem>

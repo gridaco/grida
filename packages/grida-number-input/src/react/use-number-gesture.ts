@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import { useDrag, type UserDragConfig } from "@use-gesture/react";
 import type { NumberChange } from "../types";
+import { usePointerLock } from "./use-pointer-lock";
 
 type UseNumberGestureProps<MODE extends "auto" | "fixed" = "auto"> = {
   /** Initial value for the gesture (required for "fixed" mode, optional for "auto" mode) */
@@ -33,6 +34,8 @@ type UseNumberGestureProps<MODE extends "auto" | "fixed" = "auto"> = {
   axisForValue?: "x" | "y";
   /** Whether the gesture is disabled (default: false) */
   disabled?: boolean;
+  /** Whether to use pointer lock for continuous dragging (default: true) */
+  uxPointerLock?: boolean;
 };
 
 /**
@@ -55,6 +58,7 @@ type UseNumberGestureProps<MODE extends "auto" | "fixed" = "auto"> = {
  * ## Features
  * - **Virtual Slider**: Can be applied to any UI element (labels, icons, divs, etc.)
  * - **Dual Axis Control**: Separate gesture axis and value axis for optimal UX
+ * - **Pointer Lock**: Continuous dragging without screen boundary limits
  * - **Conditional Disable**: Built-in disabled state to avoid conditional hook issues
  * - **Drag Threshold**: Configurable threshold for drag movement before gesture starts
  * - **Sensitivity Control**: Configurable sensitivity multiplier for fine-tuned control
@@ -131,6 +135,17 @@ type UseNumberGestureProps<MODE extends "auto" | "fixed" = "auto"> = {
  *   }
  * });
  *
+ * // Pointer lock enabled for continuous dragging
+ * const continuousGesture = useNumberGesture({
+ *   enablePointerLock: true, // Enable pointer lock for continuous dragging
+ *   sensitivity: 0.01,
+ *   onValueChange: (change) => {
+ *     if (change.type === "delta") {
+ *       setValue(prev => prev + change.value);
+ *     }
+ *   }
+ * });
+ *
  * return (
  *   <div
  *     {...gesture.bind()}
@@ -145,6 +160,7 @@ type UseNumberGestureProps<MODE extends "auto" | "fixed" = "auto"> = {
  * - **Dual Axis Control**: Separate control for gesture detection and value calculation
  * - **Gesture Axis**: Controls which directions trigger the drag gesture (prevents unwanted triggers)
  * - **Value Axis**: Controls which movement direction affects the value (filters movement)
+ * - **Pointer Lock**: Locks cursor to element for continuous dragging without screen boundaries
  * - **Movement Calculation**: Uses dominant direction when value axis is undefined
  * - **Threshold**: Configurable threshold for drag movement before gesture starts (default: 0.5)
  * - **Sensitivity**: Configurable multiplier for drag-to-value ratio (default: 0.01)
@@ -169,9 +185,19 @@ export function useNumberGesture<MODE extends "auto" | "fixed" = "auto">({
   axisForGesture,
   axisForValue,
   disabled = false,
+  uxPointerLock = true,
 }: UseNumberGestureProps<MODE>) {
   const startValueRef = useRef<number>(value);
   const lastValueRef = useRef<number>(value);
+
+  // Use pointer lock hook
+  const {
+    ref: pointerLockElementRef,
+    requestLock,
+    exitLock,
+  } = usePointerLock({
+    enabled: uxPointerLock,
+  });
 
   /**
    * Rounds a number to match the precision of the given step value.
@@ -259,11 +285,22 @@ export function useNumberGesture<MODE extends "auto" | "fixed" = "auto">({
   );
 
   const bind = useDrag(
-    ({ first, last, movement: [mx, my], memo = [0, 0] }) => {
+    ({ first, last, movement: [mx, my], memo = [0, 0], event }) => {
       if (first) {
         // Store the starting value when drag begins
         startValueRef.current = value;
         lastValueRef.current = value;
+
+        // Store the element reference for pointer lock
+        if (event?.target instanceof HTMLElement) {
+          pointerLockElementRef.current = event.target;
+        }
+
+        // Request pointer lock if enabled
+        if (uxPointerLock) {
+          requestLock();
+        }
+
         return [mx, my];
       }
 
@@ -303,6 +340,11 @@ export function useNumberGesture<MODE extends "auto" | "fixed" = "auto">({
             : finalValue;
           handleValueCommit(clampedValue, finalIncrementalDelta);
         }
+
+        // Exit pointer lock when drag ends
+        if (uxPointerLock) {
+          exitLock();
+        }
       }
 
       return [mx, my];
@@ -312,7 +354,7 @@ export function useNumberGesture<MODE extends "auto" | "fixed" = "auto">({
       axis: axisForGesture, // Use the gesture axis constraint (undefined = allow all directions)
       filterTaps: false, // Don't filter out taps
       preventScroll: true, // Prevent page scrolling during drag
-      pointer: { capture: false }, // Don't capture pointer events
+      pointer: { capture: !uxPointerLock }, // Don't capture pointer events when using pointer lock
       threshold, // Use the threshold option from useDrag
       enabled: !disabled, // Disable the gesture when true
     } satisfies UserDragConfig
