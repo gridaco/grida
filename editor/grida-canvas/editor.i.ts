@@ -1502,6 +1502,7 @@ export namespace editor.gesture {
      */
     readonly type: "corner-radius";
     readonly node_id: string;
+    readonly anchor?: cmath.IntercardinalDirection;
     readonly initial_bounding_rectangle: cmath.Rectangle | null;
   };
 
@@ -2103,7 +2104,10 @@ export namespace editor.api {
     ): void;
     startSortGesture(selection: string | string[], node_id: string): void;
     startGapGesture(selection: string | string[], axis: "x" | "y"): void;
-    startCornerRadiusGesture(selection: string): void;
+    startCornerRadiusGesture(
+      selection: string,
+      anchor?: cmath.IntercardinalDirection
+    ): void;
     startRotateGesture(selection: string): void;
     startTranslateVectorNetwork(node_id: string): void;
     startCurveGesture(

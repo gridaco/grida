@@ -2805,12 +2805,16 @@ export class Editor
   }
 
   // #region drag resize handle
-  startCornerRadiusGesture(selection: string) {
+  startCornerRadiusGesture(
+    selection: string,
+    anchor?: cmath.IntercardinalDirection
+  ) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "corner-radius",
         node_id: selection,
+        anchor,
       },
     });
   }

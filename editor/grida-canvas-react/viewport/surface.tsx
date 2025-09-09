@@ -14,7 +14,6 @@ import {
   useIsTransforming,
   useMultiplayerCursorState,
   useMultipleSelectionOverlayClick,
-  useNode,
   usePointerState,
   useSelectionState,
   useToolState,
@@ -67,6 +66,10 @@ import type { editor } from "@/grida-canvas";
 import { useFollowPlugin } from "../plugins/use-follow";
 import { SurfaceVariableWidthEditor } from "./ui/surface-varwidth-editor";
 import { MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE } from "../ui-config";
+import {
+  NodeOverlayCornerRadiusHandle,
+  NodeOverlayRectangularCornerRadiusHandles,
+} from "./ui/corner-radius-handle";
 
 const DRAG_THRESHOLD = 2;
 
@@ -1130,12 +1133,15 @@ function NodeOverlay({
             )}
             {show_corner_radius_handle &&
               supports.cornerRadius(node.type, { backend }) &&
-              !supports.children(node.type, { backend }) && (
-                <NodeOverlayRectangularCornerRadiusHandle
-                  anchor="se"
+              !supports.children(node.type, { backend }) &&
+              (supports.cornerRadius4(node.type, { backend }) ? (
+                <NodeOverlayRectangularCornerRadiusHandles node_id={node_id} />
+              ) : (
+                <NodeOverlayCornerRadiusHandle
                   node_id={node_id}
+                  anchor="se"
                 />
-              )}
+              ))}
             <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
             <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
             <LayerOverlayRotationHandle anchor="sw" node_id={node_id} />
@@ -1152,52 +1158,6 @@ function NodeOverlay({
         )}
       </LayerOverlay>
     </>
-  );
-}
-
-function NodeOverlayRectangularCornerRadiusHandle({
-  node_id,
-  anchor,
-  size = 8,
-  margin = 16,
-}: {
-  node_id: string;
-  anchor: "nw" | "ne" | "sw" | "se";
-  margin?: number;
-  size?: number;
-}) {
-  const editor = useCurrentEditor();
-
-  const bind = useSurfaceGesture({
-    onDragStart: ({ event }) => {
-      event.preventDefault();
-      editor.startCornerRadiusGesture(node_id);
-    },
-  });
-
-  const node = useNode(node_id);
-
-  // TODO: resolve by anchor
-  const radii = typeof node.cornerRadius === "number" ? node.cornerRadius : 0;
-
-  const minmargin = Math.max(radii + size, margin);
-
-  return (
-    <div
-      {...bind()}
-      className="hidden group-hover:block border rounded-full bg-white border-workbench-accent-sky absolute z-10 pointer-events-auto"
-      style={{
-        top: anchor[0] === "n" ? minmargin : "auto",
-        bottom: anchor[0] === "s" ? minmargin : "auto",
-        left: anchor[1] === "w" ? minmargin : "auto",
-        right: anchor[1] === "e" ? minmargin : "auto",
-        width: size,
-        height: size,
-        transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
-        cursor: "pointer",
-        touchAction: "none",
-      }}
-    />
   );
 }
 

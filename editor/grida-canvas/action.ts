@@ -804,7 +804,7 @@ export type EditorSurface_StartGesture = {
     | (Pick<editor.gesture.GestureGap, "type" | "axis"> & {
         selection: string | string[];
       })
-    | Pick<editor.gesture.GestureCornerRadius, "type" | "node_id">
+    | Pick<editor.gesture.GestureCornerRadius, "type" | "node_id" | "anchor">
     | Pick<
         editor.gesture.GestureCurve,
         "type" | "control" | "node_id" | "segment"
