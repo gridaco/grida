@@ -212,3 +212,25 @@ cargo fmt --all
 
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
 To handle this, you can build the `/packages/*`, then run typecheck. (when networking is not available)
+
+### Running `pnpm typecheck` from a clean checkout
+
+`pnpm typecheck` depends on compiled packages and the editor's Next.js env
+file. After cloning the repo or installing dependencies, run the following
+steps before executing `pnpm typecheck`:
+
+```sh
+# install dependencies for shared packages and the editor
+pnpm install --filter "./packages/*"
+pnpm install --filter editor
+
+# build shared packages and the wasm bundle
+pnpm turbo build --filter="./packages/*"
+pnpm --filter @grida/canvas-wasm build
+
+# generate editor/next-env.d.ts (can be stopped once the file is created)
+pnpm --filter editor dev
+
+# finally, run the repository-wide typecheck
+pnpm typecheck
+```
