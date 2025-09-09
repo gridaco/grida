@@ -64,7 +64,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         }
     }
 
@@ -86,7 +86,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
             corner_radius: None,
         }
     }
@@ -108,7 +108,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         }
     }
 
@@ -132,7 +132,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         }
     }
 
@@ -166,7 +166,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
             clip: true,
         }
     }
@@ -186,7 +186,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         }
     }
 
@@ -207,7 +207,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         }
     }
 
@@ -228,7 +228,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         }
     }
 
@@ -247,7 +247,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         }
     }
 
@@ -267,7 +267,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
             hash: String::new(),
         }
     }

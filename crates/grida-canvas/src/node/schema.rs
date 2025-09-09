@@ -20,18 +20,10 @@ pub struct LayerEffects {
 }
 
 impl LayerEffects {
-    pub fn new_empty() -> Self {
-        Self {
-            blur: None,
-            backdrop_blur: None,
-            shadows: vec![],
-        }
-    }
-
     /// Convert a list of filter effects into a layer effects object.
     /// if multiple effects that is not supported, the last effect will be used.
     pub fn from_array(effects: Vec<FilterEffect>) -> Self {
-        let mut layer_effects = Self::new_empty();
+        let mut layer_effects = Self::default();
         for effect in effects {
             match effect {
                 FilterEffect::LayerBlur(blur) => layer_effects.blur = Some(blur),
@@ -59,6 +51,16 @@ impl LayerEffects {
             return Some(self.shadows.last().unwrap().clone().into());
         }
         None
+    }
+}
+
+impl Default for LayerEffects {
+    fn default() -> Self {
+        Self {
+            blur: None,
+            backdrop_blur: None,
+            shadows: vec![],
+        }
     }
 }
 

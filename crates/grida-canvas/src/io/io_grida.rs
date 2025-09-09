@@ -1170,7 +1170,7 @@ fn merge_effects(
     fe_blur: Option<FeGaussianBlur>,
     fe_backdrop_blur: Option<FeGaussianBlur>,
 ) -> LayerEffects {
-    let mut effects = LayerEffects::new_empty();
+    let mut effects = LayerEffects::default();
     if let Some(filter_blur) = fe_blur {
         effects.blur = Some(filter_blur);
     }

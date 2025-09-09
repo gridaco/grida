@@ -608,7 +608,7 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
             world_bounds,
             n.stroke_width.unwrap_or(0.0),
             n.stroke_align,
-            &LayerEffects::new_empty(),
+            &LayerEffects::default(),
         ),
         Node::Container(n) => compute_render_bounds_from_style(
             world_bounds,

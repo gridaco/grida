@@ -601,7 +601,7 @@ impl LayerList {
                             clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
                         },
                         shape,
-                        effects: LayerEffects::new_empty(),
+                        effects: LayerEffects::default(),
                         strokes: vec![],
                         fills: vec![],
                         stroke_path: None,

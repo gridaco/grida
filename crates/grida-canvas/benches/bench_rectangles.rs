@@ -44,7 +44,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                     color: CGColor(0, 0, 0, 128),
                 })])
             } else {
-                LayerEffects::new_empty()
+                LayerEffects::default()
             },
         };
 

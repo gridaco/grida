@@ -461,7 +461,7 @@ impl FigmaConverter {
 
     /// Convert Figma's effects to our FilterEffect vector
     fn convert_effects(effects: &Vec<Effect>) -> LayerEffects {
-        let mut layer_effects = LayerEffects::new_empty();
+        let mut layer_effects = LayerEffects::default();
 
         // If no effects, return empty vector
         if effects.is_empty() {
@@ -693,7 +693,7 @@ impl FigmaConverter {
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: Self::convert_opacity(section.visible),
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
             clip: false,
         }))
     }
@@ -1012,7 +1012,7 @@ impl FigmaConverter {
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
             children,
             opacity: Self::convert_opacity(origin.visible),
             clip: false,

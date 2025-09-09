@@ -84,7 +84,7 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes
@@ -162,7 +162,7 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes
@@ -240,7 +240,7 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes
@@ -318,7 +318,7 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes

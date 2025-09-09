@@ -34,7 +34,7 @@ async fn scene() -> Scene {
         stroke_align: StrokeAlign::Outside,
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
-        effects: LayerEffects::new_empty(),
+        effects: LayerEffects::default(),
     };
     let text_outside_id = text_outside.id.clone();
     repo.insert(Node::TextSpan(text_outside));
@@ -64,7 +64,7 @@ async fn scene() -> Scene {
         stroke_align: StrokeAlign::Center,
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
-        effects: LayerEffects::new_empty(),
+        effects: LayerEffects::default(),
     };
     let text_center_id = text_center.id.clone();
     repo.insert(Node::TextSpan(text_center));
@@ -94,7 +94,7 @@ async fn scene() -> Scene {
         stroke_align: StrokeAlign::Inside,
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
-        effects: LayerEffects::new_empty(),
+        effects: LayerEffects::default(),
     };
     let text_inside_id = text_inside.id.clone();
     repo.insert(Node::TextSpan(text_inside));
