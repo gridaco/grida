@@ -12,9 +12,7 @@ export const TextWidget = ({
 
   return (
     <div {...queryattributes(props)} style={style}>
-      <span style={{ whiteSpace: maxLines && maxLines > 0 ? "pre-wrap" : "pre" }}>
-        {children}
-      </span>
+      {children}
     </div>
   );
 };

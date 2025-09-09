@@ -85,7 +85,6 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
               ...css.toReactTextStyle(
                 node as grida.program.nodes.TextNode as any as grida.program.nodes.ComputedTextNode
               ),
-              whiteSpace: "pre",
             }}
           />
         </div>
