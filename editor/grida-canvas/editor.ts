@@ -1834,6 +1834,7 @@ export class Editor
       fit,
     });
   }
+
   changeNodeCornerRadius(node_id: string, cornerRadius: cg.CornerRadius) {
     if (typeof cornerRadius === "number") {
       // When a uniform corner radius is applied after using individual corner
@@ -1862,6 +1863,44 @@ export class Editor
       });
     }
   }
+  changeNodeCornerRadiusWithDelta(node_id: string, delta: number): void {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.UnknwonNode;
+    const allCornerRadius = {
+      cornerRadius: node.cornerRadius,
+      cornerRadiusTopLeft: node.cornerRadiusTopLeft,
+      cornerRadiusTopRight: node.cornerRadiusTopRight,
+      cornerRadiusBottomRight: node.cornerRadiusBottomRight,
+      cornerRadiusBottomLeft: node.cornerRadiusBottomLeft,
+    };
+
+    const next = {
+      ...allCornerRadius,
+      cornerRadius: allCornerRadius.cornerRadius
+        ? allCornerRadius.cornerRadius + delta
+        : undefined,
+      cornerRadiusTopLeft: allCornerRadius.cornerRadiusTopLeft
+        ? allCornerRadius.cornerRadiusTopLeft + delta
+        : undefined,
+      cornerRadiusTopRight: allCornerRadius.cornerRadiusTopRight
+        ? allCornerRadius.cornerRadiusTopRight + delta
+        : undefined,
+      cornerRadiusBottomRight: allCornerRadius.cornerRadiusBottomRight
+        ? allCornerRadius.cornerRadiusBottomRight + delta
+        : undefined,
+      cornerRadiusBottomLeft: allCornerRadius.cornerRadiusBottomLeft
+        ? allCornerRadius.cornerRadiusBottomLeft + delta
+        : undefined,
+    };
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      ...next,
+    });
+  }
+
   changeNodePointCount(node_id: editor.NodeID, pointCount: number): void {
     this.dispatch({
       type: "node/change/*",
@@ -2189,9 +2228,7 @@ export class Editor
 
   changeTextNodeWordSpacing(
     node_id: string,
-    wordSpacing: editor.api.TChange<
-      grida.program.nodes.TextNode["wordSpacing"]
-    >
+    wordSpacing: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
   ) {
     try {
       let value: number | undefined;

@@ -278,6 +278,10 @@ function ModeMixedNodeProperties({
     locked,
     opacity,
     cornerRadius,
+    cornerRadiusTopLeft,
+    cornerRadiusTopRight,
+    cornerRadiusBottomRight,
+    cornerRadiusBottomLeft,
     fill,
     stroke,
     strokeWidth,
@@ -414,7 +418,24 @@ function ModeMixedNodeProperties({
                 <CornerRadius4Control onValueCommit={change.cornerRadius} />
               ) : (
                 <CornerRadius4Control
-                  value={{ cornerRadius: cornerRadius?.value }}
+                  value={{
+                    cornerRadiusTopLeft:
+                      typeof cornerRadiusTopLeft?.value === "number"
+                        ? cornerRadiusTopLeft?.value
+                        : undefined,
+                    cornerRadiusTopRight:
+                      typeof cornerRadiusTopRight?.value === "number"
+                        ? cornerRadiusTopRight?.value
+                        : undefined,
+                    cornerRadiusBottomRight:
+                      typeof cornerRadiusBottomRight?.value === "number"
+                        ? cornerRadiusBottomRight?.value
+                        : undefined,
+                    cornerRadiusBottomLeft:
+                      typeof cornerRadiusBottomLeft?.value === "number"
+                        ? cornerRadiusBottomLeft?.value
+                        : undefined,
+                  }}
                   onValueCommit={change.cornerRadius}
                 />
               )}
@@ -937,10 +958,15 @@ function ModeNodeProperties({
             <>
               {supports.cornerRadius4(node.type, { backend }) ? (
                 <PropertyLine>
-                  <PropertyLineLabel>Radius</PropertyLineLabel>
+                  <PropertyLineLabelWithNumberGesture
+                    step={1}
+                    sensitivity={0.1}
+                    onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
+                  >
+                    Radius
+                  </PropertyLineLabelWithNumberGesture>
                   <CornerRadius4Control
                     value={{
-                      cornerRadius,
                       cornerRadiusTopLeft,
                       cornerRadiusTopRight,
                       cornerRadiusBottomRight,
@@ -951,7 +977,13 @@ function ModeNodeProperties({
                 </PropertyLine>
               ) : (
                 <PropertyLine>
-                  <PropertyLineLabel>Radius</PropertyLineLabel>
+                  <PropertyLineLabelWithNumberGesture
+                    step={1}
+                    sensitivity={0.1}
+                    onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
+                  >
+                    Radius
+                  </PropertyLineLabelWithNumberGesture>
                   <CornerRadiusControl
                     value={cornerRadius}
                     onValueCommit={actions.cornerRadius}

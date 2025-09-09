@@ -1891,6 +1891,7 @@ export namespace editor.api {
       node_id: NodeID,
       cornerRadius: cg.CornerRadius
     ): void;
+    changeNodeCornerRadiusWithDelta(node_id: NodeID, delta: number): void;
     changeNodePointCount(node_id: NodeID, pointCount: number): void;
     changeNodeInnerRadius(node_id: NodeID, innerRadius: number): void;
     changeNodeArcData(
