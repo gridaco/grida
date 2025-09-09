@@ -145,6 +145,17 @@ export namespace editor.config {
     export const DEFAULT_FONT_WEIGHT = 400;
     export const DEFAULT_FONT_SIZE = 14;
 
+    export const DEFAULT_TEXT_STYLE_INTER: grida.program.nodes.i.ITextStyle = {
+      fontFamily: DEFAULT_FONT_FAMILY,
+      fontPostscriptName: "Inter-Regular",
+      fontStyleItalic: false,
+      fontFeatures: {},
+      fontOpticalSizing: "auto",
+      fontWeight: DEFAULT_FONT_WEIGHT,
+      fontSize: DEFAULT_FONT_SIZE,
+      textDecorationLine: "none",
+    };
+
     const PLATFORM_FONTS = {
       Inter: {
         family: "Inter",
