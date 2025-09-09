@@ -9,7 +9,7 @@
     "docusaurus": "docusaurus",
     "start": "docusaurus start --port 3001",
     "dev": "content:watch & pnpm start",
-    "build": "docusaurus build",
+    "build": "pnpm content:setup && docusaurus build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",

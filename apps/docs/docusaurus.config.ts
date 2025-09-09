@@ -74,15 +74,15 @@ const config: Config = {
         },
         {
           type: "doc",
-          docId: "flags/intro",
-          position: "left",
-          label: "Flags",
-        },
-        {
-          type: "doc",
           docId: "reference/intro",
           position: "left",
           label: "Reference",
+        },
+        {
+          type: "doc",
+          docId: "wg/intro",
+          position: "left",
+          label: "Working Group",
         },
         {
           href: "https://grida.co/sign-in",
