@@ -37,6 +37,14 @@ const paint_label = {
 export interface PaintControlProps {
   value?: grida.program.nodes.i.props.PropsPaintValue;
   onValueChange?: (value: ComputedPaint | TokenizedPaint | null) => void;
+  /**
+   * called when user explicitly adds a new paint via the UI
+   */
+  onValueAdd?: (value: ComputedPaint | TokenizedPaint) => void;
+  /**
+   * called when user removes the paint via the UI
+   */
+  onValueRemove?: () => void;
   onOpenChange?: (open: boolean) => void;
   selectedGradientStop?: number;
   removable?: boolean;
@@ -46,6 +54,8 @@ export interface PaintControlProps {
 export function PaintControl({
   value,
   onValueChange,
+  onValueAdd,
+  onValueRemove,
   removable,
   selectedGradientStop,
   onOpenChange,
@@ -63,6 +73,8 @@ export function PaintControl({
       <ComputedPaintControl
         value={value as ComputedPaint}
         onValueChange={onValueChange}
+        onValueAdd={onValueAdd as any}
+        onValueRemove={onValueRemove}
         onOpenChange={onOpenChange}
         selectedGradientStop={selectedGradientStop}
         removable={removable}
@@ -78,6 +90,8 @@ type TokenizedPaint = grida.program.nodes.i.props.SolidPaintToken;
 function ComputedPaintControl({
   value,
   onValueChange,
+  onValueAdd,
+  onValueRemove,
   removable,
   onOpenChange,
   selectedGradientStop,
@@ -85,6 +99,8 @@ function ComputedPaintControl({
 }: {
   value?: ComputedPaint;
   onValueChange?: (value: ComputedPaint | null) => void;
+  onValueAdd?: (value: ComputedPaint) => void;
+  onValueRemove?: () => void;
   removable?: boolean;
   onOpenChange?: (open: boolean) => void;
   selectedGradientStop?: number;
@@ -154,15 +170,24 @@ function ComputedPaintControl({
   );
 
   const onAddPaint = () => {
-    onValueChange?.({
+    const paint: ComputedPaint = {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: 1 },
-    });
+    };
+    if (onValueAdd) {
+      onValueAdd(paint);
+    } else {
+      onValueChange?.(paint);
+    }
   };
 
   const onRemovePaint = () => {
     if (!removable) return;
-    onValueChange?.(null);
+    if (onValueRemove) {
+      onValueRemove();
+    } else {
+      onValueChange?.(null);
+    }
   };
 
   return (

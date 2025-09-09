@@ -686,12 +686,30 @@ function ModeMixedNodeProperties({
                 <PaintControl
                   value={undefined}
                   onValueChange={change.stroke}
+                  onValueAdd={(value) => {
+                    change.stroke(value);
+                    if (!strokeWidth?.value || strokeWidth?.value === 0) {
+                      change.strokeWidth({ type: "set", value: 1 });
+                    }
+                  }}
+                  onValueRemove={() => {
+                    change.stroke(null);
+                  }}
                   removable
                 />
               ) : (
                 <PaintControl
                   value={stroke?.value}
                   onValueChange={change.stroke}
+                  onValueAdd={(value) => {
+                    change.stroke(value);
+                    if (!strokeWidth?.value || strokeWidth?.value === 0) {
+                      change.strokeWidth({ type: "set", value: 1 });
+                    }
+                  }}
+                  onValueRemove={() => {
+                    change.stroke(null);
+                  }}
                   removable
                 />
               )}
@@ -1664,6 +1682,15 @@ function SectionStrokes({
           <PaintControl
             value={stroke}
             onValueChange={actions.stroke}
+            onValueAdd={(value) => {
+              actions.stroke(value);
+              if (!strokeWidth || strokeWidth === 0) {
+                actions.strokeWidth({ type: "set", value: 1 });
+              }
+            }}
+            onValueRemove={() => {
+              actions.stroke(null);
+            }}
             removable
           />
         </PropertyLine>
