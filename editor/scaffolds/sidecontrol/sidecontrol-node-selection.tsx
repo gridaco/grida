@@ -113,6 +113,7 @@ import {
   CurrentFontProvider,
   useCurrentFontFamily,
 } from "./controls/context/font";
+import { PropertyLineLabelWithNumberGesture } from "./ui/label-with-number-gesture";
 
 function FontStyleControlScaffold({ selection }: { selection: string[] }) {
   const editor = useCurrentEditor();
@@ -1176,7 +1177,14 @@ function PropertyLineOpacity({ node_id }: { node_id: string }) {
 
   return (
     <PropertyLine>
-      <PropertyLineLabel>Opacity</PropertyLineLabel>
+      <PropertyLineLabelWithNumberGesture
+        step={0.01}
+        min={0}
+        max={1}
+        onValueChange={actions.opacity}
+      >
+        Opacity
+      </PropertyLineLabelWithNumberGesture>
       <OpacityControl value={opacity as any} onValueCommit={actions.opacity} />
     </PropertyLine>
   );
@@ -1234,7 +1242,13 @@ function SectionPosition({ node_id }: { node_id: string }) {
           />
         </PropertyLine>
         <PropertyLine>
-          <PropertyLineLabel>Rotate</PropertyLineLabel>
+          <PropertyLineLabelWithNumberGesture
+            step={1}
+            sensitivity={1}
+            onValueChange={actions.rotation}
+          >
+            Rotate
+          </PropertyLineLabelWithNumberGesture>
           <RotateControl value={rotation} onValueCommit={actions.rotation} />
         </PropertyLine>
       </SidebarMenuSectionContent>
@@ -1425,14 +1439,25 @@ function SectionText({ node_id }: { node_id: string }) {
             />
           </PropertyLine>
           <PropertyLine>
-            <PropertyLineLabel>Line</PropertyLineLabel>
+            <PropertyLineLabelWithNumberGesture
+              step={0.1}
+              min={0}
+              onValueChange={actions.lineHeight}
+            >
+              Line
+            </PropertyLineLabelWithNumberGesture>
             <LineHeightControl
               value={lineHeight}
               onValueCommit={actions.lineHeight}
             />
           </PropertyLine>
           <PropertyLine>
-            <PropertyLineLabel>Letter</PropertyLineLabel>
+            <PropertyLineLabelWithNumberGesture
+              step={0.01}
+              onValueChange={actions.letterSpacing}
+            >
+              Letter
+            </PropertyLineLabelWithNumberGesture>
             <LetterSpacingControl
               value={letterSpacing}
               onValueCommit={actions.letterSpacing}

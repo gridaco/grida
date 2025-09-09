@@ -1214,6 +1214,9 @@ importers:
 
   packages/grida-number-input:
     dependencies:
+      '@use-gesture/react':
+        specifier: ^10
+        version: 10.3.1(react@19.0.0)
       react-dom:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.0.0(react@19.0.0)

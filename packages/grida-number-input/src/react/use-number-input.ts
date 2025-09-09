@@ -1,12 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { NumberChange } from "../types";
 
 // Local type definitions (duplicated to avoid external dependencies)
 type TMixed<T, MIXED = "mixed"> = T | MIXED;
-
-type NumberChange = {
-  type: "set" | "delta";
-  value: number;
-};
 
 /**
  * Rounds a number to match the precision of the given step value.

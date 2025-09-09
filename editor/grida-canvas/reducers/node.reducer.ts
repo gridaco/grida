@@ -460,7 +460,7 @@ const safe_properties: Partial<
   lineHeight: defineNodeProperty<"lineHeight">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).lineHeight = value;
+      (draft as UN).lineHeight = ranged(0, value);
     },
   }),
   letterSpacing: defineNodeProperty<"letterSpacing">({
