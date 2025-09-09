@@ -6,6 +6,10 @@ use serde::Serialize;
 use std::boxed::Box;
 use std::ffi::CString;
 
+// ====================================================================================================
+// #region: internal helpers
+// ====================================================================================================
+
 #[no_mangle]
 pub extern "C" fn allocate(len: usize) -> *mut u8 {
     let mut buf = Vec::<u8>::with_capacity(len);
@@ -30,13 +34,11 @@ pub unsafe fn __str_from_ptr_len(ptr: *const u8, len: usize) -> Option<String> {
     std::str::from_utf8(slice).ok().map(|s| s.to_string())
 }
 
-#[derive(Serialize)]
-pub struct FontKey {
-    /// CSS font-family name.
-    pub family: String,
-    // In the future, additional properties will precisely describe the font to enable
-    // partial fetching and more accurate identification.
-}
+// #endregion: internal helpers
+
+// ====================================================================================================
+// #region: main app lifecycle
+// ====================================================================================================
 
 #[no_mangle]
 pub extern "C" fn init(
@@ -87,28 +89,77 @@ pub unsafe extern "C" fn load_scene_json(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn load_dummy_scene(app: *mut EmscriptenApplication) {
-    if let Some(app) = app.as_mut() {
-        app.load_dummy_scene();
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn load_benchmark_scene(
-    app: *mut EmscriptenApplication,
-    cols: u32,
-    rows: u32,
-) {
-    if let Some(app) = app.as_mut() {
-        app.load_benchmark_scene(cols, rows);
-    }
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn pointer_move(app: *mut EmscriptenApplication, x: f32, y: f32) {
     if let Some(app) = app.as_mut() {
         app.pointer_move(x, y);
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn command(app: *mut EmscriptenApplication, id: u32, a: f32, b: f32) {
+    use cg::window::command::ApplicationCommand;
+    if let Some(app) = app.as_mut() {
+        let cmd = match id {
+            1 => ApplicationCommand::ZoomIn,
+            2 => ApplicationCommand::ZoomOut,
+            3 => ApplicationCommand::ZoomDelta { delta: a },
+            4 => ApplicationCommand::Pan { tx: a, ty: b },
+            _ => ApplicationCommand::None,
+        };
+        app.command(cmd);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_main_camera_transform(
+    app: *mut EmscriptenApplication,
+    a: f32,
+    c: f32,
+    e: f32,
+    b: f32,
+    d: f32,
+    f: f32,
+) {
+    use math2::transform::AffineTransform;
+    if let Some(app) = app.as_mut() {
+        app.set_main_camera_transform(AffineTransform::from_acebdf(a, c, e, b, d, f));
+    }
+}
+
+// #endregion: main app lifecycle
+
+// ====================================================================================================
+// #region: image management
+// ====================================================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn add_image(
+    app: *mut EmscriptenApplication,
+    data_ptr: *const u8,
+    data_len: usize,
+) -> *const u8 {
+    if let Some(app) = app.as_mut() {
+        let data = std::slice::from_raw_parts(data_ptr, data_len);
+        let hash = app.add_image(data);
+        if let Ok(cstr) = CString::new(hash) {
+            return cstr.into_raw() as *const u8;
+        }
+    }
+    std::ptr::null()
+}
+
+// #endregion
+
+// ====================================================================================================
+// #region: font management & text style api
+// ====================================================================================================
+
+#[derive(Serialize)]
+pub struct FontKey {
+    /// CSS font-family name.
+    pub family: String,
+    // In the future, additional properties will precisely describe the font to enable
+    // partial fetching and more accurate identification.
 }
 
 #[no_mangle]
@@ -125,22 +176,6 @@ pub unsafe extern "C" fn add_font(
             app.add_font(&family, data);
         }
     }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn add_image(
-    app: *mut EmscriptenApplication,
-    data_ptr: *const u8,
-    data_len: usize,
-) -> *const u8 {
-    if let Some(app) = app.as_mut() {
-        let data = std::slice::from_raw_parts(data_ptr, data_len);
-        let hash = app.add_image(data);
-        if let Ok(cstr) = CString::new(hash) {
-            return cstr.into_raw() as *const u8;
-        }
-    }
-    std::ptr::null()
 }
 
 #[no_mangle]
@@ -224,36 +259,11 @@ pub unsafe extern "C" fn get_default_fallback_fonts(app: *mut EmscriptenApplicat
     std::ptr::null()
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn command(app: *mut EmscriptenApplication, id: u32, a: f32, b: f32) {
-    use cg::window::command::ApplicationCommand;
-    if let Some(app) = app.as_mut() {
-        let cmd = match id {
-            1 => ApplicationCommand::ZoomIn,
-            2 => ApplicationCommand::ZoomOut,
-            3 => ApplicationCommand::ZoomDelta { delta: a },
-            4 => ApplicationCommand::Pan { tx: a, ty: b },
-            _ => ApplicationCommand::None,
-        };
-        app.command(cmd);
-    }
-}
+// #endregion
 
-#[no_mangle]
-pub unsafe extern "C" fn set_main_camera_transform(
-    app: *mut EmscriptenApplication,
-    a: f32,
-    c: f32,
-    e: f32,
-    b: f32,
-    d: f32,
-    f: f32,
-) {
-    use math2::transform::AffineTransform;
-    if let Some(app) = app.as_mut() {
-        app.set_main_camera_transform(AffineTransform::from_acebdf(a, c, e, b, d, f));
-    }
-}
+// ====================================================================================================
+// #region: hit testing & geometry
+// ====================================================================================================
 
 #[no_mangle]
 pub unsafe extern "C" fn get_node_id_from_point(
@@ -336,6 +346,12 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
     std::ptr::null()
 }
 
+// #endregion
+
+// ====================================================================================================
+// #region: export api
+// ====================================================================================================
+
 #[no_mangle]
 pub unsafe extern "C" fn export_node_as(
     app: *mut EmscriptenApplication,
@@ -401,6 +417,12 @@ pub unsafe extern "C" fn to_vector_network(
     std::ptr::null()
 }
 
+// #endregion: export api
+
+// ====================================================================================================
+// #region: devtools
+// ====================================================================================================
+
 #[no_mangle]
 pub unsafe extern "C" fn set_debug(app: *mut EmscriptenApplication, debug: bool) {
     if let Some(app) = app.as_mut() {
@@ -429,47 +451,6 @@ pub unsafe extern "C" fn devtools_rendering_set_show_ruler(
 ) {
     if let Some(app) = app.as_mut() {
         app.devtools_rendering_set_show_ruler(show);
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn highlight_strokes(
-    app: *mut EmscriptenApplication,
-    ptr: *const u8,
-    len: usize,
-) {
-    use serde::Deserialize;
-    use serde_json;
-    #[derive(Deserialize)]
-    struct JsStyle {
-        #[serde(rename = "strokeWidth")]
-        stroke_width: Option<f32>,
-        stroke: Option<String>,
-    }
-    #[derive(Deserialize)]
-    struct JsArgs {
-        nodes: Vec<String>,
-        #[serde(default)]
-        style: Option<JsStyle>,
-    }
-
-    if let Some(app) = app.as_mut() {
-        if let Some(json) = __str_from_ptr_len(ptr, len) {
-            if let Ok(args) = serde_json::from_str::<JsArgs>(&json) {
-                let style = args.style.map(|s| {
-                    let mut st = cg::devtools::stroke_overlay::StrokeOverlayStyle::default();
-                    if let Some(w) = s.stroke_width {
-                        st.stroke_width = w;
-                    }
-                    if let Some(color) = s.stroke {
-                        let rgba = math2::hex_to_rgba8888(&color);
-                        st.stroke = cg::cg::CGColor(rgba.r, rgba.g, rgba.b, (rgba.a * 255.0) as u8);
-                    }
-                    st
-                });
-                app.highlight_strokes(args.nodes, style);
-            }
-        }
     }
 }
 
@@ -522,6 +503,79 @@ pub unsafe extern "C" fn devtools_rendering_set_show_hit_testing(
         app.devtools_rendering_set_show_hit_testing(show);
     }
 }
+
+// #endregion: devtools
+
+// ====================================================================================================
+// #region: surface api
+// ====================================================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn highlight_strokes(
+    app: *mut EmscriptenApplication,
+    ptr: *const u8,
+    len: usize,
+) {
+    use serde::Deserialize;
+    use serde_json;
+    #[derive(Deserialize)]
+    struct JsStyle {
+        #[serde(rename = "strokeWidth")]
+        stroke_width: Option<f32>,
+        stroke: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct JsArgs {
+        nodes: Vec<String>,
+        #[serde(default)]
+        style: Option<JsStyle>,
+    }
+
+    if let Some(app) = app.as_mut() {
+        if let Some(json) = __str_from_ptr_len(ptr, len) {
+            if let Ok(args) = serde_json::from_str::<JsArgs>(&json) {
+                let style = args.style.map(|s| {
+                    let mut st = cg::devtools::stroke_overlay::StrokeOverlayStyle::default();
+                    if let Some(w) = s.stroke_width {
+                        st.stroke_width = w;
+                    }
+                    if let Some(color) = s.stroke {
+                        let rgba = math2::hex_to_rgba8888(&color);
+                        st.stroke = cg::cg::CGColor(rgba.r, rgba.g, rgba.b, (rgba.a * 255.0) as u8);
+                    }
+                    st
+                });
+                app.highlight_strokes(args.nodes, style);
+            }
+        }
+    }
+}
+
+// #endregion: surface api
+
+// ====================================================================================================
+// #region: testing / mock / dummy
+// ====================================================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn load_dummy_scene(app: *mut EmscriptenApplication) {
+    if let Some(app) = app.as_mut() {
+        app.load_dummy_scene();
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn load_benchmark_scene(
+    app: *mut EmscriptenApplication,
+    cols: u32,
+    rows: u32,
+) {
+    if let Some(app) = app.as_mut() {
+        app.load_benchmark_scene(cols, rows);
+    }
+}
+
+// #endregion
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {}
