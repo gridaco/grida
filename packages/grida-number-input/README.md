@@ -1,10 +1,10 @@
 # `@grida/number-input`
 
-React hooks for robust number input and slider value handling with comprehensive safety checks and accessibility features.
+React hooks for robust number input, slider value, and hex color input handling with comprehensive safety checks and accessibility features.
 
 ## Overview
 
-This package provides React hooks for managing number inputs and slider values with comprehensive safety checks, precision handling, and accessibility features. It's designed primarily for the Grida editor but aims to become a general-purpose solution as it matures.
+This package provides React hooks for managing number inputs, slider values, and hex color inputs with comprehensive safety checks, precision handling, and accessibility features. It's designed primarily for the Grida editor but aims to become a general-purpose solution as it matures.
 
 ## Features
 
@@ -24,6 +24,15 @@ This package provides React hooks for managing number inputs and slider values w
 - **Controlled/Uncontrolled**: Support for both controlled and uncontrolled value management
 - **Value Clamping**: Automatic clamping within min/max bounds
 - **Radix UI Compatible**: Returns values in array format for Radix UI Slider components
+
+### Hex Color Input Features
+
+- **Channel-specific Editing**: Arrow keys modify only the selected color channel(s)
+- **Smart Selection**: Automatically selects appropriate hex digits based on cursor position
+- **RGB/RGBA Support**: Works with both RGB and RGBA color formats
+- **Real-time Conversion**: Converts between hex strings and RGB/RGBA objects
+- **Value Clamping**: Ensures color values stay within valid ranges (0-255 for RGB, 0-1 for alpha)
+- **Keyboard Shortcuts**: Shift + arrow keys for larger increments
 
 ### Safety & Validation
 
@@ -60,10 +69,14 @@ yarn add @grida/number-input
 
 ## Usage
 
-This package provides React hooks for number input and slider value management:
+This package provides React hooks for number input, slider value, and hex color management:
 
 ```typescript
-import { useNumberInput, useSliderValue } from "@grida/number-input/react";
+import {
+  useNumberInput,
+  useSliderValue,
+  useHexValueInput,
+} from "@grida/number-input/react";
 ```
 
 **Note**: This package requires React as a peer dependency and is optimized for modern bundlers with tree shaking support.
@@ -109,6 +122,27 @@ A React hook for handling slider values with snapping and step constraints, comp
 | `onValueChange` | `(value: number) => void` | -       | Callback fired when value changes during dragging   |
 | `onValueCommit` | `(value: number) => void` | -       | Callback fired when value is committed (drag ends)  |
 | `snapThreshold` | `number`                  | `5%`    | Distance threshold for snapping to marks (optional) |
+
+### `useHexValueInput<T extends RGB | RGBA>(options: UseHexValueInputOptions<T>)`
+
+A React hook for managing hex color input with RGB/RGBA value manipulation and channel-specific editing.
+
+**Options:**
+
+| Option          | Type                 | Default | Description                             |
+| --------------- | -------------------- | ------- | --------------------------------------- |
+| `value`         | `T`                  | -       | Initial RGB or RGBA color value         |
+| `onValueChange` | `(color: T) => void` | -       | Callback fired when color value changes |
+
+**Returns:**
+
+| Property        | Type                          | Description                                    |
+| --------------- | ----------------------------- | ---------------------------------------------- |
+| `inputRef`      | `RefObject<HTMLInputElement>` | Ref to the input element                       |
+| `hex`           | `string`                      | Current hex string representation of the color |
+| `handleKeyDown` | `(e: KeyboardEvent) => void`  | Key down handler for arrow key navigation      |
+| `handleChange`  | `(e: ChangeEvent) => void`    | Change handler for hex input                   |
+| `handleFocus`   | `() => void`                  | Focus handler that auto-selects all hex digits |
 
 ## Usage Examples
 
@@ -240,9 +274,77 @@ function StepSlider() {
 }
 ```
 
+### RGB Color Input
+
+```typescript
+import { useHexValueInput, type RGB } from '@grida/number-input/react';
+
+function RGBColorInput() {
+  const [color, setColor] = useState<RGB>({ r: 255, g: 128, b: 64 });
+
+  const hexInput = useHexValueInput<RGB>({
+    value: color,
+    onValueChange: (newColor) => setColor(newColor),
+  });
+
+  return (
+    <input
+      ref={hexInput.inputRef}
+      value={hexInput.hex}
+      onChange={hexInput.handleChange}
+      onKeyDown={hexInput.handleKeyDown}
+      onFocus={hexInput.handleFocus}
+      placeholder="#FF8040"
+    />
+  );
+}
+```
+
+### RGBA Color Input
+
+```typescript
+import { useHexValueInput, type RGBA } from '@grida/number-input/react';
+
+function RGBAColorInput() {
+  const [color, setColor] = useState<RGBA>({ r: 255, g: 128, b: 64, a: 0.8 });
+
+  const hexInput = useHexValueInput<RGBA>({
+    value: color,
+    onValueChange: (newColor) => setColor(newColor),
+  });
+
+  return (
+    <input
+      ref={hexInput.inputRef}
+      value={hexInput.hex}
+      onChange={hexInput.handleChange}
+      onKeyDown={hexInput.handleKeyDown}
+      onFocus={hexInput.handleFocus}
+      placeholder="#FF8040CC"
+    />
+  );
+}
+```
+
+## Keyboard Navigation
+
+### Number Input
+
+- **Arrow Up/Down**: Increment/decrement with step precision
+- **Shift + Arrow Up/Down**: Increment/decrement by 10x step
+- **Enter/Tab**: Commit current value
+- **Escape**: Blur input without committing
+
+### Hex Color Input
+
+- **Arrow Up/Down**: Increment/decrement selected color channel(s)
+- **Shift + Arrow Up/Down**: Increment/decrement by 10
+- **Focus**: Auto-selects all hex digits for easy replacement
+- **Channel Selection**: Based on cursor position (0-1: Red, 2-3: Green, 4-5: Blue, 6-7: Alpha)
+
 ## Commit Behavior
 
-The hook provides multiple commit scenarios with comprehensive safety checks:
+The number input hook provides multiple commit scenarios with comprehensive safety checks:
 
 1. **Blur Events**: Commits if value is dirty and valid (forceCommit=true)
 2. **Enter/Tab Keys**: Commits if value is valid (forceCommit=true)
@@ -270,6 +372,8 @@ The hook provides multiple commit scenarios with comprehensive safety checks:
 - [x] Configurable mixed value types
 - [x] Slider value management with snapping
 - [x] Radix UI Slider compatibility
+- [x] Hex color input with channel-specific editing
+- [x] RGB/RGBA color format support
 - [ ] Multi-unit support with automatic unit detection
 - [ ] Unit conversion utilities
 - [ ] Enhanced accessibility features
