@@ -744,13 +744,14 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,
-            fill: node.base.fill.into(),
-            stroke: node.base.stroke.map(|s| Paint::from(Some(s))),
-            stroke_width: if node.base.stroke_width > 0.0 {
-                Some(node.base.stroke_width)
-            } else {
-                None
-            },
+            fills: vec![node.base.fill.into()],
+            strokes: node
+                .base
+                .stroke
+                .map(|s| Paint::from(Some(s)))
+                .into_iter()
+                .collect(),
+            stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,

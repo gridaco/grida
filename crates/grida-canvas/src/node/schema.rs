@@ -1261,14 +1261,14 @@ pub struct TextSpanNodeRec {
     /// to change this behaviour, set ellipsis to empty string.
     pub ellipsis: Option<String>,
 
-    /// Fill paint (solid or gradient)
-    pub fill: Paint,
+    /// Fill paints stack (solid, gradient, etc.)
+    pub fills: Vec<Paint>,
 
-    /// Stroke paint (solid or gradient)
-    pub stroke: Option<Paint>,
+    /// Stroke paints stack (solid, gradient, etc.)
+    pub strokes: Vec<Paint>,
 
     /// Stroke width
-    pub stroke_width: Option<f32>,
+    pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     /// Overall node opacity.
     pub opacity: f32,

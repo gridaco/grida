@@ -45,7 +45,7 @@ async fn demo_scene() -> Scene {
     };
     title_text.text_align = TextAlign::Center;
     title_text.text_align_vertical = TextAlignVertical::Center;
-    title_text.fill = Paint::from(CGColor(50, 50, 50, 255));
+    title_text.fills = vec![Paint::from(CGColor(50, 50, 50, 255))];
     all_node_ids.push(title_text.id.clone());
     repo.insert(Node::TextSpan(title_text));
 
@@ -59,7 +59,7 @@ async fn demo_scene() -> Scene {
     subtitle_text.text_style = TextStyleRec::from_font("", 18.0);
     subtitle_text.text_align = TextAlign::Center;
     subtitle_text.text_align_vertical = TextAlignVertical::Center;
-    subtitle_text.fill = Paint::from(CGColor(100, 100, 100, 255));
+    subtitle_text.fills = vec![Paint::from(CGColor(100, 100, 100, 255))];
     all_node_ids.push(subtitle_text.id.clone());
     repo.insert(Node::TextSpan(subtitle_text));
 
@@ -242,7 +242,7 @@ async fn demo_scene() -> Scene {
     description_text.text_style = TextStyleRec::from_font("", 14.0);
     description_text.text_align = TextAlign::Center;
     description_text.text_align_vertical = TextAlignVertical::Center;
-    description_text.fill = Paint::from(CGColor(80, 80, 80, 255));
+    description_text.fills = vec![Paint::from(CGColor(80, 80, 80, 255))];
     all_node_ids.push(description_text.id.clone());
     repo.insert(Node::TextSpan(description_text));
 

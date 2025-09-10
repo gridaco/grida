@@ -172,12 +172,12 @@ impl<'a> Painter<'a> {
 
     fn cached_paragraph(
         &self,
-        id: &NodeId,
+        _id: &NodeId,
         text: &str,
         width: &Option<f32>,
         max_lines: &Option<usize>,
         ellipsis: &Option<String>,
-        fill: &Paint,
+        fills: &[Paint],
         align: &TextAlign,
         // TODO: vertical align shall be computed on our end, since sk paragraph does not have a concept of "vertical align"
         _valign: &TextAlignVertical,
@@ -186,19 +186,18 @@ impl<'a> Painter<'a> {
         let scene_cache = self
             .scene_cache
             .expect("Painter must have scene_cache for text rendering");
-        let paragraph_rc = scene_cache.paragraph.borrow_mut().get_or_create(
-            id, text, fill, align, style, max_lines, ellipsis, self.fonts,
-        );
-
-        // Always apply layout - either with specified width or intrinsic width
-        let layout_width = width.unwrap_or_else(|| {
-            let mut para_ref = paragraph_rc.borrow_mut();
-            para_ref.layout(f32::INFINITY);
-            para_ref.max_intrinsic_width()
-        });
-        paragraph_rc.borrow_mut().layout(layout_width);
-
-        paragraph_rc
+        scene_cache.paragraph.borrow_mut().paragraph(
+            text,
+            fills,
+            align,
+            style,
+            max_lines,
+            ellipsis,
+            *width,
+            self.fonts,
+            self.images,
+            Some(_id),
+        )
     }
 
     fn draw_fills(&self, shape: &PainterShape, fills: &[Paint]) {
@@ -295,34 +294,36 @@ impl<'a> Painter<'a> {
         width: &Option<f32>,
         max_lines: &Option<usize>,
         ellipsis: &Option<String>,
-        fill: &Paint,
-        stroke: Option<&Paint>,
+        fills: &[Paint],
+        strokes: &[Paint],
         stroke_width: f32,
         stroke_align: &StrokeAlign,
         text_align: &TextAlign,
         text_align_vertical: &TextAlignVertical,
         text_style: &TextStyleRec,
     ) {
+        if fills.is_empty() {
+            return;
+        }
+
         let paragraph = self.cached_paragraph(
             id,
             text,
             width,
             max_lines,
             ellipsis,
-            fill,
+            fills,
             text_align,
             text_align_vertical,
             text_style,
         );
-        // Measure laid-out paragraph size once for gradient resolution and stroke handling.
         let layout_size = {
             let para = paragraph.borrow();
             (para.max_width(), para.height())
         };
 
-        // For outside strokes we can draw the stroke beforehand with a fast path.
         if stroke_width > 0.0 && matches!(stroke_align, StrokeAlign::Outside) {
-            if let Some(stroke_paint_def) = stroke {
+            for stroke_paint_def in strokes {
                 paragraph.borrow_mut().visit(|_, info| {
                     if let Some(info) = info {
                         text_stroke::draw_text_stroke_outside_fast_pre(
@@ -340,37 +341,11 @@ impl<'a> Painter<'a> {
             }
         }
 
-        // NOTE: we should be relying on paragraph.paint() to support the decorations.
-        // the current model does not support custom paint + decorations. - the decorations will be supported manually, in the future, after then, we will completely drop the paragraph.paint()
-        // see: https://github.com/gridaco/grida/issues/416
+        // Now we can simply paint the paragraph - all paint handling is done in paragraph()
+        paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
 
-        // If the fill is a gradient, we need the final layout size to resolve
-        // the shader. Measure the laid-out paragraph and draw glyphs manually
-        // with the resolved paint.
-        match fill {
-            Paint::LinearGradient(_)
-            | Paint::RadialGradient(_)
-            | Paint::SweepGradient(_)
-            | Paint::DiamondGradient(_) => {
-                let paint = cvt::sk_paint(fill, 1.0, layout_size);
-                paragraph.borrow_mut().visit(|_, info| {
-                    if let Some(info) = info {
-                        self.canvas.draw_glyphs_at(
-                            info.glyphs(),
-                            info.positions(),
-                            info.origin(),
-                            info.font(),
-                            &paint,
-                        );
-                    }
-                });
-            }
-            _ => paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0)),
-        }
-
-        // Draw stroke for non-outside alignments after the fill
         if stroke_width > 0.0 && !matches!(stroke_align, StrokeAlign::Outside) {
-            if let Some(stroke_paint_def) = stroke {
+            for stroke_paint_def in strokes {
                 paragraph.borrow_mut().visit(|_, info| {
                     if let Some(info) = info {
                         text_stroke::draw_text_stroke(
@@ -426,18 +401,17 @@ impl<'a> Painter<'a> {
                         let clip_path = &text_layer.base.clip_path;
                         let draw_content = || {
                             self.with_opacity(text_layer.base.opacity, || {
+                                if text_layer.fills.is_empty() {
+                                    return;
+                                }
                                 self.draw_text_span(
                                     &text_layer.base.id,
                                     &text_layer.text,
                                     &text_layer.width,
                                     &text_layer.max_lines,
                                     &text_layer.ellipsis,
-                                    // TODO: support multiple fills for text
-                                    match text_layer.fills.first() {
-                                        Some(f) => f,
-                                        None => return,
-                                    },
-                                    text_layer.strokes.first(),
+                                    &text_layer.fills,
+                                    &text_layer.strokes,
                                     text_layer.stroke_width,
                                     &text_layer.stroke_align,
                                     &text_layer.text_align,
@@ -748,6 +722,9 @@ impl<'a> NodePainter<'a> {
 
     /// Draw a TextSpanNode (simple text block)
     pub fn draw_text_span_node(&self, node: &TextSpanNodeRec) {
+        if node.fills.is_empty() {
+            return;
+        }
         self.painter.with_transform(&node.transform.matrix, || {
             self.painter.with_opacity(node.opacity, || {
                 self.painter.with_blendmode(node.blend_mode, || {
@@ -757,9 +734,9 @@ impl<'a> NodePainter<'a> {
                         &node.width,
                         &node.max_lines,
                         &node.ellipsis,
-                        &node.fill,
-                        node.stroke.as_ref(),
-                        node.stroke_width.unwrap_or(0.0),
+                        &node.fills,
+                        &node.strokes,
+                        node.stroke_width,
                         &node.stroke_align,
                         &node.text_align,
                         &node.text_align_vertical,

@@ -51,7 +51,7 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0); // Moved text up slightly
         text.text = "Union (A ∪ B): Combines two shapes into one".to_string();
         text.text_style.font_size = 16.0;
-        text.fill = Paint::from(CGColor(0, 0, 0, 255));
+        text.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
@@ -114,7 +114,7 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.text = "Intersection (A ∩ B): Shows only the overlapping area".to_string();
         text.text_style.font_size = 16.0;
-        text.fill = Paint::from(CGColor(0, 0, 0, 255));
+        text.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
@@ -177,7 +177,7 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.text = "Difference (A - B): Removes the second shape from the first".to_string();
         text.text_style.font_size = 16.0;
-        text.fill = Paint::from(CGColor(0, 0, 0, 255));
+        text.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
@@ -240,7 +240,7 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.text = "XOR (A ⊕ B): Shows areas that don't overlap".to_string();
         text.text_style.font_size = 16.0;
-        text.fill = Paint::from(CGColor(0, 0, 0, 255));
+        text.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {

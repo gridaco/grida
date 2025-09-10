@@ -123,8 +123,8 @@ async fn demo_basic() -> Scene {
     text_span_node.text_style = TextStyleRec::from_font(font_caveat_family.as_str(), 32.0);
     text_span_node.text_align = TextAlign::Center;
     text_span_node.text_align_vertical = TextAlignVertical::Center;
-    text_span_node.stroke = Some(Paint::from(CGColor(0, 0, 0, 255)));
-    text_span_node.stroke_width = Some(4.0);
+    text_span_node.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+    text_span_node.stroke_width = 4.0;
 
     // Create a test path node
     let mut path_node = nf.create_path_node();

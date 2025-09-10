@@ -12,34 +12,18 @@ impl TextOverlay {
         cache: &SceneCache,
         layer: &PainterPictureTextLayer,
     ) -> Option<Path> {
-        // Try to get paragraph from cache first
-        if let Some(entry) = cache.paragraph.borrow().get(&layer.base.id) {
-            let paragraph = &entry.paragraph;
-            let paragraph_ref = paragraph.borrow_mut();
-
-            // // Apply layout if width is specified
-            // if let Some(width) = layer.width {
-            //     paragraph_ref.layout(width);
-            // }
-
+        // Get baseline information from the paragraph cache using the layer's ID
+        if let Some(baseline_info) = cache
+            .paragraph
+            .borrow()
+            .get_baseline_info_if_cached_by_id(&layer.id, layer.width)
+        {
             // Create a path with just the baselines
             let mut path = Path::new();
-            let lines = paragraph_ref.line_number();
-            for i in 0..lines {
-                if let Some(line_metrics) = paragraph_ref.get_line_metrics_at(i) {
-                    let baseline_y = line_metrics.baseline as f32;
-
-                    // Use the actual line bounds from metrics
-                    // left: The left edge of the line
-                    // width: Width of the line
-                    // right edge: left + width
-                    let line_start_x = line_metrics.left as f32;
-                    let line_end_x = (line_metrics.left + line_metrics.width) as f32;
-
-                    // Add a line segment for the baseline
-                    path.move_to((line_start_x, baseline_y));
-                    path.line_to((line_end_x, baseline_y));
-                }
+            for baseline in baseline_info {
+                // Add a line segment for the baseline
+                path.move_to((baseline.left, baseline.baseline_y));
+                path.line_to((baseline.left + baseline.width, baseline.baseline_y));
             }
             Some(path)
         } else {

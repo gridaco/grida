@@ -154,6 +154,7 @@ pub struct PainterPictureTextLayer {
     pub text_style: TextStyleRec,
     pub text_align: TextAlign,
     pub text_align_vertical: TextAlignVertical,
+    pub id: NodeId,
 }
 
 #[derive(Debug, Clone)]
@@ -500,9 +501,9 @@ impl LayerList {
                         max_lines: n.max_lines,
                         ellipsis: n.ellipsis.clone(),
                         effects: n.effects.clone(),
-                        strokes: n.stroke.clone().into_iter().collect(),
-                        fills: vec![n.fill.clone()],
-                        stroke_width: n.stroke_width.unwrap_or(0.0),
+                        strokes: n.strokes.clone(),
+                        fills: n.fills.clone(),
+                        stroke_width: n.stroke_width,
                         stroke_align: n.stroke_align,
                         stroke_path: None,
                         shape,
@@ -510,6 +511,7 @@ impl LayerList {
                         text_style: n.text_style.clone(),
                         text_align: n.text_align,
                         text_align_vertical: n.text_align_vertical,
+                        id: n.id.clone(),
                     }))
                 }
                 Node::SVGPath(n) => {

@@ -46,12 +46,11 @@ async fn demo_texts() -> Scene {
         line_height: Default::default(),
         text_transform: TextTransform::Uppercase,
     };
-    word_text_node.stroke = Some(Paint::from(CGColor(255, 255, 255, 255)));
-    word_text_node.fill = Paint::LinearGradient(LinearGradientPaint::from_colors(vec![
-        CGColor(255, 255, 255, 255),
-        CGColor(0, 0, 0, 255),
-    ]));
-    word_text_node.stroke_width = Some(1.0);
+    word_text_node.strokes = vec![Paint::from(CGColor(255, 255, 255, 255))];
+    word_text_node.fills = vec![Paint::LinearGradient(LinearGradientPaint::from_colors(
+        vec![CGColor(255, 255, 255, 255), CGColor(0, 0, 0, 255)],
+    ))];
+    word_text_node.stroke_width = 1.0;
     word_text_node.text_align = TextAlign::Left;
     word_text_node.text_align_vertical = TextAlignVertical::Top;
 
@@ -86,7 +85,7 @@ async fn demo_texts() -> Scene {
     second_paragraph_text_node.text_style = TextStyleRec::from_font("VT323", 16.0);
     second_paragraph_text_node.text_align = TextAlign::Left;
     second_paragraph_text_node.text_align_vertical = TextAlignVertical::Top;
-    second_paragraph_text_node.fill = Paint::from(CGColor(70, 130, 180, 255));
+    second_paragraph_text_node.fills = vec![Paint::from(CGColor(70, 130, 180, 255))];
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();

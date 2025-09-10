@@ -923,13 +923,9 @@ impl FigmaConverter {
             text_align_vertical: Self::convert_text_align_vertical(
                 style.text_align_vertical.as_ref(),
             ),
-            fill: self
-                .convert_fills(Some(&origin.fills))
-                .first()
-                .cloned()
-                .unwrap_or(BLACK),
-            stroke: self.convert_strokes(Some(&origin.strokes)).first().cloned(),
-            stroke_width: Some(origin.stroke_weight.unwrap_or(0.0) as f32),
+            fills: self.convert_fills(Some(&origin.fills)),
+            strokes: self.convert_strokes(Some(&origin.strokes)),
+            stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: StrokeAlign::Inside,
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),

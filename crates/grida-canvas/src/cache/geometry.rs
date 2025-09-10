@@ -257,56 +257,26 @@ impl GeometryCache {
                 union_world_bounds
             }
             Node::TextSpan(n) => {
-                // Get or create paragraph from cache and apply layout to measure size
-                let paragraph = paragraph_cache
-                    .get_or_create(
-                        id,
-                        &n.text,
-                        &n.fill,
-                        &n.text_align,
-                        &n.text_style,
-                        &n.max_lines,
-                        &n.ellipsis,
-                        fonts,
-                    )
-                    .clone();
-
-                // For intrinsic sizing, we need to layout with infinity first to measure
-                let layout_width = if n.width.is_none() {
-                    // Layout with infinity to get intrinsic width
-                    let mut para_ref = paragraph.borrow_mut();
-                    para_ref.layout(f32::INFINITY);
-                    let intrinsic_width = para_ref.max_intrinsic_width();
-
-                    // Re-layout with the intrinsic width
-                    // Note: The paragraph style should have set_apply_rounding_hack(false)
-                    // to prevent fractional width truncation that causes line breaking
-                    para_ref.layout(intrinsic_width);
-                    intrinsic_width
-                } else {
-                    // Use the specified width
-                    n.width.unwrap()
-                };
-
-                // Apply layout with the determined width
-                paragraph.borrow_mut().layout(layout_width);
-
-                // Get the measured bounds
-                let para_ref = paragraph.borrow();
-
-                /// TODO:
-                /// this is to handle the known issue, where if the text's width/height is set 0, it will be invisible due to our picture recording.
-                /// this should be cleanly removed, to even support 0 value to be visible.
-                const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
-                let measured_width = para_ref.max_width().max(MIN_SIZE_DIRTY_HACK);
-                let measured_height = para_ref.height().max(MIN_SIZE_DIRTY_HACK);
+                // Get final measured metrics from cache
+                let measurements = paragraph_cache.measure(
+                    &n.text,
+                    &n.text_style,
+                    &n.text_align,
+                    &n.max_lines,
+                    &n.ellipsis,
+                    n.width,
+                    fonts,
+                    Some(&n.id),
+                );
 
                 // Create intrinsic bounds (starting at origin, like other nodes)
+                /// TODO: Remove this hack to support 0 value visibility
+                const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
                 let intrinsic_bounds = Rectangle {
                     x: 0.0,
                     y: 0.0,
-                    width: measured_width,
-                    height: measured_height,
+                    width: measurements.max_width.max(MIN_SIZE_DIRTY_HACK),
+                    height: measurements.height.max(MIN_SIZE_DIRTY_HACK),
                 };
 
                 // Use the node's transform directly (which already includes positioning)
@@ -606,7 +576,7 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
         ),
         Node::TextSpan(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_width.unwrap_or(0.0),
+            n.stroke_width,
             n.stroke_align,
             &LayerEffects::default(),
         ),

@@ -203,7 +203,7 @@ async fn demo_blendmode() -> Scene {
         label.text_style = TextStyleRec::from_font("Geist", 14.0);
         label.text_align = TextAlign::Left;
         label.text_align_vertical = TextAlignVertical::Top;
-        label.fill = Paint::from(CGColor(0, 0, 0, 255));
+        label.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
         let label_id = label.id.clone();
         repository.insert(Node::TextSpan(label));
 
