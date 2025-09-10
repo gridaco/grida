@@ -143,6 +143,32 @@ impl<'a> Painter<'a> {
         shadow::draw_inner_shadow(self.canvas, shape, shadow);
     }
 
+    /// Draw a text drop shadow using a paragraph as the source.
+    fn draw_text_shadow(&self, paragraph: &Rc<RefCell<textlayout::Paragraph>>, shadow: &FeShadow) {
+        let mut paint = SkPaint::default();
+        paint.set_image_filter(shadow::drop_shadow_image_filter(shadow));
+        paint.set_anti_alias(true);
+        self.canvas
+            .save_layer(&SaveLayerRec::default().paint(&paint));
+        paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
+        self.canvas.restore();
+    }
+
+    /// Draw an inner shadow for text using a paragraph as the source.
+    fn draw_text_inner_shadow(
+        &self,
+        paragraph: &Rc<RefCell<textlayout::Paragraph>>,
+        shadow: &FeShadow,
+    ) {
+        let mut paint = SkPaint::default();
+        paint.set_image_filter(shadow::inner_shadow_image_filter(shadow));
+        paint.set_anti_alias(true);
+        self.canvas
+            .save_layer(&SaveLayerRec::default().paint(&paint));
+        paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
+        self.canvas.restore();
+    }
+
     /// Draw a backdrop blur: blur what's behind the shape.
     fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeGaussianBlur) {
         let canvas = self.canvas;
@@ -322,6 +348,17 @@ impl<'a> Painter<'a> {
             (para.max_width(), para.height())
         };
 
+        self.draw_text_paragraph(&paragraph, strokes, stroke_width, stroke_align, layout_size);
+    }
+
+    fn draw_text_paragraph(
+        &self,
+        paragraph: &Rc<RefCell<textlayout::Paragraph>>,
+        strokes: &[Paint],
+        stroke_width: f32,
+        stroke_align: &StrokeAlign,
+        layout_size: (f32, f32),
+    ) {
         if stroke_width > 0.0 && matches!(stroke_align, StrokeAlign::Outside) {
             for stroke_paint_def in strokes {
                 paragraph.borrow_mut().visit(|_, info| {
@@ -400,33 +437,62 @@ impl<'a> Painter<'a> {
                         let effects = &text_layer.effects;
                         let clip_path = &text_layer.base.clip_path;
 
+                        let paragraph = self.cached_paragraph(
+                            &text_layer.base.id,
+                            &text_layer.text,
+                            &text_layer.width,
+                            &text_layer.max_lines,
+                            &text_layer.ellipsis,
+                            &text_layer.fills,
+                            &text_layer.text_align,
+                            &text_layer.text_align_vertical,
+                            &text_layer.text_style,
+                        );
+                        let layout_size = {
+                            let para = paragraph.borrow();
+                            (para.max_width(), para.height())
+                        };
+
                         let draw_content = || {
                             self.with_opacity(text_layer.base.opacity, || {
                                 if text_layer.fills.is_empty() {
                                     return;
                                 }
-                                self.draw_text_span(
-                                    &text_layer.base.id,
-                                    &text_layer.text,
-                                    &text_layer.width,
-                                    &text_layer.max_lines,
-                                    &text_layer.ellipsis,
-                                    &text_layer.fills,
+                                self.draw_text_paragraph(
+                                    &paragraph,
                                     &text_layer.strokes,
                                     text_layer.stroke_width,
                                     &text_layer.stroke_align,
-                                    &text_layer.text_align,
-                                    &text_layer.text_align_vertical,
-                                    &text_layer.text_style,
+                                    layout_size,
                                 );
                             });
                         };
 
+                        let apply_effects = || {
+                            if let Some(blur) = effects.backdrop_blur {
+                                self.draw_backdrop_blur(&text_layer.shape, &blur);
+                            }
+
+                            for shadow in &effects.shadows {
+                                if let FilterShadowEffect::DropShadow(ds) = shadow {
+                                    self.draw_text_shadow(&paragraph, ds);
+                                }
+                            }
+
+                            draw_content();
+
+                            for shadow in &effects.shadows {
+                                if let FilterShadowEffect::InnerShadow(is) = shadow {
+                                    self.draw_text_inner_shadow(&paragraph, is);
+                                }
+                            }
+                        };
+
                         let draw_with_effects = || {
                             if let Some(layer_blur) = effects.blur {
-                                self.with_layer_blur(layer_blur.radius, draw_content);
+                                self.with_layer_blur(layer_blur.radius, apply_effects);
                             } else {
-                                draw_content();
+                                apply_effects();
                             }
                         };
 
