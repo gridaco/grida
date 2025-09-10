@@ -1,4 +1,4 @@
-import { rgbToHex, hexToRgb, type RGB, type RGBA } from "./use-hex-value-input";
+import { rgbToHex, hexToRgb, type RGB, type RGBA } from "./color";
 
 describe("hex conversion", () => {
   test("rgb to hex without alpha", () => {
