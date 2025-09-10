@@ -19,6 +19,7 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
     if let Some(shader) = shader_from_paint(paint, opacity, size, None) {
         skia_paint.set_shader(shader);
     }
+    skia_paint.set_blend_mode(paint.blend_mode().into());
     skia_paint
 }
 
@@ -33,12 +34,13 @@ pub fn sk_paint_stack(
     let mut shader = shader_from_paint(first, opacity, size, Some(images))?;
     for p in iter {
         if let Some(s) = shader_from_paint(p, opacity, size, Some(images)) {
-            shader = shaders::blend(BlendMode::SrcOver, s, shader);
+            shader = shaders::blend(p.blend_mode(), s, shader);
         }
     }
     let mut paint = skia_safe::Paint::default();
     paint.set_anti_alias(true);
     paint.set_shader(shader);
+    // Don't set blend mode - defaults to SrcOver, and blending is already handled in shader composition
     Some(paint)
 }
 

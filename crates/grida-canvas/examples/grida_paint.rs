@@ -71,6 +71,7 @@ async fn demo_paints() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         }));
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -105,6 +106,7 @@ async fn demo_paints() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         }));
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -168,6 +170,7 @@ async fn demo_paints() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         })];
         rect.stroke_width = 4.0; // Consistent stroke width
 
@@ -207,6 +210,7 @@ async fn demo_paints() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         })];
         rect.stroke_width = 4.0; // Consistent stroke width
 

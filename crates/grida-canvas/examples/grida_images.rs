@@ -34,6 +34,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
+        blend_mode: BlendMode::Normal,
     }));
     rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
     rect1.stroke_width = 2.0;
@@ -51,12 +52,14 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
+        blend_mode: BlendMode::Normal,
     }));
     rect2.strokes = vec![Paint::Image(ImagePaint {
         hash: hash_str.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
+        blend_mode: BlendMode::Normal,
     })];
     rect2.stroke_width = 10.0;
 
@@ -75,6 +78,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
+        blend_mode: BlendMode::Normal,
     })];
     rect3.stroke_width = 10.0;
 
@@ -94,6 +98,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
             matrix: [[0.7071, -0.7071, 100.0], [0.7071, 0.7071, 0.0]],
         },
         fit: BoxFit::None,
+        blend_mode: BlendMode::Normal,
     }));
 
     let mut repository = NodeRepository::new();

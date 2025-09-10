@@ -76,6 +76,7 @@ async fn demo_blendmode() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         }));
 
         let background_id = background.id.clone();
@@ -130,6 +131,7 @@ async fn demo_blendmode() -> Scene {
                 },
             ],
             opacity: 0.3, // Make it subtle
+            blend_mode: BlendMode::Normal,
         }));
 
         let sweep_overlay_id = sweep_overlay.id.clone();

@@ -85,6 +85,7 @@ async fn demo_lines() -> Scene {
             },
         ],
         opacity: 1.0,
+        blend_mode: BlendMode::Normal,
     })];
     line_gradient.stroke_width = 6.0;
     ids.push(line_gradient.id.clone());

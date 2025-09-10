@@ -171,7 +171,7 @@ pub type ContainerClipFlag = bool;
 /// - SVG: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/mix-blend-mode
 /// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
 /// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 pub enum BlendMode {
     // Skia: kSrcOver, CSS: normal
     #[serde(rename = "normal")]
@@ -816,6 +816,17 @@ impl Paint {
         }
     }
 
+    pub fn blend_mode(&self) -> BlendMode {
+        match self {
+            Paint::Solid(solid) => solid.blend_mode,
+            Paint::LinearGradient(gradient) => gradient.blend_mode,
+            Paint::RadialGradient(gradient) => gradient.blend_mode,
+            Paint::SweepGradient(gradient) => gradient.blend_mode,
+            Paint::DiamondGradient(gradient) => gradient.blend_mode,
+            Paint::Image(image) => image.blend_mode,
+        }
+    }
+
     /// Returns the color of the solid paint, if any.
     pub fn solid_color(&self) -> Option<CGColor> {
         match self {
@@ -830,9 +841,11 @@ impl Paint {
             Paint::Solid(solid) => {
                 solid.color.0.hash(hasher);
                 solid.opacity.to_bits().hash(hasher);
+                solid.blend_mode.hash(hasher);
             }
             Paint::LinearGradient(gradient) => {
                 gradient.opacity.to_bits().hash(hasher);
+                gradient.blend_mode.hash(hasher);
                 for stop in &gradient.stops {
                     stop.offset.to_bits().hash(hasher);
                     stop.color.0.hash(hasher);
@@ -840,6 +853,7 @@ impl Paint {
             }
             Paint::RadialGradient(gradient) => {
                 gradient.opacity.to_bits().hash(hasher);
+                gradient.blend_mode.hash(hasher);
                 for stop in &gradient.stops {
                     stop.offset.to_bits().hash(hasher);
                     stop.color.0.hash(hasher);
@@ -847,6 +861,7 @@ impl Paint {
             }
             Paint::SweepGradient(gradient) => {
                 gradient.opacity.to_bits().hash(hasher);
+                gradient.blend_mode.hash(hasher);
                 for stop in &gradient.stops {
                     stop.offset.to_bits().hash(hasher);
                     stop.color.0.hash(hasher);
@@ -854,6 +869,7 @@ impl Paint {
             }
             Paint::DiamondGradient(gradient) => {
                 gradient.opacity.to_bits().hash(hasher);
+                gradient.blend_mode.hash(hasher);
                 for stop in &gradient.stops {
                     stop.offset.to_bits().hash(hasher);
                     stop.color.0.hash(hasher);
@@ -863,6 +879,7 @@ impl Paint {
                 // For image paints, hash the image hash
                 image.hash.hash(hasher);
                 image.opacity.to_bits().hash(hasher);
+                image.blend_mode.hash(hasher);
             }
         }
     }
@@ -958,6 +975,7 @@ pub struct LinearGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 impl LinearGradientPaint {
@@ -973,6 +991,18 @@ impl LinearGradientPaint {
                 })
                 .collect(),
             opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for LinearGradientPaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
         }
     }
 }
@@ -1015,6 +1045,7 @@ pub struct RadialGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -1037,6 +1068,7 @@ pub struct DiamondGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -1077,6 +1109,7 @@ pub struct SweepGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -1085,6 +1118,52 @@ pub struct ImagePaint {
     pub hash: String,
     pub fit: BoxFit,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
+}
+
+impl Default for RadialGradientPaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for DiamondGradientPaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for SweepGradientPaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for ImagePaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            hash: String::new(),
+            fit: BoxFit::Cover,
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
 }
 
 // #endregion

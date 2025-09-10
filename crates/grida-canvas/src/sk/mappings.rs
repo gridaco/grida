@@ -18,6 +18,32 @@ impl From<BooleanPathOperation> for skia_safe::PathOp {
     }
 }
 
+impl Into<skia_safe::Blender> for BlendMode {
+    fn into(self) -> skia_safe::Blender {
+        use skia_safe::BlendMode::*;
+        let sk_blend_mode = match self {
+            BlendMode::Normal => SrcOver,
+            BlendMode::Multiply => Multiply,
+            BlendMode::Screen => Screen,
+            BlendMode::Overlay => Overlay,
+            BlendMode::Darken => Darken,
+            BlendMode::Lighten => Lighten,
+            BlendMode::ColorDodge => ColorDodge,
+            BlendMode::ColorBurn => ColorBurn,
+            BlendMode::HardLight => HardLight,
+            BlendMode::SoftLight => SoftLight,
+            BlendMode::Difference => Difference,
+            BlendMode::Exclusion => Exclusion,
+            BlendMode::Hue => Hue,
+            BlendMode::Saturation => Saturation,
+            BlendMode::Color => Color,
+            BlendMode::Luminosity => Luminosity,
+            BlendMode::PassThrough => SrcOver, // Pass-through maps to normal
+        };
+        skia_safe::Blender::mode(sk_blend_mode)
+    }
+}
+
 impl From<BlendMode> for skia_safe::BlendMode {
     fn from(mode: BlendMode) -> Self {
         use skia_safe::BlendMode::*;

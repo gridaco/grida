@@ -155,6 +155,7 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
+                    blend_mode: BlendMode::default(),
                 })
             }
             Some(JSONPaint::RadialGradient {
@@ -167,6 +168,7 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
+                    blend_mode: BlendMode::default(),
                 })
             }
             Some(JSONPaint::DiamondGradient {
@@ -179,6 +181,7 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
+                    blend_mode: BlendMode::default(),
                 })
             }
             Some(JSONPaint::SweepGradient {
@@ -191,6 +194,7 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
+                    blend_mode: BlendMode::default(),
                 })
             }
             None => Paint::Solid(SolidPaint {

@@ -46,6 +46,7 @@ async fn demo_gradients() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         }));
         ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -77,6 +78,7 @@ async fn demo_gradients() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         }));
         ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -107,6 +109,7 @@ async fn demo_gradients() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         })];
         rect.stroke_width = 8.0;
         ids.push(rect.id.clone());
@@ -140,6 +143,7 @@ async fn demo_gradients() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         })];
         rect.stroke_width = 8.0;
         ids.push(rect.id.clone());

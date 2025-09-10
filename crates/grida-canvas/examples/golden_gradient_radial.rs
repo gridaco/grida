@@ -29,6 +29,7 @@ fn main() {
         ],
         opacity: 1.0,
         transform: AffineTransform::identity(),
+        blend_mode: BlendMode::Normal,
     };
 
     let paint = radial_gradient_paint(&gradient, 1.0, (width as f32, height as f32));

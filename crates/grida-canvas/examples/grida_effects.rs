@@ -132,6 +132,7 @@ async fn demo_effects() -> Scene {
             }, // Yellow
         ],
         opacity: 1.0,
+        blend_mode: BlendMode::Normal,
     }));
     let vivid_gradient_rect_id = vivid_gradient_rect.id.clone();
     repository.insert(Node::Rectangle(vivid_gradient_rect));

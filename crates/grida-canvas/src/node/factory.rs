@@ -46,6 +46,7 @@ impl NodeFactory {
             opacity: 1.0,
             transform: AffineTransform::identity(),
             fit: BoxFit::Cover,
+            blend_mode: BlendMode::default(),
         }
     }
 

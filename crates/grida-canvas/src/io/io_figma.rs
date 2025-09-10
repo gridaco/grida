@@ -81,6 +81,7 @@ impl From<&FigmaPaint> for Paint {
                     hash: image.image_ref.clone(),
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
+                    blend_mode: BlendMode::default(),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -101,6 +102,7 @@ impl From<&FigmaPaint> for Paint {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
@@ -110,6 +112,7 @@ impl From<&FigmaPaint> for Paint {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientDiamond => {
@@ -119,6 +122,7 @@ impl From<&FigmaPaint> for Paint {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientAngular => {
@@ -128,6 +132,7 @@ impl From<&FigmaPaint> for Paint {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                 }
@@ -318,6 +323,7 @@ impl FigmaConverter {
                     hash: url,
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
+                    blend_mode: BlendMode::default(),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -338,6 +344,7 @@ impl FigmaConverter {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
@@ -347,6 +354,7 @@ impl FigmaConverter {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientDiamond => {
@@ -356,6 +364,7 @@ impl FigmaConverter {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientAngular => {
@@ -365,6 +374,7 @@ impl FigmaConverter {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                 }

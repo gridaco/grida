@@ -77,6 +77,7 @@ async fn demo_basic() -> Scene {
             },
         ],
         opacity: 1.0,
+        blend_mode: BlendMode::Normal,
     })];
     ellipse_node.stroke_width = 6.0;
 

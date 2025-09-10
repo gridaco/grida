@@ -152,8 +152,8 @@ fn main() {
 
     // 3. solid + solid
     let fills = vec![
-        DemoPaint::Solid(SolidPaint::from(CGColor(255, 0, 0, 255))),
-        DemoPaint::Solid(SolidPaint::from(CGColor(0, 0, 255, 255))),
+        DemoPaint::Solid(SolidPaint::from(CGColor(255, 0, 0, 128))),
+        DemoPaint::Solid(SolidPaint::from(CGColor(0, 0, 255, 128))),
     ];
     draw_pair(canvas, padding, y, tile, &fills);
     draw_label(canvas, padding, y + tile + 10.0, "3. Solid + Solid (Alpha)");

@@ -101,6 +101,7 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
+        blend_mode: BlendMode::Normal,
     }));
     rect_gradient.stroke_width = 3.0;
     rect_gradient.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
@@ -139,6 +140,7 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
+        blend_mode: BlendMode::Normal,
     })];
     ellipse_radial.stroke_width = 4.0;
     ellipse_radial.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
@@ -225,6 +227,7 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
+        blend_mode: BlendMode::Normal,
     })];
     line.stroke_width = 8.0;
     all_node_ids.push(line.id.clone());

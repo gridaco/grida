@@ -539,6 +539,7 @@ impl<'a> NodePainter<'a> {
                                 opacity: node.opacity,
                                 transform: AffineTransform::identity(),
                                 fit: math2::box_fit::BoxFit::Cover,
+                                blend_mode: BlendMode::default(),
                             });
 
                             self.painter
