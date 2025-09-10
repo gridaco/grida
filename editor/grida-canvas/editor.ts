@@ -2998,34 +2998,44 @@ export class Editor
       fontVariations?: Record<string, number>;
     }
   ): { face: editor.font.UIFontData; instance: FvarInstance | null } | null {
+    // 1. match family
     const font = this.__font_details_cache.get(fontFamily);
     if (!font) {
       this.log("font not found", fontFamily);
       return null;
     }
 
-    // match with fvar.instances
-    for (const face of font.types) {
-      // try to match with fvar.instances
-      const matched = editor.font.matchFvarInstance(face.instances, {
+    // check if vf
+    const is_vf = font.axes !== undefined;
+
+    if (is_vf) {
+      // 2. match with fvar.instances (need to flatten first, so we can pick the best one "per family", not "per face")
+      const instances = font.types.flatMap((face) => face.instances);
+      const matched_by_instance = editor.font.matchFvarInstance(instances, {
         postscriptName: description.fontPostscriptName,
         axesValues: description.fontVariations ?? {},
       });
 
-      if (matched) return { face, instance: matched };
-    }
+      if (matched_by_instance) {
+        // locate the original face
+        const face = font.types.find((face) =>
+          face.instances.some(
+            (instance) =>
+              instance.postscriptName === matched_by_instance.postscriptName
+          )
+        )!;
 
-    // match with static postscriptName
-    for (const face of font.types) {
-      if (face.postscriptName === description.fontPostscriptName) {
-        return { face, instance: null };
+        return { face, instance: matched_by_instance };
+      }
+    } else {
+      // 3. match with static postscriptName
+      for (const face of font.types) {
+        if (face.postscriptName === description.fontPostscriptName) {
+          return { face, instance: null };
+        }
       }
     }
-    // const matchedDetails = font.types.find(
-    //   (typeface) => typeface.postscriptName === matched?.postscriptName
-    // );
 
-    // return matchedDetails ?? null;
     return null;
   }
 
