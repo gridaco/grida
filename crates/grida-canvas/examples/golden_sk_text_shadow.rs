@@ -20,7 +20,7 @@
 //! - Text with multiple shadows
 
 use cg::cg::types::*;
-use skia_safe::{self as sk, image_filters, surfaces, Color, Font, Paint as SkPaint, Point};
+use skia_safe::{self as sk, surfaces, Color, Font, Paint as SkPaint, Point};
 
 thread_local! {
     static FONT: Font = Font::new(cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES), 48.0);
@@ -91,24 +91,16 @@ fn draw_text_with_shadow(
     text_color: Color,
 ) {
     FONT.with(|font| {
-        // Convert CGColor to Skia Color
-        let CGColor(r, g, b, a) = shadow.color;
-        let shadow_color = Color::from_argb(a, r, g, b);
+        // Use the existing text shadow image filter from the painter module
+        let text_shadow_filter = cg::painter::shadow::drop_shadow_image_filter(shadow);
 
-        // Create shadow paint
+        // Create shadow paint with the filter
         let mut shadow_paint = SkPaint::default();
-        shadow_paint.set_color(shadow_color);
         shadow_paint.set_anti_alias(true);
+        shadow_paint.set_image_filter(text_shadow_filter);
 
-        // Apply blur filter to shadow
-        if shadow.blur > 0.0 {
-            let blur_filter = image_filters::blur((shadow.blur, shadow.blur), None, None, None)
-                .expect("create blur filter");
-            shadow_paint.set_image_filter(blur_filter);
-        }
-
-        // Draw shadow text (offset)
-        let shadow_point = Point::new(x + shadow.dx, y + shadow.dy);
+        // Draw shadow text
+        let shadow_point = Point::new(x, y);
         canvas.draw_str(text, shadow_point, font, &shadow_paint);
 
         // Create main text paint

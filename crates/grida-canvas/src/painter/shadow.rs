@@ -2,31 +2,12 @@ use super::geometry::PainterShape;
 use crate::cg::types::FeShadow;
 use skia_safe::{self as sk, color_filters, image_filters, BlendMode, ColorMatrix, Paint};
 
-/// Draw a drop shadow behind the given shape on the provided canvas.
-pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
-    let sk::Color4f { r, g, b, a } = {
-        let crate::cg::types::CGColor(r, g, b, a) = shadow.color;
-        sk::Color4f::new(
-            r as f32 / 255.0,
-            g as f32 / 255.0,
-            b as f32 / 255.0,
-            a as f32 / 255.0,
-        )
-    };
-    let color = sk::Color::from_argb(
-        (a * 255.0) as u8,
-        (r * 255.0) as u8,
-        (g * 255.0) as u8,
-        (b * 255.0) as u8,
-    );
-    let path = shape.to_path();
+/// Create an image filter for drop shadow effects. (for any paint)
+/// works for primitive shapes and also text
+pub fn drop_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
     let spread = shadow.spread;
-
+    let color: sk::Color = shadow.color.into();
     if spread != 0.0 {
-        let mut paint = Paint::default();
-        paint.set_color(color);
-        paint.set_anti_alias(true);
-
         let mut filter = if spread > 0.0 {
             image_filters::dilate((spread, spread), None, None)
         } else {
@@ -39,12 +20,10 @@ pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeSh
         }
 
         let filter = image_filters::offset((shadow.dx, shadow.dy), filter, None).unwrap();
-        paint.set_image_filter(filter);
-
-        canvas.draw_path(&path, &paint);
+        filter
     } else {
         // fast path using Skia's drop_shadow filter when no spread is applied
-        let image_filter = image_filters::drop_shadow(
+        let image_filter = image_filters::drop_shadow_only(
             (shadow.dx, shadow.dy),
             (shadow.blur, shadow.blur),
             color,
@@ -53,13 +32,21 @@ pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeSh
             None,
         );
 
-        let mut shadow_paint = Paint::default();
-        shadow_paint.set_color(color);
-        shadow_paint.set_image_filter(image_filter);
-        shadow_paint.set_anti_alias(true);
-
-        canvas.draw_path(&path, &shadow_paint);
+        image_filter.unwrap()
     }
+}
+
+/// Draw a drop shadow behind the given shape on the provided canvas.
+pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
+    let color: sk::Color = shadow.color.into();
+    let path = shape.to_path();
+
+    let mut paint = Paint::default();
+    let filter = drop_shadow_image_filter(shadow);
+    paint.set_color(color);
+    paint.set_image_filter(filter);
+    paint.set_anti_alias(true);
+    canvas.draw_path(&path, &paint);
 }
 
 pub fn inner_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
