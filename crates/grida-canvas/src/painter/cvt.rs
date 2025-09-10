@@ -1,6 +1,7 @@
 use super::gradient;
-use crate::cg::types::*;
-use skia_safe;
+use crate::{cg::types::*, runtime::repository::ImageRepository, sk};
+use math2::box_fit::BoxFit;
+use skia_safe::{self, shaders, BlendMode, Color, SamplingOptions, Shader, TileMode};
 
 pub fn sk_solid_paint(paint: impl Into<SolidPaint>) -> skia_safe::Paint {
     let p: SolidPaint = paint.into();
@@ -15,48 +16,90 @@ pub fn sk_solid_paint(paint: impl Into<SolidPaint>) -> skia_safe::Paint {
 pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Paint {
     let mut skia_paint = skia_safe::Paint::default();
     skia_paint.set_anti_alias(true);
+    if let Some(shader) = shader_from_paint(paint, opacity, size, None) {
+        skia_paint.set_shader(shader);
+    }
+    skia_paint
+}
+
+pub fn sk_paint_stack(
+    paints: &[Paint],
+    opacity: f32,
+    size: (f32, f32),
+    images: &ImageRepository,
+) -> Option<skia_safe::Paint> {
+    let mut iter = paints.iter();
+    let first = iter.next()?;
+    let mut shader = shader_from_paint(first, opacity, size, Some(images))?;
+    for p in iter {
+        if let Some(s) = shader_from_paint(p, opacity, size, Some(images)) {
+            shader = shaders::blend(BlendMode::SrcOver, s, shader);
+        }
+    }
+    let mut paint = skia_safe::Paint::default();
+    paint.set_anti_alias(true);
+    paint.set_shader(shader);
+    Some(paint)
+}
+
+pub fn shader_from_paint(
+    paint: &Paint,
+    opacity: f32,
+    size: (f32, f32),
+    images: Option<&ImageRepository>,
+) -> Option<Shader> {
     match paint {
         Paint::Solid(solid) => {
             let CGColor(r, g, b, a) = solid.color;
-            let final_alpha = (a as f32 * opacity * solid.opacity) as u8;
-            skia_paint.set_color(skia_safe::Color::from_argb(final_alpha, r, g, b));
+            let final_alpha = (a as f32 * opacity * solid.opacity).round() as u8;
+            Some(shaders::color(Color::from_argb(final_alpha, r, g, b)))
         }
-        Paint::LinearGradient(gradient) => {
-            return gradient::gradient_paint(
-                &GradientPaint::Linear(gradient.clone()),
-                opacity,
+        Paint::LinearGradient(g) => gradient::linear_gradient_paint(g, opacity, size).shader(),
+        Paint::RadialGradient(g) => gradient::radial_gradient_paint(g, opacity, size).shader(),
+        Paint::SweepGradient(g) => gradient::sweep_gradient_paint(g, opacity, size).shader(),
+        Paint::DiamondGradient(g) => gradient::diamond_gradient_paint(g, opacity, size).shader(),
+        Paint::Image(img) => {
+            let repo = images?;
+            let image = repo.get_by_size(&img.hash, size.0, size.1)?;
+            let matrix = sk::sk_matrix(image_paint_matrix(
+                img,
+                (image.width() as f32, image.height() as f32),
                 size,
-            );
-        }
-        Paint::RadialGradient(gradient) => {
-            return gradient::gradient_paint(
-                &GradientPaint::Radial(gradient.clone()),
-                opacity,
-                size,
-            );
-        }
-        Paint::SweepGradient(gradient) => {
-            return gradient::gradient_paint(
-                &GradientPaint::Sweep(gradient.clone()),
-                opacity,
-                size,
-            );
-        }
-        Paint::DiamondGradient(gradient) => {
-            return gradient::gradient_paint(
-                &GradientPaint::Diamond(gradient.clone()),
-                opacity,
-                size,
-            );
-        }
-        Paint::Image(image_paint) => {
-            // For image paints, we just set the opacity since the actual drawing
-            // is handled by draw_image_rect in the draw_fill_and_stroke method
-            let final_alpha = (opacity * image_paint.opacity * 255.0) as u8;
-            skia_paint.set_alpha(final_alpha);
+            ));
+            let sampling = SamplingOptions::default();
+            let shader = image.to_shader(
+                Some((TileMode::Clamp, TileMode::Clamp)),
+                sampling,
+                Some(&matrix),
+            )?;
+            if img.opacity < 1.0 {
+                let opacity_color = Color::from_argb((img.opacity * 255.0) as u8, 255, 255, 255);
+                Some(shaders::blend(
+                    BlendMode::DstIn,
+                    shader,
+                    shaders::color(opacity_color),
+                ))
+            } else {
+                Some(shader)
+            }
         }
     }
-    skia_paint
+}
+
+pub fn image_paint_matrix(
+    paint: &ImagePaint,
+    image_size: (f32, f32),
+    container_size: (f32, f32),
+) -> [[f32; 3]; 2] {
+    match paint.fit {
+        BoxFit::None => paint.transform.matrix,
+        _ => {
+            paint
+                .fit
+                .calculate_transform(image_size, container_size)
+                .matrix
+        }
+    }
 }
 
 // pub fn sk_paint_with_stroke(

@@ -12,7 +12,7 @@ use crate::runtime::repository::{FontRepository, ImageRepository};
 use crate::shape::*;
 use crate::sk;
 use crate::vectornetwork::vn_painter::StrokeOptions;
-use math2::{box_fit::BoxFit, transform::AffineTransform};
+use math2::transform::AffineTransform;
 use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -201,170 +201,56 @@ impl<'a> Painter<'a> {
         paragraph_rc
     }
 
-    /// Determine the transformation matrix for an [`ImagePaint`].
-    ///
-    /// If the paint specifies a [`BoxFit`] other than `None`, the box-fit
-    /// transform is used. Otherwise, the paint's own transform is applied.
-    fn image_paint_matrix(
-        &self,
-        paint: &ImagePaint,
-        image_size: (f32, f32),
-        container_size: (f32, f32),
-    ) -> [[f32; 3]; 2] {
-        match paint.fit {
-            BoxFit::None => paint.transform.matrix,
-            _ => {
-                paint
-                    .fit
-                    .calculate_transform(image_size, container_size)
-                    .matrix
-            }
+    fn draw_fills(&self, shape: &PainterShape, fills: &[Paint]) {
+        if fills.is_empty() {
+            return;
         }
-    }
-
-    fn draw_fills(&self, shape: &PainterShape, fills: &Vec<Paint>) {
-        for fill in fills {
-            self.draw_fill(shape, fill);
-        }
-    }
-
-    /// Draw fill for a shape using given paint.
-    fn draw_fill(&self, shape: &PainterShape, fill: &Paint) {
-        let canvas = self.canvas;
-        let (fill_paint, image, image_params) = match fill {
-            Paint::Image(image_paint) => {
-                if let Some(image) = self.images.get_by_size(
-                    &image_paint.hash,
-                    shape.rect.width(),
-                    shape.rect.height(),
-                ) {
-                    let mut paint = SkPaint::default();
-                    paint.set_anti_alias(true);
-                    (paint, Some(image.clone()), Some(image_paint.clone()))
-                } else {
-                    // Image not ready - skip fill
-                    return;
-                }
-            }
-            _ => (
-                cvt::sk_paint(fill, 1.0, (shape.rect.width(), shape.rect.height())),
-                None,
-                None,
-            ),
-        };
-
-        if let (Some(image), Some(img_paint)) = (image, image_params) {
-            // For image fills, clip to the shape and apply transforms
-            canvas.save();
-            canvas.clip_path(&shape.to_path(), None, true);
-
-            // Apply either the fit transform or the paint's custom transform
-            let m = self.image_paint_matrix(
-                &img_paint,
-                (image.width() as f32, image.height() as f32),
-                (shape.rect.width(), shape.rect.height()),
-            );
-            canvas.concat(&sk::sk_matrix(m));
-
-            canvas.draw_image_rect(
-                &image,
-                None,
-                skia_safe::Rect::from_xywh(0.0, 0.0, image.width() as f32, image.height() as f32),
-                &fill_paint,
-            );
-            canvas.restore();
-        } else {
-            // For regular fills, draw the shape directly
-            canvas.draw_path(&shape.to_path(), &fill_paint);
+        if let Some(paint) = cvt::sk_paint_stack(
+            fills,
+            1.0,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            self.canvas.draw_path(&shape.to_path(), &paint);
         }
     }
 
     fn draw_strokes(
         &self,
         shape: &PainterShape,
-        strokes: &Vec<Paint>,
+        strokes: &[Paint],
         stroke_width: f32,
         stroke_align: StrokeAlign,
         stroke_dash_array: Option<&Vec<f32>>,
     ) {
-        for stroke in strokes {
-            self.draw_stroke(shape, stroke, stroke_width, stroke_align, stroke_dash_array);
-        }
-    }
-
-    /// Draw stroke for a shape using given paint.
-    fn draw_stroke(
-        &self,
-        shape: &PainterShape,
-        stroke: &Paint,
-        stroke_width: f32,
-        stroke_align: StrokeAlign,
-        stroke_dash_array: Option<&Vec<f32>>,
-    ) {
-        if stroke_width <= 0.0 {
+        if stroke_width <= 0.0 || strokes.is_empty() {
             return;
         }
-
-        // Generate the stroke geometry
         let stroke_path = stroke_geometry(
             &shape.to_path(),
             stroke_width,
             stroke_align,
             stroke_dash_array,
         );
-
-        self.draw_stroke_path(shape, stroke, &stroke_path);
+        self.draw_stroke_path(shape, &stroke_path, strokes);
     }
 
-    /// Draw stroke for a shape using a precomputed stroke path.
     fn draw_stroke_path(
         &self,
         shape: &PainterShape,
-        stroke: &Paint,
         stroke_path: &skia_safe::Path,
+        strokes: &[Paint],
     ) {
-        let canvas = self.canvas;
-
-        // Draw the stroke using the generated geometry
-        match stroke {
-            Paint::Image(image_paint) => {
-                if let Some(image) = self.images.get_by_size(
-                    &image_paint.hash,
-                    shape.rect.width(),
-                    shape.rect.height(),
-                ) {
-                    let mut paint = SkPaint::default();
-                    paint.set_anti_alias(true);
-
-                    // For image strokes, clip and apply transforms
-                    canvas.save();
-                    canvas.clip_path(&stroke_path, None, true);
-
-                    let m = self.image_paint_matrix(
-                        image_paint,
-                        (image.width() as f32, image.height() as f32),
-                        (shape.rect.width(), shape.rect.height()),
-                    );
-                    canvas.concat(&sk::sk_matrix(m));
-
-                    canvas.draw_image_rect(
-                        &image,
-                        None,
-                        skia_safe::Rect::from_xywh(
-                            0.0,
-                            0.0,
-                            image.width() as f32,
-                            image.height() as f32,
-                        ),
-                        &paint,
-                    );
-                    canvas.restore();
-                }
-            }
-            _ => {
-                let paint = cvt::sk_paint(stroke, 1.0, (shape.rect.width(), shape.rect.height()));
-                canvas.draw_path(&stroke_path, &paint);
-            }
+        if strokes.is_empty() {
+            return;
+        }
+        if let Some(paint) = cvt::sk_paint_stack(
+            strokes,
+            1.0,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            self.canvas.draw_path(stroke_path, &paint);
         }
     }
 
@@ -515,14 +401,10 @@ impl<'a> Painter<'a> {
                         let draw_content = || {
                             self.with_opacity(shape_layer.base.opacity, || {
                                 if shape.is_closed() {
-                                    for fill in &shape_layer.fills {
-                                        self.draw_fill(shape, fill);
-                                    }
+                                    self.draw_fills(shape, &shape_layer.fills);
                                 }
-                                for stroke in &shape_layer.strokes {
-                                    if let Some(path) = &shape_layer.stroke_path {
-                                        self.draw_stroke_path(shape, stroke, path);
-                                    }
+                                if let Some(path) = &shape_layer.stroke_path {
+                                    self.draw_stroke_path(shape, path, &shape_layer.strokes);
                                 }
                             });
                         };
@@ -685,10 +567,11 @@ impl<'a> NodePainter<'a> {
                                 fit: math2::box_fit::BoxFit::Cover,
                             });
 
-                            self.painter.draw_fill(&shape, &image_paint);
-                            self.painter.draw_stroke(
+                            self.painter
+                                .draw_fills(&shape, std::slice::from_ref(&image_paint));
+                            self.painter.draw_strokes(
                                 &shape,
-                                &node.stroke,
+                                std::slice::from_ref(&node.stroke),
                                 node.stroke_width,
                                 node.stroke_align,
                                 node.stroke_dash_array.as_ref(),
@@ -729,16 +612,13 @@ impl<'a> NodePainter<'a> {
 
             self.painter.with_opacity(node.opacity, || {
                 self.painter.with_blendmode(node.blend_mode, || {
-                    for stroke in &node.strokes {
-                        let paint = cvt::sk_paint(stroke, node.opacity, (node.size.width, 0.0));
-                        let stroke_path = stroke_geometry(
-                            &shape.to_path(),
-                            node.stroke_width,
-                            node.get_stroke_align(),
-                            node.stroke_dash_array.as_ref(),
-                        );
-                        self.painter.canvas.draw_path(&stroke_path, &paint);
-                    }
+                    self.painter.draw_strokes(
+                        &shape,
+                        &node.strokes,
+                        node.stroke_width,
+                        node.get_stroke_align(),
+                        node.stroke_dash_array.as_ref(),
+                    );
                 });
             });
         });
@@ -754,7 +634,7 @@ impl<'a> NodePainter<'a> {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
                             if let Some(fill) = &node.fill {
-                                self.painter.draw_fill(&shape, fill);
+                                self.painter.draw_fills(&shape, std::slice::from_ref(fill));
                             }
                             self.painter.draw_strokes(
                                 &shape,
@@ -778,11 +658,12 @@ impl<'a> NodePainter<'a> {
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter.draw_fill(&shape, &node.fill);
+                            self.painter
+                                .draw_fills(&shape, std::slice::from_ref(&node.fill));
                             if let Some(stroke) = &node.stroke {
-                                self.painter.draw_stroke(
+                                self.painter.draw_strokes(
                                     &shape,
-                                    stroke,
+                                    std::slice::from_ref(stroke),
                                     node.stroke_width,
                                     node.stroke_align,
                                     node.stroke_dash_array.as_ref(),
@@ -957,9 +838,14 @@ impl<'a> NodePainter<'a> {
             });
 
             self.painter.with_opacity(node.opacity, || {
-                self.painter.draw_fill(&shape, &fill);
-                self.painter
-                    .draw_stroke(&shape, &stroke, 1.0, StrokeAlign::Inside, None);
+                self.painter.draw_fills(&shape, std::slice::from_ref(&fill));
+                self.painter.draw_strokes(
+                    &shape,
+                    std::slice::from_ref(&stroke),
+                    1.0,
+                    StrokeAlign::Inside,
+                    None,
+                );
             });
         });
     }
@@ -994,11 +880,12 @@ impl<'a> NodePainter<'a> {
                     .draw_shape_with_effects(&node.effects, &shape, || {
                         self.painter.with_opacity(node.opacity, || {
                             self.painter.with_blendmode(node.blend_mode, || {
-                                self.painter.draw_fill(&shape, &node.fill);
+                                self.painter
+                                    .draw_fills(&shape, std::slice::from_ref(&node.fill));
                                 if let Some(stroke) = &node.stroke {
-                                    self.painter.draw_stroke(
+                                    self.painter.draw_strokes(
                                         &shape,
-                                        stroke,
+                                        std::slice::from_ref(stroke),
                                         node.stroke_width,
                                         node.stroke_align,
                                         node.stroke_dash_array.as_ref(),

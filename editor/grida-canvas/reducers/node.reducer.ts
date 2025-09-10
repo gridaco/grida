@@ -252,8 +252,13 @@ const safe_properties: Partial<
       switch (value.type) {
         case "linear_gradient":
         case "radial_gradient":
+        case "sweep_gradient":
+        case "diamond_gradient":
           draft.stroke = {
-            ...(value as cg.LinearGradientPaint | cg.RadialGradientPaint),
+            ...(value as
+              | cg.LinearGradientPaint
+              | cg.RadialGradientPaint
+              | cg.SweepGradientPaint),
           };
           break;
         case "solid":
