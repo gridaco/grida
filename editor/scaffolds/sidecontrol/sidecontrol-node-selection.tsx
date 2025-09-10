@@ -1724,6 +1724,7 @@ function SectionStrokes({
   );
 }
 
+// TODO: need to validate feX supported effect types, only allow them, currently we are only relying on feDropShadow to validate if effects are supported.
 function SectionEffects({ node_id }: { node_id: string }) {
   const backend = useBackendState();
   const instance = useCurrentEditor();
