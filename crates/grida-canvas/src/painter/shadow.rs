@@ -62,12 +62,9 @@ pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeSh
     }
 }
 
-/// Draw an inner shadow clipped to the given shape.
-pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
+pub fn inner_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
     let crate::cg::types::CGColor(r, g, b, a) = shadow.color;
     let spread = shadow.spread;
-
-    let path = shape.to_path();
 
     // Construct color matrix selecting and colorizing the inverse alpha
     #[rustfmt::skip]
@@ -100,11 +97,19 @@ pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeS
     let masked = image_filters::blend(BlendMode::DstIn, offset, None, None).unwrap();
     let inner_shadow = image_filters::merge([Some(masked)].into_iter(), None).unwrap();
 
+    inner_shadow
+}
+
+/// Draw an inner shadow clipped to the given shape.
+pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
+    let inner_shadow = inner_shadow_image_filter(shadow);
+
     let mut shadow_paint = Paint::default();
     shadow_paint.set_image_filter(inner_shadow);
     shadow_paint.set_anti_alias(true);
 
     canvas.save();
+    let path = shape.to_path();
     canvas.clip_path(&path, None, true);
     canvas.draw_path(&path, &shadow_paint);
     canvas.restore();
