@@ -1,5 +1,5 @@
-import { useRef, useState, useEffect } from "react";
 import type * as React from "react";
+import { useRef, useState, useEffect } from "react";
 import { hexToRgb, rgbToHex, type RGB, type RGBA } from "../color";
 
 /**
@@ -74,7 +74,7 @@ export function useHexValueInput<T extends RGB | RGBA>({
   value: T;
   onValueChange?: (color: T) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [value, setValue] = useState<T>(initialValue);
 
   useEffect(() => {

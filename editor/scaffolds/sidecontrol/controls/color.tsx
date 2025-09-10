@@ -1,3 +1,4 @@
+import React from "react";
 import { WorkbenchUI } from "@/components/workbench";
 import { RGBAChip } from "./utils/paint-chip";
 import {
@@ -25,28 +26,60 @@ export function RGBAColorControl({
   disabled?: boolean;
   onValueChange?: (value: RGBA) => void;
 }) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  const handleContainerClick = React.useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleContainerPointerDown = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.target === e.currentTarget) {
+        inputRef.current?.focus();
+      }
+    },
+    []
+  );
+
+  const handleInputFocus = React.useCallback(() => {
+    setIsFocused(true);
+  }, []);
+
+  const handleInputBlur = React.useCallback(() => {
+    setIsFocused(false);
+  }, []);
+
   return (
     <Popover>
       <div
         className={cn(
           "flex items-center border cursor-default",
-          WorkbenchUI.inputVariants({ size: "xs", variant: "paint-container" })
+          WorkbenchUI.inputVariants({
+            size: "xs",
+            variant: "paint-container",
+          })
         )}
+        data-focus={isFocused}
+        onClick={handleContainerClick}
+        onPointerDown={handleContainerPointerDown}
+        tabIndex={-1}
       >
-        <PopoverTrigger disabled={disabled}>
+        <PopoverTrigger disabled={disabled} className="flex-shrink-0">
           <RGBAChip rgba={value} className="rounded-sm" />
         </PopoverTrigger>
 
-        {/* <span className="ms-2">#{css.rgbaToHex(value)}</span> */}
         <HexValueInput
-          className="border-none outline-none w-full h-full ps-2 text-xs"
+          ref={inputRef}
+          className="flex-1 ps-1.5"
           disabled={disabled}
           value={{
             r: value.r,
             g: value.g,
             b: value.b,
-            // ommit the alpha
           }}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
           onValueChange={(color) => {
             onValueChange?.({
               ...color,

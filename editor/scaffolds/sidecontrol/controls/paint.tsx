@@ -190,23 +190,55 @@ function ComputedPaintControl({
     }
   };
 
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  const handleContainerClick = React.useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleContainerPointerDown = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.target === e.currentTarget) {
+        inputRef.current?.focus();
+      }
+    },
+    []
+  );
+
+  const handleInputFocus = React.useCallback(() => {
+    setIsFocused(true);
+  }, []);
+
+  const handleInputBlur = React.useCallback(() => {
+    setIsFocused(false);
+  }, []);
+
   return (
     <Popover onOpenChange={onOpenChange}>
       {value ? (
         <>
           {value.type === "solid" && (
-            <PaintInputContainer>
-              <PopoverTrigger>
+            <PaintInputContainer
+              isFocused={isFocused}
+              onClick={handleContainerClick}
+              onPointerDown={handleContainerPointerDown}
+              tabIndex={-1}
+              className="gap-2 cursor-text"
+            >
+              <PopoverTrigger className="flex-shrink-0">
                 <PaintChip paint={value} className="rounded-sm" />
               </PopoverTrigger>
               <HexValueInput
-                className="border-none outline-none w-full h-full ps-2 text-xs"
+                ref={inputRef}
+                className="flex-1"
                 value={{
                   r: value.color.r,
                   g: value.color.g,
                   b: value.color.b,
-                  // ommit the alpha
                 }}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
                 onValueChange={(color) => {
                   onValueChange?.({
                     type: "solid",
@@ -217,7 +249,7 @@ function ComputedPaintControl({
               {removable && (
                 <button
                   onClick={onRemovePaint}
-                  className="px-1 py-1 me-0.5 text-muted-foreground"
+                  className="flex-shrink-0 px-1 py-1 me-0.5 text-muted-foreground"
                 >
                   <Cross2Icon className="w-3.5 h-3.5" />
                 </button>
@@ -251,19 +283,10 @@ function ComputedPaintControl({
         </>
       ) : (
         <PopoverTrigger className="w-full">
-          <div
-            className={cn(
-              "flex items-center border cursor-default",
-              WorkbenchUI.inputVariants({
-                size: "xs",
-                variant: "paint-container",
-              })
-            )}
-            onClick={onAddPaint}
-          >
+          <PaintInputContainer onClick={onAddPaint}>
             <PaintChip paint={cg.paints.transparent} className="rounded-sm" />
             <span className="ms-2 text-xs">Add</span>
-          </div>
+          </PaintInputContainer>
         </PopoverTrigger>
       )}
       <PopoverContent align="start" side="right" sideOffset={8} className="p-0">
@@ -425,15 +448,25 @@ function ContextVariableColors({
   );
 }
 
-function PaintInputContainer({ children }: React.PropsWithChildren<{}>) {
+function PaintInputContainer({
+  children,
+  isFocused,
+  className,
+  ...props
+}: React.PropsWithChildren<
+  React.HTMLAttributes<HTMLDivElement> & { isFocused?: boolean }
+>) {
   return (
     <div
+      {...props}
+      data-focus={isFocused}
       className={cn(
         "flex items-center border cursor-default",
         WorkbenchUI.inputVariants({
           size: "xs",
           variant: "paint-container",
-        })
+        }),
+        className
       )}
     >
       {children}

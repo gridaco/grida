@@ -4,30 +4,53 @@ import {
   type RGB,
   type RGBA,
 } from "@grida/number-input/react";
+import { WorkbenchUI } from "@/components/workbench";
+import { cn } from "@/components/lib/utils";
 
-export default function HexValueInput<T extends RGB | RGBA>({
-  className,
-  value,
-  onValueChange,
-  disabled,
-}: React.HtmlHTMLAttributes<HTMLInputElement> & {
+type HexValueInputProps<T extends RGB | RGBA> = Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "value" | "onChange"
+> & {
   value: T;
   onValueChange?: (color: T) => void;
-  disabled?: boolean;
-}) {
+};
+
+function HexValueInputInner<T extends RGB | RGBA>(
+  { className, value, onValueChange, onFocus, ...props }: HexValueInputProps<T>,
+  ref: React.Ref<HTMLInputElement>
+) {
   const { inputRef, hex, handleKeyDown, handleChange, handleFocus } =
     useHexValueInput<T>({ value, onValueChange });
 
+  const mergeRefs = React.useCallback(
+    (node: HTMLInputElement) => {
+      inputRef.current = node;
+      if (typeof ref === "function") {
+        ref(node);
+      } else if (ref) {
+        (ref as React.RefObject<HTMLInputElement | null>).current = node;
+      }
+    },
+    [ref, inputRef]
+  );
+
   return (
     <input
-      ref={inputRef}
-      className={className}
+      {...props}
+      ref={mergeRefs}
+      className={cn(WorkbenchUI.rawInputVariants({ size: "xs" }), className)}
       value={hex}
       onKeyDown={handleKeyDown}
       onChange={handleChange}
-      onFocus={handleFocus}
+      onFocus={(e) => {
+        handleFocus();
+        onFocus?.(e);
+      }}
       spellCheck={false}
-      disabled={disabled}
     />
   );
 }
+
+const HexValueInput = React.forwardRef(HexValueInputInner);
+
+export default HexValueInput;

@@ -1,5 +1,5 @@
-export type RGB = { r: number; g: number; b: number };
-export type RGBA = { r: number; g: number; b: number; a: number };
+import type { RGB, RGBA } from "./types";
+export { type RGB, type RGBA };
 
 /**
  * Converts an RGB or RGBA color object to a hex string.
