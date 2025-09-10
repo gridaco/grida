@@ -95,7 +95,18 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         opacity: 1.0,
         // Rotate the image 45 degrees with BoxFit::None to showcase the paint transform
         transform: AffineTransform {
-            matrix: [[0.7071, -0.7071, 100.0], [0.7071, 0.7071, 0.0]],
+            matrix: [
+                [
+                    std::f32::consts::FRAC_1_SQRT_2,
+                    -std::f32::consts::FRAC_1_SQRT_2,
+                    100.0,
+                ],
+                [
+                    std::f32::consts::FRAC_1_SQRT_2,
+                    std::f32::consts::FRAC_1_SQRT_2,
+                    0.0,
+                ],
+            ],
         },
         fit: BoxFit::None,
         blend_mode: BlendMode::Normal,

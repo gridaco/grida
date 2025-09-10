@@ -13,7 +13,9 @@ use crate::shape::*;
 use crate::sk;
 use crate::vectornetwork::vn_painter::StrokeOptions;
 use math2::transform::AffineTransform;
-use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
+use skia_safe::{
+    canvas::SaveLayerRec, path::AddPathMode, textlayout, Paint as SkPaint, Path, Point,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -167,6 +169,51 @@ impl<'a> Painter<'a> {
             .save_layer(&SaveLayerRec::default().paint(&paint));
         paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
         self.canvas.restore();
+    }
+
+    /// Draw a backdrop blur for text using the actual glyph outlines.
+    ///
+    /// This clips the canvas to the precise glyph paths derived from the
+    /// paragraph's shaped runs and applies a backdrop blur within that clip.
+    fn draw_text_backdrop_blur(
+        &self,
+        paragraph: &Rc<RefCell<textlayout::Paragraph>>,
+        blur: &FeGaussianBlur,
+    ) {
+        // Build a path from all glyphs in the paragraph.
+        let mut path = Path::new();
+        paragraph.borrow_mut().visit(|_, info| {
+            if let Some(info) = info {
+                let glyphs = info.glyphs();
+                let positions = info.positions();
+                let origin = info.origin();
+                let font = info.font();
+                for (glyph, pos) in glyphs.iter().zip(positions.iter()) {
+                    if let Some(glyph_path) = font.get_path(*glyph) {
+                        let offset = Point::new(pos.x + origin.x, pos.y + origin.y);
+                        path.add_path(&glyph_path, offset, AddPathMode::Append);
+                    }
+                }
+            }
+        });
+
+        if path.is_empty() {
+            return;
+        }
+
+        let canvas = self.canvas;
+        let Some(image_filter) =
+            skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None)
+        else {
+            return;
+        };
+
+        canvas.save();
+        canvas.clip_path(&path, None, true);
+        let layer_rec = SaveLayerRec::default().backdrop(&image_filter);
+        canvas.save_layer(&layer_rec);
+        canvas.restore();
+        canvas.restore();
     }
 
     /// Draw a backdrop blur: blur what's behind the shape.
@@ -470,7 +517,7 @@ impl<'a> Painter<'a> {
 
                         let apply_effects = || {
                             if let Some(blur) = effects.backdrop_blur {
-                                self.draw_backdrop_blur(&text_layer.shape, &blur);
+                                self.draw_text_backdrop_blur(&paragraph, &blur);
                             }
 
                             for shadow in &effects.shadows {
