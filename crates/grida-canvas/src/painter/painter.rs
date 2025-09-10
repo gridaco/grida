@@ -397,8 +397,9 @@ impl<'a> Painter<'a> {
             PainterPictureLayer::Text(text_layer) => {
                 self.with_blendmode(text_layer.base.blend_mode, || {
                     self.with_transform(&text_layer.base.transform.matrix, || {
-                        let _effect_ref = &text_layer.effects;
+                        let effects = &text_layer.effects;
                         let clip_path = &text_layer.base.clip_path;
+
                         let draw_content = || {
                             self.with_opacity(text_layer.base.opacity, || {
                                 if text_layer.fills.is_empty() {
@@ -420,13 +421,22 @@ impl<'a> Painter<'a> {
                                 );
                             });
                         };
+
+                        let draw_with_effects = || {
+                            if let Some(layer_blur) = effects.blur {
+                                self.with_layer_blur(layer_blur.radius, draw_content);
+                            } else {
+                                draw_content();
+                            }
+                        };
+
                         if let Some(clip) = clip_path {
                             self.canvas.save();
                             self.canvas.clip_path(clip, None, true);
-                            draw_content();
+                            draw_with_effects();
                             self.canvas.restore();
                         } else {
-                            draw_content();
+                            draw_with_effects();
                         }
                     });
                 });

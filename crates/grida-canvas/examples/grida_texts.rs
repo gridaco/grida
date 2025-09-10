@@ -87,6 +87,20 @@ async fn demo_texts() -> Scene {
     second_paragraph_text_node.text_align_vertical = TextAlignVertical::Top;
     second_paragraph_text_node.fills = vec![Paint::from(CGColor(70, 130, 180, 255))];
 
+    // Create a blurry text span with the commented style
+    let mut blurry_text_node = nf.create_text_span_node();
+    blurry_text_node.name = Some("Blurry Text".to_string());
+    blurry_text_node.transform = AffineTransform::new(50.0, 1000.0, 0.0);
+    blurry_text_node.text = "This text has a blur effect applied".to_string();
+    blurry_text_node.text_style = TextStyleRec::from_font("Geist", 40.0);
+    blurry_text_node.text_align = TextAlign::Left;
+    blurry_text_node.text_align_vertical = TextAlignVertical::Top;
+    blurry_text_node.fills = vec![Paint::from(CGColor(100, 100, 100, 255))];
+    blurry_text_node.effects =
+        LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
+            radius: 4.0,
+        })]);
+
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
     root_container_node.name = Some("Root Container".to_string());
@@ -103,12 +117,14 @@ async fn demo_texts() -> Scene {
     let sentence_text_id = sentence_text_node.id.clone();
     let paragraph_text_id = paragraph_text_node.id.clone();
     let second_paragraph_text_id = second_paragraph_text_node.id.clone();
+    let blurry_text_id = blurry_text_node.id.clone();
 
     // Add all nodes to the repository
     repository.insert(Node::TextSpan(word_text_node));
     repository.insert(Node::TextSpan(sentence_text_node));
     repository.insert(Node::TextSpan(paragraph_text_node));
     repository.insert(Node::TextSpan(second_paragraph_text_node));
+    repository.insert(Node::TextSpan(blurry_text_node));
 
     // Set up the root container with all IDs
     root_container_node.children = vec![
@@ -116,6 +132,7 @@ async fn demo_texts() -> Scene {
         sentence_text_id,
         paragraph_text_id,
         second_paragraph_text_id,
+        blurry_text_id,
     ];
     let root_container_id = root_container_node.id.clone();
     repository.insert(Node::Container(root_container_node));
