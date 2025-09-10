@@ -33,15 +33,12 @@ async fn demo_ellipses() -> Scene {
             width: base_size * (0.5 + (i as f32 * 0.2)), // 0.5x to 1.9x width
             height: base_size,
         };
-        ellipse.fills = vec![Paint::Solid(SolidPaint {
-            color: CGColor(
-                100 + (i * 20) as u8,
-                150 + (i * 10) as u8,
-                200 + (i * 5) as u8,
-                255,
-            ), // Blue gradient
-            opacity: 1.0,
-        })];
+        ellipse.fills = vec![Paint::from(CGColor(
+            100 + (i * 20) as u8,
+            150 + (i * 10) as u8,
+            200 + (i * 5) as u8,
+            255,
+        ))]; // Blue gradient
         all_ellipse_ids.push(ellipse.id.clone());
         repository.insert(Node::Ellipse(ellipse));
     }
@@ -56,15 +53,12 @@ async fn demo_ellipses() -> Scene {
             height: base_size,
         };
         ring.inner_radius = Some(0.1 + (i as f32 * 0.1)); // 0.1 to 0.8 inner radius
-        ring.fills = vec![Paint::Solid(SolidPaint {
-            color: CGColor(
-                200 + (i * 7) as u8,
-                100 + (i * 15) as u8,
-                50 + (i * 20) as u8,
-                255,
-            ), // Orange gradient
-            opacity: 1.0,
-        })];
+        ring.fills = vec![Paint::from(CGColor(
+            200 + (i * 7) as u8,
+            100 + (i * 15) as u8,
+            50 + (i * 20) as u8,
+            255,
+        ))]; // Orange gradient
         all_ellipse_ids.push(ring.id.clone());
         repository.insert(Node::Ellipse(ring));
     }
@@ -80,15 +74,12 @@ async fn demo_ellipses() -> Scene {
         };
         arc.start_angle = 0.0;
         arc.angle = Some(30.0 + (i as f32 * 45.0)); // 30 to 345 degrees
-        arc.fills = vec![Paint::Solid(SolidPaint {
-            color: CGColor(
-                50 + (i * 25) as u8,
-                200 + (i * 7) as u8,
-                100 + (i * 15) as u8,
-                255,
-            ), // Green gradient
-            opacity: 1.0,
-        })];
+        arc.fills = vec![Paint::from(CGColor(
+            50 + (i * 25) as u8,
+            200 + (i * 7) as u8,
+            100 + (i * 15) as u8,
+            255,
+        ))]; // Green gradient
         all_ellipse_ids.push(arc.id.clone());
         repository.insert(Node::Ellipse(arc));
     }
@@ -105,15 +96,12 @@ async fn demo_ellipses() -> Scene {
         donut_arc.start_angle = 0.0;
         donut_arc.angle = Some(60.0 + (i as f32 * 37.5)); // 60 to 337.5 degrees
         donut_arc.inner_radius = Some(0.4); // Fixed inner radius
-        donut_arc.fills = vec![Paint::Solid(SolidPaint {
-            color: CGColor(
-                200 + (i * 7) as u8,
-                50 + (i * 25) as u8,
-                150 + (i * 12) as u8,
-                255,
-            ), // Purple gradient
-            opacity: 1.0,
-        })];
+        donut_arc.fills = vec![Paint::from(CGColor(
+            200 + (i * 7) as u8,
+            50 + (i * 25) as u8,
+            150 + (i * 12) as u8,
+            255,
+        ))]; // Purple gradient
         all_ellipse_ids.push(donut_arc.id.clone());
         repository.insert(Node::Ellipse(donut_arc));
     }
@@ -127,19 +115,13 @@ async fn demo_ellipses() -> Scene {
             width: base_size * (0.8 + (i as f32 * 0.15)), // 0.8x to 1.85x width
             height: base_size,
         };
-        stroke_ellipse.fills = vec![Paint::Solid(SolidPaint {
-            color: CGColor(255, 255, 255, 255), // White fill
-            opacity: 1.0,
-        })];
-        stroke_ellipse.strokes = vec![Paint::Solid(SolidPaint {
-            color: CGColor(
-                255 - (i * 30) as u8,
-                100 + (i * 20) as u8,
-                50 + (i * 25) as u8,
-                255,
-            ), // Red gradient stroke
-            opacity: 1.0,
-        })];
+        stroke_ellipse.fills = vec![Paint::from(CGColor(255, 255, 255, 255))];
+        stroke_ellipse.strokes = vec![Paint::from(CGColor(
+            255 - (i * 30) as u8,
+            100 + (i * 20) as u8,
+            50 + (i * 25) as u8,
+            255,
+        ))]; // Red gradient stroke
         stroke_ellipse.stroke_width = 3.0 + (i as f32 * 2.0); // 3 to 17 stroke weight
         all_ellipse_ids.push(stroke_ellipse.id.clone());
         repository.insert(Node::Ellipse(stroke_ellipse));

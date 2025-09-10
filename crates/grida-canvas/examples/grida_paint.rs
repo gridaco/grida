@@ -33,15 +33,12 @@ async fn demo_paints() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
-        rect.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(
-                255 - (i * 25) as u8,
-                100 + (i * 15) as u8,
-                50 + (i * 20) as u8,
-                255,
-            ),
-            opacity: 1.0,
-        }));
+        rect.set_fill(Paint::from(CGColor(
+            255 - (i * 25) as u8,
+            100 + (i * 15) as u8,
+            50 + (i * 20) as u8,
+            255,
+        )));
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
@@ -125,21 +122,15 @@ async fn demo_paints() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
-        rect.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 0), // Transparent
-            opacity: 1.0,
-        }));
+        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
 
         // Solid color stroke with varying colors
-        rect.strokes = vec![Paint::Solid(SolidPaint {
-            color: CGColor(
-                255 - (i * 25) as u8,
-                100 + (i * 15) as u8,
-                50 + (i * 20) as u8,
-                255,
-            ),
-            opacity: 1.0,
-        })];
+        rect.strokes = vec![Paint::from(CGColor(
+            255 - (i * 25) as u8,
+            100 + (i * 15) as u8,
+            50 + (i * 20) as u8,
+            255,
+        ))];
         rect.stroke_width = 4.0; // Consistent stroke width
 
         all_shape_ids.push(rect.id.clone());
@@ -158,10 +149,7 @@ async fn demo_paints() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
-        rect.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 0), // Transparent
-            opacity: 1.0,
-        }));
+        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
 
         // Create a linear gradient that changes angle based on index
         let angle = (i as f32 * 36.0) * std::f32::consts::PI / 180.0; // 0 to 360 degrees
@@ -199,10 +187,7 @@ async fn demo_paints() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
-        rect.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 0), // Transparent
-            opacity: 1.0,
-        }));
+        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
 
         // Create a radial gradient with varying center positions
         let center_x = 0.2 + (i as f32 * 0.06); // 0.2 to 0.8

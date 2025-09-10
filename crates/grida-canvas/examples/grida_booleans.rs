@@ -34,10 +34,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        rect.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(200, 200, 200, 255),
-            opacity: 1.0,
-        }));
+        rect.set_fill(Paint::from(CGColor(200, 200, 200, 255)));
 
         let mut circle = nf.create_ellipse_node();
         circle.name = Some("Circle".to_string());
@@ -46,10 +43,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        circle.fills = vec![Paint::Solid(SolidPaint {
-            color: CGColor(200, 200, 200, 255),
-            opacity: 1.0,
-        })];
+        circle.fills = vec![Paint::from(CGColor(200, 200, 200, 255))];
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -57,10 +51,7 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0); // Moved text up slightly
         text.text = "Union (A ∪ B): Combines two shapes into one".to_string();
         text.text_style.font_size = 16.0;
-        text.fill = Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 255),
-            opacity: 1.0,
-        });
+        text.fill = Paint::from(CGColor(0, 0, 0, 255));
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
@@ -71,14 +62,8 @@ async fn demo_booleans() -> Scene {
             op: BooleanPathOperation::Union,
             corner_radius: None,
             children: vec![rect.id.clone(), circle.id.clone()],
-            fill: Paint::Solid(SolidPaint {
-                color: CGColor(100, 100, 200, 255),
-                opacity: 1.0,
-            }),
-            stroke: Some(Paint::Solid(SolidPaint {
-                color: CGColor(0, 0, 0, 255),
-                opacity: 1.0,
-            })),
+            fill: Paint::from(CGColor(100, 100, 200, 255)),
+            stroke: Some(Paint::from(CGColor(0, 0, 0, 255))),
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
@@ -112,10 +97,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        circle1.fills = vec![Paint::Solid(SolidPaint {
-            color: CGColor(200, 200, 200, 255),
-            opacity: 1.0,
-        })];
+        circle1.fills = vec![Paint::from(CGColor(200, 200, 200, 255))];
 
         let mut circle2 = nf.create_ellipse_node();
         circle2.name = Some("Circle 2".to_string());
@@ -124,10 +106,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        circle2.fills = vec![Paint::Solid(SolidPaint {
-            color: CGColor(200, 200, 200, 255),
-            opacity: 1.0,
-        })];
+        circle2.fills = vec![Paint::from(CGColor(200, 200, 200, 255))];
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -135,10 +114,7 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.text = "Intersection (A ∩ B): Shows only the overlapping area".to_string();
         text.text_style.font_size = 16.0;
-        text.fill = Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 255),
-            opacity: 1.0,
-        });
+        text.fill = Paint::from(CGColor(0, 0, 0, 255));
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
@@ -149,14 +125,8 @@ async fn demo_booleans() -> Scene {
             op: BooleanPathOperation::Intersection,
             children: vec![circle1.id.clone(), circle2.id.clone()],
             corner_radius: None,
-            fill: Paint::Solid(SolidPaint {
-                color: CGColor(100, 100, 200, 255),
-                opacity: 1.0,
-            }),
-            stroke: Some(Paint::Solid(SolidPaint {
-                color: CGColor(0, 0, 0, 255),
-                opacity: 1.0,
-            })),
+            fill: Paint::from(CGColor(100, 100, 200, 255)),
+            stroke: Some(Paint::from(CGColor(0, 0, 0, 255))),
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
@@ -190,10 +160,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        star.fills = vec![Paint::Solid(SolidPaint {
-            color: CGColor(200, 200, 200, 255),
-            opacity: 1.0,
-        })];
+        star.fills = vec![Paint::from(CGColor(200, 200, 200, 255))];
 
         let mut rect = nf.create_rectangle_node();
         rect.name = Some("Rectangle".to_string());
@@ -202,10 +169,7 @@ async fn demo_booleans() -> Scene {
             width: base_size * 0.8,
             height: base_size * 0.8,
         };
-        rect.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(200, 200, 200, 255),
-            opacity: 1.0,
-        }));
+        rect.set_fill(Paint::from(CGColor(200, 200, 200, 255)));
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -213,10 +177,7 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.text = "Difference (A - B): Removes the second shape from the first".to_string();
         text.text_style.font_size = 16.0;
-        text.fill = Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 255),
-            opacity: 1.0,
-        });
+        text.fill = Paint::from(CGColor(0, 0, 0, 255));
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
@@ -227,14 +188,8 @@ async fn demo_booleans() -> Scene {
             op: BooleanPathOperation::Difference,
             corner_radius: None,
             children: vec![star.id.clone(), rect.id.clone()],
-            fill: Paint::Solid(SolidPaint {
-                color: CGColor(100, 100, 200, 255),
-                opacity: 1.0,
-            }),
-            stroke: Some(Paint::Solid(SolidPaint {
-                color: CGColor(0, 0, 0, 255),
-                opacity: 1.0,
-            })),
+            fill: Paint::from(CGColor(100, 100, 200, 255)),
+            stroke: Some(Paint::from(CGColor(0, 0, 0, 255))),
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
@@ -268,10 +223,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        square1.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(200, 200, 200, 255),
-            opacity: 1.0,
-        }));
+        square1.set_fill(Paint::from(CGColor(200, 200, 200, 255)));
 
         let mut square2 = nf.create_rectangle_node();
         square2.name = Some("Square 2".to_string());
@@ -280,10 +232,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        square2.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(200, 200, 200, 255),
-            opacity: 1.0,
-        }));
+        square2.set_fill(Paint::from(CGColor(200, 200, 200, 255)));
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -291,10 +240,7 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.text = "XOR (A ⊕ B): Shows areas that don't overlap".to_string();
         text.text_style.font_size = 16.0;
-        text.fill = Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 255),
-            opacity: 1.0,
-        });
+        text.fill = Paint::from(CGColor(0, 0, 0, 255));
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
@@ -305,14 +251,8 @@ async fn demo_booleans() -> Scene {
             op: BooleanPathOperation::Xor,
             corner_radius: None,
             children: vec![square1.id.clone(), square2.id.clone()],
-            fill: Paint::Solid(SolidPaint {
-                color: CGColor(100, 100, 200, 255),
-                opacity: 1.0,
-            }),
-            stroke: Some(Paint::Solid(SolidPaint {
-                color: CGColor(0, 0, 0, 255),
-                opacity: 1.0,
-            })),
+            fill: Paint::from(CGColor(100, 100, 200, 255)),
+            stroke: Some(Paint::from(CGColor(0, 0, 0, 255))),
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,

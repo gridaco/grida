@@ -32,18 +32,9 @@ async fn demo_fills() -> Scene {
     };
     multi_solid_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     multi_solid_rect.fills = vec![
-        Paint::Solid(SolidPaint {
-            color: CGColor(255, 0, 0, 255), // Red base
-            opacity: 1.0,
-        }),
-        Paint::Solid(SolidPaint {
-            color: CGColor(0, 255, 0, 255), // Green overlay
-            opacity: 0.6,
-        }),
-        Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 255, 255), // Blue overlay
-            opacity: 0.4,
-        }),
+        Paint::from(CGColor(255, 0, 0, 255)),
+        Paint::from(CGColor(0, 255, 0, 255)),
+        Paint::from(CGColor(0, 0, 255, 255)),
     ];
     multi_solid_rect.stroke_width = 3.0;
     ids.push(multi_solid_rect.id.clone());
@@ -59,10 +50,7 @@ async fn demo_fills() -> Scene {
     };
     solid_gradient_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     solid_gradient_rect.fills = vec![
-        Paint::Solid(SolidPaint {
-            color: CGColor(255, 255, 0, 255), // Yellow base
-            opacity: 1.0,
-        }),
+        Paint::from(CGColor(255, 255, 0, 255)),
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(45.0),
             stops: vec![
@@ -92,10 +80,7 @@ async fn demo_fills() -> Scene {
     };
     solid_radial_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     solid_radial_rect.fills = vec![
-        Paint::Solid(SolidPaint {
-            color: CGColor(128, 128, 128, 255), // Gray base
-            opacity: 1.0,
-        }),
+        Paint::from(CGColor(128, 128, 128, 255)),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::identity(),
             stops: vec![
@@ -236,10 +221,7 @@ async fn demo_fills() -> Scene {
     complex_fill_polygon.transform = AffineTransform::new(start_x + spacing, base_y + spacing, 0.0);
     complex_fill_polygon.points = pentagon_points;
     complex_fill_polygon.fills = vec![
-        Paint::Solid(SolidPaint {
-            color: CGColor(255, 128, 0, 255), // Orange base
-            opacity: 1.0,
-        }),
+        Paint::from(CGColor(255, 128, 0, 255)),
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(30.0),
             stops: vec![
@@ -343,10 +325,7 @@ async fn demo_fills() -> Scene {
         height: 150.0,
     };
     multi_fill_container.fills = vec![
-        Paint::Solid(SolidPaint {
-            color: CGColor(128, 0, 128, 255), // Purple base
-            opacity: 1.0,
-        }),
+        Paint::from(CGColor(128, 0, 128, 255)),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::identity(),
             stops: vec![

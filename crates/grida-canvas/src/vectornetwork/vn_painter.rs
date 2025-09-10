@@ -125,6 +125,7 @@ impl<'a> VNPainter<'a> {
         let paint = Paint::Solid(SolidPaint {
             color,
             opacity: 1.0,
+            blend_mode: BlendMode::default(),
         });
         let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
         sk_paint.set_style(PaintStyle::Fill);
@@ -162,6 +163,7 @@ impl<'a> VNPainter<'a> {
         let paint = Paint::Solid(SolidPaint {
             color: stroke_color,
             opacity: 1.0,
+            blend_mode: BlendMode::default(),
         });
 
         // Convert to Skia paint and draw

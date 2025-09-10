@@ -17,14 +17,8 @@ async fn scene() -> Scene {
     };
     container.stroke_width = 10.0;
     container.stroke_align = StrokeAlign::Outside;
-    container.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(255, 0, 0, 255),
-        opacity: 1.0,
-    })];
-    container.set_fill(Paint::Solid(SolidPaint {
-        color: CGColor(255, 255, 255, 255),
-        opacity: 1.0,
-    }));
+    container.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
+    container.set_fill(Paint::from(CGColor(255, 255, 255, 255)));
     // Center the container in the 800x800 canvas
     container.transform = AffineTransform::new(200.0, 200.0, 0.0);
 
@@ -35,10 +29,7 @@ async fn scene() -> Scene {
         width: 400.0,
         height: 400.0,
     };
-    circle.set_fill(Paint::Solid(SolidPaint {
-        color: CGColor(0, 255, 0, 255), // Green color
-        opacity: 1.0,
-    }));
+    circle.set_fill(Paint::from(CGColor(0, 255, 0, 255)));
     // Position the circle at the right-bottom of the container
     // Container is 400x400, centered at (200, 200), so right-bottom would be around (350, 350)
     // But we want it to overlap with the stroke, so position it at the edge

@@ -35,10 +35,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
     }));
-    rect1.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(255, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
     rect1.stroke_width = 2.0;
 
     // Second example: Rectangle with ImagePaint fill and stroke
@@ -72,10 +69,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         height: 200.0,
     };
     rect3.corner_radius = RectangularCornerRadius::circular(40.0);
-    rect3.set_fill(Paint::Solid(SolidPaint {
-        color: CGColor(240, 240, 240, 255),
-        opacity: 1.0,
-    }));
+    rect3.set_fill(Paint::from(CGColor(240, 240, 240, 255)));
     rect3.strokes = vec![Paint::Image(ImagePaint {
         hash: hash_str.clone(),
         opacity: 1.0,

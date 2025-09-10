@@ -44,10 +44,7 @@ async fn demo_scene() -> Scene {
     };
     title_text.text_align = TextAlign::Center;
     title_text.text_align_vertical = TextAlignVertical::Center;
-    title_text.fill = Paint::Solid(SolidPaint {
-        color: CGColor(50, 50, 50, 255),
-        opacity: 1.0,
-    });
+    title_text.fill = Paint::from(CGColor(50, 50, 50, 255));
     all_node_ids.push(title_text.id.clone());
     repo.insert(Node::TextSpan(title_text));
 
@@ -74,10 +71,7 @@ async fn demo_scene() -> Scene {
     };
     subtitle_text.text_align = TextAlign::Center;
     subtitle_text.text_align_vertical = TextAlignVertical::Center;
-    subtitle_text.fill = Paint::Solid(SolidPaint {
-        color: CGColor(100, 100, 100, 255),
-        opacity: 1.0,
-    });
+    subtitle_text.fill = Paint::from(CGColor(100, 100, 100, 255));
     all_node_ids.push(subtitle_text.id.clone());
     repo.insert(Node::TextSpan(subtitle_text));
 
@@ -109,10 +103,7 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     }));
     rect_gradient.stroke_width = 3.0;
-    rect_gradient.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(0, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    rect_gradient.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
     rect_gradient.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 5.0,
         dy: 5.0,
@@ -150,10 +141,7 @@ async fn demo_scene() -> Scene {
         opacity: 1.0,
     })];
     ellipse_radial.stroke_width = 4.0;
-    ellipse_radial.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(0, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    ellipse_radial.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
     all_node_ids.push(ellipse_radial.id.clone());
     repo.insert(Node::Ellipse(ellipse_radial));
 
@@ -172,15 +160,9 @@ async fn demo_scene() -> Scene {
     hexagon.name = Some("Hexagon".to_string());
     hexagon.transform = AffineTransform::new(550.0, 200.0, 0.0);
     hexagon.points = hexagon_points;
-    hexagon.fills = vec![Paint::Solid(SolidPaint {
-        color: CGColor(128, 0, 255, 255),
-        opacity: 1.0,
-    })];
+    hexagon.fills = vec![Paint::from(CGColor(128, 0, 255, 255))];
     hexagon.stroke_width = 3.0;
-    hexagon.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(255, 255, 255, 255),
-        opacity: 1.0,
-    })];
+    hexagon.strokes = vec![Paint::from(CGColor(255, 255, 255, 255))];
     hexagon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 3.0,
         dy: 3.0,
@@ -201,15 +183,9 @@ async fn demo_scene() -> Scene {
     };
     star.point_count = 5;
     star.inner_radius = 0.4;
-    star.fills = vec![Paint::Solid(SolidPaint {
-        color: CGColor(255, 215, 0, 255), // Gold
-        opacity: 1.0,
-    })];
+    star.fills = vec![Paint::from(CGColor(255, 215, 0, 255))];
     star.stroke_width = 2.0;
-    star.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(139, 69, 19, 255), // Brown
-        opacity: 1.0,
-    })];
+    star.strokes = vec![Paint::from(CGColor(139, 69, 19, 255))];
     all_node_ids.push(star.id.clone());
     repo.insert(Node::RegularStarPolygon(star));
 
@@ -218,15 +194,9 @@ async fn demo_scene() -> Scene {
     path.name = Some("Complex Path".to_string());
     path.transform = AffineTransform::new(220.0, 400.0, 0.0);
     path.data = "M50,0 L61,35 L98,35 L68,57 L79,91 L50,71 L21,91 L32,57 L2,35 L39,35 Z".to_string();
-    path.fill = Paint::Solid(SolidPaint {
-        color: CGColor(255, 20, 147, 255), // Deep pink
-        opacity: 1.0,
-    });
+    path.fill = Paint::from(CGColor(255, 20, 147, 255));
     path.stroke_width = 2.0;
-    path.stroke = Some(Paint::Solid(SolidPaint {
-        color: CGColor(0, 0, 0, 255),
-        opacity: 1.0,
-    }));
+    path.stroke = Some(Paint::from(CGColor(0, 0, 0, 255)));
     all_node_ids.push(path.id.clone());
     repo.insert(Node::SVGPath(path));
 
@@ -269,15 +239,9 @@ async fn demo_scene() -> Scene {
         height: 100.0,
     };
     octagon.point_count = 8;
-    octagon.fills = vec![Paint::Solid(SolidPaint {
-        color: CGColor(0, 255, 255, 255), // Cyan
-        opacity: 0.8,
-    })];
+    octagon.fills = vec![Paint::from(CGColor(0, 255, 255, 255))];
     octagon.stroke_width = 3.0;
-    octagon.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(0, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    octagon.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
     all_node_ids.push(octagon.id.clone());
     repo.insert(Node::RegularPolygon(octagon));
 
@@ -303,10 +267,7 @@ async fn demo_scene() -> Scene {
     };
     description_text.text_align = TextAlign::Center;
     description_text.text_align_vertical = TextAlignVertical::Center;
-    description_text.fill = Paint::Solid(SolidPaint {
-        color: CGColor(80, 80, 80, 255),
-        opacity: 1.0,
-    });
+    description_text.fill = Paint::from(CGColor(80, 80, 80, 255));
     all_node_ids.push(description_text.id.clone());
     repo.insert(Node::TextSpan(description_text));
 

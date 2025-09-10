@@ -72,11 +72,12 @@ impl CGColor {
     }
 }
 
-impl Into<SolidPaint> for CGColor {
-    fn into(self) -> SolidPaint {
+impl From<CGColor> for SolidPaint {
+    fn from(color: CGColor) -> Self {
         SolidPaint {
-            color: self,
+            color,
             opacity: 1.0,
+            blend_mode: BlendMode::default(),
         }
     }
 }
@@ -890,49 +891,58 @@ impl GradientPaint {
 pub struct SolidPaint {
     pub color: CGColor,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 impl SolidPaint {
-    pub fn transparent() -> Self {
+    pub fn new_color(color: CGColor) -> Self {
         Self {
-            color: CGColor(0, 0, 0, 0),
-            opacity: 0.0,
+            color,
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
         }
     }
 
-    pub fn black() -> Self {
-        Self {
-            color: CGColor(0, 0, 0, 255),
-            opacity: 1.0,
-        }
-    }
+    pub const TRANSPARENT: Self = Self {
+        color: CGColor::TRANSPARENT,
+        opacity: 0.0,
+        blend_mode: BlendMode::Normal,
+    };
 
-    pub fn white() -> Self {
-        Self {
-            color: CGColor(255, 255, 255, 255),
-            opacity: 1.0,
-        }
-    }
+    pub const BLACK: Self = Self {
+        color: CGColor::BLACK,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
 
-    pub fn red() -> Self {
-        Self {
-            color: CGColor(255, 0, 0, 255),
-            opacity: 1.0,
-        }
-    }
+    pub const WHITE: Self = Self {
+        color: CGColor::WHITE,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
 
-    pub fn blue() -> Self {
-        Self {
-            color: CGColor(0, 0, 255, 255),
-            opacity: 1.0,
-        }
-    }
+    pub const RED: Self = Self {
+        color: CGColor::RED,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
 
-    pub fn green() -> Self {
-        Self {
-            color: CGColor(0, 255, 0, 255),
-            opacity: 1.0,
-        }
+    pub const BLUE: Self = Self {
+        color: CGColor::BLUE,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
+
+    pub const GREEN: Self = Self {
+        color: CGColor::GREEN,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
+}
+
+impl From<CGColor> for Paint {
+    fn from(color: CGColor) -> Self {
+        Paint::Solid(color.into())
     }
 }
 

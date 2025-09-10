@@ -18,15 +18,9 @@ use figma_api::models::{
 use math2::box_fit::BoxFit;
 use math2::transform::AffineTransform;
 
-const TRANSPARENT: Paint = Paint::Solid(SolidPaint {
-    color: CGColor(0, 0, 0, 0),
-    opacity: 0.0,
-});
+const TRANSPARENT: Paint = Paint::Solid(SolidPaint::TRANSPARENT);
 
-const BLACK: Paint = Paint::Solid(SolidPaint {
-    color: CGColor(0, 0, 0, 255),
-    opacity: 1.0,
-});
+const BLACK: Paint = Paint::Solid(SolidPaint::BLACK);
 
 // Map implementations
 impl From<&Rgba> for CGColor {
@@ -57,6 +51,7 @@ impl From<&FigmaPaint> for Paint {
             FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
                 color: CGColor::from(&solid.color),
                 opacity: solid.opacity.unwrap_or(1.0) as f32,
+                blend_mode: BlendMode::default(),
             }),
             FigmaPaint::ImagePaint(image) => {
                 let transform =
@@ -140,6 +135,7 @@ impl From<&FigmaPaint> for Paint {
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
+                blend_mode: BlendMode::default(),
             }),
         }
     }
@@ -287,6 +283,7 @@ impl FigmaConverter {
             FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
                 color: CGColor::from(&solid.color),
                 opacity: solid.opacity.unwrap_or(1.0) as f32,
+                blend_mode: BlendMode::default(),
             }),
             FigmaPaint::ImagePaint(image) => {
                 let url = self
@@ -375,6 +372,7 @@ impl FigmaConverter {
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
+                blend_mode: BlendMode::default(),
             }),
         }
     }

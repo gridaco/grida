@@ -149,34 +149,22 @@ fn main() {
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::Solid(SolidPaint {
-                    color: CGColor(242, 80, 34, 255), // Microsoft Red #F25022
-                    opacity: 1.0,
-                })]),
+                fills: Some(vec![Paint::from(CGColor(242, 80, 34, 255))]),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![4, 5, 6, 7])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::Solid(SolidPaint {
-                    color: CGColor(127, 186, 0, 255), // Microsoft Green #7FBA00
-                    opacity: 1.0,
-                })]),
+                fills: Some(vec![Paint::from(CGColor(127, 186, 0, 255))]),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![8, 9, 10, 11])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::Solid(SolidPaint {
-                    color: CGColor(0, 164, 239, 255), // Microsoft Blue #00A4EF
-                    opacity: 1.0,
-                })]),
+                fills: Some(vec![Paint::from(CGColor(0, 164, 239, 255))]),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![12, 13, 14, 15])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::Solid(SolidPaint {
-                    color: CGColor(255, 185, 0, 255), // Microsoft Yellow #FFB900
-                    opacity: 1.0,
-                })]),
+                fills: Some(vec![Paint::from(CGColor(255, 185, 0, 255))]),
             },
         ],
     };

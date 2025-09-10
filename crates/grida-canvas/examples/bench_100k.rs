@@ -50,10 +50,7 @@ async fn demo_n_shapes(n: usize) -> Scene {
         // Convert HSV to RGB
         let (r, g, b) = hsv_to_rgb(hue, 1.0, 1.0);
 
-        rect.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(r, g, b, 255),
-            opacity: 1.0,
-        }));
+        rect.set_fill(Paint::from(CGColor(r, g, b, 255)));
 
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));

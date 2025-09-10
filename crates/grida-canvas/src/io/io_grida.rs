@@ -141,8 +141,9 @@ impl From<Option<JSONPaint>> for Paint {
     fn from(fill: Option<JSONPaint>) -> Self {
         match fill {
             Some(JSONPaint::Solid { color }) => Paint::Solid(SolidPaint {
-                color: color.map_or(CGColor(0, 0, 0, 0), |c| c.into()),
+                color: color.map_or(CGColor::TRANSPARENT, |c| c.into()),
                 opacity: 1.0,
+                blend_mode: BlendMode::default(),
             }),
             Some(JSONPaint::LinearGradient {
                 transform, stops, ..
@@ -193,8 +194,9 @@ impl From<Option<JSONPaint>> for Paint {
                 })
             }
             None => Paint::Solid(SolidPaint {
-                color: CGColor(0, 0, 0, 0),
+                color: CGColor::TRANSPARENT,
                 opacity: 1.0,
+                blend_mode: BlendMode::default(),
             }),
         }
     }

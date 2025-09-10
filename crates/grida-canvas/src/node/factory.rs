@@ -35,6 +35,7 @@ impl NodeFactory {
         Paint::Solid(SolidPaint {
             color,
             opacity: 1.0,
+            blend_mode: BlendMode::default(),
         })
     }
 

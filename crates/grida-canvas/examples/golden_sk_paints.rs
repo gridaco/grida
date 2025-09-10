@@ -60,6 +60,17 @@ pub struct GradientStop {
 pub struct SolidPaint {
     pub color: CGColor,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
+}
+
+impl From<CGColor> for SolidPaint {
+    fn from(color: CGColor) -> Self {
+        SolidPaint {
+            color,
+            opacity: 1.0,
+            blend_mode: BlendMode::SrcOver,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -110,10 +121,7 @@ fn main() {
     let mut y = padding;
 
     // 1. single solid
-    let fills = vec![DemoPaint::Solid(SolidPaint {
-        color: CGColor(255, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    let fills = vec![DemoPaint::Solid(SolidPaint::from(CGColor(255, 0, 0, 255)))];
     draw_pair(canvas, padding, y, tile, &fills);
     draw_label(canvas, padding, y + tile + 10.0, "1. Single Solid");
     y += tile + row_gap + label_height;
@@ -144,14 +152,8 @@ fn main() {
 
     // 3. solid + solid
     let fills = vec![
-        DemoPaint::Solid(SolidPaint {
-            color: CGColor(255, 0, 0, 255),
-            opacity: 1.0,
-        }),
-        DemoPaint::Solid(SolidPaint {
-            color: CGColor(0, 0, 255, 255),
-            opacity: 0.5,
-        }),
+        DemoPaint::Solid(SolidPaint::from(CGColor(255, 0, 0, 255))),
+        DemoPaint::Solid(SolidPaint::from(CGColor(0, 0, 255, 255))),
     ];
     draw_pair(canvas, padding, y, tile, &fills);
     draw_label(canvas, padding, y + tile + 10.0, "3. Solid + Solid (Alpha)");
@@ -159,10 +161,7 @@ fn main() {
 
     // 4. solid + linear gradient
     let fills = vec![
-        DemoPaint::Solid(SolidPaint {
-            color: CGColor(255, 255, 0, 255),
-            opacity: 1.0,
-        }),
+        DemoPaint::Solid(SolidPaint::from(CGColor(255, 255, 0, 255))),
         DemoPaint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::default(),
             stops: vec![
@@ -301,10 +300,7 @@ fn main() {
     // 8. ALL MIXED: solid + linear + radial + image (all with alpha)
     let image = load_fixture_image("checker.png", tile as i32, tile as i32);
     let fills = vec![
-        DemoPaint::Solid(SolidPaint {
-            color: CGColor(255, 0, 0, 255),
-            opacity: 0.7,
-        }),
+        DemoPaint::Solid(SolidPaint::from(CGColor(255, 0, 0, 255))),
         DemoPaint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::default(),
             stops: vec![

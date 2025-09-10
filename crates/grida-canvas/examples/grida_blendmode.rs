@@ -154,10 +154,7 @@ async fn demo_blendmode() -> Scene {
             width: circle_radius * 2.0,
             height: circle_radius * 2.0,
         };
-        green_circle.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(0, 255, 0, 255), // Green
-            opacity: 1.0,
-        }));
+        green_circle.set_fill(Paint::from(CGColor(0, 255, 0, 255)));
         green_circle.blend_mode = BlendMode::Normal; // Plus equivalent
         let green_circle_id = green_circle.id.clone();
         repository.insert(Node::Ellipse(green_circle));
@@ -171,10 +168,7 @@ async fn demo_blendmode() -> Scene {
             width: circle_radius * 2.0,
             height: circle_radius * 2.0,
         };
-        red_circle.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(255, 0, 0, 255), // Red
-            opacity: 1.0,
-        }));
+        red_circle.set_fill(Paint::from(CGColor(255, 0, 0, 255)));
         red_circle.blend_mode = BlendMode::Normal; // Plus equivalent
         let red_circle_id = red_circle.id.clone();
         repository.insert(Node::Ellipse(red_circle));
@@ -189,10 +183,7 @@ async fn demo_blendmode() -> Scene {
             width: circle_radius * 2.0,
             height: circle_radius * 2.0,
         };
-        blue_circle.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 255, 255), // Blue
-            opacity: 1.0,
-        }));
+        blue_circle.set_fill(Paint::from(CGColor(0, 0, 255, 255)));
         blue_circle.blend_mode = BlendMode::Normal; // Plus equivalent
         let blue_circle_id = blue_circle.id.clone();
         repository.insert(Node::Ellipse(blue_circle));
@@ -212,10 +203,7 @@ async fn demo_blendmode() -> Scene {
         label.text_style = TextStyleRec::from_font("Geist", 14.0);
         label.text_align = TextAlign::Left;
         label.text_align_vertical = TextAlignVertical::Top;
-        label.fill = Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 255), // Black text
-            opacity: 1.0,
-        });
+        label.fill = Paint::from(CGColor(0, 0, 0, 255));
         let label_id = label.id.clone();
         repository.insert(Node::TextSpan(label));
 

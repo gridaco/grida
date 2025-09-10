@@ -38,10 +38,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
     }));
-    rect1.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(255, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
     rect1.stroke_width = 2.0;
 
     let mut repository = NodeRepository::new();

@@ -831,10 +831,12 @@ impl<'a> NodePainter<'a> {
             let fill = Paint::Solid(SolidPaint {
                 color: CGColor(255, 0, 0, 51), // Semi-transparent red
                 opacity: 1.0,
+                blend_mode: BlendMode::Normal,
             });
             let stroke = Paint::Solid(SolidPaint {
                 color: CGColor(255, 0, 0, 255), // Solid red
                 opacity: 1.0,
+                blend_mode: BlendMode::Normal,
             });
 
             self.painter.with_opacity(node.opacity, || {

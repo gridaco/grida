@@ -25,10 +25,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                 height: 100.0,
             },
             corner_radius: RectangularCornerRadius::zero(),
-            fills: vec![Paint::Solid(SolidPaint {
-                color: CGColor(255, 0, 0, 255),
-                opacity: 1.0,
-            })],
+            fills: vec![Paint::from(CGColor(255, 0, 0, 255))],
             strokes: vec![],
             stroke_width: 1.0,
             stroke_align: StrokeAlign::Inside,

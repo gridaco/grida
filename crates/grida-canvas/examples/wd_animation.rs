@@ -20,10 +20,7 @@ fn create_scene(t: f32) -> Scene {
     rect.transform = AffineTransform::new(x, y, t);
     let r = ((t.sin() * 0.5 + 0.5) * 255.0) as u8;
     let g = ((t.cos() * 0.5 + 0.5) * 255.0) as u8;
-    rect.set_fill(Paint::Solid(SolidPaint {
-        color: CGColor(r, g, 200, 255),
-        opacity: 1.0,
-    }));
+    rect.set_fill(Paint::from(CGColor(r, g, 200, 255)));
     let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));
 
