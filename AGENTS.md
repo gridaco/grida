@@ -203,6 +203,9 @@ cargo test
 # for crates specific check
 cargo check
 
+# for crates (with long build time deps, e.g. skia)
+cargo clippy --no-deps
+
 # for crates specific build
 cargo build
 
