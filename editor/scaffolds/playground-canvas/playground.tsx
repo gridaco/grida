@@ -131,6 +131,13 @@ type UIConfig = {
 
 const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
 
+function snapshotFilename() {
+  const now = new Date();
+  const date = now.toISOString().split("T")[0];
+  const time = now.toLocaleTimeString().replace(/:/g, ".");
+  return `Snapshot ${date} at ${time}.grida`;
+}
+
 function useSyncMultiplayerCursors(editor: Editor, room_id?: string) {
   const pluginRef = useRef<EditorYSyncPlugin | null>(null);
 
@@ -273,7 +280,7 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
 
   const onExport = () => {
     const blob = instance.archive();
-    saveAs(blob, `${v4()}.grida`);
+    saveAs(blob, snapshotFilename());
   };
 
   return (
@@ -657,7 +664,7 @@ function PlaygroundMenuContent() {
 
   const onExport = () => {
     const blob = instance.archive();
-    saveAs(blob, `${v4()}.grida`);
+    saveAs(blob, snapshotFilename());
   };
 
   return (
