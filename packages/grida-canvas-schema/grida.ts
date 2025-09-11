@@ -1366,13 +1366,40 @@ export namespace grida.program.nodes {
     export interface ITextStyle {
       fontFamily?: string;
       fontSize: number;
+      /**
+       * font weight
+       *
+       * when set for VF font, the variation `wght` will also be set. - this always overrides the `wght` if different.
+       *
+       * @default 400
+       */
       fontWeight: cg.NFontWeight | number;
+
+      /**
+       * font width
+       *
+       * font width is high level exposure for `wdth` variable axis.
+       * this is effectively no-op if the font does not support `wdth` feature.
+       *
+       * @default undefined
+       *
+       */
+      fontWidth?: number;
+
+      /**
+       * font optical sizing
+       *
+       * when set for VF font, the variation `opsz` will also be set. - this always overrides the `opsz` if different.
+       *
+       * @default "auto"
+       */
       fontOpticalSizing?: cg.OpticalSizing;
 
       /**
        * Font kerning mode
        *
        * this controls the font feature `kern` this serves as high-level `kern` switch.
+       * this is effectively no-op if the font does not support `kern` feature.
        *
        * @default `normal`
        */

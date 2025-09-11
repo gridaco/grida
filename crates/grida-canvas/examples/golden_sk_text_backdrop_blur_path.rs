@@ -141,6 +141,7 @@ fn create_paragraph(text: &str, text_color: Color) -> Paragraph {
         font_family: "Geist".to_string(),
         font_size: 144.0,
         font_weight: FontWeight(900), // Maximum weight
+        font_width: None,
         font_kerning: true,
         font_style_italic: false,
         text_decoration: None,

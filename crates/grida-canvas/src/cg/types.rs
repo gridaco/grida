@@ -675,6 +675,8 @@ pub struct FontVariation {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FontOpticalSizing {
+    /// Auto mode will set the optical size to the font size.
+    /// this is the default behavior.
     Auto,
     None,
     Fixed(f32),
@@ -746,12 +748,30 @@ pub struct TextStyleRec {
     /// Font weight (100–900).
     pub font_weight: FontWeight,
 
+    /// Font width
+    /// this is a high-level exposure for `wdth` variable axis.
+    /// this is effectively no-op if the font does not support `wdth` feature.
+    pub font_width: Option<f32>,
+
     /// Font italic style.
     pub font_style_italic: bool,
 
     /// Font kerning.
     /// this is a high-level switch for the font feature `kern`.
     pub font_kerning: bool,
+
+    /// Font optical sizing
+    /// this is a high-level exposure for `opsz` variable axis.
+    /// this is effectively no-op if the font does not support `opsz` feature.
+    ///
+    /// defaults to [`FontOpticalSizing::Auto`]
+    pub font_optical_sizing: FontOpticalSizing,
+
+    /// OpenType font features
+    pub font_features: Option<Vec<FontFeature>>,
+
+    /// Custom font variation axes
+    pub font_variations: Option<Vec<FontVariation>>,
 
     /// Additional spacing between characters, in logical pixels.
     /// Default is `0.0`.
@@ -766,15 +786,6 @@ pub struct TextStyleRec {
 
     /// Text transform (e.g. uppercase, lowercase, capitalize)
     pub text_transform: TextTransform,
-
-    /// Font optical sizing
-    pub font_optical_sizing: FontOpticalSizing,
-
-    /// OpenType font features
-    pub font_features: Option<Vec<FontFeature>>,
-
-    /// Custom font variation axes
-    pub font_variations: Option<Vec<FontVariation>>,
 }
 
 impl TextStyleRec {
@@ -784,15 +795,16 @@ impl TextStyleRec {
             font_family: font.to_string(),
             font_size: size,
             font_weight: Default::default(),
+            font_width: None,
             font_style_italic: false,
             font_kerning: true,
+            font_optical_sizing: FontOpticalSizing::Auto,
+            font_features: None,
+            font_variations: None,
             letter_spacing: Default::default(),
             word_spacing: Default::default(),
             line_height: Default::default(),
             text_transform: TextTransform::None,
-            font_optical_sizing: FontOpticalSizing::Auto,
-            font_features: None,
-            font_variations: None,
         }
     }
 }

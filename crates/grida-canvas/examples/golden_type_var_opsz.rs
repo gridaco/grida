@@ -327,6 +327,7 @@ fn draw_text_example(
         font_family: "Roboto Flex".to_string(),
         font_size: font_size,
         font_weight: Default::default(),
+        font_width: None,
         font_kerning: true,
         font_features: None,
         font_variations: None,

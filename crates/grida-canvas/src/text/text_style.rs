@@ -1,8 +1,6 @@
 use crate::cg::types::*;
 use skia_safe;
 
-// pub fn decoration()
-
 pub fn textstyle(
     style: &TextStyleRec,
     _ctx: &Option<TextStyleRecBuildContext>,
@@ -28,12 +26,9 @@ pub fn textstyle(
     );
 
     // [variables]
-    let mut coords = vec![var_wght(style.font_weight.value() as f32)];
-    match style.font_optical_sizing {
-        FontOpticalSizing::Auto => coords.push(var_opsz(style.font_size)),
-        FontOpticalSizing::Fixed(v) => coords.push(var_opsz(v)),
-        FontOpticalSizing::None => {}
-    }
+    let mut coords = vec![];
+
+    // variables::[1]. apply font variations
     if let Some(vars) = &style.font_variations {
         for v in vars {
             let tag = tag_from_str(&v.axis);
@@ -43,6 +38,23 @@ pub fn textstyle(
             });
         }
     }
+
+    // higher-level attribute overrides
+    // variables::[2.1]. apply font weight
+    coords.push(var_wght(style.font_weight.value() as f32));
+
+    // variables::[2.2]. apply font width
+    if let Some(wdth) = style.font_width {
+        coords.push(var_wdth(wdth));
+    }
+
+    // variables::[2.3]. apply font optical sizing
+    match style.font_optical_sizing {
+        FontOpticalSizing::Auto => coords.push(var_opsz(style.font_size)),
+        FontOpticalSizing::Fixed(v) => coords.push(var_opsz(v)),
+        FontOpticalSizing::None => {}
+    }
+
     let variation_position = skia_safe::font_arguments::VariationPosition {
         coordinates: coords.as_slice(),
     };
@@ -52,8 +64,7 @@ pub fn textstyle(
     //
     ts.set_font_size(style.font_size);
 
-    // if non-zero
-
+    // letter_spacing
     // map
     let letter_spacing = match style.letter_spacing {
         TextLetterSpacing::Fixed(px) => px,
@@ -64,6 +75,8 @@ pub fn textstyle(
         ts.set_letter_spacing(letter_spacing);
     }
 
+    // word_spacing
+    // map
     let word_spacing = match style.word_spacing {
         TextWordSpacing::Fixed(px) => px,
         TextWordSpacing::Factor(factor) => factor * style.font_size,
@@ -122,10 +135,17 @@ pub fn textstyle(
     ts
 }
 
-fn var_wght(weight: f32) -> skia_safe::font_arguments::variation_position::Coordinate {
+fn var_wght(wght: f32) -> skia_safe::font_arguments::variation_position::Coordinate {
     skia_safe::font_arguments::variation_position::Coordinate {
         axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
-        value: weight,
+        value: wght,
+    }
+}
+
+fn var_wdth(wdth: f32) -> skia_safe::font_arguments::variation_position::Coordinate {
+    skia_safe::font_arguments::variation_position::Coordinate {
+        axis: skia_safe::FourByteTag::from(('w', 'd', 't', 'h')),
+        value: wdth,
     }
 }
 
