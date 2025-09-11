@@ -1264,13 +1264,21 @@ function LayerOverlayResizeSide({
       event.preventDefault();
       event.stopPropagation();
 
-      // feat: text-node-auto-width
+      // feat: text-node-auto-size
       if (
-        anchor === "e" &&
         typeof selection === "string" &&
         editor.getNodeSnapshotById(selection)?.type === "text"
       ) {
-        editor.changeNodeSize(selection, "width", "auto");
+        switch (anchor) {
+          case "e":
+          case "w":
+            editor.changeNodeSize(selection, "width", "auto");
+            break;
+          case "n":
+          case "s":
+            editor.changeNodeSize(selection, "height", "auto");
+            break;
+        }
       }
     },
   });

@@ -3,4 +3,4 @@
 - [hide and show right inspection panel](./right-inspector-panel-show-hide.md)
 - [vector network editor](./vector-network-editor.md)
 - [copy selection as PNG](./copy-as-png.md)
-- [text node auto width](./feat-text-node-auto-width.md)
+- [text node auto size](./feat-text-node-auto-size.md)
