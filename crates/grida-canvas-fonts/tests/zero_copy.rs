@@ -1,4 +1,4 @@
-use grida_canvas_fonts::parse_ui::*;
+use fonts::parse_ui::*;
 
 /// Test that zero-copy UIFontFace works correctly
 #[test]

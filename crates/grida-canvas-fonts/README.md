@@ -18,7 +18,7 @@ This crate implements a complete font selection pipeline that follows the Blink 
 ## Quick Start
 
 ```rust
-use grida_canvas_fonts::{UIFontParser, UIFontFace};
+use fonts::{UIFontParser, UIFontFace};
 
 // Create parser and load font data
 let parser = UIFontParser::new();
@@ -124,7 +124,7 @@ The library is organized into focused modules following the Selection terminolog
 ### Font Selection API (Core)
 
 ```rust
-use grida_canvas_fonts::{FontSelectionParser, FaceRecord, FontStyle};
+use fonts::{FontSelectionParser, FaceRecord, FontStyle};
 
 // Create font selection parser
 let parser = FontSelectionParser::new();
@@ -168,7 +168,7 @@ match selection {
 ### High-Level UI API (Recommended)
 
 ```rust
-use grida_canvas_fonts::UIFontParser;
+use fonts::UIFontParser;
 
 // Create UI parser
 let parser = UIFontParser::new();
@@ -214,7 +214,7 @@ if let Some(vf_info) = &result.variable_font_info {
 ### Low-Level API (Advanced Usage)
 
 ```rust
-use grida_canvas_fonts::{Parser, FontSelectionParser};
+use fonts::{Parser, FontSelectionParser};
 
 // Parse individual font files
 let font_data = std::fs::read("font.ttf")?;
@@ -233,7 +233,7 @@ let capability_map = selection_parser.build_capability_map(faces);
 ### JSON Serialization (with `serde` feature)
 
 ```rust
-use grida_canvas_fonts::serde::*;
+use fonts::serde::*;
 
 // Enable serde feature: cargo build --features serde
 
@@ -574,7 +574,7 @@ The library handles various font family configurations:
 ### Basic Font Analysis
 
 ```rust
-use grida_canvas_fonts::{UIFontParser, UIFontFace};
+use fonts::{UIFontParser, UIFontFace};
 
 let parser = UIFontParser::new();
 let font_faces = vec![UIFontFace {
@@ -616,7 +616,7 @@ println!("Italic available: {}", result.italic_capability.has_italic);
 Find the closest italic or roman variants to your current text style:
 
 ```rust
-use grida_canvas_fonts::{UIFontParser, UIFontFace, CurrentTextStyle};
+use fonts::{UIFontParser, UIFontFace, CurrentTextStyle};
 use std::collections::HashMap;
 
 let parser = UIFontParser::new();
@@ -686,7 +686,7 @@ if let Some(closest_roman) = roman_matches.first() {
 For easier toggling between italic and roman variants, use the unified `get_faces()` interface:
 
 ```rust
-use grida_canvas_fonts::{UIFontParser, UIFontFace, CurrentTextStyle, FaceType};
+use fonts::{UIFontParser, UIFontFace, CurrentTextStyle, FaceType};
 use std::collections::HashMap;
 
 let parser = UIFontParser::new();
@@ -742,7 +742,7 @@ let toggle_to_italic = parser.get_faces(
 
 ```rust
 // Enable serde feature
-use grida_canvas_fonts::serde::*;
+use fonts::serde::*;
 
 // Create analysis response
 let response = FontAnalysisResponse {

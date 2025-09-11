@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use grida_canvas_fonts::FaceRecord;
-use grida_canvas_fonts::selection_italic as italic;
+use fonts::FaceRecord;
+use fonts::selection_italic as italic;
 
 /// Test italic instance detection with various name combinations
 #[test]

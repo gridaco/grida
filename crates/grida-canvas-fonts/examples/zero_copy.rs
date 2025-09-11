@@ -1,4 +1,4 @@
-use grida_canvas_fonts::parse_ui::*;
+use fonts::parse_ui::*;
 
 /// Example that demonstrates both copy and zero-copy APIs work
 fn main() {

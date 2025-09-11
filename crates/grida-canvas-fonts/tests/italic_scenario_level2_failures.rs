@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use grida_canvas_fonts::selection_italic as italic;
-use grida_canvas_fonts::FaceRecord;
+use fonts::selection_italic as italic;
+use fonts::FaceRecord;
 
 /// Test scenarios that demonstrate Level 2+ features that fail with Level 1 implementation.
 ///

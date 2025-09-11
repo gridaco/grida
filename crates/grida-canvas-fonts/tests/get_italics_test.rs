@@ -1,6 +1,6 @@
 //! Tests for the `get_italics` method functionality.
 
-use grida_canvas_fonts::parse_ui::{CurrentTextStyle, UIFontFace, UIFontParser};
+use fonts::parse_ui::{CurrentTextStyle, UIFontFace, UIFontParser};
 use std::collections::HashMap;
 use std::fs;
 

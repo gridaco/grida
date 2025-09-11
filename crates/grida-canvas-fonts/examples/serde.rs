@@ -6,7 +6,7 @@
 //! Run with: cargo run --example wasm_communication --features serde
 
 #[cfg(feature = "serde")]
-use grida_canvas_fonts::serde::*;
+use fonts::serde::*;
 
 #[cfg(feature = "serde")]
 fn main() {

@@ -140,7 +140,7 @@ impl UIFontParser {
     ///
     /// # Example
     /// ```rust
-    /// use grida_canvas_fonts::parse_ui::{UIFontParser, UIFontFace};
+    /// use fonts::parse_ui::{UIFontParser, UIFontFace};
     ///
     /// let parser = UIFontParser::new();
     /// // Note: In real usage, you would load actual font files
@@ -663,7 +663,7 @@ impl UIFontParser {
     ///
     /// # Example
     /// ```rust
-    /// use grida_canvas_fonts::parse_ui::{UIFontParser, UIFontFace, CurrentTextStyle};
+    /// use fonts::parse_ui::{UIFontParser, UIFontFace, CurrentTextStyle};
     /// use std::collections::HashMap;
     ///
     /// let parser = UIFontParser::new();
@@ -947,7 +947,7 @@ impl UIFontParser {
     /// # Examples
     ///
     /// ```rust
-    /// use grida_canvas_fonts::{UIFontParser, UIFontFace, CurrentTextStyle};
+    /// use fonts::{UIFontParser, UIFontFace, CurrentTextStyle};
     /// use std::collections::HashMap;
     ///
     /// let parser = UIFontParser::new();
@@ -1129,7 +1129,7 @@ impl UIFontParser {
     /// # Examples
     ///
     /// ```rust
-    /// use grida_canvas_fonts::{UIFontParser, UIFontFace, CurrentTextStyle, FaceType};
+    /// use fonts::{UIFontParser, UIFontFace, CurrentTextStyle, FaceType};
     /// use std::collections::HashMap;
     ///
     /// let parser = UIFontParser::new();

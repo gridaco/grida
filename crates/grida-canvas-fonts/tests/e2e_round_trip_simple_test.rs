@@ -1,4 +1,4 @@
-use grida_canvas_fonts::{CurrentTextStyle, UIFontFace, UIFontParser};
+use fonts::{CurrentTextStyle, UIFontFace, UIFontParser};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;

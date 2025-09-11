@@ -1,4 +1,4 @@
-use grida_canvas_fonts::{CurrentTextStyle, UIFontParser};
+use fonts::{CurrentTextStyle, UIFontParser};
 use std::collections::HashMap;
 
 /// Test smart auto-resolution for CurrentTextStyle

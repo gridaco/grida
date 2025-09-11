@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use grida_canvas_fonts::{parse::Parser, selection_italic as italic, FaceRecord, FamilyScenario, ParserConfig, VfRecipe};
+use fonts::{parse::Parser, selection_italic as italic, FaceRecord, FamilyScenario, ParserConfig, VfRecipe};
 
 fn font_path(rel: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

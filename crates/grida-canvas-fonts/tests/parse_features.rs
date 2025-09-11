@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use grida_canvas_fonts::Parser;
+use fonts::Parser;
 
 fn font_path(rel: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

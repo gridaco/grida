@@ -3,7 +3,7 @@
 //! This example demonstrates how to use the UIFontParser for family-level
 //! font analysis with opinionated, UI-friendly results.
 
-use grida_canvas_fonts::{UIFontFace, UIFontParser};
+use fonts::{UIFontFace, UIFontParser};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🎨 UI Font Parser Example");
