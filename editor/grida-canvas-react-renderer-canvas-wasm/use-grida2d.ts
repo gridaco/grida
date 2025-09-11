@@ -23,6 +23,12 @@ export function useGrida2D(
 
         rendererRef.current = grida;
         console.log("grida wasm initialized");
+
+        if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
+          grida.setVerbose(true);
+          grida.setDebug(true);
+          console.log("wasm::factory", factory);
+        }
       });
     }
   }, [canvasRef]);

@@ -17,9 +17,11 @@ rustflags = [
     
     # Enable WebGL2 support for hardware-accelerated graphics
     "-C", "link-arg=-sMAX_WEBGL_VERSION=2",
+    "-C", "link-arg=-sUSE_WEBGL2=1",
     
     # Allow dynamic memory growth (important for large graphics operations)
     "-C", "link-arg=-sALLOW_MEMORY_GROWTH=1",
+    "-C", "link-arg=-sINITIAL_MEMORY=256MB",
     
     # Create modular output (factory function instead of global Module)
     "-C", "link-arg=-sMODULARIZE=1",
