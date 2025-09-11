@@ -1931,6 +1931,8 @@ export namespace editor.api {
     ): void;
     changeTextNodeFontFamily(node_id: NodeID, fontFamily: string): void;
     changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
+    changeTextNodeFontKerning(node_id: NodeID, fontKerning: boolean): void;
+    changeTextNodeFontWidth(node_id: NodeID, fontWidth: number): void;
 
     /**
      * use when font style change or family change
@@ -1941,6 +1943,7 @@ export namespace editor.api {
      * | `fontPostscriptName`  | set              | |
      * | `fontStyleItalic`     | set              | |
      * | `fontWeight`          | set              | |
+     * | `fontWidth`           | set              | |
      * | `fontOpticalSizing`   | set              | |
      * | `fontVariations`      | update / clean   | if instance change, remove not-defined variations |
      * | `fontFeatures`        | clean            | if instance change, remove not-def features |

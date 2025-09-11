@@ -27,8 +27,8 @@ describe("toReactTextStyle", () => {
 
     const result = css.toReactTextStyle(style);
 
-    expect(result.fontFeatureSettings).toBe('"liga" off, "smpl" on');
-    expect(result.fontVariationSettings).toBe('"wght" 700, "slnt" 12');
+    expect(result.fontFeatureSettings).toBe('"liga" off, "smpl" on, "kern" on');
+    expect(result.fontVariationSettings).toBe('"slnt" 12');
   });
 
   it("handles font optical sizing", () => {
@@ -51,7 +51,50 @@ describe("toReactTextStyle", () => {
     const result = css.toReactTextStyle(style);
 
     expect(result.fontOpticalSizing).toBe("none");
-    expect(result.fontVariationSettings).toBe('"wght" 500, "opsz" 12');
+    expect(result.fontVariationSettings).toBe('"opsz" 12');
+  });
+
+  it("overrides kern feature with fontKerning", () => {
+    const style: grida.program.nodes.i.IComputedTextNodeStyle = {
+      textAlign: "left",
+      textAlignVertical: "top",
+      textDecorationLine: "none",
+      fontFamily: "Inter",
+      fontSize: 16,
+      fontWeight: 400,
+      fontKerning: false,
+      fill: {
+        type: "solid",
+        color: { r: 0, g: 0, b: 0, a: 1 },
+      },
+      fontFeatures: { kern: true },
+    };
+
+    const result = css.toReactTextStyle(style);
+
+    expect(result.fontFeatureSettings).toBe('"kern" off');
+  });
+
+  it("overrides wdth variation with fontWidth", () => {
+    const style: grida.program.nodes.i.IComputedTextNodeStyle = {
+      textAlign: "left",
+      textAlignVertical: "top",
+      textDecorationLine: "none",
+      fontFamily: "Inter",
+      fontSize: 16,
+      fontWeight: 400,
+      fontKerning: true,
+      fontWidth: 150,
+      fill: {
+        type: "solid",
+        color: { r: 0, g: 0, b: 0, a: 1 },
+      },
+      fontVariations: { wdth: 120, wght: 500 },
+    };
+
+    const result = css.toReactTextStyle(style);
+
+    expect(result.fontVariationSettings).toBe('"wdth" 150');
   });
 
   it("maps textTransform to CSS property", () => {

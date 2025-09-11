@@ -1359,11 +1359,11 @@ export namespace grida.program.nodes {
     }
 
     /**
-     * Text Style
+     * Font Style
      *
-     * a set of properties that can be either applied to a text or textspan
+     * this is a abstract font-related style container, where this subset of text style attrutes are hightly likely change within this scope, as font family or font (postscript) / instance change.
      */
-    export interface ITextStyle {
+    export interface IFontStyle {
       fontFamily?: string;
       fontSize: number;
       /**
@@ -1434,7 +1434,14 @@ export namespace grida.program.nodes {
        */
       fontPostscriptName?: string;
       // #endregion semantics
+    }
 
+    /**
+     * Text Style
+     *
+     * a set of properties that can be either applied to a text or textspan
+     */
+    export interface ITextStyle extends IFontStyle {
       // #region decorations
       textDecorationLine: cg.TextDecorationLine;
       textDecorationStyle?: cg.TextDecorationStyle | null;

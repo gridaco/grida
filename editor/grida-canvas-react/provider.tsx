@@ -186,6 +186,10 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeFontFamily(node_id, value),
       fontWeight: (value: cg.NFontWeight) =>
         instance.changeTextNodeFontWeight(node_id, value),
+      fontKerning: (value: boolean) =>
+        instance.changeTextNodeFontKerning(node_id, value),
+      fontWidth: (value: number) =>
+        instance.changeTextNodeFontWidth(node_id, value),
       fontFeature: (key: cg.OpenTypeFeature, value: boolean) =>
         instance.changeTextNodeFontFeature(node_id, key, value),
       fontVariation: (key: string, value: number) =>

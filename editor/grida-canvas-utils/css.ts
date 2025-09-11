@@ -184,6 +184,7 @@ export namespace css {
         fontSize,
         fontWeight,
         fontKerning,
+        fontWidth,
         letterSpacing,
         lineHeight,
         fontFeatures,
@@ -208,6 +209,7 @@ export namespace css {
           fontSize,
           fontWeight,
           fontKerning,
+          fontWidth,
           letterSpacing,
           lineHeight,
           fontFeatures,
@@ -298,6 +300,7 @@ export namespace css {
       fontSize,
       fontWeight,
       fontKerning,
+      fontWidth,
       letterSpacing,
       wordSpacing,
       lineHeight,
@@ -308,7 +311,18 @@ export namespace css {
       fill,
     } = style;
 
+    let ffs = fontFeatures ? { ...fontFeatures } : undefined;
+    if (typeof fontKerning === "boolean") {
+      ffs = { ...(ffs ?? {}), kern: fontKerning };
+    }
+
     let fvs = fontVariations ? { ...fontVariations } : undefined;
+    if (typeof fontWeight === "number" && fvs) {
+      delete (fvs as any).wght;
+    }
+    if (typeof fontWidth === "number") {
+      fvs = { ...(fvs ?? {}), wdth: fontWidth };
+    }
     if (typeof fontOpticalSizing === "number") {
       fvs = { ...(fvs ?? {}), opsz: fontOpticalSizing };
     }
@@ -347,9 +361,7 @@ export namespace css {
       fontKerning: fontKerning ? "normal" : "none",
       fontOpticalSizing:
         typeof fontOpticalSizing === "number" ? "none" : fontOpticalSizing,
-      fontFeatureSettings: fontFeatures
-        ? toFontFeatureSettings(fontFeatures)
-        : undefined,
+      fontFeatureSettings: ffs ? toFontFeatureSettings(ffs) : undefined,
       fontVariationSettings: fvs ? toFontVariationSettings(fvs) : undefined,
       textTransform: textTransform,
       color: fill ? toFillString(fill) : undefined,

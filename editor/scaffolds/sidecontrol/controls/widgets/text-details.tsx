@@ -420,6 +420,8 @@ interface TextDetailsProps {
   fontFamily?: string;
   wordSpacing?: number;
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
+  fontKerning?: boolean;
+  fontWidth?: number;
   /**
    * required for opsz display
    */
@@ -441,6 +443,8 @@ interface TextDetailsProps {
   onFontVariationChange?: (key: string, value: number) => void;
   onFontOpticalSizingChange?: (value: cg.OpticalSizing) => void;
   onFontWeightChange?: (value: number) => void;
+  onFontKerningChange?: (value: boolean) => void;
+  onFontWidthChange?: (value: number) => void;
   onFontFeatureChange?: (key: cg.OpenTypeFeature, value: boolean) => void;
   onWordSpacingChange?: (change: editor.api.NumberChange) => void;
 }
@@ -460,6 +464,8 @@ export function TextDetails({
   fontVariations = {},
   fontOpticalSizing = "auto",
   fontWeight = 400,
+  fontKerning = true,
+  fontWidth,
   fontSize,
   fontFamily,
   wordSpacing = 0,
@@ -479,6 +485,8 @@ export function TextDetails({
   onFontVariationChange,
   onFontOpticalSizingChange,
   onFontWeightChange,
+  onFontKerningChange,
+  onFontWidthChange,
   onFontFeatureChange,
   onWordSpacingChange,
 }: TextDetailsProps) {
@@ -530,6 +538,13 @@ export function TextDetails({
     setHoverPreview(null);
   };
 
+  const handleFontFeatureChange = (key: cg.OpenTypeFeature, value: boolean) => {
+    if (key === "kern") {
+      onFontKerningChange?.(value);
+    }
+    onFontFeatureChange?.(key, value);
+  };
+
   const handleTruncateToggleChange = (value: string) => {
     const isEnabled = value === "on";
     const next = isEnabled ? (maxLines && maxLines > 0 ? maxLines : 2) : 0;
@@ -538,6 +553,7 @@ export function TextDetails({
 
   const hasVariableAxes = axes && Object.keys(axes).length > 0;
   const hasFeatures = features.length > 0;
+  const resolvedFontFeatures = { ...fontFeatures, kern: fontKerning };
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -772,8 +788,8 @@ export function TextDetails({
               <div className="space-y-4">
                 <FontFeatureSettings
                   features={features}
-                  fontFeatures={fontFeatures}
-                  onFeatureToggleChange={onFontFeatureChange}
+                  fontFeatures={resolvedFontFeatures}
+                  onFeatureToggleChange={handleFontFeatureChange}
                   onFeatureHover={handleFeatureHover}
                   onFeatureHoverLeave={handleFeatureHoverLeave}
                 />
@@ -804,6 +820,7 @@ export function TextDetails({
                         onFontOpticalSizingChange={onFontOpticalSizingChange}
                         onFontVariationChange={onFontVariationChange}
                         onFontWeightChange={onFontWeightChange}
+                        onFontWidthChange={onFontWidthChange}
                         onHover={() => handleAxisHover(key)}
                         onHoverLeave={handleAxisHoverLeave}
                       />
@@ -814,6 +831,7 @@ export function TextDetails({
                     fontVariations,
                     fontWeight,
                     fontOpticalSizing,
+                    fontWidth,
                     key
                   );
 
@@ -847,7 +865,8 @@ export function TextDetails({
                                 v,
                                 onFontVariationChange,
                                 onFontWeightChange,
-                                onFontOpticalSizingChange
+                                onFontOpticalSizingChange,
+                                onFontWidthChange
                               );
                             }}
                             min={axis.min}
@@ -872,7 +891,8 @@ export function TextDetails({
                               v,
                               onFontVariationChange,
                               onFontWeightChange,
-                              onFontOpticalSizingChange
+                              onFontOpticalSizingChange,
+                              onFontWidthChange
                             );
                           }}
                         />
@@ -896,6 +916,7 @@ interface OpticalSizeAxisProps {
   onFontOpticalSizingChange?: (value: cg.OpticalSizing) => void;
   onFontVariationChange?: (key: string, value: number) => void;
   onFontWeightChange?: (value: number) => void;
+  onFontWidthChange?: (value: number) => void;
   onHover: () => void;
   onHoverLeave: () => void;
 }
@@ -908,6 +929,7 @@ function OpticalSizeAxis({
   onFontOpticalSizingChange,
   onFontVariationChange,
   onFontWeightChange,
+  onFontWidthChange,
   onHover,
   onHoverLeave,
 }: OpticalSizeAxisProps) {
@@ -939,7 +961,8 @@ function OpticalSizeAxis({
                 v,
                 onFontVariationChange,
                 onFontWeightChange,
-                onFontOpticalSizingChange
+                onFontOpticalSizingChange,
+                onFontWidthChange
               );
             }}
             min={axis.min}
@@ -964,7 +987,8 @@ function OpticalSizeAxis({
               value,
               onFontVariationChange,
               onFontWeightChange,
-              onFontOpticalSizingChange
+              onFontOpticalSizingChange,
+              onFontWidthChange
             );
           }}
         />
@@ -1005,15 +1029,19 @@ const fvar = {
     fontVariations: Record<string, number> = {},
     fontWeight: number | undefined,
     fontOpticalSizing: cg.OpticalSizing | undefined,
+    fontWidth: number | undefined,
     key: string
   ): number | undefined => {
     if (key === "wght") {
-      return fontWeight ?? fontVariations[key];
+      return fontWeight ?? fontVariations["wght"];
     }
     if (key === "opsz") {
       return typeof fontOpticalSizing === "number"
         ? fontOpticalSizing
-        : fontVariations[key];
+        : fontVariations["opsz"];
+    }
+    if (key === "wdth") {
+      return fontWidth ?? fontVariations["wdth"];
     }
     return fontVariations[key];
   },
@@ -1022,12 +1050,15 @@ const fvar = {
     value: number,
     onFontVariationChange?: (key: string, value: number) => void,
     onFontWeightChange?: (value: number) => void,
-    onFontOpticalSizingChange?: (value: cg.OpticalSizing) => void
+    onFontOpticalSizingChange?: (value: cg.OpticalSizing) => void,
+    onFontWidthChange?: (value: number) => void
   ): void => {
     if (key === "wght") {
       onFontWeightChange?.(value);
     } else if (key === "opsz") {
       onFontOpticalSizingChange?.(value);
+    } else if (key === "wdth") {
+      onFontWidthChange?.(value);
     } else {
       onFontVariationChange?.(key, value);
     }

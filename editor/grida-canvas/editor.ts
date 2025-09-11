@@ -1946,6 +1946,22 @@ export class Editor
     });
   }
 
+  changeTextNodeFontKerning(node_id: string, fontKerning: boolean) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontKerning,
+    });
+  }
+
+  changeTextNodeFontWidth(node_id: string, fontWidth: number) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontWidth,
+    });
+  }
+
   changeTextNodeFontStyle(
     node_id: string,
     fontStyleDescription: editor.api.FontStyleChangeDescription
@@ -1957,14 +1973,17 @@ export class Editor
     ) as grida.program.nodes.TextNode;
 
     const prev_family = node.fontFamily;
-    const prev = {
+    const prev: grida.program.nodes.i.IFontStyle = {
       fontPostscriptName: node.fontPostscriptName,
       fontWeight: node.fontWeight,
+      fontWidth: node.fontWidth,
+      fontKerning: node.fontKerning,
+      fontSize: node.fontSize,
       fontVariations: node.fontVariations,
       fontFeatures: node.fontFeatures,
       fontOpticalSizing: node.fontOpticalSizing,
       fontStyleItalic: node.fontStyleItalic,
-    } as const;
+    };
 
     const match = this.matchFontFace(fontFamily, {
       fontPostscriptName,
@@ -1979,14 +1998,19 @@ export class Editor
     }
 
     const next_family = fontFamily;
-    const next = {
+    const next: grida.program.nodes.i.IFontStyle = {
       ...prev,
       fontPostscriptName:
         match.instance?.postscriptName || match.face.postscriptName,
-      fontWeight: match.instance?.coordinates?.wght,
+      // ----
+      // [high level variables]
+      fontWeight: match.instance?.coordinates?.wght ?? prev.fontWeight,
       // TODO: should prevent optical sizing auto => fixed
       // (if the next value === auto's expected value && prev value is auto, keep auto) => the change style does not change the size, so the logic can be even simpler.
-      fontOpticalSizing: match.instance?.coordinates?.opsz,
+      fontOpticalSizing:
+        match.instance?.coordinates?.opsz ?? prev.fontOpticalSizing,
+      fontWidth: match.instance?.coordinates?.wdth ?? prev.fontWidth,
+      // ----
       fontVariations: match.instance?.coordinates,
       // TODO: clean the invalid features by face change.
       // fontFeatures: match.features,

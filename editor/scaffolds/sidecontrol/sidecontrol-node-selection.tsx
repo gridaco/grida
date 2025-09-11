@@ -1372,6 +1372,8 @@ function SectionText({ node_id }: { node_id: string }) {
     fontVariations,
     fontFeatures,
     fontOpticalSizing,
+    fontKerning,
+    fontWidth,
   } = useNodeState(node_id, (_node) => {
     const node = _node as grida.program.nodes.TextNode;
     return {
@@ -1396,6 +1398,8 @@ function SectionText({ node_id }: { node_id: string }) {
       fontVariations: node.fontVariations,
       fontFeatures: node.fontFeatures,
       fontOpticalSizing: node.fontOpticalSizing,
+      fontKerning: node.fontKerning,
+      fontWidth: node.fontWidth,
     };
   });
 
@@ -1432,6 +1436,8 @@ function SectionText({ node_id }: { node_id: string }) {
                   fontVariations={fontVariations}
                   fontOpticalSizing={fontOpticalSizing}
                   fontWeight={fontWeight}
+                  fontKerning={fontKerning}
+                  fontWidth={fontWidth}
                   fontSize={fontSize}
                   fontFamily={fontFamily}
                   fontFeatures={fontFeatures}
@@ -1454,6 +1460,8 @@ function SectionText({ node_id }: { node_id: string }) {
                     actions.fontVariation(key, value);
                   }}
                   onFontOpticalSizingChange={actions.fontOpticalSizing}
+                  onFontKerningChange={actions.fontKerning}
+                  onFontWidthChange={actions.fontWidth}
                   onFontFeatureChange={(key, value) => {
                     actions.fontFeature(key, value);
                   }}

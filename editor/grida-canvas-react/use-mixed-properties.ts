@@ -135,6 +135,24 @@ export function useMixedProperties(ids: string[]) {
     [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontWeight]
   );
 
+  const fontKerning = useCallback(
+    (value: boolean) => {
+      mixedProperties.fontKerning?.ids.forEach((id) => {
+        instance.changeTextNodeFontKerning(id, value);
+      });
+    },
+    [mixedProperties.fontKerning?.ids, instance.changeTextNodeFontKerning]
+  );
+
+  const fontWidth = useCallback(
+    (value: number) => {
+      mixedProperties.fontWidth?.ids.forEach((id) => {
+        instance.changeTextNodeFontWidth(id, value);
+      });
+    },
+    [mixedProperties.fontWidth?.ids, instance.changeTextNodeFontWidth]
+  );
+
   const fontStyle = useCallback(
     (change: editor.api.FontStyleChangeDescription) => {
       mixedProperties.fontStyleItalic?.ids.forEach((id) => {
@@ -342,6 +360,8 @@ export function useMixedProperties(ids: string[]) {
       positioningMode,
       fontFamily,
       fontWeight,
+      fontKerning,
+      fontWidth,
       fontStyle,
       fontOpticalSizing,
       fontVariation,
@@ -375,6 +395,8 @@ export function useMixedProperties(ids: string[]) {
       positioningMode,
       fontFamily,
       fontWeight,
+      fontKerning,
+      fontWidth,
       fontStyle,
       fontOpticalSizing,
       fontVariation,
