@@ -1137,10 +1137,7 @@ function NodeOverlay({
               (supports.cornerRadius4(node.type, { backend }) ? (
                 <NodeOverlayRectangularCornerRadiusHandles node_id={node_id} />
               ) : (
-                <NodeOverlayCornerRadiusHandle
-                  node_id={node_id}
-                  anchor="se"
-                />
+                <NodeOverlayCornerRadiusHandle node_id={node_id} anchor="se" />
               ))}
             <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
             <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
@@ -1262,6 +1259,19 @@ function LayerOverlayResizeSide({
     onDragStart: ({ event }) => {
       event.preventDefault();
       editor.startScaleGesture(selection, anchor);
+    },
+    onDoubleClick: ({ event }) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      // feat: text-node-auto-width
+      if (
+        anchor === "e" &&
+        typeof selection === "string" &&
+        editor.getNodeSnapshotById(selection)?.type === "text"
+      ) {
+        editor.changeNodeSize(selection, "width", "auto");
+      }
     },
   });
 
