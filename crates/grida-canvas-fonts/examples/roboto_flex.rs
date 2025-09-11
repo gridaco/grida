@@ -13,6 +13,8 @@ fn main() {
     explore_roboto_flex_comprehensive();
     test_roboto_flex_italic_detection_scenarios();
     test_roboto_flex_name_table_analysis();
+    explore_roboto_flex_gpos_features();
+    explore_roboto_flex_feat_table();
 }
 
 fn explore_roboto_flex_comprehensive() {
@@ -391,4 +393,148 @@ fn test_roboto_flex_name_table_analysis() {
             }
         }
     }
+}
+
+fn explore_roboto_flex_gpos_features() {
+    let path = font_path(
+        "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf",
+    );
+
+    if !path.exists() {
+        println!("Roboto Flex font not found, skipping GPOS exploration");
+        return;
+    }
+
+    let data = fs::read(&path).unwrap();
+    let face = Face::parse(&data, 0).unwrap();
+    let tables = face.tables();
+
+    println!("=== ROBOTO FLEX GPOS FEATURES EXPLORATION ===");
+    println!();
+
+    // Check available tables
+    println!("📋 Available tables in Roboto Flex font:");
+    println!("  - kern: {}", tables.kern.is_some());
+    println!("  - GSUB: {}", tables.gsub.is_some());
+    println!("  - GPOS: {}", tables.gpos.is_some());
+    println!("  - fvar: {}", tables.fvar.is_some());
+    println!("  - STAT: {}", tables.stat.is_some());
+    println!();
+
+    // Explore GPOS table structure
+    if let Some(gpos) = tables.gpos {
+        println!("🎯 GPOS table found!");
+        println!("  - Scripts: {}", gpos.scripts.len());
+        println!("  - Features: {}", gpos.features.len());
+        println!("  - Lookups: {}", gpos.lookups.len());
+        println!();
+
+        // List GPOS features
+        println!("📝 GPOS features:");
+        for feature in gpos.features {
+            println!(
+                "  - {}: {} lookups",
+                feature.tag,
+                feature.lookup_indices.len()
+            );
+        }
+        println!();
+
+        // Explore lookups to see what gpos module provides
+        println!("🔍 GPOS lookup exploration:");
+        for lookup_index in 0..gpos.lookups.len() {
+            if let Some(lookup) = gpos.lookups.get(lookup_index) {
+                println!(
+                    "  Lookup {}: flags {:?}, subtables: {}",
+                    lookup_index,
+                    lookup.flags,
+                    lookup.subtables.len()
+                );
+
+                // Try to parse the first subtable using the gpos module
+                if let Some(pos_subtable) = lookup
+                    .subtables
+                    .get::<ttf_parser::gpos::PositioningSubtable>(0)
+                {
+                    println!("      PositioningSubtable parsed successfully!");
+                    println!("        Coverage: {:?}", pos_subtable.coverage());
+
+                    // Now we can use the gpos module types
+                    match pos_subtable {
+                        ttf_parser::gpos::PositioningSubtable::Single(single_adj) => {
+                            println!("        Single adjustment: {:?}", single_adj);
+                        }
+                        ttf_parser::gpos::PositioningSubtable::Pair(pair_adj) => {
+                            println!("        Pair adjustment: {:?}", pair_adj);
+                        }
+                        ttf_parser::gpos::PositioningSubtable::Cursive(cursive_adj) => {
+                            println!("        Cursive adjustment: {:?}", cursive_adj);
+                        }
+                        ttf_parser::gpos::PositioningSubtable::MarkToBase(mark_to_base) => {
+                            println!("        Mark to base: {:?}", mark_to_base);
+                        }
+                        ttf_parser::gpos::PositioningSubtable::MarkToLigature(mark_to_lig) => {
+                            println!("        Mark to ligature: {:?}", mark_to_lig);
+                        }
+                        ttf_parser::gpos::PositioningSubtable::MarkToMark(mark_to_mark) => {
+                            println!("        Mark to mark: {:?}", mark_to_mark);
+                        }
+                        ttf_parser::gpos::PositioningSubtable::Context(ctx) => {
+                            println!("        Context: {:?}", ctx);
+                        }
+                        ttf_parser::gpos::PositioningSubtable::ChainContext(chain_ctx) => {
+                            println!("        Chain context: {:?}", chain_ctx);
+                        }
+                    }
+                } else {
+                    println!("      Failed to parse PositioningSubtable");
+                }
+            }
+        }
+    } else {
+        println!("❌ GPOS table NOT found in Roboto Flex");
+    }
+    println!();
+}
+
+fn explore_roboto_flex_feat_table() {
+    let path = font_path(
+        "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf",
+    );
+
+    if !path.exists() {
+        println!("Roboto Flex font not found, skipping feat table exploration");
+        return;
+    }
+
+    let data = fs::read(&path).unwrap();
+    let face = Face::parse(&data, 0).unwrap();
+    let tables = face.tables();
+
+    println!("=== ROBOTO FLEX FEAT TABLE EXPLORATION ===");
+    println!();
+
+    // Check if we can access feat table using the feat module
+    if let Some(feat_table) = tables.feat {
+        println!("🎯 feat table found and already parsed!");
+        println!("Feature names count: {}", feat_table.names.len());
+        println!();
+
+        // List feature names using the feat module
+        println!("📝 Feature names (using feat module):");
+        for feature_name in feat_table.names {
+            println!(
+                "  - Feature ID {}: name_index {}",
+                feature_name.feature, feature_name.name_index
+            );
+            println!(
+                "    Settings: {}, Exclusive: {}",
+                feature_name.setting_names.len(),
+                feature_name.exclusive
+            );
+        }
+    } else {
+        println!("❌ feat table not found in Roboto Flex");
+    }
+    println!();
 }

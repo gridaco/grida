@@ -40,3 +40,19 @@ fn returns_original_characters_for_single_substitution_features() {
     let ss01 = features.iter().find(|f| f.tag == "ss01").unwrap();
     assert!(ss01.glyphs.contains(&"a".to_string()));
 }
+
+#[test]
+fn extracts_kern_feature_from_inter_font() {
+    let path = font_path("Inter/Inter-VariableFont_opsz,wght.ttf");
+    let data = fs::read(path).unwrap();
+    let parser = Parser::new(&data).unwrap();
+    let features = parser.ffeatures();
+
+    // Check if kern feature exists
+    let kern = features.iter().find(|f| f.tag == "kern");
+    assert!(kern.is_some(), "kern feature should exist in Inter font");
+
+    let kern_feature = kern.unwrap();
+    assert!(!kern_feature.lookup_indices.is_empty());
+    assert!(!kern_feature.glyphs.is_empty());
+}
