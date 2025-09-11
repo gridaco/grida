@@ -152,6 +152,7 @@ export namespace editor.config {
       fontFeatures: {},
       fontOpticalSizing: "auto",
       fontWeight: DEFAULT_FONT_WEIGHT,
+      fontKerning: true,
       fontSize: DEFAULT_FONT_SIZE,
       textDecorationLine: "none",
     };

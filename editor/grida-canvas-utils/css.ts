@@ -183,6 +183,7 @@ export namespace css {
         fontFamily,
         fontSize,
         fontWeight,
+        fontKerning,
         letterSpacing,
         lineHeight,
         fontFeatures,
@@ -206,6 +207,7 @@ export namespace css {
           fontFamily,
           fontSize,
           fontWeight,
+          fontKerning,
           letterSpacing,
           lineHeight,
           fontFeatures,
@@ -274,6 +276,7 @@ export namespace css {
     | "fontFamily"
     | "fontSize"
     | "fontWeight"
+    | "fontKerning"
     | "letterSpacing"
     | "wordSpacing"
     | "lineHeight"
@@ -294,6 +297,7 @@ export namespace css {
       fontFamily,
       fontSize,
       fontWeight,
+      fontKerning,
       letterSpacing,
       wordSpacing,
       lineHeight,
@@ -340,6 +344,7 @@ export namespace css {
         typeof wordSpacing === "number" ? `${wordSpacing}em` : undefined,
       fontSize: fontSize,
       fontWeight: fontWeight,
+      fontKerning: fontKerning ? "normal" : "none",
       fontOpticalSizing:
         typeof fontOpticalSizing === "number" ? "none" : fontOpticalSizing,
       fontFeatureSettings: fontFeatures

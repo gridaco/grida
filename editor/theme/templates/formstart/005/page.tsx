@@ -290,6 +290,7 @@ _005.definition = {
       width: "auto",
       height: "auto",
       fontWeight: 400,
+      fontKerning: true,
       fontSize: 24,
       textAlign: "left",
       textAlignVertical: "top",

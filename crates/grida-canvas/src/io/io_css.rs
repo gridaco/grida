@@ -113,6 +113,37 @@ where
     }
 }
 
+#[derive(Debug, PartialEq, Deserialize)]
+pub enum CSSFontKerning {
+    #[serde(rename = "auto")]
+    Auto,
+    #[serde(rename = "normal")]
+    Normal,
+    #[serde(rename = "none")]
+    None,
+}
+
+impl Default for CSSFontKerning {
+    fn default() -> Self {
+        CSSFontKerning::Auto
+    }
+}
+
+pub trait UserAgentAutoTaste {
+    /// converts a enum with "auto", that requires user agent default behaviour, to a boolean flag.
+    fn to_flag_with_auto(&self) -> bool;
+}
+
+impl UserAgentAutoTaste for CSSFontKerning {
+    fn to_flag_with_auto(&self) -> bool {
+        match self {
+            CSSFontKerning::Auto => true,
+            CSSFontKerning::Normal => true,
+            CSSFontKerning::None => false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

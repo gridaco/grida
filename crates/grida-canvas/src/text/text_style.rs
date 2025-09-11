@@ -115,6 +115,10 @@ pub fn textstyle(
             ts.add_font_feature(feature.tag.clone(), if feature.value { 1 } else { 0 });
         }
     }
+
+    // super override kerning for [font_kerning]
+    ts.add_font_feature("kern", if style.font_kerning { 1 } else { 0 });
+
     ts
 }
 

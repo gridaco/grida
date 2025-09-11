@@ -637,9 +637,11 @@ impl FontWeight {
         self.0
     }
 
-    pub fn default() -> Self {
-        Self(400)
-    }
+    pub const BOLD700: Self = Self(700);
+    pub const MEDIUM500: Self = Self(500);
+    pub const REGULAR400: Self = Self(400);
+    pub const LIGHT300: Self = Self(300);
+    pub const THIN100: Self = Self(100);
 }
 
 /// Context for building a text style.
@@ -747,6 +749,10 @@ pub struct TextStyleRec {
     /// Font italic style.
     pub font_style_italic: bool,
 
+    /// Font kerning.
+    /// this is a high-level switch for the font feature `kern`.
+    pub font_kerning: bool,
+
     /// Additional spacing between characters, in logical pixels.
     /// Default is `0.0`.
     pub letter_spacing: TextLetterSpacing,
@@ -779,6 +785,7 @@ impl TextStyleRec {
             font_size: size,
             font_weight: Default::default(),
             font_style_italic: false,
+            font_kerning: true,
             letter_spacing: Default::default(),
             word_spacing: Default::default(),
             line_height: Default::default(),

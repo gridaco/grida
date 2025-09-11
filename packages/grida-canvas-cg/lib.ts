@@ -547,6 +547,27 @@ export namespace cg {
   export type OpticalSizing = "auto" | "none" | number;
 
   /**
+   * Font kerning modes
+   *
+   * - `"normal"` enables kerning
+   * - `"none"` disables kerning
+   *
+   * @remark we don't support `auto`. use `normal` instead.
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-kerning
+   * @default `auto`
+   */
+  export type FontKerning = "normal" | "none";
+
+  /**
+   * Font kerning flag
+   *
+   * @see {@link FontKerning}
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-kerning
+   * @default `true`
+   */
+  export type FontKerningFlag = boolean;
+
+  /**
    * @see https://api.flutter.dev/flutter/painting/Axis.html
    */
   export type Axis = "horizontal" | "vertical";

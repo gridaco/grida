@@ -16,6 +16,7 @@ describe("toReactTextStyle", () => {
       fontFamily: "Inter",
       fontSize: 16,
       fontWeight: 400,
+      fontKerning: true,
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
@@ -38,6 +39,7 @@ describe("toReactTextStyle", () => {
       fontFamily: "Inter",
       fontSize: 16,
       fontWeight: 400,
+      fontKerning: true,
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
@@ -60,6 +62,7 @@ describe("toReactTextStyle", () => {
       fontFamily: "Inter",
       fontSize: 16,
       fontWeight: 400,
+      fontKerning: true,
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },

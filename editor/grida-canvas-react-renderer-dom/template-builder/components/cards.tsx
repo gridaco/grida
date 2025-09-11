@@ -103,6 +103,7 @@ export const Card_001 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".p": {
@@ -123,6 +124,7 @@ export const Card_001 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".date1": {
@@ -143,6 +145,7 @@ export const Card_001 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".n": {
@@ -163,6 +166,7 @@ export const Card_001 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".badge": {
@@ -183,6 +187,7 @@ export const Card_001 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".media": {
@@ -221,6 +226,7 @@ export const Card_001 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".tags": {
@@ -326,6 +332,7 @@ export const Card_002 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".p": {
@@ -346,6 +353,7 @@ export const Card_002 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".date1": {
@@ -366,6 +374,7 @@ export const Card_002 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".n": {
@@ -386,6 +395,7 @@ export const Card_002 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".badge": {
@@ -406,6 +416,7 @@ export const Card_002 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".media": {
@@ -444,6 +455,7 @@ export const Card_002 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
     },
@@ -551,6 +563,7 @@ export const Card_003 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".p": {
@@ -571,6 +584,7 @@ export const Card_003 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".date1": {
@@ -591,6 +605,7 @@ export const Card_003 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".n": {
@@ -611,6 +626,7 @@ export const Card_003 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".badge": {
@@ -631,6 +647,7 @@ export const Card_003 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".media": {
@@ -669,6 +686,7 @@ export const Card_003 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".tags": {
@@ -771,6 +789,7 @@ export const Hero_001 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".p": {
@@ -791,6 +810,7 @@ export const Hero_001 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".media": {
@@ -867,6 +887,7 @@ export const Hero_002 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".p": {
@@ -887,6 +908,7 @@ export const Hero_002 = withTemplateDefinition(
         textDecorationLine: "none",
         fontSize: 16,
         fontWeight: 400,
+        fontKerning: true,
         position: "relative",
       },
       ".media": {

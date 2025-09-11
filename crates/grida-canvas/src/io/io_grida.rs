@@ -1,6 +1,9 @@
 use crate::cg::types::*;
 use crate::cg::varwidth::{VarWidthProfile, WidthStop};
-use crate::io::io_css::{de_css_dimension, default_height_css, default_width_css, CSSDimension};
+use crate::io::io_css::{
+    de_css_dimension, default_height_css, default_width_css, CSSDimension, CSSFontKerning,
+    UserAgentAutoTaste,
+};
 use crate::node::schema::*;
 use crate::vectornetwork::*;
 use math2::transform::AffineTransform;
@@ -439,6 +442,8 @@ pub struct JSONTextNode {
     #[serde(rename = "fontStyleItalic", default)]
     pub font_style_italic: bool,
 
+    #[serde(rename = "fontKerning", default)]
+    pub font_kerning: CSSFontKerning,
     #[serde(rename = "fontFeatures", default)]
     pub font_features: Option<HashMap<String, bool>>,
     #[serde(rename = "fontVariations", default)]
@@ -734,6 +739,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                     .map(TextLineHeight::Factor)
                     .unwrap_or_default(),
                 text_transform: node.text_transform,
+                font_kerning: node.font_kerning.to_flag_with_auto(),
                 font_features: node.font_features.map(|ff| {
                     ff.into_iter()
                         .map(|(tag, value)| FontFeature { tag, value })

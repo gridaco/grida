@@ -902,6 +902,7 @@ impl FigmaConverter {
                 font_features: None,
                 font_variations: None,
                 font_weight: FontWeight::new(style.font_weight.unwrap_or(400.0) as u32),
+                font_kerning: true,
                 letter_spacing: style
                     .letter_spacing
                     .map(|v| TextLetterSpacing::Factor(v as f32))

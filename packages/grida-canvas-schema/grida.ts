@@ -1370,6 +1370,15 @@ export namespace grida.program.nodes {
       fontOpticalSizing?: cg.OpticalSizing;
 
       /**
+       * Font kerning mode
+       *
+       * this controls the font feature `kern` this serves as high-level `kern` switch.
+       *
+       * @default `normal`
+       */
+      fontKerning: cg.FontKerningFlag;
+
+      /**
        * OpenType features
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-feature-settings
        */

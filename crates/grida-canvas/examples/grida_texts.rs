@@ -38,6 +38,7 @@ async fn demo_texts() -> Scene {
         font_size: 48.0,
         font_style_italic: false,          // TODO: add italic to text style
         font_weight: FontWeight::new(700), // Bold
+        font_kerning: true,
         font_features: None,
         font_variations: None,
         font_optical_sizing: Default::default(),

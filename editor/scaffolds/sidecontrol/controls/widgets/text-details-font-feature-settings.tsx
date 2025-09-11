@@ -30,16 +30,23 @@ const NUMBER_FEATURES = [
 // Letter case-related OpenType features
 const LETTER_CASE_FEATURES = [
   "case", // Case sensitive forms
+] as const;
+
+// Horizontal spacing-related OpenType features
+const HORIZONTAL_SPACING_FEATURES = [
   "cpsp", // Capital spacing
+  "kern", // Kerning
 ] as const;
 
 type NumberFeature = (typeof NUMBER_FEATURES)[number];
 type LetterCaseFeature = (typeof LETTER_CASE_FEATURES)[number];
+type HorizontalSpacingFeature = (typeof HORIZONTAL_SPACING_FEATURES)[number];
 
 interface GroupedFeatures {
   ssxx: FontFeature[];
   numbers: FontFeature[];
   letterCase: FontFeature[];
+  horizontal_spacing: FontFeature[];
   other: FontFeature[];
 }
 
@@ -56,23 +63,29 @@ function groupFeatures(features: FontFeature[]): GroupedFeatures {
     LETTER_CASE_FEATURES.includes(feature.tag as LetterCaseFeature)
   );
 
-  const other = features
-    .filter(
-      (feature) =>
-        !feature.tag.startsWith("ss") || !/^ss\d{1,2}$/.test(feature.tag)
+  const horizontal_spacing = features.filter((feature) =>
+    HORIZONTAL_SPACING_FEATURES.includes(
+      feature.tag as HorizontalSpacingFeature
     )
-    .filter(
-      (feature) => !NUMBER_FEATURES.includes(feature.tag as NumberFeature)
-    )
-    .filter(
-      (feature) =>
-        !LETTER_CASE_FEATURES.includes(feature.tag as LetterCaseFeature)
-    );
+  );
+
+  // Build other features by excluding already categorized features
+  const categorizedFeatures = new Set([
+    ...ssxx.map((f) => f.tag),
+    ...numbers.map((f) => f.tag),
+    ...letterCase.map((f) => f.tag),
+    ...horizontal_spacing.map((f) => f.tag),
+  ]);
+
+  const other = features.filter(
+    (feature) => !categorizedFeatures.has(feature.tag)
+  );
 
   return {
     ssxx,
     numbers,
     letterCase,
+    horizontal_spacing,
     other,
   };
 }
@@ -151,7 +164,7 @@ function FontFeatureToggle({
 }
 
 interface FontFeatureSectionProps {
-  title: string;
+  title?: string;
   features: FontFeature[];
   fontFeatures: Partial<Record<cg.OpenTypeFeature, boolean>>;
   onFeatureToggleChange?: (feature: cg.OpenTypeFeature, value: boolean) => void;
@@ -171,11 +184,13 @@ function FontFeatureSection({
 
   return (
     <div className="space-y-3">
-      <PropertyLine>
-        <Label className="text-sm font-semibold text-foreground w-auto">
-          {title}
-        </Label>
-      </PropertyLine>
+      {title && (
+        <PropertyLine>
+          <Label className="text-sm font-semibold text-foreground w-auto">
+            {title}
+          </Label>
+        </PropertyLine>
+      )}
       <div>
         {features.map((feature) => {
           const tag = feature.tag as cg.OpenTypeFeature;
@@ -212,15 +227,26 @@ export function FontFeatureSettings({
   onFeatureHoverLeave,
 }: FontFeatureSettingsProps) {
   const groupedFeatures = groupFeatures(features);
-  const { ssxx, numbers, letterCase, other } = groupedFeatures;
+  const { ssxx, numbers, letterCase, horizontal_spacing, other } =
+    groupedFeatures;
 
   return (
     <div className="divide-y divide-border">
+      <div className="py-6 first:pt-0 last:pb-0">
+        <PropertyLine>
+          <Label className="text-sm font-semibold text-foreground w-auto">
+            Features{" "}
+            <span className="text-xs text-muted-foreground">
+              ({features.length})
+            </span>
+          </Label>
+        </PropertyLine>
+      </div>
+
       {/* Other Features Section */}
       {other.length > 0 && (
         <div className="py-6 first:pt-0 last:pb-0">
           <FontFeatureSection
-            title="Features"
             features={other}
             fontFeatures={fontFeatures}
             onFeatureToggleChange={onFeatureToggleChange}
@@ -250,6 +276,20 @@ export function FontFeatureSettings({
           <FontFeatureSection
             title="Letter case"
             features={letterCase}
+            fontFeatures={fontFeatures}
+            onFeatureToggleChange={onFeatureToggleChange}
+            onFeatureHover={onFeatureHover}
+            onFeatureHoverLeave={onFeatureHoverLeave}
+          />
+        </div>
+      )}
+
+      {/* Horizontal Spacing Section */}
+      {horizontal_spacing.length > 0 && (
+        <div className="py-6 first:pt-0 last:pb-0">
+          <FontFeatureSection
+            title="Horizontal spacing"
+            features={horizontal_spacing}
             fontFeatures={fontFeatures}
             onFeatureToggleChange={onFeatureToggleChange}
             onFeatureHover={onFeatureHover}

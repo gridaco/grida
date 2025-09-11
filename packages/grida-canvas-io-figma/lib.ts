@@ -575,6 +575,7 @@ export namespace iofigma {
               fontFamily: node.style.fontFamily,
               fontWeight:
                 (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
+              fontKerning: true, // TODO: parse from features (`kern`)
             };
           }
           case "RECTANGLE": {

@@ -26,7 +26,8 @@ async fn demo_webfonts() -> Scene {
         text_decoration: None,
         font_family: "Playfair Display".to_string(),
         font_size: 64.0,
-        font_weight: FontWeight::new(700), // Bold
+        font_weight: FontWeight::BOLD700,
+        font_kerning: true,
         font_features: None,
         font_variations: None,
         font_optical_sizing: Default::default(),
@@ -49,7 +50,8 @@ async fn demo_webfonts() -> Scene {
         text_decoration: None,
         font_family: "Playfair Display".to_string(),
         font_size: 14.0,
-        font_weight: FontWeight::new(400), // Regular
+        font_weight: Default::default(),
+        font_kerning: true,
         font_features: None,
         font_variations: None,
         font_optical_sizing: Default::default(),
@@ -95,6 +97,7 @@ async fn demo_webfonts() -> Scene {
             font_family: "Albert Sans".to_string(),
             font_size: 24.0,
             font_weight: FontWeight::new(*weight),
+            font_kerning: true,
             font_features: None,
             font_variations: None,
             font_optical_sizing: Default::default(),
