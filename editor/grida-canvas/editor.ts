@@ -15,7 +15,7 @@ import { InternalAction, TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
-import type { Grida2D } from "@grida/canvas-wasm";
+import type { Scene } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
 import * as google from "@grida/fonts/google";
 import type { FvarAxes, FvarInstance, FontFeature } from "@grida/fonts/parse";
@@ -89,7 +89,11 @@ export class Editor
   private mstate: editor.state.IEditorState;
 
   readonly backend: editor.EditorContentRenderingBackend;
+
   readonly viewport: domapi.DOMViewportApi;
+
+  private _m_wasm_canva_scene: Scene | null = null;
+
   _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
   get geometry() {
     return this._m_geometry;
@@ -145,7 +149,7 @@ export class Editor
   }: {
     backend: editor.EditorContentRenderingBackend;
     viewportElement: string | HTMLElement;
-    contentElement: string | HTMLElement | Grida2D;
+    contentElement: string | HTMLElement | Scene;
     geometry:
       | editor.api.IDocumentGeometryInterfaceProvider
       | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider);
@@ -286,9 +290,10 @@ export class Editor
     return this._tid;
   }
 
-  public bind(surface: Grida2D) {
+  public bind(surface: Scene) {
     this.log("bind surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");
+    this._m_wasm_canva_scene = surface;
     //
     this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
       this,

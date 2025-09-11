@@ -1,7 +1,7 @@
 import cmath from "@grida/cmath";
 import type { editor } from "..";
 import type { Editor } from "../editor";
-import type { Grida2D } from "@grida/canvas-wasm";
+import type { Scene } from "@grida/canvas-wasm";
 import type vn from "@grida/vn";
 import {
   UnifiedFontManager,
@@ -15,7 +15,7 @@ export class CanvasWasmGeometryQueryInterfaceProvider
 {
   constructor(
     readonly editor: Editor,
-    readonly surface: Grida2D
+    readonly surface: Scene
   ) {}
 
   getNodeIdsFromPoint(point: cmath.Vector2): string[] {
@@ -47,7 +47,7 @@ export class CanvasWasmImageExportInterfaceProvider
 {
   constructor(
     readonly editor: Editor,
-    readonly surface: Grida2D
+    readonly surface: Scene
   ) {}
 
   async exportNodeAsImage(
@@ -70,7 +70,7 @@ export class CanvasWasmPDFExportInterfaceProvider
 {
   constructor(
     readonly editor: Editor,
-    readonly surface: Grida2D
+    readonly surface: Scene
   ) {}
 
   async exportNodeAsPDF(node_id: string): Promise<Uint8Array> {
@@ -86,7 +86,7 @@ export class CanvasWasmSVGExportInterfaceProvider
 {
   constructor(
     readonly editor: Editor,
-    readonly surface: Grida2D
+    readonly surface: Scene
   ) {}
 
   async exportNodeAsSVG(node_id: string): Promise<string> {
@@ -103,7 +103,7 @@ export class CanvasWasmVectorInterfaceProvider
 {
   constructor(
     readonly editor: Editor,
-    readonly surface: Grida2D
+    readonly surface: Scene
   ) {}
 
   toVectorNetwork(node_id: string): vn.VectorNetwork | null {
@@ -112,7 +112,7 @@ export class CanvasWasmVectorInterfaceProvider
 }
 
 class WasmFontAdapter implements FontAdapter {
-  constructor(private surface: Grida2D) {}
+  constructor(private surface: Scene) {}
 
   async onRegister(
     bytes: ArrayBuffer,
@@ -136,7 +136,7 @@ export class CanvasWasmFontManagerAgentInterfaceProvider
 
   constructor(
     readonly editor: Editor,
-    readonly surface: Grida2D
+    readonly surface: Scene
   ) {
     this.manager = new UnifiedFontManager(new WasmFontAdapter(surface));
   }

@@ -1,6 +1,9 @@
 import createGridaCanvas from "./bin/grida-canvas-wasm";
-import { version } from "../package.json";
-import { Grida2D } from "./modules/canvas";
+import { version as _version } from "../package.json";
+import { Scene } from "./modules/canvas";
+
+export { type Scene };
+export const version = _version;
 
 export interface GridaCanvasModuleInitOptions {
   /**
@@ -90,7 +93,7 @@ interface CreateWebGLCanvasSurfaceOptions {
 }
 
 class ApplicationFactory {
-  private readonly module: createGridaCanvas.GridaCanvasWasmBindings;
+  public readonly module: createGridaCanvas.GridaCanvasWasmBindings;
 
   constructor(module: createGridaCanvas.GridaCanvasWasmBindings) {
     this.module = module;
@@ -99,7 +102,7 @@ class ApplicationFactory {
   createWebGLCanvasSurface(
     canvas: HTMLCanvasElement,
     options: CreateWebGLCanvasSurfaceOptions = { use_embedded_fonts: true }
-  ) {
+  ): Scene {
     const context = canvas.getContext("webgl2", {
       antialias: true,
       depth: true,
@@ -120,13 +123,13 @@ class ApplicationFactory {
       canvas.height,
       options.use_embedded_fonts
     );
-    const _ = new Grida2D(this.module, ptr);
+    const _ = new Scene(this.module, ptr);
     _.resize(canvas.width, canvas.height);
 
     return _;
   }
 
-  createWebGLCanvasSurfaceById(htmlcanvasid: string) {
+  createWebGLCanvasSurfaceById(htmlcanvasid: string): Scene {
     const canvas = document.getElementById(htmlcanvasid) as HTMLCanvasElement;
     if (!(canvas instanceof HTMLCanvasElement)) {
       throw new Error(`Element with id ${htmlcanvasid} is not a <canvas>`);

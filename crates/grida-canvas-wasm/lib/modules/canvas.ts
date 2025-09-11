@@ -1,4 +1,5 @@
 import type { types } from "../";
+import { FontsAPI } from "./fonts";
 import { memory } from "./memory";
 
 const ApplicationCommandID = {
@@ -8,14 +9,23 @@ const ApplicationCommandID = {
   Pan: 4,
 } as const;
 
-export class Grida2D {
+export class Scene {
   private appptr: number;
   private module: createGridaCanvas.GridaCanvasWasmBindings;
+
+  public readonly fontskit: FontsAPI;
+
   constructor(module: createGridaCanvas.GridaCanvasWasmBindings, ptr: number) {
     this.module = module;
     this.appptr = ptr;
+    this.fontskit = new FontsAPI(module);
   }
 
+  /**
+   * Allocates memory for a string and returns pointer and length.
+   * @param txt - String to allocate
+   * @returns [pointer, length] tuple
+   */
   _alloc_string(txt: string): [number, number] {
     const len = this.module.lengthBytesUTF8(txt) + 1;
     const ptr = this.module._allocate(len);
@@ -23,6 +33,11 @@ export class Grida2D {
     return [ptr, len];
   }
 
+  /**
+   * Frees memory allocated for a string.
+   * @param ptr - Pointer to free
+   * @param len - Length of allocated memory
+   */
   _free_string(ptr: number, len: number) {
     this.module._deallocate(ptr, len);
   }

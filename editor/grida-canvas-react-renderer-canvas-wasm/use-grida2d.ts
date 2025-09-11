@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef } from "react";
-import init, { Grida2D } from "@grida/canvas-wasm";
+import init, { type Scene } from "@grida/canvas-wasm";
 import locateFile from "./locate-file";
 
 export function useGrida2D(
   canvasRef: React.RefObject<HTMLCanvasElement | null>
 ) {
-  const rendererRef = useRef<Grida2D | null>(null);
+  const rendererRef = useRef<Scene | null>(null);
   const isInitializedRef = useRef(false);
 
   useLayoutEffect(() => {
@@ -25,9 +25,9 @@ export function useGrida2D(
         console.log("grida wasm initialized");
 
         if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
-          grida.setVerbose(true);
-          grida.setDebug(true);
-          console.log("wasm::factory", factory);
+          // grida.setVerbose(true);
+          // grida.setDebug(true);
+          console.log("wasm::factory", factory.module);
         }
       });
     }

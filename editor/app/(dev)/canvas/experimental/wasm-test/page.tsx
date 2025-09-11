@@ -1,13 +1,13 @@
 "use client";
 import * as React from "react";
-import init, { type Grida2D } from "@grida/canvas-wasm";
+import init, { type Scene } from "@grida/canvas-wasm";
 import locateFile from "@/grida-canvas-react-renderer-canvas-wasm/locate-file";
 
 const __test_document = `{"version":"0.0.1-beta.1+20250728","document":{"bitmaps":{},"images":{},"properties":{},"nodes":{"25575e75-a544-4fa3-b199-15d1906588b2":{"id":"25575e75-a544-4fa3-b199-15d1906588b2","name":"rectangle","locked":false,"active":true,"position":"absolute","top":0,"left":0,"opacity":1,"zIndex":0,"rotation":0,"fill":{"type":"solid","color":{"r":217,"g":217,"b":217,"a":1}},"width":100,"height":100,"style":{},"type":"rectangle","cornerRadius":0,"effects":[],"strokeWidth":0,"strokeCap":"butt"}},"scenes":{"main":{"type":"scene","guides":[],"edges":[],"constraints":{"children":"multiple"},"children":["25575e75-a544-4fa3-b199-15d1906588b2"],"id":"main","name":"main","backgroundColor":{"r":245,"g":245,"b":245,"a":1}}}}}`;
 
 export default function CanvasWasmExperimentalPage() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const rendererRef = React.useRef<Grida2D | null>(null);
+  const rendererRef = React.useRef<Scene | null>(null);
 
   React.useEffect(() => {
     if (canvasRef.current && !rendererRef.current) {
