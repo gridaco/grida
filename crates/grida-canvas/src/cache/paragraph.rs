@@ -427,7 +427,7 @@ impl ParagraphCache {
         &self,
         id: &NodeId,
         width: Option<f32>,
-    ) -> Option<Vec<BaselineInfo>> {
+    ) -> Option<(Vec<BaselineInfo>, f32)> {
         // Check if we have a cached paragraph by ID
         if let Some(entry) = self.entries_measurement_by_id.get(id) {
             let paragraph_rc = &entry.paragraph;
@@ -442,11 +442,11 @@ impl ParagraphCache {
                 }
             }
 
-            // Collect baseline info in a separate scope to avoid borrowing issues
-            let mut baseline_info = Vec::new();
-            {
+            // Collect baseline info and layout height in a separate scope to avoid borrowing issues
+            let (layout_height, baseline_info) = {
                 let paragraph_ref = paragraph_rc.borrow();
                 let lines = paragraph_ref.line_number();
+                let mut baseline_info = Vec::new();
                 for i in 0..lines {
                     if let Some(metrics) = paragraph_ref.get_line_metrics_at(i) {
                         baseline_info.push(BaselineInfo {
@@ -456,8 +456,9 @@ impl ParagraphCache {
                         });
                     }
                 }
-            }
-            return Some(baseline_info);
+                (paragraph_ref.height(), baseline_info)
+            };
+            return Some((baseline_info, layout_height));
         }
 
         None
