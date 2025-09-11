@@ -148,6 +148,7 @@ pub struct PainterPictureTextLayer {
     pub stroke_path: Option<skia_safe::Path>,
     pub shape: PainterShape,
     pub width: Option<f32>,
+    pub height: Option<f32>,
     pub max_lines: Option<usize>,
     pub ellipsis: Option<String>,
     pub text: String,
@@ -481,11 +482,12 @@ impl LayerList {
                                 .max(0.0),
                         });
 
+                    let rect_height = n.height.unwrap_or(text_bounds.height);
                     let shape = PainterShape::from_rect(skia_safe::Rect::from_xywh(
                         0.0,
                         0.0,
                         text_bounds.width,
-                        text_bounds.height,
+                        rect_height,
                     ));
 
                     out.push(PainterPictureLayer::Text(PainterPictureTextLayer {
@@ -498,6 +500,7 @@ impl LayerList {
                             clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
                         },
                         width: n.width,
+                        height: n.height,
                         max_lines: n.max_lines,
                         ellipsis: n.ellipsis.clone(),
                         effects: n.effects.clone(),

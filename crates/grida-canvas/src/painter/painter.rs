@@ -146,12 +146,18 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw a text drop shadow using a paragraph as the source.
-    fn draw_text_shadow(&self, paragraph: &Rc<RefCell<textlayout::Paragraph>>, shadow: &FeShadow) {
+    fn draw_text_shadow(
+        &self,
+        paragraph: &Rc<RefCell<textlayout::Paragraph>>,
+        shadow: &FeShadow,
+        y_offset: f32,
+    ) {
         let mut paint = SkPaint::default();
         paint.set_image_filter(shadow::drop_shadow_image_filter(shadow));
         paint.set_anti_alias(true);
         self.canvas
             .save_layer(&SaveLayerRec::default().paint(&paint));
+        self.canvas.translate((0.0, y_offset));
         paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
         self.canvas.restore();
     }
@@ -161,12 +167,14 @@ impl<'a> Painter<'a> {
         &self,
         paragraph: &Rc<RefCell<textlayout::Paragraph>>,
         shadow: &FeShadow,
+        y_offset: f32,
     ) {
         let mut paint = SkPaint::default();
         paint.set_image_filter(shadow::inner_shadow_image_filter(shadow));
         paint.set_anti_alias(true);
         self.canvas
             .save_layer(&SaveLayerRec::default().paint(&paint));
+        self.canvas.translate((0.0, y_offset));
         paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
         self.canvas.restore();
     }
@@ -179,6 +187,7 @@ impl<'a> Painter<'a> {
         &self,
         paragraph: &Rc<RefCell<textlayout::Paragraph>>,
         blur: &FeGaussianBlur,
+        y_offset: f32,
     ) {
         // Build a path from all glyphs in the paragraph.
         let mut path = Path::new();
@@ -190,7 +199,7 @@ impl<'a> Painter<'a> {
                 let font = info.font();
                 for (glyph, pos) in glyphs.iter().zip(positions.iter()) {
                     if let Some(glyph_path) = font.get_path(*glyph) {
-                        let offset = Point::new(pos.x + origin.x, pos.y + origin.y);
+                        let offset = Point::new(pos.x + origin.x, pos.y + origin.y + y_offset);
                         path.add_path(&glyph_path, offset, AddPathMode::Append);
                     }
                 }
@@ -365,6 +374,7 @@ impl<'a> Painter<'a> {
         id: &NodeId,
         text: &str,
         width: &Option<f32>,
+        height: &Option<f32>,
         max_lines: &Option<usize>,
         ellipsis: &Option<String>,
         fills: &[Paint],
@@ -395,7 +405,25 @@ impl<'a> Painter<'a> {
             (para.max_width(), para.height())
         };
 
-        self.draw_text_paragraph(&paragraph, strokes, stroke_width, stroke_align, layout_size);
+        let layout_height = layout_size.1;
+        let container_height = height.unwrap_or(layout_height);
+        let y_offset = match height {
+            Some(h) => match text_align_vertical {
+                TextAlignVertical::Top => 0.0,
+                TextAlignVertical::Center => (h - layout_height) / 2.0,
+                TextAlignVertical::Bottom => h - layout_height,
+            },
+            None => 0.0,
+        };
+
+        self.draw_text_paragraph(
+            &paragraph,
+            strokes,
+            stroke_width,
+            stroke_align,
+            (layout_size.0, container_height),
+            y_offset,
+        );
     }
 
     fn draw_text_paragraph(
@@ -405,7 +433,11 @@ impl<'a> Painter<'a> {
         stroke_width: f32,
         stroke_align: &StrokeAlign,
         layout_size: (f32, f32),
+        y_offset: f32,
     ) {
+        self.canvas.save();
+        self.canvas.translate((0.0, y_offset));
+
         if stroke_width > 0.0 && matches!(stroke_align, StrokeAlign::Outside) {
             for stroke_paint_def in strokes {
                 paragraph.borrow_mut().visit(|_, info| {
@@ -446,6 +478,8 @@ impl<'a> Painter<'a> {
                 });
             }
         }
+
+        self.canvas.restore();
     }
 
     /// Draw a single [`PainterPictureLayer`].
@@ -500,6 +534,17 @@ impl<'a> Painter<'a> {
                             (para.max_width(), para.height())
                         };
 
+                        let layout_height = layout_size.1;
+                        let container_height = text_layer.height.unwrap_or(layout_height);
+                        let y_offset = match text_layer.height {
+                            Some(h) => match text_layer.text_align_vertical {
+                                TextAlignVertical::Top => 0.0,
+                                TextAlignVertical::Center => (h - layout_height) / 2.0,
+                                TextAlignVertical::Bottom => h - layout_height,
+                            },
+                            None => 0.0,
+                        };
+
                         let draw_content = || {
                             self.with_opacity(text_layer.base.opacity, || {
                                 if text_layer.fills.is_empty() {
@@ -510,19 +555,20 @@ impl<'a> Painter<'a> {
                                     &text_layer.strokes,
                                     text_layer.stroke_width,
                                     &text_layer.stroke_align,
-                                    layout_size,
+                                    (layout_size.0, container_height),
+                                    y_offset,
                                 );
                             });
                         };
 
                         let apply_effects = || {
                             if let Some(blur) = effects.backdrop_blur {
-                                self.draw_text_backdrop_blur(&paragraph, &blur);
+                                self.draw_text_backdrop_blur(&paragraph, &blur, y_offset);
                             }
 
                             for shadow in &effects.shadows {
                                 if let FilterShadowEffect::DropShadow(ds) = shadow {
-                                    self.draw_text_shadow(&paragraph, ds);
+                                    self.draw_text_shadow(&paragraph, ds, y_offset);
                                 }
                             }
 
@@ -530,7 +576,7 @@ impl<'a> Painter<'a> {
 
                             for shadow in &effects.shadows {
                                 if let FilterShadowEffect::InnerShadow(is) = shadow {
-                                    self.draw_text_inner_shadow(&paragraph, is);
+                                    self.draw_text_inner_shadow(&paragraph, is, y_offset);
                                 }
                             }
                         };
@@ -856,6 +902,7 @@ impl<'a> NodePainter<'a> {
                         &node.id,
                         &node.text,
                         &node.width,
+                        &node.height,
                         &node.max_lines,
                         &node.ellipsis,
                         &node.fills,

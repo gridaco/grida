@@ -276,7 +276,10 @@ impl GeometryCache {
                     x: 0.0,
                     y: 0.0,
                     width: measurements.max_width.max(MIN_SIZE_DIRTY_HACK),
-                    height: measurements.height.max(MIN_SIZE_DIRTY_HACK),
+                    height: n
+                        .height
+                        .unwrap_or(measurements.height)
+                        .max(MIN_SIZE_DIRTY_HACK),
                 };
 
                 // Use the node's transform directly (which already includes positioning)
