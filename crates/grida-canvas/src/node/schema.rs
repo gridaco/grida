@@ -145,7 +145,10 @@ pub struct UnknownNodeProperties {
     pub text_style: Option<TextStyleRec>,
     /// Horizontal alignment.
     pub text_align: Option<TextAlign>,
-    /// Vertical alignment.
+    /// Vertical alignment of text within its container height.
+    ///
+    /// See [`TextSpanNodeRec::text_align_vertical`] for detailed documentation
+    /// on how vertical text alignment works in this system.
     pub text_align_vertical: Option<TextAlignVertical>,
 }
 
@@ -1240,6 +1243,55 @@ pub struct TextSpanNodeRec {
     /// Layout bounds (used for wrapping and alignment).
     pub width: Option<f32>,
 
+    /// Height of the text container box.
+    ///
+    /// This property defines the height of the "box" that contains the text paragraph.
+    /// Unlike width, which affects text layout and wrapping, height does not influence
+    /// the Skia text layout engine itself. Instead, it controls the positioning of the
+    /// rendered text within the specified height.
+    ///
+    /// ## Behavior
+    ///
+    /// - **When `None` (auto)**: The height is effectively "auto", similar to how width
+    ///   works. The text will be rendered at its natural height without any vertical
+    ///   positioning adjustments.
+    ///
+    /// - **When `Some(height)`**: The text is positioned within a container of the
+    ///   specified height. The actual text layout height (from Skia's paragraph layout)
+    ///   remains unchanged, but the y-position where the text is painted is adjusted
+    ///   based on the `text_align_vertical` property.
+    ///
+    /// ## Y-Offset Calculation
+    ///
+    /// When a height is specified, the y-offset for painting the text is calculated
+    /// using simple math based on the alignment:
+    ///
+    /// ```text
+    /// y_offset = match text_align_vertical {
+    ///     TextAlignVertical::Top => 0.0,
+    ///     TextAlignVertical::Center => (requested_height - textlayout_height) / 2.0,
+    ///     TextAlignVertical::Bottom => requested_height - textlayout_height,
+    /// }
+    /// ```
+    ///
+    /// Where:
+    /// - `requested_height` is the value of this `height` property
+    /// - `textlayout_height` is the natural height of the text as calculated by Skia
+    ///
+    /// ## Valid Use Cases
+    ///
+    /// It is perfectly valid to request a height smaller than the post-layouted text
+    /// height. This allows for text clipping or creating text that extends beyond its
+    /// container bounds, similar to how image positioning works with image boxes.
+    ///
+    /// ## Relationship to Image Positioning
+    ///
+    /// This behavior is analogous to how image positioning works:
+    /// - The image (actual text content) has its natural dimensions
+    /// - The image box (height container) defines the positioning space
+    /// - The alignment determines how the image is positioned within the box
+    pub height: Option<f32>,
+
     /// Text content (plain UTF-8).
     pub text: String,
 
@@ -1249,7 +1301,56 @@ pub struct TextSpanNodeRec {
     /// Horizontal alignment.
     pub text_align: TextAlign,
 
-    /// Vertical alignment.
+    /// Vertical alignment of text within its container height.
+    ///
+    /// This property controls how text is positioned vertically within the height
+    /// defined by the `height` property. Since Skia's text layout engine only
+    /// supports width-based layout, vertical alignment is handled by this library
+    /// through post-layout positioning adjustments.
+    ///
+    /// ## How It Works
+    ///
+    /// 1. **Text Layout**: Skia performs the text layout based on width constraints,
+    ///    producing a paragraph with a natural height (`textlayout_height`).
+    ///
+    /// 2. **Height Container**: If a `height` is specified, it defines the container
+    ///    height (`requested_height`) within which the text should be positioned.
+    ///
+    /// 3. **Y-Offset Calculation**: The vertical alignment determines the y-offset
+    ///    (delta) where the text is painted:
+    ///
+    ///    ```text
+    ///    y_offset = match text_align_vertical {
+    ///        TextAlignVertical::Top => 0.0,
+    ///        TextAlignVertical::Center => (requested_height - textlayout_height) / 2.0,
+    ///        TextAlignVertical::Bottom => requested_height - textlayout_height,
+    ///    }
+    ///    ```
+    ///
+    /// 4. **Rendering**: The text is painted at the calculated y-offset, effectively
+    ///    positioning it within the specified height container.
+    ///
+    /// ## Interaction with Height
+    ///
+    /// - **When `height` is `None`**: This property has no effect, as there's no
+    ///   container height to align within. Text renders at its natural position.
+    ///
+    /// - **When `height` is `Some(value)`**: This property determines how the text
+    ///   is positioned within that height container.
+    ///
+    /// ## Use Cases
+    ///
+    /// - **Top Alignment**: Text starts at the top of the container (default behavior)
+    /// - **Center Alignment**: Text is vertically centered within the container
+    /// - **Bottom Alignment**: Text is positioned at the bottom of the container
+    ///
+    /// ## Clipping Behavior
+    ///
+    /// When the requested height is smaller than the natural text height, the text
+    /// may be clipped. The alignment determines which part of the text remains visible:
+    /// - `Top`: Bottom portion may be clipped
+    /// - `Center`: Top and bottom portions may be clipped equally
+    /// - `Bottom`: Top portion may be clipped
     pub text_align_vertical: TextAlignVertical,
 
     /// Maximum number of lines to render.

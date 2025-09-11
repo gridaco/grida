@@ -578,18 +578,94 @@ impl Default for TextAlign {
     }
 }
 
-/// Supported vertical alignment values for text.
+/// Supported vertical alignment values for text within its container height.
 ///
-/// In CSS, this maps to `align-content`.
+/// This enum defines how text is positioned vertically within the height container
+/// specified by the `height` property in `TextSpanNodeRec`. Since Skia's text layout
+/// engine only supports width-based layout, vertical alignment is implemented by
+/// this library through post-layout positioning adjustments.
 ///
-/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/align-content)  
-/// - [Konva](https://konvajs.org/api/Konva.Text.html#verticalAlign)
+/// ## How Vertical Alignment Works
+///
+/// The vertical alignment system works by calculating a y-offset (delta) that determines
+/// where the text is painted within the specified height container:
+///
+/// ```text
+/// y_offset = match alignment {
+///     TextAlignVertical::Top => 0.0,
+///     TextAlignVertical::Center => (container_height - text_height) / 2.0,
+///     TextAlignVertical::Bottom => container_height - text_height,
+/// }
+/// ```
+///
+/// Where:
+/// - `container_height` is the value of the `height` property (when specified)
+/// - `text_height` is the natural height of the text as calculated by Skia's layout engine
+///
+/// ## Alignment Behaviors
+///
+/// ### Top Alignment
+/// - **Y-offset**: `0.0` (no vertical adjustment)
+/// - **Behavior**: Text starts at the top of the container
+/// - **Clipping**: When container height < text height, bottom portion is clipped
+/// - **Use case**: Default behavior, suitable for most text layouts
+///
+/// ### Center Alignment  
+/// - **Y-offset**: `(container_height - text_height) / 2.0`
+/// - **Behavior**: Text is vertically centered within the container
+/// - **Clipping**: When container height < text height, top and bottom portions are clipped equally
+/// - **Use case**: Centering text in buttons, cards, or other UI elements
+///
+/// ### Bottom Alignment
+/// - **Y-offset**: `container_height - text_height`
+/// - **Behavior**: Text is positioned at the bottom of the container
+/// - **Clipping**: When container height < text height, top portion is clipped
+/// - **Use case**: Aligning text to the bottom of containers, footers, etc.
+///
+/// ## Relationship to CSS
+///
+/// In CSS, this maps to `align-content` or `vertical-align` properties:
+/// - [MDN align-content](https://developer.mozilla.org/en-US/docs/Web/CSS/align-content)
+/// - [MDN vertical-align](https://developer.mozilla.org/en-US/docs/Web/CSS/vertical-align)
+///
+/// ## Relationship to Other Frameworks
+///
+/// - [Konva.js Text.verticalAlign](https://konvajs.org/api/Konva.Text.html#verticalAlign)
+/// - [Flutter TextAlignVertical](https://api.flutter.dev/flutter/painting/TextAlignVertical-class.html)
+///
+/// ## Implementation Notes
+///
+/// This alignment system is implemented post-layout, meaning:
+/// 1. Skia performs text layout based on width constraints only
+/// 2. The resulting paragraph has a natural height
+/// 3. This library calculates the y-offset based on the alignment choice
+/// 4. The text is painted at the calculated offset position
+///
+/// This approach allows for flexible text positioning while maintaining compatibility
+/// with Skia's text layout engine limitations.
 #[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextAlignVertical {
+    /// Align text to the top of the container.
+    ///
+    /// Text starts at y-position 0 within the height container.
+    /// When the container height is smaller than the text height,
+    /// the bottom portion of the text will be clipped.
     #[serde(rename = "top")]
     Top,
+
+    /// Center text vertically within the container.
+    ///
+    /// Text is positioned so that it appears centered within the
+    /// height container. When the container height is smaller than
+    /// the text height, both top and bottom portions are clipped equally.
     #[serde(rename = "center")]
     Center,
+
+    /// Align text to the bottom of the container.
+    ///
+    /// Text is positioned at the bottom of the height container.
+    /// When the container height is smaller than the text height,
+    /// the top portion of the text will be clipped.
     #[serde(rename = "bottom")]
     Bottom,
 }

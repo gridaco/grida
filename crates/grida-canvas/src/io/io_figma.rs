@@ -876,6 +876,10 @@ impl FigmaConverter {
                 .size
                 .as_ref()
                 .map_or(None, |size| Some(size.x as f32)),
+            height: origin
+                .size
+                .as_ref()
+                .map_or(None, |size| Some(size.y as f32)),
             max_lines: None,
             ellipsis: None,
             // size: Size {

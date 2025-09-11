@@ -122,6 +122,7 @@ impl NodeFactory {
             active: true,
             transform: AffineTransform::identity(),
             width: None,
+            height: None,
             max_lines: None,
             ellipsis: None,
             text: String::new(),

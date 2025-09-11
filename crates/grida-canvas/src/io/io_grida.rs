@@ -700,6 +700,11 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             CSSDimension::LengthPX(length) => Some(length),
         };
 
+        let height = match node.base.height {
+            CSSDimension::Auto => None,
+            CSSDimension::LengthPX(length) => Some(length),
+        };
+
         TextSpanNodeRec {
             id: node.base.id,
             name: node.base.name,
@@ -712,6 +717,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 node.base.rotation,
             ),
             width,
+            height,
             max_lines: node.max_lines,
             ellipsis: None,
             text: node.text,
