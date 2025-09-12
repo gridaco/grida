@@ -117,7 +117,16 @@ impl ResourceRepository<ImageMipmaps> for ImageRepository {
 /// A repository for managing fonts and their availability state.
 #[derive(Clone)]
 pub struct FontRepository {
-    provider: TypefaceFontProvider,
+    /// Font manager for embedded (bundled) fonts.
+    embedded_provider: TypefaceFontProvider,
+    /// Font manager for fonts loaded at runtime by the user.
+    user_provider: TypefaceFontProvider,
+    /// Font manager for user specified fallback fonts.
+    fallback_provider: TypefaceFontProvider,
+    /// Collection configured with the above providers.
+    font_collection: FontCollection,
+    /// Shared loader used to create [`Typeface`] instances from raw bytes.
+    loader: FontMgr,
     fonts: HashMap<String, Vec<Vec<u8>>>,
     /// Fonts that have been requested but not yet provided.
     missing: HashSet<String>,
@@ -130,26 +139,47 @@ pub struct FontRepository {
 
 impl FontRepository {
     pub fn new() -> Self {
-        Self {
-            provider: TypefaceFontProvider::new(),
+        let embedded_provider = TypefaceFontProvider::new();
+        let user_provider = TypefaceFontProvider::new();
+        let fallback_provider = TypefaceFontProvider::new();
+
+        let mut font_collection = FontCollection::new();
+        font_collection.set_asset_font_manager(Some(embedded_provider.clone().into()));
+        font_collection.set_dynamic_font_manager(Some(user_provider.clone().into()));
+        font_collection.set_test_font_manager(Some(fallback_provider.clone().into()));
+
+        let mut this = Self {
+            embedded_provider,
+            user_provider,
+            fallback_provider,
+            font_collection,
+            loader: FontMgr::new(),
             fonts: HashMap::new(),
             missing: HashSet::new(),
             requested: HashSet::new(),
             generation: 0,
             user_fallback_fonts: Vec::new(),
-        }
+        };
+        this.refresh_collection_defaults();
+        this
     }
 
     pub fn insert(&mut self, family: String, bytes: Vec<u8>) {
-        let family_fonts = self.fonts.entry(family.clone()).or_insert_with(Vec::new);
-
-        if let Some(tf) = FontMgr::new().new_from_data(&bytes, None) {
-            self.provider.register_typeface(tf, Some(family.as_str()));
+        let entry = self.fonts.entry(family);
+        {
+            let key = entry.key().as_str();
+            if let Some(tf) = self.loader.new_from_data(&bytes, None) {
+                self.user_provider.register_typeface(tf, Some(key));
+            }
+            self.missing.remove(key);
         }
-
-        family_fonts.push(bytes);
-        self.missing.remove(&family);
+        entry.or_insert_with(Vec::new).push(bytes);
         self.generation += 1;
+        // Newly loaded fonts won't be visible to existing paragraphs until the
+        // FontCollection's internal caches are cleared. Without this, layout
+        // requests made before a font is registered would keep returning the
+        // previous fallback result.
+        self.font_collection.clear_caches();
     }
 
     pub fn add(&mut self, bytes: &[u8], family: &str) {
@@ -158,31 +188,73 @@ impl FontRepository {
             .entry(family.to_string())
             .or_insert_with(Vec::new);
 
-        if let Some(tf) = FontMgr::new().new_from_data(bytes, None) {
-            self.provider.register_typeface(tf, Some(family));
+        if let Some(tf) = self.loader.new_from_data(bytes, None) {
+            self.user_provider.register_typeface(tf, Some(family));
         }
 
         family_fonts.push(bytes.to_vec());
         self.missing.remove(family);
         self.generation += 1;
+        // Ensure the collection picks up the newly registered typeface.
+        self.font_collection.clear_caches();
     }
 
     /// Register the built-in embedded fonts bundled with the renderer.
     pub fn register_embedded_fonts(&mut self) {
-        self.add(
+        self.register_embedded_font(
             crate::fonts::embedded::geist::BYTES,
             crate::fonts::embedded::geist::FAMILY,
         );
-        self.add(
+        self.register_embedded_font(
             crate::fonts::embedded::geistmono::BYTES,
             crate::fonts::embedded::geistmono::FAMILY,
         );
     }
 
-    pub fn font_collection(&self) -> FontCollection {
-        let mut collection = FontCollection::new();
-        collection.set_asset_font_manager(Some(self.provider.clone().into()));
-        collection
+    fn register_embedded_font(&mut self, bytes: &[u8], family: &str) {
+        if let Some(tf) = self.loader.new_from_data(bytes, None) {
+            self.embedded_provider.register_typeface(tf, Some(family));
+        }
+        // Clearing caches ensures embedded fonts become available immediately
+        // when registered after the collection has already been used.
+        self.font_collection.clear_caches();
+    }
+
+    /// Add a font that will be used as a fallback when no other font can
+    /// render a given glyph.
+    pub fn add_fallback_font(&mut self, bytes: &[u8], family: &str) {
+        if let Some(tf) = self.loader.new_from_data(bytes, None) {
+            self.fallback_provider.register_typeface(tf, Some(family));
+        }
+        // Update collection so newly added fallback fonts can be selected.
+        self.font_collection.clear_caches();
+    }
+
+    /// Access the configured font collection.
+    pub fn font_collection(&self) -> &FontCollection {
+        &self.font_collection
+    }
+
+    fn refresh_collection_defaults(&mut self) {
+        if !self.user_fallback_fonts.is_empty() {
+            let families: Vec<&str> = self
+                .user_fallback_fonts
+                .iter()
+                .map(|s| s.as_str())
+                .collect();
+            self.font_collection
+                .set_default_font_manager_and_family_names(
+                    Some(self.fallback_provider.clone().into()),
+                    &families,
+                );
+        } else {
+            self.font_collection.set_default_font_manager(
+                Some(self.fallback_provider.clone().into()),
+                None::<&str>,
+            );
+        }
+        // Recompute layout after changing default fallbacks.
+        self.font_collection.clear_caches();
     }
 
     pub fn family_count(&self) -> usize {
@@ -248,6 +320,7 @@ impl FontRepository {
     /// Set default fallback font families. The order determines priority.
     pub fn set_user_fallback_families(&mut self, families: Vec<String>) {
         self.user_fallback_fonts = families;
+        self.refresh_collection_defaults();
         // Changing fallbacks may affect text layout caching.
         self.generation += 1;
     }
@@ -275,8 +348,12 @@ impl FontRepository {
         family: &str,
         style: skia_safe::FontStyle,
     ) -> Option<Vec<skia_safe::font_parameters::variation::Axis>> {
-        // get typeface by family name
-        let typeface = self.provider.match_family_style(family, style)?;
+        // try to find the typeface across all managers
+        let typeface = self
+            .user_provider
+            .match_family_style(family, style)
+            .or_else(|| self.embedded_provider.match_family_style(family, style))
+            .or_else(|| self.fallback_provider.match_family_style(family, style))?;
         typeface.variation_design_parameters()
     }
 }
@@ -286,14 +363,18 @@ impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
     type Iter<'a> = std::collections::hash_map::Iter<'a, String, Vec<Vec<u8>>>;
 
     fn insert(&mut self, id: Self::Id, item: Vec<Vec<u8>>) {
+        let key = id.as_str();
         for font_data in &item {
-            if let Some(tf) = FontMgr::new().new_from_data(font_data, None) {
-                self.provider.register_typeface(tf, Some(id.as_str()));
+            if let Some(tf) = self.loader.new_from_data(font_data, None) {
+                self.user_provider.register_typeface(tf, Some(key));
             }
         }
-        self.fonts.insert(id.clone(), item);
-        self.missing.remove(&id);
+        self.missing.remove(key);
+        self.fonts.insert(id, item);
         self.generation += 1;
+        // Clearing caches ensures fonts added through the repository trait are
+        // visible to subsequent layout requests.
+        self.font_collection.clear_caches();
     }
 
     fn get(&self, id: &Self::Id) -> Option<&Vec<Vec<u8>>> {
@@ -308,6 +389,7 @@ impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
         let res = self.fonts.remove(id);
         if res.is_some() {
             self.generation += 1;
+            self.font_collection.clear_caches();
         }
         res
     }
@@ -368,6 +450,28 @@ mod tests {
         repo.add(fonts::BUNGEE_REGULAR, "Bungee");
         assert!(!repo.has_missing());
         assert_eq!(repo.available_families(), vec!["Bungee".to_string()]);
+    }
+
+    #[test]
+    fn fonts_become_available_after_cache_cleared() {
+        use skia_safe::FontStyle;
+
+        let mut repo = FontRepository::new();
+
+        // First query before registering the font populates the collection's
+        // internal cache with a miss.
+        let mut tfs = repo
+            .font_collection
+            .find_typefaces(&["Bungee"], FontStyle::default());
+        assert!(tfs.is_empty());
+
+        // Register the font. The repository should clear the collection cache
+        // so the next lookup finds it.
+        repo.add(fonts::BUNGEE_REGULAR, "Bungee");
+        tfs = repo
+            .font_collection
+            .find_typefaces(&["Bungee"], FontStyle::default());
+        assert!(!tfs.is_empty());
     }
 
     #[test]

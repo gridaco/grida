@@ -247,7 +247,7 @@ impl ParagraphCache {
             user_fallback_fonts: fonts.user_fallback_families(),
         };
         let mut para_builder =
-            textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
+            textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
         let ts = textstyle(style, &Some(ctx));
         // No paint for measurement
         para_builder.push_style(&ts);
@@ -400,7 +400,7 @@ impl ParagraphCache {
             user_fallback_fonts: fonts.user_fallback_families(),
         };
         let mut para_builder =
-            textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
+            textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
         let mut ts = textstyle(style, &Some(ctx));
         if let Some(ref paint) = fill_paint {
             ts.set_foreground_paint(paint);
