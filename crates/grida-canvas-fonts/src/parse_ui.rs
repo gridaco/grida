@@ -477,6 +477,7 @@ impl UIFontParser {
                     .iter()
                     .map(|instance| UIFontInstance {
                         name: instance.name.clone(),
+                        postscript_name: instance.postscript_name.clone(),
                         coordinates: instance.coordinates.clone(),
                     })
                     .collect();
@@ -612,6 +613,8 @@ pub struct UIFontAxis {
 pub struct UIFontInstance {
     /// Instance name
     pub name: String,
+    /// PostScript name if available
+    pub postscript_name: Option<String>,
     /// Axis coordinates
     pub coordinates: HashMap<String, f32>,
 }
@@ -662,8 +665,8 @@ pub struct UIFontFeature {
 pub struct UIFontStyleInstance {
     /// User-friendly style name (e.g., "Regular", "Bold", "Light Italic")
     pub name: String,
-    /// PostScript name for this style
-    pub postscript_name: String,
+    /// PostScript name for this style (may be None for fonts like Inter)
+    pub postscript_name: Option<String>,
     /// Whether this style is italic
     pub italic: bool,
 }
@@ -671,7 +674,7 @@ pub struct UIFontStyleInstance {
 /// Font style mapping utility functions.
 impl UIFontStyleInstance {
     /// Create a new font style instance
-    pub fn new(name: String, postscript_name: String, italic: bool) -> Self {
+    pub fn new(name: String, postscript_name: Option<String>, italic: bool) -> Self {
         Self {
             name,
             postscript_name,
@@ -702,7 +705,7 @@ fn generate_font_styles(
             // For variable fonts, generate styles from instances
             for instance in instances {
                 let style_name = instance.name.clone();
-                let postscript_name = instance.name.clone();
+                let postscript_name = instance.postscript_name.clone();
 
                 // Determine italic status for this instance
                 let italic = if italic_capability.scenario == FamilyScenario::SingleVf {
@@ -729,7 +732,7 @@ fn generate_font_styles(
         } else {
             // For static fonts, generate one style per face
             let style_name = face.subfamily_name.clone();
-            let postscript_name = face.postscript_name.clone();
+            let postscript_name = Some(face.postscript_name.clone());
 
             // Use the analyzed italic status from the capability map
             let italic = face_italic_map
@@ -745,9 +748,20 @@ fn generate_font_styles(
         }
     }
 
-    // Remove duplicates based on postscript name
-    styles.sort_by(|a, b| a.postscript_name.cmp(&b.postscript_name));
-    styles.dedup_by(|a, b| a.postscript_name == b.postscript_name);
+    // Remove duplicates based on postscript name, or style name if postscript name is None
+    styles.sort_by(|a, b| match (&a.postscript_name, &b.postscript_name) {
+        (Some(ps_a), Some(ps_b)) => ps_a.cmp(ps_b),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => a.name.cmp(&b.name),
+    });
+    styles.dedup_by(|a, b| {
+        match (&a.postscript_name, &b.postscript_name) {
+            (Some(ps_a), Some(ps_b)) => ps_a == ps_b,
+            (None, None) => a.name == b.name,
+            _ => false, // Different types, not duplicates
+        }
+    });
 
     styles
 }

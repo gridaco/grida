@@ -141,8 +141,10 @@ pub struct WasmFontAxis {
 pub struct WasmFontInstance {
     /// Instance name
     pub name: String,
-    /// Axis coordinates as a vector for predictable JSON ordering
-    pub coordinates: Vec<WasmAxisValue>,
+    /// PostScript name if available
+    pub postscript_name: Option<String>,
+    /// Axis coordinates as a map (tag -> value)
+    pub coordinates: std::collections::HashMap<String, f32>,
 }
 
 /// WASM response for font feature information
@@ -165,8 +167,8 @@ pub struct WasmFontFeature {
 pub struct WasmFontStyleInstance {
     /// User-friendly style name (e.g., "Regular", "Bold", "Light Italic")
     pub name: String,
-    /// PostScript name for this style
-    pub postscript_name: String,
+    /// PostScript name for this style (may be None for fonts like Inter)
+    pub postscript_name: Option<String>,
     /// Whether this style is italic
     pub italic: bool,
 }
@@ -269,11 +271,8 @@ impl From<UIFontInstance> for WasmFontInstance {
     fn from(instance: UIFontInstance) -> Self {
         Self {
             name: instance.name,
-            coordinates: instance
-                .coordinates
-                .into_iter()
-                .map(|(tag, value)| WasmAxisValue { tag, value })
-                .collect(),
+            postscript_name: instance.postscript_name,
+            coordinates: instance.coordinates,
         }
     }
 }

@@ -2,6 +2,8 @@
 // #region: High-Level JavaScript Wrapper Functions
 // ====================================================================================================
 
+import type { fonts } from "./fonts-bindings";
+
 export class FontsAPI {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
 
@@ -70,7 +72,7 @@ export class FontsAPI {
       userFontStyleItalic?: boolean;
     }>,
     familyName?: string
-  ): Promise<fonts.FontAnalysisResult | fonts.FontError> {
+  ): Promise<fonts.types.FontFamilyAnalysisResponse> {
     try {
       const fontCount = fontFaces.length;
 
@@ -132,8 +134,8 @@ export class FontsAPI {
       // Get result
       const resultJson = this._string_from_wasm(resultPtr);
       const result = JSON.parse(resultJson) as
-        | fonts.FontAnalysisResult
-        | fonts.FontError;
+        | fonts.types.FontFamilyAnalysisResponse
+        | fonts.types.FontError;
 
       // Clean up memory
       if (familyNamePtr !== 0) {
@@ -164,7 +166,7 @@ export class FontsAPI {
         error: {
           message: error instanceof Error ? error.message : String(error),
         },
-      };
+      } satisfies fonts.types.FontError;
     }
   }
 
@@ -175,13 +177,13 @@ export class FontsAPI {
    * @param fontData - Font data as ArrayBuffer or Uint8Array
    * @param faceId - Unique identifier for this font face
    * @param userFontStyleItalic - User-declared italic style (optional)
-   * @returns Promise resolving to FaceRecord or FontError
+   * @returns Promise resolving to FaceRecord
    */
   async parseFont(
     fontData: ArrayBuffer | Uint8Array,
     faceId: string,
     userFontStyleItalic?: boolean
-  ): Promise<fonts.FaceRecord | fonts.FontError> {
+  ): Promise<fonts.types.FaceRecord> {
     try {
       // Allocate font data
       const [fontDataPtr, fontDataSize] = this._alloc_data(fontData);
@@ -205,9 +207,7 @@ export class FontsAPI {
 
       // Get result
       const resultJson = this._string_from_wasm(resultPtr);
-      const result = JSON.parse(resultJson) as
-        | fonts.FaceRecord
-        | fonts.FontError;
+      const result = JSON.parse(resultJson) as fonts.types.FaceRecord;
 
       // Clean up memory
       this.module._deallocate(fontDataPtr, fontDataSize);
@@ -218,12 +218,7 @@ export class FontsAPI {
 
       return result;
     } catch (error) {
-      return {
-        success: false,
-        error: {
-          message: error instanceof Error ? error.message : String(error),
-        },
-      };
+      throw new Error(error instanceof Error ? error.message : String(error));
     }
   }
 

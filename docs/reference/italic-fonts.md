@@ -57,6 +57,8 @@ N/A
 | Inter | Inter-VariableFont_opsz,wght.ttf        | Regular                   | Inter-Regular              | `00000000 11000000` | no slnt/ital   | ✗ (bit 0 not set) |
 | Inter | Inter-Italic-VariableFont_opsz,wght.ttf | Italic                    | Inter-Italic               | `00000000 10000001` | no slnt/ital   | ✓ (bit 0 set)     |
 
+**Note**: Inter is exceptionally unusual in that its variable font instances lack PostScript names in the `fvar` table, unlike most other variable fonts (e.g., Recursive, Noto Sans) which include comprehensive PostScript names for all instances.
+
 ## See also
 
 - [Italic](./italic.md) for more details.

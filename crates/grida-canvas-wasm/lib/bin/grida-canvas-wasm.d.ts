@@ -6,6 +6,8 @@
 /// - https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/emscripten/index.d.ts
 ///
 
+import type { fonts } from "../modules/fonts-bindings";
+
 export = createGridaCanvas;
 export as namespace createGridaCanvas;
 

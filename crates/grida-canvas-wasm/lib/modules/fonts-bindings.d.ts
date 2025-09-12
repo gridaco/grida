@@ -1,35 +1,73 @@
-declare namespace fonts {
-  // ====================================================================================================
-  // #region: Type Definitions
-  // ====================================================================================================
+export namespace fonts {
+  export namespace types {
+    // ====================================================================================================
+    // #region: Core Type Definitions
+    // ====================================================================================================
 
-  export interface FontAnalysisResult {
-    family_name: string;
-    axes: Array<{
+    /** Axis value pair for variable font recipes */
+    export interface AxisValue {
+      tag: string;
+      value: number;
+    }
+
+    /** Family-level axis information (no default values as they vary per face) */
+    export interface FontFamilyAxis {
       tag: string;
       name: string;
       min: number;
       max: number;
-    }>;
-    italic_capability: {
+    }
+
+    /** Face-specific axis information (includes default values) */
+    export interface FontAxis {
+      tag: string;
+      name: string;
+      min: number;
+      default: number;
+      max: number;
+    }
+
+    /** Variable font recipe */
+    export interface VfRecipe {
+      axis_values: Array<AxisValue>;
+    }
+
+    /** Italic recipe for UI consumption */
+    export interface ItalicRecipe {
+      name: string;
+      description: string;
+      is_italic: boolean;
+      face_id: string;
+      vf_recipe?: VfRecipe;
+    }
+
+    /** Italic capability analysis for UI consumption */
+    export interface ItalicCapability {
       has_italic: boolean;
       has_upright: boolean;
       strategy: string;
-      recipes: Array<{
-        name: string;
-        description: string;
-        is_italic: boolean;
-        face_id: string;
-        vf_recipe?: {
-          axis_values: Array<{
-            tag: string;
-            value: number;
-          }>;
-        };
-      }>;
+      recipes: Array<ItalicRecipe>;
       scenario: string;
-    };
-    faces: Array<{
+    }
+
+    /** Variable font instance information */
+    export interface FontInstance {
+      name: string;
+      postscript_name: string | null;
+      coordinates: Record<string, number>;
+    }
+
+    /** Font feature information for UI consumption */
+    export interface FontFeature {
+      tag: string;
+      name: string;
+      tooltip: string | null;
+      sample_text: string | null;
+      glyphs: string[];
+    }
+
+    /** Face-level information for UI consumption */
+    export interface FontFaceInfo {
       face_id: string;
       family_name: string;
       subfamily_name: string;
@@ -37,62 +75,55 @@ declare namespace fonts {
       weight_class: number;
       width_class: number;
       is_variable: boolean;
-      axes: Array<{
-        tag: string;
-        name: string;
-        min: number;
-        default: number;
-        max: number;
-      }>;
-      instances?: Array<{
-        name: string;
-        coordinates: Array<{
-          tag: string;
-          value: number;
-        }>;
-      }>;
-      features: FontFeature[];
-    }>;
-    styles: FontStyle[];
-  }
+      axes: Array<FontAxis>;
+      instances?: Array<FontInstance>;
+      features: Array<FontFeature>;
+    }
 
-  export interface FontAnalysisResponse {
-    success: true;
-    data: FontAnalysisResult;
-  }
+    /** Font style instance for UI consumption */
+    export interface FontStyle {
+      name: string;
+      postscript_name: string | null;
+      italic: boolean;
+    }
 
-  export interface FaceRecord {
-    face_id: string;
-    ps_name: string;
-    family_name: string;
-    subfamily_name: string;
-    is_variable: boolean;
-    os2_italic_bit: boolean;
-    weight_class: number;
-    width_class: number;
-    user_font_style_italic: boolean | null;
-    axes_count: number;
-  }
+    /** Complete family-level analysis result for UI consumption */
+    export interface FontFamilyAnalysisResult {
+      family_name: string;
+      axes: Array<FontFamilyAxis>;
+      italic_capability: ItalicCapability;
+      faces: Array<FontFaceInfo>;
+      styles: Array<FontStyle>;
+    }
 
-  export interface FontFeature {
-    tag: string;
-    name: string;
-    tooltip: string | null;
-    sample_text: string | null;
-    glyphs: string[];
-  }
+    export type FontFamilyAnalysisResponse =
+      | {
+          success: true;
+          data: FontFamilyAnalysisResult;
+        }
+      | FontError;
 
-  export interface FontStyle {
-    name: string;
-    postscript_name: string;
-    italic: boolean;
-  }
+    /** Face record for single font parsing */
+    export interface FaceRecord {
+      face_id: string;
+      ps_name: string;
+      family_name: string;
+      subfamily_name: string;
+      is_variable: boolean;
+      os2_italic_bit: boolean;
+      weight_class: number;
+      width_class: number;
+      user_font_style_italic: boolean | null;
+      axes_count: number;
+    }
 
-  export interface FontError {
-    success: false;
-    error: {
-      message: string;
-    };
+    /** Error response for failed operations */
+    export interface FontError {
+      success: false;
+      error: {
+        message: string;
+      };
+    }
   }
 
   // ====================================================================================================
@@ -114,7 +145,7 @@ declare namespace fonts {
      * @param font_data_ptrs - Array of pointers to font data
      * @param font_data_sizes - Array of font data sizes
      * @param user_italic_flags - Array of user italic declarations (-1 = null, 0 = false, 1 = true)
-     * @returns JSON string containing FontAnalysisResponse or FontError
+     * @returns JSON string containing {@link FontFamilyAnalysisResponse}
      */
     _grida_fonts_analyze_family(
       family_name: number | null,
@@ -133,7 +164,7 @@ declare namespace fonts {
      * @param font_data_size - Size of font data
      * @param face_id - Unique identifier for this font face
      * @param user_font_style_italic - User-declared italic style (can be null for auto-detection)
-     * @returns JSON string containing FaceRecord or FontError
+     * @returns JSON string containing FaceRecord
      */
     _grida_fonts_parse_font(
       font_data_ptr: number,

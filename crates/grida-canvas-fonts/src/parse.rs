@@ -28,8 +28,8 @@ pub struct FvarAxis {
     pub def: f32,
     /// Maximum value for this axis
     pub max: f32,
-    /// Axis flags
-    pub flags: u16,
+    /// Whether this axis is hidden
+    pub hidden: bool,
     /// Human-readable name for this axis
     pub name: String,
 }
@@ -152,11 +152,37 @@ impl<'a> Parser<'a> {
     /// Returns `FvarData` containing all variation information, or empty data
     /// if the font is not variable or the `fvar` table is missing.
     pub fn fvar(&self) -> FvarData {
-        let table = match self.face.raw_face().table(Tag::from_bytes(b"fvar")) {
-            Some(t) => t,
-            None => return FvarData::default(),
+        if !self.face.is_variable() {
+            return FvarData::default();
+        }
+
+        // Use ttf-parser's built-in variation_axes() for axes
+        let mut axes: HashMap<String, FvarAxis> = HashMap::new();
+        for axis in self.face.variation_axes() {
+            let tag = axis.tag.to_string();
+            let name = lookup_name(&self.face, axis.name_id).unwrap_or_default();
+            axes.insert(
+                tag.clone(),
+                FvarAxis {
+                    tag,
+                    min: axis.min_value,
+                    def: axis.def_value,
+                    max: axis.max_value,
+                    hidden: axis.hidden,
+                    name,
+                },
+            );
+        }
+
+        // For instances, we still need manual parsing since ttf-parser doesn't expose them
+        // See: https://github.com/harfbuzz/ttf-parser/issues/129
+        let instances = if let Some(table) = self.face.raw_face().table(Tag::from_bytes(b"fvar")) {
+            parse_fvar_instances(&self.face, table, &axes.keys().cloned().collect::<Vec<_>>())
+        } else {
+            Vec::new()
         };
-        parse_fvar(&self.face, table)
+
+        FvarData { axes, instances }
     }
 
     /// Parses the `STAT` table providing axis values and combinations.
@@ -185,6 +211,8 @@ impl<'a> Parser<'a> {
     /// - Glyph coverage (characters affected by the feature)
     /// - Lookup table indices
     /// - Additional metadata when available
+    ///
+    // note: keep the name ffeatures (with double "ff") - this is to avoid rust compiler errors
     pub fn ffeatures(&self) -> Vec<FontFeature> {
         let mut features = Vec::new();
 
@@ -244,54 +272,33 @@ impl<'a> Parser<'a> {
     }
 }
 
-/// Parses the `fvar` table from raw font data.
+/// Parses only the instances from the `fvar` table.
+///
+/// This function manually parses the instance records from the raw `fvar` table data,
+/// as `ttf-parser` does not currently provide a high-level API for this.
+///
+/// **Note**: This is a temporary implementation. See [ttf-parser issue #129](https://github.com/harfbuzz/ttf-parser/issues/129)
+/// for the feature request to add built-in support for `fvar` instances parsing.
+/// This manual parsing should be replaced once `ttf-parser` adds official support.
 ///
 /// # Arguments
 ///
 /// * `face` - The parsed font face
 /// * `data` - Raw `fvar` table data
+/// * `axis_tags` - List of axis tags in order
 ///
 /// # Returns
 ///
-/// Returns `FvarData` containing all variation axes and named instances.
-fn parse_fvar(face: &Face<'_>, data: &[u8]) -> FvarData {
+/// Returns a vector of `FvarInstance` objects.
+fn parse_fvar_instances(face: &Face<'_>, data: &[u8], axis_tags: &[String]) -> Vec<FvarInstance> {
     if data.len() < 16 {
-        return FvarData::default();
+        return Vec::new();
     }
     let axis_offset = be_u16(data, 4) as usize;
     let axis_count = be_u16(data, 8) as usize;
     let axis_size = be_u16(data, 10) as usize;
     let instance_count = be_u16(data, 12) as usize;
     let instance_size = be_u16(data, 14) as usize;
-
-    let mut axes: HashMap<String, FvarAxis> = HashMap::new();
-    let mut axis_tags: Vec<String> = Vec::new();
-
-    for i in 0..axis_count {
-        let off = axis_offset + i * axis_size;
-        if off + axis_size > data.len() {
-            break;
-        }
-        let tag = tag_to_string(&data[off..off + 4]);
-        let min = be_fixed(data, off + 4);
-        let def = be_fixed(data, off + 8);
-        let max = be_fixed(data, off + 12);
-        let flags = be_u16(data, off + 16);
-        let name_id = be_u16(data, off + 18);
-        let name = lookup_name(face, name_id).unwrap_or_default();
-        axis_tags.push(tag.clone());
-        axes.insert(
-            tag.clone(),
-            FvarAxis {
-                tag,
-                min,
-                def,
-                max,
-                flags,
-                name,
-            },
-        );
-    }
 
     let mut instances: Vec<FvarInstance> = Vec::new();
     let mut inst_off = axis_offset + axis_count * axis_size;
@@ -303,7 +310,7 @@ fn parse_fvar(face: &Face<'_>, data: &[u8]) -> FvarData {
         let flags = be_u16(data, inst_off + 2);
         let mut coords = HashMap::new();
         let mut coord_off = inst_off + 4;
-        for tag in &axis_tags {
+        for tag in axis_tags {
             if coord_off + 4 > data.len() {
                 break;
             }
@@ -328,7 +335,7 @@ fn parse_fvar(face: &Face<'_>, data: &[u8]) -> FvarData {
         inst_off += instance_size;
     }
 
-    FvarData { axes, instances }
+    instances
 }
 
 /// Parses the `STAT` table from raw font data.

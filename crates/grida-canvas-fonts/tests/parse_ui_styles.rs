@@ -22,7 +22,7 @@ fn test_static_font_styles() {
 
     let style = &result.styles[0];
     assert_eq!(style.name, "Regular");
-    assert_eq!(style.postscript_name, "PTSerif-Regular");
+    assert_eq!(style.postscript_name, Some("PTSerif-Regular".to_string()));
     assert_eq!(style.italic, false);
 }
 
@@ -49,9 +49,12 @@ fn test_variable_font_styles() {
     // Should have at least one style
     assert!(!result.styles.is_empty());
 
-    // All styles should have postscript names
+    // PostScript names may or may not be present depending on the font
+    // (Inter fonts don't have PostScript names for instances)
     for style in &result.styles {
-        assert!(!style.postscript_name.is_empty());
+        if let Some(ref ps_name) = style.postscript_name {
+            assert!(!ps_name.is_empty());
+        }
     }
 }
 
@@ -115,8 +118,8 @@ fn test_multiple_static_font_styles() {
     assert!(style_names.contains(&&"Bold".to_string()));
 
     // Check that styles are unique by postscript name
-    let postscript_names: Vec<&String> = result.styles.iter().map(|s| &s.postscript_name).collect();
-    let unique_postscript_names: std::collections::HashSet<&String> =
+    let postscript_names: Vec<Option<&String>> = result.styles.iter().map(|s| s.postscript_name.as_ref()).collect();
+    let unique_postscript_names: std::collections::HashSet<Option<&String>> =
         postscript_names.iter().cloned().collect();
     assert_eq!(postscript_names.len(), unique_postscript_names.len());
 }
@@ -138,7 +141,7 @@ fn test_italic_style_detection() {
 
     let style = &result.styles[0];
     assert_eq!(style.name, "Italic");
-    assert_eq!(style.postscript_name, "PTSerif-Italic");
+    assert_eq!(style.postscript_name, Some("PTSerif-Italic".to_string()));
     assert_eq!(style.italic, true);
 }
 
@@ -163,7 +166,7 @@ fn test_user_declared_italic_style() {
 
     let style = &result.styles[0];
     assert_eq!(style.name, "Regular");
-    assert_eq!(style.postscript_name, "PTSerif-Regular");
+    assert_eq!(style.postscript_name, Some("PTSerif-Regular".to_string()));
     assert_eq!(style.italic, true); // Should be italic due to user declaration
 }
 
@@ -194,7 +197,7 @@ fn test_styles_sorting_and_deduplication() {
     assert_eq!(result.styles.len(), 1);
 
     let style = &result.styles[0];
-    assert_eq!(style.postscript_name, "PTSerif-Regular");
+    assert_eq!(style.postscript_name, Some("PTSerif-Regular".to_string()));
 }
 
 /// Test Inter Duo VF scenario with both regular and italic variable fonts
