@@ -4,7 +4,7 @@ use crate::node::repository::NodeRepository;
 use crate::node::schema::{
     IntrinsicSizeNode, LayerEffects, Node, NodeGeometryMixin, NodeId, Scene,
 };
-use crate::runtime::repository::FontRepository;
+use crate::runtime::font_repository::FontRepository;
 use math2::rect;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
@@ -47,12 +47,8 @@ impl GeometryCache {
         }
     }
 
-    pub fn from_scene(scene: &Scene) -> Self {
-        Self::from_scene_with_paragraph_cache(
-            scene,
-            &mut ParagraphCache::new(),
-            &FontRepository::new(),
-        )
+    pub fn from_scene(scene: &Scene, fonts: &FontRepository) -> Self {
+        Self::from_scene_with_paragraph_cache(scene, &mut ParagraphCache::new(), fonts)
     }
 
     pub fn from_scene_with_paragraph_cache(

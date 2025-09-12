@@ -3,8 +3,8 @@ use crate::{
     node::schema::Scene,
     runtime::{
         camera::Camera2D,
-        repository::FontRepository,
-        scene::{Backend, Renderer},
+        font_repository::FontRepository,
+        scene::{Backend, Renderer, RendererOptions},
     },
 };
 use math2::Rectangle;
@@ -32,11 +32,14 @@ pub fn export_node_as_image(
 
     let camera = Camera2D::new_from_bounds(rect);
 
-    // 2. create a renderer
-    let mut r = Renderer::new(
+    // 2. create a renderer sharing the font repository's ByteStore
+    let store = fonts.store();
+    let mut r = Renderer::new_with_store(
         Backend::new_from_raster(size.width as i32, size.height as i32),
         None,
         camera,
+        store,
+        RendererOptions::default(),
     );
 
     r.fonts = fonts.clone();

@@ -4,7 +4,7 @@ use crate::devtools::text_overlay;
 use crate::node::schema::NodeId;
 use crate::painter::layer::Layer;
 use crate::runtime::camera::Camera2D;
-use crate::runtime::repository::FontRepository;
+use crate::runtime::font_repository::FontRepository;
 use crate::sk;
 use skia_safe::{Canvas, Color, Font, Paint, PaintStyle};
 

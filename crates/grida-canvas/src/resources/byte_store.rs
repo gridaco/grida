@@ -3,7 +3,7 @@ use std::collections::HashMap;
 /// In-memory byte store keyed by content hash.
 ///
 /// Uses a simple HashMap with `u64` keys produced by SeaHash.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ByteStore {
     blobs: HashMap<u64, Vec<u8>>,
 }

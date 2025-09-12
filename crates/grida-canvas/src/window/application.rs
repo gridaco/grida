@@ -7,7 +7,6 @@ use crate::io::io_grida::JSONVectorNetwork;
 use crate::node::schema::*;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
-use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::sys::clock;
 use crate::sys::scheduler;
@@ -507,8 +506,8 @@ impl UnknownTargetApplication {
                     family_name,
                     font_variants.len()
                 );
-                for (j, font_data) in font_variants.iter().enumerate() {
-                    println!("     - Variant {}: {} bytes", j + 1, font_data.len());
+                for (j, hash) in font_variants.iter().enumerate() {
+                    println!("     - Variant {}: hash {:016x}", j + 1, hash);
                 }
             }
         }
@@ -553,7 +552,11 @@ impl UnknownTargetApplication {
     }
 
     pub fn list_missing_fonts(&self) -> Vec<String> {
-        self.renderer.fonts.missing_families()
+        self.renderer
+            .fonts
+            .missing_families()
+            .into_iter()
+            .collect()
     }
 
     pub fn list_available_fonts(&self) -> Vec<String> {

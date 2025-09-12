@@ -1,6 +1,6 @@
 use crate::node::schema::{NodeId, Scene};
 use crate::runtime::camera::Camera2D;
-use crate::runtime::repository::FontRepository;
+use crate::runtime::font_repository::FontRepository;
 use crate::{
     cache::{
         geometry::GeometryCache,

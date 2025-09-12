@@ -34,7 +34,9 @@
 //! ```rust
 //! # use cg::cache::paragraph::ParagraphCache;
 //! # use cg::cg::types::*;
-//! # use cg::runtime::repository::FontRepository;
+//! # use std::sync::{Arc, Mutex};
+//! # use cg::resources::ByteStore;
+//! # use cg::runtime::font_repository::FontRepository;
 //! # let mut cache = ParagraphCache::new();
 //! # let text = "Hello World";
 //! # let style = TextStyleRec::from_font("Arial", 16.0);
@@ -42,7 +44,7 @@
 //! # let max_lines = None;
 //! # let ellipsis = None;
 //! # let width = Some(100.0);
-//! # let fonts = FontRepository::new();
+//! # let fonts = FontRepository::new(Arc::new(Mutex::new(ByteStore::new())));
 //! let measurements = cache.measure(text, &style, &align, &max_lines, &ellipsis, width, &fonts, None);
 //! // Use measurements.max_width, measurements.height, etc.
 //! ```
@@ -51,7 +53,9 @@
 //! ```rust
 //! # use cg::cache::paragraph::ParagraphCache;
 //! # use cg::cg::types::*;
-//! # use cg::runtime::repository::{FontRepository, ImageRepository};
+//! # use std::sync::{Arc, Mutex};
+//! # use cg::resources::ByteStore;
+//! # use cg::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 //! # let mut cache = ParagraphCache::new();
 //! # let text = "Hello World";
 //! # let fills = &[Paint::Solid(CGColor::BLACK.into())];
@@ -60,8 +64,8 @@
 //! # let max_lines = None;
 //! # let ellipsis = None;
 //! # let width = Some(100.0);
-//! # let fonts = FontRepository::new();
-//! # let images = ImageRepository::new();
+//! # let fonts = FontRepository::new(Arc::new(Mutex::new(ByteStore::new())));
+//! # let images = ImageRepository::new(Arc::new(Mutex::new(ByteStore::new())));
 //! let paragraph = cache.paragraph(text, fills, &align, &style, &max_lines, &ellipsis, width, &fonts, &images, None);
 //! // paragraph.paint(canvas, point); // Use with actual canvas and point
 //! ```
@@ -69,7 +73,7 @@
 use crate::cg::types::*;
 use crate::node::schema::NodeId;
 use crate::painter::cvt;
-use crate::runtime::repository::FontRepository;
+use crate::runtime::font_repository::FontRepository;
 use crate::text::text_style::textstyle;
 use skia_safe::textlayout;
 use std::cell::RefCell;
@@ -364,7 +368,7 @@ impl ParagraphCache {
         ellipsis: &Option<String>,
         width: Option<f32>,
         fonts: &FontRepository,
-        images: &crate::runtime::repository::ImageRepository,
+        images: &crate::runtime::image_repository::ImageRepository,
         id: Option<&NodeId>,
     ) -> Rc<RefCell<textlayout::Paragraph>> {
         let _fonts_gen = fonts.generation();

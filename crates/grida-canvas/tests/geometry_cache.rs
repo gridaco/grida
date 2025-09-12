@@ -1,6 +1,9 @@
 use cg::cache::geometry::GeometryCache;
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use cg::resources::ByteStore;
+use cg::runtime::font_repository::FontRepository;
 use math2::transform::AffineTransform;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn geometry_cache_builds_recursively() {
@@ -38,7 +41,9 @@ fn geometry_cache_builds_recursively() {
         background_color: None,
     };
 
-    let cache = GeometryCache::from_scene(&scene);
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    let fonts = FontRepository::new(store);
+    let cache = GeometryCache::from_scene(&scene, &fonts);
     assert_eq!(cache.len(), repo.len());
 
     let expected = AffineTransform::new(21.0, 34.0, 0.0);
@@ -82,7 +87,9 @@ fn container_world_bounds_include_children() {
         background_color: None,
     };
 
-    let cache = GeometryCache::from_scene(&scene);
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    let fonts = FontRepository::new(store);
+    let cache = GeometryCache::from_scene(&scene, &fonts);
     let bounds = cache.get_world_bounds(&container_id).unwrap();
     assert_eq!(bounds.x, 0.0);
     assert_eq!(bounds.y, 0.0);

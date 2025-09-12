@@ -8,7 +8,7 @@ use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
-use crate::runtime::repository::{FontRepository, ImageRepository};
+use crate::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use crate::shape::*;
 use crate::sk;
 use crate::vectornetwork::vn_painter::StrokeOptions;

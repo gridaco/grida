@@ -1,5 +1,5 @@
 use super::gradient;
-use crate::{cg::types::*, runtime::repository::ImageRepository, sk};
+use crate::{cg::types::*, runtime::image_repository::ImageRepository, sk};
 use math2::box_fit::BoxFit;
 use skia_safe::{self, shaders, BlendMode, Color, SamplingOptions, Shader, TileMode};
 

@@ -11,7 +11,7 @@ use crate::{
         export_as_svg::export_node_as_svg,
     },
     node::schema::Scene,
-    runtime::repository::FontRepository,
+    runtime::font_repository::FontRepository,
 };
 
 type FileData = Vec<u8>;

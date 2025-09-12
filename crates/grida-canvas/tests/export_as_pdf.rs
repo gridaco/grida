@@ -1,8 +1,10 @@
 use cg::cg::types::*;
 use cg::export::{export_node_as, ExportAs};
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
-use cg::runtime::repository::FontRepository;
+use cg::resources::ByteStore;
+use cg::runtime::font_repository::FontRepository;
 use math2::transform::AffineTransform;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_pdf_export() {
@@ -30,12 +32,14 @@ fn test_pdf_export() {
         background_color: Some(CGColor(255, 255, 255, 255)), // White background
     };
 
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    let fonts = FontRepository::new(store.clone());
+
     // Create a geometry cache to get the render bounds
-    let geometry_cache = cg::cache::geometry::GeometryCache::from_scene(&scene);
+    let geometry_cache = cg::cache::geometry::GeometryCache::from_scene(&scene, &fonts);
 
     // Test PDF export
     let pdf_format = ExportAs::pdf();
-    let fonts = FontRepository::new();
     let result = export_node_as(&scene, &geometry_cache, &fonts, &rect_id, pdf_format);
 
     // Verify that we got a PDF result

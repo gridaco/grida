@@ -7,11 +7,10 @@ use crate::runtime::counter::FrameCounter;
 use crate::sk;
 use crate::{
     cache,
-    resources::{self, Resources},
+    resources::{self, ByteStore, Resources},
     runtime::{
-        camera::Camera2D,
-        config::RuntimeRendererConfig,
-        repository::{FontRepository, ImageRepository},
+        camera::Camera2D, config::RuntimeRendererConfig, font_repository::FontRepository,
+        image_repository::ImageRepository,
     },
 };
 
@@ -20,7 +19,7 @@ use skia_safe::{
     surfaces, Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface,
 };
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// Callback type used to request a redraw from the host window.
@@ -176,16 +175,33 @@ impl Renderer {
         camera: Camera2D,
         options: RendererOptions,
     ) -> Self {
-        let mut font_repository = FontRepository::new();
+        Self::new_with_store(
+            backend,
+            request_redraw,
+            camera,
+            Arc::new(Mutex::new(ByteStore::new())),
+            options,
+        )
+    }
+
+    pub fn new_with_store(
+        backend: Backend,
+        request_redraw: Option<RequestRedrawCallback>,
+        camera: Camera2D,
+        store: Arc<Mutex<ByteStore>>,
+        options: RendererOptions,
+    ) -> Self {
+        let resources = Resources::with_store(store.clone());
+        let mut font_repository = FontRepository::new(store.clone());
         if options.use_embedded_fonts {
             font_repository.register_embedded_fonts();
         }
-        let image_repository = ImageRepository::new();
+        let image_repository = ImageRepository::new(store);
         Self {
             backend,
             scene: None,
             camera,
-            resources: Resources::new(),
+            resources,
             images: image_repository,
             fonts: font_repository,
             scene_cache: cache::scene::SceneCache::new(),
@@ -213,9 +229,10 @@ impl Renderer {
     }
 
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
+        let hash = resources::hash_bytes(bytes);
         let rid = format!("res://fonts/{}", family);
         self.resources.insert(&rid, bytes.to_vec());
-        self.fonts.add(bytes, family);
+        self.fonts.add(hash, family);
     }
 
     pub fn add_image(&mut self, bytes: &[u8]) -> String {
@@ -223,10 +240,7 @@ impl Renderer {
         let hash_str = format!("{:016x}", hash);
         let rid = format!("res://images/{}", hash_str);
         self.resources.insert(&rid, bytes.to_vec());
-        let data = skia_safe::Data::new_copy(bytes);
-        if let Some(image) = Image::from_encoded(data) {
-            self.images.insert(hash_str.clone(), image);
-        }
+        self.images.insert(hash_str.clone(), hash);
         hash_str
     }
 
@@ -750,7 +764,11 @@ mod tests {
 
         assert!(renderer.fonts.has_missing());
         assert_eq!(
-            renderer.fonts.missing_families(),
+            renderer
+                .fonts
+                .missing_families()
+                .into_iter()
+                .collect::<Vec<_>>(),
             vec!["MissingFont".to_string()]
         );
 

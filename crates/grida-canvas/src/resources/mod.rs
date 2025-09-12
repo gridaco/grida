@@ -2,7 +2,10 @@ mod byte_store;
 mod index;
 
 use seahash::SeaHasher;
-use std::hash::Hasher;
+use std::{
+    hash::Hasher,
+    sync::{Arc, Mutex},
+};
 
 pub use byte_store::ByteStore;
 pub use index::ResourceIndex;
@@ -18,20 +21,36 @@ use winit::event_loop::EventLoopProxy;
 
 #[derive(Default)]
 pub struct Resources {
-    bytes: ByteStore,
+    bytes: Arc<Mutex<ByteStore>>,
     index: ResourceIndex,
 }
 
 impl Resources {
     /// Create a new empty resource store.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            bytes: Arc::new(Mutex::new(ByteStore::new())),
+            index: ResourceIndex::new(),
+        }
+    }
+
+    /// Create resources backed by an existing [`ByteStore`].
+    pub fn with_store(store: Arc<Mutex<ByteStore>>) -> Self {
+        Self {
+            bytes: store,
+            index: ResourceIndex::new(),
+        }
+    }
+
+    /// Get a reference to the underlying [`ByteStore`].
+    pub fn byte_store(&self) -> Arc<Mutex<ByteStore>> {
+        Arc::clone(&self.bytes)
     }
 
     /// Insert bytes under a logical RID returning a `mem://` URL.
     pub fn insert(&mut self, rid: &str, bytes: Vec<u8>) -> String {
         let hash = hash_bytes(&bytes);
-        self.bytes.insert(hash, bytes);
+        self.bytes.lock().unwrap().insert(hash, bytes);
         self.index.insert(rid.to_string(), hash);
         mem_url(hash)
     }
@@ -39,25 +58,27 @@ impl Resources {
     /// Store bytes and return a `mem://` URL without associating a RID.
     pub fn create_mem(&mut self, bytes: Vec<u8>) -> String {
         let hash = hash_bytes(&bytes);
-        self.bytes.insert(hash, bytes);
+        self.bytes.lock().unwrap().insert(hash, bytes);
         mem_url(hash)
     }
 
     /// Get bytes by logical RID.
-    pub fn get(&self, rid: &str) -> Option<&[u8]> {
+    pub fn get(&self, rid: &str) -> Option<Vec<u8>> {
         self.index
             .get(rid)
-            .and_then(|h| self.bytes.get(h).map(|b| b.as_slice()))
+            .and_then(|h| self.bytes.lock().unwrap().get(h).cloned())
     }
 
     /// Get bytes directly by `mem://` URL.
-    pub fn get_mem(&self, url: &str) -> Option<&[u8]> {
-        parse_mem_url(url).and_then(|h| self.bytes.get(h).map(|b| b.as_slice()))
+    pub fn get_mem(&self, url: &str) -> Option<Vec<u8>> {
+        parse_mem_url(url).and_then(|h| self.bytes.lock().unwrap().get(h).cloned())
     }
 
     /// Remove bytes by RID returning them if present.
     pub fn remove(&mut self, rid: &str) -> Option<Vec<u8>> {
-        self.index.remove(rid).and_then(|h| self.bytes.remove(h))
+        self.index
+            .remove(rid)
+            .and_then(|h| self.bytes.lock().unwrap().remove(h))
     }
 
     /// Number of resources stored.
