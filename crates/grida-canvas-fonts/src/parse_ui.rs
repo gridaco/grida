@@ -4,9 +4,9 @@
 //! It focuses on family-level analysis and provides clear, actionable results
 //! for font rendering and user interface display.
 
+use crate::parse::Parser;
 use crate::selection::{FaceRecord, FamilyScenario};
 use crate::selection_italic::{ItalicCapabilityMap, ItalicParser};
-use crate::parse::Parser;
 use std::collections::HashMap;
 
 /// Represents a font face with user-specified ID, data, and optional style declaration.
@@ -194,17 +194,21 @@ impl UIFontParser {
         // Analyze italic capabilities
         let italic_capability = self.analyze_italic_capability(&face_records)?;
 
-        // Analyze variable font data
-        let variable_font_info = self.analyze_variable_font_info(&parsers)?;
-
         // Analyze face-level information
         let face_info = self.analyze_face_info(&parsers, &face_records)?;
 
+        // Analyze family-level axes
+        let axes = self.analyze_family_axes(&parsers)?;
+
+        // Generate font styles for UI style picker
+        let styles = generate_font_styles(&face_info, &face_records, &italic_capability);
+
         Ok(UIFontFamilyResult {
             family_name,
+            axes,
             italic_capability,
-            variable_font_info,
-            face_info,
+            faces: face_info,
+            styles,
         })
     }
 
@@ -290,8 +294,6 @@ impl UIFontParser {
                     .face_id
                     .clone(),
                 vf_recipe: None,
-                weight_range: self.extract_weight_range(&capability_map.upright_slots),
-                stretch_range: self.extract_stretch_range(&capability_map.upright_slots),
             });
         }
 
@@ -306,8 +308,6 @@ impl UIFontParser {
                 is_italic: true,
                 face_id: face.face_id.clone(),
                 vf_recipe: face.vf_recipe.clone(),
-                weight_range: (*weight_key, *weight_key),
-                stretch_range: (*stretch_key, *stretch_key),
             });
         }
 
@@ -410,67 +410,40 @@ impl UIFontParser {
         }
     }
 
-    /// Extracts weight range from a collection of faces.
-    fn extract_weight_range(
-        &self,
-        faces: &HashMap<(u16, u16), crate::selection::FaceOrVfWithRecipe>,
-    ) -> (u16, u16) {
-        let weights: Vec<u16> = faces.keys().map(|(weight, _)| *weight).collect();
-        let min_weight = weights.iter().min().copied().unwrap_or(400);
-        let max_weight = weights.iter().max().copied().unwrap_or(400);
-        (min_weight, max_weight)
-    }
-
-    /// Extracts stretch range from a collection of faces.
-    fn extract_stretch_range(
-        &self,
-        faces: &HashMap<(u16, u16), crate::selection::FaceOrVfWithRecipe>,
-    ) -> (u16, u16) {
-        let stretches: Vec<u16> = faces.keys().map(|(_, stretch)| *stretch).collect();
-        let min_stretch = stretches.iter().min().copied().unwrap_or(5);
-        let max_stretch = stretches.iter().max().copied().unwrap_or(5);
-        (min_stretch, max_stretch)
-    }
-
-    /// Analyzes variable font information.
-    fn analyze_variable_font_info(
-        &self,
-        parsers: &[Parser],
-    ) -> Result<Option<UIFontVariableInfo>, String> {
-        let mut has_variable = false;
-        let mut axes = Vec::new();
-        let mut instances = Vec::new();
+    /// Analyzes family-level axes (min/max across all faces, no default values).
+    fn analyze_family_axes(&self, parsers: &[Parser]) -> Result<Vec<UIFontFamilyAxis>, String> {
+        let mut axis_map: std::collections::HashMap<String, (String, f32, f32)> =
+            std::collections::HashMap::new();
 
         for parser in parsers {
             if parser.is_variable() {
-                has_variable = true;
-
-                // Get fvar data
                 let fvar_data = parser.fvar();
                 for (_, axis) in &fvar_data.axes {
-                    axes.push(UIFontAxis {
-                        tag: axis.tag.clone(),
-                        name: axis.name.clone(),
-                        min: axis.min,
-                        default: axis.def,
-                        max: axis.max,
-                    });
-                }
+                    let entry = axis_map.entry(axis.tag.clone()).or_insert((
+                        axis.name.clone(),
+                        axis.min,
+                        axis.max,
+                    ));
 
-                for instance in &fvar_data.instances {
-                    instances.push(UIFontInstance {
-                        name: instance.name.clone(),
-                        coordinates: instance.coordinates.clone(),
-                    });
+                    // Update min/max across all faces
+                    entry.1 = entry.1.min(axis.min);
+                    entry.2 = entry.2.max(axis.max);
                 }
             }
         }
 
-        if has_variable {
-            Ok(Some(UIFontVariableInfo { axes, instances }))
-        } else {
-            Ok(None)
-        }
+        let mut axes: Vec<UIFontFamilyAxis> = axis_map
+            .into_iter()
+            .map(|(tag, (name, min, max))| UIFontFamilyAxis {
+                tag,
+                name,
+                min,
+                max,
+            })
+            .collect();
+
+        axes.sort_by(|a, b| a.tag.cmp(&b.tag));
+        Ok(axes)
     }
 
     /// Analyzes face-level information.
@@ -484,6 +457,35 @@ impl UIFontParser {
         for (_index, (parser, face_record)) in parsers.iter().zip(face_records.iter()).enumerate() {
             let features = parser.ffeatures();
 
+            // Get face-specific axes and instances if this is a variable font
+            let (axes, instances) = if parser.is_variable() {
+                let fvar_data = parser.fvar();
+                let axes = fvar_data
+                    .axes
+                    .iter()
+                    .map(|(_, axis)| UIFontAxis {
+                        tag: axis.tag.clone(),
+                        name: axis.name.clone(),
+                        min: axis.min,
+                        default: axis.def,
+                        max: axis.max,
+                    })
+                    .collect();
+
+                let instances = fvar_data
+                    .instances
+                    .iter()
+                    .map(|instance| UIFontInstance {
+                        name: instance.name.clone(),
+                        coordinates: instance.coordinates.clone(),
+                    })
+                    .collect();
+
+                (axes, Some(instances))
+            } else {
+                (Vec::new(), None)
+            };
+
             face_info.push(UIFontFaceInfo {
                 face_id: face_record.face_id.clone(),
                 family_name: face_record.family_name.clone(),
@@ -492,6 +494,8 @@ impl UIFontParser {
                 weight_class: face_record.weight_class,
                 width_class: face_record.width_class,
                 is_variable: face_record.is_variable,
+                axes,
+                instances,
                 features: features
                     .into_iter()
                     .map(|f| UIFontFeature {
@@ -499,6 +503,7 @@ impl UIFontParser {
                         name: f.name,
                         tooltip: f.tooltip,
                         sample_text: f.sample_text,
+                        glyphs: f.glyphs,
                     })
                     .collect(),
             });
@@ -519,12 +524,14 @@ impl Default for UIFontParser {
 pub struct UIFontFamilyResult {
     /// Family name
     pub family_name: String,
+    /// Family-level axes (no default values as they vary per face)
+    pub axes: Vec<UIFontFamilyAxis>,
     /// Italic capabilities and recipes
     pub italic_capability: UIFontItalicCapability,
-    /// Variable font information (if applicable)
-    pub variable_font_info: Option<UIFontVariableInfo>,
     /// Face-level information
-    pub face_info: Vec<UIFontFaceInfo>,
+    pub faces: Vec<UIFontFaceInfo>,
+    /// Available font styles for UI style picker
+    pub styles: Vec<UIFontStyleInstance>,
 }
 
 /// Italic capability analysis for UI consumption.
@@ -570,22 +577,22 @@ pub struct UIFontItalicRecipe {
     pub face_id: String,
     /// Variable font recipe (if applicable)
     pub vf_recipe: Option<crate::selection::VfRecipe>,
-    /// Weight range (min, max)
-    pub weight_range: (u16, u16),
-    /// Stretch range (min, max)
-    pub stretch_range: (u16, u16),
 }
 
-/// Variable font information for UI consumption.
+/// Family-level axis information (no default values as they vary per face).
 #[derive(Debug, Clone)]
-pub struct UIFontVariableInfo {
-    /// Available axes
-    pub axes: Vec<UIFontAxis>,
-    /// Named instances
-    pub instances: Vec<UIFontInstance>,
+pub struct UIFontFamilyAxis {
+    /// Axis tag (e.g., "wght", "ital", "slnt")
+    pub tag: String,
+    /// Human-readable axis name
+    pub name: String,
+    /// Minimum value across all faces
+    pub min: f32,
+    /// Maximum value across all faces
+    pub max: f32,
 }
 
-/// Variable font axis information.
+/// Face-specific axis information (includes default values).
 #[derive(Debug, Clone)]
 pub struct UIFontAxis {
     /// Axis tag (e.g., "wght", "ital", "slnt")
@@ -594,7 +601,7 @@ pub struct UIFontAxis {
     pub name: String,
     /// Minimum value
     pub min: f32,
-    /// Default value
+    /// Default value for this face
     pub default: f32,
     /// Maximum value
     pub max: f32,
@@ -626,6 +633,10 @@ pub struct UIFontFaceInfo {
     pub width_class: u16,
     /// Whether this is a variable font
     pub is_variable: bool,
+    /// Face-specific axes (includes default values)
+    pub axes: Vec<UIFontAxis>,
+    /// Variable font instances (if this is a variable font)
+    pub instances: Option<Vec<UIFontInstance>>,
     /// Available font features
     pub features: Vec<UIFontFeature>,
 }
@@ -641,6 +652,104 @@ pub struct UIFontFeature {
     pub tooltip: Option<String>,
     /// Sample text
     pub sample_text: Option<String>,
+    /// Characters covered by this feature
+    pub glyphs: Vec<String>,
+}
+
+/// Font style instance for UI consumption.
+/// Represents either a static font face or a variable font instance that can be selected in a style picker.
+#[derive(Debug, Clone)]
+pub struct UIFontStyleInstance {
+    /// User-friendly style name (e.g., "Regular", "Bold", "Light Italic")
+    pub name: String,
+    /// PostScript name for this style
+    pub postscript_name: String,
+    /// Whether this style is italic
+    pub italic: bool,
+}
+
+/// Font style mapping utility functions.
+impl UIFontStyleInstance {
+    /// Create a new font style instance
+    pub fn new(name: String, postscript_name: String, italic: bool) -> Self {
+        Self {
+            name,
+            postscript_name,
+            italic,
+        }
+    }
+}
+
+/// Generate font styles from face information, face records, and variable font instances.
+/// Uses the analyzed italic capability data to determine italic status for each style.
+fn generate_font_styles(
+    face_info: &[UIFontFaceInfo],
+    face_records: &[crate::selection::FaceRecord],
+    italic_capability: &UIFontItalicCapability,
+) -> Vec<UIFontStyleInstance> {
+    let mut styles = Vec::new();
+
+    // Create a map from face_id to italic status using the analyzed recipes
+    let face_italic_map: std::collections::HashMap<String, bool> = italic_capability
+        .recipes
+        .iter()
+        .map(|recipe| (recipe.face_id.clone(), recipe.is_italic))
+        .collect();
+
+    // For each face, generate styles
+    for (face, face_record) in face_info.iter().zip(face_records.iter()) {
+        if let Some(ref instances) = face.instances {
+            // For variable fonts, generate styles from instances
+            for instance in instances {
+                let style_name = instance.name.clone();
+                let postscript_name = instance.name.clone();
+
+                // Determine italic status for this instance
+                let italic = if italic_capability.scenario == FamilyScenario::SingleVf {
+                    // For Scenario 3-1 (SingleVf with slnt axis and italic instances),
+                    // analyze each instance individually using the selection module
+                    crate::selection_italic::is_instance_italic_scenario_3_1(
+                        &instance.name,
+                        &instance.coordinates,
+                    )
+                } else {
+                    // For other scenarios, use face-level italic status
+                    face_italic_map
+                        .get(&face_record.face_id)
+                        .copied()
+                        .unwrap_or(false)
+                };
+
+                styles.push(UIFontStyleInstance::new(
+                    style_name,
+                    postscript_name,
+                    italic,
+                ));
+            }
+        } else {
+            // For static fonts, generate one style per face
+            let style_name = face.subfamily_name.clone();
+            let postscript_name = face.postscript_name.clone();
+
+            // Use the analyzed italic status from the capability map
+            let italic = face_italic_map
+                .get(&face_record.face_id)
+                .copied()
+                .unwrap_or(false); // Default to false if not found
+
+            styles.push(UIFontStyleInstance::new(
+                style_name,
+                postscript_name,
+                italic,
+            ));
+        }
+    }
+
+    // Remove duplicates based on postscript name
+    styles.sort_by(|a, b| a.postscript_name.cmp(&b.postscript_name));
+    styles.dedup_by(|a, b| a.postscript_name == b.postscript_name);
+
+    styles
 }
 
 impl UIFontParser {
@@ -738,11 +847,8 @@ impl UIFontParser {
         let mut matches: Vec<ItalicMatch> = italic_recipes
             .into_iter()
             .map(|recipe| {
-                let (distance, axis_diffs) = self.calculate_style_distance(
-                    &current_style,
-                    &recipe,
-                    &family_result.variable_font_info,
-                );
+                let (distance, axis_diffs) =
+                    self.calculate_style_distance(&current_style, &recipe, &family_result.axes);
                 ItalicMatch {
                     recipe,
                     distance,
@@ -787,7 +893,7 @@ impl UIFontParser {
         &self,
         current_style: &CurrentTextStyle,
         recipe: &UIFontItalicRecipe,
-        variable_font_info: &Option<UIFontVariableInfo>,
+        family_axes: &[UIFontFamilyAxis],
     ) -> (f32, Option<Vec<AxisDiff>>) {
         let mut total_distance = 0.0;
         let mut axis_diffs = Vec::new();
@@ -820,24 +926,22 @@ impl UIFontParser {
         }
 
         // For variable fonts, calculate axis differences
-        if let Some(vf_info) = variable_font_info {
-            for axis in &vf_info.axes {
-                let current_value = self.get_current_axis_value(current_style, &axis.tag);
-                let target_value = self.get_recipe_axis_value(recipe, &axis.tag);
+        for axis in family_axes {
+            let current_value = self.get_current_axis_value(current_style, &axis.tag);
+            let target_value = self.get_recipe_axis_value(recipe, &axis.tag);
 
-                if let (Some(current), Some(target)) = (current_value, target_value) {
-                    let diff = target - current;
-                    if diff.abs() > 0.001 {
-                        // Only include significant differences
-                        axis_diffs.push(AxisDiff {
-                            tag: axis.tag.clone(),
-                            spec: target,
-                            diff,
-                        });
-                        // Add to total distance
-                        let normalized_diff = diff.abs() / (axis.max - axis.min);
-                        total_distance += normalized_diff * 0.1; // Weight axis differences less
-                    }
+            if let (Some(current), Some(target)) = (current_value, target_value) {
+                let diff = target - current;
+                if diff.abs() > 0.001 {
+                    // Only include significant differences
+                    axis_diffs.push(AxisDiff {
+                        tag: axis.tag.clone(),
+                        spec: target,
+                        diff,
+                    });
+                    // Add to total distance
+                    let normalized_diff = diff.abs() / (axis.max - axis.min);
+                    total_distance += normalized_diff * 0.1; // Weight axis differences less
                 }
             }
         }
@@ -1060,11 +1164,8 @@ impl UIFontParser {
             .into_iter()
             .filter_map(|recipe| {
                 // Calculate distance between current style and this roman recipe
-                let (distance, axis_diffs) = self.calculate_style_distance(
-                    &current_style,
-                    &recipe,
-                    &family_result.variable_font_info,
-                );
+                let (distance, axis_diffs) =
+                    self.calculate_style_distance(&current_style, &recipe, &family_result.axes);
 
                 Some(ItalicMatch {
                     recipe,

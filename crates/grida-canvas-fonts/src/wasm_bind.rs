@@ -4,78 +4,18 @@
 //! from JavaScript/TypeScript in the browser. All functions use the `grida_fonts_` prefix
 //! and return JSON strings for easy consumption by web applications.
 
-use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 use crate::parse::Parser;
 use crate::parse_ui::{UIFontFaceOwned, UIFontParser};
+use crate::serde::{WasmErrorResponse, WasmFontFamilyResult, WasmSuccessResponse};
 
 // ====================================================================================================
-// #region: WASM Response Structs
+// #region: WASM Response Structs (Single Font Only)
 // ====================================================================================================
 
-/// WASM response for font family analysis
-#[derive(serde::Serialize)]
-pub struct WasmFontAnalysisResult {
-    pub success: bool,
-    pub family_name: String,
-    pub has_italic: bool,
-    pub has_upright: bool,
-    pub strategy: String,
-    pub scenario: String,
-    pub recipe_count: usize,
-    pub variable_font_info: Option<WasmVariableFontInfo>,
-    pub face_info: Vec<WasmFaceInfo>,
-}
-
-/// WASM response for variable font information
-#[derive(serde::Serialize)]
-pub struct WasmVariableFontInfo {
-    pub axes: Vec<WasmFontAxis>,
-    pub instances: Vec<WasmFontInstance>,
-}
-
-/// WASM response for font axis information
-#[derive(serde::Serialize)]
-pub struct WasmFontAxis {
-    pub tag: String,
-    pub name: String,
-    pub min: f32,
-    pub default: f32,
-    pub max: f32,
-}
-
-/// WASM response for font instance information
-#[derive(serde::Serialize)]
-pub struct WasmFontInstance {
-    pub name: String,
-    pub coordinates: HashMap<String, f32>,
-}
-
-/// WASM response for face information
-#[derive(serde::Serialize)]
-pub struct WasmFaceInfo {
-    pub face_id: String,
-    pub family_name: String,
-    pub subfamily_name: String,
-    pub postscript_name: String,
-    pub weight_class: u16,
-    pub width_class: u16,
-    pub is_variable: bool,
-    pub features: Vec<WasmFontFeature>,
-}
-
-/// WASM response for font feature information
-#[derive(serde::Serialize)]
-pub struct WasmFontFeature {
-    pub tag: String,
-    pub name: String,
-    pub tooltip: Option<String>,
-    pub sample_text: Option<String>,
-}
-
-/// WASM response for face record
+/// WASM response for face record (single font parsing)
 #[derive(serde::Serialize)]
 pub struct WasmFaceRecord {
     pub face_id: String,
@@ -90,88 +30,9 @@ pub struct WasmFaceRecord {
     pub axes_count: usize,
 }
 
-/// WASM error response
-#[derive(serde::Serialize)]
-pub struct WasmError {
-    pub error: bool,
-    pub message: String,
-}
-
 // ====================================================================================================
 // #region: Conversion Functions
 // ====================================================================================================
-
-impl From<crate::parse_ui::UIFontFamilyResult> for WasmFontAnalysisResult {
-    fn from(result: crate::parse_ui::UIFontFamilyResult) -> Self {
-        Self {
-            success: true,
-            family_name: result.family_name,
-            has_italic: result.italic_capability.has_italic,
-            has_upright: result.italic_capability.has_upright,
-            strategy: format!("{:?}", result.italic_capability.strategy),
-            scenario: format!("{:?}", result.italic_capability.scenario),
-            recipe_count: result.italic_capability.recipes.len(),
-            variable_font_info: result.variable_font_info.map(Into::into),
-            face_info: result.face_info.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<crate::parse_ui::UIFontVariableInfo> for WasmVariableFontInfo {
-    fn from(vfi: crate::parse_ui::UIFontVariableInfo) -> Self {
-        Self {
-            axes: vfi.axes.into_iter().map(Into::into).collect(),
-            instances: vfi.instances.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<crate::parse_ui::UIFontAxis> for WasmFontAxis {
-    fn from(axis: crate::parse_ui::UIFontAxis) -> Self {
-        Self {
-            tag: axis.tag,
-            name: axis.name,
-            min: axis.min,
-            default: axis.default,
-            max: axis.max,
-        }
-    }
-}
-
-impl From<crate::parse_ui::UIFontInstance> for WasmFontInstance {
-    fn from(instance: crate::parse_ui::UIFontInstance) -> Self {
-        Self {
-            name: instance.name,
-            coordinates: instance.coordinates,
-        }
-    }
-}
-
-impl From<crate::parse_ui::UIFontFaceInfo> for WasmFaceInfo {
-    fn from(face: crate::parse_ui::UIFontFaceInfo) -> Self {
-        Self {
-            face_id: face.face_id,
-            family_name: face.family_name,
-            subfamily_name: face.subfamily_name,
-            postscript_name: face.postscript_name,
-            weight_class: face.weight_class,
-            width_class: face.width_class,
-            is_variable: face.is_variable,
-            features: face.features.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<crate::parse_ui::UIFontFeature> for WasmFontFeature {
-    fn from(feature: crate::parse_ui::UIFontFeature) -> Self {
-        Self {
-            tag: feature.tag,
-            name: feature.name,
-            tooltip: feature.tooltip,
-            sample_text: feature.sample_text,
-        }
-    }
-}
 
 impl From<crate::selection::FaceRecord> for WasmFaceRecord {
     fn from(record: crate::selection::FaceRecord) -> Self {
@@ -300,18 +161,16 @@ pub unsafe extern "C" fn grida_fonts_analyze_family(
         let result = parser.analyze_family_owned(family_name, faces)?;
 
         // Convert to WASM response struct and serialize
-        let response = WasmFontAnalysisResult::from(result);
-        serde_json::to_string(&response).map_err(|e| format!("Failed to serialize result: {}", e))
+        let wasm_result = WasmFontFamilyResult::from(result);
+        let response = WasmSuccessResponse::new(wasm_result);
+        response.to_json()
     })();
 
     match result {
         Ok(json) => CString::new(json).unwrap().into_raw(),
         Err(error) => {
-            let error_response = WasmError {
-                error: true,
-                message: error,
-            };
-            CString::new(serde_json::to_string(&error_response).unwrap())
+            let error_response = WasmErrorResponse::new(error);
+            CString::new(error_response.to_json().unwrap())
                 .unwrap()
                 .into_raw()
         }
@@ -384,11 +243,8 @@ pub unsafe extern "C" fn grida_fonts_parse_font(
     match result {
         Ok(json) => CString::new(json).unwrap().into_raw(),
         Err(error) => {
-            let error_response = WasmError {
-                error: true,
-                message: error,
-            };
-            CString::new(serde_json::to_string(&error_response).unwrap())
+            let error_response = WasmErrorResponse::new(error);
+            CString::new(error_response.to_json().unwrap())
                 .unwrap()
                 .into_raw()
         }
@@ -420,7 +276,3 @@ pub unsafe extern "C" fn grida_fonts_version() -> *mut c_char {
     let version = env!("CARGO_PKG_VERSION");
     CString::new(version).unwrap().into_raw()
 }
-
-// ====================================================================================================
-// #region: JSON Helper Types
-// ====================================================================================================

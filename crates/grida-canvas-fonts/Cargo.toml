@@ -13,7 +13,7 @@ categories = ["graphics", "text-processing"]
 readme = "README.md"
 
 [dependencies]
-ttf-parser = "0.25"
+ttf-parser = { version = "0.25", features = ["apple-layout"] }
 
 [dependencies.serde]
 version = "1.0"

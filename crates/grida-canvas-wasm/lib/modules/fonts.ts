@@ -160,8 +160,10 @@ export class FontsAPI {
       return result;
     } catch (error) {
       return {
-        error: true,
-        message: error instanceof Error ? error.message : String(error),
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+        },
       };
     }
   }
@@ -180,7 +182,6 @@ export class FontsAPI {
     faceId: string,
     userFontStyleItalic?: boolean
   ): Promise<fonts.FaceRecord | fonts.FontError> {
-    console.log("wasm::parseFont", fontData.byteLength);
     try {
       // Allocate font data
       const [fontDataPtr, fontDataSize] = this._alloc_data(fontData);
@@ -218,8 +219,10 @@ export class FontsAPI {
       return result;
     } catch (error) {
       return {
-        error: true,
-        message: error instanceof Error ? error.message : String(error),
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+        },
       };
     }
   }

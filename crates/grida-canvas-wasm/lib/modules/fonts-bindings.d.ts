@@ -4,27 +4,32 @@ declare namespace fonts {
   // ====================================================================================================
 
   export interface FontAnalysisResult {
-    success: boolean;
     family_name: string;
-    has_italic: boolean;
-    has_upright: boolean;
-    strategy: string;
-    scenario: string;
-    recipe_count: number;
-    variable_font_info?: {
-      axes: Array<{
-        tag: string;
+    axes: Array<{
+      tag: string;
+      name: string;
+      min: number;
+      max: number;
+    }>;
+    italic_capability: {
+      has_italic: boolean;
+      has_upright: boolean;
+      strategy: string;
+      recipes: Array<{
         name: string;
-        min: number;
-        default: number;
-        max: number;
+        description: string;
+        is_italic: boolean;
+        face_id: string;
+        vf_recipe?: {
+          axis_values: Array<{
+            tag: string;
+            value: number;
+          }>;
+        };
       }>;
-      instances: Array<{
-        name: string;
-        coordinates: Record<string, number>;
-      }>;
+      scenario: string;
     };
-    face_info: Array<{
+    faces: Array<{
       face_id: string;
       family_name: string;
       subfamily_name: string;
@@ -32,8 +37,28 @@ declare namespace fonts {
       weight_class: number;
       width_class: number;
       is_variable: boolean;
+      axes: Array<{
+        tag: string;
+        name: string;
+        min: number;
+        default: number;
+        max: number;
+      }>;
+      instances?: Array<{
+        name: string;
+        coordinates: Array<{
+          tag: string;
+          value: number;
+        }>;
+      }>;
       features: FontFeature[];
     }>;
+    styles: FontStyle[];
+  }
+
+  export interface FontAnalysisResponse {
+    success: true;
+    data: FontAnalysisResult;
   }
 
   export interface FaceRecord {
@@ -54,11 +79,20 @@ declare namespace fonts {
     name: string;
     tooltip: string | null;
     sample_text: string | null;
+    glyphs: string[];
+  }
+
+  export interface FontStyle {
+    name: string;
+    postscript_name: string;
+    italic: boolean;
   }
 
   export interface FontError {
-    error: true;
-    message: string;
+    success: false;
+    error: {
+      message: string;
+    };
   }
 
   // ====================================================================================================
@@ -80,7 +114,7 @@ declare namespace fonts {
      * @param font_data_ptrs - Array of pointers to font data
      * @param font_data_sizes - Array of font data sizes
      * @param user_italic_flags - Array of user italic declarations (-1 = null, 0 = false, 1 = true)
-     * @returns JSON string containing FontAnalysisResult or FontError
+     * @returns JSON string containing FontAnalysisResponse or FontError
      */
     _grida_fonts_analyze_family(
       family_name: number | null,

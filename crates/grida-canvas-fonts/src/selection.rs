@@ -167,16 +167,49 @@ pub struct FontSelectionCapabilityMap {
     pub scenario: FamilyScenario,
 }
 
-/// Family scenario type for diagnostics and selection policy.
+/// Family scenario types for font selection diagnostics.
+///
+/// These scenarios represent different ways that font families can implement italic styles,
+/// from traditional static fonts to modern variable fonts with complex axis configurations.
+///
+/// ## Reference
+///
+/// See [italic-fonts.md](https://grida.co/docs/reference/italic-fonts) for complete scenario documentation
+/// with real-world font examples from the Google Fonts registry.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FamilyScenario {
-    /// Single static font only
+    /// **Scenario 1**: Single static font only
+    ///
+    /// A single static font file without variable axes. Italic may or may not be present.
+    /// Detection method: OS/2 italic bit.
+    ///
+    /// Example: `Allerta-Regular.ttf` (upright only) or `Molle-Italic.ttf` (italic only)
     SingleStatic,
-    /// Multiple static fonts with at least one italic
+
+    /// **Scenario 2**: Multiple static fonts with at least one italic
+    ///
+    /// Multiple static font files, some designated as italic/oblique variants.
+    /// Detection method: OS/2 italic bit.
+    ///
+    /// Example: `PTSerif-Regular.ttf`, `PTSerif-Bold.ttf`, `PTSerif-Italic.ttf`, `PTSerif-BoldItalic.ttf`
     MultiStatic,
-    /// Single variable font providing upright and italic
+
+    /// **Scenario 3-1**: Single variable font with italic instances
+    ///
+    /// A single variable font with `slnt` axis and explicit italic instances in `fvar.instances`.
+    /// The font has `slnt` axis but OS/2 bit 0 is not set, so detection relies on `slnt` axis
+    /// values and instance names rather than reliable table sources.
+    ///
+    /// Example: `Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf` with 64 instances (32 upright + 32 italic)
     SingleVf,
-    /// Two variable fonts: Roman VF and Italic VF
+
+    /// **Scenario 4**: Two variable fonts (Roman VF + Italic VF)
+    ///
+    /// Separate Roman VF and Italic VF, switching between them based on style.
+    /// When 2 VF variants exist, they are explicitly `["regular", "italic"]`.
+    /// Detection method: OS/2 italic bit.
+    ///
+    /// Example: `Inter-VariableFont_opsz,wght.ttf` + `Inter-Italic-VariableFont_opsz,wght.ttf`
     DualVf,
 }
 
@@ -314,7 +347,8 @@ impl FontSelectionParser {
                 }
 
                 // Try to synthesize from variable font
-                if let Some(face) = self.synthesize_italic_from_vf(capability_map, weight, stretch) {
+                if let Some(face) = self.synthesize_italic_from_vf(capability_map, weight, stretch)
+                {
                     return FontSelection::from_face(&face);
                 }
 
@@ -526,6 +560,57 @@ impl FontSelectionParser {
         subfamily_lower.contains("italic") || ps_name_lower.contains("italic")
     }
 
+    /// Determines if a variable font instance is italic for Single Variable Font with Italic Instances scenario.
+    ///
+    /// This function implements italic detection for the "Single Variable Font with Italic Instances" scenario,
+    /// which is documented as scenario "3-1" in the italic fonts reference documentation.
+    ///
+    /// ## Scenario Description
+    ///
+    /// **Single Variable Font with Italic Instances**: A single variable font with `slnt` axis and explicit
+    /// italic instances in `fvar.instances`. The font has `slnt` axis but OS/2 bit 0 is not set, so we need
+    /// to rely on `slnt` axis values and instance names for detection.
+    ///
+    /// ## Detection Logic
+    ///
+    /// An instance is considered italic if:
+    /// 1. The instance has a negative `slnt` axis value (< 0), OR
+    /// 2. The instance name contains "italic" (case-insensitive)
+    ///
+    /// Both conditions can be true, but only one needs to be true for the instance to be italic.
+    ///
+    /// ## Examples
+    ///
+    /// - `slnt = -10.0` → italic (negative slant)
+    /// - `slnt = 0.0` + name "Mono Casual Italic" → italic (name contains "italic")
+    /// - `slnt = 0.0` + name "Mono Casual" → not italic (no negative slant, no "italic" in name)
+    ///
+    /// ## Reference
+    ///
+    /// See [italic-fonts.md](https://grida.co/docs/reference/italic-fonts) for the complete scenario documentation
+    /// and real-world font examples.
+    pub fn is_instance_italic_scenario_3_1(
+        &self,
+        instance_name: &str,
+        instance_coordinates: &std::collections::HashMap<String, f32>,
+    ) -> bool {
+        // Check 1: slnt axis value
+        if let Some(slnt_value) = instance_coordinates.get("slnt") {
+            if *slnt_value < 0.0 {
+                return true;
+            }
+        }
+
+        // Check 2: instance name contains "italic"
+        let instance_name_lower = instance_name.to_lowercase();
+        if instance_name_lower.contains("italic") {
+            return true;
+        }
+
+        // If neither condition is met, the instance is not italic
+        false
+    }
+
     /// Determines the family scenario for diagnostics.
     fn determine_scenario(&self, faces: &[ClassifiedFace]) -> FamilyScenario {
         if faces.len() == 1 {
@@ -560,7 +645,8 @@ impl FontSelectionParser {
         let mut best_distance = f32::INFINITY;
 
         for ((w, s), face) in &capability_map.italic_slots {
-            let distance = ((*w as f32 - weight as f32).powi(2) + (*s as f32 - stretch as f32).powi(2)).sqrt();
+            let distance =
+                ((*w as f32 - weight as f32).powi(2) + (*s as f32 - stretch as f32).powi(2)).sqrt();
             if distance < best_distance {
                 best_distance = distance;
                 best_face = Some(face);
@@ -582,7 +668,8 @@ impl FontSelectionParser {
         let mut best_distance = f32::INFINITY;
 
         for ((w, s), face) in &capability_map.upright_slots {
-            let distance = ((*w as f32 - weight as f32).powi(2) + (*s as f32 - stretch as f32).powi(2)).sqrt();
+            let distance =
+                ((*w as f32 - weight as f32).powi(2) + (*s as f32 - stretch as f32).powi(2)).sqrt();
             if distance < best_distance {
                 best_distance = distance;
                 best_face = Some(face);
@@ -734,10 +821,7 @@ mod tests {
         };
 
         let classification = parser.classify_face(face);
-        assert_eq!(
-            classification.classification.font_style,
-            FontStyle::Italic
-        );
+        assert_eq!(classification.classification.font_style, FontStyle::Italic);
     }
 
     #[test]
@@ -759,10 +843,7 @@ mod tests {
         };
 
         let classification = parser.classify_face(face);
-        assert_eq!(
-            classification.classification.font_style,
-            FontStyle::Italic
-        );
+        assert_eq!(classification.classification.font_style, FontStyle::Italic);
         assert!(classification.classification.vf_recipe.is_none());
     }
 
@@ -788,10 +869,7 @@ mod tests {
         };
 
         let classification = parser.classify_face(face);
-        assert_eq!(
-            classification.classification.font_style,
-            FontStyle::Italic
-        );
+        assert_eq!(classification.classification.font_style, FontStyle::Italic);
         assert!(classification.classification.vf_recipe.is_some());
         assert_eq!(
             classification
@@ -823,10 +901,7 @@ mod tests {
         };
 
         let classification = parser.classify_face(face);
-        assert_eq!(
-            classification.classification.font_style,
-            FontStyle::Normal
-        );
+        assert_eq!(classification.classification.font_style, FontStyle::Normal);
         assert!(classification.classification.vf_recipe.is_none());
     }
 

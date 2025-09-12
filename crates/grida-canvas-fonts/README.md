@@ -1,6 +1,6 @@
 # Grida Canvas Fonts
 
-A high-performance font parsing and selection library for the Grida design tool, providing comprehensive font selection capabilities, italic detection, variable font support, and JSON serialization for WASM communication. This library implements the Blink (Chrome) font selection model for professional-grade font handling.
+A high-performance font parsing and selection library for the Grida design tool, providing comprehensive font selection capabilities, italic detection, variable font support, font style management, and JSON serialization for WASM communication. This library implements the Blink (Chrome) font selection model for professional-grade font handling.
 
 ## Overview
 
@@ -11,6 +11,7 @@ This crate implements a complete font selection pipeline that follows the Blink 
 - 🎯 **Smart Font Selection** - Intelligent font matching following Blink (Chrome) model
 - 🔤 **True Italic Detection** - Reliable italic classification using OS/2 bits and variable font axes
 - 📊 **Variable Font Support** - Full support for `fvar` table parsing with axes and instances
+- 🎨 **Font Style Management** - UI-friendly font style instances for style pickers
 - 🎨 **UI-Friendly API** - High-level interface designed for design tool integration
 - ⚡ **High Performance** - Zero-copy parsing with minimal allocations
 - 🌐 **WASM Ready** - JSON serialization for web integration
@@ -42,6 +43,13 @@ let result = parser.analyze_family(Some("Inter".to_string()), font_faces)?;
 println!("Family: {}", result.family_name);
 println!("Has italic: {}", result.italic_capability.has_italic);
 println!("Strategy: {:?}", result.italic_capability.strategy);
+
+// Display available font styles
+println!("Available styles: {}", result.styles.len());
+for style in &result.styles {
+    println!("- {} ({})", style.name, style.postscript_name);
+    println!("  Italic: {}", style.italic);
+}
 
 // Find closest italic variants
 let italic_matches = parser.get_italics(
@@ -94,13 +102,14 @@ if let Some(closest) = italic_matches.first() {
 - **Parser Configuration**: Configurable trust levels for user declarations
 - **Style Matching**: Find closest italic variants to current text style with axis differences
 - **Font Selection Pipeline**: Complete font selection workflow following Blink (Chrome) model
+- **Font Style Generation**: Automatic generation of UI-friendly font style instances
 
-### JSON Serialization (Optional)
+### WASM Bindings (Optional)
 
-- **WASM Communication**: JSON-friendly structs for WASM transport
-- **Serialization Only**: Focused on output serialization (no deserialization)
-- **Predictable Ordering**: Uses `Vec` instead of `HashMap` for consistent JSON
-- **Clean API**: High-level response structures for easy consumption
+- **Web Integration**: WASM bindings for browser-based font analysis
+- **JSON Serialization**: Automatic JSON serialization for WASM communication
+- **High-Level API**: Same API surface as native Rust code
+- **TypeScript Support**: Full TypeScript declarations for web development
 
 ## Module Structure
 
@@ -110,7 +119,7 @@ The library is organized into focused modules following the Selection terminolog
 - **`selection`**: Core font selection logic and classification
 - **`selection_italic`**: Italic-specific selection functionality with legacy compatibility
 - **`parse_ui`**: High-level UI-friendly API for font analysis
-- **`serde`**: JSON serialization for WASM communication (optional feature)
+- **`wasm_bind`**: WASM bindings for web integration (optional feature)
 
 ### API Layers
 
@@ -203,10 +212,26 @@ for recipe in &result.italic_capability.recipes {
     }
 }
 
-// Show variable font axes
-if let Some(vf_info) = &result.variable_font_info {
-    for axis in &vf_info.axes {
-        println!("Axis: {} ({}): {} to {}", axis.tag, axis.name, axis.min, axis.max);
+// Show font style instances for UI picker
+println!("Font style instances: {}", result.styles.len());
+for style in &result.styles {
+    println!("- {} ({})", style.name, style.postscript_name);
+    println!("  Italic: {}", style.italic);
+}
+
+// Show family-level axes
+for axis in &result.axes {
+    println!("Axis: {} ({}): {} to {}", axis.tag, axis.name, axis.min, axis.max);
+}
+
+// Show face-specific information including instances
+for face in &result.faces {
+    println!("Face: {} ({})", face.subfamily_name, face.postscript_name);
+    if face.is_variable {
+        println!("  Variable font with {} axes", face.axes.len());
+        if let Some(instances) = &face.instances {
+            println!("  Instances: {}", instances.len());
+        }
     }
 }
 ```
@@ -230,29 +255,22 @@ let faces = vec![face_record1, face_record2, face_record3];
 let capability_map = selection_parser.build_capability_map(faces);
 ```
 
-### JSON Serialization (with `serde` feature)
+### WASM Bindings (with `wasm_bind` feature)
 
 ```rust
-use fonts::serde::*;
+// Enable wasm_bind feature: cargo build --features wasm_bind
 
-// Enable serde feature: cargo build --features serde
+// WASM functions are automatically available and return JSON:
+// - _grida_fonts_analyze_family: Analyze font family
+// - _grida_fonts_parse_font: Parse single font
+// - _grida_fonts_version: Get version
 
-// Convert analysis results to JSON
-let response = FontAnalysisResponse {
-    classifications: vec![FaceClassificationJson::from(classification)],
-    capability_map: ItalicCapabilityMapJson::from(capability_map),
-    fvar_data: None,
-    stat_data: None,
-    metadata: AnalysisMetadata {
-        face_count: 1,
-        has_variable_fonts: false,
-        timestamp: "2024-01-15T10:30:00Z".to_string(),
-        engine_version: "0.1.0".to_string(),
-    },
-};
-
-// Serialize to JSON
-let json_string = serde_json::to_string(&response)?;
+// Example usage in JavaScript/TypeScript:
+// const result = await fontsModule.analyzeFamily(familyName, fontFaces);
+// console.log(result.family_name);
+// console.log(result.axes);        // Family-level axes
+// console.log(result.faces);       // Face-level information with instances
+// console.log(result.styles);      // UI-friendly font style instances
 ```
 
 ## Installation
@@ -263,10 +281,10 @@ Add to your `Cargo.toml`:
 [dependencies]
 grida-canvas-fonts = "0.1.0"
 
-# Optional: Enable JSON serialization for WASM
+# Optional: Enable WASM bindings for web integration
 [dependencies.grida-canvas-fonts]
 version = "0.1.0"
-features = ["serde"]
+features = ["wasm_bind"]
 ```
 
 ## API Reference
@@ -391,9 +409,23 @@ Complete family-level analysis result.
 ```rust
 pub struct UIFontFamilyResult {
     pub family_name: String,                    // Family name
+    pub axes: Vec<UIFontFamilyAxis>,            // Family-level axes (min/max across all faces)
     pub italic_capability: UIFontItalicCapability, // Italic capabilities
-    pub variable_font_info: Option<UIFontVariableInfo>, // Variable font data
-    pub face_info: Vec<UIFontFaceInfo>,         // Face-level information
+    pub faces: Vec<UIFontFaceInfo>,             // Face-level information
+    pub styles: Vec<UIFontStyleInstance>,       // UI-friendly font style instances
+}
+```
+
+#### `UIFontFamilyAxis`
+
+Family-level axis information (no default values as they vary per face).
+
+```rust
+pub struct UIFontFamilyAxis {
+    pub tag: String,                            // Axis tag (e.g., "wght", "ital", "slnt")
+    pub name: String,                           // Human-readable axis name
+    pub min: f32,                              // Minimum value across all faces
+    pub max: f32,                              // Maximum value across all faces
 }
 ```
 
@@ -422,8 +454,18 @@ pub struct UIFontItalicRecipe {
     pub is_italic: bool,                        // Whether this recipe produces italic text
     pub face_id: String,                        // Face ID to use for this recipe
     pub vf_recipe: Option<VfRecipe>,            // Variable font recipe (if applicable)
-    pub weight_range: (u16, u16),               // Weight range (min, max)
-    pub stretch_range: (u16, u16),              // Stretch range (min, max)
+}
+```
+
+#### `UIFontStyleInstance`
+
+Font style instance for UI consumption. Represents either a static font face or a variable font instance that can be selected in a style picker.
+
+```rust
+pub struct UIFontStyleInstance {
+    pub name: String,                           // User-friendly style name (e.g., "Regular", "Bold", "Light Italic")
+    pub postscript_name: String,                // PostScript name for this style
+    pub italic: bool,                           // Whether this style is italic
 }
 ```
 
@@ -491,29 +533,43 @@ pub struct FontSelectionCapabilityMap {
 }
 ```
 
-### JSON Types (with `serde` feature)
+### WASM Bindings (with `wasm_bind` feature)
 
-#### `FontAnalysisResponse`
+#### `WasmFontAnalysisResult`
 
-Complete font analysis results for WASM consumption.
+WASM response structure for font family analysis.
 
 ```rust
-pub struct FontAnalysisResponse {
-    pub classifications: Vec<FaceClassificationJson>,
-    pub capability_map: ItalicCapabilityMapJson,
-    pub fvar_data: Option<FvarDataJson>,
-    pub stat_data: Option<StatDataJson>,
-    pub metadata: AnalysisMetadata,
+pub struct WasmFontAnalysisResult {
+    pub success: bool,
+    pub family_name: String,
+    pub axes: Vec<WasmFontFamilyAxis>,        // Family-level axes
+    pub has_italic: bool,
+    pub has_upright: bool,
+    pub strategy: String,
+    pub scenario: String,
+    pub recipe_count: usize,
+    pub faces: Vec<WasmFaceInfo>,             // Face-level information with instances
+    pub styles: Vec<WasmFontStyle>,           // UI-friendly font style instances
 }
 ```
 
-#### Utility Functions
+#### `WasmFaceInfo`
+
+WASM response structure for individual font face information.
 
 ```rust
-pub mod utils {
-    pub fn success_response<T: serde::Serialize>(data: T) -> SuccessResponse<T>
-    pub fn error_response(code: &str, message: &str) -> ErrorResponseWrapper
-    pub fn error_response_with_details(code: &str, message: &str, details: &str) -> ErrorResponseWrapper
+pub struct WasmFaceInfo {
+    pub face_id: String,
+    pub family_name: String,
+    pub subfamily_name: String,
+    pub postscript_name: String,
+    pub weight_class: u16,
+    pub width_class: u16,
+    pub is_variable: bool,
+    pub axes: Vec<WasmFontAxis>,              // Face-specific axes with defaults
+    pub instances: Option<Vec<WasmFontInstance>>, // Variable font instances
+    pub features: Vec<WasmFontFeature>,
 }
 ```
 
@@ -559,6 +615,7 @@ The library handles various font family configurations:
 - **Family Aggregation** - Intelligent grouping and selection of font families
 - **Style Matching** - Find closest italic variants with axis differences
 - **Parser Configuration** - Configurable trust levels for user declarations
+- **Font Style Generation** - Automatic generation of UI-friendly font style instances
 
 ### 🔄 **Future Features (Level 2+)**
 
@@ -738,28 +795,99 @@ let toggle_to_italic = parser.get_faces(
 )?;
 ```
 
-### WASM Communication
+### Font Style Management
+
+The library provides comprehensive font style management for UI integration:
 
 ```rust
-// Enable serde feature
-use fonts::serde::*;
+use fonts::{UIFontParser, UIFontFace};
 
-// Create analysis response
-let response = FontAnalysisResponse {
-    classifications: classifications.into_iter().map(|c| c.into()).collect(),
-    capability_map: capability_map.into(),
-    fvar_data: fvar_data.map(|f| f.into()),
-    stat_data: stat_data.map(|s| s.into()),
-    metadata: AnalysisMetadata {
-        face_count: faces.len(),
-        has_variable_fonts: faces.iter().any(|f| f.is_variable),
-        timestamp: chrono::Utc::now().to_rfc3339(),
-        engine_version: env!("CARGO_PKG_VERSION").to_string(),
+let parser = UIFontParser::new();
+let font_faces = vec![
+    UIFontFace {
+        face_id: "Inter-Regular.ttf".to_string(),
+        data: std::fs::read("Inter-Regular.ttf")?,
+        user_font_style_italic: Some(false),
     },
-};
+    UIFontFace {
+        face_id: "Inter-Italic.ttf".to_string(),
+        data: std::fs::read("Inter-Italic.ttf")?,
+        user_font_style_italic: Some(true),
+    },
+];
 
-// Serialize for WASM
-let json = serde_json::to_string(&response)?;
+let result = parser.analyze_family(Some("Inter".to_string()), font_faces)?;
+
+// Get all available styles for a style picker
+let styles = &result.styles;
+println!("Available styles: {}", styles.len());
+
+for style in styles {
+    println!("- {} ({})", style.name, style.postscript_name);
+    println!("  Italic: {}", style.italic);
+}
+
+// Filter styles by italic status
+let italic_styles: Vec<_> = styles.iter()
+    .filter(|s| s.italic)
+    .collect();
+
+let roman_styles: Vec<_> = styles.iter()
+    .filter(|s| !s.italic)
+    .collect();
+
+println!("Italic styles: {}", italic_styles.len());
+println!("Roman styles: {}", roman_styles.len());
+```
+
+### Variable Font Style Generation
+
+For variable fonts, styles are generated from font instances:
+
+```rust
+let font_faces = vec![
+    UIFontFace {
+        face_id: "Inter-VariableFont.ttf".to_string(),
+        data: std::fs::read("Inter-VariableFont.ttf")?,
+        user_font_style_italic: None, // Let the parser analyze the font metadata
+    },
+];
+
+let result = parser.analyze_family(Some("Inter".to_string()), font_faces)?;
+
+// Display variable font styles
+for style in &result.styles {
+    println!("Variable Style: {} ({})", style.name, style.postscript_name);
+    println!("  Italic: {}", style.italic);
+}
+```
+
+### WASM Communication
+
+The library provides WASM bindings for web integration. The WASM API exposes the same high-level functionality with JSON serialization:
+
+```rust
+// Enable wasm_bind feature
+// cargo build --features wasm_bind
+
+// WASM functions are automatically available:
+// - _grida_fonts_analyze_family: Analyze font family with multiple faces
+// - _grida_fonts_parse_font: Parse single font file
+// - _grida_fonts_version: Get library version
+
+// The WASM API returns JSON with the same structure as UIFontFamilyResult:
+// {
+//   "success": true,
+//   "family_name": "Inter",
+//   "axes": [...],           // Family-level axes
+//   "has_italic": true,
+//   "has_upright": true,
+//   "strategy": "DualVariableFonts",
+//   "scenario": "DualVf",
+//   "recipe_count": 2,
+//   "faces": [...],          // Face-level information with instances
+//   "styles": [...]          // UI-friendly font style instances
+// }
 ```
 
 ## Performance

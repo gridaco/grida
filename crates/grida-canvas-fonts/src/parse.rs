@@ -228,6 +228,20 @@ impl<'a> Parser<'a> {
     pub fn is_variable(&self) -> bool {
         self.face.is_variable()
     }
+
+    /// Checks if this is a strict (OS/2) italic font.
+    pub fn is_strict_italic(&self) -> bool {
+        self.face.is_italic()
+    }
+
+    /// Gets access to the underlying font face for debugging purposes.
+    ///
+    /// # Returns
+    ///
+    /// Returns a reference to the parsed font face.
+    pub fn face(&self) -> &Face<'a> {
+        &self.face
+    }
 }
 
 /// Parses the `fvar` table from raw font data.
@@ -464,13 +478,13 @@ fn parse_gsub_features_raw(face: &Face<'_>, data: &[u8]) -> Vec<FontFeature> {
         if params_offset != 0 && feature_off + params_offset + 2 <= data.len() {
             let po = feature_off + params_offset;
             if tag.starts_with("ss") {
-                if po + 6 <= data.len() {
+                // Stylistic Set features only have UI name, no sample text
+                if po + 4 <= data.len() {
                     let ui = be_u16(data, po + 2);
-                    let sample = be_u16(data, po + 4);
                     name = lookup_name(face, ui);
-                    sample_text = lookup_name(face, sample);
                 }
             } else if tag.starts_with("cv") {
+                // Character Variant features have UI name, tooltip, sample text, and parameter labels
                 if po + 12 <= data.len() {
                     let ui = be_u16(data, po + 2);
                     let ti = be_u16(data, po + 4);
@@ -480,6 +494,7 @@ fn parse_gsub_features_raw(face: &Face<'_>, data: &[u8]) -> Vec<FontFeature> {
                     name = lookup_name(face, ui);
                     tooltip = lookup_name(face, ti);
                     sample_text = lookup_name(face, si);
+
                     for k in 0..pcnt {
                         if let Some(label) = lookup_name(face, first + k as u16) {
                             param_labels.push(label);

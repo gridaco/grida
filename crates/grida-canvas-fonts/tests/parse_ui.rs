@@ -32,7 +32,7 @@ fn test_ui_parser_single_static_font() {
 
     // Verify family information
     assert_eq!(result.family_name, "Molle");
-    assert_eq!(result.face_info.len(), 1);
+    assert_eq!(result.faces.len(), 1);
 
     // Verify italic capability
     assert!(result.italic_capability.has_italic);
@@ -50,7 +50,7 @@ fn test_ui_parser_single_static_font() {
     assert!(recipe.description.contains("Italic"));
 
     // Verify face info
-    let face = &result.face_info[0];
+    let face = &result.faces[0];
     assert_eq!(face.family_name, "Molle");
     assert!(!face.is_variable);
 }
@@ -93,7 +93,7 @@ fn test_ui_parser_multi_static_fonts() {
 
     // Verify family information
     assert_eq!(result.family_name, "PT Serif");
-    assert_eq!(result.face_info.len(), existing_paths.len());
+    assert_eq!(result.faces.len(), existing_paths.len());
 
     // Verify italic capability
     assert!(result.italic_capability.has_italic);
@@ -158,15 +158,13 @@ fn test_ui_parser_variable_font() {
 
     // Verify family information
     assert_eq!(result.family_name, "Inter");
-    assert_eq!(result.face_info.len(), existing_paths.len());
+    assert_eq!(result.faces.len(), existing_paths.len());
 
-    // Verify variable font info
-    assert!(result.variable_font_info.is_some());
-    let vf_info = result.variable_font_info.unwrap();
-    assert!(!vf_info.axes.is_empty());
+    // Verify family-level axes
+    assert!(!result.axes.is_empty());
 
     // Check for weight axis
-    let weight_axis = vf_info
+    let weight_axis = result
         .axes
         .iter()
         .find(|a| a.tag == "wght")
@@ -211,14 +209,15 @@ fn test_ui_parser_slnt_axis_font() {
 
     // Verify family information
     assert_eq!(result.family_name, "Recursive");
-    assert_eq!(result.face_info.len(), 1);
+    assert_eq!(result.faces.len(), 1);
 
-    // Verify variable font info
-    assert!(result.variable_font_info.is_some());
-    let vf_info = result.variable_font_info.unwrap();
+    // Verify variable font info is in the face
+    let face = &result.faces[0];
+    assert!(face.is_variable);
+    assert!(face.instances.is_some());
 
     // Check for slnt axis
-    let slnt_axis = vf_info
+    let slnt_axis = result
         .axes
         .iter()
         .find(|a| a.tag == "slnt")
@@ -308,8 +307,8 @@ fn test_face_info_analysis() {
     let result = parser.analyze_family(None, font_faces).unwrap();
 
     // Verify face info
-    assert_eq!(result.face_info.len(), 1);
-    let face = &result.face_info[0];
+    assert_eq!(result.faces.len(), 1);
+    let face = &result.faces[0];
 
     assert!(!face.face_id.is_empty());
     assert!(!face.family_name.is_empty());
@@ -340,26 +339,27 @@ fn test_variable_font_info_analysis() {
 
     let result = parser.analyze_family(None, font_faces).unwrap();
 
-    // Verify variable font info
-    assert!(result.variable_font_info.is_some());
-    let vf_info = result.variable_font_info.unwrap();
+    // Verify variable font info is in the face
+    let face = &result.faces[0];
+    assert!(face.is_variable);
+    assert!(face.instances.is_some());
+    let instances = face.instances.as_ref().unwrap();
 
-    // Should have axes
-    assert!(!vf_info.axes.is_empty());
+    // Should have family-level axes
+    assert!(!result.axes.is_empty());
 
-    // Check axis properties
-    for axis in &vf_info.axes {
+    // Check family-level axis properties (no default values)
+    for axis in &result.axes {
         assert!(!axis.tag.is_empty());
         assert!(!axis.name.is_empty());
-        assert!(axis.min <= axis.default);
-        assert!(axis.default <= axis.max);
+        assert!(axis.min <= axis.max);
     }
 
     // Should have instances
-    assert!(!vf_info.instances.is_empty());
+    assert!(!instances.is_empty());
 
     // Check instance properties
-    for instance in &vf_info.instances {
+    for instance in instances {
         assert!(!instance.name.is_empty());
         assert!(!instance.coordinates.is_empty());
     }

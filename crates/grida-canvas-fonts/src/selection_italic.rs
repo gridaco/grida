@@ -104,6 +104,36 @@ impl ItalicSelectionParser {
     pub fn is_italic_by_name(&self, face: &FaceRecord) -> bool {
         self.base_parser.is_italic_by_name(face)
     }
+
+    /// Determines if a variable font instance is italic for Single Variable Font with Italic Instances scenario.
+    ///
+    /// This method provides per-instance italic detection for the "Single Variable Font with Italic Instances"
+    /// scenario (documented as scenario "3-1" in the italic fonts reference).
+    ///
+    /// ## Scenario Description
+    ///
+    /// **Single Variable Font with Italic Instances**: A single variable font with `slnt` axis and explicit
+    /// italic instances in `fvar.instances`. The font has `slnt` axis but OS/2 bit 0 is not set, so we need
+    /// to rely on `slnt` axis values and instance names for detection.
+    ///
+    /// ## Detection Logic
+    ///
+    /// An instance is considered italic if:
+    /// 1. The instance has a negative `slnt` axis value (< 0), OR
+    /// 2. The instance name contains "italic" (case-insensitive)
+    ///
+    /// ## Reference
+    ///
+    /// See [italic-fonts.md](https://grida.co/docs/reference/italic-fonts) for the complete scenario documentation
+    /// and real-world font examples.
+    pub fn is_instance_italic_scenario_3_1(
+        &self,
+        instance_name: &str,
+        instance_coordinates: &std::collections::HashMap<String, f32>,
+    ) -> bool {
+        self.base_parser
+            .is_instance_italic_scenario_3_1(instance_name, instance_coordinates)
+    }
 }
 
 impl Default for ItalicSelectionParser {
@@ -195,6 +225,29 @@ pub fn extract_italic_instances(face: &FaceRecord) -> Vec<String> {
 pub fn is_italic_by_name(face: &FaceRecord) -> bool {
     let parser = ItalicSelectionParser::new();
     parser.is_italic_by_name(face)
+}
+
+/// Legacy compatibility function for per-instance italic detection in Single Variable Font with Italic Instances scenario.
+///
+/// This function provides per-instance italic detection for the "Single Variable Font with Italic Instances"
+/// scenario (documented as scenario "3-1" in the italic fonts reference).
+///
+/// ## Scenario Description
+///
+/// **Single Variable Font with Italic Instances**: A single variable font with `slnt` axis and explicit
+/// italic instances in `fvar.instances`. The font has `slnt` axis but OS/2 bit 0 is not set, so we need
+/// to rely on `slnt` axis values and instance names for detection.
+///
+/// ## Reference
+///
+/// See [italic-fonts.md](https://grida.co/docs/reference/italic-fonts) for the complete scenario documentation
+/// and real-world font examples.
+pub fn is_instance_italic_scenario_3_1(
+    instance_name: &str,
+    instance_coordinates: &std::collections::HashMap<String, f32>,
+) -> bool {
+    let parser = ItalicSelectionParser::new();
+    parser.is_instance_italic_scenario_3_1(instance_name, instance_coordinates)
 }
 
 /// Legacy compatibility function for extracting face records.
@@ -326,5 +379,40 @@ mod tests {
                 panic!("Expected to find a normal face");
             }
         }
+    }
+
+    #[test]
+    fn test_instance_italic_detection_single_vf_with_italic_instances() {
+        // Test per-instance italic detection for "Single Variable Font with Italic Instances" scenario
+        // (documented as scenario "3-1" in italic-fonts.md)
+        let parser = ItalicSelectionParser::new();
+
+        // Test case 1: Instance with negative slnt value should be italic
+        let mut coordinates = HashMap::new();
+        coordinates.insert("slnt".to_string(), -10.0);
+        assert!(parser.is_instance_italic_scenario_3_1("Mono Casual", &coordinates));
+
+        // Test case 2: Instance with positive slnt value should not be italic
+        coordinates.insert("slnt".to_string(), 10.0);
+        assert!(!parser.is_instance_italic_scenario_3_1("Mono Casual", &coordinates));
+
+        // Test case 3: Instance with zero slnt value should not be italic
+        coordinates.insert("slnt".to_string(), 0.0);
+        assert!(!parser.is_instance_italic_scenario_3_1("Mono Casual", &coordinates));
+
+        // Test case 4: Instance with "Italic" in name should be italic (regardless of slnt)
+        coordinates.insert("slnt".to_string(), 0.0);
+        assert!(parser.is_instance_italic_scenario_3_1("Mono Casual Italic", &coordinates));
+
+        // Test case 5: Instance with "italic" in name should be italic (case insensitive)
+        assert!(parser.is_instance_italic_scenario_3_1("Mono Casual italic", &coordinates));
+
+        // Test case 6: Instance with no slnt axis and no "italic" in name should not be italic
+        let empty_coordinates = HashMap::new();
+        assert!(!parser.is_instance_italic_scenario_3_1("Mono Casual", &empty_coordinates));
+
+        // Test case 7: Instance with negative slnt AND "italic" in name should be italic
+        coordinates.insert("slnt".to_string(), -10.0);
+        assert!(parser.is_instance_italic_scenario_3_1("Mono Casual Italic", &coordinates));
     }
 }
