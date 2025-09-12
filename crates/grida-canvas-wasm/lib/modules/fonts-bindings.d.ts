@@ -64,6 +64,9 @@ export namespace fonts {
       tooltip: string | null;
       sample_text: string | null;
       glyphs: string[];
+      script: string;
+      language: string;
+      source_table: string;
     }
 
     /** Face-level information for UI consumption */
@@ -75,6 +78,7 @@ export namespace fonts {
       weight_class: number;
       width_class: number;
       is_variable: boolean;
+      is_strict_italic: boolean;
       axes: Array<FontAxis>;
       instances?: Array<FontInstance>;
       features: Array<FontFeature>;

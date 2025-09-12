@@ -116,17 +116,22 @@ if let Some(closest) = italic_matches.first() {
 The library is organized into focused modules following the Selection terminology:
 
 - **`parse`**: Low-level font parsing functionality using ttf-parser
+- **`parse_feature_params`**: Feature parameters parsing and UI name extraction
+- **`parse_feature`**: Configurable feature parsing with different parser types and modes
 - **`selection`**: Core font selection logic and classification
 - **`selection_italic`**: Italic-specific selection functionality with legacy compatibility
 - **`parse_ui`**: High-level UI-friendly API for font analysis
+- **`serde`**: JSON serialization support for WASM communication (optional feature)
 - **`wasm_bind`**: WASM bindings for web integration (optional feature)
 
 ### API Layers
 
 1. **High-Level UI API** (`parse_ui`) - Recommended for most use cases
 2. **Core Selection API** (`selection`) - For advanced font selection logic
-3. **Low-Level Parsing API** (`parse`) - For direct font file analysis
-4. **Legacy Compatibility** (`selection_italic`) - Backward compatibility layer
+3. **Feature Parsing API** (`parse_feature`, `parse_feature_params`) - For OpenType feature analysis
+4. **Low-Level Parsing API** (`parse`) - For direct font file analysis
+5. **Serialization API** (`serde`) - For JSON serialization and WASM communication
+6. **Legacy Compatibility** (`selection_italic`) - Backward compatibility layer
 
 ## Quick Start
 

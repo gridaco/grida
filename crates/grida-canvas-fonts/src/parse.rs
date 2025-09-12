@@ -10,12 +10,10 @@
 //! - **Font Selection**: Provides face record extraction for font matching
 //! - **Clean API**: No hardcoded UI labels, relies only on font data
 
-use std::collections::{HashMap, HashSet};
-use ttf_parser::{
-    gpos, gsub,
-    opentype_layout::{Coverage, LookupSubtable},
-    Face, Tag,
-};
+use std::collections::HashMap;
+use ttf_parser::{Face, Tag};
+
+use crate::parse_feature::{FeatureParser, ParserType, DEFAULT_PARSER};
 
 /// Represents a single variation axis from the `fvar` table.
 #[derive(Debug, Clone)]
@@ -119,6 +117,12 @@ pub struct FontFeature {
     pub param_labels: Vec<String>,
     /// Lookup table indices used by this feature
     pub lookup_indices: Vec<u16>,
+    /// Script system this feature belongs to (e.g., "latn", "cyrl", "grek", "DFLT")
+    pub script: String,
+    /// Language system this feature belongs to (e.g., "CAT", "MOL", "ROM", "DFLT")
+    pub language: String,
+    /// Source table this feature comes from ("GSUB" or "GPOS")
+    pub source_table: String,
 }
 
 /// Font metadata parser backed by `ttf-parser`.
@@ -127,10 +131,12 @@ pub struct FontFeature {
 /// variation axes, style information, and font features.
 pub struct Parser<'a> {
     face: Face<'a>,
+    font_data: &'a [u8],
+    feature_parser: Box<dyn FeatureParser>,
 }
 
 impl<'a> Parser<'a> {
-    /// Creates a new parser from raw font data.
+    /// Creates a new parser from raw font data using the default feature parser.
     ///
     /// # Arguments
     ///
@@ -141,8 +147,31 @@ impl<'a> Parser<'a> {
     /// * `Ok(Parser)` - Successfully parsed font
     /// * `Err(FaceParsingError)` - Failed to parse font data
     pub fn new(data: &'a [u8]) -> Result<Self, ttf_parser::FaceParsingError> {
+        Self::with_feature_parser(data, DEFAULT_PARSER)
+    }
+
+    /// Creates a new parser from raw font data with a specific feature parser.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - Raw font file bytes
+    /// * `parser_type` - Type of feature parser to use
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Parser)` - Successfully parsed font
+    /// * `Err(FaceParsingError)` - Failed to parse font data
+    pub fn with_feature_parser(
+        data: &'a [u8],
+        parser_type: ParserType,
+    ) -> Result<Self, ttf_parser::FaceParsingError> {
         let face = Face::parse(data, 0)?;
-        Ok(Self { face })
+        let feature_parser = parser_type.create_parser();
+        Ok(Self {
+            face,
+            font_data: data,
+            feature_parser,
+        })
     }
 
     /// Parses the `fvar` table, returning variation axes and named instances.
@@ -214,19 +243,13 @@ impl<'a> Parser<'a> {
     ///
     // note: keep the name ffeatures (with double "ff") - this is to avoid rust compiler errors
     pub fn ffeatures(&self) -> Vec<FontFeature> {
-        let mut features = Vec::new();
+        self.feature_parser
+            .parse_features(&self.face, self.font_data)
+    }
 
-        // Parse GSUB features using raw table access for compatibility
-        if let Some(data) = self.face.raw_face().table(Tag::from_bytes(b"GSUB")) {
-            features.extend(parse_gsub_features_raw(&self.face, data));
-        }
-
-        // Parse GPOS features using high-level API
-        if let Some(gpos_table) = self.face.tables().gpos {
-            features.extend(parse_gpos_features(&self.face, gpos_table));
-        }
-
-        features
+    /// Gets a reference to the underlying font face.
+    pub fn face(&self) -> &Face<'a> {
+        &self.face
     }
 
     /// Extracts a face record for font selection.
@@ -260,15 +283,6 @@ impl<'a> Parser<'a> {
     /// Checks if this is a strict (OS/2) italic font.
     pub fn is_strict_italic(&self) -> bool {
         self.face.is_italic()
-    }
-
-    /// Gets access to the underlying font face for debugging purposes.
-    ///
-    /// # Returns
-    ///
-    /// Returns a reference to the parsed font face.
-    pub fn face(&self) -> &Face<'a> {
-        &self.face
     }
 }
 
@@ -428,238 +442,6 @@ fn parse_stat(face: &Face<'_>, data: &[u8]) -> StatData {
     }
 }
 
-/// Parses GSUB features from raw table data using manual parsing for compatibility.
-///
-/// This function uses raw table access to maintain compatibility with existing
-/// functionality while extracting comprehensive feature information.
-///
-/// # Arguments
-///
-/// * `face` - The parsed font face
-/// * `data` - Raw GSUB table data
-///
-/// # Returns
-///
-/// Returns a vector of `FontFeature` objects from the GSUB table.
-fn parse_gsub_features_raw(face: &Face<'_>, data: &[u8]) -> Vec<FontFeature> {
-    if data.len() < 10 {
-        return Vec::new();
-    }
-    let feature_list_offset = be_u16(data, 6) as usize;
-    let lookup_list_offset = be_u16(data, 8) as usize;
-
-    let glyph_map = build_glyph_map(face);
-
-    if feature_list_offset >= data.len() {
-        return Vec::new();
-    }
-    let fl_base = feature_list_offset;
-    let feature_count = be_u16(data, fl_base) as usize;
-    let mut features: Vec<FontFeature> = Vec::new();
-
-    for i in 0..feature_count {
-        let rec_off = fl_base + 2 + i * 6;
-        if rec_off + 6 > data.len() {
-            break;
-        }
-        let tag = tag_to_string(&data[rec_off..rec_off + 4]);
-        let feature_off = fl_base + be_u16(data, rec_off + 4) as usize;
-        if feature_off + 4 > data.len() {
-            continue;
-        }
-        let params_offset = be_u16(data, feature_off) as usize;
-        let lookup_count = be_u16(data, feature_off + 2) as usize;
-        let mut lookup_indices = Vec::new();
-        for j in 0..lookup_count {
-            let li_off = feature_off + 4 + j * 2;
-            if li_off + 2 > data.len() {
-                break;
-            }
-            lookup_indices.push(be_u16(data, li_off));
-        }
-
-        let mut name = None;
-        let mut tooltip = None;
-        let mut sample_text = None;
-        let mut param_labels: Vec<String> = Vec::new();
-        if params_offset != 0 && feature_off + params_offset + 2 <= data.len() {
-            let po = feature_off + params_offset;
-            if tag.starts_with("ss") {
-                // Stylistic Set features only have UI name, no sample text
-                if po + 4 <= data.len() {
-                    let ui = be_u16(data, po + 2);
-                    name = lookup_name(face, ui);
-                }
-            } else if tag.starts_with("cv") {
-                // Character Variant features have UI name, tooltip, sample text, and parameter labels
-                if po + 12 <= data.len() {
-                    let ui = be_u16(data, po + 2);
-                    let ti = be_u16(data, po + 4);
-                    let si = be_u16(data, po + 6);
-                    let pcnt = be_u16(data, po + 8) as usize;
-                    let first = be_u16(data, po + 10);
-                    name = lookup_name(face, ui);
-                    tooltip = lookup_name(face, ti);
-                    sample_text = lookup_name(face, si);
-
-                    for k in 0..pcnt {
-                        if let Some(label) = lookup_name(face, first + k as u16) {
-                            param_labels.push(label);
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut glyph_set: HashSet<u16> = HashSet::new();
-        for &lookup_index in &lookup_indices {
-            glyph_set.extend(parse_lookup_glyphs(data, lookup_list_offset, lookup_index));
-        }
-        let glyphs: Vec<String> = glyph_set
-            .into_iter()
-            .filter_map(|gid| glyph_map.get(&gid).copied())
-            .map(|c| c.to_string())
-            .collect();
-
-        let feature_name = name
-            .clone()
-            .unwrap_or_else(|| get_feature_name_from_font(face, &tag));
-        features.push(FontFeature {
-            tag: tag.clone(),
-            name: feature_name,
-            tooltip,
-            sample_text,
-            glyphs,
-            param_labels,
-            lookup_indices,
-        });
-    }
-
-    features
-}
-
-/// Extracts glyph IDs from a GSUB lookup table.
-///
-/// # Arguments
-///
-/// * `data` - Raw GSUB table data
-/// * `lookup_list_offset` - Offset to the lookup list
-/// * `lookup_index` - Index of the lookup to extract
-///
-/// # Returns
-///
-/// Returns a vector of glyph IDs covered by the lookup.
-fn parse_lookup_glyphs(data: &[u8], lookup_list_offset: usize, lookup_index: u16) -> Vec<u16> {
-    let mut glyphs = Vec::new();
-    let ll_offset = lookup_list_offset;
-    if ll_offset + 2 > data.len() {
-        return glyphs;
-    }
-    let lookup_count = be_u16(data, ll_offset);
-    if lookup_index as usize >= lookup_count as usize {
-        return glyphs;
-    }
-    let lookup_offset_pos = ll_offset + 2 + lookup_index as usize * 2;
-    if lookup_offset_pos + 2 > data.len() {
-        return glyphs;
-    }
-    let lookup_offset = ll_offset + be_u16(data, lookup_offset_pos) as usize;
-    if lookup_offset + 6 > data.len() {
-        return glyphs;
-    }
-    let lookup_type = be_u16(data, lookup_offset);
-    let sub_count = be_u16(data, lookup_offset + 4) as usize;
-    for i in 0..sub_count {
-        let sub_off_pos = lookup_offset + 6 + i * 2;
-        if sub_off_pos + 2 > data.len() {
-            break;
-        }
-        let sub_off = lookup_offset + be_u16(data, sub_off_pos) as usize;
-        if sub_off > data.len() {
-            continue;
-        }
-        if let Some(subtable) = gsub::SubstitutionSubtable::parse(&data[sub_off..], lookup_type) {
-            match subtable {
-                gsub::SubstitutionSubtable::Single(s) => {
-                    glyphs.extend(coverage_glyphs(s.coverage()));
-                }
-                gsub::SubstitutionSubtable::Ligature(l) => {
-                    let sets = l.ligature_sets;
-                    for si in 0..sets.len() {
-                        if let Some(set) = sets.get(si) {
-                            for li in 0..set.len() {
-                                if let Some(lig) = set.get(li) {
-                                    glyphs.push(lig.glyph.0);
-                                }
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    glyphs
-}
-
-/// Extracts glyph IDs from a Coverage table.
-///
-/// # Arguments
-///
-/// * `cov` - The coverage table to extract from
-///
-/// # Returns
-///
-/// Returns a vector of glyph IDs covered by the table.
-fn coverage_glyphs(cov: Coverage) -> Vec<u16> {
-    match cov {
-        Coverage::Format1 { glyphs } => (0..glyphs.len())
-            .filter_map(|i| glyphs.get(i))
-            .map(|g| g.0)
-            .collect(),
-        Coverage::Format2 { records } => {
-            let mut res = Vec::new();
-            for i in 0..records.len() {
-                if let Some(rec) = records.get(i) {
-                    for g in rec.start.0..=rec.end.0 {
-                        res.push(g);
-                    }
-                }
-            }
-            res
-        }
-    }
-}
-
-/// Builds a map from glyph IDs to Unicode characters using the font's character map.
-///
-/// # Arguments
-///
-/// * `face` - The parsed font face
-///
-/// # Returns
-///
-/// Returns a HashMap mapping glyph IDs to their corresponding Unicode characters.
-fn build_glyph_map(face: &Face<'_>) -> HashMap<u16, char> {
-    let mut map = HashMap::new();
-    if let Some(cmap) = face.tables().cmap {
-        for sub in cmap.subtables.into_iter() {
-            if sub.is_unicode() {
-                sub.codepoints(|cp| {
-                    if let Some(gid) = sub.glyph_index(cp) {
-                        if gid.0 != 0 && !map.contains_key(&gid.0) {
-                            if let Some(ch) = char::from_u32(cp) {
-                                map.insert(gid.0, ch);
-                            }
-                        }
-                    }
-                });
-            }
-        }
-    }
-    map
-}
-
 /// Looks up a name from the font's name table by ID.
 ///
 /// # Arguments
@@ -691,228 +473,19 @@ fn tag_to_string(bytes: &[u8]) -> String {
 }
 
 /// Reads a big-endian u16 from the given offset in the data.
-///
-/// # Arguments
-///
-/// * `data` - The data buffer
-/// * `offset` - Byte offset to read from
-///
-/// # Returns
-///
-/// Returns the u16 value read from the buffer.
 fn be_u16(data: &[u8], offset: usize) -> u16 {
-    let b = [data[offset], data[offset + 1]];
-    u16::from_be_bytes(b)
+    if offset + 2 > data.len() {
+        return 0;
+    }
+    u16::from_be_bytes([data[offset], data[offset + 1]])
 }
 
-/// Reads a big-endian fixed-point number from the given offset in the data.
-///
-/// # Arguments
-///
-/// * `data` - The data buffer
-/// * `offset` - Byte offset to read from
-///
-/// # Returns
-///
-/// Returns the fixed-point value as f32.
+/// Reads a big-endian fixed-point 16.16 number from the given offset in the data.
 fn be_fixed(data: &[u8], offset: usize) -> f32 {
-    let b = [
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-    ];
-    let v = i32::from_be_bytes(b);
-    v as f32 / 65536.0
-}
-
-/// Parses GPOS features using the high-level `ttf-parser` API.
-///
-/// This function extracts features from the GPOS table using the parsed layout table,
-/// providing clean access to positioning features like kerning.
-///
-/// # Arguments
-///
-/// * `face` - The parsed font face
-/// * `gpos_table` - The parsed GPOS layout table
-///
-/// # Returns
-///
-/// Returns a vector of `FontFeature` objects from the GPOS table.
-fn parse_gpos_features(
-    face: &Face<'_>,
-    gpos_table: ttf_parser::opentype_layout::LayoutTable<'_>,
-) -> Vec<FontFeature> {
-    let mut features = Vec::new();
-
-    for feature in gpos_table.features {
-        let tag = feature.tag.to_string();
-        let lookup_indices: Vec<u16> = feature.lookup_indices.into_iter().collect();
-
-        // Extract glyph coverage for this feature using the gpos module
-        let glyphs = analyze_gpos_feature(&gpos_table, &lookup_indices, face);
-        let name = get_feature_name_from_font(face, &tag);
-
-        features.push(FontFeature {
-            tag,
-            name,
-            tooltip: None,
-            sample_text: None,
-            glyphs,
-            param_labels: Vec::new(),
-            lookup_indices,
-        });
+    if offset + 4 > data.len() {
+        return 0.0;
     }
-
-    features
-}
-
-/// Analyzes a GPOS feature to extract glyph coverage and convert to characters.
-///
-/// This function processes GPOS positioning subtables to extract which glyphs
-/// are covered by the feature, then converts glyph IDs to Unicode characters.
-///
-/// # Arguments
-///
-/// * `gpos_table` - The parsed GPOS layout table
-/// * `lookup_indices` - Indices of lookups used by this feature
-/// * `face` - The parsed font face for character mapping
-///
-/// # Returns
-///
-/// Returns a vector of Unicode characters covered by this GPOS feature.
-fn analyze_gpos_feature(
-    gpos_table: &ttf_parser::opentype_layout::LayoutTable<'_>,
-    lookup_indices: &[u16],
-    face: &Face<'_>,
-) -> Vec<String> {
-    let mut covered_glyphs = std::collections::HashSet::new();
-
-    for &lookup_index in lookup_indices {
-        if let Some(lookup) = gpos_table.lookups.get(lookup_index) {
-            // Try to parse the first subtable to extract coverage
-            if let Some(pos_subtable) = lookup.subtables.get::<gpos::PositioningSubtable>(0) {
-                match pos_subtable {
-                    gpos::PositioningSubtable::Single(single_adj) => {
-                        extract_coverage_glyphs(&single_adj.coverage(), &mut covered_glyphs);
-                    }
-                    gpos::PositioningSubtable::Pair(pair_adj) => {
-                        extract_coverage_glyphs(&pair_adj.coverage(), &mut covered_glyphs);
-                    }
-                    gpos::PositioningSubtable::MarkToBase(mark_to_base) => {
-                        extract_coverage_glyphs(&mark_to_base.mark_coverage, &mut covered_glyphs);
-                    }
-                    gpos::PositioningSubtable::MarkToMark(mark_to_mark) => {
-                        extract_coverage_glyphs(&mark_to_mark.mark1_coverage, &mut covered_glyphs);
-                    }
-                    gpos::PositioningSubtable::Cursive(cursive_adj) => {
-                        extract_coverage_glyphs(&cursive_adj.coverage, &mut covered_glyphs);
-                    }
-                    gpos::PositioningSubtable::MarkToLigature(mark_to_lig) => {
-                        extract_coverage_glyphs(&mark_to_lig.mark_coverage, &mut covered_glyphs);
-                    }
-                    gpos::PositioningSubtable::Context(ctx) => {
-                        extract_coverage_glyphs(&ctx.coverage(), &mut covered_glyphs);
-                    }
-                    gpos::PositioningSubtable::ChainContext(chain_ctx) => {
-                        extract_coverage_glyphs(&chain_ctx.coverage(), &mut covered_glyphs);
-                    }
-                }
-            }
-        }
-    }
-
-    // Build glyph map for converting glyph IDs to characters
-    let glyph_map = build_glyph_map(face);
-
-    // Convert glyph IDs to characters
-    covered_glyphs
-        .into_iter()
-        .filter_map(|gid_str| {
-            gid_str
-                .parse::<u16>()
-                .ok()
-                .and_then(|gid| glyph_map.get(&gid).copied())
-                .map(|c| c.to_string())
-        })
-        .collect()
-}
-
-/// Extracts glyph IDs from a Coverage table and adds them to the set.
-///
-/// # Arguments
-///
-/// * `coverage` - The coverage table to extract from
-/// * `covered_glyphs` - Mutable set to add glyph IDs to
-fn extract_coverage_glyphs(
-    coverage: &ttf_parser::opentype_layout::Coverage<'_>,
-    covered_glyphs: &mut std::collections::HashSet<String>,
-) {
-    match coverage {
-        ttf_parser::opentype_layout::Coverage::Format1 { glyphs } => {
-            for i in 0..glyphs.len() {
-                if let Some(glyph_id) = glyphs.get(i) {
-                    covered_glyphs.insert(format!("{}", glyph_id.0));
-                }
-            }
-        }
-        ttf_parser::opentype_layout::Coverage::Format2 { records } => {
-            for i in 0..records.len() {
-                if let Some(record) = records.get(i) {
-                    // Add all glyphs in the range
-                    for glyph_id in record.start.0..=record.end.0 {
-                        covered_glyphs.insert(format!("{}", glyph_id));
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Attempts to get a human-readable feature name from the font's data.
-///
-/// This function tries to extract feature names from the font's `feat` table
-/// or name table, falling back to the tag itself if no name is found.
-///
-/// # Arguments
-///
-/// * `face` - The parsed font face
-/// * `tag` - The feature tag to look up
-///
-/// # Returns
-///
-/// Returns the feature name if found, or the tag itself as fallback.
-fn get_feature_name_from_font(face: &Face<'_>, tag: &str) -> String {
-    // First, try to get the name from the feat table if available
-    if let Some(feat_table) = face.tables().feat {
-        // Convert tag to feature ID by looking up the feature in the feat table
-        // The feat table uses feature IDs, not tags, so we need to find the matching feature
-        for i in 0..feat_table.names.len() {
-            if let Some(feature_name) = feat_table.names.get(i) {
-                // For now, we'll use a simple approach: try to find a feature name
-                // that might correspond to our tag. This is not perfect but works for common cases.
-                if let Some(name) = lookup_name(face, feature_name.name_index) {
-                    // Check if this name might be related to our tag
-                    // This is a heuristic approach - in a real implementation,
-                    // you'd need proper tag-to-ID mapping
-                    if name.to_lowercase().contains(&tag.to_lowercase())
-                        || tag.to_lowercase().contains(&name.to_lowercase())
-                    {
-                        return name;
-                    }
-                }
-            }
-        }
-
-        // If no specific match found, try to get any name from the feat table
-        for feature_name in feat_table.names {
-            if let Some(name) = lookup_name(face, feature_name.name_index) {
-                return name;
-            }
-        }
-    }
-
-    // If feat table is not available or doesn't have the feature,
-    // fall back to the tag itself as the name
-    tag.to_string()
+    let int_part = be_u16(data, offset) as f32;
+    let frac_part = be_u16(data, offset + 2) as f32 / 65536.0;
+    int_part + frac_part
 }

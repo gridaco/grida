@@ -487,6 +487,14 @@ impl UIFontParser {
                 (Vec::new(), None)
             };
 
+            // Determine if this face is strictly italic using the italic parser
+            let is_strict_italic = self
+                .italic_parser
+                .classify_face(face_record.clone())
+                .classification
+                .font_style
+                == crate::selection::FontStyle::Italic;
+
             face_info.push(UIFontFaceInfo {
                 face_id: face_record.face_id.clone(),
                 family_name: face_record.family_name.clone(),
@@ -495,6 +503,7 @@ impl UIFontParser {
                 weight_class: face_record.weight_class,
                 width_class: face_record.width_class,
                 is_variable: face_record.is_variable,
+                is_strict_italic,
                 axes,
                 instances,
                 features: features
@@ -505,6 +514,9 @@ impl UIFontParser {
                         tooltip: f.tooltip,
                         sample_text: f.sample_text,
                         glyphs: f.glyphs,
+                        script: f.script,
+                        language: f.language,
+                        source_table: f.source_table,
                     })
                     .collect(),
             });
@@ -636,6 +648,17 @@ pub struct UIFontFaceInfo {
     pub width_class: u16,
     /// Whether this is a variable font
     pub is_variable: bool,
+    /// Whether this is a strict italic font (determined by font metadata analysis)
+    ///
+    /// This field provides a clear boolean indicator for italic fonts, similar to `is_variable`.
+    /// It's determined by analyzing the font's metadata including:
+    /// - OS/2 table italic bit
+    /// - `slnt` axis values
+    /// - Font name analysis (subfamily/PostScript names containing "italic")
+    ///
+    /// The term "strict" is used to avoid confusion with variable font instances
+    /// that may have italic variants but aren't inherently italic fonts.
+    pub is_strict_italic: bool,
     /// Face-specific axes (includes default values)
     pub axes: Vec<UIFontAxis>,
     /// Variable font instances (if this is a variable font)
@@ -657,6 +680,12 @@ pub struct UIFontFeature {
     pub sample_text: Option<String>,
     /// Characters covered by this feature
     pub glyphs: Vec<String>,
+    /// Script system this feature belongs to (e.g., "latn", "cyrl", "grek", "DFLT")
+    pub script: String,
+    /// Language system this feature belongs to (e.g., "CAT", "MOL", "ROM", "DFLT")
+    pub language: String,
+    /// Source table this feature comes from ("GSUB" or "GPOS")
+    pub source_table: String,
 }
 
 /// Font style instance for UI consumption.

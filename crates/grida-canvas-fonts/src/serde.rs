@@ -113,6 +113,8 @@ pub struct WasmFontFaceInfo {
     pub width_class: u16,
     /// Whether this is a variable font
     pub is_variable: bool,
+    /// Whether this is a strict italic font (determined by font metadata analysis)
+    pub is_strict_italic: bool,
     /// Face-specific axes (includes default values)
     pub axes: Vec<WasmFontAxis>,
     /// Variable font instances (if this is a variable font)
@@ -160,6 +162,12 @@ pub struct WasmFontFeature {
     pub sample_text: Option<String>,
     /// Characters covered by this feature
     pub glyphs: Vec<String>,
+    /// Script system this feature belongs to (e.g., "latn", "cyrl", "grek", "DFLT")
+    pub script: String,
+    /// Language system this feature belongs to (e.g., "CAT", "MOL", "ROM", "DFLT")
+    pub language: String,
+    /// Source table this feature comes from ("GSUB" or "GPOS")
+    pub source_table: String,
 }
 
 /// WASM response for font style instance
@@ -246,6 +254,7 @@ impl From<UIFontFaceInfo> for WasmFontFaceInfo {
             weight_class: face.weight_class,
             width_class: face.width_class,
             is_variable: face.is_variable,
+            is_strict_italic: face.is_strict_italic,
             axes: face.axes.into_iter().map(Into::into).collect(),
             instances: face
                 .instances
@@ -285,6 +294,9 @@ impl From<UIFontFeature> for WasmFontFeature {
             tooltip: feature.tooltip,
             sample_text: feature.sample_text,
             glyphs: feature.glyphs,
+            script: feature.script,
+            language: feature.language,
+            source_table: feature.source_table,
         }
     }
 }

@@ -5,6 +5,8 @@
 //! functionality using the Blink (Chrome) font selection model.
 
 pub mod parse;
+pub mod parse_feature;
+pub mod parse_feature_params;
 pub mod parse_ui;
 pub mod selection;
 pub mod selection_italic;
@@ -17,6 +19,7 @@ pub use parse::{
     FontFeature, FvarAxis, FvarData, FvarInstance, Parser, StatAxis, StatAxisValue,
     StatCombination, StatData,
 };
+pub use parse_feature::{FeatureParser, ParserType, DEFAULT_PARSER};
 pub use selection::{
     FaceClassification, FaceRecord, FamilyScenario, FontSelection, FontSelectionCapabilityMap,
     FontSelectionParser, FontStyle, InstanceInfo, ParserConfig, VfRecipe,
