@@ -482,12 +482,27 @@ fn be_u16(data: &[u8], offset: usize) -> u16 {
     u16::from_be_bytes([data[offset], data[offset + 1]])
 }
 
+/// Reads a big-endian i32 from the given offset in the data.
+fn be_i32(data: &[u8], offset: usize) -> i32 {
+    if offset + 4 > data.len() {
+        return 0;
+    }
+    i32::from_be_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
 /// Reads a big-endian fixed-point 16.16 number from the given offset in the data.
 fn be_fixed(data: &[u8], offset: usize) -> f32 {
     if offset + 4 > data.len() {
         return 0.0;
     }
-    let int_part = be_u16(data, offset) as f32;
-    let frac_part = be_u16(data, offset + 2) as f32 / 65536.0;
-    int_part + frac_part
+    // Use the fixed crate for proper 16.16 fixed-point parsing
+    use fixed::types::I16F16;
+    let fixed32 = be_i32(data, offset);
+    let fixed_point = I16F16::from_bits(fixed32);
+    fixed_point.to_num::<f32>()
 }

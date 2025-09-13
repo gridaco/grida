@@ -458,3 +458,102 @@ fn test_inter_black_weight_extraction() {
         }
     }
 }
+
+/// Test negative axis values (like slnt) don't get converted to large positive numbers
+#[test]
+fn test_negative_axis_values() {
+    let paths = vec![
+        font_path("Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf"),
+    ];
+
+    // Check if fonts exist
+    let existing_paths: Vec<_> = paths.iter().filter(|p| p.exists()).collect();
+    if existing_paths.is_empty() {
+        println!("RobotoFlex fonts not found, skipping test");
+        return;
+    }
+
+    let parser = UIFontParser::new();
+    let font_data: Vec<_> = existing_paths
+        .iter()
+        .map(|p| fs::read(p).unwrap())
+        .collect();
+    let font_faces: Vec<UIFontFace> = existing_paths
+        .iter()
+        .enumerate()
+        .map(|(i, _p)| UIFontFace {
+            face_id: format!("RobotoFlex-{}", i),
+            data: &font_data[i],
+            user_font_style_italic: None,
+        })
+        .collect();
+
+    let result = parser
+        .analyze_family(Some("RobotoFlex".to_string()), font_faces)
+        .unwrap();
+
+    // Check for instances with negative slnt values
+    for face in &result.faces {
+        if let Some(instances) = &face.instances {
+            for instance in instances {
+                if let Some(slnt_value) = instance.coordinates.get("slnt") {
+                    println!("Instance '{}': slnt={}", instance.name, slnt_value);
+                    // slnt values should be negative for italic instances
+                    if instance.name.to_lowercase().contains("italic") {
+                        assert!(
+                            *slnt_value < 0.0,
+                            "Italic instance should have negative slnt value, got {}",
+                            slnt_value
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // Check that weight values are reasonable (100-1000 range, including ExtraBlack)
+    for style in &result.styles {
+        assert!(
+            style.weight >= 100 && style.weight <= 1000,
+            "Weight should be in 100-1000 range, got {} for style '{}'",
+            style.weight,
+            style.name
+        );
+    }
+
+    // Test the casting issue directly
+    let test_negative_value = -10.0_f32;
+    let cast_to_u16 = test_negative_value as u16;
+    println!("Test: {} as u16 = {}", test_negative_value, cast_to_u16);
+
+    // Test various negative values
+    let test_values = vec![-1.0, -10.0, -100.0, -203.0];
+    for val in test_values {
+        let as_u16 = val as u16;
+        let as_u32 = val as u32;
+        let as_i32 = val as i32;
+        println!(
+            "{} -> u16: {}, u32: {}, i32: {}",
+            val, as_u16, as_u32, as_i32
+        );
+    }
+
+    // Check if the issue is in the WASM serialization
+    #[cfg(feature = "serde")]
+    {
+        use fonts::parse_ui::UIFontInstance;
+        use fonts::serde::WasmFontInstance;
+        use std::collections::HashMap;
+
+        let mut coords = HashMap::new();
+        coords.insert("slnt".to_string(), -203.0);
+        let instance = UIFontInstance {
+            name: "Test".to_string(),
+            postscript_name: None,
+            coordinates: coords,
+        };
+
+        let wasm_instance: WasmFontInstance = instance.into();
+        println!("WASM instance coordinates: {:?}", wasm_instance.coordinates);
+    }
+}

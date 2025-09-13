@@ -14,6 +14,7 @@ readme = "README.md"
 
 [dependencies]
 ttf-parser = { version = "0.25", features = ["apple-layout"] }
+fixed = "1.25"
 
 [dependencies.serde]
 version = "1.0"
