@@ -70,7 +70,11 @@ pub fn shader_from_paint(
             ));
             let sampling = SamplingOptions::default();
             let shader = image.to_shader(
-                Some((TileMode::Clamp, TileMode::Clamp)),
+                // Use `Decal` tile mode so Skia doesn't extend edge pixels
+                // when the image is scaled beyond its natural bounds. This
+                // prevents the visual artifacts where the last row/column is
+                // repeated to fill the remaining area.
+                Some((TileMode::Decal, TileMode::Decal)),
                 sampling,
                 Some(&matrix),
             )?;
