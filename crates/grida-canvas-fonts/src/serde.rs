@@ -325,74 +325,6 @@ impl From<UIFontStyleInstance> for WasmFontStyleInstance {
 }
 
 // ====================================================================================================
-// #region: Utility Functions
-// ====================================================================================================
-
-/// Serializes a `UIFontFamilyResult` to JSON string for WASM consumption
-pub fn serialize_font_family_result(result: UIFontFamilyResult) -> Result<String, String> {
-    let wasm_result = WasmFontFamilyResult::from(result);
-    serde_json::to_string(&wasm_result)
-        .map_err(|e| format!("Failed to serialize font family result: {}", e))
-}
-
-/// Creates a success response wrapper for WASM
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmSuccessResponse<T> {
-    /// Success flag
-    pub success: bool,
-    /// Response data
-    pub data: T,
-}
-
-/// Creates an error response wrapper for WASM
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmErrorResponse {
-    /// Success flag
-    pub success: bool,
-    /// Error information
-    pub error: WasmError,
-}
-
-/// Error information for WASM responses
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmError {
-    /// Error message
-    pub message: String,
-}
-
-impl<T: serde::Serialize> WasmSuccessResponse<T> {
-    /// Creates a new success response
-    pub fn new(data: T) -> Self {
-        Self {
-            success: true,
-            data,
-        }
-    }
-
-    /// Serializes the response to JSON
-    pub fn to_json(&self) -> Result<String, String> {
-        serde_json::to_string(self)
-            .map_err(|e| format!("Failed to serialize success response: {}", e))
-    }
-}
-
-impl WasmErrorResponse {
-    /// Creates a new error response
-    pub fn new(message: String) -> Self {
-        Self {
-            success: false,
-            error: WasmError { message },
-        }
-    }
-
-    /// Serializes the response to JSON
-    pub fn to_json(&self) -> Result<String, String> {
-        serde_json::to_string(self)
-            .map_err(|e| format!("Failed to serialize error response: {}", e))
-    }
-}
-
-// ====================================================================================================
 // #region: Tests
 // ====================================================================================================
 
@@ -446,24 +378,5 @@ mod tests {
         assert!(json_str.contains("\"value\":1.0"));
         assert!(json_str.contains("\"tag\":\"wght\""));
         assert!(json_str.contains("\"value\":400.0"));
-    }
-
-    #[test]
-    fn test_wasm_success_response() {
-        let data = "test_data".to_string();
-        let response = WasmSuccessResponse::new(data);
-        let json_str = response.to_json().unwrap();
-
-        assert!(json_str.contains("\"success\":true"));
-        assert!(json_str.contains("\"data\":\"test_data\""));
-    }
-
-    #[test]
-    fn test_wasm_error_response() {
-        let response = WasmErrorResponse::new("Test error message".to_string());
-        let json_str = response.to_json().unwrap();
-
-        assert!(json_str.contains("\"success\":false"));
-        assert!(json_str.contains("\"message\":\"Test error message\""));
     }
 }

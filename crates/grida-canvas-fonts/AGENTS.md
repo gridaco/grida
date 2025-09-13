@@ -1,6 +1,6 @@
 # Agent Documentation
 
-This document contains technical information for AI agents and developers working on the `grida-canvas-fonts` crate.
+This document contains technical information for AI agents and developers working on the `fonts` crate.
 
 ## Testing
 

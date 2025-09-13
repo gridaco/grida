@@ -38,6 +38,3 @@ pub use parse_ui::{
     UIFontFamilyResult, UIFontItalicCapability, UIFontItalicRecipe, UIFontItalicStrategy,
     UIFontParser,
 };
-
-#[cfg(feature = "wasm_bind")]
-pub mod wasm_bind;

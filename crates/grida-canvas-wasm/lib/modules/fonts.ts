@@ -221,19 +221,4 @@ export class FontsAPI {
       throw new Error(error instanceof Error ? error.message : String(error));
     }
   }
-
-  /**
-   * Gets the version of the font parsing library.
-   * This is a ping function to verify the WASM module is working.
-   *
-   * @returns Version string
-   */
-  getVersion(): string {
-    try {
-      const versionPtr = this.module._grida_fonts_version();
-      return this._string_from_wasm(versionPtr);
-    } catch (error) {
-      return "unknown";
-    }
-  }
 }

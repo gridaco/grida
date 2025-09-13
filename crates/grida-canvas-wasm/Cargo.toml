@@ -9,7 +9,7 @@ edition = "2021"
 cg = { path = "../grida-canvas", features = ["web"] }
 math2 = { path = "../math2" }
 serde_json="1.0.140"
-fonts = { path = "../grida-canvas-fonts", features = ["wasm_bind"] }
+fonts = { path = "../grida-canvas-fonts", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 
 [features]

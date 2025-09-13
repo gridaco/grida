@@ -190,13 +190,5 @@ export namespace fonts {
      * @param ptr - Pointer to memory allocated by a WASM function
      */
     _grida_fonts_free(ptr: number): void;
-
-    /**
-     * Returns the version of the font parsing library.
-     * This is a ping function to verify the WASM module is working.
-     *
-     * @returns Version string
-     */
-    _grida_fonts_version(): number;
   }
 }

@@ -122,7 +122,6 @@ The library is organized into focused modules following the Selection terminolog
 - **`selection_italic`**: Italic-specific selection functionality with legacy compatibility
 - **`parse_ui`**: High-level UI-friendly API for font analysis
 - **`serde`**: JSON serialization support for WASM communication (optional feature)
-- **`wasm_bind`**: WASM bindings for web integration (optional feature)
 
 ### API Layers
 
@@ -260,36 +259,13 @@ let faces = vec![face_record1, face_record2, face_record3];
 let capability_map = selection_parser.build_capability_map(faces);
 ```
 
-### WASM Bindings (with `wasm_bind` feature)
-
-```rust
-// Enable wasm_bind feature: cargo build --features wasm_bind
-
-// WASM functions are automatically available and return JSON:
-// - _grida_fonts_analyze_family: Analyze font family
-// - _grida_fonts_parse_font: Parse single font
-// - _grida_fonts_version: Get version
-
-// Example usage in JavaScript/TypeScript:
-// const result = await fontsModule.analyzeFamily(familyName, fontFaces);
-// console.log(result.family_name);
-// console.log(result.axes);        // Family-level axes
-// console.log(result.faces);       // Face-level information with instances
-// console.log(result.styles);      // UI-friendly font style instances
-```
-
 ## Installation
 
 Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-grida-canvas-fonts = "0.1.0"
-
-# Optional: Enable WASM bindings for web integration
-[dependencies.grida-canvas-fonts]
-version = "0.1.0"
-features = ["wasm_bind"]
+fonts = "0.1.0"
 ```
 
 ## API Reference
@@ -542,59 +518,6 @@ pub struct FontSelectionCapabilityMap {
     pub upright_slots: HashMap<(u16, u16), FaceOrVfWithRecipe>, // (weight, stretch) -> face
     pub italic_slots: HashMap<(u16, u16), FaceOrVfWithRecipe>,  // (weight, stretch) -> face
     pub scenario: FamilyScenario,                               // Family scenario type
-}
-```
-
-### WASM Bindings (with `wasm_bind` feature)
-
-#### `WasmFontAnalysisResult`
-
-WASM response structure for font family analysis.
-
-```rust
-pub struct WasmFontAnalysisResult {
-    pub success: bool,
-    pub family_name: String,
-    pub axes: Vec<WasmFontFamilyAxis>,        // Family-level axes
-    pub has_italic: bool,
-    pub has_upright: bool,
-    pub strategy: String,
-    pub scenario: String,
-    pub recipe_count: usize,
-    pub faces: Vec<WasmFaceInfo>,             // Face-level information with instances
-    pub styles: Vec<WasmFontStyleInstance>,   // UI-friendly font style instances
-}
-```
-
-#### `WasmFaceInfo`
-
-WASM response structure for individual font face information.
-
-```rust
-pub struct WasmFaceInfo {
-    pub face_id: String,
-    pub family_name: String,
-    pub subfamily_name: String,
-    pub postscript_name: String,
-    pub weight_class: u16,
-    pub width_class: u16,
-    pub is_variable: bool,
-    pub axes: Vec<WasmFontAxis>,              // Face-specific axes with defaults
-    pub instances: Option<Vec<WasmFontInstance>>, // Variable font instances
-    pub features: Vec<WasmFontFeature>,
-}
-```
-
-#### `WasmFontStyleInstance`
-
-WASM response structure for font style instances.
-
-```rust
-pub struct WasmFontStyleInstance {
-    pub name: String,                         // User-friendly style name
-    pub postscript_name: Option<String>,      // PostScript name (may be None)
-    pub italic: bool,                         // Whether this style is italic
-    pub weight: u16,                          // Weight class (100-900)
 }
 ```
 
@@ -885,34 +808,6 @@ for style in &result.styles {
     println!("Variable Style: {} ({})", style.name, style.postscript_name.as_deref().unwrap_or("N/A"));
     println!("  Italic: {}, Weight: {}", style.italic, style.weight);
 }
-```
-
-### WASM Communication
-
-The library provides WASM bindings for web integration. The WASM API exposes the same high-level functionality with JSON serialization:
-
-```rust
-// Enable wasm_bind feature
-// cargo build --features wasm_bind
-
-// WASM functions are automatically available:
-// - _grida_fonts_analyze_family: Analyze font family with multiple faces
-// - _grida_fonts_parse_font: Parse single font file
-// - _grida_fonts_version: Get library version
-
-// The WASM API returns JSON with the same structure as UIFontFamilyResult:
-// {
-//   "success": true,
-//   "family_name": "Inter",
-//   "axes": [...],           // Family-level axes
-//   "has_italic": true,
-//   "has_upright": true,
-//   "strategy": "DualVariableFonts",
-//   "scenario": "DualVf",
-//   "recipe_count": 2,
-//   "faces": [...],          // Face-level information with instances
-//   "styles": [...]          // UI-friendly font style instances
-// }
 ```
 
 ## Performance
