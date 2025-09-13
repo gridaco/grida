@@ -165,9 +165,12 @@ export class DocumentFontManager {
       return null;
     }
 
-    const currAxesValues = Object.assign({}, description.fontVariations || {}, {
-      wght: description.fontWeight,
-    });
+    const currAxesValues = {
+      ...(description.fontVariations || {}),
+      ...(description.fontWeight !== undefined
+        ? { wght: description.fontWeight }
+        : {}),
+    };
 
     // 1. match with style name (if specified)
     if (description.fontStyleName) {
@@ -248,6 +251,31 @@ export class DocumentFontManager {
           description.fontStyleItalic
         );
         // continue
+      }
+    }
+
+    // 2.5. match with fontInstancePostscriptName directly from styles
+    if (description.fontInstancePostscriptName) {
+      const style = styles.find(
+        (s) =>
+          s.fontInstancePostscriptName ===
+          description.fontInstancePostscriptName
+      );
+      if (style) {
+        const face = font.faces.find(
+          (face) => face.postscriptName === style.fontPostscriptName
+        );
+        const instance = instances.find(
+          (inst) => inst.postscriptName === style.fontInstancePostscriptName
+        );
+        if (face) {
+          return {
+            key: style,
+            face,
+            instance: instance ?? null,
+            isVariable: is_vf,
+          };
+        }
       }
     }
 
@@ -370,7 +398,7 @@ export class DocumentFontManager {
    * @param instances - Array of font variation instances
    * @param context - Context containing PostScript name and axis values
    * @param mode - The mode to use for matching
-   *   - strict: only match if the postscript name or axes values are exactly the same
+   *   - strict: match instances whose axis values exactly match the provided ones
    *   - loose: find the instance with the highest matching score based on coordinate similarity
    * @returns The matching instance if found, undefined otherwise
    */
@@ -386,6 +414,10 @@ export class DocumentFontManager {
 
     const { fontInstancePostscriptName, axesValues } = context;
 
+    const axesEntries = Object.entries(axesValues).filter(
+      ([, v]) => typeof v === "number"
+    );
+
     // First, try to match by PostScript name if provided
     if (fontInstancePostscriptName) {
       const by_name = instances.find(
@@ -395,54 +427,32 @@ export class DocumentFontManager {
     }
 
     if (mode === "strict") {
-      // Strict mode: exact coordinate matching
+      // Strict mode: match only on provided axes
       return instances.find((inst) => {
         const instanceCoords = inst.coordinates;
-
-        // First, check if all instance coordinates are present in current values
-        for (const [axis, value] of Object.entries(instanceCoords)) {
-          if (axesValues[axis] !== value) {
-            return false;
-          }
-        }
-
-        // Then, check if all current values are present in instance coordinates
-        // This ensures we don't match when current values have additional axes
-        for (const [axis, value] of Object.entries(axesValues)) {
+        for (const [axis, value] of axesEntries) {
           if (instanceCoords[axis] !== value) {
             return false;
           }
         }
-
         return true;
       });
     } else {
-      // Loose mode: find the best matching instance
+      // Loose mode: find the best matching instance based on provided axes only
       let bestMatch: editor.font_spec.UIFontFaceInstance | undefined;
       let bestScore = -1;
 
       for (const inst of instances) {
         const instanceCoords = inst.coordinates;
         let score = 0;
-        let totalAxes = 0;
+        const totalAxes = axesEntries.length;
 
-        // Calculate matching score based on how many axes match
-        for (const [axis, value] of Object.entries(axesValues)) {
-          totalAxes++;
+        for (const [axis, value] of axesEntries) {
           if (instanceCoords[axis] === value) {
             score++;
           }
         }
 
-        // Also check for instance coordinates that don't exist in current values
-        for (const [axis, value] of Object.entries(instanceCoords)) {
-          if (!(axis in axesValues)) {
-            totalAxes++;
-            // Don't penalize for extra axes in the instance
-          }
-        }
-
-        // Normalize score by total axes and prefer instances with higher match ratio
         const normalizedScore = totalAxes > 0 ? score / totalAxes : 0;
 
         if (normalizedScore > bestScore) {
