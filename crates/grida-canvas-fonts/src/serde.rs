@@ -179,6 +179,12 @@ pub struct WasmFontStyleInstance {
     pub postscript_name: Option<String>,
     /// Whether this style is italic
     pub italic: bool,
+    /// Weight class
+    ///
+    /// - for static fonts, this uses the weight class
+    /// - for variable fonts, this uses the instance `wght`
+    /// - for variable fonts, without `wght` axis, this uses the default weight class
+    pub weight: u16,
 }
 
 // ====================================================================================================
@@ -307,6 +313,7 @@ impl From<UIFontStyleInstance> for WasmFontStyleInstance {
             name: style.name,
             postscript_name: style.postscript_name,
             italic: style.italic,
+            weight: style.weight,
         }
     }
 }

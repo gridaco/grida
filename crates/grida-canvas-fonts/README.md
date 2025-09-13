@@ -1,4 +1,4 @@
-# Grida Canvas Fonts
+# `fonts` (Grida Canvas Fonts)
 
 A high-performance font parsing and selection library for the Grida design tool, providing comprehensive font selection capabilities, italic detection, variable font support, font style management, and JSON serialization for WASM communication. This library implements the Blink (Chrome) font selection model for professional-grade font handling.
 
@@ -47,8 +47,8 @@ println!("Strategy: {:?}", result.italic_capability.strategy);
 // Display available font styles
 println!("Available styles: {}", result.styles.len());
 for style in &result.styles {
-    println!("- {} ({})", style.name, style.postscript_name);
-    println!("  Italic: {}", style.italic);
+    println!("- {} ({})", style.name, style.postscript_name.as_deref().unwrap_or("N/A"));
+    println!("  Italic: {}, Weight: {}", style.italic, style.weight);
 }
 
 // Find closest italic variants
@@ -220,8 +220,8 @@ for recipe in &result.italic_capability.recipes {
 // Show font style instances for UI picker
 println!("Font style instances: {}", result.styles.len());
 for style in &result.styles {
-    println!("- {} ({})", style.name, style.postscript_name);
-    println!("  Italic: {}", style.italic);
+    println!("- {} ({})", style.name, style.postscript_name.as_deref().unwrap_or("N/A"));
+    println!("  Italic: {}, Weight: {}", style.italic, style.weight);
 }
 
 // Show family-level axes
@@ -466,11 +466,18 @@ pub struct UIFontItalicRecipe {
 
 Font style instance for UI consumption. Represents either a static font face or a variable font instance that can be selected in a style picker.
 
+**Weight Field**: The `weight` field provides the font weight for each style:
+
+- For static fonts: Uses the weight class from the font metadata
+- For variable fonts: Uses the `wght` axis value from the instance coordinates
+- For variable fonts without `wght` axis: Falls back to the default weight class
+
 ```rust
 pub struct UIFontStyleInstance {
     pub name: String,                           // User-friendly style name (e.g., "Regular", "Bold", "Light Italic")
-    pub postscript_name: String,                // PostScript name for this style
+    pub postscript_name: Option<String>,        // PostScript name for this style (may be None for fonts like Inter)
     pub italic: bool,                           // Whether this style is italic
+    pub weight: u16,                            // Weight class (100-900)
 }
 ```
 
@@ -555,7 +562,7 @@ pub struct WasmFontAnalysisResult {
     pub scenario: String,
     pub recipe_count: usize,
     pub faces: Vec<WasmFaceInfo>,             // Face-level information with instances
-    pub styles: Vec<WasmFontStyle>,           // UI-friendly font style instances
+    pub styles: Vec<WasmFontStyleInstance>,   // UI-friendly font style instances
 }
 ```
 
@@ -575,6 +582,19 @@ pub struct WasmFaceInfo {
     pub axes: Vec<WasmFontAxis>,              // Face-specific axes with defaults
     pub instances: Option<Vec<WasmFontInstance>>, // Variable font instances
     pub features: Vec<WasmFontFeature>,
+}
+```
+
+#### `WasmFontStyleInstance`
+
+WASM response structure for font style instances.
+
+```rust
+pub struct WasmFontStyleInstance {
+    pub name: String,                         // User-friendly style name
+    pub postscript_name: Option<String>,      // PostScript name (may be None)
+    pub italic: bool,                         // Whether this style is italic
+    pub weight: u16,                          // Weight class (100-900)
 }
 ```
 
@@ -828,8 +848,8 @@ let styles = &result.styles;
 println!("Available styles: {}", styles.len());
 
 for style in styles {
-    println!("- {} ({})", style.name, style.postscript_name);
-    println!("  Italic: {}", style.italic);
+    println!("- {} ({})", style.name, style.postscript_name.as_deref().unwrap_or("N/A"));
+    println!("  Italic: {}, Weight: {}", style.italic, style.weight);
 }
 
 // Filter styles by italic status
@@ -862,8 +882,8 @@ let result = parser.analyze_family(Some("Inter".to_string()), font_faces)?;
 
 // Display variable font styles
 for style in &result.styles {
-    println!("Variable Style: {} ({})", style.name, style.postscript_name);
-    println!("  Italic: {}", style.italic);
+    println!("Variable Style: {} ({})", style.name, style.postscript_name.as_deref().unwrap_or("N/A"));
+    println!("  Italic: {}, Weight: {}", style.italic, style.weight);
 }
 ```
 

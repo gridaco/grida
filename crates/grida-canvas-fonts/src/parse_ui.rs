@@ -693,21 +693,32 @@ pub struct UIFontFeature {
 #[derive(Debug, Clone)]
 pub struct UIFontStyleInstance {
     /// User-friendly style name (e.g., "Regular", "Bold", "Light Italic")
+    /// - for static fonts, this uses the subfamily name
+    /// - for variable fonts, this uses the instance name
     pub name: String,
     /// PostScript name for this style (may be None for fonts like Inter)
+    /// - for static fonts, this uses the postscript name
+    /// - for variable fonts, this uses the instance postscript name
     pub postscript_name: Option<String>,
     /// Whether this style is italic
     pub italic: bool,
+    /// Weight class
+    ///
+    /// - for static fonts, this uses the weight class
+    /// - for variable fonts, this uses the instance `wght`
+    /// - for variable fonts, without `wght` axis, this uses the default weight class
+    pub weight: u16,
 }
 
 /// Font style mapping utility functions.
 impl UIFontStyleInstance {
     /// Create a new font style instance
-    pub fn new(name: String, postscript_name: Option<String>, italic: bool) -> Self {
+    pub fn new(name: String, postscript_name: Option<String>, italic: bool, weight: u16) -> Self {
         Self {
             name,
             postscript_name,
             italic,
+            weight,
         }
     }
 }
@@ -752,10 +763,18 @@ fn generate_font_styles(
                         .unwrap_or(false)
                 };
 
+                // Determine weight for this instance
+                let weight = instance
+                    .coordinates
+                    .get("wght")
+                    .map(|&w| w as u16)
+                    .unwrap_or(face_record.weight_class);
+
                 styles.push(UIFontStyleInstance::new(
                     style_name,
                     postscript_name,
                     italic,
+                    weight,
                 ));
             }
         } else {
@@ -769,10 +788,14 @@ fn generate_font_styles(
                 .copied()
                 .unwrap_or(false); // Default to false if not found
 
+            // For static fonts, use the weight class from the face record
+            let weight = face_record.weight_class;
+
             styles.push(UIFontStyleInstance::new(
                 style_name,
                 postscript_name,
                 italic,
+                weight,
             ));
         }
     }

@@ -89,6 +89,7 @@ export namespace fonts {
       name: string;
       postscript_name: string | null;
       italic: boolean;
+      weight: number;
     }
 
     /** Complete family-level analysis result for UI consumption */
