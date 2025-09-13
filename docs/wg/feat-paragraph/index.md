@@ -121,7 +121,7 @@
   - [x] PostScriptNames
   - [x] multi typeface (multiple ttf for family)
 - [x] a11y/toggleItalic
-- [ ] a11y/togglebold
+- [x] a11y/togglebold
 
 **`@grida/fonts` / `fonts (rs)`**
 

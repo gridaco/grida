@@ -1896,8 +1896,25 @@ export namespace editor.api {
   export interface INodeChangeActions {
     toggleNodeActive(node_id: NodeID): void;
     toggleNodeLocked(node_id: NodeID): void;
-    toggleNodeBold(node_id: NodeID): void;
-    toggleNodeItalic(node_id: NodeID): void;
+
+    /**
+     * @param node_id text node id
+     * @returns the font weight if the node is toggled, false otherwise
+     *
+     * @remarks
+     * not all fonts can be toggled bold, the font should actually have 400 / 700 weight defined.
+     */
+    toggleNodeBold(node_id: NodeID): false | cg.NFontWeight;
+
+    /**
+     * @param node_id text node id
+     * @returns true if the node is toggled, false otherwise
+     *
+     * note: the boolean does not return if its italic, it returns the result of successful toggle
+     * not all fonts can be toggled italic, the font should actually have italic style defined.
+     */
+    toggleNodeItalic(node_id: NodeID): boolean;
+
     toggleNodeUnderline(node_id: NodeID): void;
     toggleNodeLineThrough(node_id: NodeID): void;
     changeNodeActive(node_id: NodeID, active: boolean): void;

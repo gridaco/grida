@@ -218,15 +218,15 @@ function EditModePanel() {
 
 function FontsPanel() {
   const editor = useCurrentEditor();
-  const { fontdescriptions, webfontlist } = useEditorState(editor, (state) => ({
+  const { fontfaces, webfontlist } = useEditorState(editor, (state) => ({
     webfontlist: state.webfontlist,
-    fontdescriptions: state.fontfaces,
+    fontfaces: state.fontfaces,
   }));
 
   return (
     <JSONContent
       value={{
-        fontdescriptions,
+        fontfaces,
         webfontlist,
       }}
     />

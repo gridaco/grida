@@ -1494,10 +1494,7 @@ export class Editor
     const target_ids =
       target === "selection" ? this.mstate.selection : [target];
     target_ids.forEach((node_id) => {
-      this.dispatch({
-        type: "node/toggle/bold",
-        node_id,
-      });
+      this.toggleNodeBold(node_id);
     });
   }
 
@@ -1655,20 +1652,44 @@ export class Editor
     return next;
   }
   toggleNodeBold(node_id: string) {
-    this.dispatch({
-      type: "node/toggle/bold",
-      node_id: node_id,
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    if (node.type !== "text") return false;
+
+    const isBold = node.fontWeight === 700;
+    const next_weight = isBold ? 400 : 700;
+    const fontFamily = node.fontFamily;
+    if (!fontFamily) return false;
+
+    const match = this.selectFontStyle({
+      fontFamily: fontFamily,
+      fontWeight: next_weight,
+      fontStyleItalic: node.fontStyleItalic,
     });
+
+    if (!match) {
+      this.log(
+        "toggleNodeBold: matching font face not found",
+        fontFamily,
+        next_weight,
+        node.fontStyleItalic
+      );
+      return false;
+    }
+
+    this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
+    return match.key.fontWeight as cg.NFontWeight;
   }
   toggleNodeItalic(node_id: string) {
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextNode;
-    if (node.type !== "text") return;
+    if (node.type !== "text") return false;
 
     const next_italic = !node.fontStyleItalic;
     const fontFamily = node.fontFamily;
-    if (!fontFamily) return;
+    if (!fontFamily) return false;
 
     const match = this.selectFontStyle({
       fontFamily: fontFamily,
@@ -1683,10 +1704,11 @@ export class Editor
         next_italic,
         node.fontWeight
       );
-      return;
+      return false;
     }
 
     this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
+    return true;
   }
   toggleNodeUnderline(node_id: string) {
     this.dispatch({

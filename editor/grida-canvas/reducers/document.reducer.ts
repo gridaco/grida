@@ -5,7 +5,6 @@ import type {
   NodeChangeAction,
   TemplateEditorSetTemplatePropsAction,
   TemplateNodeOverrideChangeAction,
-  NodeToggleBoldAction,
   NodeToggleUnderlineAction,
   NodeToggleLineThroughAction,
   EditorSelectGradientStopAction,
@@ -1546,23 +1545,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
         }
       });
-    }
-    //
-    case "node/toggle/bold": {
-      return produce(state, (draft) => {
-        const { node_id } = <NodeToggleBoldAction>action;
-        const node = dq.__getNodeById(draft, node_id);
-        assert(node, `node not found with node_id: "${node_id}"`);
-        if (node.type !== "text") return;
-
-        const isBold = node.fontWeight === 700;
-        if (isBold) {
-          node.fontWeight = 400;
-        } else {
-          node.fontWeight = 700;
-        }
-      });
-      //
     }
     //
     case "node/toggle/underline": {

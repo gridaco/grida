@@ -54,7 +54,6 @@ export type DocumentAction =
   | SurfaceAction
   //
   | NodeChangeAction
-  | NodeToggleBoldAction
   | NodeToggleUnderlineAction
   | NodeToggleLineThroughAction
   | TemplateNodeOverrideChangeAction
@@ -872,9 +871,6 @@ export type NodeChangeAction =
   | ({ type: "node/change/fontFamily" } & ITextNodeChangeFontFamilyAction)
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/props" } & INodeChangePropsAction);
-
-export type NodeToggleBoldAction = { type: "node/toggle/bold" } & INodeID;
-
 export type NodeToggleUnderlineAction = {
   type: "node/toggle/underline";
 } & INodeID;
