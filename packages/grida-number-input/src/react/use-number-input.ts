@@ -1,55 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { NumberChange } from "../types";
+import n from "../n";
 
 // Local type definitions (duplicated to avoid external dependencies)
 type TMixed<T, MIXED = "mixed"> = T | MIXED;
-
-/**
- * Rounds a number to match the precision of the given step value.
- *
- * @param value - The number to round
- * @param step - The step value to match precision with
- * @returns The rounded number with precision matching the step
- *
- * @example
- * roundToStep(1.234, 0.1) // Returns 1.2
- * roundToStep(1.234, 1)   // Returns 1
- * roundToStep(1.234, 0.01) // Returns 1.23
- */
-const roundToStep = (value: number, step: number): number => {
-  // Count decimal places in step
-  const stepDecimals = step.toString().split(".")[1]?.length || 0;
-  // Round to the same number of decimal places as step
-  return Number(value.toFixed(stepDecimals));
-};
-
-/**
- * Formats a number with precision matching the step value and removes trailing zeros.
- *
- * @param value - The number to format
- * @param step - The step value to determine precision
- * @returns Formatted string with appropriate precision
- *
- * @example
- * formatValueWithPrecision(5.00, 1)   // Returns "5"
- * formatValueWithPrecision(5.10, 0.1) // Returns "5.1"
- * formatValueWithPrecision(5.12, 0.01) // Returns "5.12"
- */
-const formatValueWithPrecision = (value: number, step: number): string => {
-  // Count decimal places in step
-  const stepDecimals = step.toString().split(".")[1]?.length || 0;
-
-  if (stepDecimals === 0) {
-    // Integer step - show as integer
-    return Math.round(value).toString();
-  }
-
-  // Format with step precision
-  const formatted = value.toFixed(stepDecimals);
-
-  // Remove trailing zeros after decimal point
-  return formatted.replace(/\.?0+$/, "");
-};
 
 /**
  * Parses a string value into a number, handling optional suffix removal.
@@ -92,18 +46,21 @@ const parseValueWithSuffix = (
  * @param suffix - Optional suffix to append (e.g., "%", "px")
  * @param scale - Optional scale factor for display (e.g., 100 for percentages)
  * @param step - Optional step value to determine precision
+ * @param type - The input type ('integer' or 'number')
  * @returns Formatted string for display
  *
  * @example
- * formatValueWithSuffix(0.5, "%", 100, 0.1) // Returns "50%"
- * formatValueWithSuffix("mixed")            // Returns "mixed"
- * formatValueWithSuffix("")                 // Returns ""
+ * formatValueWithSuffix(0.5, "%", 100, 0.1, 'number') // Returns "50%"
+ * formatValueWithSuffix("mixed")                      // Returns "mixed"
+ * formatValueWithSuffix("")                           // Returns ""
  */
 const formatValueWithSuffix = (
   value: string | number,
   suffix?: string,
   scale?: number,
-  step?: number
+  step?: number,
+  type: "integer" | "number" = "number",
+  precision: number = 1
 ): string => {
   if (value === "mixed") return "mixed";
   if (value === "") return "";
@@ -116,10 +73,10 @@ const formatValueWithSuffix = (
     numericValue = numericValue * scale;
   }
 
-  // Format with proper precision based on step
+  // Format with proper precision based on step and type
   const formattedValue = step
-    ? formatValueWithPrecision(numericValue, step)
-    : String(numericValue);
+    ? n.formatValueWithPrecision(numericValue, step, type, precision)
+    : String(n.applyPrecision(numericValue, precision));
 
   return suffix ? `${formattedValue}${suffix}` : formattedValue;
 };
@@ -160,6 +117,8 @@ type UseNumberInputProps<MIXED = "mixed"> = {
   value?: TMixed<number | "", MIXED>;
   /** Step size for increment/decrement operations */
   step?: number;
+  /** Maximum precision tolerance to prevent floating point precision issues (default: 1) */
+  precision?: number;
   /** Whether to automatically select all text when the input is focused */
   autoSelect?: boolean;
   /** Minimum allowed value */
@@ -205,8 +164,9 @@ type UseNumberInputProps<MIXED = "mixed"> = {
  *
  * ## Smart Formatting
  * - Respects step precision (step=1 shows integers, step=0.1 shows 1 decimal)
+ * - Preserves natural precision when step allows it (0.9 stays 0.9 with step=1)
  * - Removes unnecessary trailing zeros (5.00 -> 5, 5.10 -> 5.1)
- * - Maintains proper precision based on step value
+ * - Maintains proper precision based on step value only when necessary
  *
  * ## Usage Examples
  * ```tsx
@@ -253,7 +213,7 @@ type UseNumberInputProps<MIXED = "mixed"> = {
  * - **Mixed Values**: Handles "mixed" state gracefully without committing
  * - **Focus Loss**: Safely handles cases where input is destroyed before blur
  * - **Value Constraints**: Automatically clamps values to min/max bounds
- * - **Precision Loss**: Rounds values to match step precision to avoid floating point errors
+ * - **Precision Loss**: Conditionally rounds values only when step precision requires it to avoid unnecessary precision loss
  * - **Suffix Parsing**: Safely handles malformed suffix inputs
  * - **Scaling Edge Cases**: Handles zero scale values and extreme scaling factors
  *
@@ -271,6 +231,7 @@ export function useNumberInput<MIXED = "mixed">({
   type = "number",
   value,
   step = 1,
+  precision = 1,
   autoSelect = true,
   min,
   max,
@@ -286,7 +247,14 @@ export function useNumberInput<MIXED = "mixed">({
   const [internalValue, setInternalValue] = useState<string | number>(
     mixed
       ? "mixed"
-      : formatValueWithSuffix((value as number | "") ?? "", suffix, scale, step)
+      : formatValueWithSuffix(
+          (value as number | "") ?? "",
+          suffix,
+          scale,
+          step,
+          type,
+          precision
+        )
   );
   const lastCommittedRef = useRef<number | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -301,11 +269,13 @@ export function useNumberInput<MIXED = "mixed">({
             (value as number | "") ?? "",
             suffix,
             scale,
-            step
+            step,
+            type,
+            precision
           )
     );
     if (typeof value === "number" && !mixed) {
-      const rounded = roundToStep(value, step);
+      const rounded = n.roundToStep(value, step, type, precision);
       const clamped = Math.min(
         Math.max(rounded, min ?? -Infinity),
         max ?? Infinity
@@ -314,11 +284,12 @@ export function useNumberInput<MIXED = "mixed">({
     } else {
       lastCommittedRef.current = undefined;
     }
-  }, [value, mixed, suffix, scale, step, min, max]);
+  }, [value, mixed, suffix, scale, step, type, precision, min, max]);
 
   const handleCommit = useCallback(
     (newValue: number) => {
-      const roundedValue = roundToStep(newValue, step);
+      // Round based on type: integer type always rounds, number type preserves precision when possible
+      const roundedValue = n.roundToStep(newValue, step, type, precision);
       const clampedValue = Math.min(
         Math.max(roundedValue, min ?? -Infinity),
         max ?? Infinity
@@ -338,7 +309,7 @@ export function useNumberInput<MIXED = "mixed">({
           break;
       }
     },
-    [step, min, max, mode, onValueCommit]
+    [step, type, precision, min, max, mode, onValueCommit]
   );
 
   /**
@@ -413,7 +384,14 @@ export function useNumberInput<MIXED = "mixed">({
           const committed = safeCommit(currentValue, true);
           if (committed) {
             setInternalValue(
-              formatValueWithSuffix(currentValue, suffix, scale, step)
+              formatValueWithSuffix(
+                currentValue,
+                suffix,
+                scale,
+                step,
+                type,
+                precision
+              )
             );
           } else {
             setInternalValue(
@@ -421,7 +399,9 @@ export function useNumberInput<MIXED = "mixed">({
                 (value as number | "") ?? "",
                 suffix,
                 scale,
-                step
+                step,
+                type,
+                precision
               )
             );
           }
@@ -431,7 +411,9 @@ export function useNumberInput<MIXED = "mixed">({
               (value as number | "") ?? "",
               suffix,
               scale,
-              step
+              step,
+              type,
+              precision
             )
           );
         }
@@ -443,13 +425,25 @@ export function useNumberInput<MIXED = "mixed">({
                 (value as number | "") ?? "",
                 suffix,
                 scale,
-                step
+                step,
+                type,
+                precision
               )
         );
       }
       onBlur?.(e);
     },
-    [commitOnBlur, mixed, value, suffix, scale, step, type, safeCommit]
+    [
+      commitOnBlur,
+      mixed,
+      value,
+      suffix,
+      scale,
+      step,
+      type,
+      precision,
+      safeCommit,
+    ]
   );
 
   const handleKeyDown = useCallback(
@@ -480,7 +474,12 @@ export function useNumberInput<MIXED = "mixed">({
 
         const delta =
           e.key === "ArrowUp" ? step * multiplier : -step * multiplier;
-        const newValue = roundToStep(currentValue + delta, step);
+        const newValue = n.roundToStep(
+          currentValue + delta,
+          step,
+          type,
+          precision
+        );
         const clampedValue =
           e.key === "ArrowUp"
             ? Math.min(newValue, max ?? Infinity)
@@ -488,7 +487,14 @@ export function useNumberInput<MIXED = "mixed">({
 
         if (clampedValue !== currentValue) {
           setInternalValue(
-            formatValueWithSuffix(clampedValue, suffix, scale, step)
+            formatValueWithSuffix(
+              clampedValue,
+              suffix,
+              scale,
+              step,
+              type,
+              precision
+            )
           );
           switch (mode) {
             case "auto":
@@ -526,6 +532,7 @@ export function useNumberInput<MIXED = "mixed">({
       internalValue,
       type,
       step,
+      precision,
       max,
       min,
       mode,
@@ -555,7 +562,7 @@ export function useNumberInput<MIXED = "mixed">({
           break;
       }
     },
-    [type, mode, onValueChange, suffix, scale]
+    [type, mode, onValueChange, suffix, scale, precision]
   );
 
   // Global pointer down listener to commit pending changes when the input is
@@ -585,7 +592,16 @@ export function useNumberInput<MIXED = "mixed">({
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown, true);
     };
-  }, [commitOnBlur, mixed, internalValue, type, suffix, scale, safeCommit]);
+  }, [
+    commitOnBlur,
+    mixed,
+    internalValue,
+    type,
+    suffix,
+    scale,
+    precision,
+    safeCommit,
+  ]);
 
   return {
     // State

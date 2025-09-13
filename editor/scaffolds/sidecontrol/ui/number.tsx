@@ -153,6 +153,7 @@ export default function InputPropertyNumber({
     value,
     step,
     autoSelect,
+    precision: 1,
     min,
     max,
     mode,
