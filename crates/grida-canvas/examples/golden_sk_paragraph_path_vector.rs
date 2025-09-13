@@ -13,17 +13,13 @@
 //! - Typography showcase with rich content
 
 use cg::{
-    cg::types::{CGColor, FillRule, Paint, StrokeAlign},
-    vectornetwork::{
-        StrokeOptions, VNPainter, VectorNetwork, VectorNetworkLoop, VectorNetworkRegion,
-        VectorNetworkSegment,
-    },
+    cg::types::{CGColor, Paint, StrokeAlign},
+    vectornetwork::{StrokeOptions, VNPainter, VectorNetwork},
 };
 use skia_safe::{
     self as sk,
     font_style::{Slant, Weight, Width},
     path::AddPathMode,
-    path::Verb,
     surfaces,
     textlayout::{
         FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, TextAlign, TextStyle,
@@ -205,7 +201,7 @@ fn scenario_geist(canvas: &sk::Canvas, y_offset: f32) -> f32 {
         paragraph.layout(3400.0);
 
         if let Some(path) = paragraph_to_path(&mut paragraph, Point::new(50.0, current_y)) {
-            let vn = path_to_vector_network(&path);
+            let vn = VectorNetwork::from(&path);
             let painter = VNPainter::new(canvas);
             let fill = Paint::from(color);
             let stroke = StrokeOptions {
@@ -292,7 +288,7 @@ fn scenario_roboto_flex(canvas: &sk::Canvas, y_offset: f32) -> f32 {
         paragraph.layout(3400.0);
 
         if let Some(path) = paragraph_to_path(&mut paragraph, Point::new(50.0, current_y)) {
-            let vn = path_to_vector_network(&path);
+            let vn = VectorNetwork::from(&path);
             let painter = VNPainter::new(canvas);
             let fill = Paint::from(color);
             let stroke = StrokeOptions {
@@ -396,7 +392,7 @@ fn scenario_multiscript(canvas: &sk::Canvas, y_offset: f32) -> f32 {
         paragraph.layout(3400.0);
 
         if let Some(path) = paragraph_to_path(&mut paragraph, Point::new(50.0, current_y)) {
-            let vn = path_to_vector_network(&path);
+            let vn = VectorNetwork::from(&path);
             let painter = VNPainter::new(canvas);
             let fill = Paint::from(color);
             let stroke = StrokeOptions {
@@ -472,7 +468,7 @@ fn scenario_variable_fonts(canvas: &sk::Canvas, y_offset: f32) -> f32 {
         paragraph.layout(3400.0);
 
         if let Some(path) = paragraph_to_path(&mut paragraph, Point::new(50.0, current_y)) {
-            let vn = path_to_vector_network(&path);
+            let vn = VectorNetwork::from(&path);
             let painter = VNPainter::new(canvas);
             let fill = Paint::from(color);
             let stroke = StrokeOptions {
@@ -512,145 +508,5 @@ fn paragraph_to_path(paragraph: &mut Paragraph, origin: Point) -> Option<Path> {
         None
     } else {
         Some(path)
-    }
-}
-
-fn quad_to_cubic(p0: Point, p1: Point, p2: Point) -> (Point, Point) {
-    let c1 = Point::new(
-        p0.x + (2.0 / 3.0) * (p1.x - p0.x),
-        p0.y + (2.0 / 3.0) * (p1.y - p0.y),
-    );
-    let c2 = Point::new(
-        p2.x + (2.0 / 3.0) * (p1.x - p2.x),
-        p2.y + (2.0 / 3.0) * (p1.y - p2.y),
-    );
-    (c1, c2)
-}
-
-fn conic_to_cubic(p0: Point, p1: Point, p2: Point, w: f32) -> (Point, Point) {
-    // Convert a conic section to cubic Bézier control points.
-    // When w == 1 this reduces to the quadratic case using the 2/3 rule.
-    let rw = 2.0 * w / (1.0 + w);
-    let c1 = Point::new(p0.x + rw * (p1.x - p0.x), p0.y + rw * (p1.y - p0.y));
-    let c2 = Point::new(p2.x + rw * (p1.x - p2.x), p2.y + rw * (p1.y - p2.y));
-    (c1, c2)
-}
-
-fn path_to_vector_network(path: &Path) -> VectorNetwork {
-    let mut vertices: Vec<(f32, f32)> = Vec::new();
-    let mut segments: Vec<VectorNetworkSegment> = Vec::new();
-    let mut loops: Vec<VectorNetworkLoop> = Vec::new();
-
-    let mut iter = sk::path::Iter::new(path, false);
-    let mut start_idx: Option<usize> = None;
-    let mut prev_idx: Option<usize> = None;
-    let mut current_loop: Vec<usize> = Vec::new();
-
-    while let Some((verb, pts)) = iter.next() {
-        match verb {
-            Verb::Move => {
-                let p = pts[0];
-                let idx = vertices.len();
-                vertices.push((p.x, p.y));
-                start_idx = Some(idx);
-                prev_idx = Some(idx);
-            }
-            Verb::Line => {
-                // pts[1] is the endpoint; pts[0] is the previous point.
-                let p = pts[1];
-                let idx = vertices.len();
-                vertices.push((p.x, p.y));
-                let seg_idx = segments.len();
-                segments.push(VectorNetworkSegment::ab(prev_idx.unwrap(), idx));
-                current_loop.push(seg_idx);
-                prev_idx = Some(idx);
-            }
-            Verb::Quad => {
-                // pts: [p0, p1, p2]
-                let p0 = pts[0];
-                let c = pts[1];
-                let p2 = pts[2];
-                let (c1, c2) = quad_to_cubic(p0, c, p2);
-                let idx = vertices.len();
-                vertices.push((p2.x, p2.y));
-                let seg_idx = segments.len();
-                segments.push(VectorNetworkSegment {
-                    a: prev_idx.unwrap(),
-                    b: idx,
-                    ta: Some((c1.x - p0.x, c1.y - p0.y)),
-                    tb: Some((c2.x - p2.x, c2.y - p2.y)),
-                });
-                current_loop.push(seg_idx);
-                prev_idx = Some(idx);
-            }
-            Verb::Conic => {
-                // pts: [p0, p1, p2]
-                let p0 = pts[0];
-                let c = pts[1];
-                let p2 = pts[2];
-                let w = iter.conic_weight().unwrap_or(1.0);
-                let (c1, c2) = conic_to_cubic(p0, c, p2, w);
-                let idx = vertices.len();
-                vertices.push((p2.x, p2.y));
-                let seg_idx = segments.len();
-                segments.push(VectorNetworkSegment {
-                    a: prev_idx.unwrap(),
-                    b: idx,
-                    ta: Some((c1.x - p0.x, c1.y - p0.y)),
-                    tb: Some((c2.x - p2.x, c2.y - p2.y)),
-                });
-                current_loop.push(seg_idx);
-                prev_idx = Some(idx);
-            }
-            Verb::Cubic => {
-                // pts: [p0, c1, c2, p3]
-                let p0 = pts[0];
-                let c1 = pts[1];
-                let c2 = pts[2];
-                let p3 = pts[3];
-                let idx = vertices.len();
-                vertices.push((p3.x, p3.y));
-                let seg_idx = segments.len();
-                segments.push(VectorNetworkSegment {
-                    a: prev_idx.unwrap(),
-                    b: idx,
-                    ta: Some((c1.x - p0.x, c1.y - p0.y)),
-                    tb: Some((c2.x - p3.x, c2.y - p3.y)),
-                });
-                current_loop.push(seg_idx);
-                prev_idx = Some(idx);
-            }
-            Verb::Close => {
-                if let (Some(start), Some(prev)) = (start_idx, prev_idx) {
-                    let seg_idx = segments.len();
-                    segments.push(VectorNetworkSegment::ab(prev, start));
-                    current_loop.push(seg_idx);
-                    loops.push(VectorNetworkLoop(current_loop.clone()));
-                    current_loop.clear();
-                    prev_idx = Some(start);
-                }
-            }
-            Verb::Done => break,
-        }
-    }
-
-    if !current_loop.is_empty() {
-        loops.push(VectorNetworkLoop(current_loop));
-    }
-
-    let regions = if loops.is_empty() {
-        vec![]
-    } else {
-        vec![VectorNetworkRegion {
-            loops,
-            fill_rule: FillRule::EvenOdd,
-            fills: None,
-        }]
-    };
-
-    VectorNetwork {
-        vertices,
-        segments,
-        regions,
     }
 }
