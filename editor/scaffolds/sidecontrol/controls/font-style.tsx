@@ -53,17 +53,21 @@ export function FontStyleControl({
           description: { fontVariations: {}, fontWeight: 400 },
         };
 
-  // Group styles by italic variants
+  // Group styles by italic variants and sort by weight
   const options: EnumItem<string>[][] = useMemo(() => {
     const options: EnumItem<string>[][] = [];
     // Separate styles into italic and non-italic groups
     const g_romans = styles.filter((style) => !style.fontStyleItalic);
     const g_italics = styles.filter((style) => style.fontStyleItalic);
 
+    // Sort each group by weight (ascending)
+    const sortByWeight = (a: (typeof styles)[0], b: (typeof styles)[0]) =>
+      a.fontWeight - b.fontWeight;
+
     // Add regular styles group if there are any
     if (g_romans.length > 0) {
       options.push(
-        g_romans.map((v) => ({
+        g_romans.sort(sortByWeight).map((v) => ({
           value: editor.font_spec.fontStyleKey.key2str(v),
           label: v.fontStyleName,
         }))
@@ -73,7 +77,7 @@ export function FontStyleControl({
     // Add italic styles group if there are any
     if (g_italics.length > 0) {
       options.push(
-        g_italics.map((v) => ({
+        g_italics.sort(sortByWeight).map((v) => ({
           value: editor.font_spec.fontStyleKey.key2str(v),
           label: v.fontStyleName,
         }))
