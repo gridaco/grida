@@ -136,14 +136,7 @@ function FontFeatureToggle({
             <PropertyLineLabel className="w-auto">{label}</PropertyLineLabel>
           </TooltipTrigger>
           <TooltipContent side="left">
-            {sampleText ? (
-              <div className="flex flex-col items-start gap-1">
-                <span className="text-xs">{tag}</span>
-                <span className="text-sm font-medium">{sampleText}</span>
-              </div>
-            ) : (
-              tag
-            )}
+            {sampleText ? <span className="text-xs">{tag}</span> : tag}
           </TooltipContent>
         </Tooltip>
         <PropertyEnumToggle
@@ -214,7 +207,7 @@ function FontFeatureSection({
 }
 
 interface FontFeatureSettingsProps {
-  features: editor.font_spec.UIFontFaceFeature[];
+  features: { [tag: string]: editor.font_spec.UIFontFaceFeature };
   fontFeatures: Partial<Record<cg.OpenTypeFeature, boolean>>;
   onFeatureToggleChange?: (feature: cg.OpenTypeFeature, value: boolean) => void;
   onFeatureHover: (feature: cg.OpenTypeFeature, value?: "0" | "1") => void;
@@ -228,7 +221,8 @@ export function FontFeatureSettings({
   onFeatureHover,
   onFeatureHoverLeave,
 }: FontFeatureSettingsProps) {
-  const groupedFeatures = groupFeatures(features);
+  const featuresArray = Object.values(features);
+  const groupedFeatures = groupFeatures(featuresArray);
   const { ssxx, numbers, letterCase, horizontal_spacing, other } =
     groupedFeatures;
 
@@ -239,7 +233,7 @@ export function FontFeatureSettings({
           <Label className="text-sm font-semibold text-foreground w-auto">
             Features{" "}
             <span className="text-xs text-muted-foreground">
-              ({features.length})
+              ({featuresArray.length})
             </span>
           </Label>
         </PropertyLine>

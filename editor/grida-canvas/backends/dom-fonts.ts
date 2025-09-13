@@ -71,7 +71,13 @@ export class DOMFontParserInterfaceProvider
           postscriptName: postscriptName ?? "TTF_ERROR_NO_POSTSCRIPT_NAME",
           axes: fvar.axes,
           instances: fvar.instances,
-          features,
+          features: features.reduce(
+            (acc, feature) => {
+              acc[feature.tag] = feature;
+              return acc;
+            },
+            {} as { [tag: string]: editor.font_spec.UIFontFaceFeature }
+          ),
         } satisfies editor.font_spec.UIFontFaceData;
       }
     );

@@ -11,7 +11,9 @@ type CurrentFontStyleAttrubutes = {
   /**
    * features defined by the face (ttf)
    */
-  faceFeatures: editor.font_spec.UIFontFaceFeature[] | undefined;
+  faceFeatures:
+    | { [tag: string]: editor.font_spec.UIFontFaceFeature }
+    | undefined;
 };
 
 interface CurrentFontState {

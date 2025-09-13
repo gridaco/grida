@@ -185,17 +185,20 @@ export class CanvasWasmFontParserInterfaceProvider
           (face) =>
             ({
               postscriptName: face.postscript_name,
-              axes: face.axes.reduce((acc, axis) => {
-                acc[axis.tag] = axis;
-                return acc;
-              }, {} as any),
+              axes: face.axes,
               instances:
                 face.instances?.map((instance) => ({
                   name: instance.name,
                   postscriptName: instance.postscript_name,
                   coordinates: instance.coordinates,
                 })) ?? [],
-              features: face.features,
+              features: face.features.reduce(
+                (acc, feature) => {
+                  acc[feature.tag] = feature;
+                  return acc;
+                },
+                {} as { [tag: string]: editor.font_spec.UIFontFaceFeature }
+              ),
               italic: face.is_strict_italic,
             }) satisfies editor.font_spec.UIFontFaceData
         ),

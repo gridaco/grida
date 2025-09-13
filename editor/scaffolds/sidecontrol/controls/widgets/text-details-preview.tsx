@@ -57,7 +57,7 @@ interface PreviewProps {
   fontFamily?: string;
 
   // Features preview props
-  features?: editor.font_spec.UIFontFaceFeature[];
+  features?: { [tag: string]: editor.font_spec.UIFontFaceFeature };
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
 
   // Type indicator
@@ -185,18 +185,18 @@ function FeaturesPreview({
   fontFamily,
   fontWeight,
   hoveredFeature,
-  features = [],
+  features = {},
   selectedValue,
 }: {
   fontFamily?: string;
   fontWeight?: number;
   hoveredFeature: cg.OpenTypeFeature | null;
-  features?: editor.font_spec.UIFontFaceFeature[];
+  features?: { [tag: string]: editor.font_spec.UIFontFaceFeature };
   selectedValue?: "0" | "1";
 }) {
   if (!hoveredFeature || !selectedValue) return null;
 
-  const feature = features.find((f) => f.tag === hoveredFeature);
+  const feature = features[hoveredFeature];
   const demoText = feature?.glyphs?.join(" ");
 
   if (!demoText) return null;
@@ -228,9 +228,7 @@ function Preview(props: PreviewProps) {
   } else if (props.type === "features") {
     const featurePreview = props.hoverPreview as FeaturePreview;
     if (featurePreview?.feature && featurePreview?.value) {
-      const feature = props.features?.find(
-        (f) => f.tag === featurePreview.feature
-      );
+      const feature = props.features?.[featurePreview.feature];
       hasPreviewText = !!feature?.glyphs?.join(" ");
     }
   }

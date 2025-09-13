@@ -23,7 +23,7 @@ export namespace fonts {
       tag: string;
       name: string;
       min: number;
-      default: number;
+      def: number;
       max: number;
     }
 
@@ -79,7 +79,7 @@ export namespace fonts {
       width_class: number;
       is_variable: boolean;
       is_strict_italic: boolean;
-      axes: Array<FontAxis>;
+      axes?: Record<string, FontAxis>;
       instances?: Array<FontInstance>;
       features: Array<FontFeature>;
     }

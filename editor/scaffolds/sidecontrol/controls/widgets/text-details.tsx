@@ -499,7 +499,7 @@ export function TextDetails({
     return null;
   }
 
-  const { faceAxes: axes, faceFeatures: features = [] } = face.state;
+  const { faceAxes: axes, faceFeatures: features } = face.state;
 
   const truncate = !!maxLines && maxLines > 0;
 
@@ -552,7 +552,7 @@ export function TextDetails({
   };
 
   const hasVariableAxes = axes && Object.keys(axes).length > 0;
-  const hasFeatures = features.length > 0;
+  const hasFeatures = features && Object.keys(features).length > 0;
   const resolvedFontFeatures = { ...fontFeatures, kern: fontKerning };
 
   return (

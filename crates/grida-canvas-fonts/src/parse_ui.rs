@@ -463,12 +463,17 @@ impl UIFontParser {
                 let axes = fvar_data
                     .axes
                     .iter()
-                    .map(|(_, axis)| UIFontAxis {
-                        tag: axis.tag.clone(),
-                        name: axis.name.clone(),
-                        min: axis.min,
-                        default: axis.def,
-                        max: axis.max,
+                    .map(|(tag, axis)| {
+                        (
+                            tag.clone(),
+                            UIFontAxis {
+                                tag: axis.tag.clone(),
+                                name: axis.name.clone(),
+                                min: axis.min,
+                                def: axis.def,
+                                max: axis.max,
+                            },
+                        )
                     })
                     .collect();
 
@@ -482,9 +487,9 @@ impl UIFontParser {
                     })
                     .collect();
 
-                (axes, Some(instances))
+                (Some(axes), Some(instances))
             } else {
-                (Vec::new(), None)
+                (None, None)
             };
 
             // Determine if this face is strictly italic using the italic parser
@@ -615,7 +620,7 @@ pub struct UIFontAxis {
     /// Minimum value
     pub min: f32,
     /// Default value for this face
-    pub default: f32,
+    pub def: f32,
     /// Maximum value
     pub max: f32,
 }
@@ -659,8 +664,8 @@ pub struct UIFontFaceInfo {
     /// The term "strict" is used to avoid confusion with variable font instances
     /// that may have italic variants but aren't inherently italic fonts.
     pub is_strict_italic: bool,
-    /// Face-specific axes (includes default values)
-    pub axes: Vec<UIFontAxis>,
+    /// Face-specific axes (includes default values) - None for non-variable fonts
+    pub axes: Option<HashMap<String, UIFontAxis>>,
     /// Variable font instances (if this is a variable font)
     pub instances: Option<Vec<UIFontInstance>>,
     /// Available font features
@@ -787,9 +792,9 @@ fn generate_font_styles(
                     .or_else(|| {
                         // If no wght coordinate, try to get default from font axes
                         face.axes
-                            .iter()
-                            .find(|axis| axis.tag == "wght")
-                            .map(|axis| axis.default.round() as u16)
+                            .as_ref()
+                            .and_then(|axes| axes.get("wght"))
+                            .map(|axis| axis.def.round() as u16)
                     })
                     .unwrap_or(face_record.weight_class);
 

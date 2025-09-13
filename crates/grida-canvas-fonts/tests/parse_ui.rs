@@ -557,3 +557,66 @@ fn test_negative_axis_values() {
         println!("WASM instance coordinates: {:?}", wasm_instance.coordinates);
     }
 }
+
+#[test]
+fn test_axes_structure_changes() {
+    use fonts::parse_ui::{UIFontFaceOwned, UIFontParser};
+
+    // Test with a variable font (Roboto Flex)
+    let variable_font_data = include_bytes!("../../../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf");
+    let variable_face = UIFontFaceOwned::new(
+        "RobotoFlex-Variable.ttf".to_string(),
+        variable_font_data.to_vec(),
+        None,
+    );
+
+    let parser = UIFontParser::new();
+    let faces = parser
+        .analyze_family_owned(Some("Roboto Flex".to_string()), vec![variable_face])
+        .unwrap();
+
+    // Check that variable font has axes as Some(HashMap)
+    let variable_face_info = faces.faces.first().unwrap();
+    assert!(
+        variable_face_info.is_variable,
+        "Roboto Flex should be a variable font"
+    );
+    assert!(
+        variable_face_info.axes.is_some(),
+        "Variable font should have axes"
+    );
+
+    if let Some(axes) = &variable_face_info.axes {
+        assert!(axes.contains_key("wght"), "Should have wght axis");
+        assert!(axes.contains_key("slnt"), "Should have slnt axis");
+        assert!(axes.contains_key("opsz"), "Should have opsz axis");
+
+        // Test that we can access axis by tag
+        let wght_axis = axes.get("wght").unwrap();
+        assert_eq!(wght_axis.tag, "wght");
+        assert!(wght_axis.min >= 100.0 && wght_axis.max <= 1000.0);
+    }
+
+    // Test with a static font (PT Serif)
+    let static_font_data = include_bytes!("../../../fixtures/fonts/PT_Serif/PTSerif-Regular.ttf");
+    let static_face = UIFontFaceOwned::new(
+        "PTSerif-Regular.ttf".to_string(),
+        static_font_data.to_vec(),
+        None,
+    );
+
+    let faces = parser
+        .analyze_family_owned(Some("PT Serif".to_string()), vec![static_face])
+        .unwrap();
+
+    // Check that static font has axes as None
+    let static_face_info = faces.faces.first().unwrap();
+    assert!(
+        !static_face_info.is_variable,
+        "PT Serif Regular should be a static font"
+    );
+    assert!(
+        static_face_info.axes.is_none(),
+        "Static font should not have axes"
+    );
+}

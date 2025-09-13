@@ -12,6 +12,8 @@
 //! - Include all fields from the original UI structures
 //! - Optimized for WASM consumption
 
+use std::collections::HashMap;
+
 use crate::parse_ui::{
     UIFontAxis, UIFontFaceInfo, UIFontFamilyAxis, UIFontFamilyResult, UIFontFeature,
     UIFontInstance, UIFontItalicCapability, UIFontItalicRecipe, UIFontStyleInstance,
@@ -115,8 +117,8 @@ pub struct WasmFontFaceInfo {
     pub is_variable: bool,
     /// Whether this is a strict italic font (determined by font metadata analysis)
     pub is_strict_italic: bool,
-    /// Face-specific axes (includes default values)
-    pub axes: Vec<WasmFontAxis>,
+    /// Face-specific axes (includes default values) - None for non-variable fonts
+    pub axes: Option<HashMap<String, WasmFontAxis>>,
     /// Variable font instances (if this is a variable font)
     pub instances: Option<Vec<WasmFontInstance>>,
     /// Available font features
@@ -133,7 +135,7 @@ pub struct WasmFontAxis {
     /// Minimum value
     pub min: f32,
     /// Default value for this face
-    pub default: f32,
+    pub def: f32,
     /// Maximum value
     pub max: f32,
 }
@@ -265,7 +267,11 @@ impl From<UIFontFaceInfo> for WasmFontFaceInfo {
             width_class: face.width_class,
             is_variable: face.is_variable,
             is_strict_italic: face.is_strict_italic,
-            axes: face.axes.into_iter().map(Into::into).collect(),
+            axes: face.axes.map(|axes| {
+                axes.into_iter()
+                    .map(|(tag, axis)| (tag, axis.into()))
+                    .collect()
+            }),
             instances: face
                 .instances
                 .map(|instances| instances.into_iter().map(Into::into).collect()),
@@ -280,7 +286,7 @@ impl From<UIFontAxis> for WasmFontAxis {
             tag: axis.tag,
             name: axis.name,
             min: axis.min,
-            default: axis.default,
+            def: axis.def,
             max: axis.max,
         }
     }

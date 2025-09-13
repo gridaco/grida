@@ -397,9 +397,18 @@ export namespace editor.font_spec {
    */
   export type UIFontFaceData = {
     postscriptName: string;
-    axes: { [tag: string]: UIFontFaceAxis };
     instances: UIFontFaceInstance[];
-    features: UIFontFaceFeature[];
+    axes?: { [tag: string]: UIFontFaceAxis };
+    /**
+     * the feature spec by the font face GSUB/GPOS
+     * this is not a 100% accurate representation of features, as there can be multiple feature definition by same tag, with different language/script/source table.
+     *
+     * as this is non-essential for ui display, we have it as de-duplicated way.
+     *
+     * @internal
+     * re visit this as needed for super-advanced use cases.
+     */
+    features: { [tag: string]: UIFontFaceFeature };
     italic: boolean;
   };
 

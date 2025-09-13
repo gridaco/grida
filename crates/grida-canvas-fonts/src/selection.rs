@@ -402,9 +402,9 @@ impl FontSelectionParser {
         }
 
         // Priority 2: Variable font `ital` axis
-        if let Some((min, default, max)) = face.axes.get("ital") {
+        if let Some((min, def, max)) = face.axes.get("ital") {
             // Check if default location has ital=1
-            if (*default - 1.0).abs() < f32::EPSILON {
+            if (*def - 1.0).abs() < f32::EPSILON {
                 return FaceClassification {
                     font_style: FontStyle::Italic,
                     vf_recipe: Some(VfRecipe::new("ital", 1.0)),
