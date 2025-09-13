@@ -177,6 +177,7 @@ export class CanvasWasmFontParserInterfaceProvider
     const res = await this.surface.fontskit.analyzeFamily(faces, familyName);
     if (res.success) {
       const d = res.data;
+
       const fam = {
         family: d.family_name,
         axes: d.axes,
@@ -205,8 +206,8 @@ export class CanvasWasmFontParserInterfaceProvider
               fontStyleName: style.name,
               fontPostscriptName: style.face_post_script_name,
               fontInstancePostscriptName: style.postscript_name,
-              italic: style.italic,
-              weight: style.weight,
+              fontStyleItalic: style.italic,
+              fontWeight: style.weight,
             }) satisfies editor.font_spec.FontStyleInstance
         ),
       } satisfies editor.font_spec.UIFontFamily;

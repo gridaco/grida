@@ -57,8 +57,8 @@ export function FontStyleControl({
   const options: EnumItem<string>[][] = useMemo(() => {
     const options: EnumItem<string>[][] = [];
     // Separate styles into italic and non-italic groups
-    const g_romans = styles.filter((style) => !style.italic);
-    const g_italics = styles.filter((style) => style.italic);
+    const g_romans = styles.filter((style) => !style.fontStyleItalic);
+    const g_italics = styles.filter((style) => style.fontStyleItalic);
 
     // Add regular styles group if there are any
     if (g_romans.length > 0) {

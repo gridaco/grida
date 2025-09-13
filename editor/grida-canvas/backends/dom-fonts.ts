@@ -108,9 +108,9 @@ function mapStyles(
             fontStyleName: instance.name,
             fontPostscriptName: typeface.postscriptName,
             fontInstancePostscriptName: instance.postscriptName ?? null,
-            italic: typeface.italic,
+            fontStyleItalic: typeface.italic,
             // FIXME: support Typr to return the weight
-            weight: 400,
+            fontWeight: 400,
           }) satisfies editor.font_spec.FontStyleInstance
       );
     } else {
@@ -120,9 +120,9 @@ function mapStyles(
           fontStyleName: typeface.postscriptName,
           fontPostscriptName: typeface.postscriptName,
           fontInstancePostscriptName: typeface.postscriptName,
-          italic: typeface.italic,
+          fontStyleItalic: typeface.italic,
           // FIXME: support Typr to return the weight
-          weight: 400,
+          fontWeight: 400,
         } satisfies editor.font_spec.FontStyleInstance,
       ];
     }

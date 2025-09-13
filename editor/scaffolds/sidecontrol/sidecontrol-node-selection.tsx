@@ -288,6 +288,7 @@ function ModeMixedNodeProperties({
     fit,
     fontFamily,
     fontWeight,
+    fontStyleItalic,
     fontPostscriptName,
     fontOpticalSizing,
     fontVariations,
@@ -494,6 +495,10 @@ function ModeMixedNodeProperties({
             fontWeight:
               typeof fontWeight?.value === "number"
                 ? fontWeight.value
+                : undefined,
+            fontStyleItalic:
+              typeof fontStyleItalic?.value === "boolean"
+                ? fontStyleItalic.value
                 : undefined,
             fontVariations:
               typeof fontVariations?.value === "object"
@@ -1350,6 +1355,7 @@ function SectionText({ node_id }: { node_id: string }) {
     text,
     fontFamily,
     fontWeight,
+    fontStyleItalic,
     fontSize,
     lineHeight,
     letterSpacing,
@@ -1376,6 +1382,7 @@ function SectionText({ node_id }: { node_id: string }) {
       text: node.text,
       fontFamily: node.fontFamily,
       fontWeight: node.fontWeight,
+      fontStyleItalic: node.fontStyleItalic,
       fontSize: node.fontSize,
       lineHeight: node.lineHeight,
       letterSpacing: node.letterSpacing,
@@ -1405,6 +1412,7 @@ function SectionText({ node_id }: { node_id: string }) {
         fontFamily: fontFamily ?? "",
         fontInstancePostscriptName: fontPostscriptName,
         fontWeight,
+        fontStyleItalic,
         fontVariations,
       }}
     >

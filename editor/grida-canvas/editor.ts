@@ -2029,6 +2029,7 @@ export class Editor
     fontStyleDescription: editor.api.FontStyleChangeDescription
   ) {
     const { fontStyleKey } = fontStyleDescription;
+    const next_family = fontStyleKey.fontFamily;
 
     const node = this.getNodeSnapshotById(
       node_id
@@ -2046,12 +2047,19 @@ export class Editor
       fontStyleItalic: node.fontStyleItalic,
     };
 
-    const description = {
-      fontFamily: fontStyleKey.fontFamily,
-      fontInstancePostscriptName: fontStyleKey.fontInstancePostscriptName,
-      fontWeight: prev.fontWeight,
-      fontVariations: prev.fontVariations,
-    } satisfies editor.api.FontStyleSelectDescription;
+    const description = Object.assign(
+      {},
+      {
+        fontFamily: next_family,
+        fontInstancePostscriptName: fontStyleKey.fontPostscriptName,
+        fontStyleItalic: fontStyleKey.fontStyleItalic,
+        fontWeight: fontStyleKey.fontWeight,
+      } satisfies Partial<editor.api.FontStyleSelectDescription>,
+      Object.fromEntries(
+        Object.entries(fontStyleKey).filter(([_, v]) => v !== undefined)
+      )
+    ) as editor.api.FontStyleSelectDescription;
+
     const match = this.selectFontStyle(description);
 
     // reject
@@ -2064,8 +2072,10 @@ export class Editor
       return;
     }
 
-    const next_family = fontStyleKey.fontFamily;
-    const next: grida.program.nodes.i.IFontStyle = {
+    const {
+      fontFamily: _fontFamily,
+      ...next
+    }: grida.program.nodes.i.IFontStyle = {
       ...prev,
       fontPostscriptName:
         match.instance?.postscriptName || match.face.postscriptName,
@@ -2084,7 +2094,17 @@ export class Editor
       fontStyleItalic: match.face.italic,
     } as const;
 
-    console.log("next", next, match, fontStyleDescription);
+    this.log(
+      "changeTextNodeFontStyle",
+      "next",
+      next,
+      "match",
+      match,
+      "fontStyleKey",
+      fontStyleKey,
+      "description",
+      description
+    );
 
     this.dispatch({
       type: "node/change/fontFamily",
@@ -3084,103 +3104,15 @@ export class Editor
     face: editor.font_spec.UIFontFaceData;
     instance: editor.font_spec.UIFontFaceInstance | null;
   } | null {
-    // 1. match family
-    const font = this.__font_details_cache.get(description.fontFamily);
+    // 0. match family
+    const fontFamily = description.fontFamily;
+    const font = this.__font_details_cache.get(fontFamily);
     if (!font) {
-      this.log("font family not found", description.fontFamily);
+      this.log("font family not found", fontFamily);
       return null;
     }
 
-    const instances = font.faces.flatMap((face) => face.instances);
-    const styles = font.styles;
-
-    const currAxesValues = Object.assign({}, description.fontVariations || {}, {
-      wght: description.fontWeight,
-    });
-
-    // 2. match with style name (highest priority)
-    if (description.fontStyleName) {
-      const matched_by_style = styles.find(
-        (style) => style.fontStyleName === description.fontStyleName
-      );
-      if (matched_by_style) {
-        // resolve the face where this style is originated from
-        const face = font.faces.find(
-          (face) => face.postscriptName === matched_by_style.fontPostscriptName
-        );
-
-        const instance = instances.find(
-          (instance) =>
-            instance.postscriptName ===
-            matched_by_style.fontInstancePostscriptName
-        );
-
-        if (face) {
-          return {
-            key: matched_by_style,
-            face: face,
-            instance: instance ?? null,
-          };
-        }
-      }
-    }
-
-    // check if variable font
-    const is_vf = font.axes !== undefined;
-
-    if (is_vf) {
-      // 3. match with fvar.instances (for variable fonts)
-      const matched_by_instance = editor.font_spec.matchFvarInstance(
-        instances,
-        {
-          fontInstancePostscriptName: description.fontInstancePostscriptName,
-          axesValues: currAxesValues,
-        }
-      );
-
-      if (matched_by_instance) {
-        // locate the original face
-        const face = font.faces.find((face) =>
-          face.instances.some(
-            (instance) =>
-              instance.postscriptName === matched_by_instance.postscriptName
-          )
-        );
-        if (face) {
-          // Create a FontStyleKey for the matched instance
-          const key: editor.font_spec.FontStyleKey = {
-            fontFamily: description.fontFamily,
-            fontStyleName: matched_by_instance.name || "Unknown",
-            fontPostscriptName: face.postscriptName,
-            fontInstancePostscriptName: matched_by_instance.postscriptName,
-          };
-          return { key, face, instance: matched_by_instance };
-        }
-      }
-    } else {
-      // 4. match with static postscriptName (for static fonts)
-      if (description.fontPostscriptName) {
-        const face = font.faces.find(
-          (face) => face.postscriptName === description.fontPostscriptName
-        );
-        if (face) {
-          // Create a FontStyleKey for the matched face
-          // For static fonts, we need to find the corresponding style from the styles array
-          const correspondingStyle = styles.find(
-            (style) => style.fontPostscriptName === face.postscriptName
-          );
-          const key: editor.font_spec.FontStyleKey = {
-            fontFamily: description.fontFamily,
-            fontStyleName: correspondingStyle?.fontStyleName || "Regular",
-            fontPostscriptName: face.postscriptName,
-            fontInstancePostscriptName: null,
-          };
-          return { key, face, instance: null };
-        }
-      }
-    }
-
-    return null;
+    return this._fontManager.selectFontStyle(font, description);
   }
 
   // #endregion IFontLoaderActions implementation

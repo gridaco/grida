@@ -339,6 +339,8 @@ export namespace editor.font_spec {
     fontPostscriptName: string;
     fontInstancePostscriptName: string | null;
     fontStyleName: string;
+    fontStyleItalic: boolean;
+    fontWeight: number;
   };
 
   /**
@@ -348,30 +350,10 @@ export namespace editor.font_spec {
    */
   export const fontStyleKey = {
     key2str: (key: FontStyleKey): string => {
-      if (key.fontInstancePostscriptName === null) {
-        //    |1                  2                    3                          |
-        return `${key.fontFamily},${key.fontStyleName},${key.fontPostscriptName}`;
-      } else {
-        //    |1                  2                    3                         4|
-        return `${key.fontFamily},${key.fontStyleName},${key.fontPostscriptName},${key.fontInstancePostscriptName}`;
-      }
+      return JSON.stringify(key);
     },
     str2key: (str: string): FontStyleKey | null => {
-      if (str.includes(",")) {
-        const [
-          fontFamily, // 1
-          fontStyleName, // 2
-          fontPostscriptName, // 3
-          fontInstancePostscriptName, // 4
-        ] = str.split(",");
-        return {
-          fontFamily,
-          fontStyleName,
-          fontPostscriptName,
-          fontInstancePostscriptName: fontInstancePostscriptName ?? null,
-        };
-      }
-      return null;
+      return JSON.parse(str) ?? null;
     },
   };
 
@@ -434,6 +416,7 @@ export namespace editor.font_spec {
      * if the user's input is invalid, and if the givven list of ttf does not share the same axes, this will only contain the shared axes, with the same spec (min/max)
      * this axes does not include the `def` (default) as it is expected to have different default value per ttf.
      */
+    // TODO: make it Record<string, UIFontFamilyAxis>
     axes?: UIFontFamilyAxis[];
 
     faces: UIFontFaceData[];
@@ -476,105 +459,15 @@ export namespace editor.font_spec {
     /**
      * if the face is italic (by OS/2 or by vendor specified)
      */
-    italic: boolean;
+    fontStyleItalic: boolean;
 
     /**
      * the weight of the font style
      * for static font, this is the weight class of the face
      * for variable font, this is the `wght` of the instance, if `wght` not supported, it fallbacks to weight class of the face
      */
-    weight: number;
+    fontWeight: number;
   };
-
-  /**
-   * Get the matching instance from a list of instances based on current values
-   * @param instances - Array of font variation instances
-   * @param context - Context containing PostScript name and axis values
-   * @param mode - The mode to use for matching
-   *   - strict: only match if the postscript name or axes values are exactly the same
-   *   - loose: find the instance with the highest matching score based on coordinate similarity
-   * @returns The matching instance if found, undefined otherwise
-   */
-  export function matchFvarInstance(
-    instances: UIFontFaceInstance[],
-    context: {
-      fontInstancePostscriptName?: string | null;
-      axesValues: Record<string, number>;
-    },
-    mode: "strict" | "loose" = "loose"
-  ): UIFontFaceInstance | undefined {
-    if (!instances || instances.length === 0) return undefined;
-
-    const { fontInstancePostscriptName, axesValues } = context;
-
-    // First, try to match by PostScript name if provided
-    if (fontInstancePostscriptName) {
-      const by_name = instances.find(
-        (inst) => inst.postscriptName === fontInstancePostscriptName
-      );
-      if (by_name) return by_name;
-    }
-
-    if (mode === "strict") {
-      // Strict mode: exact coordinate matching
-      return instances.find((inst) => {
-        const instanceCoords = inst.coordinates;
-
-        // First, check if all instance coordinates are present in current values
-        for (const [axis, value] of Object.entries(instanceCoords)) {
-          if (axesValues[axis] !== value) {
-            return false;
-          }
-        }
-
-        // Then, check if all current values are present in instance coordinates
-        // This ensures we don't match when current values have additional axes
-        for (const [axis, value] of Object.entries(axesValues)) {
-          if (instanceCoords[axis] !== value) {
-            return false;
-          }
-        }
-
-        return true;
-      });
-    } else {
-      // Loose mode: find the best matching instance
-      let bestMatch: UIFontFaceInstance | undefined;
-      let bestScore = -1;
-
-      for (const inst of instances) {
-        const instanceCoords = inst.coordinates;
-        let score = 0;
-        let totalAxes = 0;
-
-        // Calculate matching score based on how many axes match
-        for (const [axis, value] of Object.entries(axesValues)) {
-          totalAxes++;
-          if (instanceCoords[axis] === value) {
-            score++;
-          }
-        }
-
-        // Also check for instance coordinates that don't exist in current values
-        for (const [axis, value] of Object.entries(instanceCoords)) {
-          if (!(axis in axesValues)) {
-            totalAxes++;
-            // Don't penalize for extra axes in the instance
-          }
-        }
-
-        // Normalize score by total axes and prefer instances with higher match ratio
-        const normalizedScore = totalAxes > 0 ? score / totalAxes : 0;
-
-        if (normalizedScore > bestScore) {
-          bestScore = normalizedScore;
-          bestMatch = inst;
-        }
-      }
-
-      return bestMatch;
-    }
-  }
 }
 
 export namespace editor.state {
@@ -1925,6 +1818,8 @@ export namespace editor.api {
      * @example "Inter", "Noto Sans"
      *
      * expects exactly one family name, and expected to exactly match
+     *
+     * [p0]: must match, otherwise it selects nothing
      */
     fontFamily: string;
 
@@ -1938,6 +1833,20 @@ export namespace editor.api {
     fontStyleName?: string;
 
     /**
+     * the requested font weight.
+     *
+     * [p2#1]: secondary priority, if given. breaks if single match
+     */
+    fontWeight?: number;
+
+    /**
+     * if the requested font style is italic.
+     *
+     * [p2#2]: secondary priority, if given. breaks if single match
+     */
+    fontStyleItalic?: boolean;
+
+    /**
      * the postscript name of the typeface.
      */
     fontPostscriptName?: string;
@@ -1946,11 +1855,6 @@ export namespace editor.api {
      * the postscript name of the instance.
      */
     fontInstancePostscriptName?: string | null;
-
-    /**
-     * the requested font weight.
-     */
-    fontWeight?: number;
 
     /**
      * the requested font variations.
