@@ -316,6 +316,36 @@ fn build_path_from_segments(
     path
 }
 
+// TODO: move to math2
+fn quad_to_cubic(
+    p0: skia_safe::Point,
+    p1: skia_safe::Point,
+    p2: skia_safe::Point,
+) -> (skia_safe::Point, skia_safe::Point) {
+    let c1 = skia_safe::Point::new(
+        p0.x + (2.0 / 3.0) * (p1.x - p0.x),
+        p0.y + (2.0 / 3.0) * (p1.y - p0.y),
+    );
+    let c2 = skia_safe::Point::new(
+        p2.x + (2.0 / 3.0) * (p1.x - p2.x),
+        p2.y + (2.0 / 3.0) * (p1.y - p2.y),
+    );
+    (c1, c2)
+}
+
+// TODO: move to math2
+fn conic_to_cubic(
+    p0: skia_safe::Point,
+    p1: skia_safe::Point,
+    p2: skia_safe::Point,
+    w: f32,
+) -> (skia_safe::Point, skia_safe::Point) {
+    let rw = 2.0 * w / (1.0 + w);
+    let c1 = skia_safe::Point::new(p0.x + rw * (p1.x - p0.x), p0.y + rw * (p1.y - p0.y));
+    let c2 = skia_safe::Point::new(p2.x + rw * (p1.x - p2.x), p2.y + rw * (p1.y - p2.y));
+    (c1, c2)
+}
+
 impl VectorNetwork {
     /// Convert this vector network into a list of [`skia_safe::Path`].
     ///
@@ -461,5 +491,124 @@ impl Default for VectorNetwork {
 impl Into<skia_safe::Path> for VectorNetwork {
     fn into(self) -> skia_safe::Path {
         self.to_union_path()
+    }
+}
+
+impl From<&skia_safe::Path> for VectorNetwork {
+    fn from(path: &skia_safe::Path) -> Self {
+        use skia_safe::path::Verb;
+
+        let mut vertices: Vec<(f32, f32)> = Vec::new();
+        let mut segments: Vec<VectorNetworkSegment> = Vec::new();
+        let mut loops: Vec<VectorNetworkLoop> = Vec::new();
+
+        let mut iter = skia_safe::path::Iter::new(path, false);
+        let mut start_idx: Option<usize> = None;
+        let mut prev_idx: Option<usize> = None;
+        let mut current_loop: Vec<usize> = Vec::new();
+
+        while let Some((verb, pts)) = iter.next() {
+            match verb {
+                Verb::Move => {
+                    let p = pts[0];
+                    let idx = vertices.len();
+                    vertices.push((p.x, p.y));
+                    start_idx = Some(idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Line => {
+                    let p = pts[1];
+                    let idx = vertices.len();
+                    vertices.push((p.x, p.y));
+                    let seg_idx = segments.len();
+                    segments.push(VectorNetworkSegment::ab(prev_idx.unwrap(), idx));
+                    current_loop.push(seg_idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Quad => {
+                    let p0 = pts[0];
+                    let c = pts[1];
+                    let p2 = pts[2];
+                    let (c1, c2) = quad_to_cubic(p0, c, p2);
+                    let idx = vertices.len();
+                    vertices.push((p2.x, p2.y));
+                    let seg_idx = segments.len();
+                    segments.push(VectorNetworkSegment {
+                        a: prev_idx.unwrap(),
+                        b: idx,
+                        ta: Some((c1.x - p0.x, c1.y - p0.y)),
+                        tb: Some((c2.x - p2.x, c2.y - p2.y)),
+                    });
+                    current_loop.push(seg_idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Conic => {
+                    let p0 = pts[0];
+                    let c = pts[1];
+                    let p2 = pts[2];
+                    let w = iter.conic_weight().unwrap_or(1.0);
+                    let (c1, c2) = conic_to_cubic(p0, c, p2, w);
+                    let idx = vertices.len();
+                    vertices.push((p2.x, p2.y));
+                    let seg_idx = segments.len();
+                    segments.push(VectorNetworkSegment {
+                        a: prev_idx.unwrap(),
+                        b: idx,
+                        ta: Some((c1.x - p0.x, c1.y - p0.y)),
+                        tb: Some((c2.x - p2.x, c2.y - p2.y)),
+                    });
+                    current_loop.push(seg_idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Cubic => {
+                    let p0 = pts[0];
+                    let c1 = pts[1];
+                    let c2 = pts[2];
+                    let p3 = pts[3];
+                    let idx = vertices.len();
+                    vertices.push((p3.x, p3.y));
+                    let seg_idx = segments.len();
+                    segments.push(VectorNetworkSegment {
+                        a: prev_idx.unwrap(),
+                        b: idx,
+                        ta: Some((c1.x - p0.x, c1.y - p0.y)),
+                        tb: Some((c2.x - p3.x, c2.y - p3.y)),
+                    });
+                    current_loop.push(seg_idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Close => {
+                    if let (Some(start), Some(prev)) = (start_idx, prev_idx) {
+                        let seg_idx = segments.len();
+                        segments.push(VectorNetworkSegment::ab(prev, start));
+                        current_loop.push(seg_idx);
+                        loops.push(VectorNetworkLoop(current_loop.clone()));
+                        current_loop.clear();
+                        prev_idx = Some(start);
+                    }
+                }
+                Verb::Done => break,
+            }
+        }
+
+        if !current_loop.is_empty() {
+            loops.push(VectorNetworkLoop(current_loop));
+        }
+
+        let regions = if loops.is_empty() {
+            vec![]
+        } else {
+            vec![VectorNetworkRegion {
+                loops,
+                fill_rule: FillRule::EvenOdd,
+                fills: None,
+            }]
+        };
+
+        VectorNetwork {
+            vertices,
+            segments,
+            regions,
+        }
     }
 }

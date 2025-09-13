@@ -18,6 +18,8 @@ export const FLATTENABLE_NODE_TYPES = new Set<grida.program.nodes.NodeType>([
   "polygon",
   "ellipse",
   "line",
+  // TODO: only supported by wasm backend, need backend check or seperate api (e.g. vector.textToVectorNetwork())
+  "text",
   "vector",
   "boolean",
 ]);
@@ -55,9 +57,8 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
   const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id);
   if (!rect) return null;
 
-  // TODO: flatten via wasm backend
-  // let v = context.vector?.toVectorNetwork(node_id);
-  let v = null;
+  // attempt to resolve vector network via wasm backend when available
+  let v = context.vector?.toVectorNetwork(node_id) ?? null;
   if (!v) {
     v = toVectorNetworkFallback(node, {
       width: rect.width,

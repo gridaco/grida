@@ -1,3 +1,4 @@
+use crate::cg::types::TextAlignVertical;
 use crate::devtools::{
     fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay, tile_overlay,
 };
@@ -11,9 +12,12 @@ use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::sys::clock;
 use crate::sys::scheduler;
 use crate::sys::timer::TimerMgr;
+use crate::text;
+use crate::vectornetwork::VectorNetwork;
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
+use skia_safe::Matrix;
 
 pub trait ApplicationApi {
     fn tick(&mut self, time: f64);
@@ -277,6 +281,40 @@ impl ApplicationApi for UnknownTargetApplication {
                     Node::RegularPolygon(n) => Some(n.to_vector_network()),
                     Node::RegularStarPolygon(n) => Some(n.to_vector_network()),
                     Node::Vector(n) => Some(n.network.clone()),
+                    // TODO: find a better way to clean this, as simple as Text::to_vector_network()
+                    Node::TextSpan(n) => {
+                        let paragraph = self.renderer.get_cache().paragraph.borrow_mut().paragraph(
+                            &n.text,
+                            &n.fills,
+                            &n.text_align,
+                            &n.text_style,
+                            &n.max_lines,
+                            &n.ellipsis,
+                            n.width,
+                            &self.renderer.fonts,
+                            &self.renderer.images,
+                            Some(&n.id),
+                        );
+
+                        let layout_height = paragraph.borrow().height();
+                        let y_offset = match n.height {
+                            Some(h) => match n.text_align_vertical {
+                                TextAlignVertical::Top => 0.0,
+                                TextAlignVertical::Center => (h - layout_height) / 2.0,
+                                TextAlignVertical::Bottom => h - layout_height,
+                            },
+                            None => 0.0,
+                        };
+
+                        let mut path = {
+                            let mut para_ref = paragraph.borrow_mut();
+                            text::paragraph_to_path(&mut para_ref)
+                        };
+                        if y_offset != 0.0 {
+                            path.transform(&Matrix::translate((0.0, y_offset)));
+                        }
+                        Some(VectorNetwork::from(&path))
+                    }
                     _ => None,
                 };
                 return vn.map(|v| v.into());

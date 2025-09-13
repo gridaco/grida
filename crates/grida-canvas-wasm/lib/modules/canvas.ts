@@ -229,7 +229,8 @@ export class Scene {
   }
 
   /**
-   * @deprecated not fully implemented yet
+   * Convert a node into a vector network representation.
+   * Supports primitive shapes and text nodes.
    */
   toVectorNetwork(id: string): types.VectorNetwork | null {
     const [ptr, len] = this._alloc_string(id);
