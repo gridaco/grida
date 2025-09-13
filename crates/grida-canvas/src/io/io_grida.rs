@@ -251,7 +251,7 @@ impl From<CSSObjectFit> for BoxFit {
         match fit {
             CSSObjectFit::Contain => BoxFit::Contain,
             CSSObjectFit::Cover => BoxFit::Cover,
-            CSSObjectFit::Fill => BoxFit::None, // Fill maps to None as it's not supported in BoxFit
+            CSSObjectFit::Fill => BoxFit::Fill,
             CSSObjectFit::None => BoxFit::None,
         }
     }

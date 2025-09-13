@@ -188,7 +188,7 @@ export namespace cg {
    * @see https://api.flutter.dev/flutter/painting/BoxFit.html
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit
    */
-  export type BoxFit = "contain" | "cover" | "none";
+  export type BoxFit = "contain" | "cover" | "fill" | "none";
 
   /**
    * Supported stoke cap modes

@@ -2,7 +2,9 @@ use crate::transform::AffineTransform;
 
 /// Supported fit modes.
 ///
-/// Only `Contain`, `Cover`, and `None` are supported in the current version.
+/// `Contain`, `Cover`, `Fill`, and `None` match the behavior of
+/// [`object-fit`](https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit)
+/// in CSS.
 ///
 /// - `None` may have unexpected results depending on the environment.
 ///
@@ -12,6 +14,8 @@ use crate::transform::AffineTransform;
 pub enum BoxFit {
     Contain,
     Cover,
+    /// Scale the content to fill the container without preserving aspect ratio.
+    Fill,
     None,
 }
 
@@ -39,6 +43,10 @@ impl BoxFit {
                     (container_width / content_width).max(container_height / content_height);
                 (scale, scale)
             }
+            BoxFit::Fill => (
+                container_width / content_width,
+                container_height / content_height,
+            ),
         };
 
         // Compute scaled dimensions
@@ -104,5 +112,14 @@ mod tests {
         assert_eq!(t.matrix[1][2], -100.0);
         assert_eq!(t.matrix[0][0], 2.0);
         assert_eq!(t.matrix[1][1], 2.0);
+    }
+
+    #[test]
+    fn test_box_fit_fill() {
+        let t = BoxFit::Fill.calculate_transform((100.0, 50.0), (200.0, 200.0));
+        assert_eq!(t.matrix[0][0], 2.0);
+        assert_eq!(t.matrix[1][1], 4.0);
+        assert_eq!(t.matrix[0][2], 0.0);
+        assert_eq!(t.matrix[1][2], 0.0);
     }
 }

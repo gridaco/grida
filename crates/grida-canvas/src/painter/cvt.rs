@@ -98,7 +98,12 @@ pub fn image_paint_matrix(
     container_size: (f32, f32),
 ) -> [[f32; 3]; 2] {
     match paint.fit {
-        BoxFit::None => paint.transform.matrix,
+        BoxFit::None => {
+            BoxFit::None
+                .calculate_transform(image_size, container_size)
+                .compose(&paint.transform)
+                .matrix
+        }
         _ => {
             paint
                 .fit
