@@ -1270,16 +1270,8 @@ function LayerOverlayResizeSide({
           typeof selection === "string" &&
           editor.getNodeSnapshotById(selection)?.type === "text"
         ) {
-          switch (anchor) {
-            case "e":
-            case "w":
-              editor.changeNodeSize(selection, "width", "auto");
-              break;
-            case "n":
-            case "s":
-              editor.changeNodeSize(selection, "height", "auto");
-              break;
-          }
+          const axis = anchor === "e" || anchor === "w" ? "width" : "height";
+          editor.autoSizeTextNode(selection, axis);
         }
       },
     },

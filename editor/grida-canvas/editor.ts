@@ -1885,6 +1885,74 @@ export class Editor
     });
   }
 
+  autoSizeTextNode(node_id: string, axis: "width" | "height") {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.UnknwonNode;
+    if (node.type !== "text") return;
+
+    const prev = this.geometry.getNodeAbsoluteBoundingRect(node_id);
+    if (!prev) return;
+
+    const h_align = node.textAlign;
+    const v_align = node.textAlignVertical;
+
+    // FIXME: nested raf.
+    // why this is needed?
+    // currently, the api does not expose a way or contains value for textlayout size, not the box size.
+    // since we can't pre-calculate the delta, this is the dirty hack to first resize, then get the next size, shift delta.
+    // => need api/data that holds actual textlayout size (non box size)
+
+    requestAnimationFrame(() => {
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        [axis]: "auto",
+      });
+
+      requestAnimationFrame(() => {
+        const next = this.geometry.getNodeAbsoluteBoundingRect(node_id);
+        if (!next) return;
+
+        if (axis === "width") {
+          const diff = prev.width - next.width;
+          if (diff === 0) return;
+          let left = prev.x;
+          switch (h_align) {
+            case "right":
+              left = prev.x + diff;
+              break;
+            case "center":
+              left = prev.x + diff / 2;
+              break;
+            default:
+              return;
+          }
+          this.changeNodePositioning(node_id, {
+            left: cmath.quantize(left, 1),
+          });
+        } else {
+          const diff = prev.height - next.height;
+          if (diff === 0) return;
+          let top = prev.y;
+          switch (v_align) {
+            case "bottom":
+              top = prev.y + diff;
+              break;
+            case "center":
+              top = prev.y + diff / 2;
+              break;
+            default:
+              return;
+          }
+          this.changeNodePositioning(node_id, {
+            top: cmath.quantize(top, 1),
+          });
+        }
+      });
+    });
+  }
+
   changeNodeFill(
     node_id: string | string[],
     fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null

@@ -1940,6 +1940,7 @@ export namespace editor.api {
       axis: "width" | "height",
       value: grida.program.css.LengthPercentage | "auto"
     ): void;
+    autoSizeTextNode(node_id: NodeID, axis: "width" | "height"): void;
     changeNodeBorder(
       node_id: NodeID,
       border: grida.program.css.Border | undefined
