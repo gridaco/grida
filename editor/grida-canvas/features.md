@@ -21,6 +21,7 @@ This document lists all implemented features including the ones that are not yet
 | copy                    | copy the current selection              | `meta+c`                   | `ctrl+c`                | canvas |
 | paste                   | paste from the clipboard                | `meta+v`                   | `ctrl+v`                | canvas |
 | toggle bold             | toggle bold style                       | `meta+b`                   | `ctrl+b`                | canvas |
+| toggle italic           | toggle italic style                     | `meta+i`                   | `ctrl+i`                | canvas |
 | toggle underline        | toggle underline style                  | `meta+u`                   | `ctrl+u`                | canvas |
 | toggle active           | toggle active state for the selection   | `meta+shift+h`             | `ctrl+shift+h`          | canvas |
 | toggle locked           | toggle locked state for the selection   | `meta+shift+l`             | `ctrl+shift+l`          | canvas |
@@ -70,6 +71,7 @@ This document lists all implemented features including the ones that are not yet
 - [x] select all children (go inner) (`enter`)
 - [x] select all parents (go outer) (`shift+enter`)
 - [x] toggle bold (`meta+b`)
+- [x] toggle italic (`meta+i`)
 
 **Alignment**
 

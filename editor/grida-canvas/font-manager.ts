@@ -24,6 +24,73 @@ export class DocumentFontManager {
     }
   }
 
+  /**
+   * Selects a font style from a font family based on the provided description.
+   *
+   * This method implements a flexible font style selection system that supports both
+   * static and variable fonts. It uses a priority-based matching system to find the
+   * most appropriate font style based on the provided criteria.
+   *
+   * @param fontFamilySpec - the analyzed font family spec
+   * @param description - The font style selection criteria
+   * @param description.fontFamily - **Required.** The font family name to select from (e.g., "Inter", "Noto Sans")
+   * @param description.fontStyleName - **Priority 1.** Non-standard font style name used internally by Grida. If provided, this takes highest priority and breaks matching if found.
+   * @param description.fontWeight - **Priority 2.1.** The requested font weight (e.g., 400, 700). Used as secondary priority for matching.
+   * @param description.fontStyleItalic - **Priority 2.2.** Whether the requested font style should be italic. Used as secondary priority for matching.
+   * @param description.fontPostscriptName - The PostScript name of the typeface. Used for static font matching.
+   * @param description.fontInstancePostscriptName - The PostScript name of the font instance. Used for variable font matching.
+   * @param description.fontVariations - Font variation axis values (e.g., { "wght": 400, "wdth": 100 }). Used for variable font matching.
+   *
+   * @returns An object containing the matched font style information, or `null` if no match is found:
+   * - `key`: The complete FontStyleKey with all font style properties
+   * - `face`: The font face data containing axes, instances, and features
+   * - `instance`: The matched font instance (for variable fonts) or `null` (for static fonts)
+   *
+   * @example
+   * ```typescript
+   * // Select by style name (highest priority)
+   * const result = editor.selectFontStyle({
+   *   fontFamily: "Inter",
+   *   fontStyleName: "Bold Italic"
+   * });
+   *
+   * // Select by weight and italic (secondary priority)
+   * const result = editor.selectFontStyle({
+   *   fontFamily: "Inter",
+   *   fontWeight: 700,
+   *   fontStyleItalic: true
+   * });
+   *
+   * // Select variable font by variations
+   * const result = editor.selectFontStyle({
+   *   fontFamily: "Inter",
+   *   fontVariations: { "wght": 500, "wdth": 110 }
+   * });
+   *
+   * // Select static font by PostScript name
+   * const result = editor.selectFontStyle({
+   *   fontFamily: "Inter",
+   *   fontPostscriptName: "Inter-Bold"
+   * });
+   * ```
+   *
+   * **Matching Priority:**
+   * 1. **Style Name** (if provided) - Exact match by `fontStyleName`
+   * 2. **Weight/Italic** (if provided) - Match by `fontWeight` and/or `fontStyleItalic`
+   * 3. **Variable Font Instances** - Match by `fontInstancePostscriptName` or `fontVariations` using strict then loose matching
+   * 4. **Static Font Faces** - Match by `fontPostscriptName`
+   *
+   * **Variable Font Matching:**
+   * - First attempts strict matching (exact coordinate values)
+   * - Falls back to loose matching (best similarity score)
+   * - Uses `fontVariations` and `fontWeight` to build axis values
+   *
+   * **Static Font Matching:**
+   * - Matches by PostScript name
+   * - Creates FontStyleKey from corresponding style in the styles array
+   *
+   * @throws Logs warning if font family is not found in the font cache
+   */
   public selectFontStyle(
     fontFamilySpec: editor.font_spec.UIFontFamily,
     description: Omit<editor.api.FontStyleSelectDescription, "fontFamily">

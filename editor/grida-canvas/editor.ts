@@ -1501,6 +1501,14 @@ export class Editor
     });
   }
 
+  public toggleItalic(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.toggleNodeItalic(node_id);
+    });
+  }
+
   public toggleUnderline(target: "selection" | editor.NodeID = "selection") {
     const target_ids =
       target === "selection" ? this.mstate.selection : [target];
@@ -1651,6 +1659,34 @@ export class Editor
       type: "node/toggle/bold",
       node_id: node_id,
     });
+  }
+  toggleNodeItalic(node_id: string) {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    if (node.type !== "text") return;
+
+    const next_italic = !node.fontStyleItalic;
+    const fontFamily = node.fontFamily;
+    if (!fontFamily) return;
+
+    const match = this.selectFontStyle({
+      fontFamily: fontFamily,
+      fontWeight: node.fontWeight,
+      fontStyleItalic: next_italic,
+    });
+
+    if (!match) {
+      this.log(
+        "toggleNodeItalic: matching font face not found",
+        fontFamily,
+        next_italic,
+        node.fontWeight
+      );
+      return;
+    }
+
+    this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
   }
   toggleNodeUnderline(node_id: string) {
     this.dispatch({

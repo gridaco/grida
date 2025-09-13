@@ -1,28 +1,49 @@
-# Paragraph (Text / Font)
-
 **Core / Modeling**
 
 - [ ] FontDescription
 - [ ] `italic` model
   - [ ] faux italic
     - [ ] DOM `font-synthesis: none;`
+- [x] font-weight
+- [x] font-optical-sizing
+- [x] font-kerning - flag `kern`
+- [x] font-width (font-stretch) - var `wdth`
+- [ ] list elements `<ol>`, `<ul>`
 
 **Core / Painting**
 
 - [x] linemetrics overlay
 - [x] max_lines
-- [x] width `<length>` | `auto`
-- [ ] vertical_align
-- [ ] line height
-- [ ] height mode
-- [ ] height
+- [x] textlayout width `<length>` | `auto`
+- [x] textlayout vertical_align
+- [x] textlayout height
+- [x] `line-height`
+- [x] `letter-spacing`
+- [x] `word-spacing`
+- [ ] `text-indent`
 - [ ] fill
   - [x] solid paint
   - [x] gradient paint
-  - [ ] gradient paint with decoration - see limitation https://github.com/gridaco/grida/issues/416
+  - [ ] shader (gradient/image) paint with decoration - see limitation https://github.com/gridaco/grida/issues/416
+  - [ ] image paint
   - [ ] multiple fills
+- [x] effects
+  - [x] drop shadow
+  - [x] inner shadow
+  - [x] blur
+  - [x] backdrop blur
 - [ ] strokes
-- [ ] RTL
+  - [ ] align
+    - [ ] outside (union)
+      - [x] fast pre-paint (only valid when the fill is non-opaque), but fast
+      - [ ] paint with clip (split the stroke / fill geometry layer)
+    - [ ] center (?)
+    - [ ] inside (?)
+  - [ ] Issues
+    - [ ] https://github.com/gridaco/grida/issues/423
+  - [x] color
+  - [x] linear gradient
+  - [x] radial gradient
 - [ ] decoration
   - [x] text-decoration-style
   - [x] text-decoration-color color
@@ -63,12 +84,21 @@
 **Fallback Model**
 
 - [ ] CJK Fallback
-  - [ ] Korean - Noto Sans KR
-  - [ ] Japanese - Noto Sans JP
-  - [ ] Chinese (bit complicated..) maybe we won't support
+  - [x] implicit fallback (user fallback list)
+  - [x] Korean - Noto Sans KR
+  - [x] Japanese - Noto Sans JP
+  - [x] Chinese SC - Noto Sans SC
+    - [ ] TC / HK - won't support (till level 2)
 - [ ] Fallback model
-  - [ ] Per-glyph fallback
-  - [ ] Per-run fallback
+  - [x] soft fallback. level 1
+  - [ ] `unicode-range` fallback with range control - level 2
+  - [ ] explicit fallback. fallback spec level 3 (not planned)
+    - [ ] Per-glyph fallback
+    - [ ] Per-run fallback
+
+**ICU**
+
+- [ ] RTL
 
 **Ecosystem**
 
@@ -82,19 +112,24 @@
 
 - [ ] flatten -> text -> path (vector network)
 - [ ] link annotation editor preview
+- [ ] textlayout height mode
 - [x] `fvar` / `STAT` table parsing - FontStyle picker
 - [x] variable axes controls
 - [x] font feature controls
 - [x] font style picker
   - [x] `fvar.instances`
-  - [ ] PostScriptNames
-  - [ ] multi typeface (multiple ttf for family)
-- [ ] a11y/toggleItalic
+  - [x] PostScriptNames
+  - [x] multi typeface (multiple ttf for family)
+- [x] a11y/toggleItalic
+- [ ] a11y/togglebold
 
-**`@grida/fonts`**
+**`@grida/fonts` / `fonts (rs)`**
 
 - [x] typr open type table parsing module
-  - [x] support `STAT` table
+  - [ ] support `STAT` table
+  - [ ] `fvar`
+  - [ ] `GSUB`
+  - [ ] `GPOS`
 
 ## References
 
@@ -130,3 +165,30 @@ https://github.com/user-attachments/assets/c1b1ecfa-671e-456a-b9ab-74986725be7f
 **`cg277` OpenType features - `fvar.instances` / text style picker**
 
 https://github.com/user-attachments/assets/afdcd445-4bf1-4910-bb71-48deb8cc4210
+
+**`cg278` OpenType features - `opsz` - Optical sizing, opsz-auto**
+
+https://github.com/user-attachments/assets/dd49666f-d840-4f60-a112-b53600dceb20
+
+**`cg279` Font fallback CJK (KR/JP/SC)**
+
+https://github.com/user-attachments/assets/c39d8a91-0a82-4bee-a150-c5a3e0cba23e
+
+**`cg280` PNG Export**
+https://github.com/gridaco/grida/pull/420
+
+**`cg281` Text Stroke**
+
+https://github.com/user-attachments/assets/a137349a-be11-4f65-8682-06a3dd92f712
+
+**`cg282` fonts.grida.co**
+
+https://github.com/user-attachments/assets/9bcc2e13-91cb-4e5a-9603-473a9acf5ef7
+
+**`cg283` text spacing - line-height / letter-spacing / word-spacing**
+
+https://github.com/user-attachments/assets/f89afb4c-07ac-4817-b5a0-d8c4fc5f10ac
+
+**`cg284` text effects - drop shadow / inner shadow / layer blur / backdrop blur**
+
+https://github.com/user-attachments/assets/8ce395bb-8095-4885-b312-961a6f9cca2b

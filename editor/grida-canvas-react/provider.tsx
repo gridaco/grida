@@ -116,6 +116,7 @@ export function useNodeActions(node_id: string | undefined) {
       toggleLocked: () => instance.toggleNodeLocked(node_id),
       toggleActive: () => instance.toggleNodeActive(node_id),
       toggleBold: () => instance.toggleNodeBold(node_id),
+      toggleItalic: () => instance.toggleNodeItalic(node_id),
       toggleUnderline: () => instance.toggleNodeUnderline(node_id),
       toggleLineThrough: () => instance.toggleNodeLineThrough(node_id),
       component: (component_id: string) =>
