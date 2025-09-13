@@ -135,14 +135,25 @@ export default function nodeTransformReducer(
           _draft.top = cmath.quantize(scaled.y, 1);
         }
 
-        _draft.width = cmath.quantize(Math.max(scaled.width, 0), 1);
+        // For text nodes, use ceil to ensure we don't cut off content
+        if (draft.type === "text") {
+          _draft.width = Math.ceil(Math.max(scaled.width, 0));
+        } else {
+          _draft.width = cmath.quantize(Math.max(scaled.width, 0), 1);
+        }
+
         if (draft.type === "line") {
           _draft.height = 0;
         } else {
           const preserveAutoHeight =
             draft.type === "text" && !heightWasNumber && movement[1] === 0;
           if (!preserveAutoHeight) {
-            _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
+            // For text nodes, use ceil to ensure we don't cut off content
+            if (draft.type === "text") {
+              _draft.height = Math.ceil(Math.max(scaled.height, 0));
+            } else {
+              _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
+            }
           }
         }
 
@@ -160,9 +171,23 @@ export default function nodeTransformReducer(
         if (_draft.bottom) _draft.bottom -= dy;
 
         // size
-        _draft.width = cmath.quantize(Math.max(_draft.width + dx, 0), 1);
-        if (draft.type === "line") _draft.height = 0;
-        else _draft.height = cmath.quantize(Math.max(_draft.height + dy, 0), 1);
+        // For text nodes, use ceil to ensure we don't cut off content
+        if (draft.type === "text") {
+          _draft.width = Math.ceil(Math.max(_draft.width + dx, 0));
+        } else {
+          _draft.width = cmath.quantize(Math.max(_draft.width + dx, 0), 1);
+        }
+
+        if (draft.type === "line") {
+          _draft.height = 0;
+        } else {
+          // For text nodes, use ceil to ensure we don't cut off content
+          if (draft.type === "text") {
+            _draft.height = Math.ceil(Math.max(_draft.height + dy, 0));
+          } else {
+            _draft.height = cmath.quantize(Math.max(_draft.height + dy, 0), 1);
+          }
+        }
       }
     }
   });

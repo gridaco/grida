@@ -771,7 +771,12 @@ function __self_start_gesture_scale(
       direction === "sw"
     ) {
       if (typeof _node.width !== "number") {
-        _node.width = cmath.quantize(rect.width, 1);
+        // For text nodes, use ceil to ensure we don't cut off content
+        if (node.type === "text") {
+          _node.width = Math.ceil(rect.width);
+        } else {
+          _node.width = cmath.quantize(rect.width, 1);
+        }
       }
     }
 
@@ -788,7 +793,12 @@ function __self_start_gesture_scale(
         if (node.type === "line") {
           _node.height = 0;
         } else {
-          _node.height = cmath.quantize(rect.height, 1);
+          // For text nodes, use ceil to ensure we don't cut off content
+          if (node.type === "text") {
+            _node.height = Math.ceil(rect.height);
+          } else {
+            _node.height = cmath.quantize(rect.height, 1);
+          }
         }
       }
     }

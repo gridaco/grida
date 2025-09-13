@@ -1252,36 +1252,44 @@ function LayerOverlayResizeSide({
 }) {
   const editor = useCurrentEditor();
 
-  const bind = useSurfaceGesture({
-    onPointerDown: ({ event }) => {
-      event.preventDefault();
-    },
-    onDragStart: ({ event }) => {
-      event.preventDefault();
-      editor.startScaleGesture(selection, anchor);
-    },
-    onDoubleClick: ({ event }) => {
-      event.preventDefault();
-      event.stopPropagation();
+  const bind = useSurfaceGesture(
+    {
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+      },
+      onDragStart: ({ event }) => {
+        event.preventDefault();
+        editor.startScaleGesture(selection, anchor);
+      },
+      onDoubleClick: ({ event }) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-      // feat: text-node-auto-size
-      if (
-        typeof selection === "string" &&
-        editor.getNodeSnapshotById(selection)?.type === "text"
-      ) {
-        switch (anchor) {
-          case "e":
-          case "w":
-            editor.changeNodeSize(selection, "width", "auto");
-            break;
-          case "n":
-          case "s":
-            editor.changeNodeSize(selection, "height", "auto");
-            break;
+        // feat: text-node-auto-size
+        if (
+          typeof selection === "string" &&
+          editor.getNodeSnapshotById(selection)?.type === "text"
+        ) {
+          switch (anchor) {
+            case "e":
+            case "w":
+              editor.changeNodeSize(selection, "width", "auto");
+              break;
+            case "n":
+            case "s":
+              editor.changeNodeSize(selection, "height", "auto");
+              break;
+          }
         }
-      }
+      },
     },
-  });
+    {
+      drag: {
+        threshold: DRAG_THRESHOLD,
+        keyboardDisplacement: 0,
+      },
+    }
+  );
 
   const offset = thickness / 2;
 
