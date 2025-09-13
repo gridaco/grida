@@ -1658,16 +1658,18 @@ function SectionStrokes({
     stroke_cap: "on" | "off";
   };
 }) {
-  const { stroke, strokeWidth, strokeAlign, strokeCap } = useNodeState(
+  const { stroke, strokeWidth, strokeAlign, strokeCap, type } = useNodeState(
     node_id,
     (node) => ({
       stroke: node.stroke,
       strokeWidth: node.strokeWidth,
       strokeAlign: node.strokeAlign,
       strokeCap: node.strokeCap,
+      type: node.type,
     })
   );
 
+  const is_text_node = type === "text";
   const has_stroke_paint = stroke !== undefined;
   const actions = useNodeActions(node_id)!;
 
@@ -1686,6 +1688,11 @@ function SectionStrokes({
               actions.stroke(value);
               if (!strokeWidth || strokeWidth === 0) {
                 actions.strokeWidth({ type: "set", value: 1 });
+              }
+
+              // set outside as default for text nodes (if none set)
+              if (is_text_node && !strokeAlign) {
+                actions.strokeAlign("outside");
               }
             }}
             onValueRemove={() => {

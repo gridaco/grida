@@ -243,7 +243,8 @@ const safe_properties: Partial<
       node.type === "vector" ||
       node.type === "line" ||
       node.type === "rectangle" ||
-      node.type === "ellipse",
+      node.type === "ellipse" ||
+      node.type === "text",
     apply: (draft, value, prev) => {
       if (value === null) {
         draft.stroke = undefined;
@@ -275,7 +276,8 @@ const safe_properties: Partial<
       node.type === "vector" ||
       node.type === "line" ||
       node.type === "rectangle" ||
-      node.type === "ellipse",
+      node.type === "ellipse" ||
+      node.type === "text",
     apply: (draft, value, prev) => {
       (draft as UN).strokeWidth = ranged(
         0,
@@ -289,7 +291,8 @@ const safe_properties: Partial<
       node.type === "vector" ||
       node.type === "line" ||
       node.type === "rectangle" ||
-      node.type === "ellipse",
+      node.type === "ellipse" ||
+      node.type === "text",
     apply: (draft, value, prev) => {
       (draft as UN).strokeAlign = value;
     },
