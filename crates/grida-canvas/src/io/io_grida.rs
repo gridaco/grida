@@ -1,11 +1,11 @@
 use crate::cg::types::*;
 use crate::cg::varwidth::{VarWidthProfile, WidthStop};
 use crate::io::io_css::{
-    de_css_dimension, default_height_css, default_width_css, CSSDimension, UserAgentAutoTaste,
+    de_css_dimension, default_height_css, default_width_css, CSSDimension, CSSObjectFit,
 };
 use crate::node::schema::*;
 use crate::vectornetwork::*;
-use math2::transform::AffineTransform;
+use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -68,6 +68,13 @@ pub enum JSONPaint {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+    },
+    #[serde(rename = "image")]
+    Image {
+        hash: String,
+        transform: Option<[[f32; 3]; 2]>,
+        #[serde(default)]
+        fit: CSSObjectFit,
     },
 }
 
@@ -199,6 +206,19 @@ impl From<Option<JSONPaint>> for Paint {
                     blend_mode: BlendMode::default(),
                 })
             }
+            Some(JSONPaint::Image {
+                hash,
+                transform,
+                fit,
+            }) => Paint::Image(ImagePaint {
+                hash,
+                transform: transform
+                    .map(|m| AffineTransform { matrix: m })
+                    .unwrap_or_else(AffineTransform::identity),
+                fit: fit.into(),
+                opacity: 1.0,
+                blend_mode: BlendMode::default(),
+            }),
             None => Paint::Solid(SolidPaint {
                 color: CGColor::TRANSPARENT,
                 opacity: 1.0,
@@ -222,6 +242,17 @@ impl From<JSONVarWidthStop> for WidthStop {
         WidthStop {
             u: stop.u,
             r: stop.r,
+        }
+    }
+}
+
+impl From<CSSObjectFit> for BoxFit {
+    fn from(fit: CSSObjectFit) -> Self {
+        match fit {
+            CSSObjectFit::Contain => BoxFit::Contain,
+            CSSObjectFit::Cover => BoxFit::Cover,
+            CSSObjectFit::Fill => BoxFit::None, // Fill maps to None as it's not supported in BoxFit
+            CSSObjectFit::None => BoxFit::None,
         }
     }
 }
@@ -364,6 +395,8 @@ pub enum JSONNode {
     Text(JSONTextNode),
     #[serde(rename = "boolean")]
     BooleanOperation(JSONBooleanOperationNode),
+    #[serde(rename = "image")]
+    Image(JSONImageNode),
     Unknown(JSONUnknownNodeProperties),
 }
 
@@ -534,6 +567,32 @@ impl From<VectorNetwork> for JSONVectorNetwork {
 pub struct JSONLineNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONImageNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+    #[serde(rename = "src")]
+    pub src: JSONImageSrc,
+    #[serde(rename = "fit", default)]
+    pub fit: CSSObjectFit,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum JSONImageSrc {
+    Url(String),
+    Hash { hash: String },
+}
+
+impl JSONImageSrc {
+    fn hash(&self) -> String {
+        match self {
+            JSONImageSrc::Url(url) => extract_image_hash(url),
+            JSONImageSrc::Hash { hash } => hash.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -864,6 +923,74 @@ impl From<JSONRectangleNode> for Node {
     }
 }
 
+impl From<JSONImageNode> for Node {
+    fn from(node: JSONImageNode) -> Self {
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
+            node.base.rotation,
+        );
+
+        let hash = node.src.hash();
+
+        let fill = match node.base.fill {
+            Some(JSONPaint::Image {
+                hash: h,
+                transform: t,
+                fit,
+            }) => ImagePaint {
+                hash: if h.is_empty() { hash.clone() } else { h },
+                transform: t
+                    .map(|m| AffineTransform { matrix: m })
+                    .unwrap_or_else(AffineTransform::identity),
+                fit: fit.into(),
+                opacity: 1.0,
+                blend_mode: BlendMode::default(),
+            },
+            _ => ImagePaint {
+                hash: hash.clone(),
+                transform: AffineTransform::identity(),
+                fit: node.fit.into(),
+                opacity: 1.0,
+                blend_mode: BlendMode::default(),
+            },
+        };
+
+        Node::Image(ImageNodeRec {
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
+            transform,
+            size: Size {
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
+            },
+            corner_radius: merge_corner_radius(
+                node.base.corner_radius,
+                node.base.corner_radius_top_left,
+                node.base.corner_radius_top_right,
+                node.base.corner_radius_bottom_right,
+                node.base.corner_radius_bottom_left,
+            ),
+            fill: fill.clone(),
+            stroke: node.base.stroke.into(),
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+            hash: fill.hash,
+        })
+    }
+}
+
 impl From<JSONRegularPolygonNode> for Node {
     fn from(node: JSONRegularPolygonNode) -> Self {
         let transform = AffineTransform::from_box_center(
@@ -1101,6 +1228,7 @@ impl From<JSONNode> for Node {
             JSONNode::RegularStarPolygon(rsp) => rsp.into(),
             JSONNode::Line(line) => line.into(),
             JSONNode::BooleanOperation(boolean) => boolean.into(),
+            JSONNode::Image(image) => image.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNodeRec {
                 id: unknown.id,
                 name: unknown.name,
@@ -1212,6 +1340,10 @@ fn merge_effects(
         }
     }
     effects
+}
+
+fn extract_image_hash(src: &str) -> String {
+    src.split('/').last().unwrap_or(src).to_string()
 }
 
 #[cfg(test)]

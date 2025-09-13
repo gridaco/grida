@@ -92,7 +92,7 @@ export class Editor
 
   readonly viewport: domapi.DOMViewportApi;
 
-  private _m_wasm_canva_scene: Scene | null = null;
+  private _m_wasm_canvas_scene: Scene | null = null;
 
   _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
   get geometry() {
@@ -293,7 +293,7 @@ export class Editor
   public bind(surface: Scene) {
     this.log("bind surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");
-    this._m_wasm_canva_scene = surface;
+    this._m_wasm_canvas_scene = surface;
     //
     this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
       this,
@@ -584,9 +584,49 @@ export class Editor
     });
   }
 
+  private readonly images = new Map<string, grida.program.document.ImageRef>();
+  private async _experimental_createImage_for_wasm(
+    src: string
+  ): Promise<Readonly<grida.program.document.ImageRef>> {
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const type = blob.type;
+
+    const { width, height } = await new Promise<{
+      width: number;
+      height: number;
+    }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = reject;
+      img.src = src;
+    });
+
+    const hash = this._m_wasm_canvas_scene.addImage(bytes);
+    const url = `res://images/${hash}`;
+
+    const ref: grida.program.document.ImageRef = {
+      url,
+      width,
+      height,
+      bytes: bytes.byteLength,
+      type: type as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+    };
+
+    this.images.set(url, ref);
+
+    return ref;
+  }
+
   async createImage(
     src: string
   ): Promise<Readonly<grida.program.document.ImageRef>> {
+    if (this.backend === "canvas" && this._m_wasm_canvas_scene) {
+      return this._experimental_createImage_for_wasm(src);
+    }
+
     const res = await fetch(src);
     const blob = await res.blob();
     const bytes = await blob.arrayBuffer();

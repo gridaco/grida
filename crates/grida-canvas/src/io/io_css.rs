@@ -144,6 +144,27 @@ impl UserAgentAutoTaste for CSSFontKerning {
     }
 }
 
+#[derive(Debug, PartialEq, Deserialize)]
+pub enum CSSObjectFit {
+    #[serde(rename = "cover")]
+    Cover,
+    #[serde(rename = "contain")]
+    Contain,
+    #[serde(rename = "fill")]
+    Fill,
+    #[serde(rename = "none")]
+    None,
+    // not supported
+    // #[serde(rename = "scale-down")]
+    // ScaleDown,
+}
+
+impl Default for CSSObjectFit {
+    fn default() -> Self {
+        CSSObjectFit::Contain
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
