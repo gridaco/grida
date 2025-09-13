@@ -2003,7 +2003,11 @@ export namespace editor.api {
       node_id: NodeID,
       rotation: editor.api.NumberChange
     ): void;
-    changeTextNodeFontFamily(node_id: NodeID, fontFamily: string): void;
+    changeTextNodeFontFamilySync(
+      node_id: NodeID,
+      fontFamily: string,
+      force?: boolean
+    ): Promise<boolean>;
     changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
     changeTextNodeFontKerning(node_id: NodeID, fontKerning: boolean): void;
     changeTextNodeFontWidth(node_id: NodeID, fontWidth: number): void;
@@ -2617,7 +2621,7 @@ export namespace editor.api {
     /**
      * Loads the font so that the backend can render it
      */
-    loadFont(font: { family: string }): Promise<void>;
+    loadFontSync(font: { family: string }): Promise<void>;
 
     /**
      * Lists fonts currently loaded and available to the renderer.
@@ -2632,7 +2636,7 @@ export namespace editor.api {
     /**
      * Retrieves font metadata, variation axes and features.
      */
-    getFontDetails(
+    getFontFamilyDetailsSync(
       fontFamily: string
     ): Promise<editor.font_spec.UIFontFamily | null>;
   }

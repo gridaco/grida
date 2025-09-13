@@ -49,7 +49,7 @@ function useFontDetails(fontFamily: string) {
   React.useEffect(() => {
     setFont(null);
     editor
-      .getFontDetails(fontFamily)
+      .getFontFamilyDetailsSync(fontFamily)
       .then((detail) => {
         setFont(detail);
       })

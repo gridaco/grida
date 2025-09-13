@@ -123,12 +123,12 @@ export class Editor
 
   _m_font_collection: editor.api.IDocumentFontCollectionInterfaceProvider | null =
     null;
-  private get fontCollection() {
+  public get fontCollection() {
     return this._m_font_collection;
   }
 
   _m_font_parser: editor.api.IDocumentFontParserInterfaceProvider | null = null;
-  private get fontParser() {
+  public get fontParser() {
     return this._m_font_parser;
   }
 
@@ -444,7 +444,7 @@ export class Editor
       ...payload,
     });
     for (const font of this.mstate.fontfaces) {
-      this.loadFont(font);
+      this.loadFontSync(font);
     }
   }
 
@@ -2048,14 +2048,50 @@ export class Editor
     });
   }
   // text style
-  changeTextNodeFontFamily(node_id: string, fontFamily: string | undefined) {
-    this.dispatch({
-      type: "node/change/fontFamily",
-      node_id: node_id,
-      fontFamily,
-    });
-    if (fontFamily) {
-      void this.loadFont({ family: fontFamily });
+  async changeTextNodeFontFamilySync(
+    node_id: string,
+    fontFamily: string,
+    force = true
+  ) {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    assert(node, "node is not found");
+    assert(node.type === "text", "node is not a text node");
+
+    // load the font family & prepare
+    await this.loadFontSync({ family: fontFamily });
+    const ready = await this.getFontFamilyDetailsSync(fontFamily);
+
+    if (!ready) {
+      this.log(
+        "tried to change font family, but the font could not be parsed correctly",
+        fontFamily
+      );
+      return false;
+    }
+
+    const description: editor.api.FontStyleSelectDescription = { fontFamily };
+
+    if (!force) {
+      // when not force, try to keep the previous (current) font style
+      description.fontWeight = node.fontWeight;
+      description.fontStyleItalic = node.fontStyleItalic;
+      description.fontVariations = node.fontVariations;
+    }
+
+    const match = this.selectFontStyle(description);
+
+    if (match) {
+      this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
+      return true;
+    } else {
+      this.log(
+        "tried to change font family, but matching font face not found",
+        fontFamily,
+        description
+      );
+      return false;
     }
   }
   changeTextNodeFontWeight(node_id: string, fontWeight: cg.NFontWeight) {
@@ -3074,12 +3110,7 @@ export class Editor
 
   // #region IFontLoaderActions implementation
 
-  private __font_details_cache = new Map<
-    string,
-    editor.font_spec.UIFontFamily
-  >();
-
-  async loadFont(font: { family: string }): Promise<void> {
+  async loadFontSync(font: { family: string }): Promise<void> {
     if (!this.fontCollection) return;
     await this.fontCollection.loadFont(font);
   }
@@ -3096,7 +3127,7 @@ export class Editor
     );
 
     if (this.fontCollection) {
-      void Promise.all(fonts.map((family) => this.loadFont({ family })));
+      void Promise.all(fonts.map((family) => this.loadFontSync({ family })));
       void this.fontCollection.setFallbackFonts(fonts);
     }
   }
@@ -3113,48 +3144,10 @@ export class Editor
    * face is available. This method fetches all font files first and then runs
    * analysis to avoid progressive parsing.
    */
-  async getFontDetails(
+  async getFontFamilyDetailsSync(
     fontFamily: string
   ): Promise<editor.font_spec.UIFontFamily | null> {
-    if (this.__font_details_cache.has(fontFamily)) {
-      return this.__font_details_cache.get(fontFamily)!;
-    }
-
-    const item = this.getFontItem(fontFamily);
-    if (!item) return null;
-
-    const files = Object.entries(item.files);
-
-    // Load all font buffers non-progressively
-    const buffers = await Promise.all(
-      files.map(([, url]) => fetch(url).then((r) => r.arrayBuffer()))
-    );
-
-    const familydata = await this.fontParser?.parseFamily(
-      fontFamily,
-      buffers.map((buffer, index) => ({
-        faceId: files[index][0],
-        data: buffer,
-        userFontStyleItalic: item.files[files[index][0]]
-          .toLowerCase()
-          .includes("italic"),
-      }))
-    );
-
-    if (!familydata) return null;
-
-    const final: editor.font_spec.UIFontFamily = {
-      ...familydata,
-      family: fontFamily,
-      axes: item.axes?.map((axis) => ({
-        ...axis,
-        min: axis.start,
-        max: axis.end,
-      })),
-    };
-
-    this.__font_details_cache.set(fontFamily, final);
-    return final;
+    return this._fontManager.parseFontFamily(fontFamily);
   }
 
   public selectFontStyle(description: editor.api.FontStyleSelectDescription): {
@@ -3162,15 +3155,7 @@ export class Editor
     face: editor.font_spec.UIFontFaceData;
     instance: editor.font_spec.UIFontFaceInstance | null;
   } | null {
-    // 0. match family
-    const fontFamily = description.fontFamily;
-    const font = this.__font_details_cache.get(fontFamily);
-    if (!font) {
-      this.log("font family not found", fontFamily);
-      return null;
-    }
-
-    return this._fontManager.selectFontStyle(font, description);
+    return this._fontManager.selectFontStyle(description);
   }
 
   // #endregion IFontLoaderActions implementation

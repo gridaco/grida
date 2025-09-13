@@ -118,12 +118,12 @@ export function useMixedProperties(ids: string[]) {
   );
 
   const fontFamily = useCallback(
-    (value: string) => {
+    (value: string, force?: boolean) => {
       mixedProperties.fontFamily?.ids.forEach((id) => {
-        instance.changeTextNodeFontFamily(id, value);
+        instance.changeTextNodeFontFamilySync(id, value, force);
       });
     },
-    [mixedProperties.fontFamily?.ids, instance.changeTextNodeFontFamily]
+    [mixedProperties.fontFamily?.ids, instance.changeTextNodeFontFamilySync]
   );
 
   const fontWeight = useCallback(

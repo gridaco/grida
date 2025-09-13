@@ -183,8 +183,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeNodeSize(node_id, "height", value),
 
       // text style
-      fontFamily: (value: string) =>
-        instance.changeTextNodeFontFamily(node_id, value),
+      fontFamily: (value: string, force?: boolean) =>
+        instance.changeTextNodeFontFamilySync(node_id, value, force),
       fontWeight: (value: cg.NFontWeight) =>
         instance.changeTextNodeFontWeight(node_id, value),
       fontKerning: (value: boolean) =>

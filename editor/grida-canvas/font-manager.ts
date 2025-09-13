@@ -6,6 +6,11 @@ import { editor } from ".";
  * using the bound font loader.
  */
 export class DocumentFontManager {
+  private __font_details_cache = new Map<
+    string,
+    editor.font_spec.UIFontFamily
+  >();
+
   constructor(private editor: Editor) {
     // watch for font registry changes
     this.editor.subscribeWithSelector(
@@ -20,8 +25,57 @@ export class DocumentFontManager {
     const loaded = new Set(this.editor.listLoadedFonts());
     for (const { family } of keys) {
       if (loaded.has(family)) continue;
-      void this.editor.loadFont({ family });
+      void this.editor.loadFontSync({ family });
     }
+  }
+
+  /**
+   * Loads all font faces for a given family and extracts details once every
+   * face is available. This method fetches all font files first and then runs
+   * analysis to avoid progressive parsing.
+   */
+  async parseFontFamily(
+    fontFamily: string
+  ): Promise<editor.font_spec.UIFontFamily | null> {
+    if (this.__font_details_cache.has(fontFamily)) {
+      return this.__font_details_cache.get(fontFamily)!;
+    }
+
+    const item = this.editor.getFontItem(fontFamily);
+    if (!item) return null;
+
+    const files = Object.entries(item.files);
+
+    // Load all font buffers non-progressively
+    const buffers = await Promise.all(
+      files.map(([, url]) => fetch(url).then((r) => r.arrayBuffer()))
+    );
+
+    const familydata = await this.editor.fontParser?.parseFamily(
+      fontFamily,
+      buffers.map((buffer, index) => ({
+        faceId: files[index][0],
+        data: buffer,
+        userFontStyleItalic: item.files[files[index][0]]
+          .toLowerCase()
+          .includes("italic"),
+      }))
+    );
+
+    if (!familydata) return null;
+
+    const final: editor.font_spec.UIFontFamily = {
+      ...familydata,
+      family: fontFamily,
+      axes: item.axes?.map((axis) => ({
+        ...axis,
+        min: axis.start,
+        max: axis.end,
+      })),
+    };
+
+    this.__font_details_cache.set(fontFamily, final);
+    return final;
   }
 
   /**
@@ -31,7 +85,6 @@ export class DocumentFontManager {
    * static and variable fonts. It uses a priority-based matching system to find the
    * most appropriate font style based on the provided criteria.
    *
-   * @param fontFamilySpec - the analyzed font family spec
    * @param description - The font style selection criteria
    * @param description.fontFamily - **Required.** The font family name to select from (e.g., "Inter", "Noto Sans")
    * @param description.fontStyleName - **Priority 1.** Non-standard font style name used internally by Grida. If provided, this takes highest priority and breaks matching if found.
@@ -91,22 +144,25 @@ export class DocumentFontManager {
    *
    * @throws Logs warning if font family is not found in the font cache
    */
-  public selectFontStyle(
-    fontFamilySpec: editor.font_spec.UIFontFamily,
-    description: Omit<editor.api.FontStyleSelectDescription, "fontFamily">
-  ): {
+  public selectFontStyle(description: editor.api.FontStyleSelectDescription): {
     key: editor.font_spec.FontStyleKey;
     face: editor.font_spec.UIFontFaceData;
     instance: editor.font_spec.UIFontFaceInstance | null;
   } | null {
     // 0. match family
+    const font = this.__font_details_cache.get(description.fontFamily);
+    if (!font) {
+      return null;
+    }
 
-    const font = fontFamilySpec;
     const fontFamily = font.family;
-
+    const styles = font.styles;
     const instances = font.faces.flatMap((face) => face.instances);
     const is_vf = instances.length > 0;
-    const styles = font.styles;
+
+    if (styles.length === 0) {
+      return null;
+    }
 
     const currAxesValues = Object.assign({}, description.fontVariations || {}, {
       wght: description.fontWeight,
@@ -280,7 +336,15 @@ export class DocumentFontManager {
       }
     }
 
-    return null;
+    // final fallback - pick the first style
+    const firstStyle = styles[0];
+    const face = font.faces.find(
+      (face) => face.postscriptName === firstStyle.fontPostscriptName
+    )!;
+    const instance = instances.find(
+      (instance) => instance.name === firstStyle.fontStyleName
+    );
+    return { key: firstStyle, face, instance: instance ?? null };
   }
 
   /**
