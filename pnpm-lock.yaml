@@ -1229,9 +1229,6 @@ importers:
       '@use-gesture/react':
         specifier: ^10
         version: 10.3.1(react@19.0.0)
-      react-dom:
-        specifier: ^18.0.0 || ^19.0.0
-        version: 19.0.0(react@19.0.0)
     devDependencies:
       '@types/react':
         specifier: 19.1.3
