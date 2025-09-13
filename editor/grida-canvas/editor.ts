@@ -18,8 +18,8 @@ import { EditorFollowPlugin } from "./plugins/follow";
 import type { Scene } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
 import * as google from "@grida/fonts/google";
-import type { FvarAxes, FvarInstance, FontFeature } from "@grida/fonts/parse";
-import { FontParserWorker } from "@grida/fonts/parser/worker";
+import type { FvarInstance } from "@grida/fonts/parse";
+
 import { DocumentFontManager } from "./font-manager";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
@@ -28,6 +28,7 @@ import {
   CanvasWasmSVGExportInterfaceProvider,
   CanvasWasmVectorInterfaceProvider,
   CanvasWasmFontManagerAgentInterfaceProvider,
+  CanvasWasmFontParserInterfaceProvider,
 } from "./backends/wasm";
 
 function resolveNumberChangeValue(
@@ -120,18 +121,18 @@ export class Editor
     return this._m_vector;
   }
 
-  _m_font_loader: editor.api.IDocumentFontManagerAgentInterfaceProvider | null =
+  _m_font_collection: editor.api.IDocumentFontCollectionInterfaceProvider | null =
     null;
-  private get fontLoader() {
-    return this._m_font_loader;
+  private get fontCollection() {
+    return this._m_font_collection;
+  }
+
+  _m_font_parser: editor.api.IDocumentFontParserInterfaceProvider | null = null;
+  private get fontParser() {
+    return this._m_font_parser;
   }
 
   private readonly _fontManager: DocumentFontManager;
-
-  private fontParserWorker: FontParserWorker | null = null;
-  private getParserWorker() {
-    return (this.fontParserWorker ??= new FontParserWorker());
-  }
 
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
@@ -163,7 +164,8 @@ export class Editor
       export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
       export_as_svg?: WithEditorInstance<editor.api.IDocumentSVGExportInterfaceProvider>;
       vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
-      fonts?: WithEditorInstance<editor.api.IDocumentFontManagerAgentInterfaceProvider>;
+      font_collection?: WithEditorInstance<editor.api.IDocumentFontCollectionInterfaceProvider>;
+      font_parser?: WithEditorInstance<editor.api.IDocumentFontParserInterfaceProvider>;
     };
   }) {
     this.backend = backend;
@@ -199,8 +201,18 @@ export class Editor
       this._m_vector = resolveWithEditorInstance(this, plugins.vector);
     }
 
-    if (plugins?.fonts) {
-      this._m_font_loader = resolveWithEditorInstance(this, plugins.fonts);
+    if (plugins?.font_collection) {
+      this._m_font_collection = resolveWithEditorInstance(
+        this,
+        plugins.font_collection
+      );
+    }
+
+    if (plugins?.font_parser) {
+      this._m_font_parser = resolveWithEditorInstance(
+        this,
+        plugins.font_parser
+      );
     }
 
     this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
@@ -317,7 +329,12 @@ export class Editor
 
     this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
 
-    this._m_font_loader = new CanvasWasmFontManagerAgentInterfaceProvider(
+    this._m_font_collection = new CanvasWasmFontManagerAgentInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._m_font_parser = new CanvasWasmFontParserInterfaceProvider(
       this,
       surface
     );
@@ -426,7 +443,7 @@ export class Editor
       type: "insert",
       ...payload,
     });
-    for (const font of this.mstate.fontdescriptions) {
+    for (const font of this.mstate.fontfaces) {
       this.loadFont(font);
     }
   }
@@ -2011,13 +2028,12 @@ export class Editor
     node_id: string,
     fontStyleDescription: editor.api.FontStyleChangeDescription
   ) {
-    const { fontFamily, fontPostscriptName } = fontStyleDescription;
+    const { fontStyleKey } = fontStyleDescription;
 
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextNode;
 
-    const prev_family = node.fontFamily;
     const prev: grida.program.nodes.i.IFontStyle = {
       fontPostscriptName: node.fontPostscriptName,
       fontWeight: node.fontWeight,
@@ -2030,19 +2046,25 @@ export class Editor
       fontStyleItalic: node.fontStyleItalic,
     };
 
-    const match = this.matchFontFace(fontFamily, {
-      fontPostscriptName,
+    const description = {
+      fontFamily: fontStyleKey.fontFamily,
+      fontInstancePostscriptName: fontStyleKey.fontInstancePostscriptName,
       fontWeight: prev.fontWeight,
       fontVariations: prev.fontVariations,
-    });
+    } satisfies editor.api.FontStyleSelectDescription;
+    const match = this.selectFontStyle(description);
 
     // reject
     if (!match) {
-      this.log("matching font face not found", fontFamily, fontPostscriptName);
+      this.log(
+        "matching font face not found",
+        fontStyleKey.fontFamily,
+        description
+      );
       return;
     }
 
-    const next_family = fontFamily;
+    const next_family = fontStyleKey.fontFamily;
     const next: grida.program.nodes.i.IFontStyle = {
       ...prev,
       fontPostscriptName:
@@ -2050,17 +2072,19 @@ export class Editor
       // ----
       // [high level variables]
       fontWeight: match.instance?.coordinates?.wght ?? prev.fontWeight,
+      fontWidth: match.instance?.coordinates?.wdth ?? prev.fontWidth,
       // TODO: should prevent optical sizing auto => fixed
       // (if the next value === auto's expected value && prev value is auto, keep auto) => the change style does not change the size, so the logic can be even simpler.
       fontOpticalSizing:
         match.instance?.coordinates?.opsz ?? prev.fontOpticalSizing,
-      fontWidth: match.instance?.coordinates?.wdth ?? prev.fontWidth,
       // ----
       fontVariations: match.instance?.coordinates,
       // TODO: clean the invalid features by face change.
       // fontFeatures: match.features,
       fontStyleItalic: match.face.italic,
     } as const;
+
+    console.log("next", next, match, fontStyleDescription);
 
     this.dispatch({
       type: "node/change/fontFamily",
@@ -2972,16 +2996,20 @@ export class Editor
 
   // #region IFontLoaderActions implementation
 
-  private __font_details_cache = new Map<string, editor.font.UIFontFamily>();
+  private __font_details_cache = new Map<
+    string,
+    editor.font_spec.UIFontFamily
+  >();
 
   async loadFont(font: { family: string }): Promise<void> {
-    if (!this.fontLoader) return;
-    await this.fontLoader.loadFont(font);
+    if (!this.fontCollection) return;
+    await this.fontCollection.loadFont(font);
   }
 
+  // FIXME: return typeface description
   listLoadedFonts(): string[] {
-    if (!this.fontLoader) return [];
-    return this.fontLoader.listLoadedFonts();
+    if (!this.fontCollection) return [];
+    return this.fontCollection.listLoadedFonts();
   }
 
   async loadPlatformDefaultFonts(): Promise<void> {
@@ -2989,9 +3017,9 @@ export class Editor
       editor.config.fonts.DEFAULT_FONT_FALLBACK_SET
     );
 
-    if (this.fontLoader) {
+    if (this.fontCollection) {
       void Promise.all(fonts.map((family) => this.loadFont({ family })));
-      void this.fontLoader.setFallbackFonts(fonts);
+      void this.fontCollection.setFallbackFonts(fonts);
     }
   }
 
@@ -3009,7 +3037,7 @@ export class Editor
    */
   async getFontDetails(
     fontFamily: string
-  ): Promise<editor.font.UIFontFamily | null> {
+  ): Promise<editor.font_spec.UIFontFamily | null> {
     if (this.__font_details_cache.has(fontFamily)) {
       return this.__font_details_cache.get(fontFamily)!;
     }
@@ -3024,83 +3052,130 @@ export class Editor
       files.map(([, url]) => fetch(url).then((r) => r.arrayBuffer()))
     );
 
-    // Parse each buffer once all fonts are loaded
-    const parsed = await Promise.all(
-      buffers.map((buf) => this.getParserWorker().details(buf))
+    const familydata = await this.fontParser?.parseFamily(
+      fontFamily,
+      buffers.map((buffer, index) => ({
+        faceId: files[index][0],
+        data: buffer,
+        userFontStyleItalic: item.files[files[index][0]]
+          .toLowerCase()
+          .includes("italic"),
+      }))
     );
 
-    const faces: editor.font.UIFontData[] = parsed.map(
-      ({ fvar, features, postscriptName }, i) => {
-        fvar.axes;
-        // TODO: will be removed
-        const variant = files[i][0];
-        const italic = variant.toLowerCase().includes("italic");
-        return {
-          italic,
-          postscriptName: postscriptName ?? "",
-          axes: fvar.axes,
-          instances: fvar.instances,
-          features,
-        } satisfies editor.font.UIFontData;
-      }
-    );
+    if (!familydata) return null;
 
-    const detail: editor.font.UIFontFamily = {
+    const final: editor.font_spec.UIFontFamily = {
+      ...familydata,
       family: fontFamily,
       axes: item.axes?.map((axis) => ({
-        tag: axis.tag,
+        ...axis,
         min: axis.start,
         max: axis.end,
       })),
-      types: faces,
-      styles: editor.font.mapStyles(faces),
-    } satisfies editor.font.UIFontFamily;
-    this.__font_details_cache.set(fontFamily, detail);
-    return detail;
+    };
+
+    this.__font_details_cache.set(fontFamily, final);
+    return final;
   }
 
-  public matchFontFace(
-    fontFamily: string,
-    description: {
-      fontPostscriptName?: string;
-      fontWeight?: number;
-      fontVariations?: Record<string, number>;
-    }
-  ): { face: editor.font.UIFontData; instance: FvarInstance | null } | null {
+  public selectFontStyle(description: editor.api.FontStyleSelectDescription): {
+    key: editor.font_spec.FontStyleKey;
+    face: editor.font_spec.UIFontFaceData;
+    instance: editor.font_spec.UIFontFaceInstance | null;
+  } | null {
     // 1. match family
-    const font = this.__font_details_cache.get(fontFamily);
+    const font = this.__font_details_cache.get(description.fontFamily);
     if (!font) {
-      this.log("font not found", fontFamily);
+      this.log("font family not found", description.fontFamily);
       return null;
     }
 
-    // check if vf
+    const instances = font.faces.flatMap((face) => face.instances);
+    const styles = font.styles;
+
+    const currAxesValues = Object.assign({}, description.fontVariations || {}, {
+      wght: description.fontWeight,
+    });
+
+    // 2. match with style name (highest priority)
+    if (description.fontStyleName) {
+      const matched_by_style = styles.find(
+        (style) => style.fontStyleName === description.fontStyleName
+      );
+      if (matched_by_style) {
+        // resolve the face where this style is originated from
+        const face = font.faces.find(
+          (face) => face.postscriptName === matched_by_style.fontPostscriptName
+        );
+
+        const instance = instances.find(
+          (instance) =>
+            instance.postscriptName ===
+            matched_by_style.fontInstancePostscriptName
+        );
+
+        if (face) {
+          return {
+            key: matched_by_style,
+            face: face,
+            instance: instance ?? null,
+          };
+        }
+      }
+    }
+
+    // check if variable font
     const is_vf = font.axes !== undefined;
 
     if (is_vf) {
-      // 2. match with fvar.instances (need to flatten first, so we can pick the best one "per family", not "per face")
-      const instances = font.types.flatMap((face) => face.instances);
-      const matched_by_instance = editor.font.matchFvarInstance(instances, {
-        postscriptName: description.fontPostscriptName,
-        axesValues: description.fontVariations ?? {},
-      });
+      // 3. match with fvar.instances (for variable fonts)
+      const matched_by_instance = editor.font_spec.matchFvarInstance(
+        instances,
+        {
+          fontInstancePostscriptName: description.fontInstancePostscriptName,
+          axesValues: currAxesValues,
+        }
+      );
 
       if (matched_by_instance) {
         // locate the original face
-        const face = font.types.find((face) =>
+        const face = font.faces.find((face) =>
           face.instances.some(
             (instance) =>
               instance.postscriptName === matched_by_instance.postscriptName
           )
-        )!;
-
-        return { face, instance: matched_by_instance };
+        );
+        if (face) {
+          // Create a FontStyleKey for the matched instance
+          const key: editor.font_spec.FontStyleKey = {
+            fontFamily: description.fontFamily,
+            fontStyleName: matched_by_instance.name || "Unknown",
+            fontPostscriptName: face.postscriptName,
+            fontInstancePostscriptName: matched_by_instance.postscriptName,
+          };
+          return { key, face, instance: matched_by_instance };
+        }
       }
     } else {
-      // 3. match with static postscriptName
-      for (const face of font.types) {
-        if (face.postscriptName === description.fontPostscriptName) {
-          return { face, instance: null };
+      // 4. match with static postscriptName (for static fonts)
+      if (description.fontPostscriptName) {
+        const face = font.faces.find(
+          (face) => face.postscriptName === description.fontPostscriptName
+        );
+        if (face) {
+          // Create a FontStyleKey for the matched face
+          // For static fonts, we need to find the corresponding style from the styles array
+          const correspondingStyle = styles.find(
+            (style) => style.fontPostscriptName === face.postscriptName
+          );
+          const key: editor.font_spec.FontStyleKey = {
+            fontFamily: description.fontFamily,
+            fontStyleName: correspondingStyle?.fontStyleName || "Regular",
+            fontPostscriptName: face.postscriptName,
+            fontInstancePostscriptName: null,
+          };
+          return { key, face, instance: null };
         }
       }
     }
@@ -3146,6 +3221,13 @@ export class Editor
     throw new Error("Not implemented");
   }
   // #endregion IExportPluginActions implementation
+
+  /**
+   * Dispose editor instance and cleanup resources
+   */
+  dispose() {
+    this.listeners.clear();
+  }
 }
 
 export class NodeProxy<T extends grida.program.nodes.Node> {

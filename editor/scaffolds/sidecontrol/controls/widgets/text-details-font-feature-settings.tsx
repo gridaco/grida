@@ -7,8 +7,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type cg from "@grida/cg";
-import type { FontFeature } from "@grida/fonts/parse";
 import { Label } from "@/components/ui/label";
+import { editor } from "@/grida-canvas";
 
 // Number-related OpenType features
 const NUMBER_FEATURES = [
@@ -43,14 +43,16 @@ type LetterCaseFeature = (typeof LETTER_CASE_FEATURES)[number];
 type HorizontalSpacingFeature = (typeof HORIZONTAL_SPACING_FEATURES)[number];
 
 interface GroupedFeatures {
-  ssxx: FontFeature[];
-  numbers: FontFeature[];
-  letterCase: FontFeature[];
-  horizontal_spacing: FontFeature[];
-  other: FontFeature[];
+  ssxx: editor.font_spec.UIFontFaceFeature[];
+  numbers: editor.font_spec.UIFontFaceFeature[];
+  letterCase: editor.font_spec.UIFontFaceFeature[];
+  horizontal_spacing: editor.font_spec.UIFontFaceFeature[];
+  other: editor.font_spec.UIFontFaceFeature[];
 }
 
-function groupFeatures(features: FontFeature[]): GroupedFeatures {
+function groupFeatures(
+  features: editor.font_spec.UIFontFaceFeature[]
+): GroupedFeatures {
   const ssxx = features.filter(
     (feature) => feature.tag.startsWith("ss") && /^ss\d{1,2}$/.test(feature.tag)
   );
@@ -91,7 +93,7 @@ function groupFeatures(features: FontFeature[]): GroupedFeatures {
 }
 
 interface FontFeatureToggleProps {
-  feature: FontFeature;
+  feature: editor.font_spec.UIFontFaceFeature;
   enabled: boolean;
   onFeatureToggleChange?: (feature: cg.OpenTypeFeature, value: boolean) => void;
   onFeatureHover: (feature: cg.OpenTypeFeature, value?: "0" | "1") => void;
@@ -107,7 +109,7 @@ function FontFeatureToggle({
 }: FontFeatureToggleProps) {
   const tag = feature.tag as cg.OpenTypeFeature;
   const label = feature.name || tag;
-  const sampleText = feature.sampleText;
+  const sampleText = feature.glyphs?.join(" ");
   const featureToggleOptions = [
     {
       value: "0",
@@ -165,7 +167,7 @@ function FontFeatureToggle({
 
 interface FontFeatureSectionProps {
   title?: string;
-  features: FontFeature[];
+  features: editor.font_spec.UIFontFaceFeature[];
   fontFeatures: Partial<Record<cg.OpenTypeFeature, boolean>>;
   onFeatureToggleChange?: (feature: cg.OpenTypeFeature, value: boolean) => void;
   onFeatureHover: (feature: cg.OpenTypeFeature, value?: "0" | "1") => void;
@@ -212,7 +214,7 @@ function FontFeatureSection({
 }
 
 interface FontFeatureSettingsProps {
-  features: FontFeature[];
+  features: editor.font_spec.UIFontFaceFeature[];
   fontFeatures: Partial<Record<cg.OpenTypeFeature, boolean>>;
   onFeatureToggleChange?: (feature: cg.OpenTypeFeature, value: boolean) => void;
   onFeatureHover: (feature: cg.OpenTypeFeature, value?: "0" | "1") => void;

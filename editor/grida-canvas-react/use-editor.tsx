@@ -10,6 +10,7 @@ import {
   DOMImageExportInterfaceProvider,
   DOMFontManagerAgentInterfaceProvider,
   NoopGeometryQueryInterfaceProvider,
+  DOMFontParserInterfaceProvider,
 } from "@/grida-canvas/backends";
 
 const __DEFAULT_STATE: editor.state.IEditorStateInit = {
@@ -46,7 +47,8 @@ export function useEditor(
           initialState: init ?? __DEFAULT_STATE,
           plugins: {
             export_as_image: (_) => new DOMImageExportInterfaceProvider(_),
-            fonts: (_) => new DOMFontManagerAgentInterfaceProvider(_),
+            font_collection: (_) => new DOMFontManagerAgentInterfaceProvider(_),
+            font_parser: (_) => new DOMFontParserInterfaceProvider(_),
           },
         });
       }
@@ -61,6 +63,12 @@ export function useEditor(
       }
     }
   });
+
+  React.useEffect(() => {
+    return () => {
+      _editor?.dispose?.();
+    };
+  }, [_editor]);
 
   const editor = useSyncExternalStore<Editor>(
     _editor.subscribe.bind(_editor),

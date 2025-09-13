@@ -1,14 +1,18 @@
 import React, { useMemo } from "react";
 import { PropertyEnum, EnumItem } from "../ui";
 import { useCurrentFontFamily } from "./context/font";
+import { editor } from "@/grida-canvas";
 
 function placeholder(description?: {
   fontVariations?: Record<string, number>;
   fontWeight?: number;
 }) {
-  return Object.entries(description?.fontVariations || {})
+  const weight = description?.fontWeight ? `${description.fontWeight} ` : "";
+  const more = Object.entries(description?.fontVariations || {})
     .map(([axis, value]) => `${axis}: ${value}`)
     .join(", ");
+
+  return `${weight}${more}`;
 }
 
 /**
@@ -36,17 +40,17 @@ function placeholder(description?: {
 export function FontStyleControl({
   onValueChange,
 }: {
-  onValueChange?: (postscriptName: string) => void;
+  onValueChange?: (key: editor.font_spec.FontStyleKey) => void;
 }) {
   const f = useCurrentFontFamily();
 
-  const { styles, currentStyle, description } =
+  const { styles, currentStyleKey, description } =
     f.type === "ready"
       ? f.state
       : {
           styles: [],
-          currentStyle: { postscriptName: "" },
-          description: { fontVariations: {}, fontWeight: 0 },
+          currentStyleKey: null,
+          description: { fontVariations: {}, fontWeight: 400 },
         };
 
   // Group styles by italic variants
@@ -60,8 +64,8 @@ export function FontStyleControl({
     if (g_romans.length > 0) {
       options.push(
         g_romans.map((v) => ({
-          value: v.postscriptName,
-          label: v.name,
+          value: editor.font_spec.fontStyleKey.key2str(v),
+          label: v.fontStyleName,
         }))
       );
     }
@@ -70,15 +74,17 @@ export function FontStyleControl({
     if (g_italics.length > 0) {
       options.push(
         g_italics.map((v) => ({
-          value: v.postscriptName,
-          label: v.name,
+          value: editor.font_spec.fontStyleKey.key2str(v),
+          label: v.fontStyleName,
         }))
       );
     }
     return options;
   }, [styles]);
 
-  const value = currentStyle.postscriptName || "";
+  const value = currentStyleKey
+    ? editor.font_spec.fontStyleKey.key2str(currentStyleKey)
+    : "";
   const disabled = styles.length === 0;
 
   return (
@@ -87,7 +93,14 @@ export function FontStyleControl({
       placeholder={placeholder(description)}
       enum={options}
       disabled={disabled}
-      onValueChange={onValueChange}
+      onValueChange={(value) => {
+        const key = editor.font_spec.fontStyleKey.str2key(value);
+        if (key) {
+          onValueChange?.(key);
+        } else {
+          console.error("invalid font style key", value);
+        }
+      }}
     />
   );
 }

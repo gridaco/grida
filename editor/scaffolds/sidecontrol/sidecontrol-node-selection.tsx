@@ -118,19 +118,16 @@ import { PropertyLineLabelWithNumberGesture } from "./ui/label-with-number-gestu
 function FontStyleControlScaffold({ selection }: { selection: string[] }) {
   const editor = useCurrentEditor();
   const f = useCurrentFontFamily();
-  const styles = f.type === "ready" ? f.state.styles : [];
-  const fontFamily = f.type === "ready" ? f.state.family : "";
 
   const handleChange = React.useCallback(
-    (postscriptName: string) => {
+    (key: editor.font_spec.FontStyleKey) => {
       selection.forEach((id) => {
         editor.changeTextNodeFontStyle(id, {
-          fontFamily: fontFamily,
-          fontPostscriptName: postscriptName,
+          fontStyleKey: key,
         });
       });
     },
-    [fontFamily, styles]
+    []
   );
 
   return <FontStyleControl onValueChange={handleChange} />;
@@ -487,10 +484,9 @@ function ModeMixedNodeProperties({
         </SidebarSection> */}
       {config.text !== "off" && types.has("text") && (
         <CurrentFontProvider
-          fontFamily={
-            typeof fontFamily?.value === "string" ? fontFamily.value : ""
-          }
           description={{
+            fontFamily:
+              typeof fontFamily?.value === "string" ? fontFamily.value : "",
             fontPostscriptName:
               typeof fontPostscriptName?.value === "string"
                 ? fontPostscriptName.value
@@ -1405,9 +1401,9 @@ function SectionText({ node_id }: { node_id: string }) {
 
   return (
     <CurrentFontProvider
-      fontFamily={fontFamily ?? ""}
       description={{
-        fontPostscriptName,
+        fontFamily: fontFamily ?? "",
+        fontInstancePostscriptName: fontPostscriptName,
         fontWeight,
         fontVariations,
       }}

@@ -129,7 +129,7 @@ class WasmFontAdapter implements FontAdapter {
 }
 
 export class CanvasWasmFontManagerAgentInterfaceProvider
-  implements editor.api.IDocumentFontManagerAgentInterfaceProvider
+  implements editor.api.IDocumentFontCollectionInterfaceProvider
 {
   private manager: UnifiedFontManager;
   private loadedFonts = new Set<string>();
@@ -159,5 +159,60 @@ export class CanvasWasmFontManagerAgentInterfaceProvider
 
   setFallbackFonts(fonts: string[]): void {
     this.surface.setFallbackFonts(fonts);
+  }
+}
+
+export class CanvasWasmFontParserInterfaceProvider
+  implements editor.api.IDocumentFontParserInterfaceProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Scene
+  ) {}
+
+  async parseFamily(
+    familyName: string,
+    faces: { faceId: string; data: ArrayBuffer }[]
+  ): Promise<editor.font_spec.UIFontFamily | null> {
+    const res = await this.surface.fontskit.analyzeFamily(faces, familyName);
+    if (res.success) {
+      const d = res.data;
+      const fam = {
+        family: d.family_name,
+        axes: d.axes,
+        faces: d.faces.map(
+          (face) =>
+            ({
+              postscriptName: face.postscript_name,
+              axes: face.axes.reduce((acc, axis) => {
+                acc[axis.tag] = axis;
+                return acc;
+              }, {} as any),
+              instances:
+                face.instances?.map((instance) => ({
+                  name: instance.name,
+                  postscriptName: instance.postscript_name,
+                  coordinates: instance.coordinates,
+                })) ?? [],
+              features: face.features,
+              italic: face.is_strict_italic,
+            }) satisfies editor.font_spec.UIFontFaceData
+        ),
+        styles: d.styles.map(
+          (style) =>
+            ({
+              fontFamily: familyName,
+              fontStyleName: style.name,
+              fontPostscriptName: style.face_post_script_name,
+              fontInstancePostscriptName: style.postscript_name,
+              italic: style.italic,
+              weight: style.weight,
+            }) satisfies editor.font_spec.FontStyleInstance
+        ),
+      } satisfies editor.font_spec.UIFontFamily;
+
+      return fam;
+    }
+    return null;
   }
 }

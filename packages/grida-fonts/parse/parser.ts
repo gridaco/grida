@@ -7,7 +7,7 @@ import { parseStatTable, type StatData } from "./stat";
  * Parses OpenType font data once and provides access to various table data.
  */
 export class Parser {
-  private font: any;
+  private font: Typr.FontData;
   private _fvar?: FvarData;
   private _features?: FontFeature[];
   private _stat?: StatData;
@@ -38,8 +38,8 @@ export class Parser {
   }
 
   /**
-    * Returns STAT axis and combination information.
-    */
+   * Returns STAT axis and combination information.
+   */
   stat(): StatData {
     if (!this._stat) {
       this._stat = parseStatTable(this.font);

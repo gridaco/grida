@@ -183,7 +183,7 @@ function EditorPanel() {
     document,
     document_ctx,
     history,
-    fontdescriptions: googlefonts,
+    fontfaces: googlefonts,
     user_clipboard,
     ...state_without_document
   } = state;
@@ -220,7 +220,7 @@ function FontsPanel() {
   const editor = useCurrentEditor();
   const { fontdescriptions, webfontlist } = useEditorState(editor, (state) => ({
     webfontlist: state.webfontlist,
-    fontdescriptions: state.fontdescriptions,
+    fontdescriptions: state.fontfaces,
   }));
 
   return (

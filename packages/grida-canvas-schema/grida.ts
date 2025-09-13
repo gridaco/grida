@@ -1427,12 +1427,15 @@ export namespace grida.program.nodes {
        * if the used fvar.instance is semantically italic, this can be set true.
        */
       fontStyleItalic?: boolean;
+
       /**
        * [font post script name]
        * the post script name is a unique identifier for a font face scoped by the family.
        * this value is parsed from the ttf file itself.
+       *
+       * @note some fonts, like Inter, do not have a postscript name for instances.
        */
-      fontPostscriptName?: string;
+      fontPostscriptName?: string | null;
       // #endregion semantics
     }
 

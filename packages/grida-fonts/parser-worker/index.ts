@@ -50,7 +50,7 @@ export class FontParserWorker {
     fvar: FvarData;
     features: FontFeature[];
     stat: StatData;
-    postscriptName?: string;
+    postscriptName?: string | null;
   }> {
     return this.call("details", buffer);
   }

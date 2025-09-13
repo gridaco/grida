@@ -7,11 +7,7 @@ import type cg from "@grida/cg";
 import type { SnapResult } from "@grida/cmath/_snap";
 import type { tokens } from "@grida/tokens";
 import type { NodeProxy } from "./editor";
-import type {
-  GoogleWebFontList,
-  GoogleWebFontListItem,
-} from "@grida/fonts/google";
-import type { FvarAxes, FvarInstance, FontFeature } from "@grida/fonts/parse";
+import type { GoogleWebFontList } from "@grida/fonts/google";
 import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
@@ -147,7 +143,7 @@ export namespace editor.config {
 
     export const DEFAULT_TEXT_STYLE_INTER: grida.program.nodes.i.ITextStyle = {
       fontFamily: DEFAULT_FONT_FAMILY,
-      fontPostscriptName: "Inter-Regular",
+      fontPostscriptName: null,
       fontStyleItalic: false,
       fontFeatures: {},
       fontOpticalSizing: "auto",
@@ -337,7 +333,54 @@ export namespace editor.config {
   };
 }
 
-export namespace editor.font {
+export namespace editor.font_spec {
+  export type FontStyleKey = {
+    fontFamily: string;
+    fontPostscriptName: string;
+    fontInstancePostscriptName: string | null;
+    fontStyleName: string;
+  };
+
+  /**
+   * key2str and str2key for font style change key
+   *
+   * useful when inlining
+   */
+  export const fontStyleKey = {
+    key2str: (key: FontStyleKey): string => {
+      if (key.fontInstancePostscriptName === null) {
+        //    |1                  2                    3                          |
+        return `${key.fontFamily},${key.fontStyleName},${key.fontPostscriptName}`;
+      } else {
+        //    |1                  2                    3                         4|
+        return `${key.fontFamily},${key.fontStyleName},${key.fontPostscriptName},${key.fontInstancePostscriptName}`;
+      }
+    },
+    str2key: (str: string): FontStyleKey | null => {
+      if (str.includes(",")) {
+        const [
+          fontFamily, // 1
+          fontStyleName, // 2
+          fontPostscriptName, // 3
+          fontInstancePostscriptName, // 4
+        ] = str.split(",");
+        return {
+          fontFamily,
+          fontStyleName,
+          fontPostscriptName,
+          fontInstancePostscriptName: fontInstancePostscriptName ?? null,
+        };
+      }
+      return null;
+    },
+  };
+
+  /**
+   * the Axis data defined by the family (group of ttf)
+   *
+   * this holds common axes (by the spec, the axes spec should be the same for all faces under same family)
+   * the default value vary by the face, its not included
+   */
   interface UIFontFamilyAxis {
     tag: string;
     min: number;
@@ -345,13 +388,36 @@ export namespace editor.font {
   }
 
   /**
+   * the Axis data defined by the face (ttf)
+   */
+  export interface UIFontFaceAxis {
+    tag: string;
+    min: number;
+    max: number;
+    def: number;
+    name: string;
+  }
+
+  export type UIFontFaceInstance = {
+    name: string;
+    coordinates: Record<string, number>;
+    postscriptName: string | null;
+  };
+
+  export type UIFontFaceFeature = {
+    tag: string;
+    name: string;
+    glyphs: string[];
+  };
+
+  /**
    * UIFontData is a reliable data container, that is per-ttf, processed through ttf-parser
    */
-  export type UIFontData = {
+  export type UIFontFaceData = {
     postscriptName: string;
-    axes: FvarAxes;
-    instances: FvarInstance[];
-    features: FontFeature[];
+    axes: { [tag: string]: UIFontFaceAxis };
+    instances: UIFontFaceInstance[];
+    features: UIFontFaceFeature[];
     italic: boolean;
   };
 
@@ -370,7 +436,7 @@ export namespace editor.font {
      */
     axes?: UIFontFamilyAxis[];
 
-    types: UIFontData[];
+    faces: UIFontFaceData[];
 
     styles: FontStyleInstance[];
   };
@@ -388,86 +454,126 @@ export namespace editor.font {
    * if from a static font, this describes a single face of a font family
    */
   export type FontStyleInstance = {
-    name: string;
-    postscriptName: string;
+    fontFamily: string;
+
+    /**
+     * uses subfamily name for static font, instance name for variable font
+     *
+     * this is suitable for runtime identifier (as postscript name can be null)
+     * we should not rely on style name as persistable identifier.
+     */
+    fontStyleName: string;
+
+    /**
+     * the postscript name of the current font face
+     */
+    fontPostscriptName: string;
+
+    /**
+     * the postscript name of the current font style, either instance.postscriptName (variable) or face.postscriptName (static)
+     */
+    fontInstancePostscriptName: string | null;
     /**
      * if the face is italic (by OS/2 or by vendor specified)
      */
-    italic?: boolean;
+    italic: boolean;
+
+    /**
+     * the weight of the font style
+     * for static font, this is the weight class of the face
+     * for variable font, this is the `wght` of the instance, if `wght` not supported, it fallbacks to weight class of the face
+     */
+    weight: number;
   };
 
   /**
-   * map styles for static or VF fonts.
-   *
-   * style = static font face or VF instance
-   */
-  export function mapStyles(
-    types: editor.font.UIFontData[]
-  ): FontStyleInstance[] {
-    return types.flatMap((typeface) => {
-      if (typeface.instances) {
-        return typeface.instances.map((instance) => ({
-          name: instance.name,
-          // TODO: verify postscriptName is always present in instance - then remove fallback.
-          postscriptName: instance.postscriptName || instance.name,
-          italic: typeface.italic,
-        }));
-      } else {
-        return [
-          {
-            name: typeface.postscriptName,
-            postscriptName: typeface.postscriptName,
-            italic: typeface.italic,
-          },
-        ];
-      }
-    });
-  }
-
-  /**
-   * Get the exact matching instance from a list of instances based on current values
+   * Get the matching instance from a list of instances based on current values
    * @param instances - Array of font variation instances
-   * @param axesValues - Current font variation values
+   * @param context - Context containing PostScript name and axis values
+   * @param mode - The mode to use for matching
+   *   - strict: only match if the postscript name or axes values are exactly the same
+   *   - loose: find the instance with the highest matching score based on coordinate similarity
    * @returns The matching instance if found, undefined otherwise
    */
   export function matchFvarInstance(
-    instances: FvarInstance[],
+    instances: UIFontFaceInstance[],
     context: {
-      postscriptName?: string;
+      fontInstancePostscriptName?: string | null;
       axesValues: Record<string, number>;
-    }
-  ): FvarInstance | undefined {
+    },
+    mode: "strict" | "loose" = "loose"
+  ): UIFontFaceInstance | undefined {
     if (!instances || instances.length === 0) return undefined;
 
-    const { postscriptName, axesValues } = context;
+    const { fontInstancePostscriptName, axesValues } = context;
 
-    const by_name = instances.find(
-      (inst) => inst.postscriptName === postscriptName
-    );
+    // First, try to match by PostScript name if provided
+    if (fontInstancePostscriptName) {
+      const by_name = instances.find(
+        (inst) => inst.postscriptName === fontInstancePostscriptName
+      );
+      if (by_name) return by_name;
+    }
 
-    if (by_name) return by_name;
+    if (mode === "strict") {
+      // Strict mode: exact coordinate matching
+      return instances.find((inst) => {
+        const instanceCoords = inst.coordinates;
 
-    return instances.find((inst) => {
-      // Check if all coordinates in the instance match the current values exactly
-      const instanceCoords = inst.coordinates;
+        // First, check if all instance coordinates are present in current values
+        for (const [axis, value] of Object.entries(instanceCoords)) {
+          if (axesValues[axis] !== value) {
+            return false;
+          }
+        }
 
-      // First, check if all instance coordinates are present in current values
-      for (const [axis, value] of Object.entries(instanceCoords)) {
-        if (axesValues[axis] !== value) {
-          return false;
+        // Then, check if all current values are present in instance coordinates
+        // This ensures we don't match when current values have additional axes
+        for (const [axis, value] of Object.entries(axesValues)) {
+          if (instanceCoords[axis] !== value) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    } else {
+      // Loose mode: find the best matching instance
+      let bestMatch: UIFontFaceInstance | undefined;
+      let bestScore = -1;
+
+      for (const inst of instances) {
+        const instanceCoords = inst.coordinates;
+        let score = 0;
+        let totalAxes = 0;
+
+        // Calculate matching score based on how many axes match
+        for (const [axis, value] of Object.entries(axesValues)) {
+          totalAxes++;
+          if (instanceCoords[axis] === value) {
+            score++;
+          }
+        }
+
+        // Also check for instance coordinates that don't exist in current values
+        for (const [axis, value] of Object.entries(instanceCoords)) {
+          if (!(axis in axesValues)) {
+            totalAxes++;
+            // Don't penalize for extra axes in the instance
+          }
+        }
+
+        // Normalize score by total axes and prefer instances with higher match ratio
+        const normalizedScore = totalAxes > 0 ? score / totalAxes : 0;
+
+        if (normalizedScore > bestScore) {
+          bestScore = normalizedScore;
+          bestMatch = inst;
         }
       }
 
-      // Then, check if all current values are present in instance coordinates
-      // This ensures we don't match when current values have additional axes
-      for (const [axis, value] of Object.entries(axesValues)) {
-        if (instanceCoords[axis] !== value) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+      return bestMatch;
+    }
   }
 }
 
@@ -686,9 +792,9 @@ export namespace editor.state {
   /**
    * a font description, this is used to describe a font family.
    */
-  export type FontDescription = {
+  export type FontFaceDescription = {
     family: string;
-    // TODO: more properties will be added
+    italic: boolean;
   };
 
   /**
@@ -696,7 +802,7 @@ export namespace editor.state {
    * does not mean the fonts are loaded / loading
    */
   export interface IEditorFontDescriptionsState {
-    fontdescriptions: FontDescription[];
+    fontfaces: FontFaceDescription[];
   }
 
   export interface IEditorFeatureBrushState {
@@ -1242,7 +1348,11 @@ export namespace editor.state {
       surface_measurement_targeting: "off",
       surface_measurement_targeting_locked: false,
       surface_measurement_target: undefined,
-      fontdescriptions: s.fonts().map((family) => ({ family })),
+      fontfaces: s.fonts().map((family) => ({
+        family,
+        // FIXME: support italic flag
+        italic: false,
+      })),
       webfontlist: {
         kind: "webfonts#webfontList",
         items: [],
@@ -1802,8 +1912,50 @@ export namespace editor.api {
   }
 
   export type FontStyleChangeDescription = {
+    fontStyleKey: editor.font_spec.FontStyleKey;
+  };
+
+  /**
+   * flexible api when resolving font style via api, with unknown or dynamic values.
+   */
+  export type FontStyleSelectDescription = {
+    /**
+     * the font family to select from.
+     *
+     * @example "Inter", "Noto Sans"
+     *
+     * expects exactly one family name, and expected to exactly match
+     */
     fontFamily: string;
-    fontPostscriptName: string;
+
+    /**
+     * non-standard font style name, used by grida, internally.
+     *
+     * if known, user may pass this.
+     *
+     * [p1]: highest priority, if given. breaks if match
+     */
+    fontStyleName?: string;
+
+    /**
+     * the postscript name of the typeface.
+     */
+    fontPostscriptName?: string;
+
+    /**
+     * the postscript name of the instance.
+     */
+    fontInstancePostscriptName?: string | null;
+
+    /**
+     * the requested font weight.
+     */
+    fontWeight?: number;
+
+    /**
+     * the requested font variations.
+     */
+    fontVariations?: Record<string, number>;
   };
 
   export type TChange<T> =
@@ -2173,9 +2325,38 @@ export namespace editor.api {
   }
 
   /**
+   * interface for font parser
+   *
+   * grida has 2 font parsers:
+   * 1. @grida/fonts (js)
+   * 2. @grida/canvas-wasm (rust)
+   *
+   */
+  export interface IDocumentFontParserInterfaceProvider {
+    // /**
+    //  * parse single ttf font
+    //  * @param bytes font ttf bytes
+    //  */
+    // parseTTF(bytes: ArrayBuffer): Promise<any | null>;
+
+    /**
+     * parse font family
+     * @param faces font faces
+     */
+    parseFamily(
+      familyName: string,
+      faces: {
+        faceId: string;
+        data: ArrayBuffer;
+        userFontStyleItalic?: boolean;
+      }[]
+    ): Promise<editor.font_spec.UIFontFamily | null>;
+  }
+
+  /**
    * Agent interface that is responsible for resolving, managing and caching fonts.
    */
-  export interface IDocumentFontManagerAgentInterfaceProvider {
+  export interface IDocumentFontCollectionInterfaceProvider {
     /**
      * loads the font so that the backend can render it
      * @param font font descriptor
@@ -2530,7 +2711,7 @@ export namespace editor.api {
      */
     getFontDetails(
       fontFamily: string
-    ): Promise<editor.font.UIFontFamily | null>;
+    ): Promise<editor.font_spec.UIFontFamily | null>;
   }
 
   export interface IExportPluginActions {

@@ -180,19 +180,21 @@ export function PropertyEnum<T extends string>({
       <SelectContent>
         {isGrouped
           ? // Render grouped enum items with separators
-            (enums as EnumItem<T>[][]).flatMap((group, groupIndex) => [
+            (enums as EnumItem<T>[][]).flatMap((group, gi) => [
               // Add separator before each group except the first
-              ...(groupIndex > 0
-                ? [<SelectSeparator key={`sep-${groupIndex}`} />]
-                : []),
+              ...(gi > 0 ? [<SelectSeparator key={`sep-${gi}`} />] : []),
               // Add all items in the group
-              ...group.map((e) => {
+              ...group.map((e, i) => {
                 const value = typeof e === "string" ? e : e.value;
                 const label = typeof e === "string" ? e : e.label;
                 const icon = typeof e === "string" ? undefined : e.icon;
                 const disabled = typeof e === "string" ? false : e.disabled;
                 return (
-                  <SelectItem key={value} value={value} disabled={disabled}>
+                  <SelectItem
+                    key={value ?? `${gi}+${i}`}
+                    value={value}
+                    disabled={disabled}
+                  >
                     {hasIcon && icon && <>{icon}</>}
                     {label ?? value}
                   </SelectItem>

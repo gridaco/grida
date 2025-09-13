@@ -263,7 +263,7 @@ export function FontFamilyControl({
   const list = useFontFamilyList();
   const editor = useCurrentEditor();
   const usedFonts = useCanvasEditorState(editor, (state) =>
-    state.fontdescriptions.map((f) => f.family)
+    state.fontfaces.map((f) => f.family)
   );
   const mixed = value === grida.mixed;
   const [open, setOpen] = React.useState<boolean>(false);

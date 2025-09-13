@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import type cg from "@grida/cg";
 import type { FontFeature } from "@grida/fonts/parse";
 import type Typr from "@grida/fonts/typr";
+import { editor } from "@/grida-canvas";
 
 const PANGRAM_EN = "The Quick Brown Fox Jumps Over The Lazy Dog";
 
@@ -50,13 +51,13 @@ interface PreviewProps {
   hoverPreview?: BasicPreview | VariationPreview | FeaturePreview;
 
   // Axes preview props
-  axes?: Record<string, Typr.FVARAxis>;
+  axes?: Record<string, editor.font_spec.UIFontFaceAxis>;
   fontVariations?: Record<string, number>;
   fontWeight?: number;
   fontFamily?: string;
 
   // Features preview props
-  features?: FontFeature[];
+  features?: editor.font_spec.UIFontFaceFeature[];
   fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
 
   // Type indicator
@@ -190,13 +191,13 @@ function FeaturesPreview({
   fontFamily?: string;
   fontWeight?: number;
   hoveredFeature: cg.OpenTypeFeature | null;
-  features?: FontFeature[];
+  features?: editor.font_spec.UIFontFaceFeature[];
   selectedValue?: "0" | "1";
 }) {
   if (!hoveredFeature || !selectedValue) return null;
 
   const feature = features.find((f) => f.tag === hoveredFeature);
-  const demoText = feature?.sampleText ?? feature?.glyphs?.join(" ");
+  const demoText = feature?.glyphs?.join(" ");
 
   if (!demoText) return null;
 
@@ -217,25 +218,25 @@ function FeaturesPreview({
 
 function Preview(props: PreviewProps) {
   // Check if we have data to show
-  let hasData = false;
+  let hasPreviewText = false;
 
   if (props.type === "basics") {
-    hasData = !!props.hoverPreview;
+    hasPreviewText = !!props.hoverPreview;
   } else if (props.type === "axes") {
     const axesPreview = props.hoverPreview as VariationPreview;
-    hasData = !!axesPreview?.axis && !!props.axes?.[axesPreview.axis];
+    hasPreviewText = !!axesPreview?.axis && !!props.axes?.[axesPreview.axis];
   } else if (props.type === "features") {
     const featurePreview = props.hoverPreview as FeaturePreview;
     if (featurePreview?.feature && featurePreview?.value) {
       const feature = props.features?.find(
         (f) => f.tag === featurePreview.feature
       );
-      hasData = !!(feature?.sampleText ?? feature?.glyphs?.join(" "));
+      hasPreviewText = !!feature?.glyphs?.join(" ");
     }
   }
 
   // Show placeholder if no data
-  if (!hasData) {
+  if (!hasPreviewText) {
     return (
       <div className="p-4 border rounded-md bg-muted/30 h-32 flex items-center justify-start overflow-hidden">
         <span className="text-muted-foreground text-sm">Preview</span>

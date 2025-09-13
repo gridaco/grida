@@ -9,14 +9,14 @@ export class DocumentFontManager {
   constructor(private editor: Editor) {
     // watch for font registry changes
     this.editor.subscribeWithSelector(
-      (state) => state.fontdescriptions,
+      (state) => state.fontfaces,
       (_, v) => {
         this.sync(v);
       }
     );
   }
 
-  private sync(keys: editor.state.FontDescription[]) {
+  private sync(keys: editor.state.FontFaceDescription[]) {
     const loaded = new Set(this.editor.listLoadedFonts());
     for (const { family } of keys) {
       if (loaded.has(family)) continue;

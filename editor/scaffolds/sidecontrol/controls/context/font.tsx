@@ -1,37 +1,25 @@
 import React from "react";
 import { useCurrentEditor } from "@/grida-canvas-react";
-import type { FontFeature } from "@grida/fonts/parse";
-import type Typr from "@grida/fonts/typr";
 import { editor } from "@/grida-canvas";
 
-type CurrentFontStyle = {
-  /**
-   * the postscript name of the current font style, either instance.postscriptName (variable) or face.postscriptName (static)
-   */
-  postscriptName?: string;
-
+type CurrentFontStyleAttrubutes = {
   /**
    * axes defined by the face (ttf)
    */
-  faceAxes?: Record<string, Typr.FVARAxis>;
+  faceAxes?: { [tag: string]: editor.font_spec.UIFontFaceAxis };
 
   /**
    * features defined by the face (ttf)
    */
-  faceFeatures: FontFeature[] | undefined;
+  faceFeatures: editor.font_spec.UIFontFaceFeature[] | undefined;
 };
 
 interface CurrentFontState {
-  family: string;
-  styles: Array<editor.font.FontStyleInstance>;
-  description: CurrentFontDescription;
-  currentStyle: CurrentFontStyle;
-}
-
-interface CurrentFontDescription {
-  fontPostscriptName?: string;
-  fontWeight?: number;
-  fontVariations?: Record<string, number>;
+  fontFamily: string;
+  styles: Array<editor.font_spec.FontStyleInstance>;
+  description: editor.api.FontStyleSelectDescription;
+  currentStyleKey: editor.font_spec.FontStyleKey | null;
+  currentStyle: CurrentFontStyleAttrubutes;
 }
 
 type CurrentFontContextValue =
@@ -45,18 +33,18 @@ const CurrentFontContext = React.createContext<CurrentFontContextValue | null>(
 );
 
 interface CurrentFontProviderProps {
-  fontFamily: string;
-
   /**
    * the current partial values of text style, responsible for matching the font face
    */
-  description: CurrentFontDescription;
+  description: editor.api.FontStyleSelectDescription;
 }
 
 function useFontDetails(fontFamily: string) {
   const editor = useCurrentEditor();
 
-  const [font, setFont] = React.useState<editor.font.UIFontFamily | null>(null);
+  const [font, setFont] = React.useState<editor.font_spec.UIFontFamily | null>(
+    null
+  );
 
   React.useEffect(() => {
     setFont(null);
@@ -65,7 +53,8 @@ function useFontDetails(fontFamily: string) {
       .then((detail) => {
         setFont(detail);
       })
-      .catch(() => {
+      .catch((e) => {
+        console.error("error getting font details", e);
         setFont(null);
       });
   }, [editor, fontFamily]);
@@ -74,32 +63,29 @@ function useFontDetails(fontFamily: string) {
 }
 
 export function CurrentFontProvider({
-  fontFamily,
   description,
   children,
 }: React.PropsWithChildren<CurrentFontProviderProps>) {
+  const fontFamily = description.fontFamily;
   const editor = useCurrentEditor();
   const font = useFontDetails(fontFamily);
 
   const ctx: CurrentFontContextValue = React.useMemo(() => {
     if (!font) return { type: "loading" };
 
-    const match = editor.matchFontFace(font.family, description);
+    const fontFamily = font.family;
+    const match = editor.selectFontStyle(description);
 
     return {
       type: "ready",
       state: {
-        family: font.family,
-        description: {
-          fontVariations: description.fontVariations,
-          fontWeight: description.fontWeight,
-        },
+        fontFamily: fontFamily,
+        description: description,
         styles: font.styles,
+        currentStyleKey: match ? match.key : null,
         currentStyle: {
           faceAxes: match?.face?.axes,
           faceFeatures: match?.face?.features,
-          postscriptName:
-            match?.instance?.postscriptName || match?.face?.postscriptName,
         },
       } satisfies CurrentFontState,
     } satisfies CurrentFontContextValue;
@@ -124,7 +110,7 @@ export function useCurrentFontFamily() {
 
 export function useCurrentFontFace():
   | { type: "loading" }
-  | { type: "ready"; state: CurrentFontStyle } {
+  | { type: "ready"; state: CurrentFontStyleAttrubutes } {
   const f = useCurrentFontFamily();
 
   if (f.type === "loading") return { type: "loading" };

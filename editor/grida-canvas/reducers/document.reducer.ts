@@ -1538,7 +1538,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         // font family specific hook
         if (action.type === "node/change/fontFamily") {
           if (action.fontFamily) {
-            draft.fontdescriptions.push({ family: action.fontFamily });
+            draft.fontfaces.push({
+              family: action.fontFamily,
+              // FIXME: support italic flag
+              italic: false,
+            });
           }
         }
       });
