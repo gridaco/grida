@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// A repository for managing images with automatic ID indexing.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ImageRepository {
     images: HashMap<String, ImageMipmaps>,
     config: MipmapConfig,

@@ -259,6 +259,7 @@ impl ApplicationApi for UnknownTargetApplication {
                 scene,
                 &self.renderer.get_cache().geometry,
                 &self.renderer.fonts,
+                &self.renderer.images,
                 id,
                 format,
             );
@@ -552,11 +553,7 @@ impl UnknownTargetApplication {
     }
 
     pub fn list_missing_fonts(&self) -> Vec<String> {
-        self.renderer
-            .fonts
-            .missing_families()
-            .into_iter()
-            .collect()
+        self.renderer.fonts.missing_families().into_iter().collect()
     }
 
     pub fn list_available_fonts(&self) -> Vec<String> {

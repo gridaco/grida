@@ -11,7 +11,7 @@ use crate::{
         export_as_svg::export_node_as_svg,
     },
     node::schema::Scene,
-    runtime::font_repository::FontRepository,
+    runtime::{font_repository::FontRepository, image_repository::ImageRepository},
 };
 
 type FileData = Vec<u8>;
@@ -79,6 +79,7 @@ pub fn export_node_as(
     scene: &Scene,
     geometry: &GeometryCache,
     fonts: &FontRepository,
+    images: &ImageRepository,
     node_id: &str,
     format: ExportAs,
 ) -> Option<Exported> {
@@ -109,7 +110,7 @@ pub fn export_node_as(
         return export_node_as_svg(scene, fonts, rect, format);
     } else if format.is_format_image() {
         let format: ExportAsImage = format.clone().try_into().unwrap();
-        return export_node_as_image(scene, fonts, size, rect, format);
+        return export_node_as_image(scene, fonts, images, size, rect, format);
     } else {
         return None;
     }

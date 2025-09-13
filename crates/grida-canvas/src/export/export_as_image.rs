@@ -4,6 +4,7 @@ use crate::{
     runtime::{
         camera::Camera2D,
         font_repository::FontRepository,
+        image_repository::ImageRepository,
         scene::{Backend, Renderer, RendererOptions},
     },
 };
@@ -24,6 +25,7 @@ impl Into<EncodedImageFormat> for ExportAsImage {
 pub fn export_node_as_image(
     scene: &Scene,
     fonts: &FontRepository,
+    images: &ImageRepository,
     size: ExportSize,
     rect: Rectangle,
     format: ExportAsImage,
@@ -43,6 +45,7 @@ pub fn export_node_as_image(
     );
 
     r.fonts = fonts.clone();
+    r.images = images.clone();
     r.load_scene(scene.clone());
     let image = r.snapshot();
 

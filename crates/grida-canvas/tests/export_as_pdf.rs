@@ -2,7 +2,7 @@ use cg::cg::types::*;
 use cg::export::{export_node_as, ExportAs};
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
 use cg::resources::ByteStore;
-use cg::runtime::font_repository::FontRepository;
+use cg::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use math2::transform::AffineTransform;
 use std::sync::{Arc, Mutex};
 
@@ -34,13 +34,21 @@ fn test_pdf_export() {
 
     let store = Arc::new(Mutex::new(ByteStore::new()));
     let fonts = FontRepository::new(store.clone());
+    let images = ImageRepository::new(store.clone());
 
     // Create a geometry cache to get the render bounds
     let geometry_cache = cg::cache::geometry::GeometryCache::from_scene(&scene, &fonts);
 
     // Test PDF export
     let pdf_format = ExportAs::pdf();
-    let result = export_node_as(&scene, &geometry_cache, &fonts, &rect_id, pdf_format);
+    let result = export_node_as(
+        &scene,
+        &geometry_cache,
+        &fonts,
+        &images,
+        &rect_id,
+        pdf_format,
+    );
 
     // Verify that we got a PDF result
     assert!(result.is_some());
