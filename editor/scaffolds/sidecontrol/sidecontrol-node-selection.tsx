@@ -512,10 +512,6 @@ function ModeMixedNodeProperties({
             </SidebarSectionHeaderItem>
             <SidebarMenuSectionContent className="space-y-2">
               <PropertyLine>
-                <PropertyLineLabel>Value</PropertyLineLabel>
-                <StringValueControl disabled value={"multiple"} />
-              </PropertyLine>
-              <PropertyLine>
                 <PropertyLineLabel>Font</PropertyLineLabel>
                 <div className="flex-1">
                   <FontFamilyControl
@@ -1476,14 +1472,6 @@ function SectionText({ node_id }: { node_id: string }) {
           </SidebarSectionHeaderActions>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Value</PropertyLineLabel>
-            <StringValueControl
-              value={text}
-              maxlength={maxLength}
-              onValueChange={(value) => actions.text(value ?? null)}
-            />
-          </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Font</PropertyLineLabel>
             <div className="flex-1">

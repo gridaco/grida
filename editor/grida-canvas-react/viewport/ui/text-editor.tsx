@@ -15,6 +15,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const data = useSingleSelection(node_id);
   const node = useNode(node_id!);
   const { transform } = useTransformState();
+  const [scaleX, scaleY] = cmath.transform.getScale(transform);
   const ref = useRef<HTMLDivElement>(null);
 
   const stopPropagation = (e: React.BaseSyntheticEvent) => {
@@ -57,7 +58,9 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
       >
         <div
           style={{
-            scale: cmath.transform.getScale(transform)[0],
+            width: data?.object.boundingRect.width,
+            height: data?.object.boundingRect.height,
+            transform: `scale(${scaleX}, ${scaleY})`,
             transformOrigin: "0 0",
           }}
         >
@@ -81,6 +84,8 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
               editor.changeNodeText(node_id, txt);
             }}
             style={{
+              width: "100%",
+              height: "100%",
               opacity: node.opacity,
               ...css.toReactTextStyle(
                 node as grida.program.nodes.TextNode as any as grida.program.nodes.ComputedTextNode
