@@ -187,9 +187,11 @@ impl<'a> Parser<'a> {
 
         // Use ttf-parser's built-in variation_axes() for axes
         let mut axes: HashMap<String, FvarAxis> = HashMap::new();
+        let mut axis_tags_in_order = Vec::new();
         for axis in self.face.variation_axes() {
             let tag = axis.tag.to_string();
             let name = lookup_name(&self.face, axis.name_id).unwrap_or_default();
+            axis_tags_in_order.push(tag.clone());
             axes.insert(
                 tag.clone(),
                 FvarAxis {
@@ -206,7 +208,7 @@ impl<'a> Parser<'a> {
         // For instances, we still need manual parsing since ttf-parser doesn't expose them
         // See: https://github.com/harfbuzz/ttf-parser/issues/129
         let instances = if let Some(table) = self.face.raw_face().table(Tag::from_bytes(b"fvar")) {
-            parse_fvar_instances(&self.face, table, &axes.keys().cloned().collect::<Vec<_>>())
+            parse_fvar_instances(&self.face, table, &axis_tags_in_order)
         } else {
             Vec::new()
         };

@@ -783,7 +783,14 @@ fn generate_font_styles(
                 let weight = instance
                     .coordinates
                     .get("wght")
-                    .map(|&w| w as u16)
+                    .map(|&w| w.round() as u16)
+                    .or_else(|| {
+                        // If no wght coordinate, try to get default from font axes
+                        face.axes
+                            .iter()
+                            .find(|axis| axis.tag == "wght")
+                            .map(|axis| axis.default.round() as u16)
+                    })
                     .unwrap_or(face_record.weight_class);
 
                 styles.push(UIFontStyleInstance::new(

@@ -364,3 +364,97 @@ fn test_variable_font_info_analysis() {
         assert!(!instance.coordinates.is_empty());
     }
 }
+
+/// Test weight extraction for Inter Black style
+#[test]
+fn test_inter_black_weight_extraction() {
+    let paths = vec![
+        font_path("Inter/Inter-VariableFont_opsz,wght.ttf"),
+        font_path("Inter/Inter-Italic-VariableFont_opsz,wght.ttf"),
+    ];
+
+    // Check if fonts exist
+    let existing_paths: Vec<_> = paths.iter().filter(|p| p.exists()).collect();
+    if existing_paths.is_empty() {
+        println!("Inter fonts not found, skipping test");
+        return;
+    }
+
+    let parser = UIFontParser::new();
+    let font_data: Vec<_> = existing_paths
+        .iter()
+        .map(|p| fs::read(p).unwrap())
+        .collect();
+    let font_faces: Vec<UIFontFace> = existing_paths
+        .iter()
+        .enumerate()
+        .map(|(i, _p)| UIFontFace {
+            face_id: format!("Inter-{}", i),
+            data: &font_data[i],
+            user_font_style_italic: None,
+        })
+        .collect();
+
+    let result = parser
+        .analyze_family(Some("Inter".to_string()), font_faces)
+        .unwrap();
+
+    println!("Family: {}", result.family_name);
+    println!("Styles count: {}", result.styles.len());
+
+    // Look for Black style specifically
+    let black_styles: Vec<_> = result
+        .styles
+        .iter()
+        .filter(|s| s.name.to_lowercase().contains("black"))
+        .collect();
+
+    println!("Found {} Black styles:", black_styles.len());
+    for style in &black_styles {
+        println!(
+            "  {}: weight={}, italic={}",
+            style.name, style.weight, style.italic
+        );
+    }
+
+    // Print all styles for debugging
+    println!("All styles:");
+    for style in &result.styles {
+        println!(
+            "  {}: weight={}, italic={}",
+            style.name, style.weight, style.italic
+        );
+    }
+
+    // Test multiple times to check for randomness
+    for run in 0..5 {
+        let font_faces2: Vec<UIFontFace> = existing_paths
+            .iter()
+            .enumerate()
+            .map(|(i, _p)| UIFontFace {
+                face_id: format!("Inter-{}", i),
+                data: &font_data[i],
+                user_font_style_italic: None,
+            })
+            .collect();
+
+        let result2 = parser
+            .analyze_family(Some("Inter".to_string()), font_faces2)
+            .unwrap();
+
+        let black_styles2: Vec<_> = result2
+            .styles
+            .iter()
+            .filter(|s| s.name.to_lowercase().contains("black"))
+            .collect();
+
+        println!(
+            "Run {}: Found {} Black styles",
+            run + 1,
+            black_styles2.len()
+        );
+        for style in &black_styles2 {
+            println!("  {}: weight={}", style.name, style.weight);
+        }
+    }
+}
