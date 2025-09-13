@@ -5,7 +5,7 @@ export interface FvarInstance {
   name: string;
   coordinates: Record<string, number>;
   flg: number;
-  postscriptName?: string;
+  postscriptName: string | null;
 }
 export interface FvarData {
   axes: FvarAxes;
@@ -17,7 +17,7 @@ export function parseFvar(buffer: ArrayBuffer): FvarData {
   return parseFvarTable(font);
 }
 
-export function parseFvarTable(font: any): FvarData {
+export function parseFvarTable(font: Typr.FontData): FvarData {
   const axes: FvarAxes = {};
   const instances: FvarInstance[] = [];
   const fvar = font.fvar;
@@ -51,14 +51,15 @@ export function parseFvarTable(font: any): FvarData {
       if (tag) coordinates[tag] = c;
     });
 
-    let postscriptName: string | undefined;
-    if (typeof pnid === "number")
-      postscriptName = (nameTable as any)["_" + pnid];
-    else if (typeof pnid === "string") postscriptName = pnid;
+    let postscriptName: string | null = null;
+    if (typeof pnid === "number") postscriptName = nameTable["_" + pnid];
 
-    const instance: FvarInstance = { name: instName, coordinates, flg };
-    if (postscriptName) instance.postscriptName = postscriptName;
-    instances.push(instance);
+    instances.push({
+      name: instName,
+      coordinates,
+      flg,
+      postscriptName,
+    } satisfies FvarInstance);
   }
 
   return { axes, instances };

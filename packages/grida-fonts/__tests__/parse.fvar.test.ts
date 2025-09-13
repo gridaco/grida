@@ -23,7 +23,7 @@ describe("fvar parsing", () => {
     expect(instances[0]).toMatchObject({
       name: "Thin",
       flg: 0,
-      postscriptName: "RobotoFlex-Thin",
+      postscriptName: null,
     });
     expect(instances[0].coordinates).toHaveProperty("wght");
   });

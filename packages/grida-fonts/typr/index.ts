@@ -255,13 +255,6 @@ namespace Typr {
         for (const p in fnt) obj[p] = fnt[p];
         const name = (obj["name"] = JSON.parse(JSON.stringify(obj["name"])));
         name["fontSubfamily"] = (fv as any)[0];
-        if ((fv as any)[3] == null)
-          (fv as any)[3] = (
-            name["fontFamily"] +
-            "-" +
-            name["fontSubfamily"]
-          ).replaceAll(" ", "");
-        name["postScriptName"] = (fv as any)[3];
       }
       return out;
     }
