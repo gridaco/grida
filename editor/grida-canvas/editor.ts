@@ -2182,7 +2182,10 @@ export class Editor
       fontOpticalSizing:
         match.instance?.coordinates?.opsz ?? prev.fontOpticalSizing,
       // ----
-      fontVariations: match.instance?.coordinates,
+      // Clear variable axes for non-variable fonts
+      fontVariations: match.isVariable
+        ? match.instance?.coordinates
+        : undefined,
       // TODO: clean the invalid features by face change.
       // fontFeatures: match.features,
       fontStyleItalic: match.face.italic,
@@ -3154,6 +3157,7 @@ export class Editor
     key: editor.font_spec.FontStyleKey;
     face: editor.font_spec.UIFontFaceData;
     instance: editor.font_spec.UIFontFaceInstance | null;
+    isVariable: boolean;
   } | null {
     return this._fontManager.selectFontStyle(description);
   }

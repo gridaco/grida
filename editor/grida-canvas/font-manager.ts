@@ -148,6 +148,7 @@ export class DocumentFontManager {
     key: editor.font_spec.FontStyleKey;
     face: editor.font_spec.UIFontFaceData;
     instance: editor.font_spec.UIFontFaceInstance | null;
+    isVariable: boolean;
   } | null {
     // 0. match family
     const font = this.__font_details_cache.get(description.fontFamily);
@@ -188,6 +189,7 @@ export class DocumentFontManager {
             key: matched_by_style,
             face: face,
             instance: instance ?? null,
+            isVariable: is_vf,
           };
         }
       }
@@ -231,6 +233,7 @@ export class DocumentFontManager {
             key: style,
             face: face,
             instance: instance ?? null,
+            isVariable: is_vf,
           };
         }
       } else {
@@ -279,7 +282,12 @@ export class DocumentFontManager {
             fontInstancePostscriptName:
               matched_by_instance_strict.postscriptName,
           };
-          return { key, face, instance: matched_by_instance_strict };
+          return {
+            key,
+            face,
+            instance: matched_by_instance_strict,
+            isVariable: true,
+          };
         }
       }
 
@@ -306,7 +314,12 @@ export class DocumentFontManager {
             fontInstancePostscriptName:
               matched_by_instance_loose.postscriptName,
           };
-          return { key, face: face, instance: matched_by_instance_loose };
+          return {
+            key,
+            face: face,
+            instance: matched_by_instance_loose,
+            isVariable: true,
+          };
         }
       }
     } else {
@@ -330,7 +343,7 @@ export class DocumentFontManager {
               fontPostscriptName: face.postscriptName,
               fontInstancePostscriptName: null,
             };
-            return { key, face, instance: null };
+            return { key, face, instance: null, isVariable: false };
           }
         }
       }
@@ -344,7 +357,12 @@ export class DocumentFontManager {
     const instance = instances.find(
       (instance) => instance.name === firstStyle.fontStyleName
     );
-    return { key: firstStyle, face, instance: instance ?? null };
+    return {
+      key: firstStyle,
+      face,
+      instance: instance ?? null,
+      isVariable: is_vf,
+    };
   }
 
   /**
