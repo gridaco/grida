@@ -173,6 +173,10 @@ pub struct WasmFontFeature {
 /// WASM response for font style instance
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct WasmFontStyleInstance {
+    /// Face identifier
+    pub face_id: String,
+    /// PostScript name of the face (always available)
+    pub face_post_script_name: String,
     /// User-friendly style name (e.g., "Regular", "Bold", "Light Italic")
     pub name: String,
     /// PostScript name for this style (may be None for fonts like Inter)
@@ -310,6 +314,8 @@ impl From<UIFontFeature> for WasmFontFeature {
 impl From<UIFontStyleInstance> for WasmFontStyleInstance {
     fn from(style: UIFontStyleInstance) -> Self {
         Self {
+            face_id: style.face_id,
+            face_post_script_name: style.face_post_script_name,
             name: style.name,
             postscript_name: style.postscript_name,
             italic: style.italic,

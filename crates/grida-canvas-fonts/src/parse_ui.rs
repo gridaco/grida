@@ -692,6 +692,13 @@ pub struct UIFontFeature {
 /// Represents either a static font face or a variable font instance that can be selected in a style picker.
 #[derive(Debug, Clone)]
 pub struct UIFontStyleInstance {
+    /// user-specified face id
+    pub face_id: String,
+
+    /// (always) postscript name of the face (ttf, not a name of the instance)
+    /// postscript name is always available for a face. this is useful when [`UIFontStyleInstance::postscript_name`] is not available for the instance.
+    pub face_post_script_name: String,
+
     /// User-friendly style name (e.g., "Regular", "Bold", "Light Italic")
     /// - for static fonts, this uses the subfamily name
     /// - for variable fonts, this uses the instance name
@@ -713,8 +720,17 @@ pub struct UIFontStyleInstance {
 /// Font style mapping utility functions.
 impl UIFontStyleInstance {
     /// Create a new font style instance
-    pub fn new(name: String, postscript_name: Option<String>, italic: bool, weight: u16) -> Self {
+    pub fn new(
+        face_id: String,
+        face_post_script_name: String,
+        name: String,
+        postscript_name: Option<String>,
+        italic: bool,
+        weight: u16,
+    ) -> Self {
         Self {
+            face_id,
+            face_post_script_name,
             name,
             postscript_name,
             italic,
@@ -771,6 +787,8 @@ fn generate_font_styles(
                     .unwrap_or(face_record.weight_class);
 
                 styles.push(UIFontStyleInstance::new(
+                    face_record.face_id.clone(),
+                    face.postscript_name.clone(),
                     style_name,
                     postscript_name,
                     italic,
@@ -792,6 +810,8 @@ fn generate_font_styles(
             let weight = face_record.weight_class;
 
             styles.push(UIFontStyleInstance::new(
+                face_record.face_id.clone(),
+                face.postscript_name.clone(),
                 style_name,
                 postscript_name,
                 italic,

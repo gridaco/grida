@@ -86,6 +86,8 @@ export namespace fonts {
 
     /** Font style instance for UI consumption */
     export interface FontStyle {
+      face_id: string;
+      face_post_script_name: string;
       name: string;
       postscript_name: string | null;
       italic: boolean;
