@@ -4,6 +4,7 @@ import type { NodeChangeAction } from "../action";
 import type cg from "@grida/cg";
 import assert from "assert";
 import cmath from "@grida/cmath";
+import { editor } from "@/grida-canvas";
 
 type UN = grida.program.nodes.UnknwonNode;
 
@@ -276,7 +277,11 @@ const safe_properties: Partial<
       node.type === "rectangle" ||
       node.type === "ellipse",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeWidth = ranged(0, value);
+      (draft as UN).strokeWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
     },
   }),
   strokeAlign: defineNodeProperty<"strokeAlign">({
@@ -296,16 +301,96 @@ const safe_properties: Partial<
   }),
   feShadows: defineNodeProperty<"feShadows">({
     apply: (draft, value, prev) => {
-      (draft as UN).feShadows = value;
+      (draft as UN).feShadows = value?.map((s) => ({
+        ...s,
+        dx: ranged(
+          -editor.config.DEFAULT_MAX_SHADOW_OFFSET,
+          s.dx,
+          editor.config.DEFAULT_MAX_SHADOW_OFFSET
+        ),
+        dy: ranged(
+          -editor.config.DEFAULT_MAX_SHADOW_OFFSET,
+          s.dy,
+          editor.config.DEFAULT_MAX_SHADOW_OFFSET
+        ),
+        blur: ranged(0, s.blur, editor.config.DEFAULT_MAX_BLUR_RADIUS),
+        spread: ranged(
+          -editor.config.DEFAULT_MAX_SHADOW_SPREAD,
+          s.spread,
+          editor.config.DEFAULT_MAX_SHADOW_SPREAD
+        ),
+      }));
     },
   }),
   feBlur: defineNodeProperty<"feBlur">({
     apply: (draft, value, prev) => {
+      if (value) {
+        switch (value.type) {
+          case "blur": {
+            value = {
+              ...value,
+              radius: ranged(
+                0,
+                value.radius,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+            };
+            break;
+          }
+          case "progressive-blur": {
+            value = {
+              ...value,
+              radius: ranged(
+                0,
+                value.radius,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+              radius2: ranged(
+                0,
+                value.radius2,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+            } as cg.FeProgressiveBlur;
+            break;
+          }
+        }
+      }
       (draft as UN).feBlur = value;
     },
   }),
   feBackdropBlur: defineNodeProperty<"feBackdropBlur">({
     apply: (draft, value, prev) => {
+      if (value) {
+        switch (value.type) {
+          case "blur": {
+            value = {
+              ...value,
+              radius: ranged(
+                0,
+                value.radius,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+            };
+            break;
+          }
+          case "progressive-blur": {
+            value = {
+              ...value,
+              radius: ranged(
+                0,
+                value.radius,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+              radius2: ranged(
+                0,
+                value.radius2,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+            } as cg.FeProgressiveBlur;
+            break;
+          }
+        }
+      }
       (draft as UN).feBackdropBlur = value;
     },
   }),

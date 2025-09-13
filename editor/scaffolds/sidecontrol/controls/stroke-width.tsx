@@ -1,5 +1,5 @@
 import type { TMixed } from "./utils/types";
-import type { editor } from "@/grida-canvas";
+import { editor } from "@/grida-canvas";
 import InputPropertyNumber from "../ui/number";
 
 export function StrokeWidthControl({
@@ -16,6 +16,7 @@ export function StrokeWidthControl({
       type="number"
       value={value}
       min={0}
+      max={editor.config.DEFAULT_MAX_STROKE_WIDTH}
       step={1}
       onValueChange={onValueChange}
       onValueCommit={onValueCommit}

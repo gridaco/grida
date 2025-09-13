@@ -331,6 +331,11 @@ export namespace editor.config {
     radius: 0,
     radius2: 4,
   };
+
+  export const DEFAULT_MAX_STROKE_WIDTH = 1000;
+  export const DEFAULT_MAX_BLUR_RADIUS = 250;
+  export const DEFAULT_MAX_SHADOW_OFFSET = 10000;
+  export const DEFAULT_MAX_SHADOW_SPREAD = 1000;
 }
 
 export namespace editor.font_spec {
