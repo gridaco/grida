@@ -4,7 +4,7 @@ description: Learn how snapping elements works on Grida Canvas
 slug: snap-on-canvas
 authors: ramunarasinga
 date: 2025-02-05
-tags: [snap, canvas, threshold]
+tags: [canvas, ux, surface]
 hide_table_of_contents: false
 ---
 
@@ -25,7 +25,7 @@ To see the horizontal snapping in action, visit https://app.grida.co/canvas and 
 
 As you drag towards right, you do not see the snapping yet because you only have two elements added so far. Snapping uses references points based on existing elements drawn on the canvas. In this case, it is horizontal i.e., along the x-axis. Make sure you keep some visible distance between these rectangles as you drag towards right, it does not have to be too far.
 
-3. Repeat step 2, you will now create third rectangle. Select an existing rectangle, press alt and slowly drag this rectangle towards right. As you slowly move along the x-axis, when this third rectangle is "almost" at a distance that is same as the distance between the first and the second rectangle, you will see this rectangle snapping to the point that makes these three rectangles equidistant. 
+3. Repeat step 2, you will now create third rectangle. Select an existing rectangle, press alt and slowly drag this rectangle towards right. As you slowly move along the x-axis, when this third rectangle is "almost" at a distance that is same as the distance between the first and the second rectangle, you will see this rectangle snapping to the point that makes these three rectangles equidistant.
 
 ![Horizontal snap 3](./images/horizontal-snap-3.gif)
 
@@ -35,10 +35,10 @@ I said "almost" here because internally we use a metric called threshold, that d
 
 # Snapping vertically
 
-To see the vetical snapping in action, visit https://app.grida.co/canvas and follow the steps below 
+To see the vetical snapping in action, visit https://app.grida.co/canvas and follow the steps below
 
 1. Create a rectangle as shown below, this rectangle should be horizontal as we stack more rectangle in the next steps
-to demonstrate the vertical snapping.
+   to demonstrate the vertical snapping.
 
 ![vertically snap 1](./images/vertical-snap-1.gif)
 
