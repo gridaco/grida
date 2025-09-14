@@ -11,7 +11,7 @@ This behaviour mirrors conventional vector editing tools where segments can be q
 
 # Copy and Paste
 
-Selections in vector edit mode can be copied and pasted across windows using the system clipboard. When the editor is not in vector edit mode, pasting inserts the copied network as a new vector node. Cutting and translating with clone are not yet supported.
+Selections in vector edit mode can be copied, cut and pasted across windows using the system clipboard. When the editor is not in vector edit mode, pasting inserts the copied network as a new vector node. Translating with clone is not yet supported.
 
 When pasting back into the same vector node, the copied geometry is placed at the exact position it occupied when copied, even if the node moved in the meantime. This preserves the original layout of the selection.
 

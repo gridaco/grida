@@ -112,7 +112,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "copy":
     case "cut": {
       if (state.content_edit_mode?.type === "vector") {
-        if (action.type === "cut") break; // not supported yet
         const {
           node_id,
           selection: {
@@ -139,6 +138,9 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           mode.clipboard = copied;
           mode.clipboard_node_position = [node.left ?? 0, node.top ?? 0];
           draft.user_clipboard = undefined;
+          if (action.type === "cut") {
+            __self_delete_vector_network_selection(draft, mode);
+          }
         });
       }
 
@@ -1827,6 +1829,7 @@ function __self_delete_vector_network_selection(
     selected_segments: [],
     selected_tangents: [],
   };
+  draft.content_edit_mode.selection_neighbouring_vertices = [];
   draft.content_edit_mode.a_point = null;
 }
 

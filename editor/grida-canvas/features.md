@@ -132,7 +132,7 @@ This document lists all implemented features including the ones that are not yet
 - [x] Exiting vector edit mode automatically removes unused points from the vector network.
 - [x] Exiting text edit mode automatically deletes the text node when its content is empty.
 - [x] Escape in vector edit mode resets tool, clears selection, then exits the mode.
-- [x] Copy/paste vector network selections (pasting outside vector edit mode creates a new vector node; cut is not supported). Pasting back into the same vector node preserves the geometry's absolute position at the moment of copy.
+- [x] Copy/cut/paste vector network selections (pasting outside vector edit mode creates a new vector node. Pasting back into the same vector node preserves the geometry's absolute position at the moment of copy.)
 
 ### Controls
 
