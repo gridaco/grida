@@ -397,12 +397,23 @@ export namespace vn {
         }
       }
 
+      const filteredSegments = uniqueSegments.filter(
+        (seg) =>
+          !(
+            seg.a === seg.b &&
+            seg.ta[0] === 0 &&
+            seg.ta[1] === 0 &&
+            seg.tb[0] === 0 &&
+            seg.tb[1] === 0
+          )
+      );
+
       if (!remove_unused_verticies) {
-        return { vertices, segments: uniqueSegments };
+        return { vertices, segments: filteredSegments };
       }
 
       const used = new Set<number>();
-      for (const seg of uniqueSegments) {
+      for (const seg of filteredSegments) {
         used.add(seg.a);
         used.add(seg.b);
       }
@@ -414,7 +425,7 @@ export namespace vn {
           filteredVertices.push(v);
         }
       });
-      const remappedSegments = uniqueSegments.map((seg) => ({
+      const remappedSegments = filteredSegments.map((seg) => ({
         a: vertexMap.get(seg.a)!,
         b: vertexMap.get(seg.b)!,
         ta: seg.ta,

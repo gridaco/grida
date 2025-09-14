@@ -716,23 +716,23 @@ impl NodeShapeMixin for EllipseNodeRec {
         let w = self.size.width;
         let h = self.size.height;
         let angle = self.angle.unwrap_or(360.0);
+        let inner_ratio = self.inner_radius.unwrap_or(0.0);
 
-        // check if art/ring data needs to be handled.
-        // if either angle or inner radius is present.
-        // if only inner radius is present (or angle is 360) => ring
-        // if both are present => arc
-        if self.inner_radius.is_some() || angle != 360.0 {
-            if self.inner_radius.is_some() && angle == 360.0 {
+        // Check if arc/ring data needs to be handled.
+        // Only treat as ring or arc when the inner radius is greater than zero
+        // or when the sweep angle is less than a full circle.
+        if inner_ratio > 0.0 || angle != 360.0 {
+            if inner_ratio > 0.0 && angle == 360.0 {
                 return Shape::EllipticalRing(EllipticalRingShape {
                     width: w,
                     height: h,
-                    inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
+                    inner_radius_ratio: inner_ratio,
                 });
             } else {
                 return Shape::EllipticalRingSector(EllipticalRingSectorShape {
                     width: w,
                     height: h,
-                    inner_radius_ratio: self.inner_radius.unwrap_or(0.0),
+                    inner_radius_ratio: inner_ratio,
                     start_angle: self.start_angle,
                     angle: angle,
                     corner_radius: self.corner_radius.unwrap_or(0.0),
@@ -740,10 +740,10 @@ impl NodeShapeMixin for EllipseNodeRec {
             }
         }
 
-        return Shape::Ellipse(EllipseShape {
+        Shape::Ellipse(EllipseShape {
             width: w,
             height: h,
-        });
+        })
     }
 
     fn to_path(&self) -> skia_safe::Path {
