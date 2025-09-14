@@ -231,9 +231,6 @@ pnpm install --filter editor
 pnpm turbo build --filter="./packages/*"
 pnpm --filter @grida/canvas-wasm build
 
-# generate editor/next-env.d.ts (can be stopped once the file is created)
-pnpm --filter editor dev
-
 # finally, run the repository-wide typecheck
 pnpm typecheck
 ```
