@@ -258,8 +258,10 @@ export namespace editor.config {
   /**
    * the tolerance for the vector geometry vertex (when cleaning the vector geometry)
    * @deprecated - will be removed
+   *
+   * set this to 0, otherwise, it will cause small flatten text to be malformed after editing.
    */
-  export const DEFAULT_VECTOR_GEOMETRY_VERTEX_TOLERANCE = 0.5;
+  export const DEFAULT_VECTOR_GEOMETRY_VERTEX_TOLERANCE = 0.0;
 
   /**
    * Default optimization configuration for vector networks.
