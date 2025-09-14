@@ -114,15 +114,15 @@ pub fn create_variable_width_stroke(
 ///     vec![
 ///         VectorNetworkSegment {
 ///             a: 0, b: 1,
-///             ta: Some((50.0, 50.0)), tb: Some((-50.0, 50.0))
+///             ta: (50.0, 50.0), tb: (-50.0, 50.0)
 ///         },
 ///         VectorNetworkSegment {
 ///             a: 1, b: 2,
-///             ta: Some((50.0, 50.0)), tb: Some((50.0, -50.0))
+///             ta: (50.0, 50.0), tb: (50.0, -50.0)
 ///         },
 ///         VectorNetworkSegment {
 ///             a: 2, b: 3,
-///             ta: Some((50.0, 0.0)), tb: Some((-50.0, 0.0))
+///             ta: (50.0, 0.0), tb: (-50.0, 0.0)
 ///         },
 ///     ],
 /// ).expect("Valid geometry");
@@ -158,8 +158,8 @@ pub fn create_variable_width_stroke_from_geometry(
     for (segment_idx, segment) in geometry.segments.iter().enumerate() {
         let a = geometry.vertices[segment.a];
         let b = geometry.vertices[segment.b];
-        let ta = segment.ta.unwrap_or((0.0, 0.0));
-        let tb = segment.tb.unwrap_or((0.0, 0.0));
+        let ta = segment.ta;
+        let tb = segment.tb;
 
         // Convert to cubic Bezier control points
         let p0 = a;

@@ -29,12 +29,7 @@ fn main() {
         // Create a VectorNetwork for this line
         let line = VectorNetwork {
             vertices: vec![(x1, y1), (x2, y2)],
-            segments: vec![VectorNetworkSegment {
-                a: 0,
-                b: 1,
-                ta: None,
-                tb: None,
-            }],
+            segments: vec![VectorNetworkSegment::ab(0, 1)],
             regions: vec![],
         };
 

@@ -5,12 +5,7 @@ use skia_safe::{surfaces, Color, Paint, PaintStyle};
 fn main() {
     // Helper to create a segment without tangents
     fn segment(a: usize, b: usize) -> VectorNetworkSegment {
-        VectorNetworkSegment {
-            a,
-            b,
-            ta: None,
-            tb: None,
-        }
+        VectorNetworkSegment::ab(a, b)
     }
 
     // VectorNetwork representing a square with a square hole (donut shape)

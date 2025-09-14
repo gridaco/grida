@@ -18,54 +18,14 @@ fn main() {
             (150.0, 350.0),
         ],
         segments: vec![
-            VectorNetworkSegment {
-                a: 0,
-                b: 1,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 1,
-                b: 2,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 2,
-                b: 3,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 3,
-                b: 0,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 4,
-                b: 5,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 5,
-                b: 6,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 6,
-                b: 7,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 7,
-                b: 4,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(0, 1),
+            VectorNetworkSegment::ab(1, 2),
+            VectorNetworkSegment::ab(2, 3),
+            VectorNetworkSegment::ab(3, 0),
+            VectorNetworkSegment::ab(4, 5),
+            VectorNetworkSegment::ab(5, 6),
+            VectorNetworkSegment::ab(6, 7),
+            VectorNetworkSegment::ab(7, 4),
         ],
         regions: vec![
             VectorNetworkRegion {

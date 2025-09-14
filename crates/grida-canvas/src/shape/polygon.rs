@@ -51,12 +51,7 @@ pub fn build_simple_polygon_vector_network(shape: &SimplePolygonShape) -> Vector
     for i in 0..n {
         let a = i;
         let b = (i + 1) % n;
-        segments.push(VectorNetworkSegment {
-            a,
-            b,
-            ta: None,
-            tb: None,
-        });
+        segments.push(VectorNetworkSegment::ab(a, b));
     }
     VectorNetwork {
         vertices,

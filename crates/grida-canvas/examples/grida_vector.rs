@@ -34,18 +34,8 @@ async fn demo_vectors() -> Scene {
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
-                        VectorNetworkSegment {
-                            a: 0,
-                            b: 1,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 1,
-                            b: 2,
-                            ta: None,
-                            tb: None,
-                        },
+                        VectorNetworkSegment::ab(0, 1),
+                        VectorNetworkSegment::ab(1, 2),
                     ],
                     regions: vec![],
                 },
@@ -74,24 +64,9 @@ async fn demo_vectors() -> Scene {
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
-                        VectorNetworkSegment {
-                            a: 0,
-                            b: 1,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 1,
-                            b: 2,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 2,
-                            b: 0,
-                            ta: None,
-                            tb: None,
-                        },
+                        VectorNetworkSegment::ab(0, 1),
+                        VectorNetworkSegment::ab(1, 2),
+                        VectorNetworkSegment::ab(2, 0),
                     ],
                     regions: vec![],
                 },
@@ -121,24 +96,9 @@ async fn demo_vectors() -> Scene {
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0), (100.0, 0.0)],
                     segments: vec![
-                        VectorNetworkSegment {
-                            a: 0,
-                            b: 1,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 1,
-                            b: 2,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 2,
-                            b: 3,
-                            ta: None,
-                            tb: None,
-                        },
+                        VectorNetworkSegment::ab(0, 1),
+                        VectorNetworkSegment::ab(1, 2),
+                        VectorNetworkSegment::ab(2, 3),
                     ],
                     regions: vec![],
                 },
@@ -167,24 +127,9 @@ async fn demo_vectors() -> Scene {
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (0.0, 100.0), (100.0, 100.0)],
                     segments: vec![
-                        VectorNetworkSegment {
-                            a: 0,
-                            b: 1,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 1,
-                            b: 2,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 2,
-                            b: 3,
-                            ta: None,
-                            tb: None,
-                        },
+                        VectorNetworkSegment::ab(0, 1),
+                        VectorNetworkSegment::ab(1, 2),
+                        VectorNetworkSegment::ab(2, 3),
                     ],
                     regions: vec![],
                 },
@@ -214,31 +159,11 @@ async fn demo_vectors() -> Scene {
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (0.0, 100.0), (100.0, 100.0)],
                     segments: vec![
-                        VectorNetworkSegment {
-                            a: 0,
-                            b: 1,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 1,
-                            b: 2,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 2,
-                            b: 3,
-                            ta: None,
-                            tb: None,
-                        },
+                        VectorNetworkSegment::ab(0, 1),
+                        VectorNetworkSegment::ab(1, 2),
+                        VectorNetworkSegment::ab(2, 3),
                         // FIXME: this is not working
-                        VectorNetworkSegment {
-                            a: 3,
-                            b: 0,
-                            ta: None,
-                            tb: None,
-                        },
+                        VectorNetworkSegment::ab(3, 0),
                     ],
                     regions: vec![],
                 },
@@ -277,8 +202,8 @@ async fn demo_vectors() -> Scene {
                     segments: vec![VectorNetworkSegment {
                         a: 0,
                         b: 1,
-                        ta: Some((30.0, -30.0)), // Tangent handle from start point
-                        tb: Some((-30.0, 30.0)), // Tangent handle to end point
+                        ta: (30.0, -30.0), // Tangent handle from start point
+                        tb: (-30.0, 30.0), // Tangent handle to end point
                     }],
                     regions: vec![],
                 },
@@ -311,12 +236,7 @@ async fn demo_vectors() -> Scene {
                 fill: None,
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0)],
-                    segments: vec![VectorNetworkSegment {
-                        a: 0,
-                        b: 1,
-                        ta: None,
-                        tb: None,
-                    }],
+                    segments: vec![VectorNetworkSegment::ab(0, 1)],
                     regions: vec![],
                 },
                 corner_radius: 0.0,
@@ -352,24 +272,9 @@ async fn demo_vectors() -> Scene {
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
-                        VectorNetworkSegment {
-                            a: 0,
-                            b: 1,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 1,
-                            b: 2,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 2,
-                            b: 0,
-                            ta: None,
-                            tb: None,
-                        },
+                        VectorNetworkSegment::ab(0, 1),
+                        VectorNetworkSegment::ab(1, 2),
+                        VectorNetworkSegment::ab(2, 0),
                     ],
                     regions: vec![],
                 },
@@ -403,30 +308,10 @@ async fn demo_vectors() -> Scene {
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
-                        VectorNetworkSegment {
-                            a: 0,
-                            b: 1,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 1,
-                            b: 2,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 2,
-                            b: 3,
-                            ta: None,
-                            tb: None,
-                        },
-                        VectorNetworkSegment {
-                            a: 3,
-                            b: 0,
-                            ta: None,
-                            tb: None,
-                        },
+                        VectorNetworkSegment::ab(0, 1),
+                        VectorNetworkSegment::ab(1, 2),
+                        VectorNetworkSegment::ab(2, 3),
+                        VectorNetworkSegment::ab(3, 0),
                     ],
                     regions: vec![],
                 },

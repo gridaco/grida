@@ -58,12 +58,7 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         vertices.len() - 1
     };
     // helper to create line segment
-    let line = |a: usize, b: usize| VectorNetworkSegment {
-        a,
-        b,
-        ta: None,
-        tb: None,
-    };
+    let line = |a: usize, b: usize| VectorNetworkSegment::ab(a, b);
 
     // Starting point (top-left edge start)
     let start = (tl.rx, 0.0);
@@ -83,8 +78,8 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         segments.push(VectorNetworkSegment {
             a: prev,
             b: end_idx,
-            ta: Some((KAPPA * tr.rx, 0.0)),
-            tb: Some((0.0, -KAPPA * tr.ry)),
+            ta: (KAPPA * tr.rx, 0.0),
+            tb: (0.0, -KAPPA * tr.ry),
         });
         prev = end_idx;
     } else {
@@ -107,8 +102,8 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         segments.push(VectorNetworkSegment {
             a: prev,
             b: end_idx,
-            ta: Some((0.0, KAPPA * br.ry)),
-            tb: Some((-KAPPA * br.rx, 0.0)),
+            ta: (0.0, KAPPA * br.ry),
+            tb: (-KAPPA * br.rx, 0.0),
         });
         prev = end_idx;
     } else {
@@ -131,8 +126,8 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         segments.push(VectorNetworkSegment {
             a: prev,
             b: end_idx,
-            ta: Some((-KAPPA * bl.rx, 0.0)),
-            tb: Some((0.0, KAPPA * bl.ry)),
+            ta: (-KAPPA * bl.rx, 0.0),
+            tb: (0.0, KAPPA * bl.ry),
         });
         prev = end_idx;
     } else {
@@ -153,8 +148,8 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         segments.push(VectorNetworkSegment {
             a: prev,
             b: start_idx,
-            ta: Some((0.0, -KAPPA * tl.ry)),
-            tb: Some((KAPPA * tl.rx, 0.0)),
+            ta: (0.0, -KAPPA * tl.ry),
+            tb: (KAPPA * tl.rx, 0.0),
         });
     } else {
         segments.push(line(prev, start_idx));

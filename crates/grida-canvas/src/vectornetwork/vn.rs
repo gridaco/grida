@@ -6,8 +6,8 @@ use skia_safe;
 pub struct VectorNetworkSegment {
     pub a: usize,
     pub b: usize,
-    pub ta: Option<(f32, f32)>,
-    pub tb: Option<(f32, f32)>,
+    pub ta: (f32, f32),
+    pub tb: (f32, f32),
 }
 
 impl VectorNetworkSegment {
@@ -16,8 +16,8 @@ impl VectorNetworkSegment {
         Self {
             a,
             b,
-            ta: None,
-            tb: None,
+            ta: (0.0, 0.0),
+            tb: (0.0, 0.0),
         }
     }
 }
@@ -135,15 +135,15 @@ impl PiecewiseVectorNetworkGeometry {
     /// let geometry = PiecewiseVectorNetworkGeometry::new(
     ///     vec![(0.0, 0.0), (100.0, 0.0), (200.0, 100.0)],
     ///     vec![
-    ///         VectorNetworkSegment { a: 0, b: 1, ta: Some((50.0, 50.0)), tb: Some((-50.0, 50.0)) },
-    ///         VectorNetworkSegment { a: 1, b: 2, ta: Some((50.0, 50.0)), tb: Some((50.0, -50.0)) },
+    ///         VectorNetworkSegment { a: 0, b: 1, ta: (50.0, 50.0), tb: (-50.0, 50.0) },
+    ///         VectorNetworkSegment { a: 1, b: 2, ta: (50.0, 50.0), tb: (50.0, -50.0) },
     ///     ],
     /// ).expect("Valid geometry should be created successfully");
     ///
     /// // Invalid geometry - will return Err
     /// let invalid_result = PiecewiseVectorNetworkGeometry::new(
     ///     vec![(0.0, 0.0)], // Only one vertex
-    ///     vec![VectorNetworkSegment { a: 0, b: 1, ta: None, tb: None }], // References non-existent vertex 1
+    ///     vec![VectorNetworkSegment::ab(0, 1)], // References non-existent vertex 1
     /// );
     /// assert!(invalid_result.is_err());
     /// ```
@@ -186,8 +186,8 @@ impl PiecewiseVectorNetworkGeometry {
     /// let geometry = PiecewiseVectorNetworkGeometry {
     ///     vertices: vec![(0.0, 0.0), (100.0, 0.0), (200.0, 100.0)],
     ///     segments: vec![
-    ///         VectorNetworkSegment { a: 0, b: 1, ta: Some((50.0, 50.0)), tb: Some((-50.0, 50.0)) },
-    ///         VectorNetworkSegment { a: 1, b: 2, ta: Some((50.0, 50.0)), tb: Some((50.0, -50.0)) },
+    ///         VectorNetworkSegment { a: 0, b: 1, ta: (50.0, 50.0), tb: (-50.0, 50.0) },
+    ///         VectorNetworkSegment { a: 1, b: 2, ta: (50.0, 50.0), tb: (50.0, -50.0) },
     ///     ],
     /// };
     ///
@@ -216,16 +216,14 @@ impl PiecewiseVectorNetworkGeometry {
                 ));
             }
 
-            // Validate tangent vectors if present
-            if let Some(ta) = segment.ta {
-                if ta.0.is_nan() || ta.1.is_nan() || ta.0.is_infinite() || ta.1.is_infinite() {
-                    return Err(format!("Segment {}: invalid tangent 'ta' ({:?})", i, ta));
-                }
+            // Validate tangent vectors
+            let ta = segment.ta;
+            if ta.0.is_nan() || ta.1.is_nan() || ta.0.is_infinite() || ta.1.is_infinite() {
+                return Err(format!("Segment {}: invalid tangent 'ta' ({:?})", i, ta));
             }
-            if let Some(tb) = segment.tb {
-                if tb.0.is_nan() || tb.1.is_nan() || tb.0.is_infinite() || tb.1.is_infinite() {
-                    return Err(format!("Segment {}: invalid tangent 'tb' ({:?})", i, tb));
-                }
+            let tb = segment.tb;
+            if tb.0.is_nan() || tb.1.is_nan() || tb.0.is_infinite() || tb.1.is_infinite() {
+                return Err(format!("Segment {}: invalid tangent 'tb' ({:?})", i, tb));
             }
         }
 
@@ -288,8 +286,8 @@ fn build_path_from_segments(
         let b_idx = segment.b;
         let a = vertices[a_idx];
         let b = vertices[b_idx];
-        let ta = segment.ta.unwrap_or((0.0, 0.0));
-        let tb = segment.tb.unwrap_or((0.0, 0.0));
+        let ta = segment.ta;
+        let tb = segment.tb;
 
         if previous_end != Some(a_idx) {
             path.move_to((a.0, a.1));
@@ -377,8 +375,8 @@ impl VectorNetwork {
                     let b_idx = seg.b;
                     let a = vertices[a_idx];
                     let b = vertices[b_idx];
-                    let ta = seg.ta.unwrap_or((0.0, 0.0));
-                    let tb = seg.tb.unwrap_or((0.0, 0.0));
+                    let ta = seg.ta;
+                    let tb = seg.tb;
 
                     if previous_end != Some(a_idx) {
                         path.move_to((a.0, a.1));
@@ -455,8 +453,8 @@ impl VectorNetwork {
         for seg in &self.segments {
             let a = self.vertices[seg.a];
             let b = self.vertices[seg.b];
-            let ta = seg.ta.unwrap_or((0.0, 0.0));
-            let tb = seg.tb.unwrap_or((0.0, 0.0));
+            let ta = seg.ta;
+            let tb = seg.tb;
             let seg_box = if is_zero(ta) && is_zero(tb) {
                 Rectangle::from_points(&[[a.0, a.1], [b.0, b.1]])
             } else {
@@ -536,8 +534,8 @@ impl From<&skia_safe::Path> for VectorNetwork {
                     segments.push(VectorNetworkSegment {
                         a: prev_idx.unwrap(),
                         b: idx,
-                        ta: Some((c1.x - p0.x, c1.y - p0.y)),
-                        tb: Some((c2.x - p2.x, c2.y - p2.y)),
+                        ta: (c1.x - p0.x, c1.y - p0.y),
+                        tb: (c2.x - p2.x, c2.y - p2.y),
                     });
                     current_loop.push(seg_idx);
                     prev_idx = Some(idx);
@@ -554,8 +552,8 @@ impl From<&skia_safe::Path> for VectorNetwork {
                     segments.push(VectorNetworkSegment {
                         a: prev_idx.unwrap(),
                         b: idx,
-                        ta: Some((c1.x - p0.x, c1.y - p0.y)),
-                        tb: Some((c2.x - p2.x, c2.y - p2.y)),
+                        ta: (c1.x - p0.x, c1.y - p0.y),
+                        tb: (c2.x - p2.x, c2.y - p2.y),
                     });
                     current_loop.push(seg_idx);
                     prev_idx = Some(idx);
@@ -571,8 +569,8 @@ impl From<&skia_safe::Path> for VectorNetwork {
                     segments.push(VectorNetworkSegment {
                         a: prev_idx.unwrap(),
                         b: idx,
-                        ta: Some((c1.x - p0.x, c1.y - p0.y)),
-                        tb: Some((c2.x - p3.x, c2.y - p3.y)),
+                        ta: (c1.x - p0.x, c1.y - p0.y),
+                        tb: (c2.x - p3.x, c2.y - p3.y),
                     });
                     current_loop.push(seg_idx);
                     prev_idx = Some(idx);

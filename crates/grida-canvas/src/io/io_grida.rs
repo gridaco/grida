@@ -508,8 +508,8 @@ pub type JSONVectorNetworkVertex = (f32, f32);
 pub struct JSONVectorNetworkSegment {
     pub a: usize,
     pub b: usize,
-    pub ta: Option<(f32, f32)>,
-    pub tb: Option<(f32, f32)>,
+    pub ta: (f32, f32),
+    pub tb: (f32, f32),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -1447,8 +1447,8 @@ mod tests {
         assert_eq!(network.segments.len(), 1);
 
         // Check tangent handles
-        assert_eq!(network.segments[0].ta, Some((10.0, -10.0)));
-        assert_eq!(network.segments[0].tb, Some((-10.0, 10.0)));
+        assert_eq!(network.segments[0].ta, (10.0, -10.0));
+        assert_eq!(network.segments[0].tb, (-10.0, 10.0));
     }
 
     #[test]

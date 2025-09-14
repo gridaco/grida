@@ -35,12 +35,7 @@ fn main() {
 
     // Helper
     fn segment(a: usize, b: usize) -> VectorNetworkSegment {
-        VectorNetworkSegment {
-            a,
-            b,
-            ta: None,
-            tb: None,
-        }
+        VectorNetworkSegment::ab(a, b)
     }
 
     let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");

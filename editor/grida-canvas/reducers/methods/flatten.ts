@@ -58,7 +58,10 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
   if (!rect) return null;
 
   // attempt to resolve vector network via wasm backend when available
-  let v = context.vector?.toVectorNetwork(node_id) ?? null;
+  let v: vn.VectorNetwork | null = null;
+  try {
+    v = context.vector?.toVectorNetwork(node_id) ?? null;
+  } catch {}
   if (!v) {
     v = toVectorNetworkFallback(node, {
       width: rect.width,

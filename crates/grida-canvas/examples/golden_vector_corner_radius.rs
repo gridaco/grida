@@ -16,27 +16,12 @@ fn main() {
                 a: 0,
                 b: 1,
                 // demonstrate that the zero-tangents should behave as a corner
-                ta: Some((0.0, 0.0)),
-                tb: Some((0.0, 0.0)),
+                ta: (0.0, 0.0),
+                tb: (0.0, 0.0),
             },
-            VectorNetworkSegment {
-                a: 1,
-                b: 2,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 2,
-                b: 3,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 3,
-                b: 0,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(1, 2),
+            VectorNetworkSegment::ab(2, 3),
+            VectorNetworkSegment::ab(3, 0),
         ],
         regions: vec![],
     };
