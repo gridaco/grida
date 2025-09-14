@@ -64,9 +64,18 @@ export function useEditor(
     }
   });
 
+  // React 18+ runs effects twice in development (Strict Mode). This ref ensures
+  // that the editor instance is only disposed on the actual unmount, not during
+  // the first cleanup that happens immediately after mount in dev mode.
+  const _initial_cleanup_ref = React.useRef(false);
+
   React.useEffect(() => {
     return () => {
-      _editor?.dispose?.();
+      if (_initial_cleanup_ref.current) {
+        _editor?.dispose?.();
+      } else {
+        _initial_cleanup_ref.current = true;
+      }
     };
   }, [_editor]);
 
