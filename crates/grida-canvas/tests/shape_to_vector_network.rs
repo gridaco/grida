@@ -1,5 +1,6 @@
 use cg::cg::types::RectangularCornerRadius;
 use cg::node::factory::NodeFactory;
+use cg::node::schema::NodeShapeMixin;
 use cg::shape::*;
 
 #[test]

@@ -508,7 +508,9 @@ pub type JSONVectorNetworkVertex = (f32, f32);
 pub struct JSONVectorNetworkSegment {
     pub a: usize,
     pub b: usize,
+    #[serde(default)]
     pub ta: (f32, f32),
+    #[serde(default)]
     pub tb: (f32, f32),
 }
 
@@ -1397,10 +1399,10 @@ mod tests {
                 [0.0, 100.0]
             ],
             "segments": [
-                {"a": 0, "b": 1},
-                {"a": 1, "b": 2},
-                {"a": 2, "b": 3},
-                {"a": 3, "b": 0}
+                {"a": 0, "b": 1, "ta": [0.0, 0.0], "tb": [0.0, 0.0]},
+                {"a": 1, "b": 2, "ta": [0.0, 0.0], "tb": [0.0, 0.0]},
+                {"a": 2, "b": 3, "ta": [0.0, 0.0], "tb": [0.0, 0.0]},
+                {"a": 3, "b": 0, "ta": [0.0, 0.0], "tb": [0.0, 0.0]}
             ]
         }"#;
 
@@ -1689,5 +1691,57 @@ mod tests {
         } else {
             panic!("Expected Text node");
         }
+    }
+
+    #[test]
+    fn deserialize_json_vector_network_without_tangents() {
+        // Test with segments that don't have tangent handles (ta/tb should default to (0.0, 0.0))
+        let json = r#"{
+            "vertices": [
+                [0.0, 0.0],
+                [100.0, 0.0],
+                [100.0, 100.0],
+                [0.0, 100.0]
+            ],
+            "segments": [
+                {"a": 0, "b": 1},
+                {"a": 1, "b": 2},
+                {"a": 2, "b": 3},
+                {"a": 3, "b": 0}
+            ]
+        }"#;
+
+        let network: JSONVectorNetwork = serde_json::from_str(json)
+            .expect("failed to deserialize JSONVectorNetwork without tangents");
+
+        assert_eq!(network.vertices.len(), 4);
+        assert_eq!(network.segments.len(), 4);
+
+        // Check vertices
+        assert_eq!(network.vertices[0], (0.0, 0.0));
+        assert_eq!(network.vertices[1], (100.0, 0.0));
+        assert_eq!(network.vertices[2], (100.0, 100.0));
+        assert_eq!(network.vertices[3], (0.0, 100.0));
+
+        // Check segments - tangent handles should default to (0.0, 0.0)
+        assert_eq!(network.segments[0].a, 0);
+        assert_eq!(network.segments[0].b, 1);
+        assert_eq!(network.segments[0].ta, (0.0, 0.0));
+        assert_eq!(network.segments[0].tb, (0.0, 0.0));
+
+        assert_eq!(network.segments[1].a, 1);
+        assert_eq!(network.segments[1].b, 2);
+        assert_eq!(network.segments[1].ta, (0.0, 0.0));
+        assert_eq!(network.segments[1].tb, (0.0, 0.0));
+
+        assert_eq!(network.segments[2].a, 2);
+        assert_eq!(network.segments[2].b, 3);
+        assert_eq!(network.segments[2].ta, (0.0, 0.0));
+        assert_eq!(network.segments[2].tb, (0.0, 0.0));
+
+        assert_eq!(network.segments[3].a, 3);
+        assert_eq!(network.segments[3].b, 0);
+        assert_eq!(network.segments[3].ta, (0.0, 0.0));
+        assert_eq!(network.segments[3].tb, (0.0, 0.0));
     }
 }

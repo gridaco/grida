@@ -2,7 +2,7 @@ use crate::cg::types::*;
 use math2::Rectangle;
 use skia_safe;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VectorNetworkSegment {
     pub a: usize,
     pub b: usize,
