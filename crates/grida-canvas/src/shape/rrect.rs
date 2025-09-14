@@ -82,11 +82,6 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
             tb: (0.0, -KAPPA * tr.ry),
         });
         prev = end_idx;
-    } else {
-        let corner = (w, 0.0);
-        let corner_idx = push(corner);
-        segments.push(line(prev, corner_idx));
-        prev = corner_idx;
     }
 
     // Right edge
@@ -106,11 +101,6 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
             tb: (-KAPPA * br.rx, 0.0),
         });
         prev = end_idx;
-    } else {
-        let corner = (w, h);
-        let corner_idx = push(corner);
-        segments.push(line(prev, corner_idx));
-        prev = corner_idx;
     }
 
     // Bottom edge
@@ -130,16 +120,15 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
             tb: (0.0, KAPPA * bl.ry),
         });
         prev = end_idx;
-    } else {
-        let corner = (0.0, h);
-        let corner_idx = push(corner);
-        segments.push(line(prev, corner_idx));
-        prev = corner_idx;
     }
 
     // Left edge
     let tl_start = (0.0, tl.ry);
-    let tl_start_idx = push(tl_start);
+    let tl_start_idx = if tl_start == start {
+        start_idx
+    } else {
+        push(tl_start)
+    };
     segments.push(line(prev, tl_start_idx));
     prev = tl_start_idx;
 
@@ -151,13 +140,37 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
             ta: (0.0, -KAPPA * tl.ry),
             tb: (KAPPA * tl.rx, 0.0),
         });
-    } else {
-        segments.push(line(prev, start_idx));
     }
 
     VectorNetwork {
         vertices,
         segments,
         regions: vec![],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::vectornetwork::VectorNetworkSegment;
+
+    #[test]
+    fn rectangle_vector_network_is_minimal() {
+        let shape = RRectShape {
+            width: 100.0,
+            height: 50.0,
+            corner_radius: RectangularCornerRadius::zero(),
+        };
+
+        #[allow(deprecated)]
+        let vn = build_rrect_vector_network(&shape);
+
+        assert_eq!(vn.vertices.len(), 4);
+        assert_eq!(vn.segments.len(), 4);
+
+        assert_eq!(vn.segments[0], VectorNetworkSegment::ab(0, 1));
+        assert_eq!(vn.segments[1], VectorNetworkSegment::ab(1, 2));
+        assert_eq!(vn.segments[2], VectorNetworkSegment::ab(2, 3));
+        assert_eq!(vn.segments[3], VectorNetworkSegment::ab(3, 0));
     }
 }
