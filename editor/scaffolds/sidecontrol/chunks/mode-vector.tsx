@@ -27,6 +27,7 @@ import {
   MirroringAngle,
   MirroringNone,
 } from "@/grida-canvas-react-starter-kit/starterkit-icons/tangent-mirroring-mode";
+import { computeMixed } from "./compute-mixed";
 
 export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
   return (
@@ -67,7 +68,8 @@ function SectionGeometry({ node_id }: { node_id: string }) {
     });
     const result: [number, number][] = [];
     for (const v of vertices) {
-      result.push(absolute_vertices[v]);
+      const abs = absolute_vertices[v];
+      if (abs) result.push(abs);
     }
     for (const [v_idx, t_idx] of tangents) {
       const seg = segments.find((s) =>
@@ -76,6 +78,7 @@ function SectionGeometry({ node_id }: { node_id: string }) {
       if (!seg) continue;
       const vertex = absolute_vertices[t_idx === 0 ? seg.a : seg.b];
       const tangent = t_idx === 0 ? seg.ta : seg.tb;
+      if (!vertex || !tangent) continue;
       result.push([vertex[0] + tangent[0], vertex[1] + tangent[1]]);
     }
     return result;
@@ -88,17 +91,13 @@ function SectionGeometry({ node_id }: { node_id: string }) {
     segments,
   ]);
 
-  const computeMixed = React.useCallback(
-    (values: number[]): typeof grida.mixed | number | "" => {
-      if (values.length === 0) return "";
-      const first = values[0];
-      return values.every((v) => v === first) ? first : grida.mixed;
-    },
-    []
+  const safePoints = React.useMemo(
+    () => points.filter((p): p is [number, number] => Array.isArray(p)),
+    [points]
   );
 
-  const x = computeMixed(points.map((p) => p[0]));
-  const y = computeMixed(points.map((p) => p[1]));
+  const x = computeMixed(safePoints.map((p) => p[0]));
+  const y = computeMixed(safePoints.map((p) => p[1]));
 
   const handleDelta = React.useCallback(
     (axis: "x" | "y") => (change: editor.api.NumberChange) => {
