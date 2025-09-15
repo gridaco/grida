@@ -89,7 +89,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { keysymbols } from "@/grida-canvas-react/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
@@ -131,6 +130,13 @@ type UIConfig = {
 };
 
 const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
+
+function snapshotFilename() {
+  const now = new Date();
+  const date = now.toISOString().split("T")[0];
+  const time = now.toLocaleTimeString().replace(/:/g, ".");
+  return `Snapshot ${date} at ${time}.grida`;
+}
 
 function useSyncMultiplayerCursors(editor: Editor, room_id?: string) {
   const pluginRef = useRef<EditorYSyncPlugin | null>(null);
@@ -188,7 +194,7 @@ export default function CanvasPlayground({
 }: CanvasPlaygroundProps) {
   const instance = useEditor(document, backend);
   useSyncMultiplayerCursors(instance, room_id);
-  const fonts = useGoogleFontsList();
+  const fonts = useEditorState(instance, (state) => state.webfontlist.items);
 
   useEffect(() => {
     if (!src) return;
@@ -274,7 +280,7 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
 
   const onExport = () => {
     const blob = instance.archive();
-    saveAs(blob, `${v4()}.grida`);
+    saveAs(blob, snapshotFilename());
   };
 
   return (
@@ -658,7 +664,7 @@ function PlaygroundMenuContent() {
 
   const onExport = () => {
     const blob = instance.archive();
-    saveAs(blob, `${v4()}.grida`);
+    saveAs(blob, snapshotFilename());
   };
 
   return (

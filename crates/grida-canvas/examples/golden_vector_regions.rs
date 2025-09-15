@@ -31,105 +31,25 @@ fn main() {
         ],
         segments: vec![
             // Rectangle 1 segments
-            VectorNetworkSegment {
-                a: 0,
-                b: 1,
-                ta: None,
-                tb: None,
-            }, // top edge
-            VectorNetworkSegment {
-                a: 1,
-                b: 2,
-                ta: None,
-                tb: None,
-            }, // right edge
-            VectorNetworkSegment {
-                a: 2,
-                b: 3,
-                ta: None,
-                tb: None,
-            }, // bottom edge
-            VectorNetworkSegment {
-                a: 3,
-                b: 0,
-                ta: None,
-                tb: None,
-            }, // left edge (closes)
+            VectorNetworkSegment::ab(0, 1), // top edge
+            VectorNetworkSegment::ab(1, 2), // right edge
+            VectorNetworkSegment::ab(2, 3), // bottom edge
+            VectorNetworkSegment::ab(3, 0), // left edge (closes)
             // Rectangle 2 segments
-            VectorNetworkSegment {
-                a: 4,
-                b: 5,
-                ta: None,
-                tb: None,
-            }, // top edge
-            VectorNetworkSegment {
-                a: 5,
-                b: 6,
-                ta: None,
-                tb: None,
-            }, // right edge
-            VectorNetworkSegment {
-                a: 6,
-                b: 7,
-                ta: None,
-                tb: None,
-            }, // bottom edge
-            VectorNetworkSegment {
-                a: 7,
-                b: 4,
-                ta: None,
-                tb: None,
-            }, // left edge (closes)
+            VectorNetworkSegment::ab(4, 5), // top edge
+            VectorNetworkSegment::ab(5, 6), // right edge
+            VectorNetworkSegment::ab(6, 7), // bottom edge
+            VectorNetworkSegment::ab(7, 4), // left edge (closes)
             // Rectangle 3 segments
-            VectorNetworkSegment {
-                a: 8,
-                b: 9,
-                ta: None,
-                tb: None,
-            }, // top edge
-            VectorNetworkSegment {
-                a: 9,
-                b: 10,
-                ta: None,
-                tb: None,
-            }, // right edge
-            VectorNetworkSegment {
-                a: 10,
-                b: 11,
-                ta: None,
-                tb: None,
-            }, // bottom edge
-            VectorNetworkSegment {
-                a: 11,
-                b: 8,
-                ta: None,
-                tb: None,
-            }, // left edge (closes)
+            VectorNetworkSegment::ab(8, 9),   // top edge
+            VectorNetworkSegment::ab(9, 10),  // right edge
+            VectorNetworkSegment::ab(10, 11), // bottom edge
+            VectorNetworkSegment::ab(11, 8),  // left edge (closes)
             // Rectangle 4 segments
-            VectorNetworkSegment {
-                a: 12,
-                b: 13,
-                ta: None,
-                tb: None,
-            }, // top edge
-            VectorNetworkSegment {
-                a: 13,
-                b: 14,
-                ta: None,
-                tb: None,
-            }, // right edge
-            VectorNetworkSegment {
-                a: 14,
-                b: 15,
-                ta: None,
-                tb: None,
-            }, // bottom edge
-            VectorNetworkSegment {
-                a: 15,
-                b: 12,
-                ta: None,
-                tb: None,
-            }, // left edge (closes)
+            VectorNetworkSegment::ab(12, 13), // top edge
+            VectorNetworkSegment::ab(13, 14), // right edge
+            VectorNetworkSegment::ab(14, 15), // bottom edge
+            VectorNetworkSegment::ab(15, 12), // left edge (closes)
         ],
         regions: vec![],
     };
@@ -152,5 +72,9 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/vector_regions.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/vector_regions.png"),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

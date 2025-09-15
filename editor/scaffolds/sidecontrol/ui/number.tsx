@@ -3,7 +3,7 @@ import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
 import type { TMixed } from "../controls/utils/types";
 import type { editor } from "@/grida-canvas";
-import { useNumberInput } from "./use-number-input";
+import { useNumberInput } from "@grida/number-input/react";
 
 type NumericPropertyControlProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
@@ -23,6 +23,8 @@ type NumericPropertyControlProps = Omit<
   max?: number;
   /** Optional icon to display in the input */
   icon?: React.ReactNode;
+  /** Whether to commit the value when input loses focus */
+  commitOnBlur?: boolean;
 } & (
     | {
         /** Mode for handling value changes with delta support */
@@ -54,9 +56,9 @@ type NumericPropertyControlProps = Omit<
  * - Two operation modes:
  *   - "auto": Reports changes as deltas (e.g., {type: "delta", value: 1})
  *   - "fixed": Reports changes as absolute values (e.g., 101)
- * - Value commit on Enter or arrow keys
+ * - Value commit on Enter, blur, or arrow keys
  * - ESC to cancel and blur
- * - Reset to initial value on blur
+ * - Blur commit can be disabled
  * - Mixed value state support
  * - Floating point precision handling
  *
@@ -67,7 +69,7 @@ type NumericPropertyControlProps = Omit<
  *    - Arrow keys: Updates and commits in one operation
  *    - Enter: Commits current value and blurs
  *    - ESC: Cancels changes and blurs
- *    - Blur without commit: Resets to initial value
+ *    - Blur: Commits by default (reverts if commitOnBlur is false)
  *
  * 2. Arrow Key Behavior:
  *    - Works on current input value, not just committed value
@@ -79,7 +81,7 @@ type NumericPropertyControlProps = Omit<
  * 3. Value Commit Triggers:
  *    - Enter key (commits and blurs)
  *    - Arrow Up/Down keys (commits)
- *    - Blur (if value was changed)
+ *    - Blur (if enabled)
  *
  * 4. Mode Differences:
  *    - "auto": Reports changes as deltas (useful for relative adjustments)
@@ -130,6 +132,7 @@ export default function InputPropertyNumber({
   autoSelect = true,
   min,
   max,
+  commitOnBlur = true,
   appearance = "none",
   icon,
   className,
@@ -144,20 +147,20 @@ export default function InputPropertyNumber({
     handleBlur,
     handleKeyDown,
     handleChange,
+    inputRef,
   } = useNumberInput({
     type,
     value,
     step,
     autoSelect,
+    precision: 1,
     min,
     max,
     mode,
     onValueChange,
     onValueCommit,
+    commitOnBlur,
   });
-
-  // Create a ref for the input element
-  const inputRef = React.useRef<HTMLInputElement>(null);
 
   // Track focus state for data-focus attribute
   const [isFocused, setIsFocused] = React.useState(false);
@@ -165,7 +168,7 @@ export default function InputPropertyNumber({
   // Handle container click to focus the input
   const handleContainerClick = React.useCallback(() => {
     inputRef.current?.focus();
-  }, []);
+  }, [inputRef]);
 
   // Handle container pointer down to focus the input
   const handleContainerPointerDown = React.useCallback(
@@ -175,7 +178,7 @@ export default function InputPropertyNumber({
         inputRef.current?.focus();
       }
     },
-    []
+    [inputRef]
   );
 
   // Custom focus handler to track focus state

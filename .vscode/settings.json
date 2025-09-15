@@ -1,31 +1,4 @@
 {
-  "files.exclude": {
-    "**/.git": true,
-    "**/.svn": true,
-    "**/.hg": true,
-    "**/CVS": true,
-    "**/.DS_Store": true,
-    "**/node_modules": true,
-    "**/.legacy": true
-  },
-  "files.associations": {
-    ".babelrc": "jsonc",
-    ".eslintrc": "jsonc",
-    ".prettierrc": "jsonc",
-    ".eslintignore": "ignore"
-  },
-
-  "javascript.validate.enable": false,
-  "javascript.format.enable": false,
-  "typescript.format.enable": false,
-  "eslint.enable": true,
-  "eslint.validate": [
-    "javascript",
-    "javascriptreact",
-    "typescript",
-    "typescriptreact"
-  ],
-
   "search.exclude": {
     ".git": true,
     "**/.next": true,
@@ -35,14 +8,42 @@
     "src/dist": true,
     "src/main.prod.js": true,
     "src/main.prod.js.map": true,
-    "bower_components": true,
     "dll": true,
     "release": true,
     "node_modules": true,
     "**/node_modules": true,
     "npm-debug.log.*": true,
     "test/**/__snapshots__": true,
-    "yarn.lock": true,
+    "pnpm-lock.yaml": true,
+    "**/pnpm-lock.yaml": true,
     "*.{css,sass,scss}.d.ts": true
-  }
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.next": true,
+    "**/.turbo": true,
+    "**/.legacy": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true
+  },
+  "files.associations": {
+    ".grida": "json",
+    ".babelrc": "jsonc",
+    ".eslintrc": "jsonc",
+    ".prettierrc": "jsonc",
+    ".eslintignore": "ignore"
+  },
+  "javascript.validate.enable": false,
+  "javascript.format.enable": false,
+  "typescript.format.enable": false,
+  "eslint.enable": true,
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ]
 }

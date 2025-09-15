@@ -73,6 +73,16 @@ export const keybindings_sheet = [
     keys: ["meta+b"],
   },
   {
+    name: "toggle italic",
+    description: "Toggle italic style",
+    keys: ["meta+i"],
+  },
+  {
+    name: "toggle line-through",
+    description: "Toggle line-through style",
+    keys: ["meta+shift+x"],
+  },
+  {
     name: "toggle active",
     description: "Toggle active state for the selection",
     keys: ["meta+shift+h"],
@@ -696,6 +706,18 @@ export function useEditorHotKeys() {
 
   useHotkeys("meta+b, ctrl+b", () => {
     editor.toggleBold("selection");
+  });
+
+  useHotkeys("meta+i, ctrl+i", () => {
+    editor.toggleItalic("selection");
+  });
+
+  useHotkeys("meta+u, ctrl+u", () => {
+    editor.toggleUnderline("selection");
+  });
+
+  useHotkeys("meta+shift+x, ctrl+shift+x", () => {
+    editor.toggleLineThrough("selection");
   });
 
   useHotkeys("shift+r", () => {

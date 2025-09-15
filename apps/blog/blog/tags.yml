@@ -1,14 +1,19 @@
 canvas:
   label: Canvas
   permalink: /canvas
-  description: canvas tag description
+  description: Building free & open canvas for the world
 
-snap:
-  label: Snap
-  permalink: /snap
-  description: Snap tag description
+skia:
+  label: Skia
+  permalink: /skia
+  description: Leveraging Skia 2D graphics library for canvas
 
-threshold:
-  label: Threshold
-  permalink: /threshold
-  description: Threshold tag description
+surface:
+  label: Surface
+  permalink: /surface
+  description: Surface behind the scenes
+
+ux:
+  label: UX
+  permalink: /ux
+  description: Designing professional grade editor User Experience

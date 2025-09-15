@@ -188,7 +188,7 @@ export namespace cg {
    * @see https://api.flutter.dev/flutter/painting/BoxFit.html
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit
    */
-  export type BoxFit = "contain" | "cover" | "none";
+  export type BoxFit = "contain" | "cover" | "fill" | "none";
 
   /**
    * Supported stoke cap modes
@@ -217,7 +217,52 @@ export namespace cg {
    * @see https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration
    */
-  export type TextDecoration = "none" | "underline";
+  export type TextDecorationLine =
+    | "none"
+    | "underline"
+    | "overline"
+    | "line-through";
+
+  /**
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-style
+   */
+  export type TextDecorationStyle =
+    | "solid"
+    | "double"
+    | "dotted"
+    | "dashed"
+    | "wavy";
+
+  /**
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-color
+   */
+  export type TextDecorationColor = "currentcolor" | cg.RGBA8888;
+  export type TextDecorationColorValue = cg.RGBA8888;
+
+  /**
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-skip-ink
+   */
+  export type TextDecorationSkipInk = "auto" | "none";
+  export type TextDecorationSkipInkFlag = boolean;
+
+  /**
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-thickness
+   *
+   * auto or thickness in percentage
+   */
+  export type TextDecorationThicknessPercentage = "auto" | number;
+
+  /**
+   * Text transform modes
+   *
+   * - `none`
+   * - `uppercase`
+   * - `lowercase`
+   * - `capitalize`
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-transform
+   */
+  export type TextTransform = "none" | "uppercase" | "lowercase" | "capitalize";
 
   /**
    * Supported text align modes
@@ -240,12 +285,287 @@ export namespace cg {
   export type TextAlignVertical = "top" | "center" | "bottom";
 
   /**
+   * Open type feature tags
+   *
+   * @see https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist
+   * @see https://learn.microsoft.com/en-us/typography/opentype/spec/featuretags
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_fonts/OpenType_fonts_guide
+   */
+  export type OpenTypeFeature =
+    | "aalt"
+    | "abrv"
+    | "abvm"
+    | "abvs"
+    | "afrc"
+    | "akhn"
+    | "blwf"
+    | "blwm"
+    | "blws"
+    | "c2pc"
+    | "calt"
+    | "case"
+    | "ccmp"
+    | "cfar"
+    | "cjct"
+    | "clig"
+    | "cpct"
+    | "cpsp"
+    | "cswh"
+    | "curs"
+    | "cv01"
+    | "cv02"
+    | "cv03"
+    | "cv04"
+    | "cv05"
+    | "cv06"
+    | "cv07"
+    | "cv08"
+    | "cv09"
+    | "cv10"
+    | "cv11"
+    | "cv12"
+    | "cv13"
+    | "cv14"
+    | "cv15"
+    | "cv16"
+    | "cv17"
+    | "cv18"
+    | "cv19"
+    | "cv20"
+    | "cv21"
+    | "cv22"
+    | "cv23"
+    | "cv24"
+    | "cv25"
+    | "cv26"
+    | "cv27"
+    | "cv28"
+    | "cv29"
+    | "cv30"
+    | "cv31"
+    | "cv32"
+    | "cv33"
+    | "cv34"
+    | "cv35"
+    | "cv36"
+    | "cv37"
+    | "cv38"
+    | "cv39"
+    | "cv40"
+    | "cv41"
+    | "cv42"
+    | "cv43"
+    | "cv44"
+    | "cv45"
+    | "cv46"
+    | "cv47"
+    | "cv48"
+    | "cv49"
+    | "cv50"
+    | "cv51"
+    | "cv52"
+    | "cv53"
+    | "cv54"
+    | "cv55"
+    | "cv56"
+    | "cv57"
+    | "cv58"
+    | "cv59"
+    | "cv60"
+    | "cv61"
+    | "cv62"
+    | "cv63"
+    | "cv64"
+    | "cv65"
+    | "cv66"
+    | "cv67"
+    | "cv68"
+    | "cv69"
+    | "cv70"
+    | "cv71"
+    | "cv72"
+    | "cv73"
+    | "cv74"
+    | "cv75"
+    | "cv76"
+    | "cv77"
+    | "cv78"
+    | "cv79"
+    | "cv80"
+    | "cv81"
+    | "cv82"
+    | "cv83"
+    | "cv84"
+    | "cv85"
+    | "cv86"
+    | "cv87"
+    | "cv88"
+    | "cv89"
+    | "cv90"
+    | "cv91"
+    | "cv92"
+    | "cv93"
+    | "cv94"
+    | "cv95"
+    | "cv96"
+    | "cv97"
+    | "cv98"
+    | "cv99"
+    | "dist"
+    | "dlig"
+    | "dnom"
+    | "dtls"
+    | "expt"
+    | "falt"
+    | "fin2"
+    | "fin3"
+    | "fina"
+    | "flac"
+    | "fwid"
+    | "half"
+    | "haln"
+    | "halt"
+    | "hist"
+    | "hkna"
+    | "hlig"
+    | "hngl"
+    | "hojo"
+    | "hwid"
+    | "init"
+    | "isol"
+    | "ital"
+    | "jp04"
+    | "jp78"
+    | "jp83"
+    | "jp90"
+    | "just"
+    | "kern"
+    | "lfbd"
+    | "liga"
+    | "ljmo"
+    | "locl"
+    | "ltra"
+    | "ltrm"
+    | "mark"
+    | "med2"
+    | "medi"
+    | "mgrk"
+    | "mkmk"
+    | "nalt"
+    | "nlck"
+    | "nukt"
+    | "numr"
+    | "opbd"
+    | "ordn"
+    | "ornm"
+    | "palt"
+    | "pcap"
+    | "pkna"
+    | "pref"
+    | "pres"
+    | "pstf"
+    | "psts"
+    | "pwid"
+    | "qwid"
+    | "rand"
+    | "rclt"
+    | "rkrf"
+    | "rlig"
+    | "rphf"
+    | "rtbd"
+    | "rtla"
+    | "rtlm"
+    | "ruby"
+    | "rvrn"
+    | "salt"
+    | "sinf"
+    | "size"
+    | "smpl"
+    | "ss01"
+    | "ss02"
+    | "ss03"
+    | "ss04"
+    | "ss05"
+    | "ss06"
+    | "ss07"
+    | "ss08"
+    | "ss09"
+    | "ss10"
+    | "ss11"
+    | "ss12"
+    | "ss13"
+    | "ss14"
+    | "ss15"
+    | "ss16"
+    | "ss17"
+    | "ss18"
+    | "ss19"
+    | "ss20"
+    | "ssty"
+    | "stch"
+    | "swsh"
+    | "titl"
+    | "tjmo"
+    | "tnam"
+    | "trad"
+    | "twid"
+    | "unic"
+    | "valt"
+    | "vatu"
+    | "vert"
+    | "vhal"
+    | "vjmo"
+    | "vkna"
+    | "vkrn"
+    | "vpal"
+    | "vrt2"
+    | "vrtr"
+    | "zero";
+
+  /**
    * Supported font weights in numeric values
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight
    * @see https://api.flutter.dev/flutter/dart-ui/FontWeight-class.html
    * @see https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass
    */
   export type NFontWeight = 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
+
+  /**
+   * css font-style values
+   */
+  export type CSSFontStyle = "normal" | "italic" | "oblique";
+
+  /**
+   * Optical sizing modes
+   *
+   * - `"auto"` links optical size to `fontSize`
+   * - `"none"` disables optical sizing
+   * - `number` sets a fixed optical size value
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-optical-sizing
+   */
+  export type OpticalSizing = "auto" | "none" | number;
+
+  /**
+   * Font kerning modes
+   *
+   * - `"normal"` enables kerning
+   * - `"none"` disables kerning
+   *
+   * @remark we don't support `auto`. use `normal` instead.
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-kerning
+   * @default `auto`
+   */
+  export type FontKerning = "normal" | "none";
+
+  /**
+   * Font kerning flag
+   *
+   * @see {@link FontKerning}
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-kerning
+   * @default `true`
+   */
+  export type FontKerningFlag = boolean;
 
   /**
    * @see https://api.flutter.dev/flutter/painting/Axis.html

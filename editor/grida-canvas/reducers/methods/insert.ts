@@ -61,9 +61,13 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
     ...sub_ctx.__ctx_nid_to_parent_id,
   };
 
-  draft.googlefonts = Array.from(
-    new Set([...draft.googlefonts.map((g) => g.family), ...sub_fonts])
-  ).map((family) => ({ family }));
+  draft.fontfaces = Array.from(
+    new Set([...draft.fontfaces.map((g) => g.family), ...sub_fonts])
+  ).map((family) => ({
+    family,
+    // FIXME: support italic flag
+    italic: false,
+  }));
 
   // Update the hierarchy with parent-child relationships
   const context = new dq.Context(draft.document_ctx);
@@ -121,7 +125,11 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
 
   // Update the document's font registry
   const s = new dq.DocumentStateQuery(draft.document);
-  draft.googlefonts = s.fonts().map((family) => ({ family }));
+  draft.fontfaces = s.fonts().map((family) => ({
+    family,
+    // FIXME: support italic flag
+    italic: false,
+  }));
 
   // Update the runtime context with parent-child relationships
   const context = new dq.Context(draft.document_ctx);

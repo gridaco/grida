@@ -77,6 +77,7 @@ fn main() {
         .with_title("Winit RAF Demo")
         .with_inner_size(LogicalSize::new(800, 600));
 
+    #[allow(deprecated)]
     let window = el
         .create_window(window_attributes)
         .expect("Failed to create window");

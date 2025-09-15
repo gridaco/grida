@@ -1,6 +1,6 @@
 import type { TMixed } from "./utils/types";
 import type { editor } from "@/grida-canvas";
-import InputPropertyNumber from "../ui/number";
+import InputPropertyPercentage from "../ui/percentage";
 
 export function LetterSpacingControl({
   value,
@@ -12,12 +12,12 @@ export function LetterSpacingControl({
   onValueCommit?: (change: editor.api.NumberChange) => void;
 }) {
   return (
-    <InputPropertyNumber
+    <InputPropertyPercentage
       mode="auto"
-      type="integer"
+      type="number"
       value={value}
       placeholder="inherit"
-      step={1}
+      step={0.01}
       onValueChange={onValueChange}
       onValueCommit={onValueCommit}
     />

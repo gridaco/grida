@@ -1,6 +1,6 @@
 use crate::node::schema::Size;
 use crate::os::winit::{winit_window, WinitResult};
-use crate::resource::{FontMessage, ImageMessage};
+use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
 use crate::window::application::ApplicationApi;
@@ -204,22 +204,16 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
 
         match handle_window_event(&event, &self.modifiers) {
             cmd => {
-                let ok = self.app.command(cmd.clone());
+                let is_copy_png = matches!(cmd, ApplicationCommand::TryCopyAsPNG);
+                let ok = self.app.command(cmd);
 
-                if ok {
-                    match cmd.clone() {
-                        ApplicationCommand::TryCopyAsPNG => {
-                            {
-                                // save to file
-                                use std::io::Write;
-                                let path = format!("clipboard.png");
-                                let mut file = std::fs::File::create(path).unwrap();
-                                file.write_all(self.app.clipboard.data.as_ref().unwrap())
-                                    .unwrap();
-                            }
-                        }
-                        _ => {}
-                    }
+                if ok && is_copy_png {
+                    // save to file
+                    use std::io::Write;
+                    let path = "clipboard.png".to_string();
+                    let mut file = std::fs::File::create(path).unwrap();
+                    file.write_all(self.app.clipboard.data.as_ref().unwrap())
+                        .unwrap();
                 }
             }
         }

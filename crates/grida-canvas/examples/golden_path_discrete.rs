@@ -27,5 +27,9 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     std::fs::create_dir_all("goldens").unwrap();
-    std::fs::write("goldens/path_discrete.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/path_discrete.png"),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

@@ -1,9 +1,12 @@
 use crate::cg::types::*;
 use crate::cg::varwidth::{VarWidthProfile, WidthStop};
+use crate::io::io_css::{
+    de_css_dimension, default_height_css, default_width_css, CSSDimension, CSSObjectFit,
+};
 use crate::node::schema::*;
 use crate::vectornetwork::*;
-use math2::transform::AffineTransform;
-use serde::Deserialize;
+use math2::{box_fit::BoxFit, transform::AffineTransform};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -65,6 +68,13 @@ pub enum JSONPaint {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+    },
+    #[serde(rename = "image")]
+    Image {
+        hash: String,
+        transform: Option<[[f32; 3]; 2]>,
+        #[serde(default)]
+        fit: CSSObjectFit,
     },
 }
 
@@ -140,8 +150,9 @@ impl From<Option<JSONPaint>> for Paint {
     fn from(fill: Option<JSONPaint>) -> Self {
         match fill {
             Some(JSONPaint::Solid { color }) => Paint::Solid(SolidPaint {
-                color: color.map_or(CGColor(0, 0, 0, 0), |c| c.into()),
+                color: color.map_or(CGColor::TRANSPARENT, |c| c.into()),
                 opacity: 1.0,
+                blend_mode: BlendMode::default(),
             }),
             Some(JSONPaint::LinearGradient {
                 transform, stops, ..
@@ -153,6 +164,7 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
+                    blend_mode: BlendMode::default(),
                 })
             }
             Some(JSONPaint::RadialGradient {
@@ -165,6 +177,7 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
+                    blend_mode: BlendMode::default(),
                 })
             }
             Some(JSONPaint::DiamondGradient {
@@ -177,6 +190,7 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
+                    blend_mode: BlendMode::default(),
                 })
             }
             Some(JSONPaint::SweepGradient {
@@ -189,11 +203,26 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
+                    blend_mode: BlendMode::default(),
                 })
             }
-            None => Paint::Solid(SolidPaint {
-                color: CGColor(0, 0, 0, 0),
+            Some(JSONPaint::Image {
+                hash,
+                transform,
+                fit,
+            }) => Paint::Image(ImagePaint {
+                hash,
+                transform: transform
+                    .map(|m| AffineTransform { matrix: m })
+                    .unwrap_or_else(AffineTransform::identity),
+                fit: fit.into(),
                 opacity: 1.0,
+                blend_mode: BlendMode::default(),
+            }),
+            None => Paint::Solid(SolidPaint {
+                color: CGColor::TRANSPARENT,
+                opacity: 1.0,
+                blend_mode: BlendMode::default(),
             }),
         }
     }
@@ -213,6 +242,17 @@ impl From<JSONVarWidthStop> for WidthStop {
         WidthStop {
             u: stop.u,
             r: stop.r,
+        }
+    }
+}
+
+impl From<CSSObjectFit> for BoxFit {
+    fn from(fit: CSSObjectFit) -> Self {
+        match fit {
+            CSSObjectFit::Contain => BoxFit::Contain,
+            CSSObjectFit::Cover => BoxFit::Cover,
+            CSSObjectFit::Fill => BoxFit::Fill,
+            CSSObjectFit::None => BoxFit::None,
         }
     }
 }
@@ -266,16 +306,16 @@ pub struct JSONUnknownNodeProperties {
     // geometry - defaults to 0 for non-intrinsic size nodes
     #[serde(
         rename = "width",
-        default = "default_width",
-        deserialize_with = "de_css_length"
+        default = "default_width_css",
+        deserialize_with = "de_css_dimension"
     )]
-    pub width: f32,
+    pub width: CSSDimension,
     #[serde(
         rename = "height",
-        default = "default_height",
-        deserialize_with = "de_css_length"
+        default = "default_height_css",
+        deserialize_with = "de_css_dimension"
     )]
-    pub height: f32,
+    pub height: CSSDimension,
 
     #[serde(rename = "cornerRadius", default)]
     pub corner_radius: Option<f32>,
@@ -355,6 +395,8 @@ pub enum JSONNode {
     Text(JSONTextNode),
     #[serde(rename = "boolean")]
     BooleanOperation(JSONBooleanOperationNode),
+    #[serde(rename = "image")]
+    Image(JSONImageNode),
     Unknown(JSONUnknownNodeProperties),
 }
 
@@ -399,22 +441,57 @@ pub struct JSONTextNode {
     pub base: JSONUnknownNodeProperties,
 
     pub text: String,
-    #[serde(rename = "textAlign", default = "default_text_align")]
+    #[serde(rename = "maxLines", default)]
+    pub max_lines: Option<usize>,
+    #[serde(rename = "textAlign", default)]
     pub text_align: TextAlign,
-    #[serde(rename = "textAlignVertical", default = "default_text_align_vertical")]
+    #[serde(rename = "textAlignVertical", default)]
     pub text_align_vertical: TextAlignVertical,
-    #[serde(rename = "textDecoration", default = "default_text_decoration")]
-    pub text_decoration: TextDecoration,
-    #[serde(rename = "lineHeight")]
+
+    #[serde(rename = "textDecorationLine", default)]
+    pub text_decoration_line: TextDecorationLine,
+    #[serde(rename = "textDecorationStyle", default)]
+    pub text_decoration_style: Option<TextDecorationStyle>,
+    #[serde(rename = "textDecorationColor", default)]
+    pub text_decoration_color: Option<JSONRGBA>,
+    #[serde(rename = "textDecorationSkipInk", default)]
+    pub text_decoration_skip_ink: Option<bool>,
+    #[serde(rename = "textDecorationThickness", default)]
+    pub text_decoration_thinkness: Option<f32>,
+
+    #[serde(rename = "lineHeight", default)]
     pub line_height: Option<f32>,
-    #[serde(rename = "letterSpacing")]
+    #[serde(rename = "letterSpacing", default)]
     pub letter_spacing: Option<f32>,
-    #[serde(rename = "fontSize")]
+    #[serde(rename = "wordSpacing", default)]
+    pub word_spacing: Option<f32>,
+    #[serde(rename = "fontSize", default)]
     pub font_size: Option<f32>,
-    #[serde(rename = "fontFamily")]
+    #[serde(rename = "fontFamily", default)]
     pub font_family: Option<String>,
-    #[serde(rename = "fontWeight", default = "default_font_weight")]
+    #[serde(rename = "fontWeight", default)]
     pub font_weight: FontWeight,
+    #[serde(rename = "fontWidth", default)]
+    pub font_width: Option<f32>,
+    #[serde(rename = "fontStyleItalic", default)]
+    pub font_style_italic: bool,
+
+    #[serde(rename = "fontKerning", default)]
+    pub font_kerning: bool,
+    #[serde(rename = "fontFeatures", default)]
+    pub font_features: Option<HashMap<String, bool>>,
+    #[serde(rename = "fontVariations", default)]
+    pub font_variations: Option<HashMap<String, f32>>,
+
+    #[serde(
+        rename = "fontOpticalSizing",
+        default,
+        deserialize_with = "de_optical_sizing"
+    )]
+    pub font_optical_sizing: FontOpticalSizing,
+
+    #[serde(rename = "textTransform", default)]
+    pub text_transform: TextTransform,
 }
 
 #[derive(Debug, Deserialize)]
@@ -427,15 +504,17 @@ pub struct JSONSVGPathNode {
 
 pub type JSONVectorNetworkVertex = (f32, f32);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct JSONVectorNetworkSegment {
     pub a: usize,
     pub b: usize,
-    pub ta: Option<(f32, f32)>,
-    pub tb: Option<(f32, f32)>,
+    #[serde(default)]
+    pub ta: (f32, f32),
+    #[serde(default)]
+    pub tb: (f32, f32),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct JSONVectorNetwork {
     #[serde(default)]
     pub vertices: Vec<JSONVectorNetworkVertex>,
@@ -462,10 +541,60 @@ impl From<JSONVectorNetwork> for VectorNetwork {
     }
 }
 
+impl From<&VectorNetwork> for JSONVectorNetwork {
+    fn from(network: &VectorNetwork) -> Self {
+        JSONVectorNetwork {
+            vertices: network.vertices.iter().map(|v| (v.0, v.1)).collect(),
+            segments: network
+                .segments
+                .iter()
+                .map(|s| JSONVectorNetworkSegment {
+                    a: s.a,
+                    b: s.b,
+                    ta: s.ta,
+                    tb: s.tb,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl From<VectorNetwork> for JSONVectorNetwork {
+    fn from(network: VectorNetwork) -> Self {
+        (&network).into()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct JSONLineNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONImageNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+    #[serde(rename = "src")]
+    pub src: JSONImageSrc,
+    #[serde(rename = "fit", default)]
+    pub fit: CSSObjectFit,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum JSONImageSrc {
+    Url(String),
+    Hash { hash: String },
+}
+
+impl JSONImageSrc {
+    fn hash(&self) -> String {
+        match self {
+            JSONImageSrc::Url(url) => extract_image_hash(url),
+            JSONImageSrc::Hash { hash } => hash.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -550,24 +679,7 @@ fn default_rotation() -> f32 {
 fn default_z_index() -> i32 {
     0
 }
-fn default_width() -> f32 {
-    0.0
-}
-fn default_height() -> f32 {
-    0.0
-}
-fn default_text_align() -> TextAlign {
-    TextAlign::Left
-}
-fn default_text_align_vertical() -> TextAlignVertical {
-    TextAlignVertical::Top
-}
-fn default_text_decoration() -> TextDecoration {
-    TextDecoration::None
-}
-fn default_font_weight() -> FontWeight {
-    FontWeight::new(400)
-}
+
 fn default_stroke_width() -> f32 {
     0.0
 }
@@ -576,17 +688,17 @@ pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
     serde_json::from_str(file)
 }
 
-impl From<JSONGroupNode> for GroupNode {
+impl From<JSONGroupNode> for GroupNodeRec {
     fn from(node: JSONGroupNode) -> Self {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
-        GroupNode {
+        GroupNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -599,22 +711,22 @@ impl From<JSONGroupNode> for GroupNode {
     }
 }
 
-impl From<JSONContainerNode> for ContainerNode {
+impl From<JSONContainerNode> for ContainerNodeRec {
     fn from(node: JSONContainerNode) -> Self {
-        ContainerNode {
+        ContainerNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
             transform: AffineTransform::from_box_center(
                 node.base.left,
                 node.base.top,
-                node.base.width,
-                node.base.height,
+                node.base.width.length(0.0),
+                node.base.height.length(0.0),
                 node.base.rotation,
             ),
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
@@ -625,7 +737,7 @@ impl From<JSONContainerNode> for ContainerNode {
             ),
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
-            stroke_width: 0.0,
+            stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             blend_mode: node.base.blend_mode,
@@ -641,38 +753,84 @@ impl From<JSONContainerNode> for ContainerNode {
     }
 }
 
-impl From<JSONTextNode> for TextSpanNode {
+impl From<JSONTextNode> for TextSpanNodeRec {
     fn from(node: JSONTextNode) -> Self {
-        let width = node.base.width;
-        let height = node.base.height;
-        TextSpanNode {
+        // For text nodes, width can be Auto or fixed Length
+        let width = match node.base.width {
+            CSSDimension::Auto => None,
+            CSSDimension::LengthPX(length) => Some(length),
+        };
+
+        let height = match node.base.height {
+            CSSDimension::Auto => None,
+            CSSDimension::LengthPX(length) => Some(length),
+        };
+
+        TextSpanNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
             transform: AffineTransform::from_box_center(
                 node.base.left,
                 node.base.top,
-                node.base.width,
-                node.base.height,
+                node.base.width.length(0.0),
+                node.base.height.length(0.0),
                 node.base.rotation,
             ),
-            size: Size { width, height },
+            width,
+            height,
+            max_lines: node.max_lines,
+            ellipsis: None,
             text: node.text,
-            text_style: TextStyle {
-                text_decoration: node.text_decoration,
-                font_family: node.font_family.unwrap_or_else(|| "Inter".to_string()),
+            text_style: TextStyleRec {
+                text_decoration: Some(TextDecorationRec {
+                    text_decoration_line: node.text_decoration_line,
+                    text_decoration_color: node.text_decoration_color.map(CGColor::from),
+                    text_decoration_style: node.text_decoration_style,
+                    text_decoration_skip_ink: node.text_decoration_skip_ink,
+                    text_decoration_thinkness: node.text_decoration_thinkness,
+                }),
+                font_family: node.font_family.unwrap_or_else(|| "".to_string()),
                 font_size: node.font_size.unwrap_or(14.0),
                 font_weight: node.font_weight,
-                italic: false,
-                letter_spacing: node.letter_spacing,
-                line_height: node.line_height,
-                text_transform: TextTransform::None,
+                font_width: node.font_width,
+                font_style_italic: node.font_style_italic,
+                letter_spacing: node
+                    .letter_spacing
+                    .map(TextLetterSpacing::Factor)
+                    .unwrap_or_default(),
+                word_spacing: node
+                    .word_spacing
+                    .map(TextWordSpacing::Factor)
+                    .unwrap_or_default(),
+                line_height: node
+                    .line_height
+                    .map(TextLineHeight::Factor)
+                    .unwrap_or_default(),
+                text_transform: node.text_transform,
+                font_kerning: node.font_kerning,
+                font_features: node.font_features.map(|ff| {
+                    ff.into_iter()
+                        .map(|(tag, value)| FontFeature { tag, value })
+                        .collect()
+                }),
+                font_variations: node.font_variations.map(|fv| {
+                    fv.into_iter()
+                        .map(|(axis, value)| FontVariation { axis, value })
+                        .collect()
+                }),
+                font_optical_sizing: node.font_optical_sizing,
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,
-            fill: node.base.fill.into(),
-            stroke: None,
-            stroke_width: None,
+            fills: vec![node.base.fill.into()],
+            strokes: node
+                .base
+                .stroke
+                .map(|s| Paint::from(Some(s)))
+                .into_iter()
+                .collect(),
+            stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
@@ -690,19 +848,19 @@ impl From<JSONEllipseNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
-        Node::Ellipse(EllipseNode {
+        Node::Ellipse(EllipseNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             fills: vec![node.base.fill.into()],
             strokes: vec![node.base.stroke.into()],
@@ -730,19 +888,19 @@ impl From<JSONRectangleNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
-        Node::Rectangle(RectangleNode {
+        Node::Rectangle(RectangleNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
@@ -767,24 +925,92 @@ impl From<JSONRectangleNode> for Node {
     }
 }
 
-impl From<JSONRegularPolygonNode> for Node {
-    fn from(node: JSONRegularPolygonNode) -> Self {
+impl From<JSONImageNode> for Node {
+    fn from(node: JSONImageNode) -> Self {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
-        Node::RegularPolygon(RegularPolygonNode {
+        let hash = node.src.hash();
+
+        let fill = match node.base.fill {
+            Some(JSONPaint::Image {
+                hash: h,
+                transform: t,
+                fit,
+            }) => ImagePaint {
+                hash: if h.is_empty() { hash.clone() } else { h },
+                transform: t
+                    .map(|m| AffineTransform { matrix: m })
+                    .unwrap_or_else(AffineTransform::identity),
+                fit: fit.into(),
+                opacity: 1.0,
+                blend_mode: BlendMode::default(),
+            },
+            _ => ImagePaint {
+                hash: hash.clone(),
+                transform: AffineTransform::identity(),
+                fit: node.fit.into(),
+                opacity: 1.0,
+                blend_mode: BlendMode::default(),
+            },
+        };
+
+        Node::Image(ImageNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
+            },
+            corner_radius: merge_corner_radius(
+                node.base.corner_radius,
+                node.base.corner_radius_top_left,
+                node.base.corner_radius_top_right,
+                node.base.corner_radius_bottom_right,
+                node.base.corner_radius_bottom_left,
+            ),
+            fill: fill.clone(),
+            stroke: node.base.stroke.into(),
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+            hash: fill.hash,
+        })
+    }
+}
+
+impl From<JSONRegularPolygonNode> for Node {
+    fn from(node: JSONRegularPolygonNode) -> Self {
+        let transform = AffineTransform::from_box_center(
+            node.base.left,
+            node.base.top,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
+            node.base.rotation,
+        );
+
+        Node::RegularPolygon(RegularPolygonNodeRec {
+            id: node.base.id,
+            name: node.base.name,
+            active: node.base.active,
+            transform,
+            size: Size {
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
             fills: vec![node.base.fill.into()],
@@ -809,19 +1035,19 @@ impl From<JSONRegularStarPolygonNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
-        Node::RegularStarPolygon(RegularStarPolygonNode {
+        Node::RegularStarPolygon(RegularStarPolygonNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
-                height: node.base.height,
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
             },
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
             inner_radius: node.inner_radius,
@@ -847,13 +1073,13 @@ impl From<JSONSVGPathNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
         // For vector nodes, we'll create a path node with the path data
-        Node::SVGPath(SVGPathNode {
+        Node::SVGPath(SVGPathNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -886,18 +1112,18 @@ impl From<JSONLineNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
-        Node::Line(LineNode {
+        Node::Line(LineNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
             transform,
             size: Size {
-                width: node.base.width,
+                width: node.base.width.length(0.0),
                 height: 0.0,
             },
             strokes: vec![node.base.stroke.into()],
@@ -920,8 +1146,8 @@ impl From<JSONVectorNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
@@ -931,7 +1157,7 @@ impl From<JSONVectorNode> for Node {
             .map(|vn| vn.into())
             .unwrap_or_default();
 
-        Node::Vector(VectorNode {
+        Node::Vector(VectorNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -961,12 +1187,12 @@ impl From<JSONBooleanOperationNode> for Node {
         let transform = AffineTransform::from_box_center(
             node.base.left,
             node.base.top,
-            node.base.width,
-            node.base.height,
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
             node.base.rotation,
         );
 
-        Node::BooleanOperation(BooleanPathOperationNode {
+        Node::BooleanOperation(BooleanPathOperationNodeRec {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
@@ -1004,30 +1230,20 @@ impl From<JSONNode> for Node {
             JSONNode::RegularStarPolygon(rsp) => rsp.into(),
             JSONNode::Line(line) => line.into(),
             JSONNode::BooleanOperation(boolean) => boolean.into(),
-            JSONNode::Unknown(unknown) => Node::Error(ErrorNode {
+            JSONNode::Image(image) => image.into(),
+            JSONNode::Unknown(unknown) => Node::Error(ErrorNodeRec {
                 id: unknown.id,
                 name: unknown.name,
                 active: unknown.active,
                 transform: AffineTransform::identity(),
                 size: Size {
-                    width: unknown.width,
-                    height: unknown.height,
+                    width: unknown.width.length(0.0),
+                    height: unknown.height.length(0.0),
                 },
                 opacity: unknown.opacity,
                 error: "Unknown node".to_string(),
             }),
         }
-    }
-}
-
-fn de_css_length<'de, D>(deserializer: D) -> Result<f32, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value: Value = Deserialize::deserialize(deserializer)?;
-    match value {
-        Value::Number(n) => Ok(n.as_f64().unwrap_or(0.0) as f32),
-        _ => Ok(0.0),
     }
 }
 
@@ -1051,6 +1267,29 @@ where
     match value {
         Value::Number(n) => Ok(Radius::circular(n.as_f64().unwrap_or(0.0) as f32)),
         _ => Ok(Radius::zero()),
+    }
+}
+
+// https://github.com/serde-rs/json/issues/1284
+fn de_optical_sizing<'de, D>(deserializer: D) -> Result<FontOpticalSizing, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Value = Deserialize::deserialize(deserializer)?;
+    match value {
+        Value::String(s) => match s.as_str() {
+            "auto" => Ok(FontOpticalSizing::Auto),
+            "none" => Ok(FontOpticalSizing::None),
+            _ => Ok(FontOpticalSizing::Auto), // Fallback to Auto for invalid strings
+        },
+        Value::Number(n) => {
+            if let Some(f) = n.as_f64() {
+                Ok(FontOpticalSizing::Fixed(f as f32))
+            } else {
+                Ok(FontOpticalSizing::Auto) // Fallback to Auto for invalid numbers
+            }
+        }
+        _ => Ok(FontOpticalSizing::Auto), // Fallback to Auto for other types
     }
 }
 
@@ -1082,7 +1321,7 @@ fn merge_effects(
     fe_blur: Option<FeGaussianBlur>,
     fe_backdrop_blur: Option<FeGaussianBlur>,
 ) -> LayerEffects {
-    let mut effects = LayerEffects::new_empty();
+    let mut effects = LayerEffects::default();
     if let Some(filter_blur) = fe_blur {
         effects.blur = Some(filter_blur);
     }
@@ -1105,26 +1344,13 @@ fn merge_effects(
     effects
 }
 
+fn extract_image_hash(src: &str) -> String {
+    src.split('/').last().unwrap_or(src).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-
-    #[test]
-    fn parse_canvas_json() {
-        let path = "../fixtures/local/document.json";
-        let Ok(data) = fs::read_to_string(path) else {
-            eprintln!("test resource not found: {}", path);
-            return;
-        };
-        let parsed: JSONCanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
-
-        assert_eq!(parsed.version, "0.0.1-beta.1+20250728");
-        assert!(
-            !parsed.document.nodes.is_empty(),
-            "nodes should not be empty"
-        );
-    }
 
     #[test]
     fn deserialize_boolean_operation_node() {
@@ -1132,7 +1358,7 @@ mod tests {
             "id": "boolean-1",
             "name": "Boolean Operation",
             "type": "boolean",
-            "operation": "union",
+            "op": "union",
             "children": ["child-1", "child-2"],
             "left": 100.0,
             "top": 100.0,
@@ -1155,8 +1381,8 @@ mod tests {
                 assert_eq!(boolean_node.children, vec!["child-1", "child-2"]);
                 assert_eq!(boolean_node.base.left, 100.0);
                 assert_eq!(boolean_node.base.top, 100.0);
-                assert_eq!(boolean_node.base.width, 200.0);
-                assert_eq!(boolean_node.base.height, 200.0);
+                assert_eq!(boolean_node.base.width, CSSDimension::LengthPX(200.0));
+                assert_eq!(boolean_node.base.height, CSSDimension::LengthPX(200.0));
             }
             _ => panic!("Expected BooleanOperation node"),
         }
@@ -1173,10 +1399,10 @@ mod tests {
                 [0.0, 100.0]
             ],
             "segments": [
-                {"a": 0, "b": 1},
-                {"a": 1, "b": 2},
-                {"a": 2, "b": 3},
-                {"a": 3, "b": 0}
+                {"a": 0, "b": 1, "ta": [0.0, 0.0], "tb": [0.0, 0.0]},
+                {"a": 1, "b": 2, "ta": [0.0, 0.0], "tb": [0.0, 0.0]},
+                {"a": 2, "b": 3, "ta": [0.0, 0.0], "tb": [0.0, 0.0]},
+                {"a": 3, "b": 0, "ta": [0.0, 0.0], "tb": [0.0, 0.0]}
             ]
         }"#;
 
@@ -1223,8 +1449,8 @@ mod tests {
         assert_eq!(network.segments.len(), 1);
 
         // Check tangent handles
-        assert_eq!(network.segments[0].ta, Some((10.0, -10.0)));
-        assert_eq!(network.segments[0].tb, Some((-10.0, 10.0)));
+        assert_eq!(network.segments[0].ta, (10.0, -10.0));
+        assert_eq!(network.segments[0].tb, (-10.0, 10.0));
     }
 
     #[test]
@@ -1256,5 +1482,266 @@ mod tests {
         assert_eq!(network.segments.len(), 0);
         assert_eq!(network.vertices[0], (0.0, 0.0));
         assert_eq!(network.vertices[1], (50.0, 50.0));
+    }
+
+    #[test]
+    fn test_css_dimension_integration() {
+        // Test JSON with auto width for text node
+        let json_text_auto = r#"{
+            "id": "text-1",
+            "name": "Auto Width Text",
+            "type": "text",
+            "text": "Hello World",
+            "left": 100.0,
+            "top": 100.0,
+            "width": "auto",
+            "height": "auto"
+        }"#;
+
+        let text_node: JSONNode =
+            serde_json::from_str(json_text_auto).expect("failed to deserialize text node");
+
+        match text_node {
+            JSONNode::Text(text) => {
+                assert_eq!(text.base.width, CSSDimension::Auto);
+                assert_eq!(text.base.height, CSSDimension::Auto);
+            }
+            _ => panic!("Expected Text node"),
+        }
+
+        // Test JSON with fixed width for text node
+        let json_text_fixed = r#"{
+            "id": "text-2",
+            "name": "Fixed Width Text",
+            "type": "text",
+            "text": "Hello World",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": "auto"
+        }"#;
+
+        let text_node_fixed: JSONNode = serde_json::from_str(json_text_fixed)
+            .expect("failed to deserialize text node with fixed width");
+
+        match text_node_fixed {
+            JSONNode::Text(text) => {
+                assert_eq!(text.base.width, CSSDimension::LengthPX(200.0));
+                assert_eq!(text.base.height, CSSDimension::Auto);
+            }
+            _ => panic!("Expected Text node"),
+        }
+
+        // Test JSON with auto width for rectangle (should default to 0.0)
+        let json_rect_auto = r#"{
+            "id": "rect-1",
+            "name": "Auto Width Rectangle",
+            "type": "rectangle",
+            "left": 100.0,
+            "top": 100.0,
+            "width": "auto",
+            "height": "auto",
+            "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
+        }"#;
+
+        let rect_node: JSONNode =
+            serde_json::from_str(json_rect_auto).expect("failed to deserialize rectangle node");
+
+        match rect_node {
+            JSONNode::Rectangle(rect) => {
+                // Rectangle should use 0.0 for auto dimensions
+                assert_eq!(rect.base.width, CSSDimension::Auto);
+                assert_eq!(rect.base.height, CSSDimension::Auto);
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn test_font_optical_sizing_parsing() {
+        // Test "auto" case
+        let json_auto = r#"{
+            "id": "text-1",
+            "type": "text",
+            "text": "Test",
+            "left": 0,
+            "top": 0,
+            "fontOpticalSizing": "auto"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json_auto).expect("Failed to parse 'auto'");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, FontOpticalSizing::Auto));
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test "none" case
+        let json_none = r#"{
+            "id": "text-2",
+            "type": "text",
+            "text": "Test",
+            "left": 0,
+            "top": 0,
+            "fontOpticalSizing": "none"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json_none).expect("Failed to parse 'none'");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, FontOpticalSizing::None));
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test numeric case
+        let json_fixed = r#"{
+            "id": "text-3",
+            "type": "text",
+            "text": "Test",
+            "left": 0,
+            "top": 0,
+            "fontOpticalSizing": 16.5
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json_fixed).expect("Failed to parse numeric");
+        if let JSONNode::Text(text) = node {
+            match text.font_optical_sizing {
+                FontOpticalSizing::Fixed(value) => assert_eq!(value, 16.5),
+                _ => panic!("Expected Fixed variant"),
+            }
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test invalid string fallback to Auto (via serde default)
+        let json_invalid = r#"{
+            "id": "text-4",
+            "type": "text",
+            "text": "Test",
+            "left": 0,
+            "top": 0,
+            "fontOpticalSizing": "invalid_value"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json_invalid).expect("Failed to parse invalid");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, FontOpticalSizing::Auto));
+        } else {
+            panic!("Expected Text node");
+        }
+    }
+
+    #[test]
+    fn test_font_optical_sizing_all_variants() {
+        // Test "none" variant
+        let json_none = r#"{
+            "id": "text-1",
+            "name": "text",
+            "type": "text",
+            "text": "Text",
+            "left": 100,
+            "top": 100,
+            "fontOpticalSizing": "none"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json_none).expect("Failed to parse 'none' variant");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, FontOpticalSizing::None));
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test numeric variant
+        let json_fixed = r#"{
+            "id": "text-2",
+            "name": "text",
+            "type": "text",
+            "text": "Text",
+            "left": 100,
+            "top": 100,
+            "fontOpticalSizing": 16.5
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json_fixed).expect("Failed to parse numeric variant");
+        if let JSONNode::Text(text) = node {
+            match text.font_optical_sizing {
+                FontOpticalSizing::Fixed(value) => assert_eq!(value, 16.5),
+                _ => panic!("Expected Fixed variant"),
+            }
+        } else {
+            panic!("Expected Text node");
+        }
+
+        // Test default value (when fontOpticalSizing is not specified)
+        let json_default = r#"{
+            "id": "text-3",
+            "name": "text",
+            "type": "text",
+            "text": "Text",
+            "left": 100,
+            "top": 100
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json_default).expect("Failed to parse default variant");
+        if let JSONNode::Text(text) = node {
+            assert!(matches!(text.font_optical_sizing, FontOpticalSizing::Auto));
+        } else {
+            panic!("Expected Text node");
+        }
+    }
+
+    #[test]
+    fn deserialize_json_vector_network_without_tangents() {
+        // Test with segments that don't have tangent handles (ta/tb should default to (0.0, 0.0))
+        let json = r#"{
+            "vertices": [
+                [0.0, 0.0],
+                [100.0, 0.0],
+                [100.0, 100.0],
+                [0.0, 100.0]
+            ],
+            "segments": [
+                {"a": 0, "b": 1},
+                {"a": 1, "b": 2},
+                {"a": 2, "b": 3},
+                {"a": 3, "b": 0}
+            ]
+        }"#;
+
+        let network: JSONVectorNetwork = serde_json::from_str(json)
+            .expect("failed to deserialize JSONVectorNetwork without tangents");
+
+        assert_eq!(network.vertices.len(), 4);
+        assert_eq!(network.segments.len(), 4);
+
+        // Check vertices
+        assert_eq!(network.vertices[0], (0.0, 0.0));
+        assert_eq!(network.vertices[1], (100.0, 0.0));
+        assert_eq!(network.vertices[2], (100.0, 100.0));
+        assert_eq!(network.vertices[3], (0.0, 100.0));
+
+        // Check segments - tangent handles should default to (0.0, 0.0)
+        assert_eq!(network.segments[0].a, 0);
+        assert_eq!(network.segments[0].b, 1);
+        assert_eq!(network.segments[0].ta, (0.0, 0.0));
+        assert_eq!(network.segments[0].tb, (0.0, 0.0));
+
+        assert_eq!(network.segments[1].a, 1);
+        assert_eq!(network.segments[1].b, 2);
+        assert_eq!(network.segments[1].ta, (0.0, 0.0));
+        assert_eq!(network.segments[1].tb, (0.0, 0.0));
+
+        assert_eq!(network.segments[2].a, 2);
+        assert_eq!(network.segments[2].b, 3);
+        assert_eq!(network.segments[2].ta, (0.0, 0.0));
+        assert_eq!(network.segments[2].tb, (0.0, 0.0));
+
+        assert_eq!(network.segments[3].a, 3);
+        assert_eq!(network.segments[3].b, 0);
+        assert_eq!(network.segments[3].ta, (0.0, 0.0));
+        assert_eq!(network.segments[3].tb, (0.0, 0.0));
     }
 }

@@ -18,21 +18,7 @@ import { PropertyInputContainer } from "../ui";
 import grida from "@grida/schema";
 import { useMemo } from "react";
 
-type CornerRadius = Partial<
-  grida.program.nodes.i.ICornerRadius &
-    grida.program.nodes.i.IRectangularCornerRadius
->;
-
-function isUniform(value: CornerRadius) {
-  const _a = value.cornerRadius;
-  const is_all_uniform =
-    _a === value.cornerRadiusTopLeft &&
-    _a === value.cornerRadiusTopRight &&
-    _a === value.cornerRadiusBottomRight &&
-    _a === value.cornerRadiusBottomLeft;
-
-  if (is_all_uniform) return true;
-
+function isUniform(value: grida.program.nodes.i.IRectangularCornerRadius) {
   const _tl = value.cornerRadiusTopLeft;
   const is_all_4_uniform =
     _tl === value.cornerRadiusTopRight &&
@@ -78,12 +64,18 @@ export function CornerRadius4Control({
   onValueCommit,
 }: {
   disabled?: boolean;
-  value?: CornerRadius;
+  value?: grida.program.nodes.i.IRectangularCornerRadius;
   onValueCommit?: (value: cg.CornerRadius) => void;
 }) {
   const mode = useMemo(() => {
     if (!value) return "all";
     return isUniform(value) ? "all" : "each";
+  }, [value]);
+
+  const uniformValue = useMemo(() => {
+    if (!value) return undefined;
+    if (!isUniform(value)) return undefined;
+    return value.cornerRadiusTopLeft; // asserted uniform, use top left
   }, [value]);
 
   return (
@@ -99,8 +91,8 @@ export function CornerRadius4Control({
             mode="fixed"
             disabled={disabled}
             type="number"
-            value={mode === "all" ? (value as number) : ""}
-            placeholder={mode === "all" ? "0" : "mixed"}
+            value={mode === "all" ? (uniformValue ?? "") : ""}
+            placeholder={mode === "all" ? "-" : "mixed"}
             min={0}
             step={1}
             onValueCommit={onValueCommit}
@@ -120,10 +112,10 @@ export function CornerRadius4Control({
       <PopoverContent>
         <Radius4Control
           value={[
-            value?.cornerRadiusTopLeft ?? value?.cornerRadius ?? 0,
-            value?.cornerRadiusTopRight ?? value?.cornerRadius ?? 0,
-            value?.cornerRadiusBottomRight ?? value?.cornerRadius ?? 0,
-            value?.cornerRadiusBottomLeft ?? value?.cornerRadius ?? 0,
+            value?.cornerRadiusTopLeft ?? 0,
+            value?.cornerRadiusTopRight ?? 0,
+            value?.cornerRadiusBottomRight ?? 0,
+            value?.cornerRadiusBottomLeft ?? 0,
           ]}
           onValueCommit={(v) => {
             if (cg.cornerRadius4Identical(v)) {

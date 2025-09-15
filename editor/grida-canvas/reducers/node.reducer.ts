@@ -2,9 +2,11 @@ import { produce, type Draft } from "immer";
 import type grida from "@grida/schema";
 import type { NodeChangeAction } from "../action";
 import type cg from "@grida/cg";
-import { v4 } from "uuid";
 import assert from "assert";
 import cmath from "@grida/cmath";
+import { editor } from "@/grida-canvas";
+
+type UN = grida.program.nodes.UnknwonNode;
 
 function defineNodeProperty<
   K extends keyof grida.program.nodes.UnknwonNode,
@@ -38,44 +40,44 @@ const safe_properties: Partial<
   active: defineNodeProperty<"active">({
     assert: (node) => typeof node.active === "boolean",
     apply: (draft, value, prev) => {
-      draft.active = value;
+      (draft as UN).active = value;
     },
   }),
   locked: defineNodeProperty<"locked">({
     assert: (node) => typeof node.locked === "boolean",
     apply: (draft, value, prev) => {
-      draft.locked = value;
+      (draft as UN).locked = value;
     },
   }),
   name: defineNodeProperty<"name">({
     assert: (node) => typeof node.name === "string",
     apply: (draft, value, prev) => {
-      draft.name = value;
+      (draft as UN).name = value;
     },
   }),
   position: defineNodeProperty<"position">({
     apply: (draft, value, prev) => {
-      draft.position = value;
+      (draft as UN).position = value;
     },
   }),
   left: defineNodeProperty<"left">({
     apply: (draft, value, prev) => {
-      draft.left = value;
+      (draft as UN).left = value;
     },
   }),
   top: defineNodeProperty<"top">({
     apply: (draft, value, prev) => {
-      draft.top = value;
+      (draft as UN).top = value;
     },
   }),
   right: defineNodeProperty<"right">({
     apply: (draft, value, prev) => {
-      draft.right = value;
+      (draft as UN).right = value;
     },
   }),
   bottom: defineNodeProperty<"bottom">({
     apply: (draft, value, prev) => {
-      draft.bottom = value;
+      (draft as UN).bottom = value;
     },
   }),
   width: defineNodeProperty<"width">({
@@ -83,7 +85,7 @@ const safe_properties: Partial<
       if (typeof value === "number") {
         draft.width = ranged(0, value);
       } else {
-        draft.width = value;
+        (draft as UN).width = value;
       }
     },
   }),
@@ -92,50 +94,50 @@ const safe_properties: Partial<
       if (typeof value === "number") {
         draft.height = ranged(0, value);
       } else {
-        draft.height = value;
+        (draft as UN).height = value;
       }
     },
   }),
   rotation: defineNodeProperty<"rotation">({
     assert: (node) => typeof node.rotation === "number",
     apply: (draft, value, prev) => {
-      draft.rotation = value;
+      (draft as UN).rotation = value;
     },
   }),
   href: defineNodeProperty<"href">({
     assert: (node) => typeof node.href === "string",
     apply: (draft, value, prev) => {
-      draft.href = value;
+      (draft as UN).href = value;
     },
   }),
   target: defineNodeProperty<"target">({
     assert: (node) => typeof node.target === "string",
     apply: (draft, value, prev) => {
-      draft.target = value;
+      (draft as UN).target = value;
     },
   }),
   cursor: defineNodeProperty<"cursor">({
     assert: (node) => typeof node.cursor === "string",
     apply: (draft, value, prev) => {
-      draft.cursor = value;
+      (draft as UN).cursor = value;
     },
   }),
   src: defineNodeProperty<"src">({
     assert: (node) => typeof node.src === "string",
     apply: (draft, value, prev) => {
-      draft.src = value;
+      (draft as UN).src = value;
     },
   }),
   opacity: defineNodeProperty<"opacity">({
     assert: (node) => typeof node.opacity === "number",
     apply: (draft, value, prev) => {
-      draft.opacity = ranged(0, value, 1);
+      (draft as UN).opacity = ranged(0, value, 1);
     },
   }),
   blendMode: defineNodeProperty<"blendMode">({
     assert: (node) => typeof node.blendMode === "string",
     apply: (draft, value, prev) => {
-      draft.blendMode = value;
+      (draft as UN).blendMode = value;
     },
   }),
   fill: defineNodeProperty<"fill">({
@@ -178,51 +180,51 @@ const safe_properties: Partial<
   cornerRadius: defineNodeProperty<"cornerRadius">({
     apply: (draft, value, prev) => {
       // TODO: make [cornerRadius < (Math.min(width, height) / 2)]
-      draft.cornerRadius = value;
+      (draft as UN).cornerRadius = value;
     },
   }),
   cornerRadiusTopLeft: defineNodeProperty<"cornerRadiusTopLeft">({
     apply: (draft, value, prev) => {
-      draft.cornerRadiusTopLeft = value;
+      (draft as UN).cornerRadiusTopLeft = value;
     },
   }),
   cornerRadiusTopRight: defineNodeProperty<"cornerRadiusTopRight">({
     apply: (draft, value, prev) => {
-      draft.cornerRadiusTopRight = value;
+      (draft as UN).cornerRadiusTopRight = value;
     },
   }),
   cornerRadiusBottomRight: defineNodeProperty<"cornerRadiusBottomRight">({
     apply: (draft, value, prev) => {
-      draft.cornerRadiusBottomRight = value;
+      (draft as UN).cornerRadiusBottomRight = value;
     },
   }),
   cornerRadiusBottomLeft: defineNodeProperty<"cornerRadiusBottomLeft">({
     apply: (draft, value, prev) => {
-      draft.cornerRadiusBottomLeft = value;
+      (draft as UN).cornerRadiusBottomLeft = value;
     },
   }),
   pointCount: defineNodeProperty<"pointCount">({
     assert: (node) => typeof node.pointCount === "number",
     apply: (draft, value, prev) => {
-      draft.pointCount = cmath.clamp(value, 3, 60);
+      (draft as UN).pointCount = cmath.clamp(value, 3, 60);
     },
   }),
   innerRadius: defineNodeProperty<"innerRadius">({
     assert: (node) => typeof node.innerRadius === "number",
     apply: (draft, value, prev) => {
-      draft.innerRadius = cmath.clamp(value, 0, 1);
+      (draft as UN).innerRadius = cmath.clamp(value, 0, 1);
     },
   }),
   angle: defineNodeProperty<"angle">({
     assert: (node) => typeof node.angle === "number",
     apply: (draft, value, prev) => {
-      draft.angle = cmath.clamp(value, 0, 360);
+      (draft as UN).angle = cmath.clamp(value, 0, 360);
     },
   }),
   angleOffset: defineNodeProperty<"angleOffset">({
     assert: (node) => typeof node.angleOffset === "number",
     apply: (draft, value, prev) => {
-      draft.angleOffset = cmath.clamp(value, 0, 360);
+      (draft as UN).angleOffset = cmath.clamp(value, 0, 360);
     },
   }),
   border: defineNodeProperty<"border">({
@@ -233,7 +235,7 @@ const safe_properties: Partial<
       node.type === "container" ||
       node.type === "component",
     apply: (draft, value, prev) => {
-      draft.border = value;
+      (draft as UN).border = value;
     },
   }),
   stroke: defineNodeProperty<"stroke">({
@@ -241,7 +243,8 @@ const safe_properties: Partial<
       node.type === "vector" ||
       node.type === "line" ||
       node.type === "rectangle" ||
-      node.type === "ellipse",
+      node.type === "ellipse" ||
+      node.type === "text",
     apply: (draft, value, prev) => {
       if (value === null) {
         draft.stroke = undefined;
@@ -251,8 +254,13 @@ const safe_properties: Partial<
       switch (value.type) {
         case "linear_gradient":
         case "radial_gradient":
+        case "sweep_gradient":
+        case "diamond_gradient":
           draft.stroke = {
-            ...(value as cg.LinearGradientPaint | cg.RadialGradientPaint),
+            ...(value as
+              | cg.LinearGradientPaint
+              | cg.RadialGradientPaint
+              | cg.SweepGradientPaint),
           };
           break;
         case "solid":
@@ -268,9 +276,14 @@ const safe_properties: Partial<
       node.type === "vector" ||
       node.type === "line" ||
       node.type === "rectangle" ||
-      node.type === "ellipse",
+      node.type === "ellipse" ||
+      node.type === "text",
     apply: (draft, value, prev) => {
-      draft.strokeWidth = ranged(0, value);
+      (draft as UN).strokeWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
     },
   }),
   strokeAlign: defineNodeProperty<"strokeAlign">({
@@ -278,53 +291,134 @@ const safe_properties: Partial<
       node.type === "vector" ||
       node.type === "line" ||
       node.type === "rectangle" ||
-      node.type === "ellipse",
+      node.type === "ellipse" ||
+      node.type === "text",
     apply: (draft, value, prev) => {
-      draft.strokeAlign = value;
+      (draft as UN).strokeAlign = value;
     },
   }),
   strokeCap: defineNodeProperty<"strokeCap">({
     apply: (draft, value, prev) => {
-      draft.strokeCap = value;
+      (draft as UN).strokeCap = value;
     },
   }),
   feShadows: defineNodeProperty<"feShadows">({
     apply: (draft, value, prev) => {
-      draft.feShadows = value;
+      (draft as UN).feShadows = value?.map((s) => ({
+        ...s,
+        dx: ranged(
+          -editor.config.DEFAULT_MAX_SHADOW_OFFSET,
+          s.dx,
+          editor.config.DEFAULT_MAX_SHADOW_OFFSET
+        ),
+        dy: ranged(
+          -editor.config.DEFAULT_MAX_SHADOW_OFFSET,
+          s.dy,
+          editor.config.DEFAULT_MAX_SHADOW_OFFSET
+        ),
+        blur: ranged(0, s.blur, editor.config.DEFAULT_MAX_BLUR_RADIUS),
+        spread: ranged(
+          -editor.config.DEFAULT_MAX_SHADOW_SPREAD,
+          s.spread,
+          editor.config.DEFAULT_MAX_SHADOW_SPREAD
+        ),
+      }));
     },
   }),
   feBlur: defineNodeProperty<"feBlur">({
     apply: (draft, value, prev) => {
-      draft.feBlur = value;
+      if (value) {
+        switch (value.type) {
+          case "blur": {
+            value = {
+              ...value,
+              radius: ranged(
+                0,
+                value.radius,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+            };
+            break;
+          }
+          case "progressive-blur": {
+            value = {
+              ...value,
+              radius: ranged(
+                0,
+                value.radius,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+              radius2: ranged(
+                0,
+                value.radius2,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+            } as cg.FeProgressiveBlur;
+            break;
+          }
+        }
+      }
+      (draft as UN).feBlur = value;
     },
   }),
   feBackdropBlur: defineNodeProperty<"feBackdropBlur">({
     apply: (draft, value, prev) => {
-      draft.feBackdropBlur = value;
+      if (value) {
+        switch (value.type) {
+          case "blur": {
+            value = {
+              ...value,
+              radius: ranged(
+                0,
+                value.radius,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+            };
+            break;
+          }
+          case "progressive-blur": {
+            value = {
+              ...value,
+              radius: ranged(
+                0,
+                value.radius,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+              radius2: ranged(
+                0,
+                value.radius2,
+                editor.config.DEFAULT_MAX_BLUR_RADIUS
+              ),
+            } as cg.FeProgressiveBlur;
+            break;
+          }
+        }
+      }
+      (draft as UN).feBackdropBlur = value;
     },
   }),
   zIndex: defineNodeProperty<"zIndex">({
     assert: (node) => typeof node.zIndex === "number",
     apply: (draft, value, prev) => {
-      draft.zIndex = value;
+      (draft as UN).zIndex = value;
     },
   }),
   fit: defineNodeProperty<"fit">({
     assert: (node) => node.type === "image",
     apply: (draft, value, prev) => {
-      draft.fit = value;
+      (draft as UN).fit = value;
     },
   }),
   padding: defineNodeProperty<"padding">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.padding = value;
+      (draft as UN).padding = value;
     },
   }),
   layout: defineNodeProperty<"layout">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.layout = value;
+      (draft as UN).layout = value;
       if (prev !== "flex" && value === "flex") {
         // initialize flex layout
         // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)
@@ -339,79 +433,169 @@ const safe_properties: Partial<
   direction: defineNodeProperty<"direction">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.direction = value;
+      (draft as UN).direction = value;
     },
   }),
   mainAxisAlignment: defineNodeProperty<"mainAxisAlignment">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.mainAxisAlignment = value;
+      (draft as UN).mainAxisAlignment = value;
     },
   }),
   crossAxisAlignment: defineNodeProperty<"crossAxisAlignment">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.crossAxisAlignment = value;
+      (draft as UN).crossAxisAlignment = value;
     },
   }),
   mainAxisGap: defineNodeProperty<"mainAxisGap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.mainAxisGap = value;
+      (draft as UN).mainAxisGap = value;
     },
   }),
   crossAxisGap: defineNodeProperty<"crossAxisGap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      draft.crossAxisGap = value;
+      (draft as UN).crossAxisGap = value;
     },
   }),
   textAlign: defineNodeProperty<"textAlign">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      draft.textAlign = value;
+      (draft as UN).textAlign = value;
     },
   }),
   textAlignVertical: defineNodeProperty<"textAlignVertical">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      draft.textAlignVertical = value;
+      (draft as UN).textAlignVertical = value;
+    },
+  }),
+  textDecorationLine: defineNodeProperty<"textDecorationLine">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecorationLine = value;
+    },
+  }),
+  textDecorationStyle: defineNodeProperty<"textDecorationStyle">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecorationStyle = value;
+    },
+  }),
+  textDecorationColor: defineNodeProperty<"textDecorationColor">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecorationColor = value;
+    },
+  }),
+  textDecorationSkipInk: defineNodeProperty<"textDecorationSkipInk">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecorationSkipInk = value;
+    },
+  }),
+  textDecorationThickness: defineNodeProperty<"textDecorationThickness">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textDecorationThickness = value;
+    },
+  }),
+  textTransform: defineNodeProperty<"textTransform">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).textTransform = value;
+    },
+  }),
+  fontStyleItalic: defineNodeProperty<"fontStyleItalic">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontStyleItalic = value;
+    },
+  }),
+  fontPostscriptName: defineNodeProperty<"fontPostscriptName">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontPostscriptName = value;
     },
   }),
   fontWeight: defineNodeProperty<"fontWeight">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      draft.fontWeight = value;
+      (draft as UN).fontWeight = value;
+    },
+  }),
+  fontKerning: defineNodeProperty<"fontKerning">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontKerning = value;
+    },
+  }),
+  fontWidth: defineNodeProperty<"fontWidth">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontWidth = value;
+    },
+  }),
+  fontFeatures: defineNodeProperty<"fontFeatures">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontFeatures = value;
+    },
+  }),
+  fontVariations: defineNodeProperty<"fontVariations">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontVariations = value;
+    },
+  }),
+  fontOpticalSizing: defineNodeProperty<"fontOpticalSizing">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).fontOpticalSizing = value;
     },
   }),
   fontSize: defineNodeProperty<"fontSize">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      draft.fontSize = ranged(1, value);
+      (draft as UN).fontSize = ranged(1, value);
     },
   }),
   lineHeight: defineNodeProperty<"lineHeight">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      draft.lineHeight = value;
+      (draft as UN).lineHeight = ranged(0, value);
     },
   }),
   letterSpacing: defineNodeProperty<"letterSpacing">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      draft.letterSpacing = value;
+      (draft as UN).letterSpacing = value;
+    },
+  }),
+  wordSpacing: defineNodeProperty<"wordSpacing">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).wordSpacing = value;
     },
   }),
   maxLength: defineNodeProperty<"maxLength">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      draft.maxLength = value;
+      (draft as UN).maxLength = value;
+    },
+  }),
+  maxLines: defineNodeProperty<"maxLines">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      (draft as UN).maxLines = value ? ranged(1, value) : null;
     },
   }),
   text: defineNodeProperty<"text">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      draft.text = value ?? null;
+      (draft as UN).text = value ?? null;
     },
   }),
   userdata: defineNodeProperty<"userdata">({
@@ -422,7 +606,7 @@ const safe_properties: Partial<
           (typeof value === "object" && !Array.isArray(value)),
         "userdata must be an k:v object"
       );
-      draft.userdata = value;
+      (draft as UN).userdata = value;
     },
   }),
 };

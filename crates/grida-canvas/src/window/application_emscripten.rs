@@ -1,5 +1,5 @@
-use crate::resource::font_loader::FontMessage;
-use crate::resource::image_loader::ImageMessage;
+use crate::io::io_grida::JSONVectorNetwork;
+use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
 use crate::runtime::scene::RendererOptions;
@@ -134,6 +134,10 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.export_node_as(id, format)
     }
 
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+        self.base.to_vector_network(id)
+    }
+
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
         self.base.runtime_renderer_set_cache_tile(cache);
     }
@@ -209,12 +213,12 @@ impl EmscriptenApplication {
         let base = UnknownTargetApplication::new(
             state, backend, camera, 120, image_rx, font_rx, None, options,
         );
-        let app = Box::new(Self { base });
+        let _app = Box::new(Self { base });
 
         #[cfg(target_os = "emscripten")]
         unsafe {
             // Register the animation frame callback with the leaked pointer.
-            let app_ptr = Box::into_raw(app);
+            let app_ptr = Box::into_raw(_app);
             emscripten_request_animation_frame_loop(
                 Some(request_animation_frame_callback),
                 app_ptr as *mut _,
@@ -223,7 +227,7 @@ impl EmscriptenApplication {
             return Box::from_raw(app_ptr);
         }
 
-        app
+        unreachable!("emscipten cannot be initialized on native")
     }
 
     pub fn redraw(&mut self) {
@@ -234,5 +238,44 @@ impl EmscriptenApplication {
     /// hit test. Should be called whenever the pointer moves.
     pub fn pointer_move(&mut self, x: f32, y: f32) {
         self.base.pointer_move(x, y);
+    }
+
+    pub fn has_missing_fonts(&self) -> bool {
+        self.base.has_missing_fonts()
+    }
+
+    pub fn list_missing_fonts(&self) -> Vec<String> {
+        self.base.list_missing_fonts()
+    }
+
+    pub fn list_available_fonts(&self) -> Vec<String> {
+        self.base.list_available_fonts()
+    }
+
+    pub fn set_default_fallback_fonts(&mut self, fonts: Vec<String>) {
+        self.base.set_default_fallback_fonts(fonts);
+    }
+
+    pub fn get_default_fallback_fonts(&self) -> Vec<String> {
+        self.base.get_default_fallback_fonts()
+    }
+
+    /// Register font data with the renderer.
+    ///
+    /// Since wasm binaries cannot access network resources directly, font
+    /// files must be fetched by the host environment and provided as raw
+    /// bytes.  This method allows those bytes to be registered under the given
+    /// family name so that subsequent text layout can resolve the typeface.
+    pub fn add_font(&mut self, family: &str, data: &[u8]) {
+        self.base.renderer.add_font(family, data);
+        // Newly registered fonts may affect cached text layout; invalidate any
+        // existing cache so that the renderer re-computes geometry using the
+        // new typeface.
+        self.base.renderer.invalidate_cache();
+    }
+
+    /// Register an image with the renderer and return its hash.
+    pub fn add_image(&mut self, data: &[u8]) -> String {
+        self.base.renderer.add_image(data)
     }
 }

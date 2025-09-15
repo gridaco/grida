@@ -1,4 +1,4 @@
-import type { Action, EditorAction } from "../action";
+import type { Action, InternalAction, EditorAction } from "../action";
 import { produce, type Draft } from "immer";
 import {
   self_update_gesture_transform,
@@ -15,6 +15,7 @@ import { v4 } from "uuid";
 
 export type ReducerContext = {
   geometry: editor.api.IDocumentGeometryQuery;
+  vector?: editor.api.IVectorInterfaceActions;
   viewport: {
     width: number;
     height: number;
@@ -38,14 +39,9 @@ export default function reducer<S extends editor.state.IEditorState>(
   }
 
   switch (action.type) {
-    case "__internal/reset": {
-      const { state: _new_state, key } = action;
-      const prev_state = state;
-      return produce(_new_state, (draft) => {
-        if (key) draft.document_key = key;
-        // preserve the transform state
-        draft.transform = prev_state.transform;
-      }) as S;
+    case "__internal/reset":
+    case "__internal/webfonts#webfontList": {
+      return _internal_reducer(state, action);
     }
     case "load": {
       const { scene } = action;
@@ -217,6 +213,32 @@ export default function reducer<S extends editor.state.IEditorState>(
     }
     default:
       return historyExtension(state, action, _reducer(state, action, context));
+  }
+}
+
+/**
+ * reducer for internal state changes, that does not rely on context
+ */
+export function _internal_reducer<S extends editor.state.IEditorState>(
+  state: S,
+  action: InternalAction
+): S {
+  switch (action.type) {
+    case "__internal/reset": {
+      const { state: _new_state, key } = action;
+      const prev_state = state;
+      return produce(_new_state, (draft) => {
+        if (key) draft.document_key = key;
+        // preserve the transform state
+        draft.transform = prev_state.transform;
+      }) as S;
+    }
+    case "__internal/webfonts#webfontList": {
+      const { webfontlist } = action;
+      return produce(state, (draft: Draft<S>) => {
+        draft.webfontlist = webfontlist;
+      });
+    }
   }
 }
 

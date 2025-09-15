@@ -25,6 +25,10 @@ export function BoxFitControl({
           value: "cover",
           label: "Cover",
         },
+        {
+          value: "fill",
+          label: "Fill",
+        },
       ]}
       value={value}
       onValueChange={onValueChange}

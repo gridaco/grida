@@ -30,8 +30,8 @@ fn make_width_fn(sampler: VarWidthSampler) -> impl Fn(f32) -> f32 {
 /// # Example
 ///
 /// ```rust
-/// use grida_canvas::cg::varwidth::{VarWidthProfile, WidthStop};
-/// use grida_canvas::shape::stroke_varwidth::create_variable_width_stroke;
+/// use cg::cg::varwidth::{VarWidthProfile, WidthStop};
+/// use cg::shape::stroke_varwidth::create_variable_width_stroke;
 ///
 /// // Define a tapered width profile
 /// let width_profile = VarWidthProfile {
@@ -104,9 +104,9 @@ pub fn create_variable_width_stroke(
 /// # Example
 ///
 /// ```rust
-/// use grida_canvas::cg::varwidth::{VarWidthProfile, WidthStop};
-/// use grida_canvas::shape::stroke_varwidth::create_variable_width_stroke_from_geometry;
-/// use grida_canvas::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+/// use cg::cg::varwidth::{VarWidthProfile, WidthStop};
+/// use cg::shape::stroke_varwidth::create_variable_width_stroke_from_geometry;
+/// use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
 ///
 /// // Create a piecewise geometry with multiple cubic curves
 /// let geometry = PiecewiseVectorNetworkGeometry::new(
@@ -114,15 +114,15 @@ pub fn create_variable_width_stroke(
 ///     vec![
 ///         VectorNetworkSegment {
 ///             a: 0, b: 1,
-///             ta: Some((50.0, 50.0)), tb: Some((-50.0, 50.0))
+///             ta: (50.0, 50.0), tb: (-50.0, 50.0)
 ///         },
 ///         VectorNetworkSegment {
 ///             a: 1, b: 2,
-///             ta: Some((50.0, 50.0)), tb: Some((50.0, -50.0))
+///             ta: (50.0, 50.0), tb: (50.0, -50.0)
 ///         },
 ///         VectorNetworkSegment {
 ///             a: 2, b: 3,
-///             ta: Some((50.0, 0.0)), tb: Some((-50.0, 0.0))
+///             ta: (50.0, 0.0), tb: (-50.0, 0.0)
 ///         },
 ///     ],
 /// ).expect("Valid geometry");
@@ -158,8 +158,8 @@ pub fn create_variable_width_stroke_from_geometry(
     for (segment_idx, segment) in geometry.segments.iter().enumerate() {
         let a = geometry.vertices[segment.a];
         let b = geometry.vertices[segment.b];
-        let ta = segment.ta.unwrap_or((0.0, 0.0));
-        let tb = segment.tb.unwrap_or((0.0, 0.0));
+        let ta = segment.ta;
+        let tb = segment.tb;
 
         // Convert to cubic Bezier control points
         let p0 = a;
@@ -240,7 +240,7 @@ pub fn create_variable_width_stroke_from_geometry(
 /// # Example
 ///
 /// ```rust
-/// use grida_canvas::shape::stroke_varwidth::variable_width_stroke_geometry;
+/// use cg::shape::stroke_varwidth::variable_width_stroke_geometry;
 ///
 /// // Define a simple line from (0,0) to (100,100)
 /// let sample = |t: f32| (100.0 * t, 100.0 * t);
@@ -249,7 +249,7 @@ pub fn create_variable_width_stroke_from_geometry(
 ///
 /// let stroke_path = variable_width_stroke_geometry(sample, tangent, width, 20);
 /// ```
-fn variable_width_stroke_geometry<FS, FT, FW>(
+pub fn variable_width_stroke_geometry<FS, FT, FW>(
     sample: FS,
     tangent: FT,
     width: FW,

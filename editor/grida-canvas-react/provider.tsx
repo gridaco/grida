@@ -17,7 +17,6 @@ import {
   DataProvider,
   ProgramDataContextHost,
 } from "@/grida-react-program-context/data-context/context";
-import { GoogleFontsManager } from "./components/google-fonts";
 import cmath from "@grida/cmath";
 import type { Action } from "@/grida-canvas/action";
 import equal from "fast-deep-equal";
@@ -29,17 +28,6 @@ import assert from "assert";
 import nid from "../grida-canvas/reducers/tools/id";
 
 type Dispatcher = (action: Action) => void;
-
-function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
-  const editor = useCurrentEditor();
-  const fonts = useEditorState(editor, (state) => state.googlefonts);
-
-  return (
-    <GoogleFontsManager stylesheets fonts={fonts}>
-      {children}
-    </GoogleFontsManager>
-  );
-}
 
 export function StandaloneDocumentEditor({
   editor,
@@ -83,9 +71,7 @@ export function StandaloneDocumentEditor({
     <EditorContext.Provider value={editor}>
       <ProgramDataContextHost>
         {/* <DataProvider data={{ props: props }}> */}
-        <DataProvider>
-          <EditorGoogleFontsManager>{children}</EditorGoogleFontsManager>
-        </DataProvider>
+        <DataProvider>{children}</DataProvider>
       </ProgramDataContextHost>
     </EditorContext.Provider>
   );
@@ -130,6 +116,9 @@ export function useNodeActions(node_id: string | undefined) {
       toggleLocked: () => instance.toggleNodeLocked(node_id),
       toggleActive: () => instance.toggleNodeActive(node_id),
       toggleBold: () => instance.toggleNodeBold(node_id),
+      toggleItalic: () => instance.toggleNodeItalic(node_id),
+      toggleUnderline: () => instance.toggleNodeUnderline(node_id),
+      toggleLineThrough: () => instance.toggleNodeLineThrough(node_id),
       component: (component_id: string) =>
         instance.changeNodeComponent(node_id, component_id),
       text: (text: tokens.StringValueExpression | null) =>
@@ -160,6 +149,8 @@ export function useNodeActions(node_id: string | undefined) {
       //
       cornerRadius: (value: cg.CornerRadius) =>
         instance.changeNodeCornerRadius(node_id, value),
+      cornerRadiusDelta: (delta: number) =>
+        instance.changeNodeCornerRadiusWithDelta(node_id, delta),
       pointCount: (value: number) =>
         instance.changeNodePointCount(node_id, value),
       innerRadius: (value: number) =>
@@ -192,16 +183,42 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeNodeSize(node_id, "height", value),
 
       // text style
-      fontFamily: (value: string) =>
-        instance.changeTextNodeFontFamily(node_id, value),
+      fontFamily: (value: string, force?: boolean) =>
+        instance.changeTextNodeFontFamilySync(node_id, value, force),
       fontWeight: (value: cg.NFontWeight) =>
         instance.changeTextNodeFontWeight(node_id, value),
+      fontKerning: (value: boolean) =>
+        instance.changeTextNodeFontKerning(node_id, value),
+      fontWidth: (value: number) =>
+        instance.changeTextNodeFontWidth(node_id, value),
+      fontFeature: (key: cg.OpenTypeFeature, value: boolean) =>
+        instance.changeTextNodeFontFeature(node_id, key, value),
+      fontVariation: (key: string, value: number) =>
+        instance.changeTextNodeFontVariation(node_id, key, value),
+      fontOpticalSizing: (value: cg.OpticalSizing) =>
+        instance.changeTextNodeFontOpticalSizing(node_id, value),
+      fontVariationInstance: (coordinates: Record<string, number>) =>
+        instance.changeTextNodeFontVariationInstance(node_id, coordinates),
+      fontStyle: (change: editor.api.FontStyleChangeDescription) =>
+        instance.changeTextNodeFontStyle(node_id, change),
       fontSize: (change: editor.api.NumberChange) =>
         instance.changeTextNodeFontSize(node_id, change),
       textAlign: (value: cg.TextAlign) =>
         instance.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: cg.TextAlignVertical) =>
         instance.changeTextNodeTextAlignVertical(node_id, value),
+      textTransform: (value: cg.TextTransform) =>
+        instance.changeTextNodeTextTransform(node_id, value),
+      textDecorationLine: (value: cg.TextDecorationLine) =>
+        instance.changeTextNodeTextDecorationLine(node_id, value),
+      textDecorationStyle: (value: cg.TextDecorationStyle) =>
+        instance.changeTextNodeTextDecorationStyle(node_id, value),
+      textDecorationThickness: (value: cg.TextDecorationThicknessPercentage) =>
+        instance.changeTextNodeTextDecorationThickness(node_id, value),
+      textDecorationColor: (value: cg.TextDecorationColor) =>
+        instance.changeTextNodeTextDecorationColor(node_id, value),
+      textDecorationSkipInk: (value: cg.TextDecorationSkipInkFlag) =>
+        instance.changeTextNodeTextDecorationSkipInk(node_id, value),
       lineHeight: (change: editor.api.NumberChange) =>
         instance.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (
@@ -209,8 +226,13 @@ export function useNodeActions(node_id: string | undefined) {
           grida.program.nodes.TextNode["letterSpacing"]
         >
       ) => instance.changeTextNodeLetterSpacing(node_id, change),
+      wordSpacing: (
+        change: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
+      ) => instance.changeTextNodeWordSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
         instance.changeTextNodeMaxlength(node_id, value),
+      maxLines: (value: number | null) =>
+        instance.changeTextNodeMaxLines(node_id, value),
 
       // border
       border: (value: grida.program.css.Border | undefined) =>
@@ -688,6 +710,10 @@ export function useDataTransferEventTarget() {
       node.$.text = text;
       node.$.left = x;
       node.$.top = y;
+      node.$.fill = {
+        type: "solid",
+        color: { r: 0, g: 0, b: 0, a: 1 },
+      } as cg.Paint;
     },
     [instance]
   );
@@ -1131,6 +1157,9 @@ export function useNode(node_id: string): NodeWithMeta {
   };
 }
 
+/**
+ * @deprecated - expensive
+ */
 export function useComputedNode(
   node_id: string
 ): grida.program.nodes.UnknwonComputedNode {

@@ -5,12 +5,7 @@ use skia_safe::{surfaces, Color, Paint, PaintStyle};
 fn main() {
     // Helper to create a segment without tangents
     fn segment(a: usize, b: usize) -> VectorNetworkSegment {
-        VectorNetworkSegment {
-            a,
-            b,
-            ta: None,
-            tb: None,
-        }
+        VectorNetworkSegment::ab(a, b)
     }
 
     // VectorNetwork representing a square with a square hole (donut shape)
@@ -85,5 +80,9 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/vector_fillrule.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/vector_fillrule.png"),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

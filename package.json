@@ -24,7 +24,7 @@
     "prettier": "^3.5.3",
     "ts-jest": "^29.3.2",
     "tsup": "^8.4.0",
-    "turbo": "^2.5.3",
+    "turbo": "^2.5.6",
     "typescript": "^5"
   },
   "pnpm": {

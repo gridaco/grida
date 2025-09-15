@@ -18,15 +18,9 @@ use figma_api::models::{
 use math2::box_fit::BoxFit;
 use math2::transform::AffineTransform;
 
-const TRANSPARENT: Paint = Paint::Solid(SolidPaint {
-    color: CGColor(0, 0, 0, 0),
-    opacity: 0.0,
-});
+const TRANSPARENT: Paint = Paint::Solid(SolidPaint::TRANSPARENT);
 
-const BLACK: Paint = Paint::Solid(SolidPaint {
-    color: CGColor(0, 0, 0, 255),
-    opacity: 1.0,
-});
+const BLACK: Paint = Paint::Solid(SolidPaint::BLACK);
 
 // Map implementations
 impl From<&Rgba> for CGColor {
@@ -57,6 +51,7 @@ impl From<&FigmaPaint> for Paint {
             FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
                 color: CGColor::from(&solid.color),
                 opacity: solid.opacity.unwrap_or(1.0) as f32,
+                blend_mode: BlendMode::default(),
             }),
             FigmaPaint::ImagePaint(image) => {
                 let transform =
@@ -86,6 +81,7 @@ impl From<&FigmaPaint> for Paint {
                     hash: image.image_ref.clone(),
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
+                    blend_mode: BlendMode::default(),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -106,6 +102,7 @@ impl From<&FigmaPaint> for Paint {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
@@ -115,6 +112,7 @@ impl From<&FigmaPaint> for Paint {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientDiamond => {
@@ -124,6 +122,7 @@ impl From<&FigmaPaint> for Paint {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientAngular => {
@@ -133,17 +132,15 @@ impl From<&FigmaPaint> for Paint {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
-                    _ => Paint::Solid(SolidPaint {
-                        color: CGColor(0, 0, 0, 255),
-                        opacity: 1.0,
-                    }),
                 }
             }
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
+                blend_mode: BlendMode::default(),
             }),
         }
     }
@@ -180,12 +177,12 @@ impl From<&FigmaTextAlignVertical> for TextAlignVertical {
     }
 }
 
-impl From<&FigmaTextDecoration> for TextDecoration {
+impl From<&FigmaTextDecoration> for TextDecorationLine {
     fn from(decoration: &FigmaTextDecoration) -> Self {
         match decoration {
-            FigmaTextDecoration::None => TextDecoration::None,
-            FigmaTextDecoration::Underline => TextDecoration::Underline,
-            FigmaTextDecoration::Strikethrough => TextDecoration::LineThrough,
+            FigmaTextDecoration::None => TextDecorationLine::None,
+            FigmaTextDecoration::Underline => TextDecorationLine::Underline,
+            FigmaTextDecoration::Strikethrough => TextDecorationLine::LineThrough,
         }
     }
 }
@@ -253,14 +250,8 @@ impl FigmaConverter {
         self.font_store.get_discovered_fonts()
     }
 
-    fn register_font(
-        &mut self,
-        family: String,
-        postscript_name: Option<String>,
-        style: Option<String>,
-    ) {
-        self.font_store
-            .register_font(family, postscript_name, style);
+    fn add_font(&mut self, family: String, postscript_name: Option<String>, style: Option<String>) {
+        self.font_store.add_font(family, postscript_name, style);
     }
 
     /// Convert Figma's relative transform matrix to AffineTransform
@@ -297,6 +288,7 @@ impl FigmaConverter {
             FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
                 color: CGColor::from(&solid.color),
                 opacity: solid.opacity.unwrap_or(1.0) as f32,
+                blend_mode: BlendMode::default(),
             }),
             FigmaPaint::ImagePaint(image) => {
                 let url = self
@@ -331,6 +323,7 @@ impl FigmaConverter {
                     hash: url,
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
+                    blend_mode: BlendMode::default(),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -351,6 +344,7 @@ impl FigmaConverter {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
@@ -360,6 +354,7 @@ impl FigmaConverter {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientDiamond => {
@@ -369,6 +364,7 @@ impl FigmaConverter {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientAngular => {
@@ -378,17 +374,15 @@ impl FigmaConverter {
                             ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                            blend_mode: BlendMode::default(),
                         })
                     }
-                    _ => Paint::Solid(SolidPaint {
-                        color: CGColor(0, 0, 0, 255),
-                        opacity: 1.0,
-                    }),
                 }
             }
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
                 opacity: 1.0,
+                blend_mode: BlendMode::default(),
             }),
         }
     }
@@ -459,8 +453,8 @@ impl FigmaConverter {
     }
 
     /// Convert Figma's text decoration to our TextDecoration
-    fn convert_text_decoration(decoration: Option<&FigmaTextDecoration>) -> TextDecoration {
-        map_option(decoration).unwrap_or(TextDecoration::None)
+    fn convert_text_decoration(decoration: Option<&FigmaTextDecoration>) -> TextDecorationLine {
+        map_option(decoration).unwrap_or(TextDecorationLine::None)
     }
 
     /// Convert Figma's text alignment to our TextAlign
@@ -475,7 +469,7 @@ impl FigmaConverter {
 
     /// Convert Figma's effects to our FilterEffect vector
     fn convert_effects(effects: &Vec<Effect>) -> LayerEffects {
-        let mut layer_effects = LayerEffects::new_empty();
+        let mut layer_effects = LayerEffects::default();
 
         // If no effects, return empty vector
         if effects.is_empty() {
@@ -536,7 +530,7 @@ impl FigmaConverter {
 
     /// Convert Figma's slice to our SliceNode
     fn convert_slice(&mut self, slice: &Box<SliceNode>) -> Result<Node, String> {
-        Ok(Node::Error(ErrorNode {
+        Ok(Node::Error(ErrorNodeRec {
             id: slice.id.clone(),
             name: Some(format!("[Slice] {}", slice.name)),
             active: slice.visible.unwrap_or(true),
@@ -564,7 +558,7 @@ impl FigmaConverter {
         let size = Self::convert_size(component.size.as_ref());
         let transform = Self::convert_transform(component.relative_transform.as_ref());
 
-        Ok(Node::Container(ContainerNode {
+        Ok(Node::Container(ContainerNodeRec {
             id: component.id.clone(),
             name: Some(component.name.clone()),
             active: component.visible.unwrap_or(true),
@@ -601,7 +595,7 @@ impl FigmaConverter {
         &mut self,
         component_set: &Box<ComponentSetNode>,
     ) -> Result<Node, String> {
-        Ok(Node::Error(ErrorNode {
+        Ok(Node::Error(ErrorNodeRec {
             id: component_set.id.clone(),
             name: Some(format!("[ComponentSet] {}", component_set.name)),
             active: component_set.visible.unwrap_or(true),
@@ -652,7 +646,7 @@ impl FigmaConverter {
         let size = Self::convert_size(instance.size.as_ref());
         let transform = Self::convert_transform(instance.relative_transform.as_ref());
 
-        Ok(Node::Container(ContainerNode {
+        Ok(Node::Container(ContainerNodeRec {
             id: instance.id.clone(),
             name: Some(instance.name.clone()),
             active: instance.visible.unwrap_or(true),
@@ -692,7 +686,7 @@ impl FigmaConverter {
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(Node::Container(ContainerNode {
+        Ok(Node::Container(ContainerNodeRec {
             id: section.id.clone(),
             name: Some(format!("[Section] {}", section.name)),
             active: section.visible.unwrap_or(true),
@@ -707,14 +701,14 @@ impl FigmaConverter {
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: Self::convert_opacity(section.visible),
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
             clip: false,
         }))
     }
 
     /// Convert Figma's link to our LinkUnfurlNode
     fn convert_link(&mut self, link: &Box<LinkUnfurlNode>) -> Result<Node, String> {
-        Ok(Node::Error(ErrorNode {
+        Ok(Node::Error(ErrorNodeRec {
             id: link.id.clone(),
             name: Some(format!("[Link] {}", link.name)),
             active: link.visible.unwrap_or(true),
@@ -804,7 +798,7 @@ impl FigmaConverter {
         let size = Self::convert_size(origin.size.as_ref());
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
-        Ok(Node::Container(ContainerNode {
+        Ok(Node::Container(ContainerNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
@@ -866,34 +860,64 @@ impl FigmaConverter {
 
         // Register the font family and postscript name if they exist
         if let Some(font_family) = &style.font_family {
-            self.register_font(
+            self.add_font(
                 font_family.clone(),
                 style.font_post_script_name.clone(),
                 style.font_style.clone(),
             );
         }
 
-        Ok(Node::TextSpan(TextSpanNode {
+        Ok(Node::TextSpan(TextSpanNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             transform: Self::convert_transform(origin.relative_transform.as_ref()),
-            size: Size {
-                width: origin.size.as_ref().map_or(0.0, |size| size.x as f32),
-                height: origin.size.as_ref().map_or(0.0, |size| size.y as f32),
-            },
+            width: origin
+                .size
+                .as_ref()
+                .map_or(None, |size| Some(size.x as f32)),
+            height: origin
+                .size
+                .as_ref()
+                .map_or(None, |size| Some(size.y as f32)),
+            max_lines: None,
+            ellipsis: None,
+            // size: Size {
+            //     width: origin.size.as_ref().map_or(0.0, |size| size.x as f32),
+            //     height: origin.size.as_ref().map_or(0.0, |size| size.y as f32),
+            // },
             text: origin.characters.clone(),
-            text_style: TextStyle {
-                text_decoration: Self::convert_text_decoration(style.text_decoration.as_ref()),
+            text_style: TextStyleRec {
+                text_decoration: Some(TextDecorationRec {
+                    text_decoration_line: Self::convert_text_decoration(
+                        style.text_decoration.as_ref(),
+                    ),
+                    text_decoration_color: None,
+                    text_decoration_style: None,
+                    text_decoration_skip_ink: None,
+                    text_decoration_thinkness: None,
+                }),
                 font_family: style
                     .font_family
                     .clone()
                     .unwrap_or_else(|| "Inter".to_string()),
                 font_size: style.font_size.unwrap_or(14.0) as f32,
+                font_width: None,
+                font_optical_sizing: FontOpticalSizing::Auto,
+                font_features: None,
+                font_variations: None,
                 font_weight: FontWeight::new(style.font_weight.unwrap_or(400.0) as u32),
-                letter_spacing: style.letter_spacing.map(|v| v as f32),
-                italic: style.italic.unwrap_or(false),
-                line_height: style.line_height_px.map(|v| v as f32),
+                font_kerning: true,
+                letter_spacing: style
+                    .letter_spacing
+                    .map(|v| TextLetterSpacing::Factor(v as f32))
+                    .unwrap_or_default(),
+                word_spacing: Default::default(),
+                font_style_italic: style.italic.unwrap_or(false),
+                line_height: style
+                    .line_height_px
+                    .map(|v| TextLineHeight::Fixed(v as f32))
+                    .unwrap_or_default(),
                 text_transform: match origin.style.text_case.as_ref() {
                     Some(figma_api::models::type_style::TextCase::Upper) => {
                         TextTransform::Uppercase
@@ -915,13 +939,9 @@ impl FigmaConverter {
             text_align_vertical: Self::convert_text_align_vertical(
                 style.text_align_vertical.as_ref(),
             ),
-            fill: self
-                .convert_fills(Some(&origin.fills))
-                .first()
-                .cloned()
-                .unwrap_or(BLACK),
-            stroke: self.convert_strokes(Some(&origin.strokes)).first().cloned(),
-            stroke_width: Some(origin.stroke_weight.unwrap_or(0.0) as f32),
+            fills: self.convert_fills(Some(&origin.fills)),
+            strokes: self.convert_strokes(Some(&origin.strokes)),
+            stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: StrokeAlign::Inside,
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
@@ -936,7 +956,7 @@ impl FigmaConverter {
         // Convert fill geometries to path nodes
         if let Some(fill_geometries) = &origin.fill_geometry {
             for geometry in fill_geometries {
-                let path_node = Node::SVGPath(SVGPathNode {
+                let path_node = Node::SVGPath(SVGPathNodeRec {
                     id: format!("{}-path-{}", origin.id, path_index),
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
@@ -964,7 +984,7 @@ impl FigmaConverter {
         // stroke paint should be applied to the path, not stroke, as the stroke geometry is the baked path of the stroke.
         if let Some(stroke_geometries) = &origin.stroke_geometry {
             for geometry in stroke_geometries {
-                let path_node = Node::SVGPath(SVGPathNode {
+                let path_node = Node::SVGPath(SVGPathNodeRec {
                     id: format!("{}-path-{}", origin.id, path_index),
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
@@ -989,7 +1009,7 @@ impl FigmaConverter {
         }
 
         // Create a group node containing all the path nodes
-        Ok(Node::Container(ContainerNode {
+        Ok(Node::Container(ContainerNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
@@ -1002,7 +1022,7 @@ impl FigmaConverter {
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            effects: LayerEffects::new_empty(),
+            effects: LayerEffects::default(),
             children,
             opacity: Self::convert_opacity(origin.visible),
             clip: false,
@@ -1036,7 +1056,7 @@ impl FigmaConverter {
             }
         };
 
-        Ok(Node::BooleanOperation(BooleanPathOperationNode {
+        Ok(Node::BooleanOperation(BooleanPathOperationNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
@@ -1073,7 +1093,7 @@ impl FigmaConverter {
         let size = Self::convert_size(origin.size.as_ref());
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
-        Ok(Node::RegularStarPolygon(RegularStarPolygonNode {
+        Ok(Node::RegularStarPolygon(RegularStarPolygonNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
@@ -1108,7 +1128,7 @@ impl FigmaConverter {
         size.height = 0.0; // Lines have no height in our schema
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
-        Ok(Node::Line(LineNode {
+        Ok(Node::Line(LineNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
@@ -1144,7 +1164,7 @@ impl FigmaConverter {
         let transform =
             Self::convert_transform(origin.relative_transform.as_ref().map(|v| v.as_ref()));
 
-        Ok(Node::Ellipse(EllipseNode {
+        Ok(Node::Ellipse(EllipseNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
@@ -1184,7 +1204,7 @@ impl FigmaConverter {
     ) -> Result<Node, String> {
         let size = Self::convert_size(origin.size.as_ref());
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
-        Ok(Node::RegularPolygon(RegularPolygonNode {
+        Ok(Node::RegularPolygon(RegularPolygonNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
@@ -1217,7 +1237,7 @@ impl FigmaConverter {
         let size = Self::convert_size(origin.size.as_ref());
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
-        Ok(Node::Rectangle(RectangleNode {
+        Ok(Node::Rectangle(RectangleNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
@@ -1254,29 +1274,15 @@ impl FigmaConverter {
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let size = Self::convert_size(origin.size.as_ref());
-        let transform = Self::convert_transform(origin.relative_transform.as_ref());
-
-        Ok(Node::Container(ContainerNode {
+        Ok(Node::Group(GroupNodeRec {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
-            blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            transform,
-            size,
-            corner_radius: Self::convert_corner_radius(
-                origin.corner_radius,
-                origin.rectangle_corner_radii.as_ref(),
-            ),
-            fills: self.convert_fills(None),
-            strokes: vec![],
-            stroke_width: 0.0,
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            effects: LayerEffects::new_empty(),
+            // the figma's relativeTransform for group is a no-op on our model.
+            transform: None,
             children,
-            opacity: 1.0,
-            clip: origin.clips_content,
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
         }))
     }
 }

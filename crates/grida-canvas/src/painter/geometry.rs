@@ -18,11 +18,21 @@ pub struct PainterShape {
 }
 
 impl PainterShape {
-    /// Construct a plain rectangle shape
-    pub fn from_rect(rect: Rect) -> Self {
+    pub fn empty() -> Self {
         Self {
-            rect,
-            rect_shape: Some(rect),
+            rect: Rect::new(0.0, 0.0, 0.0, 0.0),
+            rect_shape: None,
+            rrect: None,
+            oval: None,
+            path: None,
+        }
+    }
+    /// Construct a plain rectangle shape
+    pub fn from_rect(rect: impl Into<Rect>) -> Self {
+        let r: Rect = rect.into();
+        Self {
+            rect: r,
+            rect_shape: Some(r),
             rrect: None,
             oval: None,
             path: None,
@@ -166,10 +176,6 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             PainterShape::from_rect(rect)
         }
-        IntrinsicSizeNode::TextSpan(n) => {
-            // Text spans don't have a shape
-            PainterShape::from_rect(Rect::new(0.0, 0.0, n.size.width, n.size.height))
-        }
     }
 }
 
@@ -236,7 +242,7 @@ pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
 
 /// Compute the resulting path for a [`BooleanPathOperationNode`] in its local coordinate space.
 pub fn boolean_operation_path(
-    node: &BooleanPathOperationNode,
+    node: &BooleanPathOperationNodeRec,
     repo: &NodeRepository,
     cache: &GeometryCache,
 ) -> Option<Path> {
@@ -291,7 +297,7 @@ pub fn boolean_operation_path(
 
 /// Convenience wrapper around [`boolean_operation_path`] returning a [`PainterShape`].
 pub fn boolean_operation_shape(
-    node: &BooleanPathOperationNode,
+    node: &BooleanPathOperationNodeRec,
     repo: &NodeRepository,
     cache: &GeometryCache,
 ) -> Option<PainterShape> {

@@ -69,7 +69,7 @@ export namespace iofigma {
 
       export const textDecorationMap: Record<
         NonNullable<TypeStyle["textDecoration"]>,
-        cg.TextDecoration | undefined
+        cg.TextDecorationLine | undefined
       > = {
         NONE: "none",
         STRIKETHROUGH: undefined,
@@ -537,6 +537,10 @@ export namespace iofigma {
                   : fixedheight,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               //
+              stroke: first_visible_stroke
+                ? paint(first_visible_stroke)
+                : undefined,
+              strokeWidth: strokeWeight ?? 0,
               border:
                 first_visible_stroke?.type === "SOLID"
                   ? {
@@ -558,7 +562,7 @@ export namespace iofigma {
               textAlignVertical: node.style.textAlignVertical
                 ? map.textAlignVerticalMap[node.style.textAlignVertical]
                 : "top",
-              textDecoration: node.style.textDecoration
+              textDecorationLine: node.style.textDecoration
                 ? (map.textDecorationMap[node.style.textDecoration] ?? "none")
                 : "none",
               lineHeight: node.style.lineHeightPercentFontSize
@@ -571,6 +575,7 @@ export namespace iofigma {
               fontFamily: node.style.fontFamily,
               fontWeight:
                 (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
+              fontKerning: true, // TODO: parse from features (`kern`)
             };
           }
           case "RECTANGLE": {

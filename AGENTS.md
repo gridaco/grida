@@ -68,6 +68,18 @@ Documentation files are located in the `./docs` directory.
 
 This directory contains the docs as-is, the deployment of the docs are handled by [apps/docs](./apps/docs). A docusaurus project that syncs the docs content to its directory. When writing docs, the root `./docs` directory is the source of truth.
 
+| directory                             | name          | description                                                      | active |
+| ------------------------------------- | ------------- | ---------------------------------------------------------------- | ------ |
+| [/docs/wg](./docs/wg)                 | working group | working group documents, architecture documents, todo list, etc  | yes    |
+| [/docs/reference](./docs/reference)   | reference     | glossary and references (technical documents)                    | yes    |
+| [/docs/math](./docs/math)             | math          | Math reference, used for internal docs referencing               | yes    |
+| [/docs/platform](./docs/platform)     | platform      | Grida Platform (API/Spec) documents                              | yes    |
+| [/docs/editor](./docs/editor)         | editor        | Grida Editor - User Documentation                                | yes    |
+| [/docs/canvas](./docs/canvas)         | canvas        | Grida Canvas SDK - User Documentation                            | no     |
+| [/docs/cli](./docs/cli)               | cli           | Grida CLI - User Documentation                                   | yes    |
+| [/docs/together](./docs/together)     | together      | Contributing, Support, Community, etc                            | yes    |
+| [/docs/with-figma](./docs/with-figma) | with-figma    | Grida with Figma - Grida <-> Figma compatilibity and user guides | yes    |
+
 ## `/crates/*`
 
 Importance: **High**
@@ -170,6 +182,9 @@ turbo test
 # run tests for packages
 turbo test --filter='./packages/*'
 
+# build packages (required for typecheck for its dependants)
+turbo build --filter='./packages/*'
+
 # run tests except for rust crates
 turbo test --filter='!./crates/*'
 
@@ -188,6 +203,9 @@ cargo test
 # for crates specific check
 cargo check
 
+# for crates (with long build time deps, e.g. skia)
+cargo clippy --no-deps
+
 # for crates specific build
 cargo build
 
@@ -197,3 +215,22 @@ cargo fmt --all
 
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
 To handle this, you can build the `/packages/*`, then run typecheck. (when networking is not available)
+
+### Running `pnpm typecheck` from a clean checkout
+
+`pnpm typecheck` depends on compiled packages and the editor's Next.js env
+file. After cloning the repo or installing dependencies, run the following
+steps before executing `pnpm typecheck`:
+
+```sh
+# install dependencies for shared packages and the editor
+pnpm install --filter "./packages/*"
+pnpm install --filter editor
+
+# build shared packages and the wasm bundle
+pnpm turbo build --filter="./packages/*"
+pnpm --filter @grida/canvas-wasm build
+
+# finally, run the repository-wide typecheck
+pnpm typecheck
+```

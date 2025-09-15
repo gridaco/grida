@@ -207,10 +207,7 @@ export function on_path_pointer_down(
 
   // Handle snapped segment point - split the segment and start/finish at the split point
   if (snapped_segment_p) {
-    const split_vertex_idx = vne.splitSegment(
-      snapped_segment_p.segment,
-      snapped_segment_p
-    );
+    const split_vertex_idx = vne.splitSegment(snapped_segment_p);
 
     // Update node bounds after splitting
     const bb_b = vne.getBBox();

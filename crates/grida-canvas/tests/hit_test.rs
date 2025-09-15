@@ -1,7 +1,10 @@
 use cg::cache::scene::SceneCache;
 use cg::hittest::HitTester;
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use cg::resources::ByteStore;
+use cg::runtime::font_repository::FontRepository;
 use math2::{rect::Rectangle, transform::AffineTransform};
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn hit_first_returns_topmost() {
@@ -35,7 +38,8 @@ fn hit_first_returns_topmost() {
     };
 
     let mut cache = SceneCache::new();
-    cache.update_geometry(&scene);
+    let fonts = FontRepository::new(Arc::new(Mutex::new(ByteStore::new())));
+    cache.update_geometry(&scene, &fonts);
     cache.update_layers(&scene);
 
     let tester = HitTester::new(&cache);
@@ -70,7 +74,8 @@ fn path_hit_testing_uses_contains() {
     };
 
     let mut cache = SceneCache::new();
-    cache.update_geometry(&scene);
+    let fonts = FontRepository::new(Arc::new(Mutex::new(ByteStore::new())));
+    cache.update_geometry(&scene, &fonts);
     cache.update_layers(&scene);
     cache
         .path
@@ -118,7 +123,8 @@ fn intersects_returns_all_nodes_in_rect() {
     };
 
     let mut cache = SceneCache::new();
-    cache.update_geometry(&scene);
+    let fonts = FontRepository::new(Arc::new(Mutex::new(ByteStore::new())));
+    cache.update_geometry(&scene, &fonts);
     cache.update_layers(&scene);
 
     let tester = HitTester::new(&cache);

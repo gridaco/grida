@@ -21,6 +21,8 @@ jobs:
           cache: pnpm
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build Packages
+        run: pnpm turbo build --filter='./packages/*'
       - name: Run Tests
         run: pnpm turbo test --filter='!./crates/*'
 

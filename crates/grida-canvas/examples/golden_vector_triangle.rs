@@ -6,24 +6,9 @@ fn main() {
     let triangle = VectorNetwork {
         vertices: vec![(200.0, 100.0), (300.0, 200.0), (100.0, 200.0)],
         segments: vec![
-            VectorNetworkSegment {
-                a: 0,
-                b: 1,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 1,
-                b: 2,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 2,
-                b: 0,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(0, 1),
+            VectorNetworkSegment::ab(1, 2),
+            VectorNetworkSegment::ab(2, 0),
         ],
         regions: vec![],
     };
@@ -45,5 +30,9 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/vector_triangle.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/vector_triangle.png"),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

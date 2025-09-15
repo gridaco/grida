@@ -1,0 +1,33 @@
+[package]
+name = "fonts"
+version = "0.2.0"
+edition = "2021"
+authors = ["Grida <hello@grida.co>", "Universe <universe@grida.co>"]
+description = "High-performance font parsing and analysis library for Grida Canvas"
+license = "MIT"
+repository = "https://github.com/gridaco/grida"
+homepage = "https://grida.co"
+documentation = "https://docs.rs/fonts"
+keywords = ["font", "opentype", "ttf", "canvas", "graphics"]
+categories = ["graphics", "text-processing"]
+readme = "README.md"
+
+[dependencies]
+ttf-parser = { version = "0.25", features = ["apple-layout"] }
+fixed = "1.25"
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+optional = true
+
+[dependencies.serde_json]
+version = "1.0"
+optional = true
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[features]
+default = []
+serde = ["dep:serde"]

@@ -24,5 +24,9 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/path_corner.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/path_corner.png"),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

@@ -1,14 +1,12 @@
 use crate::cache::scene::SceneCache;
-use crate::fonts::geistmono::sk_font_geistmono;
+use crate::devtools::text_overlay;
+
 use crate::node::schema::NodeId;
-use crate::painter::{
-    cvt,
-    layer::{Layer, PainterPictureTextLayer},
-};
+use crate::painter::layer::Layer;
 use crate::runtime::camera::Camera2D;
-use crate::runtime::repository::FontRepository;
+use crate::runtime::font_repository::FontRepository;
 use crate::sk;
-use skia_safe::{textlayout, Canvas, Color, Font, Paint, PaintStyle, Path};
+use skia_safe::{Canvas, Color, Font, Paint, PaintStyle};
 
 #[derive(Debug, Clone)]
 pub struct StrokeOverlayStyle {
@@ -26,7 +24,7 @@ impl Default for StrokeOverlayStyle {
 }
 
 thread_local! {
-    static FONT: Font = sk_font_geistmono(20.0);
+    static FONT: Font = Font::new(crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES), 20.0);
 }
 
 pub struct StrokeOverlay;
@@ -37,7 +35,7 @@ impl StrokeOverlay {
         nodes: &[NodeId],
         camera: &Camera2D,
         cache: &SceneCache,
-        fonts: &std::cell::RefCell<FontRepository>,
+        _fonts: &FontRepository,
         style: Option<&StrokeOverlayStyle>,
     ) {
         let style = style.cloned().unwrap_or_default();
@@ -63,7 +61,14 @@ impl StrokeOverlay {
                     } else {
                         match layer {
                             crate::painter::layer::PainterPictureLayer::Text(t) => {
-                                Self::text_layer_path(&fonts.borrow(), t)
+                                if let Some(text_path) =
+                                    text_overlay::TextOverlay::text_layer_baseline(cache, t)
+                                {
+                                    text_path
+                                } else {
+                                    // Skip rendering if text path is not available
+                                    continue;
+                                }
                             }
                             _ => shape.to_path(),
                         }
@@ -75,50 +80,5 @@ impl StrokeOverlay {
                 }
             }
         }
-    }
-
-    fn text_layer_path(fonts: &FontRepository, layer: &PainterPictureTextLayer) -> Path {
-        let size = crate::node::schema::Size {
-            width: layer.shape.rect.width(),
-            height: layer.shape.rect.height(),
-        };
-        let fill = layer
-            .fills
-            .first()
-            .cloned()
-            .unwrap_or(crate::cg::types::Paint::Solid(
-                crate::cg::types::SolidPaint {
-                    color: crate::cg::CGColor(0, 0, 0, 255),
-                    opacity: 1.0,
-                },
-            ));
-        let fill_paint = cvt::sk_paint(&fill, 1.0, (size.width, size.height));
-
-        let mut paragraph_style = textlayout::ParagraphStyle::new();
-        paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
-        paragraph_style.set_text_align(layer.text_align.clone().into());
-
-        let mut builder =
-            textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
-
-        let mut ts = crate::painter::make_textstyle(&layer.text_style);
-        ts.set_foreground_paint(&fill_paint);
-        builder.push_style(&ts);
-        let transformed_text = crate::text::text_transform::transform_text(
-            &layer.text,
-            layer.text_style.text_transform,
-        );
-        builder.add_text(&transformed_text);
-        let mut paragraph = builder.build();
-        builder.pop();
-        paragraph.layout(size.width);
-
-        let mut path = Path::new();
-        let lines = paragraph.line_number();
-        for i in 0..lines {
-            let (_, line_path) = paragraph.get_path_at(i);
-            path.add_path(&line_path, (0.0, 0.0), None);
-        }
-        path
     }
 }

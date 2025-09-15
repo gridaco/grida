@@ -4,6 +4,7 @@ import type { BitmapEditorBrush } from "@grida/bitmap";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
 import type vn from "@grida/vn";
+import type { GoogleWebFontList } from "@grida/fonts/google";
 
 export type Action =
   | InternalAction
@@ -13,7 +14,9 @@ export type Action =
   | EditorRedoAction
   | EditorClipAction;
 
-export type InternalAction = __InternalResetAction;
+export type InternalAction =
+  | __InternalResetAction
+  | __InternalWebfontListLoadAction;
 
 export type EditorAction =
   | EditorConfigAction
@@ -51,7 +54,8 @@ export type DocumentAction =
   | SurfaceAction
   //
   | NodeChangeAction
-  | NodeToggleBoldAction
+  | NodeToggleUnderlineAction
+  | NodeToggleLineThroughAction
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction
   //
@@ -163,6 +167,14 @@ export interface __InternalResetAction {
   type: "__internal/reset";
   key?: string;
   state: editor.state.IEditorState;
+}
+
+/**
+ * load webfont list
+ */
+export interface __InternalWebfontListLoadAction {
+  type: "__internal/webfonts#webfontList";
+  webfontlist: GoogleWebFontList;
 }
 
 export interface LoadSceneAction {
@@ -791,7 +803,7 @@ export type EditorSurface_StartGesture = {
     | (Pick<editor.gesture.GestureGap, "type" | "axis"> & {
         selection: string | string[];
       })
-    | Pick<editor.gesture.GestureCornerRadius, "type" | "node_id">
+    | Pick<editor.gesture.GestureCornerRadius, "type" | "node_id" | "anchor">
     | Pick<
         editor.gesture.GestureCurve,
         "type" | "control" | "node_id" | "segment"
@@ -859,8 +871,13 @@ export type NodeChangeAction =
   | ({ type: "node/change/fontFamily" } & ITextNodeChangeFontFamilyAction)
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/props" } & INodeChangePropsAction);
+export type NodeToggleUnderlineAction = {
+  type: "node/toggle/underline";
+} & INodeID;
 
-export type NodeToggleBoldAction = { type: "node/toggle/bold" } & INodeID;
+export type NodeToggleLineThroughAction = {
+  type: "node/toggle/line-through";
+} & INodeID;
 
 export type TemplateNodeOverrideChangeAction = ITemplateInstanceNodeID & {
   type: "document/template/override/change/*";

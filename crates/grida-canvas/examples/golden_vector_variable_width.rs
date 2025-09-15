@@ -29,8 +29,8 @@ fn main() {
             VectorNetworkSegment {
                 a: 0,
                 b: 1,
-                ta: Some((100.0, -150.0)), // p1 - p0 (first control point)
-                tb: Some((-100.0, 150.0)), // p3 - p2 (second control point)
+                ta: (100.0, -150.0), // p1 - p0 (first control point)
+                tb: (-100.0, 150.0), // p3 - p2 (second control point)
             },
         ],
     )
@@ -44,12 +44,7 @@ fn main() {
         ],
         vec![
             // Single straight line segment (zero tangent values)
-            VectorNetworkSegment {
-                a: 0,
-                b: 1,
-                ta: None, // Zero tangent = straight line
-                tb: None, // Zero tangent = straight line
-            },
+            VectorNetworkSegment::ab(0, 1),
         ],
     )
     .expect("Valid geometry");
@@ -66,40 +61,15 @@ fn main() {
         ],
         vec![
             // First segment: straight line
-            VectorNetworkSegment {
-                a: 0,
-                b: 1,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(0, 1),
             // Second segment: straight line
-            VectorNetworkSegment {
-                a: 1,
-                b: 2,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(1, 2),
             // Third segment: straight line
-            VectorNetworkSegment {
-                a: 2,
-                b: 3,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(2, 3),
             // Fourth segment: straight line
-            VectorNetworkSegment {
-                a: 3,
-                b: 4,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(3, 4),
             // Fifth segment: straight line
-            VectorNetworkSegment {
-                a: 4,
-                b: 5,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(4, 5),
         ],
     )
     .expect("Valid geometry");
@@ -118,5 +88,12 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/vector_variable_width.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/vector_variable_width.png"
+        ),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

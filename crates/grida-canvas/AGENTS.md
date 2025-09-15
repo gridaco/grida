@@ -16,6 +16,14 @@ cargo fmt
 cargo check
 cargo check --all-targets --all-features
 
+# run clippy (no deps)
+# - runs the same validation as `cargo check` (syntax + type checking)
+# - PLUS runs Clippy lints (style, performance, correctness suggestions)
+# - `--no-deps` skips re-checking huge dependencies (like skia),
+#   while still validating your code's usage of them
+# - best choice for fast iteration when working with large crates
+cargo clippy --no-deps --all-targets --all-features
+
 # run build
 cargo build
 

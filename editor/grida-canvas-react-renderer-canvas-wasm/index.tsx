@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useLayoutEffect, useState } from "react";
-import { Grida2D } from "@grida/canvas-wasm";
+import { Scene } from "@grida/canvas-wasm";
 import { useSize } from "@/grida-canvas-react/viewport/size";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
@@ -27,7 +27,7 @@ function CanvasContent({
     nodes: string[];
     style?: { strokeWidth?: number; stroke?: string };
   };
-  onMount?: (surface: Grida2D) => void;
+  onMount?: (surface: Scene) => void;
   className?: string;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -37,7 +37,7 @@ function CanvasContent({
     if (rendererRef.current) {
       onMount?.(rendererRef.current);
     }
-  }, [rendererRef.current, onMount]);
+  }, [rendererRef.current]);
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
@@ -46,7 +46,7 @@ function CanvasContent({
   }, [rendererRef.current, debug]);
 
   const syncTransform = (
-    surface: Grida2D,
+    surface: Scene,
     transform: cmath.Transform,
     width: number,
     height: number
@@ -143,7 +143,7 @@ export default function Canvas({
     nodes: string[];
     style?: { strokeWidth?: number; stroke?: string };
   };
-  onMount?: (surface: Grida2D) => void;
+  onMount?: (surface: Scene) => void;
   className?: string;
 }) {
   const size = useSize({ width, height });

@@ -46,6 +46,7 @@ async fn demo_gradients() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         }));
         ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -77,6 +78,7 @@ async fn demo_gradients() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         }));
         ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -92,10 +94,7 @@ async fn demo_gradients() -> Scene {
             height: base,
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
-        rect.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 0),
-            opacity: 1.0,
-        }));
+        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
         let angle = (i as f32) * 45.0;
         rect.strokes = vec![Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(angle),
@@ -110,6 +109,7 @@ async fn demo_gradients() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         })];
         rect.stroke_width = 8.0;
         ids.push(rect.id.clone());
@@ -126,10 +126,7 @@ async fn demo_gradients() -> Scene {
             height: base,
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
-        rect.set_fill(Paint::Solid(SolidPaint {
-            color: CGColor(0, 0, 0, 0),
-            opacity: 1.0,
-        }));
+        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
         let offset = -0.25 + 0.125 * i as f32;
         rect.strokes = vec![Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform {
@@ -146,6 +143,7 @@ async fn demo_gradients() -> Scene {
                 },
             ],
             opacity: 1.0,
+            blend_mode: BlendMode::Normal,
         })];
         rect.stroke_width = 8.0;
         ids.push(rect.id.clone());

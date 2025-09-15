@@ -58,6 +58,7 @@ fn main() {
         ],
         opacity: 1.0,
         transform: AffineTransform::identity(),
+        blend_mode: BlendMode::Normal,
     };
 
     // Draw rectangles with varying widths in a single row
@@ -84,6 +85,7 @@ fn main() {
         stops: sweep_gradient.stops.clone(),
         opacity: sweep_gradient.opacity,
         transform: AffineTransform::new(-0.25, -0.25, 0.0), // Move gradient center to top-left
+        blend_mode: BlendMode::Normal,
     };
 
     let mut current_x = start_x;
@@ -107,6 +109,7 @@ fn main() {
         stops: sweep_gradient.stops.clone(),
         opacity: sweep_gradient.opacity,
         transform: AffineTransform::new(0.0, 0.0, 45.0), // Rotate the gradient by 45 degrees
+        blend_mode: BlendMode::Normal,
     };
 
     let mut current_x = start_x;
@@ -129,5 +132,12 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write("goldens/gradient_sweep_transform.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/gradient_sweep_transform.png"
+        ),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

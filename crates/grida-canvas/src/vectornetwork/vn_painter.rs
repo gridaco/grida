@@ -42,25 +42,20 @@ impl<'a> VNPainter<'a> {
         stroke: Option<&StrokeOptions>,
     ) {
         let paths = vn.to_paths();
-        for (region, path) in vn.regions.iter().zip(paths.iter()) {
-            let fills = region
-                .fills
-                .as_ref()
-                .map(|v| v.as_slice())
-                .unwrap_or(fills_fallback);
-            if fills.is_empty() {
-                continue;
+        if vn.regions.is_empty() {
+            // When no regions are defined, apply the node-level fills to the
+            // entire vector network path.
+            for path in paths.iter() {
+                self.draw_path_fills(path, fills_fallback);
             }
-            let bounds = path.compute_tight_bounds();
-            let size = (bounds.width(), bounds.height());
-            for fill in fills {
-                let mut sk_paint = cvt::sk_paint(fill, 1.0, size);
-                sk_paint.set_style(PaintStyle::Fill);
-                if let Some(shader) = sk_paint.shader() {
-                    let matrix = skia_safe::Matrix::translate((-bounds.left, -bounds.top));
-                    sk_paint.set_shader(shader.with_local_matrix(&matrix));
-                }
-                self.canvas.draw_path(path, &sk_paint);
+        } else {
+            for (region, path) in vn.regions.iter().zip(paths.iter()) {
+                let fills = region
+                    .fills
+                    .as_ref()
+                    .map(|v| v.as_slice())
+                    .unwrap_or(fills_fallback);
+                self.draw_path_fills(path, fills);
             }
         }
 
@@ -125,6 +120,7 @@ impl<'a> VNPainter<'a> {
         let paint = Paint::Solid(SolidPaint {
             color,
             opacity: 1.0,
+            blend_mode: BlendMode::default(),
         });
         let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
         sk_paint.set_style(PaintStyle::Fill);
@@ -162,11 +158,70 @@ impl<'a> VNPainter<'a> {
         let paint = Paint::Solid(SolidPaint {
             color: stroke_color,
             opacity: 1.0,
+            blend_mode: BlendMode::default(),
         });
 
         // Convert to Skia paint and draw
         let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
         sk_paint.set_style(PaintStyle::Fill);
         self.canvas.draw_path(&stroke_path, &sk_paint);
+    }
+
+    /// Helper method to draw fills on a path.
+    fn draw_path_fills(&self, path: &skia_safe::Path, fills: &[Paint]) {
+        if fills.is_empty() {
+            return;
+        }
+        let bounds = path.compute_tight_bounds();
+        let size = (bounds.width(), bounds.height());
+        for fill in fills {
+            let mut sk_paint = cvt::sk_paint(fill, 1.0, size);
+            sk_paint.set_style(PaintStyle::Fill);
+            if let Some(shader) = sk_paint.shader() {
+                let matrix = skia_safe::Matrix::translate((-bounds.left, -bounds.top));
+                sk_paint.set_shader(shader.with_local_matrix(&matrix));
+            }
+            self.canvas.draw_path(path, &sk_paint);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cg::types::{BlendMode, CGColor, Paint, SolidPaint};
+    use crate::vectornetwork::VectorNetworkSegment;
+    use skia_safe::{surfaces, Color};
+
+    #[test]
+    fn fills_fallback_when_no_regions() {
+        // Simple rectangle vector network without region definitions
+        let vn = VectorNetwork {
+            vertices: vec![(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)],
+            segments: vec![
+                VectorNetworkSegment::ab(0, 1),
+                VectorNetworkSegment::ab(1, 2),
+                VectorNetworkSegment::ab(2, 3),
+                VectorNetworkSegment::ab(3, 0),
+            ],
+            regions: vec![],
+        };
+
+        let mut surface = surfaces::raster_n32_premul((20, 20)).expect("surface");
+        let canvas = surface.canvas();
+        canvas.clear(Color::from_argb(0, 0, 0, 0));
+
+        let painter = VNPainter::new(canvas);
+        let fills = vec![Paint::Solid(SolidPaint {
+            color: CGColor::RED,
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        })];
+        painter.draw(&vn, &fills, None);
+
+        let snapshot = surface.image_snapshot();
+        let pixmap = snapshot.peek_pixels().expect("pixmap");
+        let color = pixmap.get_color((5, 5));
+        assert_eq!(color, Color::from_argb(255, 255, 0, 0));
     }
 }

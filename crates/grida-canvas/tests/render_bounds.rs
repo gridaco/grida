@@ -1,6 +1,9 @@
 use cg::cache::geometry::GeometryCache;
 use cg::cg::types::*;
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use cg::resources::ByteStore;
+use cg::runtime::font_repository::FontRepository;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn stroke_affects_render_bounds() {
@@ -21,7 +24,9 @@ fn stroke_affects_render_bounds() {
         background_color: None,
     };
 
-    let cache = GeometryCache::from_scene(&scene);
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    let fonts = FontRepository::new(store);
+    let cache = GeometryCache::from_scene(&scene, &fonts);
     let bounds = cache.get_render_bounds(&rect_id).unwrap();
     assert_eq!(bounds.x, -10.0);
     assert_eq!(bounds.y, -10.0);
@@ -49,7 +54,9 @@ fn gaussian_blur_expands_render_bounds() {
         background_color: None,
     };
 
-    let cache = GeometryCache::from_scene(&scene);
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    let fonts = FontRepository::new(store);
+    let cache = GeometryCache::from_scene(&scene, &fonts);
     let bounds = cache.get_render_bounds(&rect_id).unwrap();
     assert_eq!(bounds.x, -5.0);
     assert_eq!(bounds.y, -5.0);
@@ -81,7 +88,9 @@ fn drop_shadow_expands_render_bounds() {
         background_color: None,
     };
 
-    let cache = GeometryCache::from_scene(&scene);
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    let fonts = FontRepository::new(store);
+    let cache = GeometryCache::from_scene(&scene, &fonts);
     let bounds = cache.get_render_bounds(&rect_id).unwrap();
     assert_eq!(bounds.x, -5.0);
     assert_eq!(bounds.y, -5.0);
@@ -113,7 +122,9 @@ fn drop_shadow_spread_expands_render_bounds() {
         background_color: None,
     };
 
-    let cache = GeometryCache::from_scene(&scene);
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    let fonts = FontRepository::new(store);
+    let cache = GeometryCache::from_scene(&scene, &fonts);
     let bounds = cache.get_render_bounds(&rect_id).unwrap();
     assert_eq!(bounds.x, -10.0);
     assert_eq!(bounds.y, -10.0);

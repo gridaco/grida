@@ -8,7 +8,9 @@ import {
   domapi,
   DOMGeometryQueryInterfaceProvider,
   DOMImageExportInterfaceProvider,
+  DOMFontManagerAgentInterfaceProvider,
   NoopGeometryQueryInterfaceProvider,
+  DOMFontParserInterfaceProvider,
 } from "@/grida-canvas/backends";
 
 const __DEFAULT_STATE: editor.state.IEditorStateInit = {
@@ -45,6 +47,8 @@ export function useEditor(
           initialState: init ?? __DEFAULT_STATE,
           plugins: {
             export_as_image: (_) => new DOMImageExportInterfaceProvider(_),
+            font_collection: (_) => new DOMFontManagerAgentInterfaceProvider(_),
+            font_parser: (_) => new DOMFontParserInterfaceProvider(_),
           },
         });
       }
@@ -59,6 +63,21 @@ export function useEditor(
       }
     }
   });
+
+  // React 18+ runs effects twice in development (Strict Mode). This ref ensures
+  // that the editor instance is only disposed on the actual unmount, not during
+  // the first cleanup that happens immediately after mount in dev mode.
+  const _initial_cleanup_ref = React.useRef(false);
+
+  React.useEffect(() => {
+    return () => {
+      if (_initial_cleanup_ref.current) {
+        _editor?.dispose?.();
+      } else {
+        _initial_cleanup_ref.current = true;
+      }
+    };
+  }, [_editor]);
 
   const editor = useSyncExternalStore<Editor>(
     _editor.subscribe.bind(_editor),

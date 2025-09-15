@@ -21,9 +21,9 @@
 //! ```
 
 use cg::helpers::webfont_helper::{find_font_files, load_webfonts_metadata};
-use cg::resource::image_loader::{load_scene_images, ImageLoader};
-use cg::resource::FontLoader;
+use cg::resources::{load_font, load_scene_images, FontMessage};
 use cg::window;
+use cg::window::application::HostEvent;
 use cg::{io::io_figma::FigmaConverter, node::schema::Scene};
 use clap::Parser;
 use figma_api::apis::{
@@ -264,22 +264,15 @@ async fn main() {
 
     // Use the window module's run_demo_window_with to handle image loading and font loading
     window::run_demo_window_with(scene_for_window, |_renderer, tx, font_tx, proxy| {
-        // Initialize the image loader in lifecycle mode
         println!("📸 Initializing image loader...");
-        let mut image_loader = ImageLoader::new_lifecycle(tx, proxy.clone());
-
-        // Initialize the font loader in lifecycle mode
-        println!("📝 Initializing font loader...");
-        let font_tx_clone = font_tx.clone();
-        let proxy_clone = proxy.clone();
-
-        // Load all images in the scene - non-blocking
         let should_load_images = !cli.no_image && (cli.file.is_none() || cli.images_dir.is_some() || cli.archive_dir.is_some());
         if should_load_images {
             println!("🔄 Starting to load scene images in background...");
             let scene_for_images = scene_for_loader.clone();
+            let tx_clone = tx.clone();
+            let proxy_clone = proxy.clone();
             tokio::spawn(async move {
-                load_scene_images(&mut image_loader, &scene_for_images).await;
+                load_scene_images(&scene_for_images, tx_clone, proxy_clone).await;
                 println!("✅ Scene images loading completed in background");
             });
         } else {
@@ -292,30 +285,36 @@ async fn main() {
             }
         }
 
-        // Load all fonts in the scene - non-blocking
+        println!("📝 Initializing font loader...");
         println!("🔄 Starting to load scene fonts in background...");
         let font_files_clone = font_files.clone();
-        let font_tx = font_tx_clone;
-        let proxy = proxy_clone;
+        let font_tx_clone = font_tx.clone();
+        let proxy_clone = proxy.clone();
         tokio::spawn(async move {
-            let font_loading_futures: Vec<_> = font_files_clone
+            let futures: Vec<_> = font_files_clone
                 .into_iter()
                 .map(|font_file| {
-                    let font_tx = font_tx.clone();
-                    let proxy = proxy.clone();
+                    let font_tx = font_tx_clone.clone();
+                    let proxy = proxy_clone.clone();
                     async move {
                         let family = font_file.family;
                         let url = font_file.url;
                         let postscript_name = font_file.postscript_name;
                         println!("Loading font: {} ({})", family, postscript_name);
-                        let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
-                        font_loader.load_font(&family, &url).await;
-                        println!("✅ Font loaded: {} ({})", family, postscript_name);
+                        if let Ok(data) = load_font(&url).await {
+                            let msg = FontMessage {
+                                family: family.clone(),
+                                style: None,
+                                data: data.clone(),
+                            };
+                            let _ = font_tx.unbounded_send(msg.clone());
+                            let _ = proxy.send_event(HostEvent::FontLoaded(msg));
+                            println!("✅ Font loaded: {} ({})", family, postscript_name);
+                        }
                     }
                 })
                 .collect();
-
-            join_all(font_loading_futures).await;
+            join_all(futures).await;
             println!("✅ Scene fonts loading completed in background");
         });
     })

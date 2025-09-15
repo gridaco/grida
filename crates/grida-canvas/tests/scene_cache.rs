@@ -1,8 +1,11 @@
 use cg::cache::scene::SceneCache;
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
 use cg::painter::layer::Layer;
+use cg::resources::ByteStore;
+use cg::runtime::font_repository::FontRepository;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn layers_in_rect_include_partially_visible_nested() {
@@ -36,7 +39,8 @@ fn layers_in_rect_include_partially_visible_nested() {
     };
 
     let mut cache = SceneCache::new();
-    cache.update_geometry(&scene);
+    let fonts = FontRepository::new(Arc::new(Mutex::new(ByteStore::new())));
+    cache.update_geometry(&scene, &fonts);
     cache.update_layers(&scene);
 
     // Query area partially overlapping the rectangle only

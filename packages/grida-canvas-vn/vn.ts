@@ -397,12 +397,23 @@ export namespace vn {
         }
       }
 
+      const filteredSegments = uniqueSegments.filter(
+        (seg) =>
+          !(
+            seg.a === seg.b &&
+            seg.ta[0] === 0 &&
+            seg.ta[1] === 0 &&
+            seg.tb[0] === 0 &&
+            seg.tb[1] === 0
+          )
+      );
+
       if (!remove_unused_verticies) {
-        return { vertices, segments: uniqueSegments };
+        return { vertices, segments: filteredSegments };
       }
 
       const used = new Set<number>();
-      for (const seg of uniqueSegments) {
+      for (const seg of filteredSegments) {
         used.add(seg.a);
         used.add(seg.b);
       }
@@ -414,7 +425,7 @@ export namespace vn {
           filteredVertices.push(v);
         }
       });
-      const remappedSegments = uniqueSegments.map((seg) => ({
+      const remappedSegments = filteredSegments.map((seg) => ({
         a: vertexMap.get(seg.a)!,
         b: vertexMap.get(seg.b)!,
         ta: seg.ta,
@@ -1825,27 +1836,19 @@ export namespace vn {
      * useful for straight line segments where the mathematical accuracy of de
      * Casteljau's algorithm would introduce non-zero tangents.
      *
-     * @param si index of the segment to split
      * @param p parametric position on the segment (0 ≤ t ≤ 1)
      * @param config optional configuration for the split operation
      * @returns index of the newly inserted vertex
      */
     splitSegment(
-      si: number,
       p: PointOnSegment,
       config: SplitSegmentConfig = { preserveZero: true }
     ): number {
-      if (si < 0 || si >= this._segments.length) {
-        throw new Error(`Invalid segment index: ${si}`);
+      if (p.segment < 0 || p.segment >= this._segments.length) {
+        throw new Error(`Invalid segment index: ${p.segment}`);
       }
 
-      if (p.segment !== si) {
-        throw new Error(
-          `PointOnSegment segment index (${p.segment}) does not match segment index (${si})`
-        );
-      }
-
-      const seg = this._segments[si];
+      const seg = this._segments[p.segment];
       const a = this._vertices[seg.a];
       const b = this._vertices[seg.b];
       const ta = seg.ta;
@@ -1913,7 +1916,7 @@ export namespace vn {
       }
 
       // Replace the original segment with the two new segments
-      this._segments.splice(si, 1, segment1, segment2);
+      this._segments.splice(p.segment, 1, segment1, segment2);
 
       return vertexIndex;
     }

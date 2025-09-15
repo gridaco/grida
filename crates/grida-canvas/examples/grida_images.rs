@@ -2,12 +2,16 @@ use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
+use cg::resources::{hash_bytes, load_image};
 use cg::window;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 
-async fn demo_images() -> Scene {
+async fn demo_images() -> (Scene, Vec<u8>) {
     let nf = NodeFactory::new();
     let image_url = "https://grida.co/images/abstract-placeholder.jpg".to_string();
+    let bytes = load_image(&image_url).await.unwrap();
+    let hash = hash_bytes(&bytes);
+    let hash_str = format!("{:016x}", hash);
 
     // Root container
     let mut root = nf.create_container_node();
@@ -26,15 +30,13 @@ async fn demo_images() -> Scene {
         height: 200.0,
     };
     rect1.set_fill(Paint::Image(ImagePaint {
-        hash: image_url.clone(),
+        hash: hash_str.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
+        blend_mode: BlendMode::Normal,
     }));
-    rect1.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(255, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
     rect1.stroke_width = 2.0;
 
     // Second example: Rectangle with ImagePaint fill and stroke
@@ -46,16 +48,18 @@ async fn demo_images() -> Scene {
         height: 200.0,
     };
     rect2.set_fill(Paint::Image(ImagePaint {
-        hash: image_url.clone(),
+        hash: hash_str.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
+        blend_mode: BlendMode::Normal,
     }));
     rect2.strokes = vec![Paint::Image(ImagePaint {
-        hash: image_url.clone(),
+        hash: hash_str.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
+        blend_mode: BlendMode::Normal,
     })];
     rect2.stroke_width = 10.0;
 
@@ -68,15 +72,13 @@ async fn demo_images() -> Scene {
         height: 200.0,
     };
     rect3.corner_radius = RectangularCornerRadius::circular(40.0);
-    rect3.set_fill(Paint::Solid(SolidPaint {
-        color: CGColor(240, 240, 240, 255),
-        opacity: 1.0,
-    }));
+    rect3.set_fill(Paint::from(CGColor(240, 240, 240, 255)));
     rect3.strokes = vec![Paint::Image(ImagePaint {
-        hash: image_url.clone(),
+        hash: hash_str.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
+        blend_mode: BlendMode::Normal,
     })];
     rect3.stroke_width = 10.0;
 
@@ -89,13 +91,25 @@ async fn demo_images() -> Scene {
         height: 200.0,
     };
     rect4.set_fill(Paint::Image(ImagePaint {
-        hash: image_url.clone(),
+        hash: hash_str.clone(),
         opacity: 1.0,
         // Rotate the image 45 degrees with BoxFit::None to showcase the paint transform
         transform: AffineTransform {
-            matrix: [[0.7071, -0.7071, 100.0], [0.7071, 0.7071, 0.0]],
+            matrix: [
+                [
+                    std::f32::consts::FRAC_1_SQRT_2,
+                    -std::f32::consts::FRAC_1_SQRT_2,
+                    100.0,
+                ],
+                [
+                    std::f32::consts::FRAC_1_SQRT_2,
+                    std::f32::consts::FRAC_1_SQRT_2,
+                    0.0,
+                ],
+            ],
         },
         fit: BoxFit::None,
+        blend_mode: BlendMode::Normal,
     }));
 
     let mut repository = NodeRepository::new();
@@ -114,17 +128,22 @@ async fn demo_images() -> Scene {
     let root_id = root.id.clone();
     repository.insert(Node::Container(root));
 
-    Scene {
+    let scene = Scene {
         id: "scene".to_string(),
         name: "Images Demo".to_string(),
         children: vec![root_id],
         nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
-    }
+    };
+
+    (scene, bytes)
 }
 
 #[tokio::main]
 async fn main() {
-    let scene = demo_images().await;
-    window::run_demo_window(scene).await;
+    let (scene, bytes) = demo_images().await;
+    window::run_demo_window_with(scene, move |renderer, _, _, _| {
+        renderer.add_image(&bytes);
+    })
+    .await;
 }

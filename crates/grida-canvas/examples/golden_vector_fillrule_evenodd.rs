@@ -35,12 +35,7 @@ fn main() {
 
     // Helper
     fn segment(a: usize, b: usize) -> VectorNetworkSegment {
-        VectorNetworkSegment {
-            a,
-            b,
-            ta: None,
-            tb: None,
-        }
+        VectorNetworkSegment::ab(a, b)
     }
 
     let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");
@@ -61,5 +56,12 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/vector_fillrule_evenodd.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/vector_fillrule_evenodd.png"
+        ),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

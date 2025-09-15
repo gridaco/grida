@@ -27,27 +27,27 @@ async fn demo_scene() -> Scene {
     let mut title_text = nf.create_text_span_node();
     title_text.name = Some("Title".to_string());
     title_text.transform = AffineTransform::new(50.0, 50.0, 0.0);
-    title_text.size = Size {
-        width: 700.0,
-        height: 60.0,
-    };
+    title_text.width = Some(700.0);
     title_text.text = "Grida Canvas SVG Demo".to_string();
-    title_text.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
+    title_text.text_style = TextStyleRec {
+        text_decoration: None,
         font_family: "".to_string(),
         font_size: 36.0,
         font_weight: FontWeight::new(700),
-        italic: false,
-        letter_spacing: None,
-        line_height: None,
+        font_width: None,
+        font_kerning: true,
+        font_features: None,
+        font_variations: None,
+        font_optical_sizing: Default::default(),
+        font_style_italic: false,
+        letter_spacing: Default::default(),
+        word_spacing: Default::default(),
+        line_height: Default::default(),
         text_transform: TextTransform::None,
     };
     title_text.text_align = TextAlign::Center;
     title_text.text_align_vertical = TextAlignVertical::Center;
-    title_text.fill = Paint::Solid(SolidPaint {
-        color: CGColor(50, 50, 50, 255),
-        opacity: 1.0,
-    });
+    title_text.fills = vec![Paint::from(CGColor(50, 50, 50, 255))];
     all_node_ids.push(title_text.id.clone());
     repo.insert(Node::TextSpan(title_text));
 
@@ -55,28 +55,13 @@ async fn demo_scene() -> Scene {
     let mut subtitle_text = nf.create_text_span_node();
     subtitle_text.name = Some("Subtitle".to_string());
     subtitle_text.transform = AffineTransform::new(50.0, 120.0, 0.0);
-    subtitle_text.size = Size {
-        width: 700.0,
-        height: 40.0,
-    };
+    subtitle_text.width = Some(700.0);
     subtitle_text.text =
         "Rich content demonstration with shapes, gradients, and effects".to_string();
-    subtitle_text.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
-        font_family: "".to_string(),
-        font_size: 18.0,
-        font_weight: FontWeight::new(400),
-        italic: true,
-        letter_spacing: None,
-        line_height: None,
-        text_transform: TextTransform::None,
-    };
+    subtitle_text.text_style = TextStyleRec::from_font("", 18.0);
     subtitle_text.text_align = TextAlign::Center;
     subtitle_text.text_align_vertical = TextAlignVertical::Center;
-    subtitle_text.fill = Paint::Solid(SolidPaint {
-        color: CGColor(100, 100, 100, 255),
-        opacity: 1.0,
-    });
+    subtitle_text.fills = vec![Paint::from(CGColor(100, 100, 100, 255))];
     all_node_ids.push(subtitle_text.id.clone());
     repo.insert(Node::TextSpan(subtitle_text));
 
@@ -106,12 +91,10 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
+        blend_mode: BlendMode::Normal,
     }));
     rect_gradient.stroke_width = 3.0;
-    rect_gradient.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(0, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    rect_gradient.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
     rect_gradient.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 5.0,
         dy: 5.0,
@@ -147,12 +130,10 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
+        blend_mode: BlendMode::Normal,
     })];
     ellipse_radial.stroke_width = 4.0;
-    ellipse_radial.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(0, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    ellipse_radial.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
     all_node_ids.push(ellipse_radial.id.clone());
     repo.insert(Node::Ellipse(ellipse_radial));
 
@@ -171,15 +152,9 @@ async fn demo_scene() -> Scene {
     hexagon.name = Some("Hexagon".to_string());
     hexagon.transform = AffineTransform::new(550.0, 200.0, 0.0);
     hexagon.points = hexagon_points;
-    hexagon.fills = vec![Paint::Solid(SolidPaint {
-        color: CGColor(128, 0, 255, 255),
-        opacity: 1.0,
-    })];
+    hexagon.fills = vec![Paint::from(CGColor(128, 0, 255, 255))];
     hexagon.stroke_width = 3.0;
-    hexagon.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(255, 255, 255, 255),
-        opacity: 1.0,
-    })];
+    hexagon.strokes = vec![Paint::from(CGColor(255, 255, 255, 255))];
     hexagon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 3.0,
         dy: 3.0,
@@ -200,15 +175,9 @@ async fn demo_scene() -> Scene {
     };
     star.point_count = 5;
     star.inner_radius = 0.4;
-    star.fills = vec![Paint::Solid(SolidPaint {
-        color: CGColor(255, 215, 0, 255), // Gold
-        opacity: 1.0,
-    })];
+    star.fills = vec![Paint::from(CGColor(255, 215, 0, 255))];
     star.stroke_width = 2.0;
-    star.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(139, 69, 19, 255), // Brown
-        opacity: 1.0,
-    })];
+    star.strokes = vec![Paint::from(CGColor(139, 69, 19, 255))];
     all_node_ids.push(star.id.clone());
     repo.insert(Node::RegularStarPolygon(star));
 
@@ -217,15 +186,9 @@ async fn demo_scene() -> Scene {
     path.name = Some("Complex Path".to_string());
     path.transform = AffineTransform::new(220.0, 400.0, 0.0);
     path.data = "M50,0 L61,35 L98,35 L68,57 L79,91 L50,71 L21,91 L32,57 L2,35 L39,35 Z".to_string();
-    path.fill = Paint::Solid(SolidPaint {
-        color: CGColor(255, 20, 147, 255), // Deep pink
-        opacity: 1.0,
-    });
+    path.fill = Paint::from(CGColor(255, 20, 147, 255));
     path.stroke_width = 2.0;
-    path.stroke = Some(Paint::Solid(SolidPaint {
-        color: CGColor(0, 0, 0, 255),
-        opacity: 1.0,
-    }));
+    path.stroke = Some(Paint::from(CGColor(0, 0, 0, 255)));
     all_node_ids.push(path.id.clone());
     repo.insert(Node::SVGPath(path));
 
@@ -254,6 +217,7 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
+        blend_mode: BlendMode::default(),
     })];
     line.stroke_width = 8.0;
     all_node_ids.push(line.id.clone());
@@ -268,15 +232,9 @@ async fn demo_scene() -> Scene {
         height: 100.0,
     };
     octagon.point_count = 8;
-    octagon.fills = vec![Paint::Solid(SolidPaint {
-        color: CGColor(0, 255, 255, 255), // Cyan
-        opacity: 0.8,
-    })];
+    octagon.fills = vec![Paint::from(CGColor(0, 255, 255, 255))];
     octagon.stroke_width = 3.0;
-    octagon.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(0, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    octagon.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
     all_node_ids.push(octagon.id.clone());
     repo.insert(Node::RegularPolygon(octagon));
 
@@ -284,27 +242,12 @@ async fn demo_scene() -> Scene {
     let mut description_text = nf.create_text_span_node();
     description_text.name = Some("Description".to_string());
     description_text.transform = AffineTransform::new(50.0, 550.0, 0.0);
-    description_text.size = Size {
-        width: 700.0,
-        height: 40.0,
-    };
+    description_text.width = Some(700.0);
     description_text.text = "This PDF demonstrates various rendering capabilities including gradients, shapes, text, and effects.".to_string();
-    description_text.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
-        font_family: "".to_string(),
-        font_size: 14.0,
-        font_weight: FontWeight::new(400),
-        italic: false,
-        letter_spacing: None,
-        line_height: None,
-        text_transform: TextTransform::None,
-    };
+    description_text.text_style = TextStyleRec::from_font("", 14.0);
     description_text.text_align = TextAlign::Center;
     description_text.text_align_vertical = TextAlignVertical::Center;
-    description_text.fill = Paint::Solid(SolidPaint {
-        color: CGColor(80, 80, 80, 255),
-        opacity: 1.0,
-    });
+    description_text.fills = vec![Paint::from(CGColor(80, 80, 80, 255))];
     all_node_ids.push(description_text.id.clone());
     repo.insert(Node::TextSpan(description_text));
 
@@ -340,7 +283,7 @@ async fn main() {
         None,
         Camera2D::new_from_bounds(Rectangle::from_xywh(0.0, 0.0, scene_width, scene_height)),
         RendererOptions {
-            font_fallback: true,
+            use_embedded_fonts: true,
         },
     );
     renderer.load_scene(scene);
@@ -351,7 +294,8 @@ async fn main() {
     renderer.render_to_canvas(&canvas, width, height);
 
     let data = canvas.end();
-    let mut file = File::create("goldens/svg.svg").expect("failed to create svg");
+    let mut file = File::create(concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/svg.svg"))
+        .expect("failed to create svg");
     file.write_all(data.as_bytes())
         .expect("failed to write svg");
 

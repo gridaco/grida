@@ -1,8 +1,10 @@
+use crate::cache::paragraph::ParagraphCache;
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::{
     IntrinsicSizeNode, LayerEffects, Node, NodeGeometryMixin, NodeId, Scene,
 };
+use crate::runtime::font_repository::FontRepository;
 use math2::rect;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
@@ -45,11 +47,27 @@ impl GeometryCache {
         }
     }
 
-    pub fn from_scene(scene: &Scene) -> Self {
+    pub fn from_scene(scene: &Scene, fonts: &FontRepository) -> Self {
+        Self::from_scene_with_paragraph_cache(scene, &mut ParagraphCache::new(), fonts)
+    }
+
+    pub fn from_scene_with_paragraph_cache(
+        scene: &Scene,
+        paragraph_cache: &mut ParagraphCache,
+        fonts: &FontRepository,
+    ) -> Self {
         let mut cache = Self::new();
         let root_world = AffineTransform::identity();
         for child in &scene.children {
-            Self::build_recursive(child, &scene.nodes, &root_world, None, &mut cache);
+            Self::build_recursive(
+                child,
+                &scene.nodes,
+                &root_world,
+                None,
+                &mut cache,
+                paragraph_cache,
+                fonts,
+            );
         }
         cache
     }
@@ -60,6 +78,8 @@ impl GeometryCache {
         parent_world: &AffineTransform,
         parent_id: Option<NodeId>,
         cache: &mut GeometryCache,
+        paragraph_cache: &mut ParagraphCache,
+        fonts: &FontRepository,
     ) -> Rectangle {
         let node = repo
             .get(id)
@@ -77,6 +97,8 @@ impl GeometryCache {
                         &world_transform,
                         Some(id.clone()),
                         cache,
+                        paragraph_cache,
+                        fonts,
                     );
                     union_bounds = match union_bounds {
                         Some(b) => Some(rect::union(&[b, child_bounds])),
@@ -134,6 +156,8 @@ impl GeometryCache {
                         &world_transform,
                         Some(id.clone()),
                         cache,
+                        paragraph_cache,
+                        fonts,
                     );
                     union_bounds = match union_bounds {
                         Some(b) => Some(rect::union(&[b, child_bounds])),
@@ -208,6 +232,8 @@ impl GeometryCache {
                         &world_transform,
                         Some(id.clone()),
                         cache,
+                        paragraph_cache,
+                        fonts,
                     );
                     union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
                 }
@@ -226,6 +252,52 @@ impl GeometryCache {
 
                 union_world_bounds
             }
+            Node::TextSpan(n) => {
+                // Get final measured metrics from cache
+                let measurements = paragraph_cache.measure(
+                    &n.text,
+                    &n.text_style,
+                    &n.text_align,
+                    &n.max_lines,
+                    &n.ellipsis,
+                    n.width,
+                    fonts,
+                    Some(&n.id),
+                );
+
+                // Create intrinsic bounds (starting at origin, like other nodes)
+                /// TODO: Remove this hack to support 0 value visibility
+                const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
+                let intrinsic_bounds = Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: measurements.max_width.max(MIN_SIZE_DIRTY_HACK),
+                    height: n
+                        .height
+                        .unwrap_or(measurements.height)
+                        .max(MIN_SIZE_DIRTY_HACK),
+                };
+
+                // Use the node's transform directly (which already includes positioning)
+                let local_transform = n.transform;
+                let world_transform = parent_world.compose(&local_transform);
+                let world_bounds = transform_rect(&intrinsic_bounds, &world_transform);
+                let render_bounds = compute_render_bounds(node, world_bounds);
+
+                let entry = GeometryEntry {
+                    transform: local_transform,
+                    absolute_transform: world_transform,
+                    bounding_box: intrinsic_bounds,
+                    absolute_bounding_box: world_bounds,
+                    absolute_render_bounds: render_bounds,
+                    parent: parent_id.clone(),
+                    dirty_transform: false,
+                    dirty_bounds: false,
+                };
+                cache.entries.insert(id.clone(), entry.clone());
+
+                intrinsic_bounds
+            }
             _ => {
                 let intrinsic_node = Box::new(match node {
                     Node::SVGPath(n) => IntrinsicSizeNode::SVGPath(n.clone()),
@@ -236,11 +308,12 @@ impl GeometryCache {
                     Node::RegularPolygon(n) => IntrinsicSizeNode::RegularPolygon(n.clone()),
                     Node::RegularStarPolygon(n) => IntrinsicSizeNode::RegularStarPolygon(n.clone()),
                     Node::Line(n) => IntrinsicSizeNode::Line(n.clone()),
-                    Node::TextSpan(n) => IntrinsicSizeNode::TextSpan(n.clone()),
                     Node::Image(n) => IntrinsicSizeNode::Image(n.clone()),
                     Node::Container(n) => IntrinsicSizeNode::Container(n.clone()),
                     Node::Error(n) => IntrinsicSizeNode::Error(n.clone()),
-                    Node::Group(_) | Node::BooleanOperation(_) => panic!("Unsupported node type"),
+                    Node::TextSpan(_) | Node::Group(_) | Node::BooleanOperation(_) => {
+                        unreachable!()
+                    }
                 });
                 let intrinsic = intrinsic_node.as_ref();
 
@@ -321,15 +394,6 @@ fn node_geometry(node: &IntrinsicSizeNode) -> (AffineTransform, Rectangle) {
                 y: 0.0,
                 width: n.size.width,
                 height: 0.0,
-            },
-        ),
-        IntrinsicSizeNode::TextSpan(n) => (
-            n.transform,
-            Rectangle {
-                x: 0.0,
-                y: 0.0,
-                width: n.size.width,
-                height: n.size.height,
             },
         ),
         IntrinsicSizeNode::SVGPath(n) => (n.transform, path_bounds(&n.data)),
@@ -494,7 +558,7 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
         Node::Vector(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width,
-            n.stroke_align,
+            n.get_stroke_align(),
             &n.effects,
         ),
         Node::Image(n) => compute_render_bounds_from_style(
@@ -511,9 +575,9 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
         ),
         Node::TextSpan(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_width.unwrap_or(0.0),
+            n.stroke_width,
             n.stroke_align,
-            &LayerEffects::new_empty(),
+            &LayerEffects::default(),
         ),
         Node::Container(n) => compute_render_bounds_from_style(
             world_bounds,

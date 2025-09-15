@@ -1,5 +1,6 @@
 use super::vn::{VectorNetwork, VectorNetworkSegment};
 use crate::cg::types::*;
+use math2::KAPPA;
 
 pub struct RRectShape {
     /// width of the box
@@ -39,9 +40,8 @@ pub fn build_rrect_path(shape: &RRectShape) -> skia_safe::Path {
 /// The network is constructed with segments in clockwise order starting from
 /// the top edge. Each corner is approximated with a single cubic Bézier curve
 /// using the KAPPA constant.
+#[deprecated(note = "use VectorGeometryShape instead")]
 pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
-    const KAPPA: f32 = 0.5522847498307936;
-
     let w = shape.width;
     let h = shape.height;
     let tl = shape.corner_radius.tl;
@@ -58,12 +58,7 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         vertices.len() - 1
     };
     // helper to create line segment
-    let line = |a: usize, b: usize| VectorNetworkSegment {
-        a,
-        b,
-        ta: None,
-        tb: None,
-    };
+    let line = |a: usize, b: usize| VectorNetworkSegment::ab(a, b);
 
     // Starting point (top-left edge start)
     let start = (tl.rx, 0.0);
@@ -83,15 +78,10 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         segments.push(VectorNetworkSegment {
             a: prev,
             b: end_idx,
-            ta: Some((KAPPA * tr.rx, 0.0)),
-            tb: Some((0.0, -KAPPA * tr.ry)),
+            ta: (KAPPA * tr.rx, 0.0),
+            tb: (0.0, -KAPPA * tr.ry),
         });
         prev = end_idx;
-    } else {
-        let corner = (w, 0.0);
-        let corner_idx = push(corner);
-        segments.push(line(prev, corner_idx));
-        prev = corner_idx;
     }
 
     // Right edge
@@ -107,15 +97,10 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         segments.push(VectorNetworkSegment {
             a: prev,
             b: end_idx,
-            ta: Some((0.0, KAPPA * br.ry)),
-            tb: Some((-KAPPA * br.rx, 0.0)),
+            ta: (0.0, KAPPA * br.ry),
+            tb: (-KAPPA * br.rx, 0.0),
         });
         prev = end_idx;
-    } else {
-        let corner = (w, h);
-        let corner_idx = push(corner);
-        segments.push(line(prev, corner_idx));
-        prev = corner_idx;
     }
 
     // Bottom edge
@@ -131,20 +116,19 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         segments.push(VectorNetworkSegment {
             a: prev,
             b: end_idx,
-            ta: Some((-KAPPA * bl.rx, 0.0)),
-            tb: Some((0.0, KAPPA * bl.ry)),
+            ta: (-KAPPA * bl.rx, 0.0),
+            tb: (0.0, KAPPA * bl.ry),
         });
         prev = end_idx;
-    } else {
-        let corner = (0.0, h);
-        let corner_idx = push(corner);
-        segments.push(line(prev, corner_idx));
-        prev = corner_idx;
     }
 
     // Left edge
     let tl_start = (0.0, tl.ry);
-    let tl_start_idx = push(tl_start);
+    let tl_start_idx = if tl_start == start {
+        start_idx
+    } else {
+        push(tl_start)
+    };
     segments.push(line(prev, tl_start_idx));
     prev = tl_start_idx;
 
@@ -153,16 +137,40 @@ pub fn build_rrect_vector_network(shape: &RRectShape) -> VectorNetwork {
         segments.push(VectorNetworkSegment {
             a: prev,
             b: start_idx,
-            ta: Some((0.0, -KAPPA * tl.ry)),
-            tb: Some((KAPPA * tl.rx, 0.0)),
+            ta: (0.0, -KAPPA * tl.ry),
+            tb: (KAPPA * tl.rx, 0.0),
         });
-    } else {
-        segments.push(line(prev, start_idx));
     }
 
     VectorNetwork {
         vertices,
         segments,
         regions: vec![],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::vectornetwork::VectorNetworkSegment;
+
+    #[test]
+    fn rectangle_vector_network_is_minimal() {
+        let shape = RRectShape {
+            width: 100.0,
+            height: 50.0,
+            corner_radius: RectangularCornerRadius::zero(),
+        };
+
+        #[allow(deprecated)]
+        let vn = build_rrect_vector_network(&shape);
+
+        assert_eq!(vn.vertices.len(), 4);
+        assert_eq!(vn.segments.len(), 4);
+
+        assert_eq!(vn.segments[0], VectorNetworkSegment::ab(0, 1));
+        assert_eq!(vn.segments[1], VectorNetworkSegment::ab(1, 2));
+        assert_eq!(vn.segments[2], VectorNetworkSegment::ab(2, 3));
+        assert_eq!(vn.segments[3], VectorNetworkSegment::ab(3, 0));
     }
 }

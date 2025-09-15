@@ -1,6 +1,7 @@
 use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::Deserialize;
+use std::hash::Hash;
 
 /// A 2D point with x and y coordinates.
 #[derive(Debug, Clone, Copy)]
@@ -38,36 +39,139 @@ impl Into<skia_safe::Point> for CGPoint {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
 impl CGColor {
+    pub const TRANSPARENT: Self = Self(0, 0, 0, 0);
     pub const BLACK: Self = Self(0, 0, 0, 255);
     pub const WHITE: Self = Self(255, 255, 255, 255);
     pub const RED: Self = Self(255, 0, 0, 255);
     pub const GREEN: Self = Self(0, 255, 0, 255);
     pub const BLUE: Self = Self(0, 0, 255, 255);
+
+    pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self(r, g, b, a)
+    }
+
+    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
+        Self(r, g, b, 255)
+    }
+
+    pub fn r(&self) -> u8 {
+        self.0
+    }
+    pub fn g(&self) -> u8 {
+        self.1
+    }
+    pub fn b(&self) -> u8 {
+        self.2
+    }
+    pub fn a(&self) -> u8 {
+        self.3
+    }
+}
+
+impl From<CGColor> for SolidPaint {
+    fn from(color: CGColor) -> Self {
+        SolidPaint {
+            color,
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
 }
 
 /// Boolean path operation.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum BooleanPathOperation {
     #[serde(rename = "union")]
-    Union,        // A ∪ B
+    Union, // A ∪ B
     #[serde(rename = "intersection")]
     Intersection, // A ∩ B
     #[serde(rename = "difference")]
-    Difference,   // A - B
+    Difference, // A - B
     #[serde(rename = "xor")]
-    Xor,          // A ⊕ B
+    Xor, // A ⊕ B
 }
+
+/// # Clipping Model (Single `clip` flag — **clips content only**)
+///
+/// This module uses a **single clipping switch**, exposed as `clip` on container-like nodes
+/// (currently `ContainerNodeRec`). The semantics are intentionally **content-only clipping**
+/// (a.k.a. *overflow clip*):
+///
+/// - When `clip == true`, the runtime **pushes a clip region** equal to the node's own
+///   geometry (its rounded-rect path derived from `size` and `corner_radius`) **before painting
+///   descendants**, and **pops** it after the descendants are painted.
+/// - This clip affects **only the node's children and any drawing that occurs *as part of
+///   child painting***. It is **not** a mask for the node's own border/stroke or its
+///   outer effects.
+///
+/// ## What is clipped vs. not clipped
+///
+/// **Clipped by `clip` (content-only):**
+/// - All **descendant nodes** (children, grandchildren, …) drawn while the clip is active.
+/// - Any content the container delegates to children (e.g., embedded images, text nodes).
+///
+/// **Not clipped by `clip` (content-only):**
+/// - The container’s **own stroke/border** (including `stroke_align: Outside/Center/Inside`).
+///   The stroke is painted **after** children and may extend outside the content region.
+/// - The container’s **outer effects** such as **drop shadows** applied via `LayerEffects`.
+/// - The container’s **outline/focus rings/debug handles** (if any).
+///
+/// > Rationale: This mirrors typical "overflow: hidden" semantics in UI frameworks where
+/// > the clip is a **descendant clip**, not a **self-mask**. It yields the common “card”
+/// > behavior: an image child is clipped to rounded corners, while the card’s border and
+/// > drop shadow remain crisp and uncut.
+///
+/// ## Paint Order (normative for containers)
+///
+/// Implementers should adhere to the following order to guarantee predictable results:
+///
+/// 1. Establish transforms / local coordinate space.
+/// 2. Paint the container **background/fills** (they naturally fit within the shape).
+/// 3. If `clip == true`: **push content clip** using the container’s rounded-rect path.
+/// 4. **Paint children** (all descendants paint under the active clip).
+/// 5. If `clip == true`: **pop content clip**.
+/// 6. Paint the container’s **stroke/border** (may extend outside; not affected by `clip`).
+/// 7. Paint **outer effects** (e.g., drop shadows, outlines, overlays).
+///
+/// ## Interaction with `LayerEffects`
+///
+/// - **DropShadow**: treated as an **outer effect** for the container; it is **not** masked by
+///   the `clip` (content-only). Shadow extents may lie outside the container’s bounds.
+/// - **InnerShadow**: always constrained by the container’s **shape**; independent of `clip`.
+/// - **LayerBlur**: blurs the container’s **composited layer** (background + children as painted).
+///   Since children were already clipped (if `clip == true`), the blur kernel may **bleed outside**
+///   the shape; that bleed is **not** additionally masked by `clip`.
+/// - **BackdropBlur**: samples content **behind** the container and is **masked to the
+///   container’s shape** (not to the content clip). It does not depend on `clip`.
+///
+/// ## Stroke alignment
+///
+/// Support for `StrokeAlign::{Inside, Center, Outside}` affects only where the stroke pixels land.
+/// The `clip` flag (content-only) **does not** trim any outside/center/inside portions of the
+/// container’s own stroke. Descendants remain clipped as described above.
+///
+/// ## Future extension (non-normative)
+///
+/// Some products need a **shape clip** (self + children), analogous to CSS `clip-path` / SVG
+/// `clipPath`. If ever introduced, it should be a **separate attribute** from `clip` to avoid
+/// breaking existing content-only behavior.
+///
+/// ### Mapping to other ecosystems (informative)
+/// - HTML/CSS `overflow: hidden` → `clip` (content-only)
+/// - CSS `clip-path` / SVG `clipPath` → (potential future **shape clip**, not implemented)
+/// - Flutter `Clip*` wrapping a subtree → (potential future **shape clip**, not implemented)
+pub type ContainerClipFlag = bool;
 
 /// Blend modes for compositing layers, compatible with Skia and SVG/CSS.
 ///
 /// - SVG: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/mix-blend-mode
 /// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
 /// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 pub enum BlendMode {
     // Skia: kSrcOver, CSS: normal
     #[serde(rename = "normal")]
@@ -158,11 +262,19 @@ impl Default for StrokeAlign {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Radius {
     pub rx: f32,
     pub ry: f32,
 }
+
+impl Radius {
+    pub fn avg(&self) -> f32 {
+        (self.rx + self.ry) / 2.0
+    }
+}
+
+impl Eq for Radius {}
 
 impl Default for Radius {
     fn default() -> Self {
@@ -214,7 +326,7 @@ impl Into<(f32, f32)> for Radius {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RectangularCornerRadius {
     pub tl: Radius,
     pub tr: Radius,
@@ -254,6 +366,10 @@ impl RectangularCornerRadius {
             && self.tl.rx == self.bl.rx
             && self.tl.rx == self.br.rx
     }
+
+    pub fn avg(&self) -> f32 {
+        (self.tl.avg() + self.tr.avg() + self.bl.avg() + self.br.avg()) / 4.0
+    }
 }
 
 impl Default for RectangularCornerRadius {
@@ -289,9 +405,9 @@ impl Default for TextTransform {
 /// Only `Underline` and `None` are supported in the current version.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html)  
-/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration)
+/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-line)
 #[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
-pub enum TextDecoration {
+pub enum TextDecorationLine {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "underline")]
@@ -300,6 +416,142 @@ pub enum TextDecoration {
     Overline,
     #[serde(rename = "line-through")]
     LineThrough,
+}
+
+impl Default for TextDecorationLine {
+    fn default() -> Self {
+        TextDecorationLine::None
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
+pub enum TextDecorationStyle {
+    #[serde(rename = "solid")]
+    Solid,
+    #[serde(rename = "double")]
+    Double,
+    #[serde(rename = "dotted")]
+    Dotted,
+    #[serde(rename = "dashed")]
+    Dashed,
+    #[serde(rename = "wavy")]
+    Wavy,
+}
+
+impl Default for TextDecorationStyle {
+    fn default() -> Self {
+        TextDecorationStyle::Solid
+    }
+}
+
+pub trait FromWithContext<T, C> {
+    fn from_with_context(value: T, ctx: &C) -> Self;
+}
+
+pub struct DecorationRecBuildContext {
+    pub color: CGColor,
+}
+
+impl From<&TextStyleRecBuildContext> for DecorationRecBuildContext {
+    fn from(ctx: &TextStyleRecBuildContext) -> Self {
+        Self { color: ctx.color }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TextDecorationRec {
+    /// Text decoration line (e.g. underline or none).
+    pub text_decoration_line: TextDecorationLine,
+
+    /// Text decoration color
+    pub text_decoration_color: Option<CGColor>,
+
+    /// Text decoration style (e.g. dashed or solid).
+    pub text_decoration_style: Option<TextDecorationStyle>,
+
+    /// Text decoration skip ink
+    pub text_decoration_skip_ink: Option<bool>,
+
+    /// The thickness of the decoration stroke as a multiplier of the thickness defined by the font.
+    pub text_decoration_thinkness: Option<f32>,
+}
+
+impl TextDecorationRec {
+    pub fn none() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::None,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
+        }
+    }
+
+    pub fn underline() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::Underline,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
+        }
+    }
+
+    pub fn overline() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::Overline,
+            text_decoration_color: None,
+            text_decoration_style: None,
+            text_decoration_skip_ink: None,
+            text_decoration_thinkness: None,
+        }
+    }
+}
+
+impl Default for TextDecorationRec {
+    fn default() -> Self {
+        Self::none()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TextDecoration {
+    pub text_decoration_line: TextDecorationLine,
+    pub text_decoration_color: CGColor,
+    pub text_decoration_style: TextDecorationStyle,
+    pub text_decoration_skip_ink: bool,
+    pub text_decoration_thinkness: f32,
+}
+
+impl Default for TextDecoration {
+    fn default() -> Self {
+        Self {
+            text_decoration_line: TextDecorationLine::None,
+            text_decoration_color: CGColor::TRANSPARENT,
+            text_decoration_style: TextDecorationStyle::Solid,
+            text_decoration_skip_ink: true,
+            text_decoration_thinkness: 1.0,
+        }
+    }
+}
+
+impl FromWithContext<TextDecorationRec, DecorationRecBuildContext> for TextDecoration {
+    fn from_with_context(value: TextDecorationRec, ctx: &DecorationRecBuildContext) -> Self {
+        let text_decoration_color = value.text_decoration_color.unwrap_or(ctx.color);
+        let text_decoration_style = value
+            .text_decoration_style
+            .unwrap_or(TextDecorationStyle::default());
+        let text_decoration_skip_ink = value.text_decoration_skip_ink.unwrap_or(true);
+        let text_decoration_thinkness = value.text_decoration_thinkness.unwrap_or(1.0);
+
+        Self {
+            text_decoration_line: value.text_decoration_line,
+            text_decoration_color: text_decoration_color,
+            text_decoration_style: text_decoration_style,
+            text_decoration_skip_ink: text_decoration_skip_ink,
+            text_decoration_thinkness: text_decoration_thinkness,
+        }
+    }
 }
 
 /// Supported horizontal text alignment.
@@ -326,18 +578,94 @@ impl Default for TextAlign {
     }
 }
 
-/// Supported vertical alignment values for text.
+/// Supported vertical alignment values for text within its container height.
 ///
-/// In CSS, this maps to `align-content`.
+/// This enum defines how text is positioned vertically within the height container
+/// specified by the `height` property in `TextSpanNodeRec`. Since Skia's text layout
+/// engine only supports width-based layout, vertical alignment is implemented by
+/// this library through post-layout positioning adjustments.
 ///
-/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/align-content)  
-/// - [Konva](https://konvajs.org/api/Konva.Text.html#verticalAlign)
+/// ## How Vertical Alignment Works
+///
+/// The vertical alignment system works by calculating a y-offset (delta) that determines
+/// where the text is painted within the specified height container:
+///
+/// ```text
+/// y_offset = match alignment {
+///     TextAlignVertical::Top => 0.0,
+///     TextAlignVertical::Center => (container_height - text_height) / 2.0,
+///     TextAlignVertical::Bottom => container_height - text_height,
+/// }
+/// ```
+///
+/// Where:
+/// - `container_height` is the value of the `height` property (when specified)
+/// - `text_height` is the natural height of the text as calculated by Skia's layout engine
+///
+/// ## Alignment Behaviors
+///
+/// ### Top Alignment
+/// - **Y-offset**: `0.0` (no vertical adjustment)
+/// - **Behavior**: Text starts at the top of the container
+/// - **Clipping**: When container height < text height, bottom portion is clipped
+/// - **Use case**: Default behavior, suitable for most text layouts
+///
+/// ### Center Alignment  
+/// - **Y-offset**: `(container_height - text_height) / 2.0`
+/// - **Behavior**: Text is vertically centered within the container
+/// - **Clipping**: When container height < text height, top and bottom portions are clipped equally
+/// - **Use case**: Centering text in buttons, cards, or other UI elements
+///
+/// ### Bottom Alignment
+/// - **Y-offset**: `container_height - text_height`
+/// - **Behavior**: Text is positioned at the bottom of the container
+/// - **Clipping**: When container height < text height, top portion is clipped
+/// - **Use case**: Aligning text to the bottom of containers, footers, etc.
+///
+/// ## Relationship to CSS
+///
+/// In CSS, this maps to `align-content` or `vertical-align` properties:
+/// - [MDN align-content](https://developer.mozilla.org/en-US/docs/Web/CSS/align-content)
+/// - [MDN vertical-align](https://developer.mozilla.org/en-US/docs/Web/CSS/vertical-align)
+///
+/// ## Relationship to Other Frameworks
+///
+/// - [Konva.js Text.verticalAlign](https://konvajs.org/api/Konva.Text.html#verticalAlign)
+/// - [Flutter TextAlignVertical](https://api.flutter.dev/flutter/painting/TextAlignVertical-class.html)
+///
+/// ## Implementation Notes
+///
+/// This alignment system is implemented post-layout, meaning:
+/// 1. Skia performs text layout based on width constraints only
+/// 2. The resulting paragraph has a natural height
+/// 3. This library calculates the y-offset based on the alignment choice
+/// 4. The text is painted at the calculated offset position
+///
+/// This approach allows for flexible text positioning while maintaining compatibility
+/// with Skia's text layout engine limitations.
 #[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextAlignVertical {
+    /// Align text to the top of the container.
+    ///
+    /// Text starts at y-position 0 within the height container.
+    /// When the container height is smaller than the text height,
+    /// the bottom portion of the text will be clipped.
     #[serde(rename = "top")]
     Top,
+
+    /// Center text vertically within the container.
+    ///
+    /// Text is positioned so that it appears centered within the
+    /// height container. When the container height is smaller than
+    /// the text height, both top and bottom portions are clipped equally.
     #[serde(rename = "center")]
     Center,
+
+    /// Align text to the bottom of the container.
+    ///
+    /// Text is positioned at the bottom of the height container.
+    /// When the container height is smaller than the text height,
+    /// the top portion of the text will be clipped.
     #[serde(rename = "bottom")]
     Bottom,
 }
@@ -355,6 +683,12 @@ impl Default for TextAlignVertical {
 /// - [OpenType spec](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass)
 #[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub struct FontWeight(pub u32);
+
+impl Default for FontWeight {
+    fn default() -> Self {
+        Self(400)
+    }
+}
 
 impl FontWeight {
     /// Creates a new font weight value.
@@ -379,16 +713,107 @@ impl FontWeight {
         self.0
     }
 
-    pub fn default() -> Self {
-        Self(400)
+    pub const BOLD700: Self = Self(700);
+    pub const MEDIUM500: Self = Self(500);
+    pub const REGULAR400: Self = Self(400);
+    pub const LIGHT300: Self = Self(300);
+    pub const THIN100: Self = Self(100);
+}
+
+/// Context for building a text style.
+pub struct TextStyleRecBuildContext {
+    /// The color of the text. this is used as fallback for [Decoration::text_decoration_color].
+    pub color: CGColor,
+    /// List of font families to use as fallbacks when the primary font is missing.
+    pub user_fallback_fonts: Vec<String>,
+}
+
+impl Default for TextStyleRecBuildContext {
+    fn default() -> Self {
+        Self {
+            color: CGColor::TRANSPARENT,
+            user_fallback_fonts: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FontFeature {
+    pub tag: String,
+    pub value: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct FontVariation {
+    pub axis: String,
+    pub value: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FontOpticalSizing {
+    /// Auto mode will set the optical size to the font size.
+    /// this is the default behavior.
+    Auto,
+    None,
+    Fixed(f32),
+}
+
+impl Default for FontOpticalSizing {
+    fn default() -> Self {
+        FontOpticalSizing::Auto
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TextLineHeight {
+    /// Normal (unset, no override)
+    Normal,
+    /// px value
+    Fixed(f32),
+    /// multiplier factor
+    Factor(f32),
+}
+
+impl Default for TextLineHeight {
+    fn default() -> Self {
+        TextLineHeight::Normal
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TextLetterSpacing {
+    /// Fixed value in px.
+    Fixed(f32),
+    /// em Factor value (percentage) relative to font size.
+    /// 1 = 100% / 1em
+    Factor(f32),
+}
+
+impl Default for TextLetterSpacing {
+    fn default() -> Self {
+        TextLetterSpacing::Fixed(0.0)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TextWordSpacing {
+    /// Fixed value in px.
+    Fixed(f32),
+    /// em Factor value (percentage) relative to font size.
+    /// 1 = 100% / 1em
+    Factor(f32),
+}
+
+impl Default for TextWordSpacing {
+    fn default() -> Self {
+        TextWordSpacing::Fixed(0.0)
     }
 }
 
 /// A set of style properties that can be applied to a text or text span.
 #[derive(Debug, Clone)]
-pub struct TextStyle {
-    /// Text decoration (e.g. underline or none).
-    pub text_decoration: TextDecoration,
+pub struct TextStyleRec {
+    pub text_decoration: Option<TextDecorationRec>,
 
     /// Optional font family name (e.g. "Roboto").
     pub font_family: String,
@@ -399,19 +824,67 @@ pub struct TextStyle {
     /// Font weight (100–900).
     pub font_weight: FontWeight,
 
-    /// Font italic style.
-    pub italic: bool,
+    /// Font width
+    /// this is a high-level exposure for `wdth` variable axis.
+    /// this is effectively no-op if the font does not support `wdth` feature.
+    pub font_width: Option<f32>,
 
-    /// Additional spacing between characters, in logical pixels.  
+    /// Font italic style.
+    pub font_style_italic: bool,
+
+    /// Font kerning.
+    /// this is a high-level switch for the font feature `kern`.
+    pub font_kerning: bool,
+
+    /// Font optical sizing
+    /// this is a high-level exposure for `opsz` variable axis.
+    /// this is effectively no-op if the font does not support `opsz` feature.
+    ///
+    /// defaults to [`FontOpticalSizing::Auto`]
+    pub font_optical_sizing: FontOpticalSizing,
+
+    /// OpenType font features
+    pub font_features: Option<Vec<FontFeature>>,
+
+    /// Custom font variation axes
+    pub font_variations: Option<Vec<FontVariation>>,
+
+    /// Additional spacing between characters, in logical pixels.
     /// Default is `0.0`.
-    pub letter_spacing: Option<f32>,
+    pub letter_spacing: TextLetterSpacing,
+
+    /// Additional spacing between words, in logical pixels.
+    /// Default is `0.0`.
+    pub word_spacing: TextWordSpacing,
 
     /// Line height
-    pub line_height: Option<f32>,
+    pub line_height: TextLineHeight,
 
     /// Text transform (e.g. uppercase, lowercase, capitalize)
     pub text_transform: TextTransform,
 }
+
+impl TextStyleRec {
+    pub fn from_font(font: &str, size: f32) -> Self {
+        Self {
+            text_decoration: None,
+            font_family: font.to_string(),
+            font_size: size,
+            font_weight: Default::default(),
+            font_width: None,
+            font_style_italic: false,
+            font_kerning: true,
+            font_optical_sizing: FontOpticalSizing::Auto,
+            font_features: None,
+            font_variations: None,
+            letter_spacing: Default::default(),
+            word_spacing: Default::default(),
+            line_height: Default::default(),
+            text_transform: TextTransform::None,
+        }
+    }
+}
+
 // #endregion
 
 // #region paint
@@ -435,6 +908,74 @@ impl Paint {
             Paint::SweepGradient(gradient) => gradient.opacity,
             Paint::DiamondGradient(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
+        }
+    }
+
+    pub fn blend_mode(&self) -> BlendMode {
+        match self {
+            Paint::Solid(solid) => solid.blend_mode,
+            Paint::LinearGradient(gradient) => gradient.blend_mode,
+            Paint::RadialGradient(gradient) => gradient.blend_mode,
+            Paint::SweepGradient(gradient) => gradient.blend_mode,
+            Paint::DiamondGradient(gradient) => gradient.blend_mode,
+            Paint::Image(image) => image.blend_mode,
+        }
+    }
+
+    /// Returns the color of the solid paint, if any.
+    pub fn solid_color(&self) -> Option<CGColor> {
+        match self {
+            Paint::Solid(solid) => Some(solid.color),
+            _ => None,
+        }
+    }
+
+    /// Hash the paint properties for caching purposes
+    pub fn hash_for_cache(&self, hasher: &mut std::collections::hash_map::DefaultHasher) {
+        match self {
+            Paint::Solid(solid) => {
+                solid.color.0.hash(hasher);
+                solid.opacity.to_bits().hash(hasher);
+                solid.blend_mode.hash(hasher);
+            }
+            Paint::LinearGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                gradient.blend_mode.hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::RadialGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                gradient.blend_mode.hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::SweepGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                gradient.blend_mode.hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::DiamondGradient(gradient) => {
+                gradient.opacity.to_bits().hash(hasher);
+                gradient.blend_mode.hash(hasher);
+                for stop in &gradient.stops {
+                    stop.offset.to_bits().hash(hasher);
+                    stop.color.0.hash(hasher);
+                }
+            }
+            Paint::Image(image) => {
+                // For image paints, hash the image hash
+                image.hash.hash(hasher);
+                image.opacity.to_bits().hash(hasher);
+                image.blend_mode.hash(hasher);
+            }
         }
     }
 }
@@ -462,49 +1003,58 @@ impl GradientPaint {
 pub struct SolidPaint {
     pub color: CGColor,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 impl SolidPaint {
-    pub fn transparent() -> Self {
+    pub fn new_color(color: CGColor) -> Self {
         Self {
-            color: CGColor(0, 0, 0, 0),
-            opacity: 0.0,
+            color,
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
         }
     }
 
-    pub fn black() -> Self {
-        Self {
-            color: CGColor(0, 0, 0, 255),
-            opacity: 1.0,
-        }
-    }
+    pub const TRANSPARENT: Self = Self {
+        color: CGColor::TRANSPARENT,
+        opacity: 0.0,
+        blend_mode: BlendMode::Normal,
+    };
 
-    pub fn white() -> Self {
-        Self {
-            color: CGColor(255, 255, 255, 255),
-            opacity: 1.0,
-        }
-    }
+    pub const BLACK: Self = Self {
+        color: CGColor::BLACK,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
 
-    pub fn red() -> Self {
-        Self {
-            color: CGColor(255, 0, 0, 255),
-            opacity: 1.0,
-        }
-    }
+    pub const WHITE: Self = Self {
+        color: CGColor::WHITE,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
 
-    pub fn blue() -> Self {
-        Self {
-            color: CGColor(0, 0, 255, 255),
-            opacity: 1.0,
-        }
-    }
+    pub const RED: Self = Self {
+        color: CGColor::RED,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
 
-    pub fn green() -> Self {
-        Self {
-            color: CGColor(0, 255, 0, 255),
-            opacity: 1.0,
-        }
+    pub const BLUE: Self = Self {
+        color: CGColor::BLUE,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
+
+    pub const GREEN: Self = Self {
+        color: CGColor::GREEN,
+        opacity: 1.0,
+        blend_mode: BlendMode::Normal,
+    };
+}
+
+impl From<CGColor> for Paint {
+    fn from(color: CGColor) -> Self {
+        Paint::Solid(color.into())
     }
 }
 
@@ -520,6 +1070,36 @@ pub struct LinearGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
+}
+
+impl LinearGradientPaint {
+    pub fn from_colors(colors: Vec<CGColor>) -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: colors
+                .iter()
+                .enumerate()
+                .map(|(i, color)| GradientStop {
+                    offset: i as f32 / (colors.len() - 1) as f32,
+                    color: *color,
+                })
+                .collect(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for LinearGradientPaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -560,6 +1140,7 @@ pub struct RadialGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -582,6 +1163,7 @@ pub struct DiamondGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -622,6 +1204,7 @@ pub struct SweepGradientPaint {
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -630,6 +1213,52 @@ pub struct ImagePaint {
     pub hash: String,
     pub fit: BoxFit,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
+}
+
+impl Default for RadialGradientPaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for DiamondGradientPaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for SweepGradientPaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for ImagePaint {
+    fn default() -> Self {
+        Self {
+            transform: AffineTransform::default(),
+            hash: String::new(),
+            fit: BoxFit::Cover,
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
 }
 
 // #endregion

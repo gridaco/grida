@@ -2,17 +2,20 @@ use super::cvt;
 use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
 use super::shadow;
+use super::text_stroke;
 use crate::cache::geometry::GeometryCache;
-use crate::cache::{paragraph::ParagraphCache, vector_path::VectorPathCache};
+use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
 use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
-use crate::runtime::repository::{FontRepository, ImageRepository};
+use crate::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use crate::shape::*;
 use crate::sk;
 use crate::vectornetwork::vn_painter::StrokeOptions;
-use math2::{box_fit::BoxFit, transform::AffineTransform};
-use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
+use math2::transform::AffineTransform;
+use skia_safe::{
+    canvas::SaveLayerRec, path::AddPathMode, textlayout, Paint as SkPaint, Path, Point,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -20,31 +23,27 @@ use std::rc::Rc;
 /// with proper effect ordering and a layer‐blur/backdrop‐blur pipeline.
 pub struct Painter<'a> {
     canvas: &'a skia_safe::Canvas,
-    fonts: Rc<RefCell<FontRepository>>,
-    images: Rc<RefCell<ImageRepository>>,
-    paragraph_cache: RefCell<ParagraphCache>,
+    fonts: &'a FontRepository,
+    images: &'a ImageRepository,
     path_cache: RefCell<VectorPathCache>,
+    scene_cache: Option<&'a SceneCache>,
 }
 
 impl<'a> Painter<'a> {
-    /// Create a new Painter for the given canvas
-    pub fn new(
+    /// Create a new Painter that uses the SceneCache's paragraph cache
+    pub fn new_with_scene_cache(
         canvas: &'a skia_safe::Canvas,
-        fonts: Rc<RefCell<FontRepository>>,
-        images: Rc<RefCell<ImageRepository>>,
+        fonts: &'a FontRepository,
+        images: &'a ImageRepository,
+        scene_cache: &'a SceneCache,
     ) -> Self {
         Self {
             canvas,
             fonts,
             images,
-            paragraph_cache: RefCell::new(ParagraphCache::new()),
             path_cache: RefCell::new(VectorPathCache::new()),
+            scene_cache: Some(scene_cache), // Store reference to scene cache
         }
-    }
-
-    #[cfg(test)]
-    pub fn paragraph_cache(&self) -> &RefCell<ParagraphCache> {
-        &self.paragraph_cache
     }
 
     #[cfg(test)]
@@ -53,7 +52,7 @@ impl<'a> Painter<'a> {
     }
 
     /// Create a NodePainter that uses this Painter for its operations
-    pub fn node_painter(&self) -> NodePainter {
+    pub fn node_painter(&self) -> NodePainter<'_> {
         NodePainter::new(self)
     }
 
@@ -146,6 +145,86 @@ impl<'a> Painter<'a> {
         shadow::draw_inner_shadow(self.canvas, shape, shadow);
     }
 
+    /// Draw a text drop shadow using a paragraph as the source.
+    fn draw_text_shadow(
+        &self,
+        paragraph: &Rc<RefCell<textlayout::Paragraph>>,
+        shadow: &FeShadow,
+        y_offset: f32,
+    ) {
+        let mut paint = SkPaint::default();
+        paint.set_image_filter(shadow::drop_shadow_image_filter(shadow));
+        paint.set_anti_alias(true);
+        self.canvas
+            .save_layer(&SaveLayerRec::default().paint(&paint));
+        self.canvas.translate((0.0, y_offset));
+        paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
+        self.canvas.restore();
+    }
+
+    /// Draw an inner shadow for text using a paragraph as the source.
+    fn draw_text_inner_shadow(
+        &self,
+        paragraph: &Rc<RefCell<textlayout::Paragraph>>,
+        shadow: &FeShadow,
+        y_offset: f32,
+    ) {
+        let mut paint = SkPaint::default();
+        paint.set_image_filter(shadow::inner_shadow_image_filter(shadow));
+        paint.set_anti_alias(true);
+        self.canvas
+            .save_layer(&SaveLayerRec::default().paint(&paint));
+        self.canvas.translate((0.0, y_offset));
+        paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
+        self.canvas.restore();
+    }
+
+    /// Draw a backdrop blur for text using the actual glyph outlines.
+    ///
+    /// This clips the canvas to the precise glyph paths derived from the
+    /// paragraph's shaped runs and applies a backdrop blur within that clip.
+    fn draw_text_backdrop_blur(
+        &self,
+        paragraph: &Rc<RefCell<textlayout::Paragraph>>,
+        blur: &FeGaussianBlur,
+        y_offset: f32,
+    ) {
+        // Build a path from all glyphs in the paragraph.
+        let mut path = Path::new();
+        paragraph.borrow_mut().visit(|_, info| {
+            if let Some(info) = info {
+                let glyphs = info.glyphs();
+                let positions = info.positions();
+                let origin = info.origin();
+                let font = info.font();
+                for (glyph, pos) in glyphs.iter().zip(positions.iter()) {
+                    if let Some(glyph_path) = font.get_path(*glyph) {
+                        let offset = Point::new(pos.x + origin.x, pos.y + origin.y + y_offset);
+                        path.add_path(&glyph_path, offset, AddPathMode::Append);
+                    }
+                }
+            }
+        });
+
+        if path.is_empty() {
+            return;
+        }
+
+        let canvas = self.canvas;
+        let Some(image_filter) =
+            skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None)
+        else {
+            return;
+        };
+
+        canvas.save();
+        canvas.clip_path(&path, None, true);
+        let layer_rec = SaveLayerRec::default().backdrop(&image_filter);
+        canvas.save_layer(&layer_rec);
+        canvas.restore();
+        canvas.restore();
+    }
+
     /// Draw a backdrop blur: blur what's behind the shape.
     fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeGaussianBlur) {
         let canvas = self.canvas;
@@ -175,188 +254,84 @@ impl<'a> Painter<'a> {
 
     fn cached_paragraph(
         &self,
-        id: &NodeId,
+        _id: &NodeId,
         text: &str,
-        size: &Size,
-        fill: &Paint,
+        width: &Option<f32>,
+        max_lines: &Option<usize>,
+        ellipsis: &Option<String>,
+        fills: &[Paint],
         align: &TextAlign,
-        valign: &TextAlignVertical,
-        style: &TextStyle,
-    ) -> Rc<textlayout::Paragraph> {
-        self.paragraph_cache.borrow_mut().get_or_create(
-            id,
+        // TODO: vertical align shall be computed on our end, since sk paragraph does not have a concept of "vertical align"
+        _valign: &TextAlignVertical,
+        style: &TextStyleRec,
+    ) -> Rc<RefCell<textlayout::Paragraph>> {
+        let scene_cache = self
+            .scene_cache
+            .expect("Painter must have scene_cache for text rendering");
+        scene_cache.paragraph.borrow_mut().paragraph(
             text,
-            size,
-            fill,
+            fills,
             align,
-            valign,
             style,
-            &self.fonts.borrow(),
+            max_lines,
+            ellipsis,
+            *width,
+            self.fonts,
+            self.images,
+            Some(_id),
         )
     }
 
-    /// Determine the transformation matrix for an [`ImagePaint`].
-    ///
-    /// If the paint specifies a [`BoxFit`] other than `None`, the box-fit
-    /// transform is used. Otherwise, the paint's own transform is applied.
-    fn image_paint_matrix(
-        &self,
-        paint: &ImagePaint,
-        image_size: (f32, f32),
-        container_size: (f32, f32),
-    ) -> [[f32; 3]; 2] {
-        match paint.fit {
-            BoxFit::None => paint.transform.matrix,
-            _ => {
-                paint
-                    .fit
-                    .calculate_transform(image_size, container_size)
-                    .matrix
-            }
+    fn draw_fills(&self, shape: &PainterShape, fills: &[Paint]) {
+        if fills.is_empty() {
+            return;
         }
-    }
-
-    fn draw_fills(&self, shape: &PainterShape, fills: &Vec<Paint>) {
-        for fill in fills {
-            self.draw_fill(shape, fill);
-        }
-    }
-
-    /// Draw fill for a shape using given paint.
-    fn draw_fill(&self, shape: &PainterShape, fill: &Paint) {
-        let canvas = self.canvas;
-        let (fill_paint, image, image_params) = match fill {
-            Paint::Image(image_paint) => {
-                let images = self.images.borrow();
-                if let Some(image) =
-                    images.get_by_size(&image_paint.hash, shape.rect.width(), shape.rect.height())
-                {
-                    let mut paint = SkPaint::default();
-                    paint.set_anti_alias(true);
-                    (paint, Some(image.clone()), Some(image_paint.clone()))
-                } else {
-                    // Image not ready - skip fill
-                    return;
-                }
-            }
-            _ => (
-                cvt::sk_paint(fill, 1.0, (shape.rect.width(), shape.rect.height())),
-                None,
-                None,
-            ),
-        };
-
-        if let (Some(image), Some(img_paint)) = (image, image_params) {
-            // For image fills, clip to the shape and apply transforms
-            canvas.save();
-            canvas.clip_path(&shape.to_path(), None, true);
-
-            // Apply either the fit transform or the paint's custom transform
-            let m = self.image_paint_matrix(
-                &img_paint,
-                (image.width() as f32, image.height() as f32),
-                (shape.rect.width(), shape.rect.height()),
-            );
-            canvas.concat(&sk::sk_matrix(m));
-
-            canvas.draw_image_rect(
-                &image,
-                None,
-                skia_safe::Rect::from_xywh(0.0, 0.0, image.width() as f32, image.height() as f32),
-                &fill_paint,
-            );
-            canvas.restore();
-        } else {
-            // For regular fills, draw the shape directly
-            canvas.draw_path(&shape.to_path(), &fill_paint);
+        if let Some(paint) = cvt::sk_paint_stack(
+            fills,
+            1.0,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            self.canvas.draw_path(&shape.to_path(), &paint);
         }
     }
 
     fn draw_strokes(
         &self,
         shape: &PainterShape,
-        strokes: &Vec<Paint>,
+        strokes: &[Paint],
         stroke_width: f32,
         stroke_align: StrokeAlign,
         stroke_dash_array: Option<&Vec<f32>>,
     ) {
-        for stroke in strokes {
-            self.draw_stroke(shape, stroke, stroke_width, stroke_align, stroke_dash_array);
-        }
-    }
-
-    /// Draw stroke for a shape using given paint.
-    fn draw_stroke(
-        &self,
-        shape: &PainterShape,
-        stroke: &Paint,
-        stroke_width: f32,
-        stroke_align: StrokeAlign,
-        stroke_dash_array: Option<&Vec<f32>>,
-    ) {
-        if stroke_width <= 0.0 {
+        if stroke_width <= 0.0 || strokes.is_empty() {
             return;
         }
-
-        // Generate the stroke geometry
         let stroke_path = stroke_geometry(
             &shape.to_path(),
             stroke_width,
             stroke_align,
             stroke_dash_array,
         );
-
-        self.draw_stroke_path(shape, stroke, &stroke_path);
+        self.draw_stroke_path(shape, &stroke_path, strokes);
     }
 
-    /// Draw stroke for a shape using a precomputed stroke path.
     fn draw_stroke_path(
         &self,
         shape: &PainterShape,
-        stroke: &Paint,
         stroke_path: &skia_safe::Path,
+        strokes: &[Paint],
     ) {
-        let canvas = self.canvas;
-
-        // Draw the stroke using the generated geometry
-        match stroke {
-            Paint::Image(image_paint) => {
-                let images = self.images.borrow();
-                if let Some(image) =
-                    images.get_by_size(&image_paint.hash, shape.rect.width(), shape.rect.height())
-                {
-                    let mut paint = SkPaint::default();
-                    paint.set_anti_alias(true);
-
-                    // For image strokes, clip and apply transforms
-                    canvas.save();
-                    canvas.clip_path(&stroke_path, None, true);
-
-                    let m = self.image_paint_matrix(
-                        image_paint,
-                        (image.width() as f32, image.height() as f32),
-                        (shape.rect.width(), shape.rect.height()),
-                    );
-                    canvas.concat(&sk::sk_matrix(m));
-
-                    canvas.draw_image_rect(
-                        &image,
-                        None,
-                        skia_safe::Rect::from_xywh(
-                            0.0,
-                            0.0,
-                            image.width() as f32,
-                            image.height() as f32,
-                        ),
-                        &paint,
-                    );
-                    canvas.restore();
-                }
-            }
-            _ => {
-                let paint = cvt::sk_paint(stroke, 1.0, (shape.rect.width(), shape.rect.height()));
-                canvas.draw_path(&stroke_path, &paint);
-            }
+        if strokes.is_empty() {
+            return;
+        }
+        if let Some(paint) = cvt::sk_paint_stack(
+            strokes,
+            1.0,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            self.canvas.draw_path(stroke_path, &paint);
         }
     }
 
@@ -398,22 +373,113 @@ impl<'a> Painter<'a> {
         &self,
         id: &NodeId,
         text: &str,
-        size: &Size,
-        fill: &Paint,
+        width: &Option<f32>,
+        height: &Option<f32>,
+        max_lines: &Option<usize>,
+        ellipsis: &Option<String>,
+        fills: &[Paint],
+        strokes: &[Paint],
+        stroke_width: f32,
+        stroke_align: &StrokeAlign,
         text_align: &TextAlign,
         text_align_vertical: &TextAlignVertical,
-        text_style: &TextStyle,
+        text_style: &TextStyleRec,
     ) {
+        if fills.is_empty() {
+            return;
+        }
+
         let paragraph = self.cached_paragraph(
             id,
             text,
-            size,
-            fill,
+            width,
+            max_lines,
+            ellipsis,
+            fills,
             text_align,
             text_align_vertical,
             text_style,
         );
-        paragraph.paint(self.canvas, Point::new(0.0, 0.0));
+        let layout_size = {
+            let para = paragraph.borrow();
+            (para.max_width(), para.height())
+        };
+
+        let layout_height = layout_size.1;
+        let container_height = height.unwrap_or(layout_height);
+        let y_offset = match height {
+            Some(h) => match text_align_vertical {
+                TextAlignVertical::Top => 0.0,
+                TextAlignVertical::Center => (h - layout_height) / 2.0,
+                TextAlignVertical::Bottom => h - layout_height,
+            },
+            None => 0.0,
+        };
+
+        self.draw_text_paragraph(
+            &paragraph,
+            strokes,
+            stroke_width,
+            stroke_align,
+            (layout_size.0, container_height),
+            y_offset,
+        );
+    }
+
+    fn draw_text_paragraph(
+        &self,
+        paragraph: &Rc<RefCell<textlayout::Paragraph>>,
+        strokes: &[Paint],
+        stroke_width: f32,
+        stroke_align: &StrokeAlign,
+        layout_size: (f32, f32),
+        y_offset: f32,
+    ) {
+        self.canvas.save();
+        self.canvas.translate((0.0, y_offset));
+
+        if stroke_width > 0.0 && matches!(stroke_align, StrokeAlign::Outside) {
+            for stroke_paint_def in strokes {
+                paragraph.borrow_mut().visit(|_, info| {
+                    if let Some(info) = info {
+                        text_stroke::draw_text_stroke_outside_fast_pre(
+                            self.canvas,
+                            info.glyphs(),
+                            info.positions(),
+                            info.origin(),
+                            info.font(),
+                            stroke_paint_def,
+                            stroke_width,
+                            layout_size,
+                        );
+                    }
+                });
+            }
+        }
+
+        // Now we can simply paint the paragraph - all paint handling is done in paragraph()
+        paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
+
+        if stroke_width > 0.0 && !matches!(stroke_align, StrokeAlign::Outside) {
+            for stroke_paint_def in strokes {
+                paragraph.borrow_mut().visit(|_, info| {
+                    if let Some(info) = info {
+                        text_stroke::draw_text_stroke(
+                            self.canvas,
+                            info.glyphs(),
+                            info.positions(),
+                            info.origin(),
+                            info.font(),
+                            stroke_paint_def,
+                            stroke_width,
+                            *stroke_align,
+                        );
+                    }
+                });
+            }
+        }
+
+        self.canvas.restore();
     }
 
     /// Draw a single [`PainterPictureLayer`].
@@ -428,14 +494,10 @@ impl<'a> Painter<'a> {
                         let draw_content = || {
                             self.with_opacity(shape_layer.base.opacity, || {
                                 if shape.is_closed() {
-                                    for fill in &shape_layer.fills {
-                                        self.draw_fill(shape, fill);
-                                    }
+                                    self.draw_fills(shape, &shape_layer.fills);
                                 }
-                                for stroke in &shape_layer.strokes {
-                                    if let Some(path) = &shape_layer.stroke_path {
-                                        self.draw_stroke_path(shape, stroke, path);
-                                    }
+                                if let Some(path) = &shape_layer.stroke_path {
+                                    self.draw_stroke_path(shape, path, &shape_layer.strokes);
                                 }
                             });
                         };
@@ -451,38 +513,91 @@ impl<'a> Painter<'a> {
                 });
             }
             PainterPictureLayer::Text(text_layer) => {
-                self.with_transform(&text_layer.base.transform.matrix, || {
-                    let shape = &text_layer.shape;
-                    let effect_ref = &text_layer.effects;
-                    let clip_path = &text_layer.base.clip_path;
-                    let draw_content = || {
-                        self.with_opacity(text_layer.base.opacity, || {
-                            self.draw_text_span(
-                                &text_layer.base.id,
-                                &text_layer.text,
-                                &Size {
-                                    width: shape.rect.width(),
-                                    height: shape.rect.height(),
-                                },
-                                // TODO: support multiple fills for text
-                                match text_layer.fills.first() {
-                                    Some(f) => f,
-                                    None => return,
-                                },
-                                &text_layer.text_align,
-                                &text_layer.text_align_vertical,
-                                &text_layer.text_style,
-                            );
-                        });
-                    };
-                    if let Some(clip) = clip_path {
-                        self.canvas.save();
-                        self.canvas.clip_path(clip, None, true);
-                        self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                        self.canvas.restore();
-                    } else {
-                        self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                    }
+                self.with_blendmode(text_layer.base.blend_mode, || {
+                    self.with_transform(&text_layer.base.transform.matrix, || {
+                        let effects = &text_layer.effects;
+                        let clip_path = &text_layer.base.clip_path;
+
+                        let paragraph = self.cached_paragraph(
+                            &text_layer.base.id,
+                            &text_layer.text,
+                            &text_layer.width,
+                            &text_layer.max_lines,
+                            &text_layer.ellipsis,
+                            &text_layer.fills,
+                            &text_layer.text_align,
+                            &text_layer.text_align_vertical,
+                            &text_layer.text_style,
+                        );
+                        let layout_size = {
+                            let para = paragraph.borrow();
+                            (para.max_width(), para.height())
+                        };
+
+                        let layout_height = layout_size.1;
+                        let container_height = text_layer.height.unwrap_or(layout_height);
+                        let y_offset = match text_layer.height {
+                            Some(h) => match text_layer.text_align_vertical {
+                                TextAlignVertical::Top => 0.0,
+                                TextAlignVertical::Center => (h - layout_height) / 2.0,
+                                TextAlignVertical::Bottom => h - layout_height,
+                            },
+                            None => 0.0,
+                        };
+
+                        let draw_content = || {
+                            self.with_opacity(text_layer.base.opacity, || {
+                                if text_layer.fills.is_empty() {
+                                    return;
+                                }
+                                self.draw_text_paragraph(
+                                    &paragraph,
+                                    &text_layer.strokes,
+                                    text_layer.stroke_width,
+                                    &text_layer.stroke_align,
+                                    (layout_size.0, container_height),
+                                    y_offset,
+                                );
+                            });
+                        };
+
+                        let apply_effects = || {
+                            if let Some(blur) = effects.backdrop_blur {
+                                self.draw_text_backdrop_blur(&paragraph, &blur, y_offset);
+                            }
+
+                            for shadow in &effects.shadows {
+                                if let FilterShadowEffect::DropShadow(ds) = shadow {
+                                    self.draw_text_shadow(&paragraph, ds, y_offset);
+                                }
+                            }
+
+                            draw_content();
+
+                            for shadow in &effects.shadows {
+                                if let FilterShadowEffect::InnerShadow(is) = shadow {
+                                    self.draw_text_inner_shadow(&paragraph, is, y_offset);
+                                }
+                            }
+                        };
+
+                        let draw_with_effects = || {
+                            if let Some(layer_blur) = effects.blur {
+                                self.with_layer_blur(layer_blur.radius, apply_effects);
+                            } else {
+                                apply_effects();
+                            }
+                        };
+
+                        if let Some(clip) = clip_path {
+                            self.canvas.save();
+                            self.canvas.clip_path(clip, None, true);
+                            draw_with_effects();
+                            self.canvas.restore();
+                        } else {
+                            draw_with_effects();
+                        }
+                    });
                 });
             }
             PainterPictureLayer::Vector(vector_layer) => {
@@ -557,7 +672,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a RectangleNode, respecting its transform, effect, fill, stroke, blend mode, opacity
-    pub fn draw_rect_node(&self, node: &RectangleNode) {
+    pub fn draw_rect_node(&self, node: &RectangleNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Rectangle(node.clone()));
             self.painter
@@ -579,7 +694,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw an ImageNode, respecting transform, effect, rounded corners, blend mode, opacity
-    pub fn draw_image_node(&self, node: &ImageNode) -> bool {
+    pub fn draw_image_node(&self, node: &ImageNodeRec) -> bool {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Image(node.clone()));
 
@@ -593,12 +708,14 @@ impl<'a> NodePainter<'a> {
                                 opacity: node.opacity,
                                 transform: AffineTransform::identity(),
                                 fit: math2::box_fit::BoxFit::Cover,
+                                blend_mode: BlendMode::default(),
                             });
 
-                            self.painter.draw_fill(&shape, &image_paint);
-                            self.painter.draw_stroke(
+                            self.painter
+                                .draw_fills(&shape, std::slice::from_ref(&image_paint));
+                            self.painter.draw_strokes(
                                 &shape,
-                                &node.stroke,
+                                std::slice::from_ref(&node.stroke),
                                 node.stroke_width,
                                 node.stroke_align,
                                 node.stroke_dash_array.as_ref(),
@@ -611,7 +728,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw an EllipseNode
-    pub fn draw_ellipse_node(&self, node: &EllipseNode) {
+    pub fn draw_ellipse_node(&self, node: &EllipseNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Ellipse(node.clone()));
             self.painter
@@ -633,43 +750,41 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a LineNode
-    pub fn draw_line_node(&self, node: &LineNode) {
+    pub fn draw_line_node(&self, node: &LineNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Line(node.clone()));
 
             self.painter.with_opacity(node.opacity, || {
                 self.painter.with_blendmode(node.blend_mode, || {
-                    for stroke in &node.strokes {
-                        let paint = cvt::sk_paint(stroke, node.opacity, (node.size.width, 0.0));
-                        let stroke_path = stroke_geometry(
-                            &shape.to_path(),
-                            node.stroke_width,
-                            node.get_stroke_align(),
-                            node.stroke_dash_array.as_ref(),
-                        );
-                        self.painter.canvas.draw_path(&stroke_path, &paint);
-                    }
+                    self.painter.draw_strokes(
+                        &shape,
+                        &node.strokes,
+                        node.stroke_width,
+                        node.get_stroke_align(),
+                        node.stroke_dash_array.as_ref(),
+                    );
                 });
             });
         });
     }
 
-    pub fn draw_vector_node(&self, node: &VectorNode) {
+    pub fn draw_vector_node(&self, node: &VectorNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
+            let stroke_align = node.get_stroke_align();
             let shape = PainterShape::from_path(path);
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
                             if let Some(fill) = &node.fill {
-                                self.painter.draw_fill(&shape, fill);
+                                self.painter.draw_fills(&shape, std::slice::from_ref(fill));
                             }
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
                                 node.stroke_width,
-                                node.stroke_align,
+                                stroke_align,
                                 node.stroke_dash_array.as_ref(),
                             );
                         });
@@ -679,7 +794,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a PathNode (SVG path data)
-    pub fn draw_path_node(&self, node: &SVGPathNode) {
+    pub fn draw_path_node(&self, node: &SVGPathNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = self.painter.cached_path(&node.id, &node.data);
             let shape = PainterShape::from_path((*path).clone());
@@ -687,11 +802,12 @@ impl<'a> NodePainter<'a> {
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter.draw_fill(&shape, &node.fill);
+                            self.painter
+                                .draw_fills(&shape, std::slice::from_ref(&node.fill));
                             if let Some(stroke) = &node.stroke {
-                                self.painter.draw_stroke(
+                                self.painter.draw_strokes(
                                     &shape,
-                                    stroke,
+                                    std::slice::from_ref(stroke),
                                     node.stroke_width,
                                     node.stroke_align,
                                     node.stroke_dash_array.as_ref(),
@@ -704,7 +820,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
-    pub fn draw_polygon_node(&self, node: &PolygonNode) {
+    pub fn draw_polygon_node(&self, node: &PolygonNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
             let shape = PainterShape::from_path(path.clone());
@@ -727,10 +843,10 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a RegularPolygonNode by converting to a PolygonNode
-    pub fn draw_regular_polygon_node(&self, node: &RegularPolygonNode) {
+    pub fn draw_regular_polygon_node(&self, node: &RegularPolygonNodeRec) {
         let points = node.to_points();
 
-        let polygon = PolygonNode {
+        let polygon = PolygonNodeRec {
             id: node.id.clone(),
             name: node.name.clone(),
             active: node.active,
@@ -751,10 +867,10 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a RegularStarPolygonNode by converting to a PolygonNode
-    pub fn draw_regular_star_polygon_node(&self, node: &RegularStarPolygonNode) {
+    pub fn draw_regular_star_polygon_node(&self, node: &RegularStarPolygonNodeRec) {
         let points = node.to_points();
 
-        let polygon = PolygonNode {
+        let polygon = PolygonNodeRec {
             id: node.id.clone(),
             name: node.name.clone(),
             active: node.active,
@@ -775,15 +891,24 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a TextSpanNode (simple text block)
-    pub fn draw_text_span_node(&self, node: &TextSpanNode) {
+    pub fn draw_text_span_node(&self, node: &TextSpanNodeRec) {
+        if node.fills.is_empty() {
+            return;
+        }
         self.painter.with_transform(&node.transform.matrix, || {
             self.painter.with_opacity(node.opacity, || {
                 self.painter.with_blendmode(node.blend_mode, || {
                     self.painter.draw_text_span(
                         &node.id,
                         &node.text,
-                        &node.size,
-                        &node.fill,
+                        &node.width,
+                        &node.height,
+                        &node.max_lines,
+                        &node.ellipsis,
+                        &node.fills,
+                        &node.strokes,
+                        node.stroke_width,
+                        &node.stroke_align,
                         &node.text_align,
                         &node.text_align_vertical,
                         &node.text_style,
@@ -796,7 +921,7 @@ impl<'a> NodePainter<'a> {
     /// Draw a ContainerNode (background + stroke + children)
     pub fn draw_container_node_recursively(
         &self,
-        node: &ContainerNode,
+        node: &ContainerNodeRec,
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
@@ -804,11 +929,35 @@ impl<'a> NodePainter<'a> {
             self.painter.with_opacity(node.opacity, || {
                 let shape = build_shape(&IntrinsicSizeNode::Container(node.clone()));
 
-                // Draw effects first (if any) - these won't be clipped
+                // Draw effects, fills, children (with optional clipping), then strokes last
                 self.painter
                     .draw_shape_with_effects(&node.effects, &shape, || {
                         self.painter.with_blendmode(node.blend_mode, || {
+                            // Paint fills first
                             self.painter.draw_fills(&shape, &node.fills);
+
+                            // Children are drawn next; if `clip` is enabled we push
+                            // a clip region for the container's shape so that
+                            // descendants are clipped but the container's own stroke
+                            // remains unaffected.
+                            if node.clip {
+                                self.painter.with_clip(&shape, || {
+                                    for child_id in &node.children {
+                                        if let Some(child) = repository.get(child_id) {
+                                            self.draw_node_recursively(child, repository, cache);
+                                        }
+                                    }
+                                });
+                            } else {
+                                for child_id in &node.children {
+                                    if let Some(child) = repository.get(child_id) {
+                                        self.draw_node_recursively(child, repository, cache);
+                                    }
+                                }
+                            }
+
+                            // Finally paint the stroke so it is not clipped by the
+                            // container's own clip and always renders above children.
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
@@ -818,29 +967,11 @@ impl<'a> NodePainter<'a> {
                             );
                         });
                     });
-
-                // Draw children with clipping if enabled
-                if node.clip {
-                    self.painter.with_clip(&shape, || {
-                        for child_id in &node.children {
-                            if let Some(child) = repository.get(child_id) {
-                                self.draw_node_recursively(child, repository, cache);
-                            }
-                        }
-                    });
-                } else {
-                    // Draw children without clipping
-                    for child_id in &node.children {
-                        if let Some(child) = repository.get(child_id) {
-                            self.draw_node_recursively(child, repository, cache);
-                        }
-                    }
-                }
             });
         });
     }
 
-    pub fn draw_error_node(&self, node: &ErrorNode) {
+    pub fn draw_error_node(&self, node: &ErrorNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Error(node.clone()));
 
@@ -848,16 +979,23 @@ impl<'a> NodePainter<'a> {
             let fill = Paint::Solid(SolidPaint {
                 color: CGColor(255, 0, 0, 51), // Semi-transparent red
                 opacity: 1.0,
+                blend_mode: BlendMode::Normal,
             });
             let stroke = Paint::Solid(SolidPaint {
                 color: CGColor(255, 0, 0, 255), // Solid red
                 opacity: 1.0,
+                blend_mode: BlendMode::Normal,
             });
 
             self.painter.with_opacity(node.opacity, || {
-                self.painter.draw_fill(&shape, &fill);
-                self.painter
-                    .draw_stroke(&shape, &stroke, 1.0, StrokeAlign::Inside, None);
+                self.painter.draw_fills(&shape, std::slice::from_ref(&fill));
+                self.painter.draw_strokes(
+                    &shape,
+                    std::slice::from_ref(&stroke),
+                    1.0,
+                    StrokeAlign::Inside,
+                    None,
+                );
             });
         });
     }
@@ -865,7 +1003,7 @@ impl<'a> NodePainter<'a> {
     /// Draw a GroupNode: no shape of its own, only children, but apply transform + opacity
     pub fn draw_group_node_recursively(
         &self,
-        node: &GroupNode,
+        node: &GroupNodeRec,
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
@@ -882,7 +1020,7 @@ impl<'a> NodePainter<'a> {
 
     pub fn draw_boolean_operation_node_recursively(
         &self,
-        node: &BooleanPathOperationNode,
+        node: &BooleanPathOperationNodeRec,
         repository: &NodeRepository,
         cache: &GeometryCache,
     ) {
@@ -892,11 +1030,12 @@ impl<'a> NodePainter<'a> {
                     .draw_shape_with_effects(&node.effects, &shape, || {
                         self.painter.with_opacity(node.opacity, || {
                             self.painter.with_blendmode(node.blend_mode, || {
-                                self.painter.draw_fill(&shape, &node.fill);
+                                self.painter
+                                    .draw_fills(&shape, std::slice::from_ref(&node.fill));
                                 if let Some(stroke) = &node.stroke {
-                                    self.painter.draw_stroke(
+                                    self.painter.draw_strokes(
                                         &shape,
-                                        stroke,
+                                        std::slice::from_ref(stroke),
                                         node.stroke_width,
                                         node.stroke_align,
                                         node.stroke_dash_array.as_ref(),
@@ -967,30 +1106,4 @@ impl<'a> NodePainter<'a> {
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
         }
     }
-}
-
-pub(crate) fn make_textstyle(text_style: &TextStyle) -> skia_safe::textlayout::TextStyle {
-    let mut ts = skia_safe::textlayout::TextStyle::new();
-    ts.set_font_size(text_style.font_size);
-    if let Some(letter_spacing) = text_style.letter_spacing {
-        ts.set_letter_spacing(letter_spacing);
-    }
-    if let Some(line_height) = text_style.line_height {
-        ts.set_height(line_height);
-    }
-    let mut decor = skia_safe::textlayout::Decoration::default();
-    decor.ty = text_style.text_decoration.into();
-    ts.set_decoration(&decor);
-    ts.set_font_families(&[&text_style.font_family]);
-    let font_style = skia_safe::FontStyle::new(
-        skia_safe::font_style::Weight::from(text_style.font_weight.value() as i32),
-        skia_safe::font_style::Width::NORMAL,
-        if text_style.italic {
-            skia_safe::font_style::Slant::Italic
-        } else {
-            skia_safe::font_style::Slant::Upright
-        },
-    );
-    ts.set_font_style(font_style);
-    ts
 }

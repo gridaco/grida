@@ -45,52 +45,52 @@ fn ellipse_to_vector_network(shape: &EllipseShape, clockwise: bool) -> VectorNet
         segments.push(VectorNetworkSegment {
             a: 0,
             b: 1,
-            ta: Some((kx, 0.0)),
-            tb: Some((0.0, -ky)),
+            ta: (kx, 0.0),
+            tb: (0.0, -ky),
         });
         segments.push(VectorNetworkSegment {
             a: 1,
             b: 2,
-            ta: Some((0.0, ky)),
-            tb: Some((kx, 0.0)),
+            ta: (0.0, ky),
+            tb: (kx, 0.0),
         });
         segments.push(VectorNetworkSegment {
             a: 2,
             b: 3,
-            ta: Some((-kx, 0.0)),
-            tb: Some((0.0, ky)),
+            ta: (-kx, 0.0),
+            tb: (0.0, ky),
         });
         segments.push(VectorNetworkSegment {
             a: 3,
             b: 0,
-            ta: Some((0.0, -ky)),
-            tb: Some((-kx, 0.0)),
+            ta: (0.0, -ky),
+            tb: (-kx, 0.0),
         });
     } else {
         vertices = vec![(cx, cy - ry), (cx - rx, cy), (cx, cy + ry), (cx + rx, cy)];
         segments.push(VectorNetworkSegment {
             a: 0,
             b: 1,
-            ta: Some((-kx, 0.0)),
-            tb: Some((0.0, -ky)),
+            ta: (-kx, 0.0),
+            tb: (0.0, -ky),
         });
         segments.push(VectorNetworkSegment {
             a: 1,
             b: 2,
-            ta: Some((0.0, ky)),
-            tb: Some((-kx, 0.0)),
+            ta: (0.0, ky),
+            tb: (-kx, 0.0),
         });
         segments.push(VectorNetworkSegment {
             a: 2,
             b: 3,
-            ta: Some((kx, 0.0)),
-            tb: Some((0.0, ky)),
+            ta: (kx, 0.0),
+            tb: (0.0, ky),
         });
         segments.push(VectorNetworkSegment {
             a: 3,
             b: 0,
-            ta: Some((0.0, -ky)),
-            tb: Some((kx, 0.0)),
+            ta: (0.0, -ky),
+            tb: (kx, 0.0),
         });
     }
 

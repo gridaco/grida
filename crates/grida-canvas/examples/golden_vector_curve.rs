@@ -11,8 +11,8 @@ fn main() {
         segments: vec![VectorNetworkSegment {
             a: 0,
             b: 1,
-            ta: Some((100.0, -100.0)), // Tangent handle from start point
-            tb: Some((-100.0, 100.0)), // Tangent handle to end point
+            ta: (100.0, -100.0), // Tangent handle from start point
+            tb: (-100.0, 100.0), // Tangent handle to end point
         }],
         regions: vec![],
     };
@@ -35,5 +35,9 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/vector_curve.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/vector_curve.png"),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-
 import {
   SidebarMenuSectionContent,
   SidebarSection,
@@ -11,7 +10,7 @@ import {
 } from "@/components/sidebar";
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
-import { FontWeightControl } from "./controls/font-weight";
+import { FontStyleControl } from "./controls/font-style";
 import { OpacityControl } from "./controls/opacity";
 import { HrefControl } from "./controls/href";
 import {
@@ -58,6 +57,7 @@ import {
   Crosshair2Icon,
   LockClosedIcon,
   LockOpen1Icon,
+  MixerVerticalIcon,
   PlusIcon,
 } from "@radix-ui/react-icons";
 import { supports } from "@/grida-canvas/utils/supports";
@@ -95,8 +95,8 @@ import {
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 import { dq } from "@/grida-canvas/query";
 import { StrokeAlignControl } from "./controls/stroke-align";
+import { TextDetails } from "./controls/widgets/text-details";
 import cg from "@grida/cg";
-import { editor } from "@/grida-canvas";
 import { FeControl } from "./controls/fe";
 import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
@@ -108,6 +108,30 @@ import {
   useMixedPaints,
   MixedPropertiesEditor,
 } from "@/grida-canvas-react/use-mixed-properties";
+import { editor } from "@/grida-canvas";
+import {
+  CurrentFontProvider,
+  useCurrentFontFamily,
+} from "./controls/context/font";
+import { PropertyLineLabelWithNumberGesture } from "./ui/label-with-number-gesture";
+
+function FontStyleControlScaffold({ selection }: { selection: string[] }) {
+  const editor = useCurrentEditor();
+  const f = useCurrentFontFamily();
+
+  const handleChange = React.useCallback(
+    (key: editor.font_spec.FontStyleKey) => {
+      selection.forEach((id) => {
+        editor.changeTextNodeFontStyle(id, {
+          fontStyleKey: key,
+        });
+      });
+    },
+    []
+  );
+
+  return <FontStyleControl onValueChange={handleChange} />;
+}
 
 function Align() {
   const editor = useCurrentEditor();
@@ -242,7 +266,6 @@ function ModeMixedNodeProperties({
   ids: string[];
   config?: ControlsConfig;
 }) {
-  const scene = useCurrentSceneState();
   const backend = useBackendState();
   const mp = useMixedProperties(ids);
   const { nodes, properties, actions: change } = mp;
@@ -250,51 +273,55 @@ function ModeMixedNodeProperties({
     name,
     active,
     locked,
-    component_id,
-    style,
-    type,
-    // properties,
     opacity,
     cornerRadius,
-    rotation,
+    cornerRadiusTopLeft,
+    cornerRadiusTopRight,
+    cornerRadiusBottomRight,
+    cornerRadiusBottomLeft,
     fill,
     stroke,
     strokeWidth,
     strokeCap,
-    position,
     width,
     height,
-    left,
-    top,
-    right,
-    bottom,
     fit,
     fontFamily,
     fontWeight,
+    fontStyleItalic,
+    fontPostscriptName,
+    fontOpticalSizing,
+    fontVariations,
     fontSize,
     lineHeight,
     letterSpacing,
     textAlign,
     textAlignVertical,
-    maxLength,
-
-    //
-    border,
-    //
-    padding,
 
     //
     layout,
     direction,
     mainAxisAlignment,
     crossAxisAlignment,
-    mainAxisGap,
-    crossAxisGap,
     //
     cursor,
 
-    // x
-    userdata,
+    // component_id,
+    // style,
+    // type,
+    // properties,
+    // position,
+    // rotation,
+    // left,
+    // top,
+    // right,
+    // bottom,
+    // maxLength,
+    // border,
+    // padding,
+    // mainAxisGap,
+    // crossAxisGap,
+    // userdata,
   } = properties;
 
   const sid = ids.join(",");
@@ -369,6 +396,66 @@ function ModeMixedNodeProperties({
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Opacity</PropertyLineLabel>
+            <OpacityControl
+              value={opacity?.value}
+              // onValueChange={change.opacity}
+              onValueCommit={change.opacity}
+            />
+          </PropertyLine>
+          {supports_corner_radius && (
+            <PropertyLine>
+              <PropertyLineLabel>Radius</PropertyLineLabel>
+              {cornerRadius?.mixed ? (
+                <CornerRadius4Control onValueCommit={change.cornerRadius} />
+              ) : (
+                <CornerRadius4Control
+                  value={{
+                    cornerRadiusTopLeft:
+                      typeof cornerRadiusTopLeft?.value === "number"
+                        ? cornerRadiusTopLeft?.value
+                        : undefined,
+                    cornerRadiusTopRight:
+                      typeof cornerRadiusTopRight?.value === "number"
+                        ? cornerRadiusTopRight?.value
+                        : undefined,
+                    cornerRadiusBottomRight:
+                      typeof cornerRadiusBottomRight?.value === "number"
+                        ? cornerRadiusBottomRight?.value
+                        : undefined,
+                    cornerRadiusBottomLeft:
+                      typeof cornerRadiusBottomLeft?.value === "number"
+                        ? cornerRadiusBottomLeft?.value
+                        : undefined,
+                  }}
+                  onValueCommit={change.cornerRadius}
+                />
+              )}
+            </PropertyLine>
+          )}
+          {/* {supports.border(node.type) && (
+              <PropertyLine>
+                <PropertyLineLabel>Border</PropertyLineLabel>
+                <BorderControl value={border} onValueChange={actions.border} />
+              </PropertyLine>
+            )} */}
+
+          {/* <PropertyLine>
+              <PropertyLineLabel>Shadow</PropertyLineLabel>
+              <BoxShadowControl
+                value={{ boxShadow }}
+                onValueChange={actions.boxShadow}
+              />
+            </PropertyLine> */}
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+
       {/* TODO: */}
       {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
           <SidebarSectionHeaderItem>
@@ -396,75 +483,90 @@ function ModeMixedNodeProperties({
             </SidebarMenuSectionContent>
           )}
         </SidebarSection> */}
-      <SidebarSection
-        hidden={config.text === "off" || !types.has("text")}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Value</PropertyLineLabel>
-            <StringValueControl disabled value={"multiple"} />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Font</PropertyLineLabel>
-            <div className="flex-1">
-              <FontFamilyControl
-                value={fontFamily?.value}
-                onValueChange={change.fontFamily}
-              />
-            </div>
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Weight</PropertyLineLabel>
-            <FontWeightControl
-              value={fontWeight?.value}
-              onValueChange={change.fontWeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Size</PropertyLineLabel>
-            <FontSizeControl
-              value={fontSize?.value}
-              onValueCommit={change.fontSize}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Line</PropertyLineLabel>
-            <LineHeightControl
-              value={lineHeight?.value}
-              onValueCommit={change.lineHeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Letter</PropertyLineLabel>
-            <LetterSpacingControl
-              value={letterSpacing?.value}
-              onValueCommit={change.letterSpacing}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Align</PropertyLineLabel>
-            <TextAlignControl
-              value={textAlign?.value}
-              onValueChange={change.textAlign}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel></PropertyLineLabel>
-            <TextAlignVerticalControl
-              value={textAlignVertical?.value}
-              onValueChange={change.textAlignVertical}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Max Length</PropertyLineLabel>
-            <MaxlengthControl disabled placeholder={"multiple"} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {config.text !== "off" && types.has("text") && (
+        <CurrentFontProvider
+          description={{
+            fontFamily:
+              typeof fontFamily?.value === "string" ? fontFamily.value : "",
+            fontPostscriptName:
+              typeof fontPostscriptName?.value === "string"
+                ? fontPostscriptName.value
+                : undefined,
+            fontWeight:
+              typeof fontWeight?.value === "number"
+                ? fontWeight.value
+                : undefined,
+            fontStyleItalic:
+              typeof fontStyleItalic?.value === "boolean"
+                ? fontStyleItalic.value
+                : undefined,
+            fontVariations:
+              typeof fontVariations?.value === "object"
+                ? (fontVariations.value as Record<string, number>)
+                : undefined,
+          }}
+        >
+          <SidebarSection className="border-b pb-4">
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuSectionContent className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Font</PropertyLineLabel>
+                <div className="flex-1">
+                  <FontFamilyControl
+                    value={fontFamily?.value}
+                    onValueChange={change.fontFamily}
+                  />
+                </div>
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Style</PropertyLineLabel>
+                <FontStyleControlScaffold selection={ids} />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Size</PropertyLineLabel>
+                <FontSizeControl
+                  value={fontSize?.value}
+                  onValueCommit={change.fontSize}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Line</PropertyLineLabel>
+                <LineHeightControl
+                  value={lineHeight?.value}
+                  onValueCommit={change.lineHeight}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Letter</PropertyLineLabel>
+                <LetterSpacingControl
+                  value={letterSpacing?.value}
+                  onValueCommit={change.letterSpacing}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Align</PropertyLineLabel>
+                <TextAlignControl
+                  value={textAlign?.value}
+                  onValueChange={change.textAlign}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel></PropertyLineLabel>
+                <TextAlignVerticalControl
+                  value={textAlignVertical?.value}
+                  onValueChange={change.textAlignVertical}
+                />
+              </PropertyLine>
+              <PropertyLine>
+                <PropertyLineLabel>Max Length</PropertyLineLabel>
+                <MaxlengthControl disabled placeholder={"multiple"} />
+              </PropertyLine>
+            </SidebarMenuSectionContent>
+          </SidebarSection>
+        </CurrentFontProvider>
+      )}
       <SidebarSection
         hidden={config.image === "off" || !types.has("image")}
         className="border-b pb-4"
@@ -545,48 +647,6 @@ function ModeMixedNodeProperties({
           </SidebarMenuSectionContent>
         </SidebarSection>
       )}
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Opacity</PropertyLineLabel>
-            <OpacityControl
-              value={opacity?.value}
-              // onValueChange={change.opacity}
-              onValueCommit={change.opacity}
-            />
-          </PropertyLine>
-          {supports_corner_radius && (
-            <PropertyLine>
-              <PropertyLineLabel>Radius</PropertyLineLabel>
-              {cornerRadius?.mixed ? (
-                <CornerRadius4Control onValueCommit={change.cornerRadius} />
-              ) : (
-                <CornerRadius4Control
-                  value={{ cornerRadius: cornerRadius?.value }}
-                  onValueCommit={change.cornerRadius}
-                />
-              )}
-            </PropertyLine>
-          )}
-          {/* {supports.border(node.type) && (
-              <PropertyLine>
-                <PropertyLineLabel>Border</PropertyLineLabel>
-                <BorderControl value={border} onValueChange={actions.border} />
-              </PropertyLine>
-            )} */}
-
-          {/* <PropertyLine>
-              <PropertyLineLabel>Shadow</PropertyLineLabel>
-              <BoxShadowControl
-                value={{ boxShadow }}
-                onValueChange={actions.boxShadow}
-              />
-            </PropertyLine> */}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
 
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
@@ -623,12 +683,30 @@ function ModeMixedNodeProperties({
                 <PaintControl
                   value={undefined}
                   onValueChange={change.stroke}
+                  onValueAdd={(value) => {
+                    change.stroke(value);
+                    if (!strokeWidth?.value || strokeWidth?.value === 0) {
+                      change.strokeWidth({ type: "set", value: 1 });
+                    }
+                  }}
+                  onValueRemove={() => {
+                    change.stroke(null);
+                  }}
                   removable
                 />
               ) : (
                 <PaintControl
                   value={stroke?.value}
                   onValueChange={change.stroke}
+                  onValueAdd={(value) => {
+                    change.stroke(value);
+                    if (!strokeWidth?.value || strokeWidth?.value === 0) {
+                      change.strokeWidth({ type: "set", value: 1 });
+                    }
+                  }}
+                  onValueRemove={() => {
+                    change.stroke(null);
+                  }}
                   removable
                 />
               )}
@@ -729,9 +807,7 @@ function ModeNodeProperties({
     active: node.active,
     locked: node.locked,
     component_id: node.component_id,
-    properties: node.properties,
     src: node.src,
-    text: node.text,
     type: node.type,
     blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
@@ -745,14 +821,6 @@ function ModeNodeProperties({
     angleOffset: node.angleOffset,
 
     fit: node.fit,
-    fontFamily: node.fontFamily,
-    fontWeight: node.fontWeight,
-    fontSize: node.fontSize,
-    lineHeight: node.lineHeight,
-    letterSpacing: node.letterSpacing,
-    textAlign: node.textAlign,
-    textAlignVertical: node.textAlignVertical,
-    maxLength: node.maxLength,
 
     //
     border: node.border,
@@ -776,7 +844,6 @@ function ModeNodeProperties({
     userdata: node.userdata,
   }));
 
-  const computed = useComputedNode(node_id);
   const {
     id,
     name,
@@ -796,14 +863,6 @@ function ModeNodeProperties({
     angleOffset,
 
     fit,
-    fontFamily,
-    fontWeight,
-    fontSize,
-    lineHeight,
-    letterSpacing,
-    textAlign,
-    textAlignVertical,
-    maxLength,
 
     //
     border,
@@ -888,108 +947,114 @@ function ModeNodeProperties({
           />
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection
-        hidden={config.props === "off" || !is_templateinstance}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
+      {config.props !== "off" && is_templateinstance && (
+        <SectionProps node_id={node_id} />
+      )}
 
-        {node.properties && Object.keys(node.properties).length ? (
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropsControl
-              properties={node.properties}
-              props={computed.props || {}}
-              onValueChange={actions.value}
+      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderActions>
+            <BlendModeDropdown
+              value={blendMode}
+              onValueChange={actions.blendMode}
             />
-          </SidebarMenuSectionContent>
-        ) : (
-          <SidebarMenuSectionContent className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              No properties defined
-            </p>
-          </SidebarMenuSectionContent>
-        )}
-      </SidebarSection>
-
-      <SidebarSection
-        hidden={config.text === "off" || !is_text}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderActions>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Value</PropertyLineLabel>
-            <StringValueControl
-              value={node.text}
-              maxlength={maxLength}
-              onValueChange={(value) => actions.text(value ?? null)}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Font</PropertyLineLabel>
-            <div className="flex-1">
-              <FontFamilyControl
-                value={fontFamily}
-                onValueChange={actions.fontFamily}
+          <PropertyLineOpacity node_id={node_id} />
+          {supports.border(node.type, { backend }) && (
+            <PropertyLine>
+              <PropertyLineLabel>Border</PropertyLineLabel>
+              <BorderControl value={border} onValueChange={actions.border} />
+            </PropertyLine>
+          )}
+          {supports.cornerRadius(node.type, { backend }) && (
+            <>
+              {supports.cornerRadius4(node.type, { backend }) ? (
+                <PropertyLine>
+                  <PropertyLineLabelWithNumberGesture
+                    step={1}
+                    sensitivity={0.1}
+                    onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
+                  >
+                    Radius
+                  </PropertyLineLabelWithNumberGesture>
+                  <CornerRadius4Control
+                    value={{
+                      cornerRadiusTopLeft,
+                      cornerRadiusTopRight,
+                      cornerRadiusBottomRight,
+                      cornerRadiusBottomLeft,
+                    }}
+                    onValueCommit={actions.cornerRadius}
+                  />
+                </PropertyLine>
+              ) : (
+                <PropertyLine>
+                  <PropertyLineLabelWithNumberGesture
+                    step={1}
+                    sensitivity={0.1}
+                    onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
+                  >
+                    Radius
+                  </PropertyLineLabelWithNumberGesture>
+                  <CornerRadiusControl
+                    value={cornerRadius}
+                    onValueCommit={actions.cornerRadius}
+                  />
+                </PropertyLine>
+              )}
+            </>
+          )}
+          {(pointCount != null || innerRadius != null) && (
+            <>
+              {pointCount != null &&
+                supports.pointCount(node.type, { backend }) && (
+                  <PropertyLine>
+                    <PropertyLineLabel>Count</PropertyLineLabel>
+                    <InputPropertyNumber
+                      mode="fixed"
+                      min={3}
+                      max={60}
+                      value={pointCount}
+                      onValueCommit={actions.pointCount}
+                    />
+                  </PropertyLine>
+                )}
+              {innerRadius != null && type !== "ellipse" && (
+                <PropertyLine>
+                  <PropertyLineLabel>Ratio</PropertyLineLabel>
+                  <InputPropertyNumber
+                    mode="fixed"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={innerRadius}
+                    onValueCommit={actions.innerRadius}
+                  />
+                </PropertyLine>
+              )}
+            </>
+          )}
+          {supports.arcData(node.type, { backend }) && (
+            <PropertyLine>
+              <PropertyLineLabel>Arc</PropertyLineLabel>
+              <ArcPropertiesControl
+                value={{
+                  angle: angle ?? 360,
+                  angleOffset: angleOffset ?? 0,
+                  innerRadius: innerRadius ?? 0,
+                }}
+                onValueChange={(v) => {
+                  actions.arcData(v);
+                }}
               />
-            </div>
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Weight</PropertyLineLabel>
-            <FontWeightControl
-              value={fontWeight}
-              onValueChange={actions.fontWeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Size</PropertyLineLabel>
-            <FontSizeControl
-              value={fontSize}
-              onValueCommit={actions.fontSize}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Line</PropertyLineLabel>
-            <LineHeightControl
-              value={lineHeight}
-              onValueCommit={actions.lineHeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Letter</PropertyLineLabel>
-            <LetterSpacingControl
-              value={letterSpacing}
-              onValueCommit={actions.letterSpacing}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Align</PropertyLineLabel>
-            <TextAlignControl
-              value={textAlign}
-              onValueChange={actions.textAlign}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel></PropertyLineLabel>
-            <TextAlignVerticalControl
-              value={textAlignVertical}
-              onValueChange={actions.textAlignVertical}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Max Length</PropertyLineLabel>
-            <MaxlengthControl
-              value={maxLength}
-              placeholder={(computed.text as any as string)?.length?.toString()}
-              onValueCommit={actions.maxLength}
-            />
-          </PropertyLine>
+            </PropertyLine>
+          )}
         </SidebarMenuSectionContent>
       </SidebarSection>
+      {config.text === "on" && is_text && <SectionText node_id={node_id} />}
       <SidebarSection
         hidden={config.image === "off" || !is_image}
         className="border-b pb-4"
@@ -1077,98 +1142,7 @@ function ModeNodeProperties({
           </SidebarMenuSectionContent>
         </SidebarSection>
       )}
-      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
-          <SidebarSectionHeaderActions>
-            <BlendModeDropdown
-              value={blendMode}
-              onValueChange={actions.blendMode}
-            />
-          </SidebarSectionHeaderActions>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLineOpacity node_id={node_id} />
-          {supports.border(node.type, { backend }) && (
-            <PropertyLine>
-              <PropertyLineLabel>Border</PropertyLineLabel>
-              <BorderControl value={border} onValueChange={actions.border} />
-            </PropertyLine>
-          )}
-          {supports.cornerRadius(node.type, { backend }) && (
-            <>
-              {supports.cornerRadius4(node.type, { backend }) ? (
-                <PropertyLine>
-                  <PropertyLineLabel>Radius</PropertyLineLabel>
-                  <CornerRadius4Control
-                    value={{
-                      cornerRadius,
-                      cornerRadiusTopLeft,
-                      cornerRadiusTopRight,
-                      cornerRadiusBottomRight,
-                      cornerRadiusBottomLeft,
-                    }}
-                    onValueCommit={actions.cornerRadius}
-                  />
-                </PropertyLine>
-              ) : (
-                <PropertyLine>
-                  <PropertyLineLabel>Radius</PropertyLineLabel>
-                  <CornerRadiusControl
-                    value={cornerRadius}
-                    onValueCommit={actions.cornerRadius}
-                  />
-                </PropertyLine>
-              )}
-            </>
-          )}
-          {(pointCount != null || innerRadius != null) && (
-            <>
-              {pointCount != null &&
-                supports.pointCount(node.type, { backend }) && (
-                  <PropertyLine>
-                    <PropertyLineLabel>Count</PropertyLineLabel>
-                    <InputPropertyNumber
-                      mode="fixed"
-                      min={3}
-                      max={60}
-                      value={pointCount}
-                      onValueCommit={actions.pointCount}
-                    />
-                  </PropertyLine>
-                )}
-              {innerRadius != null && type !== "ellipse" && (
-                <PropertyLine>
-                  <PropertyLineLabel>Ratio</PropertyLineLabel>
-                  <InputPropertyNumber
-                    mode="fixed"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={innerRadius}
-                    onValueCommit={actions.innerRadius}
-                  />
-                </PropertyLine>
-              )}
-            </>
-          )}
-          {supports.arcData(node.type, { backend }) && (
-            <PropertyLine>
-              <PropertyLineLabel>Arc</PropertyLineLabel>
-              <ArcPropertiesControl
-                value={{
-                  angle: angle ?? 360,
-                  angleOffset: angleOffset ?? 0,
-                  innerRadius: innerRadius ?? 0,
-                }}
-                onValueChange={(v) => {
-                  actions.arcData(v);
-                }}
-              />
-            </PropertyLine>
-          )}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+
       <SectionFills node_id={node_id} />
       {supports.stroke(node.type, { backend }) && (
         <SectionStrokes
@@ -1250,7 +1224,14 @@ function PropertyLineOpacity({ node_id }: { node_id: string }) {
 
   return (
     <PropertyLine>
-      <PropertyLineLabel>Opacity</PropertyLineLabel>
+      <PropertyLineLabelWithNumberGesture
+        step={0.01}
+        min={0}
+        max={1}
+        onValueChange={actions.opacity}
+      >
+        Opacity
+      </PropertyLineLabelWithNumberGesture>
       <OpacityControl value={opacity as any} onValueCommit={actions.opacity} />
     </PropertyLine>
   );
@@ -1308,7 +1289,13 @@ function SectionPosition({ node_id }: { node_id: string }) {
           />
         </PropertyLine>
         <PropertyLine>
-          <PropertyLineLabel>Rotate</PropertyLineLabel>
+          <PropertyLineLabelWithNumberGesture
+            step={1}
+            sensitivity={1}
+            onValueChange={actions.rotation}
+          >
+            Rotate
+          </PropertyLineLabelWithNumberGesture>
           <RotateControl value={rotation} onValueCommit={actions.rotation} />
         </PropertyLine>
       </SidebarMenuSectionContent>
@@ -1358,6 +1345,198 @@ function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
   );
 }
 
+function SectionText({ node_id }: { node_id: string }) {
+  const actions = useNodeActions(node_id)!;
+  const {
+    text,
+    fontFamily,
+    fontWeight,
+    fontStyleItalic,
+    fontSize,
+    lineHeight,
+    letterSpacing,
+    wordSpacing,
+    textAlign,
+    textAlignVertical,
+    textDecorationLine,
+    textDecorationStyle,
+    textDecorationColor,
+    textDecorationSkipInk,
+    textDecorationThickness,
+    textTransform,
+    maxLines,
+    maxLength,
+    fontPostscriptName,
+    fontVariations,
+    fontFeatures,
+    fontOpticalSizing,
+    fontKerning,
+    fontWidth,
+  } = useNodeState(node_id, (_node) => {
+    const node = _node as grida.program.nodes.TextNode;
+    return {
+      text: node.text,
+      fontFamily: node.fontFamily,
+      fontWeight: node.fontWeight,
+      fontStyleItalic: node.fontStyleItalic,
+      fontSize: node.fontSize,
+      lineHeight: node.lineHeight,
+      letterSpacing: node.letterSpacing,
+      wordSpacing: node.wordSpacing,
+      textAlign: node.textAlign,
+      textAlignVertical: node.textAlignVertical,
+      textDecorationLine: node.textDecorationLine,
+      textDecorationStyle: node.textDecorationStyle,
+      textDecorationColor: node.textDecorationColor,
+      textDecorationSkipInk: node.textDecorationSkipInk,
+      textDecorationThickness: node.textDecorationThickness,
+      textTransform: node.textTransform,
+      maxLines: node.maxLines,
+      maxLength: node.maxLength,
+      fontPostscriptName: node.fontPostscriptName,
+      fontVariations: node.fontVariations,
+      fontFeatures: node.fontFeatures,
+      fontOpticalSizing: node.fontOpticalSizing,
+      fontKerning: node.fontKerning,
+      fontWidth: node.fontWidth,
+    };
+  });
+
+  return (
+    <CurrentFontProvider
+      description={{
+        fontFamily: fontFamily ?? "",
+        fontInstancePostscriptName: fontPostscriptName,
+        fontWeight,
+        fontStyleItalic,
+        fontVariations,
+      }}
+    >
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderActions>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="xs">
+                  <MixerVerticalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="p-0 w-64 h-[500px]">
+                <TextDetails
+                  textAlign={textAlign}
+                  textDecorationLine={textDecorationLine}
+                  textDecorationStyle={textDecorationStyle ?? undefined}
+                  textDecorationThickness={textDecorationThickness ?? undefined}
+                  textDecorationColor={textDecorationColor ?? undefined}
+                  textDecorationSkipInk={textDecorationSkipInk ?? undefined}
+                  textTransform={textTransform}
+                  maxLines={maxLines}
+                  maxLength={maxLength}
+                  fontVariations={fontVariations}
+                  fontOpticalSizing={fontOpticalSizing}
+                  fontWeight={fontWeight}
+                  fontKerning={fontKerning}
+                  fontWidth={fontWidth}
+                  fontSize={fontSize}
+                  fontFamily={fontFamily}
+                  fontFeatures={fontFeatures}
+                  wordSpacing={wordSpacing}
+                  onTextTransformChange={actions.textTransform}
+                  onTextAlignChange={actions.textAlign}
+                  onTextDecorationLineChange={actions.textDecorationLine}
+                  onTextDecorationStyleChange={actions.textDecorationStyle}
+                  onTextDecorationThicknessChange={
+                    actions.textDecorationThickness
+                  }
+                  onTextDecorationColorChange={actions.textDecorationColor}
+                  onTextDecorationSkipInkChange={actions.textDecorationSkipInk}
+                  onMaxLinesChange={actions.maxLines}
+                  onMaxLengthChange={actions.maxLength}
+                  onFontWeightChange={(value) =>
+                    actions.fontWeight(value as cg.NFontWeight)
+                  }
+                  onFontVariationChange={(key, value) => {
+                    actions.fontVariation(key, value);
+                  }}
+                  onFontOpticalSizingChange={actions.fontOpticalSizing}
+                  onFontKerningChange={actions.fontKerning}
+                  onFontWidthChange={actions.fontWidth}
+                  onFontFeatureChange={(key, value) => {
+                    actions.fontFeature(key, value);
+                  }}
+                  onWordSpacingChange={actions.wordSpacing}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarSectionHeaderActions>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Font</PropertyLineLabel>
+            <div className="flex-1">
+              <FontFamilyControl
+                value={fontFamily}
+                onValueChange={actions.fontFamily}
+              />
+            </div>
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Style</PropertyLineLabel>
+            <FontStyleControlScaffold selection={[node_id]} />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Size</PropertyLineLabel>
+            <FontSizeControl
+              value={fontSize}
+              onValueCommit={actions.fontSize}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabelWithNumberGesture
+              step={0.1}
+              min={0}
+              onValueChange={actions.lineHeight}
+            >
+              Line
+            </PropertyLineLabelWithNumberGesture>
+            <LineHeightControl
+              value={lineHeight}
+              onValueCommit={actions.lineHeight}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabelWithNumberGesture
+              step={0.01}
+              onValueChange={actions.letterSpacing}
+            >
+              Letter
+            </PropertyLineLabelWithNumberGesture>
+            <LetterSpacingControl
+              value={letterSpacing}
+              onValueCommit={actions.letterSpacing}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Align</PropertyLineLabel>
+            <TextAlignControl
+              value={textAlign}
+              onValueChange={actions.textAlign}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel></PropertyLineLabel>
+            <TextAlignVerticalControl
+              value={textAlignVertical}
+              onValueChange={actions.textAlignVertical}
+            />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+    </CurrentFontProvider>
+  );
+}
+
 function SectionDimension({ node_id }: { node_id: string }) {
   const { width, height } = useNodeState(node_id, (node) => ({
     width: node.width,
@@ -1387,6 +1566,35 @@ function SectionDimension({ node_id }: { node_id: string }) {
           />
         </PropertyLine>
       </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function SectionProps({ node_id }: { node_id: string }) {
+  const actions = useNodeActions(node_id)!;
+  const { properties } = useNodeState(node_id, (node) => ({
+    properties: node.properties,
+  }));
+  const computed = useComputedNode(node_id);
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      {properties && Object.keys(properties).length ? (
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropsControl
+            properties={properties}
+            props={computed.props || {}}
+            onValueChange={actions.value}
+          />
+        </SidebarMenuSectionContent>
+      ) : (
+        <SidebarMenuSectionContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">No properties defined</p>
+        </SidebarMenuSectionContent>
+      )}
     </SidebarSection>
   );
 }
@@ -1450,16 +1658,18 @@ function SectionStrokes({
     stroke_cap: "on" | "off";
   };
 }) {
-  const { stroke, strokeWidth, strokeAlign, strokeCap } = useNodeState(
+  const { stroke, strokeWidth, strokeAlign, strokeCap, type } = useNodeState(
     node_id,
     (node) => ({
       stroke: node.stroke,
       strokeWidth: node.strokeWidth,
       strokeAlign: node.strokeAlign,
       strokeCap: node.strokeCap,
+      type: node.type,
     })
   );
 
+  const is_text_node = type === "text";
   const has_stroke_paint = stroke !== undefined;
   const actions = useNodeActions(node_id)!;
 
@@ -1474,6 +1684,20 @@ function SectionStrokes({
           <PaintControl
             value={stroke}
             onValueChange={actions.stroke}
+            onValueAdd={(value) => {
+              actions.stroke(value);
+              if (!strokeWidth || strokeWidth === 0) {
+                actions.strokeWidth({ type: "set", value: 1 });
+              }
+
+              // set outside as default for text nodes (if none set)
+              if (is_text_node && !strokeAlign) {
+                actions.strokeAlign("outside");
+              }
+            }}
+            onValueRemove={() => {
+              actions.stroke(null);
+            }}
             removable
           />
         </PropertyLine>
@@ -1507,6 +1731,7 @@ function SectionStrokes({
   );
 }
 
+// TODO: need to validate feX supported effect types, only allow them, currently we are only relying on feDropShadow to validate if effects are supported.
 function SectionEffects({ node_id }: { node_id: string }) {
   const backend = useBackendState();
   const instance = useCurrentEditor();

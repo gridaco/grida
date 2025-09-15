@@ -14,7 +14,6 @@ import {
   useIsTransforming,
   useMultiplayerCursorState,
   useMultipleSelectionOverlayClick,
-  useNode,
   usePointerState,
   useSelectionState,
   useToolState,
@@ -66,6 +65,11 @@ import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
 import { useFollowPlugin } from "../plugins/use-follow";
 import { SurfaceVariableWidthEditor } from "./ui/surface-varwidth-editor";
+import { MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE } from "../ui-config";
+import {
+  NodeOverlayCornerRadiusHandle,
+  NodeOverlayRectangularCornerRadiusHandles,
+} from "./ui/corner-radius-handle";
 
 const DRAG_THRESHOLD = 2;
 
@@ -366,6 +370,15 @@ export function EditorSurface() {
           {content_edit_mode?.type === "vector" && <VectorMeasurementGuide />}
           <SnapGuide />
 
+          <SurfaceGroup>
+            {content_edit_mode?.type === "text" && (
+              <SurfaceTextEditor
+                key="text-editor"
+                node_id={content_edit_mode.node_id}
+              />
+            )}
+          </SurfaceGroup>
+
           <SurfaceGroup
             hidden={
               is_transforming ||
@@ -375,12 +388,6 @@ export function EditorSurface() {
             }
             dontRenderWhenHidden
           >
-            {content_edit_mode?.type === "text" && (
-              <SurfaceTextEditor
-                key="text-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
             {content_edit_mode?.type === "vector" && (
               <SurfaceVectorEditor
                 key="vector-geometry-editor"
@@ -980,6 +987,10 @@ function SelectionGroupOverlay({
         transform={style}
         zIndex={10}
       >
+        <LayerOverlayResizeSide anchor="n" selection={ids} />
+        <LayerOverlayResizeSide anchor="s" selection={ids} />
+        <LayerOverlayResizeSide anchor="e" selection={ids} />
+        <LayerOverlayResizeSide anchor="w" selection={ids} />
         <LayerOverlayResizeHandle anchor="n" selection={ids} />
         <LayerOverlayResizeHandle anchor="s" selection={ids} />
         <LayerOverlayResizeHandle anchor="e" selection={ids} />
@@ -1071,6 +1082,10 @@ function NodeOverlay({
     height: size[1] * scaleY,
   };
 
+  const show_corner_radius_handle =
+    measurement_rect.width >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE &&
+    measurement_rect.height >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE;
+
   {
     /* TODO: resize for bitmap is not supported */
   }
@@ -1093,11 +1108,17 @@ function NodeOverlay({
               <>
                 {node.type === "line" ? (
                   <>
+                    <LayerOverlayResizeSide anchor="e" selection={node_id} />
+                    <LayerOverlayResizeSide anchor="w" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="e" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="w" selection={node_id} />
                   </>
                 ) : (
                   <>
+                    <LayerOverlayResizeSide anchor="n" selection={node_id} />
+                    <LayerOverlayResizeSide anchor="s" selection={node_id} />
+                    <LayerOverlayResizeSide anchor="e" selection={node_id} />
+                    <LayerOverlayResizeSide anchor="w" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="n" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="s" selection={node_id} />
                     <LayerOverlayResizeHandle anchor="e" selection={node_id} />
@@ -1110,10 +1131,14 @@ function NodeOverlay({
                 )}
               </>
             )}
-            {supports.cornerRadius(node.type, { backend }) &&
-              !supports.children(node.type, { backend }) && (
-                <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
-              )}
+            {show_corner_radius_handle &&
+              supports.cornerRadius(node.type, { backend }) &&
+              !supports.children(node.type, { backend }) &&
+              (supports.cornerRadius4(node.type, { backend }) ? (
+                <NodeOverlayRectangularCornerRadiusHandles node_id={node_id} />
+              ) : (
+                <NodeOverlayCornerRadiusHandle node_id={node_id} anchor="se" />
+              ))}
             <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
             <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
             <LayerOverlayRotationHandle anchor="sw" node_id={node_id} />
@@ -1130,52 +1155,6 @@ function NodeOverlay({
         )}
       </LayerOverlay>
     </>
-  );
-}
-
-function NodeOverlayCornerRadiusHandle({
-  node_id,
-  anchor,
-  size = 8,
-  margin = 16,
-}: {
-  node_id: string;
-  anchor: "nw" | "ne" | "sw" | "se";
-  margin?: number;
-  size?: number;
-}) {
-  const editor = useCurrentEditor();
-
-  const bind = useSurfaceGesture({
-    onDragStart: ({ event }) => {
-      event.preventDefault();
-      editor.startCornerRadiusGesture(node_id);
-    },
-  });
-
-  const node = useNode(node_id);
-
-  // TODO: resolve by anchor
-  const radii = typeof node.cornerRadius === "number" ? node.cornerRadius : 0;
-
-  const minmargin = Math.max(radii + size, margin);
-
-  return (
-    <div
-      {...bind()}
-      className="hidden group-hover:block border rounded-full bg-white border-workbench-accent-sky absolute z-10 pointer-events-auto"
-      style={{
-        top: anchor[0] === "n" ? minmargin : "auto",
-        bottom: anchor[0] === "s" ? minmargin : "auto",
-        left: anchor[1] === "w" ? minmargin : "auto",
-        right: anchor[1] === "e" ? minmargin : "auto",
-        width: size,
-        height: size,
-        transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
-        cursor: "pointer",
-        touchAction: "none",
-      }}
-    />
   );
 }
 
@@ -1247,6 +1226,8 @@ function LayerOverlayResizeHandle({
 }) {
   const editor = useCurrentEditor();
 
+  const zIndex = ["n", "e", "s", "w"].includes(anchor) ? 12 : 11;
+
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
       event.preventDefault();
@@ -1257,7 +1238,83 @@ function LayerOverlayResizeHandle({
     },
   });
 
-  return <Knob size={size} {...bind()} anchor={anchor} />;
+  return <Knob size={size} {...bind()} anchor={anchor} zIndex={zIndex} />;
+}
+
+function LayerOverlayResizeSide({
+  selection,
+  anchor,
+  thickness = 8,
+}: {
+  selection: string | string[];
+  anchor: "n" | "e" | "s" | "w";
+  thickness?: number;
+}) {
+  const editor = useCurrentEditor();
+
+  const bind = useSurfaceGesture(
+    {
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+      },
+      onDragStart: ({ event }) => {
+        event.preventDefault();
+        editor.startScaleGesture(selection, anchor);
+      },
+      onDoubleClick: ({ event }) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // feat: text-node-auto-size
+        if (
+          typeof selection === "string" &&
+          editor.getNodeSnapshotById(selection)?.type === "text"
+        ) {
+          const axis = anchor === "e" || anchor === "w" ? "width" : "height";
+          editor.autoSizeTextNode(selection, axis);
+        }
+      },
+    },
+    {
+      drag: {
+        threshold: DRAG_THRESHOLD,
+        keyboardDisplacement: 0,
+      },
+    }
+  );
+
+  const offset = thickness / 2;
+
+  const positionalStyle: React.CSSProperties =
+    anchor === "n" || anchor === "s"
+      ? {
+          left: 0,
+          right: 0,
+          height: thickness,
+          top: anchor === "n" ? -offset : undefined,
+          bottom: anchor === "s" ? -offset : undefined,
+        }
+      : {
+          top: 0,
+          bottom: 0,
+          width: thickness,
+          left: anchor === "w" ? -offset : undefined,
+          right: anchor === "e" ? -offset : undefined,
+        };
+
+  return (
+    <div
+      {...bind()}
+      style={{
+        position: "absolute",
+        background: "transparent",
+        cursor: cursors.resize_handle_cursor_map[anchor],
+        touchAction: "none",
+        zIndex: 10,
+        ...positionalStyle,
+      }}
+    />
+  );
 }
 
 function NetworkOverlay({ transform }: { transform: cmath.Transform }) {

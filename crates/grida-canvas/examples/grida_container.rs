@@ -18,14 +18,8 @@ async fn demo_clip() -> Scene {
         height: 300.0,
     };
     container.corner_radius = RectangularCornerRadius::circular(20.0);
-    container.set_fill(Paint::Solid(SolidPaint {
-        color: CGColor(240, 100, 100, 255), // Light red
-        opacity: 1.0,
-    }));
-    container.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(200, 50, 50, 255), // Darker red
-        opacity: 1.0,
-    })];
+    container.set_fill(Paint::from(CGColor(240, 100, 100, 255)));
+    container.strokes = vec![Paint::from(CGColor(200, 50, 50, 255))];
     container.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 0.0,
         dy: 0.0,
@@ -44,14 +38,8 @@ async fn demo_clip() -> Scene {
         width: 300.0,
         height: 200.0,
     };
-    ellipse.fills = vec![Paint::Solid(SolidPaint {
-        color: CGColor(100, 200, 100, 255), // Light green
-        opacity: 1.0,
-    })];
-    ellipse.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(50, 150, 50, 255), // Darker green
-        opacity: 1.0,
-    })];
+    ellipse.fills = vec![Paint::from(CGColor(100, 200, 100, 255))];
+    ellipse.strokes = vec![Paint::from(CGColor(50, 150, 50, 255))];
     ellipse.stroke_width = 2.0;
 
     // Add nodes to repository and collect their IDs

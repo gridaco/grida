@@ -18,6 +18,8 @@ export const FLATTENABLE_NODE_TYPES = new Set<grida.program.nodes.NodeType>([
   "polygon",
   "ellipse",
   "line",
+  // TODO: only supported by wasm backend, need backend check or seperate api (e.g. vector.textToVectorNetwork())
+  "text",
   "vector",
   "boolean",
 ]);
@@ -55,7 +57,17 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
   const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id);
   if (!rect) return null;
 
-  const v = toVectorNetwork(node, { width: rect.width, height: rect.height });
+  // attempt to resolve vector network via wasm backend when available
+  let v: vn.VectorNetwork | null = null;
+  try {
+    v = context.vector?.toVectorNetwork(node_id) ?? null;
+  } catch {}
+  if (!v) {
+    v = toVectorNetworkFallback(node, {
+      width: rect.width,
+      height: rect.height,
+    });
+  }
   if (!v) return null;
 
   const vectornode: grida.program.nodes.VectorNode = {
@@ -95,7 +107,7 @@ function modeCornerRadius(node: grida.program.nodes.Node): number | undefined {
   }
 }
 
-function toVectorNetwork(
+function toVectorNetworkFallback(
   node: grida.program.nodes.Node,
   size: { width: number; height: number }
 ): vn.VectorNetwork | null {

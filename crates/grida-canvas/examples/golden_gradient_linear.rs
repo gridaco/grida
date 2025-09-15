@@ -25,6 +25,7 @@ fn main() {
         ],
         opacity: 1.0,
         transform: AffineTransform::identity(),
+        blend_mode: BlendMode::Normal,
     };
 
     let paint = linear_gradient_paint(&gradient, 1.0, (width as f32, height as f32));
@@ -38,5 +39,9 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write("goldens/gradient_linear.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/gradient_linear.png"),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

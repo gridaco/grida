@@ -1,0 +1,37 @@
+# Grida Canvas WASM Build Configuration
+# This file configures the build settings for the wasm32-unknown-emscripten target
+
+[target.wasm32-unknown-emscripten]
+# Use Emscripten's emcc as the linker for WebAssembly compilation
+linker = "emcc"
+
+# Linker arguments passed to Emscripten
+rustflags = [
+    # Allow undefined symbols (useful for dynamic linking and Skia integration)
+    "-C", "link-arg=-sERROR_ON_UNDEFINED_SYMBOLS=0",
+    
+    # Currently only targeting web (fs=false)
+    # Target web environment (browser) instead of Node.js
+    # We will be removing this once we figure out to make SSR/CSR not fail.
+    "-C", "link-arg=-sENVIRONMENT=web",
+    
+    # Enable WebGL2 support for hardware-accelerated graphics
+    "-C", "link-arg=-sMAX_WEBGL_VERSION=2",
+    "-C", "link-arg=-sUSE_WEBGL2=1",
+    
+    # Allow dynamic memory growth (important for large graphics operations)
+    "-C", "link-arg=-sALLOW_MEMORY_GROWTH=1",
+    "-C", "link-arg=-sINITIAL_MEMORY=256MB",
+    
+    # Create modular output (factory function instead of global Module)
+    "-C", "link-arg=-sMODULARIZE=1",
+    
+    # Set the export function name for the modular output
+    "-C", "link-arg=-sEXPORT_NAME=createGridaCanvas",
+    
+    # Export specific runtime methods for JavaScript access
+    # GL: WebGL context access
+    # UTF8 functions: String conversion utilities
+    # HEAP functions: Direct memory access for performance-critical operations
+    "-C", "link-arg=-sEXPORTED_RUNTIME_METHODS=['GL','lengthBytesUTF8','stringToUTF8','UTF8ToString','HEAP32','HEAPU8','HEAPU16','HEAPU32','HEAPF32']"
+]

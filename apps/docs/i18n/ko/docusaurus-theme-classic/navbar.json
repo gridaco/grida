@@ -7,13 +7,13 @@
     "message": "문서",
     "description": "Navbar item with label Docs"
   },
-  "item.label.Flags": {
-    "message": "플래그",
-    "description": "Navbar item with label Flags"
-  },
   "item.label.Reference": {
     "message": "레퍼런스",
     "description": "Navbar item with label Reference"
+  },
+  "item.label.Working Group": {
+    "message": "작업실",
+    "description": "Navbar item with label Working Group"
   },
   "item.label.Together": {
     "message": "함께해요",

@@ -4,30 +4,34 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
+  SelectSeparator,
   SelectValue,
 } from "@/components/ui-editor/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkbenchUI } from "@/components/workbench";
-import grida from "@grida/schema";
 import { cn } from "@/components/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
 import type { TMixed } from "../controls/utils/types";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import grida from "@grida/schema";
 
 export function PropertyLine({
   children,
   className,
   hidden,
+  disabled,
 }: React.PropsWithChildren<{
   className?: string;
   hidden?: boolean;
+  disabled?: boolean;
 }>) {
   return (
     <div
       data-hidden={hidden}
+      data-disabled={disabled}
       className={cn(
-        "group flex items-start justify-between max-w-full data-[hidden='true']:hidden",
+        "group flex items-start justify-between max-w-full data-[hidden='true']:hidden data-[disabled='true']:opacity-50 data-[disabled='true']:pointer-events-none data-[disabled='true']:cursor-not-allowed",
         className
       )}
     >
@@ -36,9 +40,19 @@ export function PropertyLine({
   );
 }
 
-export function PropertyLineLabel({ children }: React.PropsWithChildren<{}>) {
+export function PropertyLineLabel({
+  children,
+  className,
+  ...props
+}: React.ComponentProps<"label">) {
   return (
-    <Label className="text-[11px] text-muted-foreground h-6 min-w-16 w-16 flex items-center me-4 overflow-hidden">
+    <Label
+      className={cn(
+        "text-[11px] text-muted-foreground h-6 min-w-16 w-16 flex items-center me-4",
+        className
+      )}
+      {...props}
+    >
       <span className="text-ellipsis overflow-hidden">{children}</span>
     </Label>
   );
@@ -138,14 +152,23 @@ export function PropertyEnum<T extends string>({
   tabIndex,
   ...props
 }: Omit<React.ComponentProps<typeof Select>, "value" | "onValueChange"> & {
-  enum: EnumItem<T>[];
+  enum: EnumItem<T>[] | EnumItem<T>[][];
   value?: TMixed<T>;
   placeholder?: string;
   onValueChange?: (value: T) => void;
   tabIndex?: number;
 }) {
   const mixed = value === grida.mixed;
-  const hasIcon = enums.some((e) => typeof e !== "string" && e.icon);
+
+  // Check if enums is grouped (array of arrays)
+  const isGrouped = Array.isArray(enums[0]);
+
+  // Flatten all enum items to check for icons
+  const allEnums = isGrouped
+    ? (enums as EnumItem<T>[][]).flat()
+    : (enums as EnumItem<T>[]);
+  const hasIcon = allEnums.some((e) => typeof e !== "string" && e.icon);
+
   return (
     <Select value={mixed ? undefined : value} {...props}>
       <SelectTrigger
@@ -155,18 +178,42 @@ export function PropertyEnum<T extends string>({
         <SelectValue placeholder={mixed ? "mixed" : placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {enums.map((e) => {
-          const value = typeof e === "string" ? e : e.value;
-          const label = typeof e === "string" ? e : e.label;
-          const icon = typeof e === "string" ? undefined : e.icon;
-          const disabled = typeof e === "string" ? false : e.disabled;
-          return (
-            <SelectItem key={value} value={value} disabled={disabled}>
-              {hasIcon && icon && <>{icon}</>}
-              {label ?? value}
-            </SelectItem>
-          );
-        })}
+        {isGrouped
+          ? // Render grouped enum items with separators
+            (enums as EnumItem<T>[][]).flatMap((group, gi) => [
+              // Add separator before each group except the first
+              ...(gi > 0 ? [<SelectSeparator key={`sep-${gi}`} />] : []),
+              // Add all items in the group
+              ...group.map((e, i) => {
+                const value = typeof e === "string" ? e : e.value;
+                const label = typeof e === "string" ? e : e.label;
+                const icon = typeof e === "string" ? undefined : e.icon;
+                const disabled = typeof e === "string" ? false : e.disabled;
+                return (
+                  <SelectItem
+                    key={value ?? `${gi}+${i}`}
+                    value={value}
+                    disabled={disabled}
+                  >
+                    {hasIcon && icon && <>{icon}</>}
+                    {label ?? value}
+                  </SelectItem>
+                );
+              }),
+            ])
+          : // Render flat enum items
+            (enums as EnumItem<T>[]).map((e) => {
+              const value = typeof e === "string" ? e : e.value;
+              const label = typeof e === "string" ? e : e.label;
+              const icon = typeof e === "string" ? undefined : e.icon;
+              const disabled = typeof e === "string" ? false : e.disabled;
+              return (
+                <SelectItem key={value} value={value} disabled={disabled}>
+                  {hasIcon && icon && <>{icon}</>}
+                  {label ?? value}
+                </SelectItem>
+              );
+            })}
       </SelectContent>
     </Select>
   );
@@ -176,6 +223,7 @@ export function PropertyEnumToggle<T extends string>({
   enum: enums,
   value,
   onValueChange,
+  onValueSeeked,
   ...props
 }: Omit<
   React.ComponentProps<typeof ToggleGroup>,
@@ -184,6 +232,7 @@ export function PropertyEnumToggle<T extends string>({
   enum: EnumItem<T>[];
   value?: TMixed<T>;
   onValueChange?: (value: T) => void;
+  onValueSeeked?: (value: T | null) => void;
 }) {
   const mixed = value === grida.mixed;
 
@@ -208,6 +257,8 @@ export function PropertyEnumToggle<T extends string>({
             value={value}
             title={label}
             disabled={disabled}
+            onMouseEnter={() => onValueSeeked?.(value as T)}
+            onMouseLeave={() => onValueSeeked?.(null)}
           >
             {icon}
           </ToggleGroupItem>

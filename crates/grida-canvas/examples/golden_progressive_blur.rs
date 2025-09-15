@@ -1,10 +1,7 @@
 use cg::cg::types::FeProgressiveBlur;
-use skia_safe::{
-    self as sk, image_filters, surfaces, BlendMode, Color, Data, Paint, Point, Rect, Shader,
-    TileMode,
-};
+use skia_safe::{self as sk, surfaces, Color, Data};
 
-static BLUR_EFFECT: FeProgressiveBlur = FeProgressiveBlur {
+static _BLUR_EFFECT: FeProgressiveBlur = FeProgressiveBlur {
     x1: 0.0,
     y1: 0.0,
     x2: 400.0,
@@ -22,9 +19,9 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     // Load the image from file
-    let image_path = "../fixtures/images/checker.png";
+    let image_path = "../../fixtures/images/checker.png";
     let image_data = std::fs::read(image_path).expect("Failed to read image file");
-    let image =
+    let _image =
         sk::Image::from_encoded(Data::new_copy(&image_data)).expect("Failed to decode image");
 
     // TODO: !!
@@ -34,6 +31,9 @@ fn main() {
     let data = image_snapshot
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("Failed to encode image");
-    std::fs::write("goldens/progressive_blur.png", data.as_bytes())
-        .expect("Failed to write output file");
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/progressive_blur.png"),
+        data.as_bytes(),
+    )
+    .expect("Failed to write output file");
 }

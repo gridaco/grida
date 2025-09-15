@@ -135,7 +135,7 @@ describe("VectorNetworkEditor getLoops", () => {
 
     // 3. Verify the expected topology based on actual results
     expect(planarizedNet.vertices.length).toBe(8); // Actual result: 8 vertices
-    expect(planarizedNet.segments.length).toBe(18); // Actual result: 18 segments
+    expect(planarizedNet.segments.length).toBe(10); // Actual result: 10 segments after optimization
 
     // Create editor and get loops
     const editor = new vn.VectorNetworkEditor(planarizedNet);

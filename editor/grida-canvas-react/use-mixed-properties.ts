@@ -118,12 +118,12 @@ export function useMixedProperties(ids: string[]) {
   );
 
   const fontFamily = useCallback(
-    (value: string) => {
+    (value: string, force?: boolean) => {
       mixedProperties.fontFamily?.ids.forEach((id) => {
-        instance.changeTextNodeFontFamily(id, value);
+        instance.changeTextNodeFontFamilySync(id, value, force);
       });
     },
-    [mixedProperties.fontFamily?.ids, instance.changeTextNodeFontFamily]
+    [mixedProperties.fontFamily?.ids, instance.changeTextNodeFontFamilySync]
   );
 
   const fontWeight = useCallback(
@@ -133,6 +133,54 @@ export function useMixedProperties(ids: string[]) {
       });
     },
     [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontWeight]
+  );
+
+  const fontKerning = useCallback(
+    (value: boolean) => {
+      mixedProperties.fontKerning?.ids.forEach((id) => {
+        instance.changeTextNodeFontKerning(id, value);
+      });
+    },
+    [mixedProperties.fontKerning?.ids, instance.changeTextNodeFontKerning]
+  );
+
+  const fontWidth = useCallback(
+    (value: number) => {
+      mixedProperties.fontWidth?.ids.forEach((id) => {
+        instance.changeTextNodeFontWidth(id, value);
+      });
+    },
+    [mixedProperties.fontWidth?.ids, instance.changeTextNodeFontWidth]
+  );
+
+  const fontStyle = useCallback(
+    (change: editor.api.FontStyleChangeDescription) => {
+      mixedProperties.fontStyleItalic?.ids.forEach((id) => {
+        instance.changeTextNodeFontStyle(id, change);
+      });
+    },
+    [mixedProperties.fontStyleItalic?.ids, instance.changeTextNodeFontStyle]
+  );
+
+  const fontOpticalSizing = useCallback(
+    (value: cg.OpticalSizing) => {
+      mixedProperties.fontOpticalSizing?.ids.forEach((id) => {
+        instance.changeTextNodeFontOpticalSizing(id, value);
+      });
+    },
+    [
+      mixedProperties.fontOpticalSizing?.ids,
+      instance.changeTextNodeFontOpticalSizing,
+    ]
+  );
+
+  const fontVariation = useCallback(
+    (key: string, value: number) => {
+      mixedProperties.fontWeight?.ids.forEach((id) => {
+        instance.changeTextNodeFontVariation(id, key, value);
+      });
+    },
+    [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontVariation]
   );
 
   const fontSize = useCallback(
@@ -162,6 +210,17 @@ export function useMixedProperties(ids: string[]) {
       });
     },
     [mixedProperties.letterSpacing?.ids, instance.changeTextNodeLetterSpacing]
+  );
+
+  const wordSpacing = useCallback(
+    (
+      change: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
+    ) => {
+      mixedProperties.wordSpacing?.ids.forEach((id) => {
+        instance.changeTextNodeWordSpacing(id, change);
+      });
+    },
+    [mixedProperties.wordSpacing?.ids, instance.changeTextNodeWordSpacing]
   );
 
   const textAlign = useCallback(
@@ -299,11 +358,17 @@ export function useMixedProperties(ids: string[]) {
       width,
       height,
       positioningMode,
-      fontWeight,
       fontFamily,
+      fontWeight,
+      fontKerning,
+      fontWidth,
+      fontStyle,
+      fontOpticalSizing,
+      fontVariation,
       fontSize,
       lineHeight,
       letterSpacing,
+      wordSpacing,
       textAlign,
       textAlignVertical,
       fit,
@@ -328,11 +393,17 @@ export function useMixedProperties(ids: string[]) {
       width,
       height,
       positioningMode,
-      fontWeight,
       fontFamily,
+      fontWeight,
+      fontKerning,
+      fontWidth,
+      fontStyle,
+      fontOpticalSizing,
+      fontVariation,
       fontSize,
       lineHeight,
       letterSpacing,
+      wordSpacing,
       textAlign,
       textAlignVertical,
       fit,

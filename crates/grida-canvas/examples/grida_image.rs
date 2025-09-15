@@ -2,17 +2,21 @@ use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
+use cg::resources::{hash_bytes, load_image};
 use cg::window;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 
-async fn demo_image() -> Scene {
+async fn demo_image() -> (Scene, Vec<u8>) {
     let nf = NodeFactory::new();
-    // let image4k = "../fixtures/images/4k.jpg".to_string();
+    // let image4k = "../../fixtures/images/4k.jpg".to_string();
     // let image4ksize = Size {
     //     width: 4000.0,
     //     height: 6000.0,
     // };
-    let image8k = "../fixtures/images/8k.jpg".to_string();
+    let image8k = "../../fixtures/images/8k.jpg".to_string();
+    let bytes = load_image(&image8k).await.unwrap();
+    let hash = hash_bytes(&bytes);
+    let hash_str = format!("{:016x}", hash);
     let image8ksize = Size {
         width: 8070.0,
         height: 5196.0,
@@ -29,15 +33,13 @@ async fn demo_image() -> Scene {
     rect1.transform = AffineTransform::identity();
     rect1.size = image8ksize.clone();
     rect1.set_fill(Paint::Image(ImagePaint {
-        hash: image8k.clone(),
+        hash: hash_str.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
+        blend_mode: BlendMode::Normal,
     }));
-    rect1.strokes = vec![Paint::Solid(SolidPaint {
-        color: CGColor(255, 0, 0, 255),
-        opacity: 1.0,
-    })];
+    rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
     rect1.stroke_width = 2.0;
 
     let mut repository = NodeRepository::new();
@@ -50,17 +52,22 @@ async fn demo_image() -> Scene {
     let root_id = root.id.clone();
     repository.insert(Node::Container(root));
 
-    Scene {
+    let scene = Scene {
         id: "scene".to_string(),
         name: "Images Demo".to_string(),
         children: vec![root_id],
         nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
-    }
+    };
+
+    (scene, bytes)
 }
 
 #[tokio::main]
 async fn main() {
-    let scene = demo_image().await;
-    window::run_demo_window(scene).await;
+    let (scene, bytes) = demo_image().await;
+    window::run_demo_window_with(scene, move |renderer, _, _, _| {
+        renderer.add_image(&bytes);
+    })
+    .await;
 }

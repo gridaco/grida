@@ -2,12 +2,24 @@ use crate::cg::types::*;
 use math2::Rectangle;
 use skia_safe;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VectorNetworkSegment {
     pub a: usize,
     pub b: usize,
-    pub ta: Option<(f32, f32)>,
-    pub tb: Option<(f32, f32)>,
+    pub ta: (f32, f32),
+    pub tb: (f32, f32),
+}
+
+impl VectorNetworkSegment {
+    /// straight line segment between two vertex indices
+    pub fn ab(a: usize, b: usize) -> Self {
+        Self {
+            a,
+            b,
+            ta: (0.0, 0.0),
+            tb: (0.0, 0.0),
+        }
+    }
 }
 
 /// A sequence of segment indices that form a closed contour (loop).
@@ -79,18 +91,6 @@ pub struct VectorNetworkRegion {
     pub fills: Option<Vec<Paint>>,
 }
 
-/// A vector network geometry is a collection of vertices and segments.
-///
-/// This is a low-level representation of a vector network that can be used
-/// to create a vector network.
-///
-/// It is used to create a vector network from a set of vertices and segments.
-#[derive(Debug, Clone)]
-pub struct VectorNetworkGeometry {
-    pub vertices: Vec<(f32, f32)>,
-    pub segments: Vec<VectorNetworkSegment>,
-}
-
 #[derive(Debug, Clone)]
 pub struct PiecewiseVectorNetworkGeometry {
     /// Array of unique vertex positions in 2D space.
@@ -129,21 +129,21 @@ impl PiecewiseVectorNetworkGeometry {
     /// # Example
     ///
     /// ```rust
-    /// use grida_canvas::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+    /// use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
     ///
     /// // Valid geometry - will succeed
     /// let geometry = PiecewiseVectorNetworkGeometry::new(
     ///     vec![(0.0, 0.0), (100.0, 0.0), (200.0, 100.0)],
     ///     vec![
-    ///         VectorNetworkSegment { a: 0, b: 1, ta: Some((50.0, 50.0)), tb: Some((-50.0, 50.0)) },
-    ///         VectorNetworkSegment { a: 1, b: 2, ta: Some((50.0, 50.0)), tb: Some((50.0, -50.0)) },
+    ///         VectorNetworkSegment { a: 0, b: 1, ta: (50.0, 50.0), tb: (-50.0, 50.0) },
+    ///         VectorNetworkSegment { a: 1, b: 2, ta: (50.0, 50.0), tb: (50.0, -50.0) },
     ///     ],
     /// ).expect("Valid geometry should be created successfully");
     ///
     /// // Invalid geometry - will return Err
     /// let invalid_result = PiecewiseVectorNetworkGeometry::new(
     ///     vec![(0.0, 0.0)], // Only one vertex
-    ///     vec![VectorNetworkSegment { a: 0, b: 1, ta: None, tb: None }], // References non-existent vertex 1
+    ///     vec![VectorNetworkSegment::ab(0, 1)], // References non-existent vertex 1
     /// );
     /// assert!(invalid_result.is_err());
     /// ```
@@ -181,13 +181,13 @@ impl PiecewiseVectorNetworkGeometry {
     /// # Example
     ///
     /// ```rust
-    /// use grida_canvas::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
+    /// use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
     ///
     /// let geometry = PiecewiseVectorNetworkGeometry {
     ///     vertices: vec![(0.0, 0.0), (100.0, 0.0), (200.0, 100.0)],
     ///     segments: vec![
-    ///         VectorNetworkSegment { a: 0, b: 1, ta: Some((50.0, 50.0)), tb: Some((-50.0, 50.0)) },
-    ///         VectorNetworkSegment { a: 1, b: 2, ta: Some((50.0, 50.0)), tb: Some((50.0, -50.0)) },
+    ///         VectorNetworkSegment { a: 0, b: 1, ta: (50.0, 50.0), tb: (-50.0, 50.0) },
+    ///         VectorNetworkSegment { a: 1, b: 2, ta: (50.0, 50.0), tb: (50.0, -50.0) },
     ///     ],
     /// };
     ///
@@ -216,16 +216,14 @@ impl PiecewiseVectorNetworkGeometry {
                 ));
             }
 
-            // Validate tangent vectors if present
-            if let Some(ta) = segment.ta {
-                if ta.0.is_nan() || ta.1.is_nan() || ta.0.is_infinite() || ta.1.is_infinite() {
-                    return Err(format!("Segment {}: invalid tangent 'ta' ({:?})", i, ta));
-                }
+            // Validate tangent vectors
+            let ta = segment.ta;
+            if ta.0.is_nan() || ta.1.is_nan() || ta.0.is_infinite() || ta.1.is_infinite() {
+                return Err(format!("Segment {}: invalid tangent 'ta' ({:?})", i, ta));
             }
-            if let Some(tb) = segment.tb {
-                if tb.0.is_nan() || tb.1.is_nan() || tb.0.is_infinite() || tb.1.is_infinite() {
-                    return Err(format!("Segment {}: invalid tangent 'tb' ({:?})", i, tb));
-                }
+            let tb = segment.tb;
+            if tb.0.is_nan() || tb.1.is_nan() || tb.0.is_infinite() || tb.1.is_infinite() {
+                return Err(format!("Segment {}: invalid tangent 'tb' ({:?})", i, tb));
             }
         }
 
@@ -266,15 +264,6 @@ pub struct VectorNetwork {
     pub regions: Vec<VectorNetworkRegion>,
 }
 
-impl Into<VectorNetworkGeometry> for VectorNetwork {
-    fn into(self) -> VectorNetworkGeometry {
-        VectorNetworkGeometry {
-            vertices: self.vertices,
-            segments: self.segments,
-        }
-    }
-}
-
 fn is_zero(tangent: (f32, f32)) -> bool {
     tangent.0 == 0.0 && tangent.1 == 0.0
 }
@@ -297,8 +286,8 @@ fn build_path_from_segments(
         let b_idx = segment.b;
         let a = vertices[a_idx];
         let b = vertices[b_idx];
-        let ta = segment.ta.unwrap_or((0.0, 0.0));
-        let tb = segment.tb.unwrap_or((0.0, 0.0));
+        let ta = segment.ta;
+        let tb = segment.tb;
 
         if previous_end != Some(a_idx) {
             path.move_to((a.0, a.1));
@@ -323,6 +312,36 @@ fn build_path_from_segments(
     }
 
     path
+}
+
+// TODO: move to math2
+fn quad_to_cubic(
+    p0: skia_safe::Point,
+    p1: skia_safe::Point,
+    p2: skia_safe::Point,
+) -> (skia_safe::Point, skia_safe::Point) {
+    let c1 = skia_safe::Point::new(
+        p0.x + (2.0 / 3.0) * (p1.x - p0.x),
+        p0.y + (2.0 / 3.0) * (p1.y - p0.y),
+    );
+    let c2 = skia_safe::Point::new(
+        p2.x + (2.0 / 3.0) * (p1.x - p2.x),
+        p2.y + (2.0 / 3.0) * (p1.y - p2.y),
+    );
+    (c1, c2)
+}
+
+// TODO: move to math2
+fn conic_to_cubic(
+    p0: skia_safe::Point,
+    p1: skia_safe::Point,
+    p2: skia_safe::Point,
+    w: f32,
+) -> (skia_safe::Point, skia_safe::Point) {
+    let rw = 2.0 * w / (1.0 + w);
+    let c1 = skia_safe::Point::new(p0.x + rw * (p1.x - p0.x), p0.y + rw * (p1.y - p0.y));
+    let c2 = skia_safe::Point::new(p2.x + rw * (p1.x - p2.x), p2.y + rw * (p1.y - p2.y));
+    (c1, c2)
 }
 
 impl VectorNetwork {
@@ -356,8 +375,8 @@ impl VectorNetwork {
                     let b_idx = seg.b;
                     let a = vertices[a_idx];
                     let b = vertices[b_idx];
-                    let ta = seg.ta.unwrap_or((0.0, 0.0));
-                    let tb = seg.tb.unwrap_or((0.0, 0.0));
+                    let ta = seg.ta;
+                    let tb = seg.tb;
 
                     if previous_end != Some(a_idx) {
                         path.move_to((a.0, a.1));
@@ -434,8 +453,8 @@ impl VectorNetwork {
         for seg in &self.segments {
             let a = self.vertices[seg.a];
             let b = self.vertices[seg.b];
-            let ta = seg.ta.unwrap_or((0.0, 0.0));
-            let tb = seg.tb.unwrap_or((0.0, 0.0));
+            let ta = seg.ta;
+            let tb = seg.tb;
             let seg_box = if is_zero(ta) && is_zero(tb) {
                 Rectangle::from_points(&[[a.0, a.1], [b.0, b.1]])
             } else {
@@ -470,5 +489,124 @@ impl Default for VectorNetwork {
 impl Into<skia_safe::Path> for VectorNetwork {
     fn into(self) -> skia_safe::Path {
         self.to_union_path()
+    }
+}
+
+impl From<&skia_safe::Path> for VectorNetwork {
+    fn from(path: &skia_safe::Path) -> Self {
+        use skia_safe::path::Verb;
+
+        let mut vertices: Vec<(f32, f32)> = Vec::new();
+        let mut segments: Vec<VectorNetworkSegment> = Vec::new();
+        let mut loops: Vec<VectorNetworkLoop> = Vec::new();
+
+        let mut iter = skia_safe::path::Iter::new(path, false);
+        let mut start_idx: Option<usize> = None;
+        let mut prev_idx: Option<usize> = None;
+        let mut current_loop: Vec<usize> = Vec::new();
+
+        while let Some((verb, pts)) = iter.next() {
+            match verb {
+                Verb::Move => {
+                    let p = pts[0];
+                    let idx = vertices.len();
+                    vertices.push((p.x, p.y));
+                    start_idx = Some(idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Line => {
+                    let p = pts[1];
+                    let idx = vertices.len();
+                    vertices.push((p.x, p.y));
+                    let seg_idx = segments.len();
+                    segments.push(VectorNetworkSegment::ab(prev_idx.unwrap(), idx));
+                    current_loop.push(seg_idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Quad => {
+                    let p0 = pts[0];
+                    let c = pts[1];
+                    let p2 = pts[2];
+                    let (c1, c2) = quad_to_cubic(p0, c, p2);
+                    let idx = vertices.len();
+                    vertices.push((p2.x, p2.y));
+                    let seg_idx = segments.len();
+                    segments.push(VectorNetworkSegment {
+                        a: prev_idx.unwrap(),
+                        b: idx,
+                        ta: (c1.x - p0.x, c1.y - p0.y),
+                        tb: (c2.x - p2.x, c2.y - p2.y),
+                    });
+                    current_loop.push(seg_idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Conic => {
+                    let p0 = pts[0];
+                    let c = pts[1];
+                    let p2 = pts[2];
+                    let w = iter.conic_weight().unwrap_or(1.0);
+                    let (c1, c2) = conic_to_cubic(p0, c, p2, w);
+                    let idx = vertices.len();
+                    vertices.push((p2.x, p2.y));
+                    let seg_idx = segments.len();
+                    segments.push(VectorNetworkSegment {
+                        a: prev_idx.unwrap(),
+                        b: idx,
+                        ta: (c1.x - p0.x, c1.y - p0.y),
+                        tb: (c2.x - p2.x, c2.y - p2.y),
+                    });
+                    current_loop.push(seg_idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Cubic => {
+                    let p0 = pts[0];
+                    let c1 = pts[1];
+                    let c2 = pts[2];
+                    let p3 = pts[3];
+                    let idx = vertices.len();
+                    vertices.push((p3.x, p3.y));
+                    let seg_idx = segments.len();
+                    segments.push(VectorNetworkSegment {
+                        a: prev_idx.unwrap(),
+                        b: idx,
+                        ta: (c1.x - p0.x, c1.y - p0.y),
+                        tb: (c2.x - p3.x, c2.y - p3.y),
+                    });
+                    current_loop.push(seg_idx);
+                    prev_idx = Some(idx);
+                }
+                Verb::Close => {
+                    if let (Some(start), Some(prev)) = (start_idx, prev_idx) {
+                        let seg_idx = segments.len();
+                        segments.push(VectorNetworkSegment::ab(prev, start));
+                        current_loop.push(seg_idx);
+                        loops.push(VectorNetworkLoop(current_loop.clone()));
+                        current_loop.clear();
+                        prev_idx = Some(start);
+                    }
+                }
+                Verb::Done => break,
+            }
+        }
+
+        if !current_loop.is_empty() {
+            loops.push(VectorNetworkLoop(current_loop));
+        }
+
+        let regions = if loops.is_empty() {
+            vec![]
+        } else {
+            vec![VectorNetworkRegion {
+                loops,
+                fill_rule: FillRule::EvenOdd,
+                fills: None,
+            }]
+        };
+
+        VectorNetwork {
+            vertices,
+            segments,
+            regions,
+        }
     }
 }

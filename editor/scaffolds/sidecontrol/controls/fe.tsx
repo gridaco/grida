@@ -235,16 +235,17 @@ function FeGaussianBlurProperties({
 }) {
   return (
     <div className="space-y-2">
-      <PropertyLine>
-        <PropertyLineLabel>Blur</PropertyLineLabel>
-        <InputPropertyNumber
-          mode="fixed"
-          value={value?.radius}
-          onValueCommit={(v) => onValueChange?.({ ...value, radius: v || 0 })}
-        />
-      </PropertyLine>
-    </div>
-  );
+        <PropertyLine>
+          <PropertyLineLabel>Blur</PropertyLineLabel>
+          <InputPropertyNumber
+            mode="fixed"
+            value={value?.radius}
+            max={editor.config.DEFAULT_MAX_BLUR_RADIUS}
+            onValueCommit={(v) => onValueChange?.({ ...value, radius: v || 0 })}
+          />
+        </PropertyLine>
+      </div>
+    );
 }
 
 function FeProgressiveBlurProperties({
@@ -261,6 +262,7 @@ function FeProgressiveBlurProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value?.radius}
+          max={editor.config.DEFAULT_MAX_BLUR_RADIUS}
           onValueCommit={(v) => onValueChange?.({ ...value, radius: v || 0 })}
         />
       </PropertyLine>
@@ -269,6 +271,7 @@ function FeProgressiveBlurProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value?.radius}
+          max={editor.config.DEFAULT_MAX_BLUR_RADIUS}
           onValueCommit={(v) => onValueChange?.({ ...value, radius2: v || 0 })}
         />
       </PropertyLine>
@@ -334,6 +337,7 @@ function FeShadowProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value.dx}
+          max={editor.config.DEFAULT_MAX_SHADOW_OFFSET}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
@@ -347,6 +351,7 @@ function FeShadowProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value.dy}
+          max={editor.config.DEFAULT_MAX_SHADOW_OFFSET}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
@@ -360,6 +365,7 @@ function FeShadowProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value.blur}
+          max={editor.config.DEFAULT_MAX_BLUR_RADIUS}
           onValueCommit={(v) => onValueChange?.({ ...value, blur: v || 0 })}
         />
       </PropertyLine>
@@ -368,6 +374,7 @@ function FeShadowProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value.spread}
+          max={editor.config.DEFAULT_MAX_SHADOW_SPREAD}
           onValueCommit={(v) => onValueChange?.({ ...value, spread: v || 0 })}
         />
       </PropertyLine>

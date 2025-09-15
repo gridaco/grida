@@ -45,138 +45,46 @@ fn main() {
         ],
         segments: vec![
             // Rect 1 (Red)
-            VectorNetworkSegment {
-                a: 0,
-                b: 1,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 1,
-                b: 2,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 2,
-                b: 3,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 3,
-                b: 0,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(0, 1),
+            VectorNetworkSegment::ab(1, 2),
+            VectorNetworkSegment::ab(2, 3),
+            VectorNetworkSegment::ab(3, 0),
             // Rect 2 (Green)
-            VectorNetworkSegment {
-                a: 4,
-                b: 5,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 5,
-                b: 6,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 6,
-                b: 7,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 7,
-                b: 4,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(4, 5),
+            VectorNetworkSegment::ab(5, 6),
+            VectorNetworkSegment::ab(6, 7),
+            VectorNetworkSegment::ab(7, 4),
             // Rect 3 (Blue)
-            VectorNetworkSegment {
-                a: 8,
-                b: 9,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 9,
-                b: 10,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 10,
-                b: 11,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 11,
-                b: 8,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(8, 9),
+            VectorNetworkSegment::ab(9, 10),
+            VectorNetworkSegment::ab(10, 11),
+            VectorNetworkSegment::ab(11, 8),
             // Rect 4 (Yellow)
-            VectorNetworkSegment {
-                a: 12,
-                b: 13,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 13,
-                b: 14,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 14,
-                b: 15,
-                ta: None,
-                tb: None,
-            },
-            VectorNetworkSegment {
-                a: 15,
-                b: 12,
-                ta: None,
-                tb: None,
-            },
+            VectorNetworkSegment::ab(12, 13),
+            VectorNetworkSegment::ab(13, 14),
+            VectorNetworkSegment::ab(14, 15),
+            VectorNetworkSegment::ab(15, 12),
         ],
         regions: vec![
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::Solid(SolidPaint {
-                    color: CGColor(242, 80, 34, 255), // Microsoft Red #F25022
-                    opacity: 1.0,
-                })]),
+                fills: Some(vec![Paint::from(CGColor(242, 80, 34, 255))]),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![4, 5, 6, 7])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::Solid(SolidPaint {
-                    color: CGColor(127, 186, 0, 255), // Microsoft Green #7FBA00
-                    opacity: 1.0,
-                })]),
+                fills: Some(vec![Paint::from(CGColor(127, 186, 0, 255))]),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![8, 9, 10, 11])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::Solid(SolidPaint {
-                    color: CGColor(0, 164, 239, 255), // Microsoft Blue #00A4EF
-                    opacity: 1.0,
-                })]),
+                fills: Some(vec![Paint::from(CGColor(0, 164, 239, 255))]),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![12, 13, 14, 15])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::Solid(SolidPaint {
-                    color: CGColor(255, 185, 0, 255), // Microsoft Yellow #FFB900
-                    opacity: 1.0,
-                })]),
+                fills: Some(vec![Paint::from(CGColor(255, 185, 0, 255))]),
             },
         ],
     };
@@ -192,5 +100,12 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/vector_regions_fills.png", data.as_bytes()).unwrap();
+    std::fs::write(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/vector_regions_fills.png"
+        ),
+        data.as_bytes(),
+    )
+    .unwrap();
 }

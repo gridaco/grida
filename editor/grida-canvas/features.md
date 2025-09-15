@@ -21,6 +21,8 @@ This document lists all implemented features including the ones that are not yet
 | copy                    | copy the current selection              | `meta+c`                   | `ctrl+c`                | canvas |
 | paste                   | paste from the clipboard                | `meta+v`                   | `ctrl+v`                | canvas |
 | toggle bold             | toggle bold style                       | `meta+b`                   | `ctrl+b`                | canvas |
+| toggle italic           | toggle italic style                     | `meta+i`                   | `ctrl+i`                | canvas |
+| toggle underline        | toggle underline style                  | `meta+u`                   | `ctrl+u`                | canvas |
 | toggle active           | toggle active state for the selection   | `meta+shift+h`             | `ctrl+shift+h`          | canvas |
 | toggle locked           | toggle locked state for the selection   | `meta+shift+l`             | `ctrl+shift+l`          | canvas |
 | select parent           | select the parent of the current node   | `shift+enter`              | `shift+enter`           | canvas |
@@ -69,6 +71,7 @@ This document lists all implemented features including the ones that are not yet
 - [x] select all children (go inner) (`enter`)
 - [x] select all parents (go outer) (`shift+enter`)
 - [x] toggle bold (`meta+b`)
+- [x] toggle italic (`meta+i`)
 
 **Alignment**
 
@@ -129,7 +132,7 @@ This document lists all implemented features including the ones that are not yet
 - [x] Exiting vector edit mode automatically removes unused points from the vector network.
 - [x] Exiting text edit mode automatically deletes the text node when its content is empty.
 - [x] Escape in vector edit mode resets tool, clears selection, then exits the mode.
-- [x] Copy/paste vector network selections (pasting outside vector edit mode creates a new vector node; cut is not supported). Pasting back into the same vector node preserves the geometry's absolute position at the moment of copy.
+- [x] Copy/cut/paste vector network selections (pasting outside vector edit mode creates a new vector node. Pasting back into the same vector node preserves the geometry's absolute position at the moment of copy.)
 
 ### Controls
 

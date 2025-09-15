@@ -1,6 +1,6 @@
 import produce from "immer";
 import { Action, editor } from ".";
-import reducer from "./reducers";
+import reducer, { _internal_reducer } from "./reducers";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
 import cg from "@grida/cg";
@@ -11,17 +11,24 @@ import cmath from "@grida/cmath";
 import assert from "assert";
 import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
-import { TCanvasEventTargetDragGestureState } from "./action";
+import { InternalAction, TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
-import type { Grida2D } from "@grida/canvas-wasm";
+import type { Scene } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
+import * as google from "@grida/fonts/google";
+import type { FvarInstance } from "@grida/fonts/parse";
+
+import { DocumentFontManager } from "./font-manager";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
   CanvasWasmPDFExportInterfaceProvider,
   CanvasWasmSVGExportInterfaceProvider,
+  CanvasWasmVectorInterfaceProvider,
+  CanvasWasmFontManagerAgentInterfaceProvider,
+  CanvasWasmFontParserInterfaceProvider,
 } from "./backends/wasm";
 
 function resolveNumberChangeValue(
@@ -74,6 +81,8 @@ export class Editor
     editor.api.ICameraActions,
     editor.api.IEventTargetActions,
     editor.api.IFollowPluginActions,
+    editor.api.IVectorInterfaceActions,
+    editor.api.IFontLoaderActions,
     editor.api.IExportPluginActions
 {
   private readonly __pointer_move_throttle_ms: number = 30;
@@ -81,7 +90,11 @@ export class Editor
   private mstate: editor.state.IEditorState;
 
   readonly backend: editor.EditorContentRenderingBackend;
+
   readonly viewport: domapi.DOMViewportApi;
+
+  private _m_wasm_canvas_scene: Scene | null = null;
+
   _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
   get geometry() {
     return this._m_geometry;
@@ -103,6 +116,24 @@ export class Editor
     return this._m_exporter_svg;
   }
 
+  _m_vector: editor.api.IDocumentVectorInterfaceProvider | null = null;
+  private get vectorProvider() {
+    return this._m_vector;
+  }
+
+  _m_font_collection: editor.api.IDocumentFontCollectionInterfaceProvider | null =
+    null;
+  public get fontCollection() {
+    return this._m_font_collection;
+  }
+
+  _m_font_parser: editor.api.IDocumentFontParserInterfaceProvider | null = null;
+  public get fontParser() {
+    return this._m_font_parser;
+  }
+
+  private readonly _fontManager: DocumentFontManager;
+
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
@@ -119,7 +150,7 @@ export class Editor
   }: {
     backend: editor.EditorContentRenderingBackend;
     viewportElement: string | HTMLElement;
-    contentElement: string | HTMLElement | Grida2D;
+    contentElement: string | HTMLElement | Scene;
     geometry:
       | editor.api.IDocumentGeometryInterfaceProvider
       | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider);
@@ -132,6 +163,9 @@ export class Editor
       export_as_image?: WithEditorInstance<editor.api.IDocumentImageExportInterfaceProvider>;
       export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
       export_as_svg?: WithEditorInstance<editor.api.IDocumentSVGExportInterfaceProvider>;
+      vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
+      font_collection?: WithEditorInstance<editor.api.IDocumentFontCollectionInterfaceProvider>;
+      font_parser?: WithEditorInstance<editor.api.IDocumentFontParserInterfaceProvider>;
     };
   }) {
     this.backend = backend;
@@ -163,8 +197,46 @@ export class Editor
       );
     }
 
+    if (plugins?.vector) {
+      this._m_vector = resolveWithEditorInstance(this, plugins.vector);
+    }
+
+    if (plugins?.font_collection) {
+      this._m_font_collection = resolveWithEditorInstance(
+        this,
+        plugins.font_collection
+      );
+    }
+
+    if (plugins?.font_parser) {
+      this._m_font_parser = resolveWithEditorInstance(
+        this,
+        plugins.font_parser
+      );
+    }
+
     this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
+    this._fontManager = new DocumentFontManager(this);
+
+    this._do_legacy_warmup();
     onCreate?.(this);
+
+    this.log("editor instantiated");
+  }
+
+  /**
+   * legacy warmup - ideally, this should be called externally, or once internallu,
+   * but as we allow dynamic surface binding, this proccess shall be duplicated once surface binded as well.
+   */
+  private _do_legacy_warmup() {
+    // warm up
+    google.fetchWebfontList().then((webfontlist) => {
+      this.__internal_dispatch({
+        type: "__internal/webfonts#webfontList",
+        webfontlist,
+      });
+      void this.loadPlatformDefaultFonts();
+    });
   }
 
   private _locked: boolean = false;
@@ -219,7 +291,7 @@ export class Editor
     key: string | undefined = undefined,
     force: boolean = false
   ): number {
-    this.dispatch(
+    this.__internal_dispatch(
       {
         type: "__internal/reset",
         key,
@@ -230,8 +302,10 @@ export class Editor
     return this._tid;
   }
 
-  public bind(surface: Grida2D) {
+  public bind(surface: Scene) {
+    this.log("bind surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");
+    this._m_wasm_canvas_scene = surface;
     //
     this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
       this,
@@ -252,6 +326,20 @@ export class Editor
       this,
       surface
     );
+
+    this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
+
+    this._m_font_collection = new CanvasWasmFontManagerAgentInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._m_font_parser = new CanvasWasmFontParserInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._do_legacy_warmup();
   }
 
   public archive(): Blob {
@@ -355,6 +443,9 @@ export class Editor
       type: "insert",
       ...payload,
     });
+    for (const font of this.mstate.fontfaces) {
+      this.loadFontSync(font);
+    }
   }
 
   public __get_node_siblings(node_id: string): string[] {
@@ -380,10 +471,19 @@ export class Editor
     this.listeners.forEach((l) => l?.(this));
   }
 
+  private __internal_dispatch(action: InternalAction, force: boolean = false) {
+    if (this._locked && !force) return;
+    this.mstate = _internal_reducer(this.mstate, action);
+
+    this._tid++;
+    this.listeners.forEach((l) => l(this, action));
+  }
+
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
     this.mstate = reducer(this.mstate, action, {
       geometry: this,
+      vector: this,
       viewport: {
         width: this.viewport.size.width,
         height: this.viewport.size.height,
@@ -399,6 +499,7 @@ export class Editor
       (state, action) =>
         reducer(state, action, {
           geometry: this,
+          vector: this,
           viewport: {
             width: this.viewport.size.width,
             height: this.viewport.size.height,
@@ -500,9 +601,49 @@ export class Editor
     });
   }
 
+  private readonly images = new Map<string, grida.program.document.ImageRef>();
+  private async _experimental_createImage_for_wasm(
+    src: string
+  ): Promise<Readonly<grida.program.document.ImageRef>> {
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const type = blob.type;
+
+    const { width, height } = await new Promise<{
+      width: number;
+      height: number;
+    }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = reject;
+      img.src = src;
+    });
+
+    const hash = this._m_wasm_canvas_scene.addImage(bytes);
+    const url = `res://images/${hash}`;
+
+    const ref: grida.program.document.ImageRef = {
+      url,
+      width,
+      height,
+      bytes: bytes.byteLength,
+      type: type as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+    };
+
+    this.images.set(url, ref);
+
+    return ref;
+  }
+
   async createImage(
     src: string
   ): Promise<Readonly<grida.program.document.ImageRef>> {
+    if (this.backend === "canvas" && this._m_wasm_canvas_scene) {
+      return this._experimental_createImage_for_wasm(src);
+    }
+
     const res = await fetch(src);
     const blob = await res.blob();
     const bytes = await blob.arrayBuffer();
@@ -1114,6 +1255,10 @@ export class Editor
         text: "",
         width: "auto",
         height: "auto",
+        fill: {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+        },
       },
     });
 
@@ -1349,8 +1494,35 @@ export class Editor
     const target_ids =
       target === "selection" ? this.mstate.selection : [target];
     target_ids.forEach((node_id) => {
+      this.toggleNodeBold(node_id);
+    });
+  }
+
+  public toggleItalic(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.toggleNodeItalic(node_id);
+    });
+  }
+
+  public toggleUnderline(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
       this.dispatch({
-        type: "node/toggle/bold",
+        type: "node/toggle/underline",
+        node_id,
+      });
+    });
+  }
+
+  public toggleLineThrough(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.dispatch({
+        type: "node/toggle/line-through",
         node_id,
       });
     });
@@ -1480,8 +1652,73 @@ export class Editor
     return next;
   }
   toggleNodeBold(node_id: string) {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    if (node.type !== "text") return false;
+
+    const isBold = node.fontWeight === 700;
+    const next_weight = isBold ? 400 : 700;
+    const fontFamily = node.fontFamily;
+    if (!fontFamily) return false;
+
+    const match = this.selectFontStyle({
+      fontFamily: fontFamily,
+      fontWeight: next_weight,
+      fontStyleItalic: node.fontStyleItalic,
+    });
+
+    if (!match) {
+      this.log(
+        "toggleNodeBold: matching font face not found",
+        fontFamily,
+        next_weight,
+        node.fontStyleItalic
+      );
+      return false;
+    }
+
+    this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
+    return match.key.fontWeight as cg.NFontWeight;
+  }
+  toggleNodeItalic(node_id: string) {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    if (node.type !== "text") return false;
+
+    const next_italic = !node.fontStyleItalic;
+    const fontFamily = node.fontFamily;
+    if (!fontFamily) return false;
+
+    const match = this.selectFontStyle({
+      fontFamily: fontFamily,
+      fontWeight: node.fontWeight,
+      fontStyleItalic: next_italic,
+    });
+
+    if (!match) {
+      this.log(
+        "toggleNodeItalic: matching font face not found",
+        fontFamily,
+        next_italic,
+        node.fontWeight
+      );
+      return false;
+    }
+
+    this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
+    return true;
+  }
+  toggleNodeUnderline(node_id: string) {
     this.dispatch({
-      type: "node/toggle/bold",
+      type: "node/toggle/underline",
+      node_id: node_id,
+    });
+  }
+  toggleNodeLineThrough(node_id: string) {
+    this.dispatch({
+      type: "node/toggle/line-through",
       node_id: node_id,
     });
   }
@@ -1648,6 +1885,74 @@ export class Editor
     });
   }
 
+  autoSizeTextNode(node_id: string, axis: "width" | "height") {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.UnknwonNode;
+    if (node.type !== "text") return;
+
+    const prev = this.geometry.getNodeAbsoluteBoundingRect(node_id);
+    if (!prev) return;
+
+    const h_align = node.textAlign;
+    const v_align = node.textAlignVertical;
+
+    // FIXME: nested raf.
+    // why this is needed?
+    // currently, the api does not expose a way or contains value for textlayout size, not the box size.
+    // since we can't pre-calculate the delta, this is the dirty hack to first resize, then get the next size, shift delta.
+    // => need api/data that holds actual textlayout size (non box size)
+
+    requestAnimationFrame(() => {
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        [axis]: "auto",
+      });
+
+      requestAnimationFrame(() => {
+        const next = this.geometry.getNodeAbsoluteBoundingRect(node_id);
+        if (!next) return;
+
+        if (axis === "width") {
+          const diff = prev.width - next.width;
+          if (diff === 0) return;
+          let left = prev.x;
+          switch (h_align) {
+            case "right":
+              left = prev.x + diff;
+              break;
+            case "center":
+              left = prev.x + diff / 2;
+              break;
+            default:
+              return;
+          }
+          this.changeNodePositioning(node_id, {
+            left: cmath.quantize(left, 1),
+          });
+        } else {
+          const diff = prev.height - next.height;
+          if (diff === 0) return;
+          let top = prev.y;
+          switch (v_align) {
+            case "bottom":
+              top = prev.y + diff;
+              break;
+            case "center":
+              top = prev.y + diff / 2;
+              break;
+            default:
+              return;
+          }
+          this.changeNodePositioning(node_id, {
+            top: cmath.quantize(top, 1),
+          });
+        }
+      });
+    });
+  }
+
   changeNodeFill(
     node_id: string | string[],
     fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
@@ -1717,6 +2022,7 @@ export class Editor
       fit,
     });
   }
+
   changeNodeCornerRadius(node_id: string, cornerRadius: cg.CornerRadius) {
     if (typeof cornerRadius === "number") {
       // When a uniform corner radius is applied after using individual corner
@@ -1745,6 +2051,44 @@ export class Editor
       });
     }
   }
+  changeNodeCornerRadiusWithDelta(node_id: string, delta: number): void {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.UnknwonNode;
+    const allCornerRadius = {
+      cornerRadius: node.cornerRadius,
+      cornerRadiusTopLeft: node.cornerRadiusTopLeft,
+      cornerRadiusTopRight: node.cornerRadiusTopRight,
+      cornerRadiusBottomRight: node.cornerRadiusBottomRight,
+      cornerRadiusBottomLeft: node.cornerRadiusBottomLeft,
+    };
+
+    const next = {
+      ...allCornerRadius,
+      cornerRadius: allCornerRadius.cornerRadius
+        ? allCornerRadius.cornerRadius + delta
+        : undefined,
+      cornerRadiusTopLeft: allCornerRadius.cornerRadiusTopLeft
+        ? allCornerRadius.cornerRadiusTopLeft + delta
+        : undefined,
+      cornerRadiusTopRight: allCornerRadius.cornerRadiusTopRight
+        ? allCornerRadius.cornerRadiusTopRight + delta
+        : undefined,
+      cornerRadiusBottomRight: allCornerRadius.cornerRadiusBottomRight
+        ? allCornerRadius.cornerRadiusBottomRight + delta
+        : undefined,
+      cornerRadiusBottomLeft: allCornerRadius.cornerRadiusBottomLeft
+        ? allCornerRadius.cornerRadiusBottomLeft + delta
+        : undefined,
+    };
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      ...next,
+    });
+  }
+
   changeNodePointCount(node_id: editor.NodeID, pointCount: number): void {
     this.dispatch({
       type: "node/change/*",
@@ -1772,18 +2116,236 @@ export class Editor
     });
   }
   // text style
-  changeTextNodeFontFamily(node_id: string, fontFamily: string | undefined) {
-    this.dispatch({
-      type: "node/change/fontFamily",
-      node_id: node_id,
-      fontFamily,
-    });
+  async changeTextNodeFontFamilySync(
+    node_id: string,
+    fontFamily: string,
+    force = true
+  ) {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    assert(node, "node is not found");
+    assert(node.type === "text", "node is not a text node");
+
+    // load the font family & prepare
+    await this.loadFontSync({ family: fontFamily });
+    const ready = await this.getFontFamilyDetailsSync(fontFamily);
+
+    if (!ready) {
+      this.log(
+        "tried to change font family, but the font could not be parsed correctly",
+        fontFamily
+      );
+      return false;
+    }
+
+    const description: editor.api.FontStyleSelectDescription = { fontFamily };
+
+    if (!force) {
+      // when not force, try to keep the previous (current) font style
+      description.fontWeight = node.fontWeight;
+      description.fontStyleItalic = node.fontStyleItalic;
+      description.fontVariations = node.fontVariations;
+    }
+
+    const match = this.selectFontStyle(description);
+
+    if (match) {
+      this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
+      return true;
+    } else {
+      this.log(
+        "tried to change font family, but matching font face not found",
+        fontFamily,
+        description
+      );
+      return false;
+    }
   }
   changeTextNodeFontWeight(node_id: string, fontWeight: cg.NFontWeight) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       fontWeight,
+    });
+  }
+
+  changeTextNodeFontKerning(node_id: string, fontKerning: boolean) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontKerning,
+    });
+  }
+
+  changeTextNodeFontWidth(node_id: string, fontWidth: number) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontWidth,
+    });
+  }
+
+  changeTextNodeFontStyle(
+    node_id: string,
+    fontStyleDescription: editor.api.FontStyleChangeDescription
+  ) {
+    const { fontStyleKey } = fontStyleDescription;
+    const next_family = fontStyleKey.fontFamily;
+
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+
+    const prev: grida.program.nodes.i.IFontStyle = {
+      fontPostscriptName: node.fontPostscriptName,
+      fontWeight: node.fontWeight,
+      fontWidth: node.fontWidth,
+      fontKerning: node.fontKerning,
+      fontSize: node.fontSize,
+      fontVariations: node.fontVariations,
+      fontFeatures: node.fontFeatures,
+      fontOpticalSizing: node.fontOpticalSizing,
+      fontStyleItalic: node.fontStyleItalic,
+    };
+
+    const description = Object.assign(
+      {},
+      {
+        fontFamily: next_family,
+        fontInstancePostscriptName: fontStyleKey.fontPostscriptName,
+        fontStyleItalic: fontStyleKey.fontStyleItalic,
+        fontWeight: fontStyleKey.fontWeight,
+      } satisfies Partial<editor.api.FontStyleSelectDescription>,
+      Object.fromEntries(
+        Object.entries(fontStyleKey).filter(([_, v]) => v !== undefined)
+      )
+    ) as editor.api.FontStyleSelectDescription;
+
+    const match = this.selectFontStyle(description);
+
+    // reject
+    if (!match) {
+      this.log(
+        "matching font face not found",
+        fontStyleKey.fontFamily,
+        description
+      );
+      return;
+    }
+
+    const {
+      fontFamily: _fontFamily,
+      ...next
+    }: grida.program.nodes.i.IFontStyle = {
+      ...prev,
+      fontPostscriptName:
+        match.instance?.postscriptName || match.face.postscriptName,
+      // ----
+      // [high level variables]
+      fontWeight: match.instance?.coordinates?.wght ?? prev.fontWeight,
+      fontWidth: match.instance?.coordinates?.wdth ?? prev.fontWidth,
+      // TODO: should prevent optical sizing auto => fixed
+      // (if the next value === auto's expected value && prev value is auto, keep auto) => the change style does not change the size, so the logic can be even simpler.
+      fontOpticalSizing:
+        match.instance?.coordinates?.opsz ?? prev.fontOpticalSizing,
+      // ----
+      // Clear variable axes for non-variable fonts
+      fontVariations: match.isVariable
+        ? match.instance?.coordinates
+        : undefined,
+      // TODO: clean the invalid features by face change.
+      // fontFeatures: match.features,
+      fontStyleItalic: match.face.italic,
+    } as const;
+
+    this.log(
+      "changeTextNodeFontStyle",
+      "next",
+      next,
+      "match",
+      match,
+      "fontStyleKey",
+      fontStyleKey,
+      "description",
+      description
+    );
+
+    this.dispatch({
+      type: "node/change/fontFamily",
+      node_id: node_id,
+      fontFamily: next_family,
+    });
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      ...next,
+    });
+  }
+
+  changeTextNodeFontFeature(
+    node_id: editor.NodeID,
+    feature: cg.OpenTypeFeature,
+    value: boolean
+  ): void {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    const features = Object.assign({}, node.fontFeatures ?? {});
+    features[feature] = value;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontFeatures: features,
+    });
+  }
+  changeTextNodeFontVariation(
+    node_id: editor.NodeID,
+    key: string,
+    value: number
+  ): void {
+    const node = this.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    const variations = Object.assign({}, node.fontVariations ?? {});
+    variations[key] = value;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontVariations: variations,
+    });
+  }
+
+  changeTextNodeFontOpticalSizing(
+    node_id: editor.NodeID,
+    fontOpticalSizing: cg.OpticalSizing
+  ): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontOpticalSizing,
+    });
+  }
+
+  // FIXME: remove me
+  changeTextNodeFontVariationInstance(
+    node_id: editor.NodeID,
+    coordinates: Record<string, number>
+  ): void {
+    const { wght, ...rest } = coordinates;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontWeight:
+        typeof wght === "number" ? (wght as cg.NFontWeight) : undefined,
+      fontVariations:
+        Object.keys(rest).length > 0
+          ? (rest as Record<string, number>)
+          : undefined,
     });
   }
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
@@ -1811,6 +2373,7 @@ export class Editor
       textAlign,
     });
   }
+
   changeTextNodeTextAlignVertical(
     node_id: string,
     textAlignVertical: cg.TextAlignVertical
@@ -1819,6 +2382,75 @@ export class Editor
       type: "node/change/*",
       node_id: node_id,
       textAlignVertical,
+    });
+  }
+
+  changeTextNodeTextTransform(
+    node_id: string,
+    textTransform: cg.TextTransform
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textTransform,
+    });
+  }
+
+  changeTextNodeTextDecorationLine(
+    node_id: string,
+    textDecorationLine: cg.TextDecorationLine
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationLine: textDecorationLine,
+    });
+  }
+
+  changeTextNodeTextDecorationStyle(
+    node_id: string,
+    textDecorationStyle: cg.TextDecorationStyle
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationStyle,
+    });
+  }
+
+  changeTextNodeTextDecorationThickness(
+    node_id: string,
+    textDecorationThickness: cg.TextDecorationThicknessPercentage
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationThickness,
+    });
+  }
+
+  changeTextNodeTextDecorationColor(
+    node_id: string,
+    textDecorationColor: cg.TextDecorationColor
+  ) {
+    const value =
+      textDecorationColor === "currentcolor" ? null : textDecorationColor;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationColor: value,
+    });
+  }
+
+  changeTextNodeTextDecorationSkipInk(
+    node_id: string,
+    textDecorationSkipInk: cg.TextDecorationSkipInkFlag
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textDecorationSkipInk,
     });
   }
 
@@ -1872,11 +2504,46 @@ export class Editor
     }
   }
 
+  changeTextNodeWordSpacing(
+    node_id: string,
+    wordSpacing: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
+  ) {
+    try {
+      let value: number | undefined;
+      if (wordSpacing.value === undefined) {
+        value = undefined;
+      } else {
+        value = resolveNumberChangeValue(
+          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+          "wordSpacing",
+          wordSpacing as editor.api.NumberChange
+        );
+      }
+
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        wordSpacing: value,
+      });
+    } catch (e) {
+      reportError(e);
+      return;
+    }
+  }
+
   changeTextNodeMaxlength(node_id: string, maxLength: number | undefined) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       maxLength,
+    });
+  }
+
+  changeTextNodeMaxLines(node_id: string, maxLines: number | null): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      maxLines,
     });
   }
 
@@ -2416,12 +3083,16 @@ export class Editor
   }
 
   // #region drag resize handle
-  startCornerRadiusGesture(selection: string) {
+  startCornerRadiusGesture(
+    selection: string,
+    anchor?: cmath.IntercardinalDirection
+  ) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "corner-radius",
         node_id: selection,
+        anchor,
       },
     });
   }
@@ -2499,6 +3170,68 @@ export class Editor
   }
   // #endregion IFollowPluginActions implementation
 
+  // #region IVectorInterfaceActions implementation
+  toVectorNetwork(node_id: string): vn.VectorNetwork | null {
+    if (!this.vectorProvider) {
+      throw new Error("Vector interface provider is not bound");
+    }
+    return this.vectorProvider.toVectorNetwork(node_id);
+  }
+  // #endregion IVectorInterfaceActions implementation
+
+  // #region IFontLoaderActions implementation
+
+  async loadFontSync(font: { family: string }): Promise<void> {
+    if (!this.fontCollection) return;
+    await this.fontCollection.loadFont(font);
+  }
+
+  // FIXME: return typeface description
+  listLoadedFonts(): string[] {
+    if (!this.fontCollection) return [];
+    return this.fontCollection.listLoadedFonts();
+  }
+
+  async loadPlatformDefaultFonts(): Promise<void> {
+    const fonts: string[] = Array.from(
+      editor.config.fonts.DEFAULT_FONT_FALLBACK_SET
+    );
+
+    if (this.fontCollection) {
+      void Promise.all(fonts.map((family) => this.loadFontSync({ family })));
+      void this.fontCollection.setFallbackFonts(fonts);
+    }
+  }
+
+  getFontItem(fontFamily: string): google.GoogleWebFontListItem | null {
+    const item: google.GoogleWebFontListItem | undefined =
+      this.mstate.webfontlist.items.find((f) => f.family === fontFamily);
+    if (!item) return null;
+    return item;
+  }
+
+  /**
+   * Loads all font faces for a given family and extracts details once every
+   * face is available. This method fetches all font files first and then runs
+   * analysis to avoid progressive parsing.
+   */
+  async getFontFamilyDetailsSync(
+    fontFamily: string
+  ): Promise<editor.font_spec.UIFontFamily | null> {
+    return this._fontManager.parseFontFamily(fontFamily);
+  }
+
+  public selectFontStyle(description: editor.api.FontStyleSelectDescription): {
+    key: editor.font_spec.FontStyleKey;
+    face: editor.font_spec.UIFontFaceData;
+    instance: editor.font_spec.UIFontFaceInstance | null;
+    isVariable: boolean;
+  } | null {
+    return this._fontManager.selectFontStyle(description);
+  }
+
+  // #endregion IFontLoaderActions implementation
+
   // #region IExportPluginActions implementation
   exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
   exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array>;
@@ -2535,6 +3268,13 @@ export class Editor
     throw new Error("Not implemented");
   }
   // #endregion IExportPluginActions implementation
+
+  /**
+   * Dispose editor instance and cleanup resources
+   */
+  dispose() {
+    this.listeners.clear();
+  }
 }
 
 export class NodeProxy<T extends grida.program.nodes.Node> {

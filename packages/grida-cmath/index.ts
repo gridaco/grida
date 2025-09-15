@@ -170,6 +170,8 @@ namespace cmath {
     | "sw"
     | "nw";
 
+  export type IntercardinalDirection = "ne" | "se" | "sw" | "nw";
+
   /**
    * Quantizes a value to the nearest multiple of a specified step.
    *

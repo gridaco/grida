@@ -110,7 +110,10 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
     std::fs::write(
-        "goldens/progressive_blur_backdrop_multipass.png",
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/progressive_blur_backdrop_multipass.png"
+        ),
         data.as_bytes(),
     )
     .unwrap();

@@ -1,0 +1,26 @@
+import fs from "fs";
+import path from "path";
+import { Parser } from "../parse";
+
+describe("STAT parsing", () => {
+  it("extracts axis values and linked styles", () => {
+    const p = path.resolve(
+      __dirname,
+      "../../../fixtures/fonts/Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf"
+    );
+    const buf = fs.readFileSync(p).buffer;
+    const parser = new Parser(buf);
+    const stat = parser.stat();
+    const opsz = stat.axes.find((a) => a.tag === "opsz");
+    expect(
+      opsz?.values.map((v) =>
+        "value" in v ? v.value : (v as any).nominalValue
+      )
+    ).toEqual(expect.arrayContaining([8, 9, 10]));
+    const wght = stat.axes.find((a) => a.tag === "wght");
+    const boldMap = wght?.values.find(
+      (v) => "linkedValue" in v && v.linkedValue === 700
+    ) as any;
+    expect(boldMap?.value).toBe(400);
+  });
+});

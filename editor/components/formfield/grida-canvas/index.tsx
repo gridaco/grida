@@ -18,10 +18,11 @@ import {
   AutoInitialFitTransformer,
   ViewportRoot,
   EditorSurface,
+  useCurrentEditor,
+  useEditorState,
 } from "@/grida-canvas-react";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
-import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
@@ -43,7 +44,6 @@ import { useEditor } from "@/grida-canvas-react";
 
 export function GridaCanvasFormField() {
   useDisableSwipeBack();
-  const fonts = useGoogleFontsList();
   const instance = useEditor(
     editor.state.init({
       editable: true,
@@ -132,32 +132,38 @@ export function GridaCanvasFormField() {
                 <NodeHierarchyList />
               </SidebarSection>
             </SidebarRoot>
-            <SidebarRoot
-              side="right"
-              className="absolute right-4 top-4 bottom-4 h-full rounded-xl overflow-hidden bg-background z-50"
-            >
-              <div className="p-2">
-                <div className="flex items-center justify-end gap-2">
-                  <Zoom
-                    className={cn(
-                      WorkbenchUI.inputVariants({
-                        variant: "input",
-                        size: "xs",
-                      }),
-                      "w-auto"
-                    )}
-                  />
-                </div>
-              </div>
-              <hr />
-              <FontFamilyListProvider fonts={fonts}>
-                <Selection />
-              </FontFamilyListProvider>
-            </SidebarRoot>
+              <SidebarRight />
           </div>
         </StandaloneDocumentEditor>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SidebarRight() {
+  const editor = useCurrentEditor();
+  const fonts = useEditorState(editor, (state) => state.webfontlist.items);
+
+  return (
+    <SidebarRoot
+      side="right"
+      className="absolute right-4 top-4 bottom-4 h-full rounded-xl overflow-hidden bg-background z-50"
+    >
+      <div className="p-2">
+        <div className="flex items-center justify-end gap-2">
+          <Zoom
+            className={cn(
+              WorkbenchUI.inputVariants({ variant: "input", size: "xs" }),
+              "w-auto"
+            )}
+          />
+        </div>
+      </div>
+      <hr />
+      <FontFamilyListProvider fonts={fonts}>
+        <Selection />
+      </FontFamilyListProvider>
+    </SidebarRoot>
   );
 }
 

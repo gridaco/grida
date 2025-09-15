@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +21,6 @@ import {
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { __UNSAFE_CONSOLE } from "@/grida-canvas-react/devtools/__unsafe-console";
-import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import type grida from "@grida/schema";
 import { useCurrentEditor, useEditorState } from "../use-editor";
 import { useRecorder } from "../plugins/use-recorder";
@@ -184,7 +183,7 @@ function EditorPanel() {
     document,
     document_ctx,
     history,
-    googlefonts,
+    fontfaces: googlefonts,
     user_clipboard,
     ...state_without_document
   } = state;
@@ -219,17 +218,16 @@ function EditModePanel() {
 
 function FontsPanel() {
   const editor = useCurrentEditor();
-  const state = useEditorState(editor, (state) => state);
-  const fonts = useGoogleFontsList();
-  const { googlefonts } = state;
+  const { fontfaces, webfontlist } = useEditorState(editor, (state) => ({
+    webfontlist: state.webfontlist,
+    fontfaces: state.fontfaces,
+  }));
 
   return (
     <JSONContent
       value={{
-        // used fonts
-        fonts: googlefonts,
-        // all fonts
-        registry: fonts,
+        fontfaces,
+        webfontlist,
       }}
     />
   );

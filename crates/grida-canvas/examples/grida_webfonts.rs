@@ -3,8 +3,9 @@ use cg::helpers::webfont_helper::{find_font_files_by_family, load_webfonts_metad
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
-use cg::resource::FontLoader;
+use cg::resources::{load_font, FontMessage};
 use cg::window;
+use cg::window::application::HostEvent;
 use futures::future::join_all;
 use math2::transform::AffineTransform;
 
@@ -19,19 +20,22 @@ async fn demo_webfonts() -> Scene {
     let mut heading_node = nf.create_text_span_node();
     heading_node.name = Some("Heading".to_string());
     heading_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
-    heading_node.size = Size {
-        width: 800.0,
-        height: 100.0,
-    };
+    heading_node.width = Some(800.0);
     heading_node.text = "Web fonts demo".to_string();
-    heading_node.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
+    heading_node.text_style = TextStyleRec {
+        text_decoration: None,
         font_family: "Playfair Display".to_string(),
         font_size: 64.0,
-        font_weight: FontWeight::new(700), // Bold
-        letter_spacing: None,
-        italic: false,
-        line_height: None,
+        font_weight: FontWeight::BOLD700,
+        font_width: None,
+        font_kerning: true,
+        font_features: None,
+        font_variations: None,
+        font_optical_sizing: Default::default(),
+        letter_spacing: Default::default(),
+        word_spacing: Default::default(),
+        font_style_italic: false,
+        line_height: Default::default(),
         text_transform: TextTransform::None,
     };
     heading_node.text_align = TextAlign::Left;
@@ -41,19 +45,22 @@ async fn demo_webfonts() -> Scene {
     let mut description_node = nf.create_text_span_node();
     description_node.name = Some("Description".to_string());
     description_node.transform = AffineTransform::new(50.0, 120.0, 0.0);
-    description_node.size = Size {
-        width: 800.0,
-        height: 120.0,
-    };
+    description_node.width = Some(800.0);
     description_node.text = PARAGRAPH.to_string();
-    description_node.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
+    description_node.text_style = TextStyleRec {
+        text_decoration: None,
         font_family: "Playfair Display".to_string(),
         font_size: 14.0,
-        font_weight: FontWeight::new(400), // Regular
-        letter_spacing: None,
-        italic: false,
-        line_height: Some(1.5), // 1.5 line height for better readability
+        font_weight: Default::default(),
+        font_width: None,
+        font_kerning: true,
+        font_features: None,
+        font_variations: None,
+        font_optical_sizing: Default::default(),
+        letter_spacing: Default::default(),
+        word_spacing: Default::default(),
+        font_style_italic: false,
+        line_height: TextLineHeight::Fixed(1.5),
         text_transform: TextTransform::None,
     };
     description_node.text_align = TextAlign::Left;
@@ -85,19 +92,22 @@ async fn demo_webfonts() -> Scene {
         let mut text_node = nf.create_text_span_node();
         text_node.name = Some(format!("Albert Sans {}", variant));
         text_node.transform = AffineTransform::new(50.0, 280.0 + (i as f32 * 40.0), 0.0);
-        text_node.size = Size {
-            width: 800.0,
-            height: 40.0,
-        };
+        text_node.width = Some(800.0);
         text_node.text = format!("AlbertSans {}", variant);
-        text_node.text_style = TextStyle {
-            text_decoration: TextDecoration::None,
+        text_node.text_style = TextStyleRec {
+            text_decoration: None,
             font_family: "Albert Sans".to_string(),
             font_size: 24.0,
             font_weight: FontWeight::new(*weight),
-            letter_spacing: None,
-            italic: *is_italic,
-            line_height: None,
+            font_width: None,
+            font_kerning: true,
+            font_features: None,
+            font_variations: None,
+            font_optical_sizing: Default::default(),
+            letter_spacing: Default::default(),
+            word_spacing: Default::default(),
+            font_style_italic: *is_italic,
+            line_height: Default::default(),
             text_transform: TextTransform::None,
         };
         text_node.text_align = TextAlign::Left;
@@ -176,15 +186,12 @@ async fn main() {
         scene_for_window,
         move |_renderer, _img_tx, font_tx, proxy| {
             println!("📝 Initializing font loader...");
-            // No need to create a FontLoader here
-
-            // Load all fonts in the scene - non-blocking
             println!("🔄 Starting to load scene fonts in background...");
             let font_files = font_files_clone.clone();
             let font_tx = font_tx.clone();
             let proxy = proxy.clone();
             tokio::spawn(async move {
-                let font_loading_futures: Vec<_> = font_files
+                let futures: Vec<_> = font_files
                     .into_iter()
                     .map(|font_file| {
                         let font_tx = font_tx.clone();
@@ -195,15 +202,20 @@ async fn main() {
                             let url = font_file.url;
                             let postscript_name = font_file.postscript_name;
                             println!("Loading font: {} ({})", family, postscript_name);
-                            let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
-                            font_loader
-                                .load_font_with_style(&family, Some(&style), &url)
-                                .await;
-                            println!("✅ Font loaded: {} ({})", family, postscript_name);
+                            if let Ok(data) = load_font(&url).await {
+                                let msg = FontMessage {
+                                    family: family.clone(),
+                                    style: Some(style.clone()),
+                                    data: data.clone(),
+                                };
+                                let _ = font_tx.unbounded_send(msg.clone());
+                                let _ = proxy.send_event(HostEvent::FontLoaded(msg));
+                                println!("✅ Font loaded: {} ({})", family, postscript_name);
+                            }
                         }
                     })
                     .collect();
-                join_all(font_loading_futures).await;
+                join_all(futures).await;
                 println!("✅ Scene fonts loading completed in background");
                 println!("\n🔍 Font Repository Information:");
                 println!("================================");

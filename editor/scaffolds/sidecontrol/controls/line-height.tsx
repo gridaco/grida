@@ -1,6 +1,6 @@
 import type { TMixed } from "./utils/types";
 import type { editor } from "@/grida-canvas";
-import InputPropertyNumber from "../ui/number";
+import InputPropertyPercentage from "../ui/percentage";
 
 export function LineHeightControl({
   value,
@@ -12,13 +12,13 @@ export function LineHeightControl({
   onValueCommit?: (change: editor.api.NumberChange) => void;
 }) {
   return (
-    <InputPropertyNumber
+    <InputPropertyPercentage
       mode="auto"
       type="number"
       value={value}
       placeholder="inherit"
-      min={1}
-      step={1}
+      min={0}
+      step={0.01}
       onValueChange={onValueChange}
       onValueCommit={onValueCommit}
     />
