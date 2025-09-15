@@ -664,13 +664,15 @@ export namespace cg {
       Partial<LinearGradientPaint> &
       Partial<RadialGradientPaint> &
       Partial<SweepGradientPaint> &
-      Partial<DiamondGradientPaint>,
+      Partial<DiamondGradientPaint> &
+      Partial<ImagePaint>,
     "type"
   > & { type: Paint["type"] };
 
   export type SolidPaint = {
     type: "solid";
     color: cg.RGBA8888;
+    blendMode?: cg.BlendMode;
   };
 
   export type GradientPaint =
@@ -692,25 +694,48 @@ export namespace cg {
     type: "linear_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
+    blendMode?: cg.BlendMode;
   };
 
   export type RadialGradientPaint = {
     type: "radial_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
+    blendMode?: cg.BlendMode;
   };
 
   export type SweepGradientPaint = {
     type: "sweep_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
+    blendMode?: cg.BlendMode;
   };
 
   export type DiamondGradientPaint = {
     type: "diamond_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
+    blendMode?: cg.BlendMode;
   };
+
+  export type ImagePaint = {
+    type: "image";
+    src?: string;
+    fit?: BoxFit;
+    transform?: AffineTransform;
+    filters?: ImageFilters;
+    blendMode?: cg.BlendMode;
+  };
+
+  export interface ImageFilters {
+    exposure?: number;
+    contrast?: number;
+    saturation?: number;
+    temperature?: number;
+    tint?: number;
+    highlights?: number;
+    shadows?: number;
+  }
 
   export type GradientStop = {
     /**

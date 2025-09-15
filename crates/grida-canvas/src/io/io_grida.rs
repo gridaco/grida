@@ -44,30 +44,42 @@ impl From<JSONGradientStop> for GradientStop {
 #[serde(tag = "type")]
 pub enum JSONPaint {
     #[serde(rename = "solid")]
-    Solid { color: Option<JSONRGBA> },
+    Solid {
+        color: Option<JSONRGBA>,
+        #[serde(default)]
+        blend_mode: BlendMode,
+    },
     #[serde(rename = "linear_gradient")]
     LinearGradient {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default)]
+        blend_mode: BlendMode,
     },
     #[serde(rename = "radial_gradient")]
     RadialGradient {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default)]
+        blend_mode: BlendMode,
     },
     #[serde(rename = "diamond_gradient")]
     DiamondGradient {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default)]
+        blend_mode: BlendMode,
     },
     #[serde(rename = "sweep_gradient")]
     SweepGradient {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default)]
+        blend_mode: BlendMode,
     },
     #[serde(rename = "image")]
     Image {
@@ -75,6 +87,8 @@ pub enum JSONPaint {
         transform: Option<[[f32; 3]; 2]>,
         #[serde(default)]
         fit: CSSObjectFit,
+        #[serde(default)]
+        blend_mode: BlendMode,
     },
 }
 
@@ -149,13 +163,16 @@ impl From<JSONFeShadow> for FeShadow {
 impl From<Option<JSONPaint>> for Paint {
     fn from(fill: Option<JSONPaint>) -> Self {
         match fill {
-            Some(JSONPaint::Solid { color }) => Paint::Solid(SolidPaint {
+            Some(JSONPaint::Solid { color, blend_mode }) => Paint::Solid(SolidPaint {
                 color: color.map_or(CGColor::TRANSPARENT, |c| c.into()),
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode,
             }),
             Some(JSONPaint::LinearGradient {
-                transform, stops, ..
+                transform,
+                stops,
+                blend_mode,
+                ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::LinearGradient(LinearGradientPaint {
@@ -164,11 +181,14 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
-                    blend_mode: BlendMode::default(),
+                    blend_mode,
                 })
             }
             Some(JSONPaint::RadialGradient {
-                transform, stops, ..
+                transform,
+                stops,
+                blend_mode,
+                ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::RadialGradient(RadialGradientPaint {
@@ -177,11 +197,14 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
-                    blend_mode: BlendMode::default(),
+                    blend_mode,
                 })
             }
             Some(JSONPaint::DiamondGradient {
-                transform, stops, ..
+                transform,
+                stops,
+                blend_mode,
+                ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::DiamondGradient(DiamondGradientPaint {
@@ -190,11 +213,14 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
-                    blend_mode: BlendMode::default(),
+                    blend_mode,
                 })
             }
             Some(JSONPaint::SweepGradient {
-                transform, stops, ..
+                transform,
+                stops,
+                blend_mode,
+                ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::SweepGradient(SweepGradientPaint {
@@ -203,13 +229,14 @@ impl From<Option<JSONPaint>> for Paint {
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity: 1.0,
-                    blend_mode: BlendMode::default(),
+                    blend_mode,
                 })
             }
             Some(JSONPaint::Image {
                 hash,
                 transform,
                 fit,
+                blend_mode,
             }) => Paint::Image(ImagePaint {
                 hash,
                 transform: transform
@@ -217,7 +244,7 @@ impl From<Option<JSONPaint>> for Paint {
                     .unwrap_or_else(AffineTransform::identity),
                 fit: fit.into(),
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode,
             }),
             None => Paint::Solid(SolidPaint {
                 color: CGColor::TRANSPARENT,
@@ -942,6 +969,7 @@ impl From<JSONImageNode> for Node {
                 hash: h,
                 transform: t,
                 fit,
+                blend_mode,
             }) => ImagePaint {
                 hash: if h.is_empty() { hash.clone() } else { h },
                 transform: t
@@ -949,7 +977,7 @@ impl From<JSONImageNode> for Node {
                     .unwrap_or_else(AffineTransform::identity),
                 fit: fit.into(),
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode,
             },
             _ => ImagePaint {
                 hash: hash.clone(),
