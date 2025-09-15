@@ -602,35 +602,23 @@ export class Editor
   }
 
   private readonly images = new Map<string, grida.program.document.ImageRef>();
-  private async _experimental_createImage_for_wasm(
-    src: string
-  ): Promise<Readonly<grida.program.document.ImageRef>> {
+  private _experimental_createImage_for_wasm(
+    data: Uint8Array
+  ): Readonly<grida.program.document.ImageRef> {
     assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
-    const res = await fetch(src);
-    const blob = await res.blob();
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    const type = blob.type;
 
-    const { width, height } = await new Promise<{
-      width: number;
-      height: number;
-    }>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve({ width: img.width, height: img.height });
-      img.onerror = reject;
-      img.src = src;
-    });
-
-    const result = this._m_wasm_canvas_scene.addImage(bytes);
+    const result = this._m_wasm_canvas_scene.addImage(data);
     if (!result) throw new Error("addImage failed");
     const { hash, url } = result;
 
     const ref: grida.program.document.ImageRef = {
       url,
-      width,
-      height,
-      bytes: bytes.byteLength,
-      type: type as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+      // TODO: the width/height will be returned from the wasm in the future.
+      width: 100,
+      height: 100,
+      bytes: data.byteLength,
+      // TODO: the type will be returned from the wasm in the future.
+      type: "image/png",
     };
 
     this.images.set(url, ref);
@@ -638,17 +626,28 @@ export class Editor
     return ref;
   }
 
-  async createImage(
+  async createImageAsync(
     src: string
   ): Promise<Readonly<grida.program.document.ImageRef>> {
-    if (this.backend === "canvas" && this._m_wasm_canvas_scene) {
-      return this._experimental_createImage_for_wasm(src);
-    }
-
     const res = await fetch(src);
     const blob = await res.blob();
     const bytes = await blob.arrayBuffer();
     const type = blob.type;
+
+    return this.createImage(new Uint8Array(bytes), src, type);
+  }
+
+  async createImage(
+    data: Uint8Array,
+    url?: string,
+    type?: string
+  ): Promise<Readonly<grida.program.document.ImageRef>> {
+    if (this.backend === "canvas" && this._m_wasm_canvas_scene) {
+      return this._experimental_createImage_for_wasm(data);
+    }
+
+    // For DOM backend, we need to get dimensions
+    const imageUrl = url || URL.createObjectURL(new Blob([data]));
 
     const { width, height } = await new Promise<{
       width: number;
@@ -657,19 +656,21 @@ export class Editor
       const img = new Image();
       img.onload = () => resolve({ width: img.width, height: img.height });
       img.onerror = reject;
-      img.src = src;
+      img.src = imageUrl;
     });
 
     const ref: grida.program.document.ImageRef = {
-      url: src,
+      url: url || imageUrl,
       width,
       height,
-      bytes: bytes.byteLength,
-      type: type as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+      bytes: data.byteLength,
+      type:
+        (type as "image/png" | "image/jpeg" | "image/webp" | "image/gif") ||
+        "image/png",
     };
 
     this.reduce((state) => {
-      state.document.images[src] = ref;
+      state.document.images[ref.url] = ref;
       return state;
     });
 

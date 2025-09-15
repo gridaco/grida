@@ -2392,11 +2392,20 @@ export namespace editor.api {
     ): void;
 
     //
+
+    /**
+     * creates an image (data) from the given data, registers it to the document
+     * @param data
+     */
+    createImage(
+      data: Uint8Array | File
+    ): Promise<grida.program.document.ImageRef>;
+
     /**
      * creates an image (data) from the given src, registers it to the document
      * @param src
      */
-    createImage(src: string): Promise<grida.program.document.ImageRef>;
+    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
 
     //
     setTool(tool: editor.state.ToolMode): void;

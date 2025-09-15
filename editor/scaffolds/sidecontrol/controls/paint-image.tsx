@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { cn } from "@/components/lib/utils";
 import { Slider } from "./utils/slider";
 import { Button } from "@/components/ui-editor/button";
@@ -6,8 +6,65 @@ import { BoxFitControl } from "./box-fit";
 import { RotateCwIcon, UploadIcon } from "lucide-react";
 import { ImageIcon } from "@radix-ui/react-icons";
 import { useFilePicker } from "use-file-picker";
+import { useCurrentEditor } from "@/grida-canvas-react/use-editor";
 import cg from "@grida/cg";
 import cmath from "@grida/cmath";
+
+/**
+ * Custom hook for handling image upload functionality
+ */
+function useImageUpload(onImageUploaded: (imageUrl: string) => void) {
+  const [isUploading, setIsUploading] = useState(false);
+  const editor = useCurrentEditor();
+
+  const { openFilePicker, plainFiles } = useFilePicker({
+    accept: "image/png,image/jpeg,image/webp,image/gif",
+    multiple: false,
+  });
+
+  // Handle file upload when files change
+  useEffect(() => {
+    if (plainFiles.length > 0) {
+      const file = plainFiles[0];
+      setIsUploading(true);
+
+      // Convert File to Uint8Array
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const arrayBuffer = reader.result as ArrayBuffer;
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          // Create image in editor
+          const imageRef = await editor.createImage(
+            uint8Array,
+            undefined,
+            file.type
+          );
+
+          // Call the callback with the new image URL
+          onImageUploaded(imageRef.url);
+        } catch (error) {
+          console.error("Failed to create image:", error);
+        } finally {
+          setIsUploading(false);
+        }
+      };
+
+      reader.onerror = () => {
+        console.error("Failed to read file");
+        setIsUploading(false);
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+  }, [plainFiles, editor, onImageUploaded]);
+
+  return {
+    openFilePicker,
+    isUploading,
+  };
+}
 
 const IMAGE_FILTERS = [
   { key: "exposure", label: "Exposure" },
@@ -29,10 +86,29 @@ export function ImagePaintControl({
   onValueChange,
 }: ImagePaintControlProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const { openFilePicker } = useFilePicker({
-    accept: "image/*",
-    multiple: false,
-  });
+
+  // Handle image upload with the new hook
+  const handleImageUploaded = useCallback(
+    (imageUrl: string) => {
+      onValueChange?.({
+        type: "image",
+        src: imageUrl,
+        fit: value?.fit || "cover",
+        transform: value?.transform || cmath.transform.identity,
+        filters: value?.filters,
+        blendMode: value?.blendMode || "normal",
+      });
+    },
+    [
+      onValueChange,
+      value?.fit,
+      value?.transform,
+      value?.filters,
+      value?.blendMode,
+    ]
+  );
+
+  const { openFilePicker, isUploading } = useImageUpload(handleImageUploaded);
 
   const handleImageUpload = useCallback(() => {
     openFilePicker();
@@ -162,9 +238,14 @@ export function ImagePaintControl({
             isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
           )}
         >
-          <Button onClick={handleImageUpload} size="xs" className="w-full">
+          <Button
+            onClick={handleImageUpload}
+            size="xs"
+            className="w-full"
+            disabled={isUploading}
+          >
             <UploadIcon className="w-4 h-4 mr-2" />
-            Upload from computer
+            {isUploading ? "Uploading..." : "Upload from computer"}
           </Button>
           {/* <Button
               onClick={() => {

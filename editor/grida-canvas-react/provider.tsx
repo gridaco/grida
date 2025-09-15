@@ -732,8 +732,8 @@ export function useDataTransferEventTarget() {
       );
 
       // TODO: uploader is not implemented. use uploader configured by user.
-      const url = URL.createObjectURL(file);
-      const image = await instance.createImage(url);
+      const bytes = await file.arrayBuffer();
+      const image = await instance.createImage(new Uint8Array(bytes));
       const node = instance.createImageNode(image);
       node.$.position = "absolute";
       node.$.name = name;
