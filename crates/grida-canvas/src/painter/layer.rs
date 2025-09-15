@@ -169,6 +169,7 @@ pub struct PainterPictureVectorLayer {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
+    pub corner_radius: f32,
 }
 
 /// Flat list of [`PainterPictureLayer`] entries.
@@ -564,6 +565,7 @@ impl LayerList {
                         stroke_width: n.stroke_width,
                         stroke_align: n.get_stroke_align(),
                         stroke_width_profile: n.stroke_width_profile.clone(),
+                        corner_radius: n.corner_radius,
                     }))
                 }
                 Node::Image(n) => {

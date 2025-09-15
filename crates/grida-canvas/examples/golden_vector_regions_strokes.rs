@@ -64,7 +64,7 @@ fn main() {
             paints: vec![Paint::from(stroke_color)],
             width_profile: None,
         };
-        painter.draw(&network, &[], Some(&options));
+        painter.draw(&network, &[], Some(&options), 0.0);
         canvas.restore();
     }
 

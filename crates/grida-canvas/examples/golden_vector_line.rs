@@ -50,7 +50,7 @@ fn main() {
 
         // Use VNPainter to render the line
         let painter = VNPainter::new(canvas);
-        painter.draw(&line, &[], Some(&stroke_options));
+        painter.draw(&line, &[], Some(&stroke_options), 0.0);
     }
 
     let image = surface.image_snapshot();

@@ -210,7 +210,7 @@ fn scenario_geist(canvas: &sk::Canvas, y_offset: f32) -> f32 {
                 paints: vec![Paint::from(CGColor::from_rgba(0, 0, 0, 100))],
                 width_profile: None,
             };
-            painter.draw(&vn, &[fill], Some(&stroke));
+            painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
         current_y += 70.0;
     }
@@ -297,7 +297,7 @@ fn scenario_roboto_flex(canvas: &sk::Canvas, y_offset: f32) -> f32 {
                 paints: vec![Paint::from(CGColor::from_rgba(0, 0, 0, 100))],
                 width_profile: None,
             };
-            painter.draw(&vn, &[fill], Some(&stroke));
+            painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
         current_y += 65.0;
     }
@@ -401,7 +401,7 @@ fn scenario_multiscript(canvas: &sk::Canvas, y_offset: f32) -> f32 {
                 paints: vec![Paint::from(CGColor::from_rgba(0, 0, 0, 80))],
                 width_profile: None,
             };
-            painter.draw(&vn, &[fill], Some(&stroke));
+            painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
         current_y += 55.0;
     }
@@ -477,7 +477,7 @@ fn scenario_variable_fonts(canvas: &sk::Canvas, y_offset: f32) -> f32 {
                 paints: vec![Paint::from(CGColor::from_rgba(0, 0, 0, 120))],
                 width_profile: None,
             };
-            painter.draw(&vn, &[fill], Some(&stroke));
+            painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
         current_y += 60.0;
     }

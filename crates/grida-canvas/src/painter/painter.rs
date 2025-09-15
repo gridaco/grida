@@ -635,6 +635,7 @@ impl<'a> Painter<'a> {
                                     &vector_layer.vector,
                                     &vector_layer.fills,
                                     stroke_options.as_ref(),
+                                    vector_layer.corner_radius,
                                 );
                             });
                         };

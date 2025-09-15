@@ -94,7 +94,7 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     let painter = VNPainter::new(canvas);
-    painter.draw(&network, &[], None);
+    painter.draw(&network, &[], None, 0.0);
 
     let image = surface.image_snapshot();
     let data = image
