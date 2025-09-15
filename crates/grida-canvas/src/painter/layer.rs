@@ -260,7 +260,7 @@ impl LayerList {
                 Node::BooleanOperation(n) => {
                     let opacity = parent_opacity * n.opacity;
                     if let Some(shape) = boolean_operation_shape(n, repo, scene_cache.geometry()) {
-                        let stroke_path = if n.stroke.is_some() && n.stroke_width > 0.0 {
+                        let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
                             Some(stroke_geometry(
                                 &shape.to_path(),
                                 n.stroke_width,
@@ -281,8 +281,8 @@ impl LayerList {
                             },
                             shape,
                             effects: n.effects.clone(),
-                            strokes: n.stroke.clone().into_iter().collect(),
-                            fills: n.fill.clone().into_iter().collect(),
+                            strokes: n.strokes.clone(),
+                            fills: n.fills.clone(),
                             stroke_path,
                         }));
                     } else {
@@ -540,8 +540,8 @@ impl LayerList {
                         },
                         shape,
                         effects: n.effects.clone(),
-                        strokes: n.stroke.clone().into_iter().collect(),
-                        fills: n.fill.clone().into_iter().collect(),
+                        strokes: n.strokes.clone(),
+                        fills: n.fills.clone(),
                         stroke_path,
                     }))
                 }
@@ -559,7 +559,7 @@ impl LayerList {
                         shape,
                         effects: n.effects.clone(),
                         strokes: n.strokes.clone(),
-                        fills: n.fill.clone().into_iter().collect(),
+                        fills: n.fills.clone(),
                         vector: n.network.clone(),
                         stroke_width: n.stroke_width,
                         stroke_align: n.get_stroke_align(),
@@ -589,8 +589,8 @@ impl LayerList {
                         },
                         shape,
                         effects: n.effects.clone(),
-                        strokes: n.stroke.clone().into_iter().collect(),
-                        fills: vec![Paint::Image(n.fill.clone())],
+                        strokes: n.strokes.clone(),
+                        fills: vec![Paint::Image(n.fill.clone())], // TODO: Optimize - avoid clone if possible
                         stroke_path,
                     }))
                 }

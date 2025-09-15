@@ -30,7 +30,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("triangle open".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x, base_y, 0.0),
-                fill: None,
+                fills: vec![],
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -60,7 +60,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("triangle closed".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x + spacing * 1.0, base_y, 0.0),
-                fill: None,
+                fills: vec![],
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -92,7 +92,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("Vector 2".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x + spacing * 2.0, base_y, 0.0),
-                fill: None,
+                fills: vec![],
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0), (100.0, 0.0)],
                     segments: vec![
@@ -123,7 +123,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("Vector 3".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x + spacing * 3.0, base_y, 0.0),
-                fill: None,
+                fills: vec![],
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (0.0, 100.0), (100.0, 100.0)],
                     segments: vec![
@@ -155,7 +155,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("Vector 1_5".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x + spacing * 4.0, base_y, 0.0),
-                fill: None,
+                fills: vec![],
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (0.0, 100.0), (100.0, 100.0)],
                     segments: vec![
@@ -196,7 +196,7 @@ async fn demo_vectors() -> Scene {
                     base_y + spacing * 1.0,
                     0.0,
                 ),
-                fill: None,
+                fills: vec![],
                 network: VectorNetwork {
                     vertices: vec![(0.0, 50.0), (100.0, 50.0)],
                     segments: vec![VectorNetworkSegment {
@@ -233,7 +233,7 @@ async fn demo_vectors() -> Scene {
                     base_y + spacing * 1.0,
                     0.0,
                 ),
-                fill: None,
+                fills: vec![],
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0)],
                     segments: vec![VectorNetworkSegment::ab(0, 1)],
@@ -268,7 +268,7 @@ async fn demo_vectors() -> Scene {
                     base_y + spacing * 2.0,
                     0.0,
                 ),
-                fill: Some(Paint::from(CGColor(255, 100, 100, 255))),
+                fills: vec![Paint::from(CGColor(255, 100, 100, 255))],
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -304,7 +304,7 @@ async fn demo_vectors() -> Scene {
                     base_y + spacing * 2.0,
                     0.0,
                 ),
-                fill: Some(Paint::from(CGColor(100, 255, 100, 255))),
+                fills: vec![Paint::from(CGColor(100, 255, 100, 255))],
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![

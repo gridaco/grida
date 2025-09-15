@@ -704,21 +704,16 @@ impl<'a> NodePainter<'a> {
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
-                            // convert the image itself to a paint
-                            let image_paint = Paint::Image(ImagePaint {
-                                image: node.image.clone(),
-                                opacity: node.opacity,
-                                transform: AffineTransform::identity(),
-                                fit: math2::box_fit::BoxFit::Cover,
-                                blend_mode: BlendMode::default(),
-                            });
-
+                            // Use the single image fill directly - aligns with web development patterns
+                            // where <img> elements have one image source
+                            // Create the Paint wrapper once and reuse the reference
+                            let image_paint = Paint::Image(node.fill.clone());
                             self.painter
                                 .draw_fills(&shape, std::slice::from_ref(&image_paint));
-                            if let Some(stroke) = &node.stroke {
+                            if !node.strokes.is_empty() {
                                 self.painter.draw_strokes(
                                     &shape,
-                                    std::slice::from_ref(stroke),
+                                    &node.strokes,
                                     node.stroke_width,
                                     node.stroke_align,
                                     node.stroke_dash_array.as_ref(),
@@ -781,8 +776,8 @@ impl<'a> NodePainter<'a> {
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
-                            if let Some(fill) = &node.fill {
-                                self.painter.draw_fills(&shape, std::slice::from_ref(fill));
+                            if !node.fills.is_empty() {
+                                self.painter.draw_fills(&shape, &node.fills);
                             }
                             self.painter.draw_strokes(
                                 &shape,
@@ -806,13 +801,13 @@ impl<'a> NodePainter<'a> {
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
-                            if let Some(fill) = &node.fill {
-                                self.painter.draw_fills(&shape, std::slice::from_ref(fill));
+                            if !node.fills.is_empty() {
+                                self.painter.draw_fills(&shape, &node.fills);
                             }
-                            if let Some(stroke) = &node.stroke {
+                            if !node.strokes.is_empty() {
                                 self.painter.draw_strokes(
                                     &shape,
-                                    std::slice::from_ref(stroke),
+                                    &node.strokes,
                                     node.stroke_width,
                                     node.stroke_align,
                                     node.stroke_dash_array.as_ref(),
@@ -1035,13 +1030,13 @@ impl<'a> NodePainter<'a> {
                     .draw_shape_with_effects(&node.effects, &shape, || {
                         self.painter.with_opacity(node.opacity, || {
                             self.painter.with_blendmode(node.blend_mode, || {
-                                if let Some(fill) = &node.fill {
-                                    self.painter.draw_fills(&shape, std::slice::from_ref(fill));
+                                if !node.fills.is_empty() {
+                                    self.painter.draw_fills(&shape, &node.fills);
                                 }
-                                if let Some(stroke) = &node.stroke {
+                                if !node.strokes.is_empty() {
                                     self.painter.draw_strokes(
                                         &shape,
-                                        std::slice::from_ref(stroke),
+                                        &node.strokes,
                                         node.stroke_width,
                                         node.stroke_align,
                                         node.stroke_dash_array.as_ref(),

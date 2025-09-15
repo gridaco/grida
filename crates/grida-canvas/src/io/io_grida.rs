@@ -301,16 +301,20 @@ pub fn merge_paints(paint: Option<JSONPaint>, paints: Option<Vec<JSONPaint>>) ->
             if paints_vec.is_empty() {
                 vec![Paint::from(Some(p))]
             } else {
+                // Optimize: avoid repeated Paint::from() calls by using collect with map
                 paints_vec
                     .into_iter()
                     .map(|p| Paint::from(Some(p)))
                     .collect()
             }
         }
-        (None, Some(paints_vec)) => paints_vec
-            .into_iter()
-            .map(|p| Paint::from(Some(p)))
-            .collect(),
+        (None, Some(paints_vec)) => {
+            // Optimize: avoid repeated Paint::from() calls by using collect with map
+            paints_vec
+                .into_iter()
+                .map(|p| Paint::from(Some(p)))
+                .collect()
+        }
     }
 }
 
@@ -1021,9 +1025,7 @@ impl From<JSONImageNode> for Node {
                 node.base.corner_radius_bottom_left,
             ),
             fill: fill.clone(),
-            stroke: merge_paints(node.base.stroke, node.base.strokes)
-                .into_iter()
-                .next(),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
@@ -1130,9 +1132,7 @@ impl From<JSONSVGPathNode> for Node {
             name: node.base.name,
             active: node.base.active,
             transform,
-            fill: merge_paints(node.base.fill, node.base.fills)
-                .into_iter()
-                .next(),
+            fills: merge_paints(node.base.fill, node.base.fills),
             data: node.paths.map_or("".to_string(), |paths| {
                 paths
                     .iter()
@@ -1140,7 +1140,7 @@ impl From<JSONSVGPathNode> for Node {
                     .collect::<Vec<String>>()
                     .join(" ")
             }),
-            stroke: None,
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: 0.0,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
@@ -1212,9 +1212,7 @@ impl From<JSONVectorNode> for Node {
             transform,
             network,
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
-            fill: merge_paints(node.base.fill, node.base.fills)
-                .into_iter()
-                .next(),
+            fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
@@ -1250,12 +1248,8 @@ impl From<JSONBooleanOperationNode> for Node {
             op: node.op,
             corner_radius: node.base.corner_radius,
             children: node.children,
-            fill: merge_paints(node.base.fill, node.base.fills)
-                .into_iter()
-                .next(),
-            stroke: merge_paints(node.base.stroke, node.base.strokes)
-                .into_iter()
-                .next(),
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,

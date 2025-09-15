@@ -598,6 +598,15 @@ impl LineNodeRec {
     }
 }
 
+/// A node representing an image element, similar to HTML `<img>`.
+///
+/// Unlike other shape nodes, ImageNodeRec intentionally supports only a single image fill
+/// to align with web development patterns where `<img>` elements have a single image source,
+/// rather than using images as backgrounds for `<div>` elements (which would support multiple fills).
+///
+/// This design choice reflects the common distinction in web development:
+/// - `<img>` = single image content (what this node represents)
+/// - `<div style="background-image: ...">` = multiple background layers (use other shape nodes)
 #[derive(Debug, Clone)]
 pub struct ImageNodeRec {
     pub id: NodeId,
@@ -606,8 +615,10 @@ pub struct ImageNodeRec {
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
+    /// Single image fill - intentionally not supporting multiple fills to align with
+    /// web development patterns where `<img>` elements have one image source.
     pub fill: ImagePaint,
-    pub stroke: Option<Paint>,
+    pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -615,6 +626,16 @@ pub struct ImageNodeRec {
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
     pub image: ResourceRef,
+}
+
+impl NodeStrokesMixin for ImageNodeRec {
+    fn set_stroke(&mut self, stroke: Paint) {
+        self.strokes = vec![stroke];
+    }
+
+    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+        self.strokes = strokes;
+    }
 }
 
 impl ImageNodeRec {
@@ -648,7 +669,7 @@ impl NodeGeometryMixin for ImageNodeRec {
     }
 
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.stroke.as_ref().map_or(false, |s| s.opacity() > 0.0)
+        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
@@ -797,14 +818,34 @@ pub struct BooleanPathOperationNodeRec {
     pub op: BooleanPathOperation,
     pub corner_radius: Option<f32>,
     pub children: Vec<NodeId>,
-    pub fill: Option<Paint>,
-    pub stroke: Option<Paint>,
+    pub fills: Vec<Paint>,
+    pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+}
+
+impl NodeFillsMixin for BooleanPathOperationNodeRec {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
+}
+
+impl NodeStrokesMixin for BooleanPathOperationNodeRec {
+    fn set_stroke(&mut self, stroke: Paint) {
+        self.strokes = vec![stroke];
+    }
+
+    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+        self.strokes = strokes;
+    }
 }
 
 ///
@@ -819,8 +860,8 @@ pub struct VectorNodeRec {
     pub network: VectorNetwork,
     /// The corner radius of the vector node.
     pub corner_radius: f32,
-    /// The fill paint of the vector node. (currently only one fill is supported)
-    pub fill: Option<Paint>,
+    /// The fill paints of the vector node.
+    pub fills: Vec<Paint>,
     pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub stroke_width_profile: Option<cg::varwidth::VarWidthProfile>,
@@ -831,6 +872,26 @@ pub struct VectorNodeRec {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+}
+
+impl NodeFillsMixin for VectorNodeRec {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
+}
+
+impl NodeStrokesMixin for VectorNodeRec {
+    fn set_stroke(&mut self, stroke: Paint) {
+        self.strokes = vec![stroke];
+    }
+
+    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+        self.strokes = strokes;
+    }
 }
 
 impl VectorNodeRec {
@@ -867,15 +928,35 @@ pub struct SVGPathNodeRec {
     pub name: Option<String>,
     pub active: bool,
     pub transform: AffineTransform,
-    pub fill: Option<Paint>,
+    pub fills: Vec<Paint>,
     pub data: String,
-    pub stroke: Option<Paint>,
+    pub strokes: Vec<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
+}
+
+impl NodeFillsMixin for SVGPathNodeRec {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
+}
+
+impl NodeStrokesMixin for SVGPathNodeRec {
+    fn set_stroke(&mut self, stroke: Paint) {
+        self.strokes = vec![stroke];
+    }
+
+    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+        self.strokes = strokes;
+    }
 }
 
 impl NodeTransformMixin for SVGPathNodeRec {

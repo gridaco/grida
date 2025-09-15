@@ -186,9 +186,9 @@ async fn demo_scene() -> Scene {
     path.name = Some("Complex Path".to_string());
     path.transform = AffineTransform::new(220.0, 400.0, 0.0);
     path.data = "M50,0 L61,35 L98,35 L68,57 L79,91 L50,71 L21,91 L32,57 L2,35 L39,35 Z".to_string();
-    path.fill = Some(Paint::from(CGColor(255, 20, 147, 255)));
+    path.fills = vec![Paint::from(CGColor(255, 20, 147, 255))];
     path.stroke_width = 2.0;
-    path.stroke = Some(Paint::from(CGColor(0, 0, 0, 255)));
+    path.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
     all_node_ids.push(path.id.clone());
     repo.insert(Node::SVGPath(path));
 

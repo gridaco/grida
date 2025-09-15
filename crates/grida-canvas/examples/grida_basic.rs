@@ -132,7 +132,7 @@ async fn demo_basic() -> Scene {
     path_node.name = Some("Test Path".to_string());
     path_node.transform = AffineTransform::new(550.0, 300.0, 0.0);
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
-    path_node.stroke = Some(Paint::from(CGColor(255, 0, 0, 255)));
+    path_node.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
     path_node.stroke_width = 4.0;
 
     // Create a test line node with solid color
