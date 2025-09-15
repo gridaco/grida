@@ -282,7 +282,7 @@ impl LayerList {
                             shape,
                             effects: n.effects.clone(),
                             strokes: n.stroke.clone().into_iter().collect(),
-                            fills: vec![n.fill.clone()],
+                            fills: n.fill.clone().into_iter().collect(),
                             stroke_path,
                         }));
                     } else {
@@ -541,7 +541,7 @@ impl LayerList {
                         shape,
                         effects: n.effects.clone(),
                         strokes: n.stroke.clone().into_iter().collect(),
-                        fills: vec![n.fill.clone()],
+                        fills: n.fill.clone().into_iter().collect(),
                         stroke_path,
                     }))
                 }
@@ -589,7 +589,7 @@ impl LayerList {
                         },
                         shape,
                         effects: n.effects.clone(),
-                        strokes: vec![n.stroke.clone()],
+                        strokes: n.stroke.clone().into_iter().collect(),
                         fills: vec![Paint::Image(n.fill.clone())],
                         stroke_path,
                     }))

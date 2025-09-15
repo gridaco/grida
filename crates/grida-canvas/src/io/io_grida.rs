@@ -288,6 +288,32 @@ impl From<CSSObjectFit> for BoxFit {
     }
 }
 
+/// Utility function to merge single and multiple paint properties according to the specified logic:
+/// - if paint and no paints, use [paint]
+/// - if no paint and no paints, use []
+/// - if both paint and paints, if paints is empty, use [paint]
+/// - if both paint and paints, if paints >= 1, use paints
+pub fn merge_paints(paint: Option<JSONPaint>, paints: Option<Vec<JSONPaint>>) -> Vec<Paint> {
+    match (paint, paints) {
+        (Some(p), None) => vec![Paint::from(Some(p))],
+        (None, None) => vec![],
+        (Some(p), Some(paints_vec)) => {
+            if paints_vec.is_empty() {
+                vec![Paint::from(Some(p))]
+            } else {
+                paints_vec
+                    .into_iter()
+                    .map(|p| Paint::from(Some(p)))
+                    .collect()
+            }
+        }
+        (None, Some(paints_vec)) => paints_vec
+            .into_iter()
+            .map(|p| Paint::from(Some(p)))
+            .collect(),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct JSONScene {
     pub id: String,
@@ -378,6 +404,8 @@ pub struct JSONUnknownNodeProperties {
     // fill
     #[serde(rename = "fill")]
     pub fill: Option<JSONPaint>,
+    #[serde(rename = "fills")]
+    pub fills: Option<Vec<JSONPaint>>,
     // stroke
     #[serde(rename = "strokeWidth", default = "default_stroke_width")]
     pub stroke_width: f32,
@@ -389,6 +417,8 @@ pub struct JSONUnknownNodeProperties {
     pub stroke_cap: Option<String>,
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
+    #[serde(rename = "strokes")]
+    pub strokes: Option<Vec<JSONPaint>>,
     // effects
     #[serde(rename = "feShadows")]
     pub fe_shadows: Option<Vec<JSONFeShadow>>,
@@ -750,8 +780,8 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 node.base.corner_radius_bottom_right,
                 node.base.corner_radius_bottom_left,
             ),
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
@@ -838,13 +868,8 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,
-            fills: vec![node.base.fill.into()],
-            strokes: node
-                .base
-                .stroke
-                .map(|s| Paint::from(Some(s)))
-                .into_iter()
-                .collect(),
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             blend_mode: node.base.blend_mode,
@@ -877,8 +902,8 @@ impl From<JSONEllipseNode> for Node {
                 width: node.base.width.length(0.0),
                 height: node.base.height.length(0.0),
             },
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
@@ -924,8 +949,8 @@ impl From<JSONRectangleNode> for Node {
                 node.base.corner_radius_bottom_right,
                 node.base.corner_radius_bottom_left,
             ),
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
@@ -996,7 +1021,9 @@ impl From<JSONImageNode> for Node {
                 node.base.corner_radius_bottom_left,
             ),
             fill: fill.clone(),
-            stroke: node.base.stroke.into(),
+            stroke: merge_paints(node.base.stroke, node.base.strokes)
+                .into_iter()
+                .next(),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
@@ -1032,8 +1059,8 @@ impl From<JSONRegularPolygonNode> for Node {
                 height: node.base.height.length(0.0),
             },
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
@@ -1070,8 +1097,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
             },
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
             inner_radius: node.inner_radius,
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
@@ -1103,7 +1130,9 @@ impl From<JSONSVGPathNode> for Node {
             name: node.base.name,
             active: node.base.active,
             transform,
-            fill: node.base.fill.into(),
+            fill: merge_paints(node.base.fill, node.base.fills)
+                .into_iter()
+                .next(),
             data: node.paths.map_or("".to_string(), |paths| {
                 paths
                     .iter()
@@ -1145,7 +1174,7 @@ impl From<JSONLineNode> for Node {
                 width: node.base.width.length(0.0),
                 height: 0.0,
             },
-            strokes: vec![node.base.stroke.into()],
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
             stroke_dash_array: None,
@@ -1183,8 +1212,10 @@ impl From<JSONVectorNode> for Node {
             transform,
             network,
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
-            fill: Some(node.base.fill.into()),
-            strokes: vec![node.base.stroke.into()],
+            fill: merge_paints(node.base.fill, node.base.fills)
+                .into_iter()
+                .next(),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
@@ -1219,8 +1250,12 @@ impl From<JSONBooleanOperationNode> for Node {
             op: node.op,
             corner_radius: node.base.corner_radius,
             children: node.children,
-            fill: node.base.fill.into(),
-            stroke: node.base.stroke.map(|s| Paint::from(Some(s))),
+            fill: merge_paints(node.base.fill, node.base.fills)
+                .into_iter()
+                .next(),
+            stroke: merge_paints(node.base.stroke, node.base.strokes)
+                .into_iter()
+                .next(),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
@@ -1758,5 +1793,92 @@ mod tests {
         assert_eq!(network.segments[3].b, 0);
         assert_eq!(network.segments[3].ta, (0.0, 0.0));
         assert_eq!(network.segments[3].tb, (0.0, 0.0));
+    }
+
+    #[test]
+    fn test_merge_paints_logic() {
+        use super::merge_paints;
+        use super::JSONPaint;
+
+        // Test case 1: paint and no paints, use [paint]
+        let paint = Some(JSONPaint::Solid {
+            color: Some(JSONRGBA {
+                r: 255,
+                g: 0,
+                b: 0,
+                a: 1.0,
+            }),
+            blend_mode: BlendMode::default(),
+        });
+        let paints = None;
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 1);
+
+        // Test case 2: no paint and no paints, use []
+        let paint = None;
+        let paints = None;
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 0);
+
+        // Test case 3: both paint and paints, if paints is empty, use [paint]
+        let paint = Some(JSONPaint::Solid {
+            color: Some(JSONRGBA {
+                r: 255,
+                g: 0,
+                b: 0,
+                a: 1.0,
+            }),
+            blend_mode: BlendMode::default(),
+        });
+        let paints = Some(vec![]);
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 1);
+
+        // Test case 4: both paint and paints, if paints >= 1, use paints
+        let paint = Some(JSONPaint::Solid {
+            color: Some(JSONRGBA {
+                r: 255,
+                g: 0,
+                b: 0,
+                a: 1.0,
+            }),
+            blend_mode: BlendMode::default(),
+        });
+        let paints = Some(vec![
+            JSONPaint::Solid {
+                color: Some(JSONRGBA {
+                    r: 0,
+                    g: 255,
+                    b: 0,
+                    a: 1.0,
+                }),
+                blend_mode: BlendMode::default(),
+            },
+            JSONPaint::Solid {
+                color: Some(JSONRGBA {
+                    r: 0,
+                    g: 0,
+                    b: 255,
+                    a: 1.0,
+                }),
+                blend_mode: BlendMode::default(),
+            },
+        ]);
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 2);
+
+        // Test case 5: no paint but has paints, use paints
+        let paint = None;
+        let paints = Some(vec![JSONPaint::Solid {
+            color: Some(JSONRGBA {
+                r: 0,
+                g: 255,
+                b: 0,
+                a: 1.0,
+            }),
+            blend_mode: BlendMode::default(),
+        }]);
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 1);
     }
 }

@@ -720,13 +720,15 @@ impl<'a> NodePainter<'a> {
 
                             self.painter
                                 .draw_fills(&shape, std::slice::from_ref(&image_paint));
-                            self.painter.draw_strokes(
-                                &shape,
-                                std::slice::from_ref(&node.stroke),
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
+                            if let Some(stroke) = &node.stroke {
+                                self.painter.draw_strokes(
+                                    &shape,
+                                    std::slice::from_ref(stroke),
+                                    node.stroke_width,
+                                    node.stroke_align,
+                                    node.stroke_dash_array.as_ref(),
+                                );
+                            }
                         });
                     });
                 });
@@ -809,8 +811,9 @@ impl<'a> NodePainter<'a> {
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter
-                                .draw_fills(&shape, std::slice::from_ref(&node.fill));
+                            if let Some(fill) = &node.fill {
+                                self.painter.draw_fills(&shape, std::slice::from_ref(fill));
+                            }
                             if let Some(stroke) = &node.stroke {
                                 self.painter.draw_strokes(
                                     &shape,
@@ -1037,8 +1040,9 @@ impl<'a> NodePainter<'a> {
                     .draw_shape_with_effects(&node.effects, &shape, || {
                         self.painter.with_opacity(node.opacity, || {
                             self.painter.with_blendmode(node.blend_mode, || {
-                                self.painter
-                                    .draw_fills(&shape, std::slice::from_ref(&node.fill));
+                                if let Some(fill) = &node.fill {
+                                    self.painter.draw_fills(&shape, std::slice::from_ref(fill));
+                                }
                                 if let Some(stroke) = &node.stroke {
                                     self.painter.draw_strokes(
                                         &shape,

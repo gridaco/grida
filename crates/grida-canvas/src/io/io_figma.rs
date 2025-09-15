@@ -961,11 +961,7 @@ impl FigmaConverter {
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
                     transform: AffineTransform::identity(),
-                    fill: self
-                        .convert_fills(Some(&origin.fills))
-                        .first()
-                        .cloned()
-                        .unwrap_or(TRANSPARENT),
+                    fill: self.convert_fills(Some(&origin.fills)).first().cloned(),
                     data: geometry.path.clone(),
                     stroke: None,
                     stroke_width: 0.0,
@@ -989,11 +985,7 @@ impl FigmaConverter {
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
                     transform: AffineTransform::identity(),
-                    fill: self
-                        .convert_strokes(Some(&origin.strokes))
-                        .first()
-                        .cloned()
-                        .unwrap_or(TRANSPARENT),
+                    fill: self.convert_strokes(Some(&origin.strokes)).first().cloned(),
                     data: geometry.path.clone(),
                     stroke: None,
                     stroke_width: 0.0,
@@ -1065,11 +1057,7 @@ impl FigmaConverter {
             children,
             // map this
             corner_radius: None,
-            fill: self
-                .convert_fills(Some(&origin.fills))
-                .first()
-                .cloned()
-                .unwrap_or(TRANSPARENT),
+            fill: self.convert_fills(Some(&origin.fills)).first().cloned(),
             stroke: self.convert_strokes(Some(&origin.strokes)).first().cloned(),
             stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: Self::convert_stroke_align(

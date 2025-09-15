@@ -131,12 +131,12 @@ async fn demo_shapes() -> Scene {
         path.name = Some(format!("Path {}", i + 1));
         path.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         path.data = data.to_string();
-        path.fill = Paint::from(CGColor(
+        path.fill = Some(Paint::from(CGColor(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             255,
-        )); // Fading gray
+        ))); // Fading gray
         all_shape_ids.push(path.id.clone());
         repository.insert(Node::SVGPath(path));
     }

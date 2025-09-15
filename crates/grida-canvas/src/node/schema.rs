@@ -607,7 +607,7 @@ pub struct ImageNodeRec {
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
     pub fill: ImagePaint,
-    pub stroke: Paint,
+    pub stroke: Option<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -648,7 +648,7 @@ impl NodeGeometryMixin for ImageNodeRec {
     }
 
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.stroke.opacity() > 0.0
+        self.stroke_width > 0.0 && self.stroke.as_ref().map_or(false, |s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
@@ -797,7 +797,7 @@ pub struct BooleanPathOperationNodeRec {
     pub op: BooleanPathOperation,
     pub corner_radius: Option<f32>,
     pub children: Vec<NodeId>,
-    pub fill: Paint,
+    pub fill: Option<Paint>,
     pub stroke: Option<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
@@ -867,7 +867,7 @@ pub struct SVGPathNodeRec {
     pub name: Option<String>,
     pub active: bool,
     pub transform: AffineTransform,
-    pub fill: Paint,
+    pub fill: Option<Paint>,
     pub data: String,
     pub stroke: Option<Paint>,
     pub stroke_width: f32,
