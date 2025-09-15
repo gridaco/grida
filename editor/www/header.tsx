@@ -39,6 +39,7 @@ const features: Item[] = [
 
 const resources: Item[] = [
   sitemap.items.library,
+  sitemap.items.fonts,
   sitemap.items.tools,
   sitemap.items.downloads,
   sitemap.items.docs,
