@@ -704,7 +704,7 @@ impl<'a> NodePainter<'a> {
                         self.painter.with_blendmode(node.blend_mode, || {
                             // convert the image itself to a paint
                             let image_paint = Paint::Image(ImagePaint {
-                                hash: node.hash.clone(),
+                                image: node.image.clone(),
                                 opacity: node.opacity,
                                 transform: AffineTransform::identity(),
                                 fit: math2::box_fit::BoxFit::Cover,

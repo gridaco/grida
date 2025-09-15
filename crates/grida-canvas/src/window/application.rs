@@ -489,8 +489,8 @@ impl UnknownTargetApplication {
     fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
-            let hash = self.renderer.add_image(&msg.data);
-            println!("📝 Registered image with renderer: {}", hash);
+            let (hash, url) = self.renderer.add_image(&msg.data);
+            println!("📝 Registered image with renderer: {} ({})", hash, url);
             updated = true;
         }
         if updated {

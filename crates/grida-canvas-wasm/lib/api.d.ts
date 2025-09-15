@@ -157,11 +157,11 @@ export interface Grida2DScene extends Grida2DRuntime {
    *
    * @privateRemarks
    * @see https://developer.mozilla.org/en-US/docs/Web/API/Document/importNode
-   */
+  */
   importNode(node: TODO): TODO;
 
   loadImage(url: string): Promise<Image>;
-  addImage(data: Uint8Array): string;
+  addImage(data: Uint8Array): CreateImageResourceResult | false;
   /**
    * Register a font with the renderer.
    * @param family - CSS font-family name.
@@ -288,4 +288,9 @@ export interface Camera2D {
    * Converts a screen-space point to canvas coordinates using the inverse view matrix.
    */
   screenPointToWorldPoint(point: Vector2): Vector2;
+}
+
+export interface CreateImageResourceResult {
+  hash: string;
+  url: string;
 }

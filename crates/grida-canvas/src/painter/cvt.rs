@@ -62,7 +62,10 @@ pub fn shader_from_paint(
         Paint::DiamondGradient(g) => gradient::diamond_gradient_paint(g, opacity, size).shader(),
         Paint::Image(img) => {
             let repo = images?;
-            let image = repo.get_by_size(&img.hash, size.0, size.1)?;
+            let key = match &img.image {
+                ResourceRef::RID(r) | ResourceRef::HASH(r) => r,
+            };
+            let image = repo.get_by_size(key, size.0, size.1)?;
             let matrix = sk::sk_matrix(image_paint_matrix(
                 img,
                 (image.width() as f32, image.height() as f32),

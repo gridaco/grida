@@ -9,6 +9,11 @@ const ApplicationCommandID = {
   Pan: 4,
 } as const;
 
+export interface CreateImageResourceResult {
+  hash: string;
+  url: string;
+}
+
 export class Scene {
   private appptr: number;
   private module: createGridaCanvas.GridaCanvasWasmBindings;
@@ -85,16 +90,21 @@ export class Scene {
     this.module._deallocate(ptr, len);
   }
 
-  addImage(data: Uint8Array): string {
+  addImage(data: Uint8Array): CreateImageResourceResult | false {
     const len = data.length;
     const ptr = this.module._allocate(len);
     this.module.HEAPU8.set(data, ptr);
     const out = this.module._add_image(this.appptr, ptr, len);
     this.module._deallocate(ptr, len);
-    const hash = this.module.UTF8ToString(out);
-    const hlen = this.module.lengthBytesUTF8(hash) + 1;
+    if (out === 0) return false;
+    const txt = this.module.UTF8ToString(out);
+    const hlen = this.module.lengthBytesUTF8(txt) + 1;
     this._free_string(out, hlen);
-    return hash;
+    try {
+      return JSON.parse(txt) as CreateImageResourceResult;
+    } catch {
+      return { hash: txt, url: `res://images/${txt}` };
+    }
   }
 
   hasMissingFonts(): boolean {

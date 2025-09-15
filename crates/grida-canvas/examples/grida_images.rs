@@ -12,6 +12,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     let bytes = load_image(&image_url).await.unwrap();
     let hash = hash_bytes(&bytes);
     let hash_str = format!("{:016x}", hash);
+    let url = format!("res://images/{}", hash_str);
 
     // Root container
     let mut root = nf.create_container_node();
@@ -30,7 +31,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         height: 200.0,
     };
     rect1.set_fill(Paint::Image(ImagePaint {
-        hash: hash_str.clone(),
+        image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
@@ -48,14 +49,14 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         height: 200.0,
     };
     rect2.set_fill(Paint::Image(ImagePaint {
-        hash: hash_str.clone(),
+        image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
         blend_mode: BlendMode::Normal,
     }));
     rect2.strokes = vec![Paint::Image(ImagePaint {
-        hash: hash_str.clone(),
+        image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
@@ -74,7 +75,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     rect3.corner_radius = RectangularCornerRadius::circular(40.0);
     rect3.set_fill(Paint::from(CGColor(240, 240, 240, 255)));
     rect3.strokes = vec![Paint::Image(ImagePaint {
-        hash: hash_str.clone(),
+        image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
@@ -91,7 +92,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         height: 200.0,
     };
     rect4.set_fill(Paint::Image(ImagePaint {
-        hash: hash_str.clone(),
+        image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         // Rotate the image 45 degrees with BoxFit::None to showcase the paint transform
         transform: AffineTransform {

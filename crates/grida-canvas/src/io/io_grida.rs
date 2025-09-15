@@ -83,7 +83,8 @@ pub enum JSONPaint {
     },
     #[serde(rename = "image")]
     Image {
-        hash: String,
+        #[serde(default)]
+        src: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         #[serde(default)]
         fit: CSSObjectFit,
@@ -233,19 +234,22 @@ impl From<Option<JSONPaint>> for Paint {
                 })
             }
             Some(JSONPaint::Image {
-                hash,
+                src,
                 transform,
                 fit,
                 blend_mode,
-            }) => Paint::Image(ImagePaint {
-                hash,
-                transform: transform
-                    .map(|m| AffineTransform { matrix: m })
-                    .unwrap_or_else(AffineTransform::identity),
-                fit: fit.into(),
-                opacity: 1.0,
-                blend_mode,
-            }),
+            }) => {
+                let url = src.unwrap_or_default();
+                Paint::Image(ImagePaint {
+                    image: ResourceRef::RID(url),
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    fit: fit.into(),
+                    opacity: 1.0,
+                    blend_mode,
+                })
+            }
             None => Paint::Solid(SolidPaint {
                 color: CGColor::TRANSPARENT,
                 opacity: 1.0,
@@ -603,25 +607,9 @@ pub struct JSONImageNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
     #[serde(rename = "src")]
-    pub src: JSONImageSrc,
+    pub src: Option<String>,
     #[serde(rename = "fit", default)]
     pub fit: CSSObjectFit,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum JSONImageSrc {
-    Url(String),
-    Hash { hash: String },
-}
-
-impl JSONImageSrc {
-    fn hash(&self) -> String {
-        match self {
-            JSONImageSrc::Url(url) => extract_image_hash(url),
-            JSONImageSrc::Hash { hash } => hash.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -962,25 +950,28 @@ impl From<JSONImageNode> for Node {
             node.base.rotation,
         );
 
-        let hash = node.src.hash();
+        let url = node.src.clone().unwrap_or_default();
 
         let fill = match node.base.fill {
             Some(JSONPaint::Image {
-                hash: h,
+                src: h,
                 transform: t,
                 fit,
                 blend_mode,
-            }) => ImagePaint {
-                hash: if h.is_empty() { hash.clone() } else { h },
-                transform: t
-                    .map(|m| AffineTransform { matrix: m })
-                    .unwrap_or_else(AffineTransform::identity),
-                fit: fit.into(),
-                opacity: 1.0,
-                blend_mode,
-            },
+            }) => {
+                let resolved = h.unwrap_or_else(|| url.clone());
+                ImagePaint {
+                    image: ResourceRef::RID(resolved),
+                    transform: t
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    fit: fit.into(),
+                    opacity: 1.0,
+                    blend_mode,
+                }
+            }
             _ => ImagePaint {
-                hash: hash.clone(),
+                image: ResourceRef::RID(url.clone()),
                 transform: AffineTransform::identity(),
                 fit: node.fit.into(),
                 opacity: 1.0,
@@ -1016,7 +1007,7 @@ impl From<JSONImageNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
-            hash: fill.hash,
+            image: fill.image.clone(),
         })
     }
 }
@@ -1370,10 +1361,6 @@ fn merge_effects(
         }
     }
     effects
-}
-
-fn extract_image_hash(src: &str) -> String {
-    src.split('/').last().unwrap_or(src).to_string()
 }
 
 #[cfg(test)]

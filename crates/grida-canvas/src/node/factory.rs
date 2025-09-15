@@ -41,8 +41,8 @@ impl NodeFactory {
 
     fn default_image_paint() -> ImagePaint {
         ImagePaint {
-            // TODO: use the built in image hash
-            hash: String::new(),
+            // TODO: use the built in image ref
+            image: ResourceRef::RID(String::new()),
             opacity: 1.0,
             transform: AffineTransform::identity(),
             fit: BoxFit::Cover,
@@ -271,7 +271,7 @@ impl NodeFactory {
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effects: LayerEffects::default(),
-            hash: String::new(),
+            image: ResourceRef::RID(String::new()),
         }
     }
 }

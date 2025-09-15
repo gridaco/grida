@@ -621,8 +621,9 @@ export class Editor
       img.src = src;
     });
 
-    const hash = this._m_wasm_canvas_scene.addImage(bytes);
-    const url = `res://images/${hash}`;
+    const result = this._m_wasm_canvas_scene.addImage(bytes);
+    if (!result) throw new Error("addImage failed");
+    const { hash, url } = result;
 
     const ref: grida.program.document.ImageRef = {
       url,

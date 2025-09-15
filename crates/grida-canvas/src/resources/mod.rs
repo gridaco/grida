@@ -10,7 +10,7 @@ use std::{
 pub use byte_store::ByteStore;
 pub use index::ResourceIndex;
 
-use crate::cg::types::Paint;
+use crate::cg::types::{Paint, ResourceRef};
 use crate::node::schema::Scene;
 use crate::window::application::HostEvent;
 #[cfg(not(target_arch = "wasm32"))]
@@ -127,12 +127,16 @@ pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
         if let crate::node::schema::Node::Rectangle(rect) = n {
             for fill in &rect.fills {
                 if let Paint::Image(img) = fill {
-                    urls.push(img.hash.clone());
+                    match &img.image {
+                        ResourceRef::RID(r) | ResourceRef::HASH(r) => urls.push(r.clone()),
+                    }
                 }
             }
             for stroke in &rect.strokes {
                 if let Paint::Image(img) = stroke {
-                    urls.push(img.hash.clone());
+                    match &img.image {
+                        ResourceRef::RID(r) | ResourceRef::HASH(r) => urls.push(r.clone()),
+                    }
                 }
             }
         }

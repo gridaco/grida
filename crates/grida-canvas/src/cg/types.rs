@@ -971,8 +971,10 @@ impl Paint {
                 }
             }
             Paint::Image(image) => {
-                // For image paints, hash the image hash
-                image.hash.hash(hasher);
+                // For image paints, hash the referenced resource identifier
+                match &image.image {
+                    ResourceRef::HASH(h) | ResourceRef::RID(h) => h.hash(hasher),
+                };
                 image.opacity.to_bits().hash(hasher);
                 image.blend_mode.hash(hasher);
             }
@@ -1207,10 +1209,60 @@ pub struct SweepGradientPaint {
     pub blend_mode: BlendMode,
 }
 
+/// A reference to a resource that can be identified either by a logical Resource ID (RID) or by a hash.
+///
+/// `ResourceRef` is used throughout the Grida Canvas to reference external resources like images,
+/// fonts, or other binary data. It provides two ways to identify resources:
+///
+/// ## Variants
+///
+/// - **`HASH(String)`**: References a resource by its content hash. This is typically used for
+///   resources that are stored in memory with a `mem://` URL format. The hash is computed from
+///   the resource's binary content using a hashing algorithm.
+///
+/// - **`RID(String)`**: References a resource by a logical Resource ID. This is typically used
+///   for resources that have a human-readable identifier like `res://images/logo.png` or
+///   external URLs. RIDs provide a stable way to reference resources that may be loaded
+///   from different sources.
+///
+/// ## Usage
+///
+/// `ResourceRef` is commonly used in:
+/// - [`ImagePaint`] to reference image resources
+/// - Resource management systems to track and resolve resource dependencies
+/// - Import/export operations to maintain resource references across different formats
+///
+/// ## Examples
+///
+/// ```ignore
+/// // Reference by logical ID
+/// let image_ref = ResourceRef::RID("res://images/logo.png".to_string());
+///
+/// // Reference by content hash (for in-memory resources)
+/// let mem_ref = ResourceRef::HASH("a1b2c3d4e5f6".to_string());
+/// ```
+///
+/// ## Resource Resolution
+///
+/// The actual resolution of a `ResourceRef` depends on the context:
+/// - RID references are typically resolved through a resource index that maps logical IDs to
+///   actual resource locations or content hashes
+/// - HASH references are typically resolved directly from a byte store using the hash as a key
+///
+/// Both variants are treated uniformly in most contexts, allowing the resource management
+/// system to handle different resource types transparently.
+#[derive(Debug, Clone)]
+pub enum ResourceRef {
+    /// Reference by content hash, typically used for in-memory resources with `mem://` URLs
+    HASH(String),
+    /// Reference by logical Resource ID, typically used for named resources with `res://` URLs
+    RID(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct ImagePaint {
     pub transform: AffineTransform,
-    pub hash: String,
+    pub image: ResourceRef,
     pub fit: BoxFit,
     pub opacity: f32,
     pub blend_mode: BlendMode,
@@ -1253,7 +1305,7 @@ impl Default for ImagePaint {
     fn default() -> Self {
         Self {
             transform: AffineTransform::default(),
-            hash: String::new(),
+            image: ResourceRef::RID(String::new()),
             fit: BoxFit::Cover,
             opacity: 1.0,
             blend_mode: BlendMode::default(),

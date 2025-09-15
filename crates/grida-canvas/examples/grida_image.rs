@@ -32,8 +32,9 @@ async fn demo_image() -> (Scene, Vec<u8>) {
     rect1.name = Some("ImageFillRect".to_string());
     rect1.transform = AffineTransform::identity();
     rect1.size = image8ksize.clone();
+    let url = format!("res://images/{}", hash_str.clone());
     rect1.set_fill(Paint::Image(ImagePaint {
-        hash: hash_str.clone(),
+        image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,

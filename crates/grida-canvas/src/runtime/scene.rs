@@ -235,13 +235,13 @@ impl Renderer {
         self.fonts.add(hash, family);
     }
 
-    pub fn add_image(&mut self, bytes: &[u8]) -> String {
+    pub fn add_image(&mut self, bytes: &[u8]) -> (String, String) {
         let hash = resources::hash_bytes(bytes);
         let hash_str = format!("{:016x}", hash);
         let rid = format!("res://images/{}", hash_str);
         self.resources.insert(&rid, bytes.to_vec());
-        self.images.insert(hash_str.clone(), hash);
-        hash_str
+        self.images.insert(rid.clone(), hash);
+        (hash_str, rid)
     }
 
     /// Enable or disable the image tile cache.

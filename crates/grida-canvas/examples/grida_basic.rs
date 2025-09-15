@@ -30,7 +30,7 @@ async fn demo_basic() -> Scene {
         spread: 0.0,
         color: CGColor(0, 0, 0, 77),
     })]);
-    image_node.hash = demo_image_id.to_string();
+    image_node.image = ResourceRef::RID(format!("res://images/{}", demo_image_id));
 
     // Create a test rectangle node with linear gradient
     let mut rect_node = nf.create_rectangle_node();

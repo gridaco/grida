@@ -614,7 +614,7 @@ pub struct ImageNodeRec {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effects: LayerEffects,
-    pub hash: String,
+    pub image: ResourceRef,
 }
 
 impl ImageNodeRec {

@@ -78,7 +78,7 @@ impl From<&FigmaPaint> for Paint {
 
                 Paint::Image(ImagePaint {
                     transform,
-                    hash: image.image_ref.clone(),
+                    image: ResourceRef::RID(image.image_ref.clone()),
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),
@@ -320,7 +320,7 @@ impl FigmaConverter {
 
                 Paint::Image(ImagePaint {
                     transform,
-                    hash: url,
+                    image: ResourceRef::RID(url),
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),

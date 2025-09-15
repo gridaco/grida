@@ -109,6 +109,12 @@ pub unsafe extern "C" fn set_main_camera_transform(
 // #region: image management
 // ====================================================================================================
 
+#[derive(Serialize)]
+pub struct CreateImageResourceResult {
+    pub hash: String,
+    pub url: String,
+}
+
 #[no_mangle]
 /// js::_add_image
 pub unsafe extern "C" fn add_image(
@@ -118,9 +124,12 @@ pub unsafe extern "C" fn add_image(
 ) -> *const u8 {
     if let Some(app) = app.as_mut() {
         let data = std::slice::from_raw_parts(data_ptr, data_len);
-        let hash = app.add_image(data);
-        if let Ok(cstr) = CString::new(hash) {
-            return cstr.into_raw() as *const u8;
+        let (hash, url) = app.add_image(data);
+        let result = CreateImageResourceResult { hash, url };
+        if let Ok(json) = serde_json::to_string(&result) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
         }
     }
     std::ptr::null()

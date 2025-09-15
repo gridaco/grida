@@ -274,8 +274,8 @@ impl EmscriptenApplication {
         self.base.renderer.invalidate_cache();
     }
 
-    /// Register an image with the renderer and return its hash.
-    pub fn add_image(&mut self, data: &[u8]) -> String {
+    /// Register an image with the renderer and return its hash and URL.
+    pub fn add_image(&mut self, data: &[u8]) -> (String, String) {
         self.base.renderer.add_image(data)
     }
 }
