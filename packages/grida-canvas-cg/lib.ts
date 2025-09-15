@@ -640,7 +640,8 @@ export namespace cg {
     | LinearGradientPaint
     | RadialGradientPaint
     | SweepGradientPaint
-    | DiamondGradientPaint;
+    | DiamondGradientPaint
+    | ImagePaint;
 
   export namespace paints {
     export const transparent: Paint = {

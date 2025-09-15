@@ -7,6 +7,7 @@ import cmath from "@grida/cmath";
 import { editor } from "@/grida-canvas";
 
 type UN = grida.program.nodes.UnknwonNode;
+type DYN_TODO = grida.program.nodes.UnknwonNode | any; // TODO: remove casting of this usage.
 
 function defineNodeProperty<
   K extends keyof grida.program.nodes.UnknwonNode,
@@ -153,7 +154,7 @@ const safe_properties: Partial<
       node.type === "component",
     apply: (draft, value, prev) => {
       if (value === null) {
-        draft.fill = undefined;
+        (draft as UN).fill = undefined;
         return;
       }
 
@@ -162,7 +163,7 @@ const safe_properties: Partial<
         case "radial_gradient":
         case "sweep_gradient":
         case "diamond_gradient":
-          draft.fill = {
+          (draft as UN).fill = {
             ...(value as
               | cg.LinearGradientPaint
               | cg.RadialGradientPaint
@@ -170,9 +171,12 @@ const safe_properties: Partial<
           };
           break;
         case "solid":
-          draft.fill = value as
+          (draft as DYN_TODO).fill = value as
             | grida.program.nodes.i.props.SolidPaintToken
             | cg.SolidPaint;
+          break;
+        case "image":
+          (draft as UN).fill = value as any; // Allow image paint type
           break;
       }
     },
@@ -267,6 +271,9 @@ const safe_properties: Partial<
           draft.stroke = value as
             | grida.program.nodes.i.props.SolidPaintToken
             | cg.SolidPaint;
+          break;
+        case "image":
+          draft.stroke = value as any; // Allow image paint type
           break;
       }
     },

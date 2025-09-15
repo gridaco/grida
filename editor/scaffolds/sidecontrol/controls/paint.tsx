@@ -2,7 +2,11 @@ import { WorkbenchUI } from "@/components/workbench";
 import grida from "@grida/schema";
 import cg from "@grida/cg";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GradientControl } from "./gradient";
+import { GradientControl } from "./paint-gradient";
+import { ImagePaintControl } from "./paint-image";
+import { BlendModeDropdown } from "./blend-mode";
+import { PropertyEnum } from "../ui";
+import { ArrowRightLeftIcon, RotateCwIcon } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -15,6 +19,7 @@ import {
   SweepGradientPaintIcon,
   SolidPaintIcon,
   DiamondGradientPaintIcon,
+  ImagePaintIcon,
 } from "./icons/paint-icon";
 import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
@@ -33,6 +38,29 @@ const paint_label = {
   sweep_gradient: "sweep",
   diamond_gradient: "diamond",
 } as const;
+
+const gradient_types = [
+  { value: "linear_gradient" as const, label: "Linear" },
+  { value: "radial_gradient" as const, label: "Radial" },
+  { value: "sweep_gradient" as const, label: "Sweep" },
+  { value: "diamond_gradient" as const, label: "Diamond" },
+];
+
+const DEFAULT_IMAGE_PAINT: cg.ImagePaint = {
+  type: "image",
+  src: undefined,
+  fit: "cover",
+  transform: cmath.transform.identity,
+  filters: {
+    exposure: 0,
+    contrast: 0,
+    saturation: 0,
+    temperature: 0,
+    tint: 0,
+    highlights: 0,
+    shadows: 0,
+  },
+};
 
 export interface PaintControlProps {
   value?: grida.program.nodes.i.props.PropsPaintValue;
@@ -84,7 +112,7 @@ export function PaintControl({
   }
 }
 
-type ComputedPaint = cg.Paint;
+type ComputedPaint = cg.Paint | cg.ImagePaint;
 type TokenizedPaint = grida.program.nodes.i.props.SolidPaintToken;
 
 function ComputedPaintControl({
@@ -107,7 +135,7 @@ function ComputedPaintControl({
   onSelectedGradientStopChange?: (stop: number) => void;
 }) {
   const onTypeChange = useCallback(
-    (type: cg.Paint["type"]) => {
+    (type: cg.Paint["type"] | "image" | "gradient") => {
       const to = type;
 
       switch (value?.type) {
@@ -135,6 +163,24 @@ function ComputedPaintControl({
               // noop
               break;
             }
+            case "image": {
+              onValueChange?.(DEFAULT_IMAGE_PAINT);
+              break;
+            }
+            case "gradient": {
+              onValueChange?.({
+                type: "linear_gradient",
+                transform: cmath.transform.identity,
+                stops: [
+                  { offset: 0, color: value.color },
+                  {
+                    offset: 1,
+                    color: { r: 255, g: 255, b: 255, a: 1 },
+                  },
+                ],
+              });
+              break;
+            }
           }
           break;
         }
@@ -158,6 +204,59 @@ function ComputedPaintControl({
                 type: to,
                 stops: value.stops,
                 transform: cmath.transform.identity,
+              });
+              break;
+            }
+            case "image": {
+              onValueChange?.(DEFAULT_IMAGE_PAINT);
+              break;
+            }
+            case "gradient": {
+              onValueChange?.({
+                type: "linear_gradient",
+                stops: value.stops,
+                transform: cmath.transform.identity,
+              });
+              break;
+            }
+          }
+          break;
+        }
+        case "image": {
+          switch (to) {
+            case "solid": {
+              onValueChange?.({
+                type: "solid",
+                color: { r: 128, g: 128, b: 128, a: 1 }, // Default gray
+              });
+              break;
+            }
+            case "linear_gradient":
+            case "radial_gradient":
+            case "sweep_gradient":
+            case "diamond_gradient": {
+              onValueChange?.({
+                type: to,
+                transform: cmath.transform.identity,
+                stops: [
+                  { offset: 0, color: { r: 128, g: 128, b: 128, a: 1 } },
+                  { offset: 1, color: { r: 255, g: 255, b: 255, a: 1 } },
+                ],
+              });
+              break;
+            }
+            case "image": {
+              // noop
+              break;
+            }
+            case "gradient": {
+              onValueChange?.({
+                type: "linear_gradient",
+                transform: cmath.transform.identity,
+                stops: [
+                  { offset: 0, color: { r: 128, g: 128, b: 128, a: 1 } },
+                  { offset: 1, color: { r: 255, g: 255, b: 255, a: 1 } },
+                ],
               });
               break;
             }
@@ -280,6 +379,25 @@ function ComputedPaintControl({
               </PopoverTrigger>
             </>
           )}
+          {value.type === "image" && (
+            <>
+              <PopoverTrigger className="w-full">
+                <PaintInputContainer>
+                  <PaintChip paint={value} className="rounded-sm" />
+                  <span className="ms-2 text-start text-xs flex-1">Image</span>
+                  {removable && (
+                    <span
+                      role="button"
+                      onClick={onRemovePaint}
+                      className="px-1 py-1 me-0.5 text-muted-foreground"
+                    >
+                      <Cross2Icon className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+                </PaintInputContainer>
+              </PopoverTrigger>
+            </>
+          )}
         </>
       ) : (
         <PopoverTrigger className="w-full">
@@ -290,32 +408,68 @@ function ComputedPaintControl({
         </PopoverTrigger>
       )}
       <PopoverContent align="start" side="right" sideOffset={8} className="p-0">
-        <Tabs value={value?.type} onValueChange={onTypeChange as any}>
-          <TabsList className="m-2">
-            <TabsTrigger value="solid">
-              <SolidPaintIcon active={value?.type === "solid"} />
-            </TabsTrigger>
-            <TabsTrigger value="linear_gradient">
-              <LinearGradientPaintIcon
-                active={value?.type === "linear_gradient"}
+        <Tabs
+          value={
+            value?.type === "linear_gradient" ||
+            value?.type === "radial_gradient" ||
+            value?.type === "sweep_gradient" ||
+            value?.type === "diamond_gradient"
+              ? "gradient"
+              : value?.type
+          }
+          onValueChange={onTypeChange as any}
+        >
+          <div className="flex items-center justify-between m-2">
+            <TabsList>
+              <TabsTrigger value="solid">
+                <SolidPaintIcon active={value?.type === "solid"} />
+              </TabsTrigger>
+              <TabsTrigger value="gradient">
+                {(() => {
+                  const isGradientActive =
+                    value?.type === "linear_gradient" ||
+                    value?.type === "radial_gradient" ||
+                    value?.type === "sweep_gradient" ||
+                    value?.type === "diamond_gradient";
+
+                  switch (value?.type) {
+                    case "radial_gradient":
+                      return (
+                        <RadialGradientPaintIcon active={isGradientActive} />
+                      );
+                    case "sweep_gradient":
+                      return (
+                        <SweepGradientPaintIcon active={isGradientActive} />
+                      );
+                    case "diamond_gradient":
+                      return (
+                        <DiamondGradientPaintIcon active={isGradientActive} />
+                      );
+                    default:
+                      return (
+                        <LinearGradientPaintIcon active={isGradientActive} />
+                      );
+                  }
+                })()}
+              </TabsTrigger>
+              <TabsTrigger value="image">
+                <ImagePaintIcon active={value?.type === "image"} />
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex items-center">
+              <BlendModeDropdown
+                value={value?.blendMode || "normal"}
+                onValueChange={(blendMode) => {
+                  if (value) {
+                    onValueChange?.({
+                      ...value,
+                      blendMode,
+                    } as any);
+                  }
+                }}
               />
-            </TabsTrigger>
-            <TabsTrigger value="radial_gradient">
-              <RadialGradientPaintIcon
-                active={value?.type === "radial_gradient"}
-              />
-            </TabsTrigger>
-            <TabsTrigger value="sweep_gradient">
-              <SweepGradientPaintIcon
-                active={value?.type === "sweep_gradient"}
-              />
-            </TabsTrigger>
-            <TabsTrigger value="diamond_gradient">
-              <DiamondGradientPaintIcon
-                active={value?.type === "diamond_gradient"}
-              />
-            </TabsTrigger>
-          </TabsList>
+            </div>
+          </div>
           <>
             {value?.type === "solid" && (
               <div>
@@ -345,12 +499,74 @@ function ComputedPaintControl({
               value?.type === "radial_gradient" ||
               value?.type === "sweep_gradient" ||
               value?.type === "diamond_gradient") && (
-              <div className="p-2">
+              <div className="p-2 space-y-4">
+                {/* Gradient Type Selector and Actions */}
+                <div className="flex items-center justify-between gap-4">
+                  <PropertyEnum<cg.Paint["type"]>
+                    enum={gradient_types}
+                    value={value.type}
+                    onValueChange={(gradientType) => {
+                      onValueChange?.({
+                        ...value,
+                        type: gradientType,
+                      } as any);
+                    }}
+                  />
+                  <div className="flex items-center gap-1">
+                    <Button
+                      onClick={() => {
+                        const flippedStops = value.stops
+                          .map((stop, index) => ({
+                            ...stop,
+                            offset: 1 - stop.offset,
+                          }))
+                          .reverse();
+                        onValueChange?.({ ...value, stops: flippedStops });
+                      }}
+                      title="Flip"
+                      variant="ghost"
+                      size="icon"
+                    >
+                      <ArrowRightLeftIcon className="size-3.5" />
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        const currentAngle = value.transform
+                          ? cmath.transform.angle(value.transform)
+                          : 0;
+                        const newAngle = currentAngle + 45;
+                        const t =
+                          cmath.transform.computeRelativeLinearGradientTransform(
+                            newAngle
+                          );
+                        onValueChange?.({
+                          ...value,
+                          transform: t,
+                        });
+                      }}
+                      title="Rotate"
+                      variant="ghost"
+                      size="icon"
+                    >
+                      <RotateCwIcon className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
                 <GradientControl
                   value={value}
                   onValueChange={onValueChange}
                   selectedStop={selectedGradientStop}
                   onSelectedStopChange={onSelectedGradientStopChange}
+                />
+              </div>
+            )}
+          </>
+          <>
+            {value?.type === "image" && (
+              <div className="p-2">
+                <ImagePaintControl
+                  value={value as any}
+                  onValueChange={onValueChange as any}
                 />
               </div>
             )}

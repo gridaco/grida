@@ -1,5 +1,5 @@
 import { css } from "@/grida-canvas-utils/css";
-import { TransparencyGridIcon } from "@radix-ui/react-icons";
+import { TransparencyGridIcon, ImageIcon } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
 import { cn } from "@/components/lib/utils";
 
@@ -7,7 +7,7 @@ export function PaintChip({
   paint,
   className,
 }: {
-  paint: cg.Paint;
+  paint: cg.Paint | cg.ImagePaint;
   className?: string;
 }) {
   switch (paint.type) {
@@ -21,6 +21,8 @@ export function PaintChip({
       return <SweepGradientPaintChip paint={paint} className={className} />;
     case "diamond_gradient":
       return <DiamondGradientPaintChip paint={paint} className={className} />;
+    case "image":
+      return <ImagePaintChip paint={paint} className={className} />;
   }
 }
 
@@ -169,6 +171,41 @@ export function DiamondGradientPaintChip({
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />
+    </div>
+  );
+}
+
+export function ImagePaintChip({
+  paint,
+  className,
+}: {
+  paint: cg.ImagePaint;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "w-4 h-4 rounded border shadow relative overflow-hidden bg-muted",
+        className
+      )}
+    >
+      {paint.src ? (
+        <img
+          src={paint.src}
+          alt="Paint image"
+          className="w-full h-full object-cover"
+          style={{
+            objectFit: paint.fit || "none",
+            transform: (paint as any).rotation
+              ? `rotate(${(paint as any).rotation}deg)`
+              : undefined,
+          }}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <ImageIcon className="w-2 h-2 text-muted-foreground/50" />
+        </div>
+      )}
     </div>
   );
 }
