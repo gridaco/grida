@@ -695,37 +695,57 @@ export namespace cg {
     type: "linear_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
-    blendMode?: cg.BlendMode;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
   };
 
   export type RadialGradientPaint = {
     type: "radial_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
-    blendMode?: cg.BlendMode;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
   };
 
   export type SweepGradientPaint = {
     type: "sweep_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
-    blendMode?: cg.BlendMode;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
   };
 
   export type DiamondGradientPaint = {
     type: "diamond_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
-    blendMode?: cg.BlendMode;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
   };
 
   export type ImagePaint = {
     type: "image";
-    src?: string;
-    fit?: BoxFit;
-    transform?: AffineTransform;
+    src: string;
+    fit: BoxFit;
+    transform: AffineTransform;
     filters?: ImageFilters;
-    blendMode?: cg.BlendMode;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
   };
 
   export interface ImageFilters {
@@ -937,4 +957,16 @@ export namespace cg {
   export type VariableWidthProfile = {
     stops: VariableWidthStop[];
   };
+
+  /**
+   * strict, solid default values.
+   * not all types have default values.
+   *
+   * only struct, widely aknowledged, de-facto standard defaults will be set.
+   *
+   * this is aligned in cg crate's default values.
+   */
+  export namespace def {
+    export const BLENDMODE: cg.BlendMode = "normal";
+  }
 }

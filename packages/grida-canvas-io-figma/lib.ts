@@ -161,6 +161,7 @@ export namespace iofigma {
                 { offset: 0, color: { r: 217, g: 217, b: 217, a: 1 } },
                 { offset: 1, color: { r: 115, g: 115, b: 115, a: 1 } },
               ],
+              blendMode: map.blendModeMap[paint.blendMode],
             };
         }
       }

@@ -94,6 +94,7 @@ function GradientEditorContent() {
       type: `${gradientType}_gradient`,
       stops,
       transform,
+      blendMode: "normal",
     });
   }, [gradientType, stops, points]);
 

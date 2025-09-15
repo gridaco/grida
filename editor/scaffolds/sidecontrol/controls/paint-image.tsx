@@ -3,10 +3,11 @@ import { cn } from "@/components/lib/utils";
 import { Slider } from "./utils/slider";
 import { Button } from "@/components/ui-editor/button";
 import { BoxFitControl } from "./box-fit";
-import { RotateCwIcon, UploadIcon, Wand2Icon } from "lucide-react";
+import { RotateCwIcon, UploadIcon } from "lucide-react";
 import { ImageIcon } from "@radix-ui/react-icons";
 import { useFilePicker } from "use-file-picker";
 import cg from "@grida/cg";
+import cmath from "@grida/cmath";
 
 const IMAGE_FILTERS = [
   { key: "exposure", label: "Exposure" },
@@ -38,14 +39,20 @@ export function ImagePaintControl({
   }, [openFilePicker]);
 
   const handleRotate = useCallback(() => {
+    if (!value?.src) return; // Don't update if no image source
+
     // For now, we'll store rotation as a separate property for UI purposes
     // In the future, this should be handled through the transform matrix
     const currentRotation = (value as any)?.rotation || 0;
     const newRotation = (currentRotation + 90) % 360;
 
     onValueChange?.({
-      ...value,
       type: "image",
+      src: value.src,
+      fit: value.fit,
+      transform: value.transform || cmath.transform.identity,
+      filters: value.filters,
+      blendMode: value.blendMode,
       rotation: newRotation,
     } as any);
   }, [value, onValueChange]);
@@ -55,13 +62,18 @@ export function ImagePaintControl({
       filterName: keyof NonNullable<cg.ImagePaint["filters"]>,
       newValue: number
     ) => {
+      if (!value?.src) return; // Don't update if no image source
+
       onValueChange?.({
-        ...value,
         type: "image",
+        src: value.src,
+        fit: value.fit,
+        transform: value.transform,
         filters: {
-          ...value?.filters,
+          ...value.filters,
           [filterName]: newValue,
         },
+        blendMode: value.blendMode,
       });
     },
     [value, onValueChange]
@@ -69,10 +81,15 @@ export function ImagePaintControl({
 
   const handleBoxFitChange = useCallback(
     (fit: cg.BoxFit) => {
+      if (!value?.src) return; // Don't update if no image source
+
       onValueChange?.({
-        ...value,
         type: "image",
+        src: value.src,
         fit,
+        transform: value.transform,
+        filters: value.filters,
+        blendMode: value.blendMode,
       });
     },
     [value, onValueChange]

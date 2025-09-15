@@ -136,6 +136,7 @@ function EditorUser({
         type: gradient.type,
         stops,
         transform,
+        blendMode: gradient.blendMode,
       });
     },
     [gradient.type, gradientType, stops, onValueChange]
@@ -157,6 +158,7 @@ function EditorUser({
         type: gradient.type,
         stops: newStops,
         transform,
+        blendMode: gradient.blendMode,
       });
     },
     [stops, points, gradient.type, gradientType, onValueChange]
@@ -183,6 +185,7 @@ function EditorUser({
         type: gradient.type,
         stops: newStops,
         transform,
+        blendMode: gradient.blendMode,
       });
     },
     [stops, points, gradient.type, gradientType, onValueChange]
