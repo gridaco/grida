@@ -610,7 +610,10 @@ impl<'a> Painter<'a> {
                             self.with_opacity(vector_layer.base.opacity, || {
                                 // Use VNPainter for vector network rendering
                                 let vn_painter =
-                                    crate::vectornetwork::vn_painter::VNPainter::new(self.canvas);
+                                    crate::vectornetwork::vn_painter::VNPainter::new_with_images(
+                                        self.canvas,
+                                        self.images,
+                                    );
 
                                 // Convert strokes to StrokeOptions for VNPainter
                                 let stroke_options = if !vector_layer.strokes.is_empty() {

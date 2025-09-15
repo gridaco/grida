@@ -1,6 +1,7 @@
 use crate::cg::types::*;
 use crate::cg::varwidth::*;
 use crate::painter::cvt;
+use crate::runtime::image_repository::ImageRepository;
 use crate::shape::stroke::stroke_geometry;
 use crate::shape::stroke_varwidth::create_variable_width_stroke_from_geometry;
 use skia_safe::{Canvas, PaintStyle};
@@ -21,12 +22,24 @@ pub struct StrokeOptions {
 /// rendering and is currently intended for development and demo use.
 pub struct VNPainter<'a> {
     canvas: &'a Canvas,
+    images: Option<&'a ImageRepository>,
 }
 
 impl<'a> VNPainter<'a> {
     /// Create a new painter targeting the provided canvas.
     pub fn new(canvas: &'a Canvas) -> Self {
-        Self { canvas }
+        Self {
+            canvas,
+            images: None,
+        }
+    }
+
+    /// Create a new painter with an image repository for image paints.
+    pub fn new_with_images(canvas: &'a Canvas, images: &'a ImageRepository) -> Self {
+        Self {
+            canvas,
+            images: Some(images),
+        }
     }
 
     /// Draw the provided vector network onto the canvas.
@@ -174,14 +187,26 @@ impl<'a> VNPainter<'a> {
         }
         let bounds = path.compute_tight_bounds();
         let size = (bounds.width(), bounds.height());
-        for fill in fills {
-            let mut sk_paint = cvt::sk_paint(fill, 1.0, size);
-            sk_paint.set_style(PaintStyle::Fill);
-            if let Some(shader) = sk_paint.shader() {
-                let matrix = skia_safe::Matrix::translate((-bounds.left, -bounds.top));
-                sk_paint.set_shader(shader.with_local_matrix(&matrix));
+
+        if let Some(images) = self.images {
+            if let Some(mut paint) = cvt::sk_paint_stack(fills, 1.0, size, images) {
+                paint.set_style(PaintStyle::Fill);
+                if let Some(shader) = paint.shader() {
+                    let matrix = skia_safe::Matrix::translate((-bounds.left, -bounds.top));
+                    paint.set_shader(shader.with_local_matrix(&matrix));
+                }
+                self.canvas.draw_path(path, &paint);
             }
-            self.canvas.draw_path(path, &sk_paint);
+        } else {
+            for fill in fills {
+                let mut sk_paint = cvt::sk_paint(fill, 1.0, size);
+                sk_paint.set_style(PaintStyle::Fill);
+                if let Some(shader) = sk_paint.shader() {
+                    let matrix = skia_safe::Matrix::translate((-bounds.left, -bounds.top));
+                    sk_paint.set_shader(shader.with_local_matrix(&matrix));
+                }
+                self.canvas.draw_path(path, &sk_paint);
+            }
         }
     }
 }
@@ -189,9 +214,15 @@ impl<'a> VNPainter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cg::types::{BlendMode, CGColor, Paint, SolidPaint};
-    use crate::vectornetwork::VectorNetworkSegment;
-    use skia_safe::{surfaces, Color};
+    use crate::cg::types::{
+        BlendMode, CGColor, FillRule, ImagePaint, Paint, ResourceRef, SolidPaint,
+    };
+    use crate::resources::ByteStore;
+    use crate::runtime::image_repository::ImageRepository;
+    use crate::vectornetwork::{VectorNetworkLoop, VectorNetworkRegion, VectorNetworkSegment};
+    use math2::{box_fit::BoxFit, transform::AffineTransform};
+    use skia_safe::{surfaces, Color, EncodedImageFormat};
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn fills_fallback_when_no_regions() {
@@ -223,5 +254,54 @@ mod tests {
         let pixmap = snapshot.peek_pixels().expect("pixmap");
         let color = pixmap.get_color((5, 5));
         assert_eq!(color, Color::from_argb(255, 255, 0, 0));
+    }
+
+    #[test]
+    fn image_fill_renders() {
+        // Prepare image repository with a simple green image
+        let mut store = ByteStore::new();
+        let mut img_surface = surfaces::raster_n32_premul((2, 2)).expect("surface");
+        img_surface.canvas().clear(Color::GREEN);
+        let img = img_surface.image_snapshot();
+        let data = img.encode(None, EncodedImageFormat::PNG, None).unwrap();
+        let hash = 1u64;
+        store.insert(hash, data.as_bytes().to_vec());
+        let store = Arc::new(Mutex::new(store));
+        let mut repo = ImageRepository::new(store);
+        repo.insert("img".to_string(), hash);
+
+        // Vector network with single rectangular region using image fill
+        let vn = VectorNetwork {
+            vertices: vec![(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)],
+            segments: vec![
+                VectorNetworkSegment::ab(0, 1),
+                VectorNetworkSegment::ab(1, 2),
+                VectorNetworkSegment::ab(2, 3),
+                VectorNetworkSegment::ab(3, 0),
+            ],
+            regions: vec![VectorNetworkRegion {
+                loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
+                fill_rule: FillRule::NonZero,
+                fills: Some(vec![Paint::Image(ImagePaint {
+                    transform: AffineTransform::identity(),
+                    image: ResourceRef::RID("img".to_string()),
+                    fit: BoxFit::Fill,
+                    opacity: 1.0,
+                    blend_mode: BlendMode::default(),
+                })]),
+            }],
+        };
+
+        let mut surface = surfaces::raster_n32_premul((10, 10)).expect("surface");
+        let canvas = surface.canvas();
+        canvas.clear(Color::WHITE);
+
+        let painter = VNPainter::new_with_images(canvas, &repo);
+        painter.draw(&vn, &[], None);
+
+        let snapshot = surface.image_snapshot();
+        let pixmap = snapshot.peek_pixels().expect("pixmap");
+        let color = pixmap.get_color((5, 5));
+        assert_eq!(color, Color::GREEN);
     }
 }
