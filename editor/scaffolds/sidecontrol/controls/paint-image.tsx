@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { cn } from "@/components/lib/utils";
-import { Slider } from "./utils/slider";
+import { PropertySlider } from "./utils/slider-fat";
 import { Button } from "@/components/ui-editor/button";
 import { BoxFitControl } from "./box-fit";
 import { RotateCwIcon, UploadIcon } from "lucide-react";
@@ -76,6 +75,71 @@ const IMAGE_FILTERS = [
   { key: "shadows", label: "Shadows" },
 ] as const;
 
+/**
+ * Image preview component with upload functionality
+ */
+interface ImagePreviewProps {
+  value?: cg.ImagePaint;
+  onImageUpload: () => void;
+  isUploading: boolean;
+}
+
+function ImagePreview({
+  value,
+  onImageUpload,
+  isUploading,
+}: ImagePreviewProps) {
+  return (
+    <div className="relative w-full aspect-square bg-muted rounded-md border overflow-hidden group">
+      {value?.src ? (
+        <img
+          src={value.src}
+          alt="Paint image"
+          className="w-full h-full object-cover"
+          style={{
+            objectFit: value.fit || "none",
+            transform: (value as any).rotation
+              ? `rotate(${(value as any).rotation}deg)`
+              : undefined,
+          }}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
+          <div className="text-center">
+            <ImageIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
+            <p className="text-xs text-muted-foreground">No image</p>
+          </div>
+        </div>
+      )}
+
+      {/* Hover Controls */}
+      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-8 py-4 transition-opacity duration-200 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
+        <Button
+          onClick={onImageUpload}
+          size="xs"
+          className="w-full"
+          disabled={isUploading}
+        >
+          <UploadIcon className="w-4 h-4 mr-2" />
+          {isUploading ? "Uploading..." : "Choose Image..."}
+        </Button>
+        {/* <Button
+            onClick={() => {
+              // TODO: Implement "Make an image" functionality
+              console.log("Make an image clicked");
+            }}
+            size="xs"
+            variant="outline"
+            className="w-full"
+          >
+            <ImageIcon className="w-4 h-4 mr-2" />
+            Make an image
+          </Button> */}
+      </div>
+    </div>
+  );
+}
+
 export interface ImagePaintControlProps {
   value?: cg.ImagePaint;
   onValueChange?: (value: cg.ImagePaint) => void;
@@ -85,8 +149,6 @@ export function ImagePaintControl({
   value,
   onValueChange,
 }: ImagePaintControlProps) {
-  const [isHovered, setIsHovered] = useState(false);
-
   // Handle image upload with the new hook
   const handleImageUploaded = useCallback(
     (imageUrl: string) => {
@@ -201,66 +263,12 @@ export function ImagePaintControl({
         </Button>
       </div>
 
-      {/* Image Box */}
-      <div
-        className="relative w-full aspect-square bg-muted rounded-md border overflow-hidden group"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
-        {value?.src ? (
-          <img
-            src={value.src}
-            alt="Paint image"
-            className="w-full h-full object-cover"
-            style={{
-              objectFit: value.fit || "none",
-              transform: (value as any).rotation
-                ? `rotate(${(value as any).rotation}deg)`
-                : undefined,
-              filter: value.filters
-                ? `brightness(${1 + (filters.exposure || 0) / 100}) contrast(${1 + (filters.contrast || 0) / 100}) saturate(${1 + (filters.saturation || 0) / 100}) hue-rotate(${(filters.temperature || 0) * 3.6}deg) sepia(${(filters.tint || 0) / 100})`
-                : undefined,
-            }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
-            <div className="text-center">
-              <ImageIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
-              <p className="text-xs text-muted-foreground">No image</p>
-            </div>
-          </div>
-        )}
-
-        {/* Hover Controls */}
-        <div
-          className={cn(
-            "absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-8 py-4 transition-opacity duration-200",
-            isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
-          )}
-        >
-          <Button
-            onClick={handleImageUpload}
-            size="xs"
-            className="w-full"
-            disabled={isUploading}
-          >
-            <UploadIcon className="w-4 h-4 mr-2" />
-            {isUploading ? "Uploading..." : "Upload from computer"}
-          </Button>
-          {/* <Button
-              onClick={() => {
-                // TODO: Implement "Make an image" functionality
-                console.log("Make an image clicked");
-              }}
-              size="xs"
-              variant="outline"
-              className="w-full"
-            >
-              <ImageIcon className="w-4 h-4 mr-2" />
-              Make an image
-            </Button> */}
-        </div>
-      </div>
+      {/* Image Preview */}
+      <ImagePreview
+        value={value}
+        onImageUpload={handleImageUpload}
+        isUploading={isUploading}
+      />
 
       {/* Edit Image Button */}
       {/* <Button
@@ -282,12 +290,14 @@ export function ImagePaintControl({
             <span className="text-xs text-muted-foreground w-20 truncate">
               {label}
             </span>
-            <Slider
+            <PropertySlider
               min={-100}
               max={100}
               step={1}
-              value={[filters[key as keyof typeof filters]]}
-              onValueChange={([value]) =>
+              defaultValue={0}
+              marks={[0]}
+              value={filters[key as keyof typeof filters]}
+              onValueChange={(value) =>
                 handleFilterChange(
                   key as keyof NonNullable<cg.ImagePaint["filters"]>,
                   value
