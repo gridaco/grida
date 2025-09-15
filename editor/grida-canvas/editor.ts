@@ -81,6 +81,7 @@ export class Editor
     editor.api.IEventTargetActions,
     editor.api.IFollowPluginActions,
     editor.api.IVectorInterfaceActions,
+    editor.api.IDocumentImageInterfaceActions,
     editor.api.IFontLoaderActions,
     editor.api.IExportPluginActions
 {
@@ -600,8 +601,37 @@ export class Editor
     });
   }
 
+  // ================================================================
+  // #region IDocumentImageInterfaceActions implementation
+  // ================================================================
+
   private readonly images = new Map<string, grida.program.document.ImageRef>();
-  private _experimental_createImage_for_wasm(
+
+  __is_image_registered(ref: string): boolean {
+    return this.images.has(ref);
+  }
+
+  __get_image_ref(ref: string): grida.program.document.ImageRef | null {
+    return this.images.get(ref) || null;
+  }
+
+  __get_image_bytes_for_wasm(ref: string): Uint8Array | null {
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+    const data = this._m_wasm_canvas_scene.getImageBytes(ref);
+    if (!data) return null;
+    return new Uint8Array(data);
+  }
+
+  __get_image_size_for_wasm(
+    ref: string
+  ): { width: number; height: number } | null {
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+    const size = this._m_wasm_canvas_scene.getImageSize(ref);
+    if (!size) return null;
+    return size;
+  }
+
+  protected _experimental_createImage_for_wasm(
     data: Uint8Array
   ): Readonly<grida.program.document.ImageRef> {
     assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
@@ -631,14 +661,22 @@ export class Editor
     const bytes = await blob.arrayBuffer();
     const type = blob.type;
 
-    return this.createImage(new Uint8Array(bytes), src, type);
+    // TODO: add file validation
+
+    return this.createImage(
+      new Uint8Array(bytes),
+      src,
+      type as grida.program.document.ImageType
+    );
   }
 
   async createImage(
     data: Uint8Array,
     url?: string,
-    type?: string
+    type?: grida.program.document.ImageType | (string | {})
   ): Promise<Readonly<grida.program.document.ImageRef>> {
+    // TODO: add file validation
+
     if (this.backend === "canvas" && this._m_wasm_canvas_scene) {
       return this._experimental_createImage_for_wasm(data);
     }
@@ -661,9 +699,7 @@ export class Editor
       width,
       height,
       bytes: data.byteLength,
-      type:
-        (type as "image/png" | "image/jpeg" | "image/webp" | "image/gif") ||
-        "image/png",
+      type: (type as grida.program.document.ImageType) || "image/png",
     };
 
     this.reduce((state) => {
@@ -673,6 +709,13 @@ export class Editor
 
     return ref;
   }
+
+  getImage(ref: string): ImageProxy | null {
+    if (!this.__is_image_registered(ref)) return null;
+    return new ImageProxy(this, ref);
+  }
+
+  // #endregion
 
   setTool(tool: editor.state.ToolMode, debug_label?: string) {
     if (debug_label) this.log("debug:setTool", tool, debug_label);
@@ -3273,6 +3316,46 @@ export class Editor
    */
   dispose() {
     this.listeners.clear();
+  }
+}
+
+export class ImageProxy implements editor.api.ImageInstance {
+  public readonly type: grida.program.document.ImageType;
+  private readonly ref_obj: grida.program.document.ImageRef;
+  constructor(
+    private readonly editor: Editor,
+    private readonly ref: string
+  ) {
+    assert(editor.__is_image_registered(ref), "Image is not registered");
+    this.ref_obj = editor.__get_image_ref(ref)!;
+    this.type = this.ref_obj.type;
+  }
+
+  getBytes(): Uint8Array {
+    return this.editor.__get_image_bytes_for_wasm(this.ref)!;
+  }
+
+  async getDataURL(): Promise<string> {
+    const bytes = this.getBytes();
+    const blob = new Blob([bytes], { type: this.type });
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        resolve(reader.result as string);
+      };
+
+      reader.onerror = () => {
+        reject(new Error("Failed to read image file"));
+      };
+
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  getSize() {
+    return this.editor.__get_image_size_for_wasm(this.ref)!;
   }
 }
 

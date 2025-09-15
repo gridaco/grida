@@ -2,6 +2,7 @@ import { css } from "@/grida-canvas-utils/css";
 import { TransparencyGridIcon, ImageIcon } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
 import { cn } from "@/components/lib/utils";
+import { ImageView } from "@/grida-canvas-react";
 
 export function PaintChip({
   paint,
@@ -190,16 +191,10 @@ export function ImagePaintChip({
       )}
     >
       {paint.src ? (
-        <img
+        <ImageView
           src={paint.src}
           alt="Paint image"
           className="w-full h-full object-cover"
-          style={{
-            objectFit: paint.fit || "none",
-            transform: (paint as any).rotation
-              ? `rotate(${(paint as any).rotation}deg)`
-              : undefined,
-          }}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">

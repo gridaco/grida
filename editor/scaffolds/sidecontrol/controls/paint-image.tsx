@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo, use } from "react";
 import { PropertySlider } from "./utils/slider-fat";
 import { Button } from "@/components/ui-editor/button";
 import { BoxFitControl } from "./box-fit";
 import { RotateCwIcon, UploadIcon } from "lucide-react";
 import { ImageIcon } from "@radix-ui/react-icons";
 import { useFilePicker } from "use-file-picker";
-import { useCurrentEditor } from "@/grida-canvas-react/use-editor";
+import { useCurrentEditor, ImageView } from "@/grida-canvas-react";
 import cg from "@grida/cg";
 import cmath from "@grida/cmath";
 
@@ -79,7 +79,7 @@ const IMAGE_FILTERS = [
  * Image preview component with upload functionality
  */
 interface ImagePreviewProps {
-  value?: cg.ImagePaint;
+  value: cg.ImagePaint;
   onImageUpload: () => void;
   isUploading: boolean;
 }
@@ -89,20 +89,12 @@ function ImagePreview({
   onImageUpload,
   isUploading,
 }: ImagePreviewProps) {
+  const Image = ImageView({ src: value.src });
+
   return (
-    <div className="relative w-full aspect-square bg-muted rounded-md border overflow-hidden group">
-      {value?.src ? (
-        <img
-          src={value.src}
-          alt="Paint image"
-          className="w-full h-full object-cover"
-          style={{
-            objectFit: value.fit || "none",
-            transform: (value as any).rotation
-              ? `rotate(${(value as any).rotation}deg)`
-              : undefined,
-          }}
-        />
+    <div className="relative w-full aspect-square bg-muted rounded-md border overflow-hidden group select-none">
+      {Image ? (
+        Image
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
           <div className="text-center">
@@ -141,7 +133,7 @@ function ImagePreview({
 }
 
 export interface ImagePaintControlProps {
-  value?: cg.ImagePaint;
+  value: cg.ImagePaint;
   onValueChange?: (value: cg.ImagePaint) => void;
 }
 
@@ -248,10 +240,11 @@ export function ImagePaintControl({
   return (
     <div className="w-full space-y-4">
       {/* Header with Box Fit and Rotate */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-8">
         <BoxFitControl
           value={value?.fit || "cover"}
           onValueChange={handleBoxFitChange}
+          className="w-24"
         />
         <Button
           onClick={handleRotate}

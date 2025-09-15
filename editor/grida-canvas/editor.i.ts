@@ -1820,6 +1820,13 @@ export namespace editor.api {
     }
   }
 
+  export interface ImageInstance {
+    readonly type: grida.program.document.ImageType;
+    getBytes(): Uint8Array;
+    getDataURL(): Promise<string>;
+    getSize(): { width: number; height: number };
+  }
+
   export type FontStyleChangeDescription = {
     fontStyleKey: editor.font_spec.FontStyleKey;
   };
@@ -2392,22 +2399,6 @@ export namespace editor.api {
     ): void;
 
     //
-
-    /**
-     * creates an image (data) from the given data, registers it to the document
-     * @param data
-     */
-    createImage(
-      data: Uint8Array | File
-    ): Promise<grida.program.document.ImageRef>;
-
-    /**
-     * creates an image (data) from the given src, registers it to the document
-     * @param src
-     */
-    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
-
-    //
     setTool(tool: editor.state.ToolMode): void;
     tryExitContentEditMode(): void;
     tryToggleContentEditMode(): void;
@@ -2641,6 +2632,30 @@ export namespace editor.api {
 
   export interface IVectorInterfaceActions {
     toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+  }
+
+  export interface IDocumentImageInterfaceActions {
+    //
+
+    /**
+     * creates an image (data) from the given data, registers it to the document
+     * @param data
+     */
+    createImage(
+      data: Uint8Array | File
+    ): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * creates an image (data) from the given src, registers it to the document
+     * @param src
+     */
+    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * gets the image instance from the given ref
+     * @param ref
+     */
+    getImage(ref: string): ImageInstance | null;
   }
 
   export interface IFontLoaderActions {

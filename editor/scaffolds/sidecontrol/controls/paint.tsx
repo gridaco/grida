@@ -745,10 +745,7 @@ function PaintTabsContent({
   if (value?.type === "image") {
     return (
       <div className="p-2">
-        <ImagePaintControl
-          value={value as any}
-          onValueChange={onValueChange as any}
-        />
+        <ImagePaintControl value={value} onValueChange={onValueChange} />
       </div>
     );
   }
@@ -783,6 +780,7 @@ function GradientControls({
               type: gradientType,
             } as any);
           }}
+          className="w-24"
         />
         <GradientActions value={value} onValueChange={onValueChange} />
       </div>
