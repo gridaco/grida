@@ -54,6 +54,16 @@ declare namespace canvas {
       data_ptr: number,
       data_len: number
     ): Ptr;
+    _get_image_bytes(
+      state: GridaCanvasWebGlApplicationPtr,
+      ref_ptr: number,
+      ref_len: number
+    ): Ptr;
+    _get_image_size(
+      state: GridaCanvasWebGlApplicationPtr,
+      ref_ptr: number,
+      ref_len: number
+    ): Ptr;
     _has_missing_fonts(state: GridaCanvasWebGlApplicationPtr): boolean;
     _list_missing_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
     _list_available_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;

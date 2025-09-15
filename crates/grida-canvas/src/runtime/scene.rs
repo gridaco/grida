@@ -22,6 +22,28 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+fn normalize_image_id(id: &str) -> String {
+    if id.starts_with("res://") {
+        id.to_string()
+    } else {
+        format!("res://images/{}", id)
+    }
+}
+
+fn detect_image_mime(bytes: &[u8]) -> &'static str {
+    if bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
+        "image/png"
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        "image/jpeg"
+    } else if bytes.len() > 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        "image/webp"
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        "image/gif"
+    } else {
+        "application/octet-stream"
+    }
+}
+
 /// Callback type used to request a redraw from the host window.
 pub type RequestRedrawCallback = Arc<dyn Fn()>;
 
@@ -235,13 +257,27 @@ impl Renderer {
         self.fonts.add(hash, family);
     }
 
-    pub fn add_image(&mut self, bytes: &[u8]) -> (String, String) {
+    pub fn add_image(&mut self, bytes: &[u8]) -> (String, String, u32, u32, String) {
         let hash = resources::hash_bytes(bytes);
         let hash_str = format!("{:016x}", hash);
         let rid = format!("res://images/{}", hash_str);
         self.resources.insert(&rid, bytes.to_vec());
-        self.images.insert(rid.clone(), hash);
-        (hash_str, rid)
+
+        let (width, height) = self.images.insert(rid.clone(), hash).unwrap_or((0, 0));
+
+        let r#type = detect_image_mime(bytes).to_string();
+
+        (hash_str, rid, width, height, r#type)
+    }
+
+    pub fn get_image_bytes(&self, id: &str) -> Option<Vec<u8>> {
+        let rid = normalize_image_id(id);
+        self.resources.get(&rid)
+    }
+
+    pub fn get_image_size(&self, id: &str) -> Option<(u32, u32)> {
+        let rid = normalize_image_id(id);
+        self.images.get_size(&rid)
     }
 
     /// Enable or disable the image tile cache.

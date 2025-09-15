@@ -59,6 +59,8 @@
 
 //   // Image management
 //   { name: "_add_image", paramCount: 3 },
+//   { name: "_get_image_bytes", paramCount: 3 },
+//   { name: "_get_image_size", paramCount: 3 },
 
 //   // Camera and transforms
 //   { name: "_set_main_camera_transform", paramCount: 7 },

@@ -157,7 +157,7 @@ export interface Grida2DScene extends Grida2DRuntime {
    *
    * @privateRemarks
    * @see https://developer.mozilla.org/en-US/docs/Web/API/Document/importNode
-  */
+   */
   importNode(node: TODO): TODO;
 
   loadImage(url: string): Promise<Image>;
@@ -205,6 +205,9 @@ export interface Grida2DScene extends Grida2DRuntime {
    * @see https://developer.mozilla.org/en-US/docs/Web/API/Document/images
    */
   images: TODO;
+
+  getImageBytes(ref: string): Uint8Array | null;
+  getImageSize(ref: string): { width: number; height: number } | null;
 
   /**
    * @default 100x100 rectangle
@@ -293,4 +296,7 @@ export interface Camera2D {
 export interface CreateImageResourceResult {
   hash: string;
   url: string;
+  width: number;
+  height: number;
+  type: string;
 }

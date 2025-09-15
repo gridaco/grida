@@ -277,11 +277,17 @@ export namespace grida.program.document {
     nodes: Record<nodes.NodeID, nodes.Node>;
   }
 
+  export type ImageType =
+    | "image/png"
+    | "image/jpeg"
+    | "image/webp"
+    | "image/gif";
+
   /**
    * reference to an registered image
    */
   export type ImageRef = {
-    type: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+    type: ImageType;
     url: string;
     width: number;
     height: number;

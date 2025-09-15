@@ -12,6 +12,9 @@ const ApplicationCommandID = {
 export interface CreateImageResourceResult {
   hash: string;
   url: string;
+  width: number;
+  height: number;
+  type: string;
 }
 
 export class Scene {
@@ -103,8 +106,34 @@ export class Scene {
     try {
       return JSON.parse(txt) as CreateImageResourceResult;
     } catch {
-      return { hash: txt, url: `res://images/${txt}` };
+      return false;
     }
+  }
+
+  getImageBytes(ref: string): Uint8Array | null {
+    const [ptr, len] = this._alloc_string(ref);
+    const outptr = this.module._get_image_bytes(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+    if (outptr === 0) return null;
+    const lengthBytes = this.module.HEAPU8.slice(outptr, outptr + 4);
+    const dataLength = new Uint32Array(
+      lengthBytes.buffer,
+      lengthBytes.byteOffset,
+      1
+    )[0];
+    const data = this.module.HEAPU8.slice(outptr + 4, outptr + 4 + dataLength);
+    this.module._deallocate(outptr, 4 + dataLength);
+    return new Uint8Array(data);
+  }
+
+  getImageSize(ref: string): { width: number; height: number } | null {
+    const [ptr, len] = this._alloc_string(ref);
+    const outptr = this.module._get_image_size(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+    if (outptr === 0) return null;
+    const view = this.module.HEAPU32.slice(outptr >> 2, (outptr >> 2) + 2);
+    this.module._deallocate(outptr, 4 * 2);
+    return { width: view[0], height: view[1] };
   }
 
   hasMissingFonts(): boolean {

@@ -18,7 +18,6 @@ import { EditorFollowPlugin } from "./plugins/follow";
 import type { Scene } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
 import * as google from "@grida/fonts/google";
-import type { FvarInstance } from "@grida/fonts/parse";
 
 import { DocumentFontManager } from "./font-manager";
 import {
@@ -609,16 +608,14 @@ export class Editor
 
     const result = this._m_wasm_canvas_scene.addImage(data);
     if (!result) throw new Error("addImage failed");
-    const { hash, url } = result;
+    const { hash, url, width, height, type } = result;
 
     const ref: grida.program.document.ImageRef = {
       url,
-      // TODO: the width/height will be returned from the wasm in the future.
-      width: 100,
-      height: 100,
+      width,
+      height,
       bytes: data.byteLength,
-      // TODO: the type will be returned from the wasm in the future.
-      type: "image/png",
+      type: type as grida.program.document.ImageType,
     };
 
     this.images.set(url, ref);

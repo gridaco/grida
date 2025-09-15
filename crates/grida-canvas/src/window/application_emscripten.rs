@@ -274,8 +274,16 @@ impl EmscriptenApplication {
         self.base.renderer.invalidate_cache();
     }
 
-    /// Register an image with the renderer and return its hash and URL.
-    pub fn add_image(&mut self, data: &[u8]) -> (String, String) {
+    /// Register an image with the renderer and return metadata.
+    pub fn add_image(&mut self, data: &[u8]) -> (String, String, u32, u32, String) {
         self.base.renderer.add_image(data)
+    }
+
+    pub fn get_image_bytes(&self, id: &str) -> Option<Vec<u8>> {
+        self.base.get_image_bytes(id)
+    }
+
+    pub fn get_image_size(&self, id: &str) -> Option<(u32, u32)> {
+        self.base.get_image_size(id)
     }
 }

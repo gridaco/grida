@@ -489,7 +489,7 @@ impl UnknownTargetApplication {
     fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
-            let (hash, url) = self.renderer.add_image(&msg.data);
+            let (hash, url, _, _, _) = self.renderer.add_image(&msg.data);
             println!("📝 Registered image with renderer: {} ({})", hash, url);
             updated = true;
         }
@@ -783,5 +783,13 @@ impl UnknownTargetApplication {
     /// Returns `true` if the timer was found and cancelled, `false` otherwise
     pub fn cancel_timer(&mut self, id: crate::sys::timer::TimerId) -> bool {
         self.timer.cancel(id)
+    }
+
+    pub fn get_image_bytes(&self, id: &str) -> Option<Vec<u8>> {
+        self.renderer.get_image_bytes(id)
+    }
+
+    pub fn get_image_size(&self, id: &str) -> Option<(u32, u32)> {
+        self.renderer.get_image_size(id)
     }
 }
