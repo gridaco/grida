@@ -438,45 +438,49 @@ impl<'a> Painter<'a> {
         self.canvas.save();
         self.canvas.translate((0.0, y_offset));
 
-        if stroke_width > 0.0 && matches!(stroke_align, StrokeAlign::Outside) {
-            for stroke_paint_def in strokes {
-                paragraph.borrow_mut().visit(|_, info| {
-                    if let Some(info) = info {
-                        text_stroke::draw_text_stroke_outside_fast_pre(
-                            self.canvas,
-                            info.glyphs(),
-                            info.positions(),
-                            info.origin(),
-                            info.font(),
-                            stroke_paint_def,
-                            stroke_width,
-                            layout_size,
-                        );
-                    }
-                });
-            }
+        if stroke_width > 0.0 && !strokes.is_empty() && matches!(stroke_align, StrokeAlign::Outside)
+        {
+            let images = self.images;
+            paragraph.borrow_mut().visit(|_, info| {
+                if let Some(info) = info {
+                    text_stroke::draw_text_stroke_outside_fast_pre(
+                        self.canvas,
+                        info.glyphs(),
+                        info.positions(),
+                        info.origin(),
+                        info.font(),
+                        strokes,
+                        stroke_width,
+                        layout_size,
+                        images,
+                    );
+                }
+            });
         }
 
         // Now we can simply paint the paragraph - all paint handling is done in paragraph()
         paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
 
-        if stroke_width > 0.0 && !matches!(stroke_align, StrokeAlign::Outside) {
-            for stroke_paint_def in strokes {
-                paragraph.borrow_mut().visit(|_, info| {
-                    if let Some(info) = info {
-                        text_stroke::draw_text_stroke(
-                            self.canvas,
-                            info.glyphs(),
-                            info.positions(),
-                            info.origin(),
-                            info.font(),
-                            stroke_paint_def,
-                            stroke_width,
-                            *stroke_align,
-                        );
-                    }
-                });
-            }
+        if stroke_width > 0.0
+            && !strokes.is_empty()
+            && !matches!(stroke_align, StrokeAlign::Outside)
+        {
+            let images = self.images;
+            paragraph.borrow_mut().visit(|_, info| {
+                if let Some(info) = info {
+                    text_stroke::draw_text_stroke(
+                        self.canvas,
+                        info.glyphs(),
+                        info.positions(),
+                        info.origin(),
+                        info.font(),
+                        strokes,
+                        stroke_width,
+                        *stroke_align,
+                        images,
+                    );
+                }
+            });
         }
 
         self.canvas.restore();
