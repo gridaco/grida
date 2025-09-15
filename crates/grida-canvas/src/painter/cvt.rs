@@ -1,4 +1,4 @@
-use super::gradient;
+use super::{gradient, image_filters};
 use crate::{cg::types::*, runtime::image_repository::ImageRepository, sk};
 use math2::box_fit::BoxFit;
 use skia_safe::{self, shaders, BlendMode, Color, SamplingOptions, Shader, TileMode};
@@ -117,7 +117,7 @@ pub fn shader_from_paint(
                 size,
             ));
             let sampling = SamplingOptions::default();
-            let shader = image.to_shader(
+            let mut shader = image.to_shader(
                 // Use `Decal` tile mode so Skia doesn't extend edge pixels
                 // when the image is scaled beyond its natural bounds. This
                 // prevents the visual artifacts where the last row/column is
@@ -126,6 +126,17 @@ pub fn shader_from_paint(
                 sampling,
                 Some(&matrix),
             )?;
+
+            // Apply image filters if any are specified
+            if img.filters.has_filters() {
+                if let Some(color_filter) =
+                    image_filters::create_image_filters_color_filter(&img.filters)
+                {
+                    shader = shader.with_color_filter(&color_filter);
+                }
+            }
+
+            // Apply opacity if needed
             if img.opacity < 1.0 {
                 let opacity_color = Color::from_argb((img.opacity * 255.0) as u8, 255, 255, 255);
                 Some(shaders::blend(

@@ -140,8 +140,8 @@ export function PropertySlider({
         value={sliderProps.value}
         onValueChange={sliderProps.onValueChange}
         onValueCommit={sliderProps.onValueCommit}
-        // Disable step to allow smooth dragging, we handle snapping ourselves
-        step={undefined}
+        // Let Radix UI handle step constraint, we apply additional logic in useSliderValue
+        step={step}
         disabled={disabled}
       >
         <SliderPrimitive.Track className="bg-muted relative grow overflow-hidden rounded-full data-[orientation=horizontal]:h-2 data-[orientation=horizontal]:w-full">

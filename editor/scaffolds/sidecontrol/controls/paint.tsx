@@ -56,13 +56,11 @@ const DEFAULT_IMAGE_PAINT: cg.ImagePaint = {
   fit: "cover",
   transform: cmath.transform.identity,
   filters: {
-    exposure: 0,
-    contrast: 0,
-    saturation: 0,
-    temperature: 0,
-    tint: 0,
-    highlights: 0,
-    shadows: 0,
+    exposure: 1.0,
+    contrast: 1.0,
+    saturation: 1.0,
+    temperature: 0.0,
+    tint: 1.0,
   },
   blendMode: cg.def.BLENDMODE,
 };

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, use } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { PropertySlider } from "./utils/slider-fat";
 import { Button } from "@/components/ui-editor/button";
 import { BoxFitControl } from "./box-fit";
@@ -66,13 +66,48 @@ function useImageUpload(onImageUploaded: (imageUrl: string) => void) {
 }
 
 const IMAGE_FILTERS = [
-  { key: "exposure", label: "Exposure" },
-  { key: "contrast", label: "Contrast" },
-  { key: "saturation", label: "Saturation" },
-  { key: "temperature", label: "Temperature" },
-  { key: "tint", label: "Tint" },
-  { key: "highlights", label: "Highlights" },
-  { key: "shadows", label: "Shadows" },
+  {
+    key: "exposure",
+    label: "Exposure",
+    min: 0.25,
+    max: 4.0,
+    step: 0.05,
+    defaultValue: 1.0,
+  },
+  {
+    key: "contrast",
+    label: "Contrast",
+    min: 0.25,
+    max: 4.0,
+    step: 0.01,
+    defaultValue: 1.0,
+  },
+  {
+    key: "saturation",
+    label: "Saturation",
+    min: 0.0,
+    max: 2.0,
+    step: 0.01,
+    defaultValue: 1.0,
+  },
+  {
+    key: "temperature",
+    label: "Temperature",
+    min: -0.4,
+    max: 0.4,
+    step: 0.01,
+    defaultValue: 0.0,
+  },
+  {
+    key: "tint",
+    label: "Tint",
+    min: 0.6,
+    max: 1.4,
+    step: 0.01,
+    defaultValue: 1.0,
+  },
+  // { key: "highlights", label: "Highlights" },
+  // { key: "shadows", label: "Shadows" },
 ] as const;
 
 /**
@@ -226,11 +261,11 @@ export function ImagePaintControl({
   );
 
   const defaultFilters = {
-    exposure: 0,
-    contrast: 0,
-    saturation: 0,
-    temperature: 0,
-    tint: 0,
+    exposure: 1.0,
+    contrast: 1.0,
+    saturation: 1.0,
+    temperature: 0.0,
+    tint: 1.0,
     highlights: 0,
     shadows: 0,
   };
@@ -278,19 +313,25 @@ export function ImagePaintControl({
 
       {/* Image Filters */}
       <div className="space-y-3">
-        {IMAGE_FILTERS.map(({ key, label }) => (
+        {IMAGE_FILTERS.map(({ key, label, min, max, step, defaultValue }) => (
           <div key={key} className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-20 truncate">
               {label}
             </span>
             <PropertySlider
-              min={-100}
-              max={100}
-              step={1}
-              defaultValue={0}
-              marks={[0]}
+              min={min}
+              max={max}
+              step={step}
+              defaultValue={defaultValue}
+              marks={[defaultValue]}
               value={filters[key as keyof typeof filters]}
               onValueChange={(value) =>
+                handleFilterChange(
+                  key as keyof NonNullable<cg.ImagePaint["filters"]>,
+                  value
+                )
+              }
+              onValueCommit={(value) =>
                 handleFilterChange(
                   key as keyof NonNullable<cg.ImagePaint["filters"]>,
                   value

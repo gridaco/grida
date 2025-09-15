@@ -329,6 +329,7 @@ mod tests {
                     fit: BoxFit::Fill,
                     opacity: 1.0,
                     blend_mode: BlendMode::default(),
+                    filters: ImageFilters::default(),
                 })]),
             }],
         };
@@ -386,6 +387,7 @@ mod tests {
                 fit: BoxFit::Fill,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
+                filters: ImageFilters::default(),
             })],
             width_profile: None,
         };

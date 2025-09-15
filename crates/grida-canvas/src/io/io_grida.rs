@@ -90,6 +90,9 @@ pub enum JSONPaint {
         fit: CSSObjectFit,
         #[serde(default)]
         blend_mode: BlendMode,
+        // Image filters
+        #[serde(default)]
+        filters: ImageFilters,
     },
 }
 
@@ -238,9 +241,10 @@ impl From<Option<JSONPaint>> for Paint {
                 transform,
                 fit,
                 blend_mode,
+                filters,
             }) => {
                 let url = src.unwrap_or_default();
-                Paint::Image(ImagePaint {
+                let image_paint = ImagePaint {
                     image: ResourceRef::RID(url),
                     transform: transform
                         .map(|m| AffineTransform { matrix: m })
@@ -248,7 +252,10 @@ impl From<Option<JSONPaint>> for Paint {
                     fit: fit.into(),
                     opacity: 1.0,
                     blend_mode,
-                })
+                    filters,
+                };
+
+                Paint::Image(image_paint)
             }
             None => Paint::Solid(SolidPaint {
                 color: CGColor::TRANSPARENT,
@@ -987,9 +994,10 @@ impl From<JSONImageNode> for Node {
                 transform: t,
                 fit,
                 blend_mode,
+                filters,
             }) => {
                 let resolved = h.unwrap_or_else(|| url.clone());
-                ImagePaint {
+                let image_paint = ImagePaint {
                     image: ResourceRef::RID(resolved),
                     transform: t
                         .map(|m| AffineTransform { matrix: m })
@@ -997,7 +1005,10 @@ impl From<JSONImageNode> for Node {
                     fit: fit.into(),
                     opacity: 1.0,
                     blend_mode,
-                }
+                    filters,
+                };
+
+                image_paint
             }
             _ => ImagePaint {
                 image: ResourceRef::RID(url.clone()),
@@ -1005,6 +1016,7 @@ impl From<JSONImageNode> for Node {
                 fit: node.fit.into(),
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
+                filters: ImageFilters::default(),
             },
         };
 

@@ -47,6 +47,7 @@ impl NodeFactory {
             transform: AffineTransform::identity(),
             fit: BoxFit::Cover,
             blend_mode: BlendMode::default(),
+            filters: ImageFilters::default(),
         }
     }
 

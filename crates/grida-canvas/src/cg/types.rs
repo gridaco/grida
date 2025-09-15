@@ -1259,6 +1259,94 @@ pub enum ResourceRef {
     RID(String),
 }
 
+/// Image filter parameters for color adjustments
+///
+/// All values are optional - when `None`, no filter is applied for that property.
+/// When `Some(value)`, the filter is applied with the specified intensity.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct ImageFilters {
+    /// Exposure adjustment factor (0.25 to 4.0, default: 1.0)
+    ///
+    /// Controls the overall brightness of the image using the formula `RGB' = RGB * k`.
+    ///
+    /// **Range**: `0.25` to `4.0`  
+    /// **Default**: `1.0` (no change)  
+    /// **Values**:
+    /// - `0.25` = very dark (like -2 EV)
+    /// - `0.5` = dark (like -1 EV)
+    /// - `1.0` = original (no change)
+    /// - `2.0` = bright (like +1 EV)
+    /// - `4.0` = very bright (like +2 EV)
+    pub exposure: Option<f32>,
+
+    /// Contrast adjustment factor (0.25 to 4.0, default: 1.0)
+    ///
+    /// Controls the difference between light and dark areas using the formula `c' = (c - p) * k + p` where `p = 0.5` (pivot point).
+    ///
+    /// **Range**: `0.25` to `4.0`  
+    /// **Default**: `1.0` (no change)  
+    /// **Values**:
+    /// - `0.25` = very low contrast
+    /// - `0.5` = low contrast
+    /// - `1.0` = original contrast
+    /// - `2.0` = high contrast
+    /// - `4.0` = very high contrast
+    pub contrast: Option<f32>,
+
+    /// Saturation adjustment factor (0.0 to 2.0, default: 1.0)
+    ///
+    /// Controls the intensity of colors using the formula `color' = lerp(luma, color, k)` where `luma` is grayscale.
+    ///
+    /// **Range**: `0.0` to `2.0`  
+    /// **Default**: `1.0` (no change)  
+    /// **Values**:
+    /// - `0.0` = grayscale (no color)
+    /// - `0.5` = desaturated
+    /// - `1.0` = original saturation
+    /// - `1.5` = oversaturated
+    /// - `2.0` = highly oversaturated
+    pub saturation: Option<f32>,
+
+    /// Temperature adjustment (-0.4 to 0.4, default: 0.0)
+    ///
+    /// Controls the warm/cool color balance using the formula `R' = R * rK`, `B' = B * bK` where `rK` and `bK` are temperature factors.
+    ///
+    /// **Range**: `-0.4` to `0.4`  
+    /// **Default**: `0.0` (no change)  
+    /// **Values**:
+    /// - `-0.4` = very cool (blue tint)
+    /// - `-0.2` = cool (slight blue tint)
+    /// - `0.0` = neutral (no change)
+    /// - `0.2` = warm (slight orange tint)
+    /// - `0.4` = very warm (strong orange tint)
+    pub temperature: Option<f32>,
+
+    /// Tint adjustment factor (0.6 to 1.4, default: 1.0)
+    ///
+    /// Controls the green/magenta color balance using the formula `G' = G * gK` where `gK` is the green multiplier.
+    ///
+    /// **Range**: `0.6` to `1.4`  
+    /// **Default**: `1.0` (no change)  
+    /// **Values**:
+    /// - `0.6` = strong magenta tint
+    /// - `0.8` = slight magenta tint
+    /// - `1.0` = neutral (no change)
+    /// - `1.2` = slight green tint
+    /// - `1.4` = strong green tint
+    pub tint: Option<f32>,
+}
+
+impl ImageFilters {
+    /// Check if any filters are active
+    pub fn has_filters(&self) -> bool {
+        self.exposure.is_some()
+            || self.contrast.is_some()
+            || self.saturation.is_some()
+            || self.temperature.is_some()
+            || self.tint.is_some()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ImagePaint {
     pub transform: AffineTransform,
@@ -1266,6 +1354,7 @@ pub struct ImagePaint {
     pub fit: BoxFit,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub filters: ImageFilters,
 }
 
 impl Default for RadialGradientPaint {
@@ -1309,6 +1398,7 @@ impl Default for ImagePaint {
             fit: BoxFit::Cover,
             opacity: 1.0,
             blend_mode: BlendMode::default(),
+            filters: ImageFilters::default(),
         }
     }
 }

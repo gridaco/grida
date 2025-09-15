@@ -754,8 +754,8 @@ export namespace cg {
     saturation?: number;
     temperature?: number;
     tint?: number;
-    highlights?: number;
-    shadows?: number;
+    // highlights?: number;
+    // shadows?: number;
   }
 
   export type GradientStop = {
