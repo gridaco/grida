@@ -621,15 +621,10 @@ impl<'a> Painter<'a> {
 
                                 // Convert strokes to StrokeOptions for VNPainter
                                 let stroke_options = if !vector_layer.strokes.is_empty() {
-                                    let first_stroke = &vector_layer.strokes[0];
-                                    let stroke_color = match first_stroke {
-                                        Paint::Solid(solid) => solid.color,
-                                        _ => CGColor(0, 0, 0, 255), // Default black
-                                    };
                                     Some(StrokeOptions {
                                         width: vector_layer.stroke_width,
                                         align: vector_layer.stroke_align,
-                                        color: stroke_color,
+                                        paints: vector_layer.strokes.clone(),
                                         width_profile: vector_layer.stroke_width_profile.clone(),
                                     })
                                 } else {

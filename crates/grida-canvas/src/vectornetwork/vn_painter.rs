@@ -12,7 +12,7 @@ use super::vn::{PiecewiseVectorNetworkGeometry, VectorNetwork};
 pub struct StrokeOptions {
     pub width: f32,
     pub align: StrokeAlign,
-    pub color: CGColor,
+    pub paints: Vec<Paint>,
     pub width_profile: Option<VarWidthProfile>,
 }
 
@@ -81,7 +81,7 @@ impl<'a> VNPainter<'a> {
                     Ok(geometry) => {
                         self.draw_stroke_variable_width(
                             &geometry,
-                            stroke_opts.color,
+                            &stroke_opts.paints,
                             var_width_profile,
                         );
                     }
@@ -112,7 +112,7 @@ impl<'a> VNPainter<'a> {
                 let merged = vn.to_union_path();
                 let stroke_path =
                     stroke_geometry(&merged, stroke_opts.width, stroke_opts.align, None);
-                self.draw_stroke_path(&stroke_path, stroke_opts.color);
+                self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
             }
             Center | Inside => {
                 // For center and inside alignments, stroke each individual path
@@ -120,24 +120,15 @@ impl<'a> VNPainter<'a> {
                 for path in paths {
                     let stroke_path =
                         stroke_geometry(&path, stroke_opts.width, stroke_opts.align, None);
-                    self.draw_stroke_path(&stroke_path, stroke_opts.color);
+                    self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
                 }
             }
         }
     }
 
     /// Helper method to draw a stroke path with the given color.
-    fn draw_stroke_path(&self, stroke_path: &skia_safe::Path, color: CGColor) {
-        let bounds = stroke_path.compute_tight_bounds();
-        let size = (bounds.width(), bounds.height());
-        let paint = Paint::Solid(SolidPaint {
-            color,
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        });
-        let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
-        sk_paint.set_style(PaintStyle::Fill);
-        self.canvas.draw_path(stroke_path, &sk_paint);
+    fn draw_stroke_path(&self, stroke_path: &skia_safe::Path, paints: &[Paint]) {
+        self.draw_path_with_paints(stroke_path, paints);
     }
 
     /// Draw a variable width stroke along a piecewise vector network geometry.
@@ -153,9 +144,12 @@ impl<'a> VNPainter<'a> {
     pub fn draw_stroke_variable_width(
         &self,
         geometry: &PiecewiseVectorNetworkGeometry,
-        stroke_color: CGColor,
+        stroke_paints: &[Paint],
         stroke_profile: &VarWidthProfile,
     ) {
+        if stroke_paints.is_empty() {
+            return;
+        }
         // Create the variable width stroke path
         let stroke_path = create_variable_width_stroke_from_geometry(
             geometry.clone(),
@@ -163,49 +157,31 @@ impl<'a> VNPainter<'a> {
             40, // Default samples per segment
         );
 
-        // Calculate bounds for the stroke path
-        let bounds = stroke_path.compute_tight_bounds();
-        let size = (bounds.width(), bounds.height());
-
-        // Create paint for the stroke
-        let paint = Paint::Solid(SolidPaint {
-            color: stroke_color,
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        });
-
-        // Convert to Skia paint and draw
-        let mut sk_paint = cvt::sk_paint(&paint, 1.0, size);
-        sk_paint.set_style(PaintStyle::Fill);
-        self.canvas.draw_path(&stroke_path, &sk_paint);
+        self.draw_path_with_paints(&stroke_path, stroke_paints);
     }
 
     /// Helper method to draw fills on a path.
     fn draw_path_fills(&self, path: &skia_safe::Path, fills: &[Paint]) {
-        if fills.is_empty() {
+        self.draw_path_with_paints(path, fills);
+    }
+
+    fn draw_path_with_paints(&self, path: &skia_safe::Path, paints: &[Paint]) {
+        if paints.is_empty() {
             return;
         }
+
         let bounds = path.compute_tight_bounds();
         let size = (bounds.width(), bounds.height());
 
         if let Some(images) = self.images {
-            if let Some(mut paint) = cvt::sk_paint_stack(fills, 1.0, size, images) {
+            if let Some(mut paint) = cvt::sk_paint_stack(paints, 1.0, size, images) {
                 paint.set_style(PaintStyle::Fill);
-                if let Some(shader) = paint.shader() {
-                    let matrix = skia_safe::Matrix::translate((-bounds.left, -bounds.top));
-                    paint.set_shader(shader.with_local_matrix(&matrix));
-                }
                 self.canvas.draw_path(path, &paint);
             }
         } else {
-            for fill in fills {
-                let mut sk_paint = cvt::sk_paint(fill, 1.0, size);
-                sk_paint.set_style(PaintStyle::Fill);
-                if let Some(shader) = sk_paint.shader() {
-                    let matrix = skia_safe::Matrix::translate((-bounds.left, -bounds.top));
-                    sk_paint.set_shader(shader.with_local_matrix(&matrix));
-                }
-                self.canvas.draw_path(path, &sk_paint);
+            if let Some(mut paint) = cvt::sk_paint_stack_without_images(paints, 1.0, size) {
+                paint.set_style(PaintStyle::Fill);
+                self.canvas.draw_path(path, &paint);
             }
         }
     }
@@ -215,7 +191,7 @@ impl<'a> VNPainter<'a> {
 mod tests {
     use super::*;
     use crate::cg::types::{
-        BlendMode, CGColor, FillRule, ImagePaint, Paint, ResourceRef, SolidPaint,
+        BlendMode, CGColor, FillRule, ImagePaint, Paint, ResourceRef, SolidPaint, StrokeAlign,
     };
     use crate::resources::ByteStore;
     use crate::runtime::image_repository::ImageRepository;
@@ -303,5 +279,56 @@ mod tests {
         let pixmap = snapshot.peek_pixels().expect("pixmap");
         let color = pixmap.get_color((5, 5));
         assert_eq!(color, Color::GREEN);
+    }
+
+    #[test]
+    fn image_stroke_renders() {
+        // Prepare image repository with a simple blue image
+        let mut store = ByteStore::new();
+        let mut img_surface = surfaces::raster_n32_premul((2, 2)).expect("surface");
+        img_surface.canvas().clear(Color::BLUE);
+        let img = img_surface.image_snapshot();
+        let data = img.encode(None, EncodedImageFormat::PNG, None).unwrap();
+        let hash = 2u64;
+        store.insert(hash, data.as_bytes().to_vec());
+        let store = Arc::new(Mutex::new(store));
+        let mut repo = ImageRepository::new(store);
+        repo.insert("stroke_img".to_string(), hash);
+
+        // Vector network with a rectangular stroke
+        let vn = VectorNetwork {
+            vertices: vec![(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)],
+            segments: vec![
+                VectorNetworkSegment::ab(0, 1),
+                VectorNetworkSegment::ab(1, 2),
+                VectorNetworkSegment::ab(2, 3),
+                VectorNetworkSegment::ab(3, 0),
+            ],
+            regions: vec![],
+        };
+
+        let mut surface = surfaces::raster_n32_premul((20, 20)).expect("surface");
+        let canvas = surface.canvas();
+        canvas.clear(Color::WHITE);
+
+        let painter = VNPainter::new_with_images(canvas, &repo);
+        let stroke = StrokeOptions {
+            width: 4.0,
+            align: StrokeAlign::Center,
+            paints: vec![Paint::Image(ImagePaint {
+                transform: AffineTransform::identity(),
+                image: ResourceRef::RID("stroke_img".to_string()),
+                fit: BoxFit::Fill,
+                opacity: 1.0,
+                blend_mode: BlendMode::default(),
+            })],
+            width_profile: None,
+        };
+        painter.draw(&vn, &[], Some(&stroke));
+
+        let snapshot = surface.image_snapshot();
+        let pixmap = snapshot.peek_pixels().expect("pixmap");
+        let color = pixmap.get_color((1, 5));
+        assert_eq!(color, Color::BLUE);
     }
 }

@@ -23,6 +23,19 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
     skia_paint
 }
 
+/// Combines multiple paints into a single Skia paint using shader blending.
+///
+/// This function efficiently stacks multiple paints by blending their shaders together,
+/// resulting in a single draw call instead of multiple separate draws.
+///
+/// # Arguments
+/// * `paints` - Array of paints to blend together
+/// * `opacity` - Overall opacity multiplier
+/// * `size` - Container size for paint calculations
+/// * `images` - Image repository for image paint resolution
+///
+/// # Returns
+/// Combined Skia paint with blended shaders, or `None` if no valid paints
 pub fn sk_paint_stack(
     paints: &[Paint],
     opacity: f32,
@@ -34,6 +47,38 @@ pub fn sk_paint_stack(
     let mut shader = shader_from_paint(first, opacity, size, Some(images))?;
     for p in iter {
         if let Some(s) = shader_from_paint(p, opacity, size, Some(images)) {
+            shader = shaders::blend(p.blend_mode(), s, shader);
+        }
+    }
+    let mut paint = skia_safe::Paint::default();
+    paint.set_anti_alias(true);
+    paint.set_shader(shader);
+    // Don't set blend mode - defaults to SrcOver, and blending is already handled in shader composition
+    Some(paint)
+}
+
+/// Combines multiple paints into a single Skia paint without image support.
+///
+/// Similar to `sk_paint_stack` but optimized for cases where image paints are not needed,
+/// avoiding the overhead of image repository handling.
+///
+/// # Arguments
+/// * `paints` - Array of paints to blend together (image paints will be ignored)
+/// * `opacity` - Overall opacity multiplier
+/// * `size` - Container size for paint calculations
+///
+/// # Returns
+/// Combined Skia paint with blended shaders, or `None` if no valid paints
+pub fn sk_paint_stack_without_images(
+    paints: &[Paint],
+    opacity: f32,
+    size: (f32, f32),
+) -> Option<skia_safe::Paint> {
+    let mut iter = paints.iter();
+    let first = iter.next()?;
+    let mut shader = shader_from_paint(first, opacity, size, None)?;
+    for p in iter {
+        if let Some(s) = shader_from_paint(p, opacity, size, None) {
             shader = shaders::blend(p.blend_mode(), s, shader);
         }
     }

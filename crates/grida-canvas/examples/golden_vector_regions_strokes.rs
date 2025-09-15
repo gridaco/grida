@@ -61,7 +61,7 @@ fn main() {
         let options = StrokeOptions {
             width: stroke_width,
             align: *align,
-            color: stroke_color,
+            paints: vec![Paint::from(stroke_color)],
             width_profile: None,
         };
         painter.draw(&network, &[], Some(&options));
