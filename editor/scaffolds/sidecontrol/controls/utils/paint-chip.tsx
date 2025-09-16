@@ -3,6 +3,19 @@ import { TransparencyGridIcon, ImageIcon } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
 import { cn } from "@/components/lib/utils";
 import { ImageView } from "@/grida-canvas-react";
+import { ComponentProps } from "react";
+
+function ChipContainer({ className, ...props }: ComponentProps<"div">) {
+  return (
+    <div
+      className={cn(
+        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
+        className
+      )}
+      {...props}
+    />
+  );
+}
 
 export function PaintChip({
   paint,
@@ -35,12 +48,7 @@ export function RGBAChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       <div
         className="absolute w-full h-full"
         style={{
@@ -48,7 +56,7 @@ export function RGBAChip({
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+    </ChipContainer>
   );
 }
 
@@ -60,12 +68,7 @@ export function LinearGradientPaintChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       <div
         className="absolute w-full h-full"
         style={{
@@ -73,7 +76,7 @@ export function LinearGradientPaintChip({
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+    </ChipContainer>
   );
 }
 
@@ -85,12 +88,7 @@ export function RadialGradientPaintChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       <div
         className="absolute w-full h-full"
         style={{
@@ -98,7 +96,7 @@ export function RadialGradientPaintChip({
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+    </ChipContainer>
   );
 }
 
@@ -110,12 +108,7 @@ export function SweepGradientPaintChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       <div
         className="absolute w-full h-full"
         style={{
@@ -123,7 +116,7 @@ export function SweepGradientPaintChip({
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+    </ChipContainer>
   );
 }
 
@@ -135,12 +128,7 @@ export function DiamondGradientPaintChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       {/* Diamond shape using CSS transform */}
       <div
         className="absolute inset-0 transform rotate-45 scale-75"
@@ -172,7 +160,7 @@ export function DiamondGradientPaintChip({
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+    </ChipContainer>
   );
 }
 
@@ -184,12 +172,7 @@ export function ImagePaintChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "w-4 h-4 rounded border shadow relative overflow-hidden bg-muted",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       {paint.src ? (
         <ImageView
           src={paint.src}
@@ -198,9 +181,10 @@ export function ImagePaintChip({
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <ImageIcon className="w-2 h-2 text-muted-foreground/50" />
+          <ImageIcon className="w-3 h-3 text-muted-foreground/50" />
         </div>
       )}
-    </div>
+      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
+    </ChipContainer>
   );
 }

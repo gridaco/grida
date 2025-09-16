@@ -700,6 +700,11 @@ export namespace cg {
      * @default "normal" {@link cg.def.BLENDMODE}
      */
     blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
   };
 
   export type RadialGradientPaint = {
@@ -711,6 +716,11 @@ export namespace cg {
      * @default "normal" {@link cg.def.BLENDMODE}
      */
     blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
   };
 
   export type SweepGradientPaint = {
@@ -722,6 +732,11 @@ export namespace cg {
      * @default "normal" {@link cg.def.BLENDMODE}
      */
     blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
   };
 
   export type DiamondGradientPaint = {
@@ -733,6 +748,11 @@ export namespace cg {
      * @default "normal" {@link cg.def.BLENDMODE}
      */
     blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
   };
 
   export type ImagePaint = {
@@ -746,6 +766,11 @@ export namespace cg {
      * @default "normal" {@link cg.def.BLENDMODE}
      */
     blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
   };
 
   export interface ImageFilters {

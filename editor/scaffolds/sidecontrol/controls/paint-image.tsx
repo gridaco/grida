@@ -182,19 +182,14 @@ export function ImagePaintControl({
       onValueChange?.({
         type: "image",
         src: imageUrl,
-        fit: value?.fit || "cover",
-        transform: value?.transform || cmath.transform.identity,
-        filters: value?.filters,
-        blendMode: value?.blendMode || "normal",
+        fit: value.fit,
+        transform: value.transform,
+        filters: value.filters,
+        blendMode: value.blendMode,
+        opacity: value.opacity,
       });
     },
-    [
-      onValueChange,
-      value?.fit,
-      value?.transform,
-      value?.filters,
-      value?.blendMode,
-    ]
+    [onValueChange, value.fit, value.transform, value.filters, value.blendMode]
   );
 
   const { openFilePicker, isUploading } = useImageUpload(handleImageUploaded);
@@ -204,7 +199,7 @@ export function ImagePaintControl({
   }, [openFilePicker]);
 
   const handleRotate = useCallback(() => {
-    if (!value?.src) return; // Don't update if no image source
+    if (!value.src) return; // Don't update if no image source
 
     // For now, we'll store rotation as a separate property for UI purposes
     // In the future, this should be handled through the transform matrix
@@ -215,7 +210,7 @@ export function ImagePaintControl({
       type: "image",
       src: value.src,
       fit: value.fit,
-      transform: value.transform || cmath.transform.identity,
+      transform: value.transform,
       filters: value.filters,
       blendMode: value.blendMode,
       rotation: newRotation,
@@ -227,7 +222,7 @@ export function ImagePaintControl({
       filterName: keyof NonNullable<cg.ImagePaint["filters"]>,
       newValue: number
     ) => {
-      if (!value?.src) return; // Don't update if no image source
+      if (!value.src) return; // Don't update if no image source
 
       onValueChange?.({
         type: "image",
@@ -239,6 +234,7 @@ export function ImagePaintControl({
           [filterName]: newValue,
         },
         blendMode: value.blendMode,
+        opacity: value.opacity,
       });
     },
     [value, onValueChange]
@@ -246,7 +242,7 @@ export function ImagePaintControl({
 
   const handleBoxFitChange = useCallback(
     (fit: cg.BoxFit) => {
-      if (!value?.src) return; // Don't update if no image source
+      if (!value.src) return; // Don't update if no image source
 
       onValueChange?.({
         type: "image",
@@ -255,6 +251,7 @@ export function ImagePaintControl({
         transform: value.transform,
         filters: value.filters,
         blendMode: value.blendMode,
+        opacity: value.opacity,
       });
     },
     [value, onValueChange]
@@ -270,14 +267,14 @@ export function ImagePaintControl({
     shadows: 0,
   };
 
-  const filters = { ...defaultFilters, ...value?.filters };
+  const filters = { ...defaultFilters, ...value.filters };
 
   return (
     <div className="w-full space-y-4">
       {/* Header with Box Fit and Rotate */}
       <div className="flex items-center justify-between gap-8">
         <BoxFitControl
-          value={value?.fit || "cover"}
+          value={value.fit}
           onValueChange={handleBoxFitChange}
           className="w-24"
         />

@@ -18,6 +18,29 @@ export const black: cg.Paint = {
   color: { r: 0, g: 0, b: 0, a: 1 },
 };
 
+/**
+ * Creates an initial node with default properties for a given node type.
+ *
+ * @param type - The type of node to create
+ * @param seed - Optional partial properties to override defaults
+ * @param constraints - Optional constraints to control which paint properties are set
+ * @returns A new node with default properties
+ *
+ * @example
+ * ```typescript
+ * // Create a rectangle with single fill
+ * const rect = initialNode("rectangle", {}, { fill: "fill" });
+ *
+ * // Create a rectangle with multiple fills
+ * const rectMulti = initialNode("rectangle", {}, { fill: "fills" });
+ *
+ * // Create a line with single stroke
+ * const line = initialNode("line", {}, { stroke: "stroke" });
+ *
+ * // Create a line with multiple strokes
+ * const lineMulti = initialNode("line", {}, { stroke: "strokes" });
+ * ```
+ */
 export default function initialNode(
   type:
     | "text"
@@ -31,7 +54,11 @@ export default function initialNode(
     | "polygon"
     | "star"
     | "line",
-  seed: Partial<Omit<grida.program.nodes.UnknwonNode, "type">> = {}
+  seed: Partial<Omit<grida.program.nodes.UnknwonNode, "type">> = {},
+  constraints: {
+    fill?: "fill" | "fills";
+    stroke?: "stroke" | "strokes";
+  } = {}
 ): grida.program.nodes.Node {
   const id = nid();
   const base: grida.program.nodes.i.IBaseNode &
@@ -54,7 +81,8 @@ export default function initialNode(
     opacity: 1,
     zIndex: 0,
     rotation: 0,
-    fill: gray,
+    fill: constraints.fill === "fills" ? undefined : gray,
+    fills: constraints.fill === "fills" ? [gray] : undefined,
     width: 100,
     height: 100,
     position: "absolute",
@@ -72,11 +100,13 @@ export default function initialNode(
         type: "text",
         textAlign: "left",
         textAlignVertical: "top",
-        fill: black,
+        fill: constraints.fill === "fills" ? undefined : black,
+        fills: constraints.fill === "fills" ? [black] : undefined,
         width: "auto",
         height: "auto",
         text: "Text",
-        stroke: undefined,
+        stroke: constraints.stroke === "strokes" ? undefined : undefined,
+        strokes: constraints.stroke === "strokes" ? [] : undefined,
         letterSpacing: 0,
         lineHeight: undefined, // normal
         strokeWidth: 0,
@@ -92,7 +122,8 @@ export default function initialNode(
         style: {
           overflow: "clip",
         },
-        fill: white,
+        fill: constraints.fill === "fills" ? undefined : white,
+        fills: constraints.fill === "fills" ? [white] : undefined,
         type: "container",
         expanded: false,
         cornerRadius: 0,
@@ -112,7 +143,8 @@ export default function initialNode(
         ...base,
         ...position,
         ...styles,
-        fill: white,
+        fill: constraints.fill === "fills" ? undefined : white,
+        fills: constraints.fill === "fills" ? [white] : undefined,
         type: "iframe",
         cornerRadius: 0,
         ...seed,
@@ -123,7 +155,8 @@ export default function initialNode(
         ...base,
         ...position,
         ...styles,
-        fill: white,
+        fill: constraints.fill === "fills" ? undefined : white,
+        fills: constraints.fill === "fills" ? [white] : undefined,
         type: "richtext",
         width: "auto",
         height: "auto",
@@ -141,7 +174,8 @@ export default function initialNode(
         width: 100,
         height: 100,
         fit: "cover",
-        fill: undefined,
+        fill: constraints.fill === "fills" ? undefined : undefined,
+        fills: constraints.fill === "fills" ? [] : undefined,
         // TODO: replace with static url
         src: "/dummy/image/png/png-square-transparent-1k.png",
         ...seed,
@@ -156,7 +190,8 @@ export default function initialNode(
         cornerRadius: 0,
         width: 100,
         height: 100,
-        fill: undefined,
+        fill: constraints.fill === "fills" ? undefined : undefined,
+        fills: constraints.fill === "fills" ? [] : undefined,
         fit: "cover",
         // TODO: replace with static url
         src: "/dummy/video/mp4/mp4-30s-5mb.mp4",
@@ -176,7 +211,8 @@ export default function initialNode(
         height: 100,
         strokeWidth: 0,
         strokeCap: "butt",
-        fill: gray,
+        fill: constraints.fill === "fills" ? undefined : gray,
+        fills: constraints.fill === "fills" ? [gray] : undefined,
         angle: 360,
         angleOffset: 0,
         innerRadius: 0,
@@ -198,7 +234,8 @@ export default function initialNode(
         height: 100,
         strokeWidth: 0,
         strokeCap: "butt",
-        fill: gray,
+        fill: constraints.fill === "fills" ? undefined : gray,
+        fills: constraints.fill === "fills" ? [gray] : undefined,
         ...seed,
       } satisfies grida.program.nodes.RectangleNode;
     }
@@ -214,7 +251,8 @@ export default function initialNode(
         height: 100,
         strokeWidth: 0,
         strokeCap: "butt",
-        fill: gray,
+        fill: constraints.fill === "fills" ? undefined : gray,
+        fills: constraints.fill === "fills" ? [gray] : undefined,
         ...seed,
       } satisfies grida.program.nodes.RegularPolygonNode;
     }
@@ -231,7 +269,8 @@ export default function initialNode(
         height: 100,
         strokeWidth: 0,
         strokeCap: "butt",
-        fill: gray,
+        fill: constraints.fill === "fills" ? undefined : gray,
+        fills: constraints.fill === "fills" ? [gray] : undefined,
         ...seed,
       } satisfies grida.program.nodes.RegularStarPolygonNode;
     }
@@ -241,7 +280,8 @@ export default function initialNode(
         ...position,
         ...styles,
         type: "line",
-        stroke: black,
+        stroke: constraints.stroke === "strokes" ? undefined : black,
+        strokes: constraints.stroke === "strokes" ? [black] : undefined,
         strokeWidth: 1,
         strokeCap: "butt",
         width: 100,

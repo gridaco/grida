@@ -24,13 +24,14 @@ import {
 import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
 import HexValueInput from "./utils/hex";
-import { Cross2Icon } from "@radix-ui/react-icons";
 import { ColorPicker } from "./color-picker";
 import cmath from "@grida/cmath";
 import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
+import { useNumberInput } from "@grida/number-input/react";
+import { Separator } from "@/components/ui/separator";
 
 const paint_label = {
   solid: "solid",
@@ -52,6 +53,7 @@ const gradient_types = [
 
 const DEFAULT_IMAGE_PAINT: cg.ImagePaint = {
   type: "image",
+  // FIXME: not registered.
   src: "res://system/images/checker.png",
   fit: "cover",
   transform: cmath.transform.identity,
@@ -63,6 +65,7 @@ const DEFAULT_IMAGE_PAINT: cg.ImagePaint = {
     tint: 1.0,
   },
   blendMode: cg.def.BLENDMODE,
+  opacity: 1,
 };
 
 function getNextPaintForType(
@@ -78,6 +81,13 @@ function getNextPaintForType(
   const transform =
     (current && "transform" in current ? current.transform : undefined) ??
     cmath.transform.identity;
+
+  // Extract current opacity value
+  const opacity = current
+    ? current.type === "solid"
+      ? current.color.a
+      : (current as any).opacity || 1
+    : 1;
 
   switch (current?.type) {
     case "solid": {
@@ -98,13 +108,17 @@ function getNextPaintForType(
               },
             ],
             blendMode: blendMode,
+            opacity: opacity,
           } as cg.Paint;
         }
         case "solid": {
           return current; // noop
         }
         case "image": {
-          return DEFAULT_IMAGE_PAINT;
+          return {
+            ...DEFAULT_IMAGE_PAINT,
+            opacity: opacity,
+          };
         }
       }
       break;
@@ -117,7 +131,10 @@ function getNextPaintForType(
         case "solid": {
           return {
             type: "solid",
-            color: current.stops[0].color,
+            color: {
+              ...current.stops[0].color,
+              a: opacity,
+            },
           };
         }
         case "linear_gradient":
@@ -129,10 +146,14 @@ function getNextPaintForType(
             stops: current.stops,
             transform,
             blendMode,
+            opacity: current.opacity || 1,
           } as cg.Paint;
         }
         case "image": {
-          return DEFAULT_IMAGE_PAINT;
+          return {
+            ...DEFAULT_IMAGE_PAINT,
+            opacity: opacity,
+          };
         }
       }
       break;
@@ -142,7 +163,7 @@ function getNextPaintForType(
         case "solid": {
           return {
             type: "solid",
-            color: { r: 128, g: 128, b: 128, a: 1 }, // Default gray
+            color: { r: 128, g: 128, b: 128, a: opacity }, // Default gray with preserved opacity
           };
         }
         case "linear_gradient":
@@ -157,6 +178,7 @@ function getNextPaintForType(
               { offset: 1, color: { r: 255, g: 255, b: 255, a: 1 } },
             ],
             blendMode,
+            opacity: opacity,
           } as cg.Paint;
         }
         case "image": {
@@ -177,13 +199,8 @@ export interface PaintControlProps {
    * called when user explicitly adds a new paint via the UI
    */
   onValueAdd?: (value: ComputedPaint | TokenizedPaint) => void;
-  /**
-   * called when user removes the paint via the UI
-   */
-  onValueRemove?: () => void;
   onOpenChange?: (open: boolean) => void;
   selectedGradientStop?: number;
-  removable?: boolean;
   onSelectedGradientStopChange?: (stop: number) => void;
 }
 
@@ -191,8 +208,6 @@ export function PaintControl({
   value,
   onValueChange,
   onValueAdd,
-  onValueRemove,
-  removable,
   selectedGradientStop,
   onOpenChange,
   onSelectedGradientStopChange,
@@ -210,10 +225,8 @@ export function PaintControl({
         value={value as ComputedPaint}
         onValueChange={onValueChange}
         onValueAdd={onValueAdd as any}
-        onValueRemove={onValueRemove}
         onOpenChange={onOpenChange}
         selectedGradientStop={selectedGradientStop}
-        removable={removable}
         onSelectedGradientStopChange={onSelectedGradientStopChange}
       />
     );
@@ -227,8 +240,6 @@ function ComputedPaintControl({
   value,
   onValueChange,
   onValueAdd,
-  onValueRemove,
-  removable,
   onOpenChange,
   selectedGradientStop,
   onSelectedGradientStopChange,
@@ -236,8 +247,6 @@ function ComputedPaintControl({
   value?: ComputedPaint;
   onValueChange?: (value: ComputedPaint | null) => void;
   onValueAdd?: (value: ComputedPaint) => void;
-  onValueRemove?: () => void;
-  removable?: boolean;
   onOpenChange?: (open: boolean) => void;
   selectedGradientStop?: number;
   onSelectedGradientStopChange?: (stop: number) => void;
@@ -264,24 +273,13 @@ function ComputedPaintControl({
     }
   };
 
-  const onRemovePaint = () => {
-    if (!removable) return;
-    if (onValueRemove) {
-      onValueRemove();
-    } else {
-      onValueChange?.(null);
-    }
-  };
-
   return (
     <Popover onOpenChange={onOpenChange}>
-      <PaintTrigger
-        value={value}
-        removable={removable}
-        onAddPaint={onAddPaint}
-        onRemovePaint={onRemovePaint}
-        onValueChange={onValueChange}
-      />
+      {!value ? (
+        <NewPaintTrigger onAddPaint={onAddPaint} />
+      ) : (
+        <PaintTrigger value={value} onValueChange={onValueChange} />
+      )}
       <PaintPopoverContent
         value={value}
         onValueChange={onValueChange}
@@ -295,12 +293,10 @@ function ComputedPaintControl({
 
 function TokenizedPaintControl({
   value,
-  removable,
   onValueChange,
   onOpenChange,
 }: {
   value: TokenizedPaint;
-  removable?: boolean;
   onValueChange?: (value: TokenizedPaint | null) => void;
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -323,14 +319,6 @@ function TokenizedPaintControl({
               identifier as tokens.PropertyAccessExpression
             )}
           </span>
-          {/* {removable && (
-          <button
-            onClick={onRemovePaint}
-            className="px-1 py-1 me-0.5 text-muted-foreground"
-          >
-            <Cross2Icon className="w-3.5 h-3.5" />
-          </button>
-        )} */}
         </PaintInputContainer>
       </PopoverTrigger>
       <PopoverContent>
@@ -380,34 +368,25 @@ function ContextVariableColors({
   );
 }
 
+function NewPaintTrigger({ onAddPaint }: { onAddPaint: () => void }) {
+  return (
+    <PopoverTrigger className="w-full">
+      <PaintInputContainer onClick={onAddPaint}>
+        <PaintChip paint={cg.paints.transparent} className="rounded-sm" />
+        <span className="ms-2 text-xs">Add</span>
+      </PaintInputContainer>
+    </PopoverTrigger>
+  );
+}
+
 function PaintTrigger({
   value,
-  removable,
-  onAddPaint,
-  onRemovePaint,
   onValueChange,
 }: {
-  value?: ComputedPaint;
-  removable?: boolean;
-  onAddPaint: () => void;
-  onRemovePaint: () => void;
+  value: ComputedPaint;
   onValueChange?: (value: ComputedPaint | null) => void;
 }) {
-  const inputRef = React.useRef<HTMLInputElement | null>(null);
   const [isFocused, setIsFocused] = React.useState(false);
-
-  const handleContainerClick = React.useCallback(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const handleContainerPointerDown = React.useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) {
-        inputRef.current?.focus();
-      }
-    },
-    []
-  );
 
   const handleInputFocus = React.useCallback(() => {
     setIsFocused(true);
@@ -416,30 +395,15 @@ function PaintTrigger({
   const handleInputBlur = React.useCallback(() => {
     setIsFocused(false);
   }, []);
-  if (!value) {
-    return (
-      <PopoverTrigger className="w-full">
-        <PaintInputContainer onClick={onAddPaint}>
-          <PaintChip paint={cg.paints.transparent} className="rounded-sm" />
-          <span className="ms-2 text-xs">Add</span>
-        </PaintInputContainer>
-      </PopoverTrigger>
-    );
-  }
 
   if (value.type === "solid") {
     return (
       <SolidPaintTrigger
         value={value}
-        removable={removable}
-        onRemovePaint={onRemovePaint}
         isFocused={isFocused}
-        inputRef={inputRef}
         onValueChange={onValueChange}
         onInputFocus={handleInputFocus}
         onInputBlur={handleInputBlur}
-        onContainerClick={handleContainerClick}
-        onContainerPointerDown={handleContainerPointerDown}
       />
     );
   }
@@ -448,8 +412,10 @@ function PaintTrigger({
     return (
       <GradientPaintTrigger
         value={value}
-        removable={removable}
-        onRemovePaint={onRemovePaint}
+        isFocused={isFocused}
+        onInputFocus={handleInputFocus}
+        onInputBlur={handleInputBlur}
+        onValueChange={onValueChange}
       />
     );
   }
@@ -458,8 +424,10 @@ function PaintTrigger({
     return (
       <ImagePaintTrigger
         value={value}
-        removable={removable}
-        onRemovePaint={onRemovePaint}
+        isFocused={isFocused}
+        onInputFocus={handleInputFocus}
+        onInputBlur={handleInputBlur}
+        onValueChange={onValueChange}
       />
     );
   }
@@ -467,43 +435,82 @@ function PaintTrigger({
   return null;
 }
 
+function InlineOpacityControl({
+  value,
+  onValueCommit,
+  onFocus,
+  onBlur,
+}: {
+  value?: number;
+  onValueCommit?: (value: number) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+}) {
+  const {
+    internalValue,
+    inputType,
+    handleFocus,
+    handleBlur,
+    handleKeyDown,
+    handleChange,
+    inputRef,
+  } = useNumberInput({
+    type: "number",
+    value,
+    step: 0.01,
+    autoSelect: true,
+    min: 0,
+    max: 1,
+    mode: "fixed",
+    onValueCommit,
+    commitOnBlur: true,
+    suffix: "%",
+    scale: 100,
+  });
+
+  return (
+    <input
+      ref={inputRef}
+      type={inputType}
+      placeholder="<opacity>"
+      value={internalValue}
+      onChange={handleChange}
+      onFocus={(e) => {
+        handleFocus(e, onFocus);
+      }}
+      onBlur={(e) => {
+        handleBlur(e, onBlur);
+      }}
+      onKeyDown={handleKeyDown}
+      className="
+        w-12 appearance-none ps-1.5
+        placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground
+        bg-transparent outline-none
+      "
+    />
+  );
+}
+
 function SolidPaintTrigger({
   value,
-  removable,
-  onRemovePaint,
   isFocused,
-  inputRef,
   onValueChange,
   onInputFocus,
   onInputBlur,
-  onContainerClick,
-  onContainerPointerDown,
 }: {
   value: cg.SolidPaint;
-  removable?: boolean;
-  onRemovePaint: () => void;
   isFocused: boolean;
-  inputRef: React.RefObject<HTMLInputElement | null>;
   onValueChange?: (value: ComputedPaint | null) => void;
   onInputFocus: () => void;
   onInputBlur: () => void;
-  onContainerClick: () => void;
-  onContainerPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
 }) {
   return (
-    <PaintInputContainer
-      isFocused={isFocused}
-      onClick={onContainerClick}
-      onPointerDown={onContainerPointerDown}
-      tabIndex={-1}
-      className="gap-2 cursor-text"
-    >
+    <PaintInputContainer isFocused={isFocused} tabIndex={-1}>
       <PopoverTrigger className="flex-shrink-0">
         <PaintChip paint={value} className="rounded-sm" />
       </PopoverTrigger>
       <HexValueInput
-        ref={inputRef}
-        className="flex-1"
+        className="flex-1 px-1.5"
         value={{
           r: value.color.r,
           g: value.color.g,
@@ -518,79 +525,97 @@ function SolidPaintTrigger({
           });
         }}
       />
-      {removable && (
-        <button
-          onClick={onRemovePaint}
-          className="flex-shrink-0 px-1 py-1 me-0.5 text-muted-foreground"
-        >
-          <Cross2Icon className="w-3.5 h-3.5" />
-        </button>
-      )}
+      <Separator orientation="vertical" />
+      <InlineOpacityControl
+        value={value.color.a}
+        onValueCommit={(opacity) => {
+          onValueChange?.({
+            type: "solid",
+            color: { ...value.color, a: opacity },
+          });
+        }}
+        onFocus={onInputFocus}
+        onBlur={onInputBlur}
+      />
     </PaintInputContainer>
   );
 }
 
 function GradientPaintTrigger({
   value,
-  removable,
-  onRemovePaint,
+  isFocused,
+  onInputFocus,
+  onInputBlur,
+  onValueChange,
 }: {
   value:
     | cg.LinearGradientPaint
     | cg.RadialGradientPaint
     | cg.SweepGradientPaint
     | cg.DiamondGradientPaint;
-  removable?: boolean;
-  onRemovePaint: () => void;
+  isFocused: boolean;
+  onInputFocus: () => void;
+  onInputBlur: () => void;
+  onValueChange?: (value: ComputedPaint | null) => void;
 }) {
   return (
-    <PopoverTrigger className="w-full">
-      <PaintInputContainer>
+    <PaintInputContainer isFocused={isFocused}>
+      <PopoverTrigger className="flex flex-1 items-center">
         <PaintChip paint={value} className="rounded-sm" />
-        <span className="ms-2 text-start text-xs flex-1 capitalize">
+        <span className="ms-2 text-start text-xs capitalize">
           {paint_label[value.type]}
         </span>
-        {removable && (
-          <span
-            role="button"
-            onClick={onRemovePaint}
-            className="px-1 py-1 me-0.5 text-muted-foreground"
-          >
-            <Cross2Icon className="w-3.5 h-3.5" />
-          </span>
-        )}
-      </PaintInputContainer>
-    </PopoverTrigger>
+      </PopoverTrigger>
+      <Separator orientation="vertical" />
+      <InlineOpacityControl
+        value={value.opacity || 1}
+        onValueCommit={(opacity) => {
+          onValueChange?.({
+            ...value,
+            opacity: opacity,
+          });
+        }}
+        onFocus={onInputFocus}
+        onBlur={onInputBlur}
+      />
+    </PaintInputContainer>
   );
 }
 
 function ImagePaintTrigger({
   value,
-  removable,
-  onRemovePaint,
+  isFocused,
+  onInputFocus,
+  onInputBlur,
+  onValueChange,
 }: {
   value: cg.ImagePaint;
-  removable?: boolean;
-  onRemovePaint: () => void;
+  isFocused: boolean;
+  onInputFocus: () => void;
+  onInputBlur: () => void;
+  onValueChange?: (value: ComputedPaint | null) => void;
 }) {
   return (
-    <PopoverTrigger className="w-full">
-      <PaintInputContainer>
+    <PaintInputContainer isFocused={isFocused}>
+      <PopoverTrigger className="flex flex-1 items-center">
         <PaintChip paint={value} className="rounded-sm" />
-        <span className="ms-2 text-start text-xs flex-1 capitalize">
+        <span className="ms-2 text-start text-xs capitalize">
           {paint_label[value.type]}
         </span>
-        {removable && (
-          <span
-            role="button"
-            onClick={onRemovePaint}
-            className="px-1 py-1 me-0.5 text-muted-foreground"
-          >
-            <Cross2Icon className="w-3.5 h-3.5" />
-          </span>
-        )}
-      </PaintInputContainer>
-    </PopoverTrigger>
+      </PopoverTrigger>
+      <Separator orientation="vertical" />
+      <InlineOpacityControl
+        value={value.opacity || 1}
+        onValueCommit={(opacity) => {
+          onValueChange?.({
+            ...value,
+            opacity: opacity,
+          });
+        }}
+        onFocus={onInputFocus}
+        onBlur={onInputBlur}
+      />
+    </PaintInputContainer>
   );
 }
 
@@ -872,7 +897,7 @@ function PaintInputContainer({
       {...props}
       data-focus={isFocused}
       className={cn(
-        "flex items-center border cursor-default",
+        "flex items-center border cursor-default w-full",
         WorkbenchUI.inputVariants({
           size: "xs",
           variant: "paint-container",
