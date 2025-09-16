@@ -288,7 +288,6 @@ impl<'a> Painter<'a> {
         }
         if let Some(paint) = cvt::sk_paint_stack(
             fills,
-            1.0,
             (shape.rect.width(), shape.rect.height()),
             self.images,
         ) {
@@ -327,7 +326,6 @@ impl<'a> Painter<'a> {
         }
         if let Some(paint) = cvt::sk_paint_stack(
             strokes,
-            1.0,
             (shape.rect.width(), shape.rect.height()),
             self.images,
         ) {

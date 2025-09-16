@@ -25,7 +25,7 @@ fn draw_rect(
     canvas.translate((x, y));
 
     // Create paint with gradient relative to container (0,0)
-    let paint = diamond_gradient_paint(gradient, gradient.opacity, size);
+    let paint = diamond_gradient_paint(gradient, size);
 
     // Draw rectangle at origin (0,0) since we translated the canvas
     canvas.draw_rect(Rect::from_xywh(0.0, 0.0, size.0, size.1), &paint);
