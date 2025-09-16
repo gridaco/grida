@@ -46,7 +46,7 @@ pub enum JSONPaint {
     #[serde(rename = "solid")]
     Solid {
         color: Option<JSONRGBA>,
-        #[serde(default)]
+        #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
     },
     #[serde(rename = "linear_gradient")]
@@ -56,7 +56,7 @@ pub enum JSONPaint {
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(default)]
+        #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
     },
     #[serde(rename = "radial_gradient")]
@@ -66,7 +66,7 @@ pub enum JSONPaint {
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(default)]
+        #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
     },
     #[serde(rename = "diamond_gradient")]
@@ -76,7 +76,7 @@ pub enum JSONPaint {
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(default)]
+        #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
     },
     #[serde(rename = "sweep_gradient")]
@@ -86,7 +86,7 @@ pub enum JSONPaint {
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(default)]
+        #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
     },
     #[serde(rename = "image")]
@@ -98,7 +98,7 @@ pub enum JSONPaint {
         fit: CSSObjectFit,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(default)]
+        #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
         // Image filters
         #[serde(default)]
@@ -363,7 +363,7 @@ pub struct JSONUnknownNodeProperties {
     // blend
     #[serde(rename = "opacity", default = "default_opacity")]
     pub opacity: f32,
-    #[serde(rename = "blendMode", default = "BlendMode::default")]
+    #[serde(rename = "blendMode", default)]
     pub blend_mode: BlendMode,
     #[serde(rename = "zIndex", default = "default_z_index")]
     pub z_index: i32,
