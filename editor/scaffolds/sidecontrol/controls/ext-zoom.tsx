@@ -48,7 +48,7 @@ export function ZoomControl({ className }: { className?: string }) {
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={editor.zoomIn}
+          onSelect={editor.zoomIn.bind(editor)}
           className="text-xs"
         >
           Zoom in
@@ -56,7 +56,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={editor.zoomOut}
+          onSelect={editor.zoomOut.bind(editor)}
           className="text-xs"
         >
           Zoom out
