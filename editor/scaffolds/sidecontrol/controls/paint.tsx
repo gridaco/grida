@@ -57,13 +57,7 @@ const DEFAULT_IMAGE_PAINT: cg.ImagePaint = {
   src: "res://system/images/checker.png",
   fit: "cover",
   transform: cmath.transform.identity,
-  filters: {
-    exposure: 1.0,
-    contrast: 1.0,
-    saturation: 1.0,
-    temperature: 0.0,
-    tint: 1.0,
-  },
+  filters: cg.def.IMAGE_FILTERS,
   blendMode: cg.def.BLENDMODE,
   opacity: 1,
 };

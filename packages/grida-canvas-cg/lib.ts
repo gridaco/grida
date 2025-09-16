@@ -760,7 +760,7 @@ export namespace cg {
     src: string;
     fit: BoxFit;
     transform: AffineTransform;
-    filters?: ImageFilters;
+    filters: ImageFilters;
 
     /**
      * @default "normal" {@link cg.def.BLENDMODE}
@@ -774,13 +774,62 @@ export namespace cg {
   };
 
   export interface ImageFilters {
-    exposure?: number;
-    contrast?: number;
-    saturation?: number;
-    temperature?: number;
-    tint?: number;
-    // highlights?: number;
-    // shadows?: number;
+    /**
+     * Exposure adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the overall brightness of the image.
+     * - -1.0 = very dark
+     * - 0.0 = original (no change)
+     * - 1.0 = very bright
+     */
+    exposure: number;
+    /**
+     * Contrast adjustment (-0.3 to 0.3, default: 0.0)
+     * Controls the difference between light and dark areas.
+     * - -0.3 = low contrast (UI cap)
+     * - 0.0 = original contrast
+     * - 0.3 = high contrast (UI cap)
+     */
+    contrast: number;
+    /**
+     * Saturation adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the intensity of colors.
+     * - -1.0 = grayscale (no color)
+     * - 0.0 = original saturation
+     * - 1.0 = highly oversaturated
+     */
+    saturation: number;
+    /**
+     * Temperature adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the warm/cool color balance.
+     * - -1.0 = very cool (blue tint)
+     * - 0.0 = neutral (no change)
+     * - 1.0 = very warm (orange tint)
+     */
+    temperature: number;
+    /**
+     * Tint adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the green/magenta color balance.
+     * - -1.0 = strong magenta tint
+     * - 0.0 = neutral (no change)
+     * - 1.0 = strong green tint
+     */
+    tint: number;
+    /**
+     * Highlights adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the brightness of highlight areas.
+     * - -1.0 = darken highlights
+     * - 0.0 = no change
+     * - 1.0 = brighten highlights
+     */
+    highlights: number;
+    /**
+     * Shadows adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the brightness of shadow areas.
+     * - -1.0 = darken shadows
+     * - 0.0 = no change
+     * - 1.0 = brighten shadows
+     */
+    shadows: number;
   }
 
   export type GradientStop = {
@@ -993,5 +1042,15 @@ export namespace cg {
    */
   export namespace def {
     export const BLENDMODE: cg.BlendMode = "normal";
+
+    export const IMAGE_FILTERS: cg.ImageFilters = {
+      exposure: 0.0,
+      contrast: 0.0,
+      saturation: 0.0,
+      temperature: 0.0,
+      tint: 0.0,
+      highlights: 0.0,
+      shadows: 0.0,
+    };
   }
 }

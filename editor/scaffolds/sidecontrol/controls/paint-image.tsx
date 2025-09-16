@@ -7,7 +7,65 @@ import { ImageIcon } from "@radix-ui/react-icons";
 import { useFilePicker } from "use-file-picker";
 import { useCurrentEditor, ImageView } from "@/grida-canvas-react";
 import cg from "@grida/cg";
-import cmath from "@grida/cmath";
+
+const IMAGE_FILTERS = [
+  {
+    key: "exposure",
+    label: "Exposure",
+    min: -1.0,
+    max: 1.0,
+    step: 0.01,
+    def: 0.0,
+  },
+  {
+    key: "contrast",
+    label: "Contrast",
+    min: -0.3,
+    max: 0.3,
+    step: 0.01,
+    def: 0.0,
+  },
+  {
+    key: "saturation",
+    label: "Saturation",
+    min: -1.0,
+    max: 1.0,
+    step: 0.01,
+    def: 0.0,
+  },
+  {
+    key: "temperature",
+    label: "Temperature",
+    min: -1.0,
+    max: 1.0,
+    step: 0.01,
+    def: 0.0,
+  },
+  {
+    key: "tint",
+    label: "Tint",
+    min: -1.0,
+    max: 1.0,
+    step: 0.01,
+    def: 0.0,
+  },
+  {
+    key: "highlights",
+    label: "Highlights",
+    min: -1.0,
+    max: 1.0,
+    step: 0.01,
+    def: 0.0,
+  },
+  {
+    key: "shadows",
+    label: "Shadows",
+    min: -1.0,
+    max: 1.0,
+    step: 0.01,
+    def: 0.0,
+  },
+] as const;
 
 /**
  * Custom hook for handling image upload functionality
@@ -64,51 +122,6 @@ function useImageUpload(onImageUploaded: (imageUrl: string) => void) {
     isUploading,
   };
 }
-
-const IMAGE_FILTERS = [
-  {
-    key: "exposure",
-    label: "Exposure",
-    min: 0.25,
-    max: 4.0,
-    step: 0.05,
-    defaultValue: 1.0,
-  },
-  {
-    key: "contrast",
-    label: "Contrast",
-    min: 0.25,
-    max: 4.0,
-    step: 0.01,
-    defaultValue: 1.0,
-  },
-  {
-    key: "saturation",
-    label: "Saturation",
-    min: 0.0,
-    max: 2.0,
-    step: 0.01,
-    defaultValue: 1.0,
-  },
-  {
-    key: "temperature",
-    label: "Temperature",
-    min: -0.4,
-    max: 0.4,
-    step: 0.01,
-    defaultValue: 0.0,
-  },
-  {
-    key: "tint",
-    label: "Tint",
-    min: 0.6,
-    max: 1.4,
-    step: 0.01,
-    defaultValue: 1.0,
-  },
-  // { key: "highlights", label: "Highlights" },
-  // { key: "shadows", label: "Shadows" },
-] as const;
 
 /**
  * Image preview component with upload functionality
@@ -180,16 +193,11 @@ export function ImagePaintControl({
   const handleImageUploaded = useCallback(
     (imageUrl: string) => {
       onValueChange?.({
-        type: "image",
+        ...value,
         src: imageUrl,
-        fit: value.fit,
-        transform: value.transform,
-        filters: value.filters,
-        blendMode: value.blendMode,
-        opacity: value.opacity,
       });
     },
-    [onValueChange, value.fit, value.transform, value.filters, value.blendMode]
+    [onValueChange, value]
   );
 
   const { openFilePicker, isUploading } = useImageUpload(handleImageUploaded);
@@ -201,40 +209,23 @@ export function ImagePaintControl({
   const handleRotate = useCallback(() => {
     if (!value.src) return; // Don't update if no image source
 
-    // For now, we'll store rotation as a separate property for UI purposes
-    // In the future, this should be handled through the transform matrix
-    const currentRotation = (value as any)?.rotation || 0;
-    const newRotation = (currentRotation + 90) % 360;
+    // const transform =
+    const transform = value.transform;
 
     onValueChange?.({
-      type: "image",
-      src: value.src,
-      fit: value.fit,
-      transform: value.transform,
-      filters: value.filters,
-      blendMode: value.blendMode,
-      rotation: newRotation,
-    } as any);
+      ...value,
+      transform,
+    });
   }, [value, onValueChange]);
 
   const handleFilterChange = useCallback(
-    (
-      filterName: keyof NonNullable<cg.ImagePaint["filters"]>,
-      newValue: number
-    ) => {
-      if (!value.src) return; // Don't update if no image source
-
+    (key: keyof NonNullable<cg.ImagePaint["filters"]>, fvalue: number) => {
       onValueChange?.({
-        type: "image",
-        src: value.src,
-        fit: value.fit,
-        transform: value.transform,
+        ...value,
         filters: {
           ...value.filters,
-          [filterName]: newValue,
+          [key]: fvalue,
         },
-        blendMode: value.blendMode,
-        opacity: value.opacity,
       });
     },
     [value, onValueChange]
@@ -245,29 +236,12 @@ export function ImagePaintControl({
       if (!value.src) return; // Don't update if no image source
 
       onValueChange?.({
-        type: "image",
-        src: value.src,
+        ...value,
         fit,
-        transform: value.transform,
-        filters: value.filters,
-        blendMode: value.blendMode,
-        opacity: value.opacity,
       });
     },
     [value, onValueChange]
   );
-
-  const defaultFilters = {
-    exposure: 1.0,
-    contrast: 1.0,
-    saturation: 1.0,
-    temperature: 0.0,
-    tint: 1.0,
-    highlights: 0,
-    shadows: 0,
-  };
-
-  const filters = { ...defaultFilters, ...value.filters };
 
   return (
     <div className="w-full space-y-4">
@@ -310,7 +284,7 @@ export function ImagePaintControl({
 
       {/* Image Filters */}
       <div className="space-y-3">
-        {IMAGE_FILTERS.map(({ key, label, min, max, step, defaultValue }) => (
+        {IMAGE_FILTERS.map(({ key, label, min, max, step, def }) => (
           <div key={key} className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-20 truncate">
               {label}
@@ -319,19 +293,18 @@ export function ImagePaintControl({
               min={min}
               max={max}
               step={step}
-              defaultValue={defaultValue}
-              marks={[defaultValue]}
-              value={filters[key as keyof typeof filters]}
-              onValueChange={(value) =>
+              marks={[def]}
+              value={value.filters?.[key as keyof typeof value.filters] ?? def}
+              onValueChange={(newValue) =>
                 handleFilterChange(
                   key as keyof NonNullable<cg.ImagePaint["filters"]>,
-                  value
+                  newValue
                 )
               }
-              onValueCommit={(value) =>
+              onValueCommit={(newValue) =>
                 handleFilterChange(
                   key as keyof NonNullable<cg.ImagePaint["filters"]>,
-                  value
+                  newValue
                 )
               }
               className="flex-1"
