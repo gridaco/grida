@@ -5,111 +5,6 @@ import n from "../n";
 // Local type definitions (duplicated to avoid external dependencies)
 type TMixed<T, MIXED = "mixed"> = T | MIXED;
 
-/**
- * Parses a string value into a number, handling optional suffix removal.
- * Returns NaN for empty or invalid values instead of 0 to prevent unwanted commits.
- *
- * @param value - The string value to parse
- * @param type - Whether to parse as integer or number
- * @param suffix - Optional suffix to remove (e.g., "%", "px")
- * @returns Parsed number or NaN if invalid/empty
- *
- * @example
- * parseValueWithSuffix("123%", "number", "%") // Returns 123
- * parseValueWithSuffix("", "number")          // Returns NaN
- * parseValueWithSuffix("abc", "number")       // Returns NaN
- */
-const parseValueWithSuffix = (
-  value: string,
-  type: "integer" | "number",
-  suffix?: string
-): number => {
-  if (!value) return NaN;
-
-  // Remove suffix if present
-  let cleanValue = value;
-  if (suffix && value.endsWith(suffix)) {
-    cleanValue = value.slice(0, -suffix.length);
-  }
-
-  // Parse the numeric value
-  const parsed =
-    type === "integer" ? parseInt(cleanValue) : parseFloat(cleanValue);
-
-  return isNaN(parsed) ? NaN : parsed;
-};
-
-/**
- * Formats a value for display with optional suffix, scaling, and precision.
- *
- * @param value - The value to format (number, string, or "mixed")
- * @param suffix - Optional suffix to append (e.g., "%", "px")
- * @param scale - Optional scale factor for display (e.g., 100 for percentages)
- * @param step - Optional step value to determine precision
- * @param type - The input type ('integer' or 'number')
- * @returns Formatted string for display
- *
- * @example
- * formatValueWithSuffix(0.5, "%", 100, 0.1, 'number') // Returns "50%"
- * formatValueWithSuffix("mixed")                      // Returns "mixed"
- * formatValueWithSuffix("")                           // Returns ""
- */
-const formatValueWithSuffix = (
-  value: string | number,
-  suffix?: string,
-  scale?: number,
-  step?: number,
-  type: "integer" | "number" = "number",
-  precision: number = 1
-): string => {
-  if (value === "mixed") return "mixed";
-  if (value === "") return "";
-
-  let numericValue =
-    typeof value === "number" ? value : parseFloat(String(value));
-
-  // Apply scaling if provided (e.g., for percentages: 0.01 -> 1)
-  if (scale && typeof numericValue === "number") {
-    numericValue = numericValue * scale;
-  }
-
-  // Format with proper precision based on step and type
-  const formattedValue = step
-    ? n.formatValueWithPrecision(numericValue, step, type, precision)
-    : String(n.applyPrecision(numericValue, precision));
-
-  return suffix ? `${formattedValue}${suffix}` : formattedValue;
-};
-
-/**
- * Parses a string value into a number with optional suffix removal and inverse scaling.
- *
- * @param value - The string value to parse
- * @param type - Whether to parse as integer or number
- * @param suffix - Optional suffix to remove (e.g., "%", "px")
- * @param scale - Optional scale factor for inverse scaling (e.g., 100 for percentages)
- * @returns Parsed number with inverse scaling applied, or NaN if invalid
- *
- * @example
- * parseValueWithScaling("50%", "number", "%", 100) // Returns 0.5
- * parseValueWithScaling("123", "number", undefined, 100) // Returns 1.23
- */
-const parseValueWithScaling = (
-  value: string,
-  type: "integer" | "number",
-  suffix?: string,
-  scale?: number
-): number => {
-  const parsedValue = parseValueWithSuffix(value, type, suffix);
-
-  // Apply inverse scaling if provided (e.g., for percentages: 1 -> 0.01)
-  if (scale && typeof parsedValue === "number") {
-    return parsedValue / scale;
-  }
-
-  return parsedValue;
-};
-
 type UseNumberInputProps<MIXED = "mixed"> = {
   /** Type of number input - 'integer' for whole numbers, 'number' for decimals */
   type?: "integer" | "number";
@@ -247,7 +142,7 @@ export function useNumberInput<MIXED = "mixed">({
   const [internalValue, setInternalValue] = useState<string | number>(
     mixed
       ? "mixed"
-      : formatValueWithSuffix(
+      : n.formatValueWithSuffix(
           (value as number | "") ?? "",
           suffix,
           scale,
@@ -265,7 +160,7 @@ export function useNumberInput<MIXED = "mixed">({
     setInternalValue(
       mixed
         ? "mixed"
-        : formatValueWithSuffix(
+        : n.formatValueWithSuffix(
             (value as number | "") ?? "",
             suffix,
             scale,
@@ -373,7 +268,7 @@ export function useNumberInput<MIXED = "mixed">({
     ) => {
       isFocusedRef.current = false;
       if (commitOnBlur && !mixed) {
-        const currentValue = parseValueWithScaling(
+        const currentValue = n.parseValueWithScaling(
           String(e.currentTarget.value),
           type,
           suffix,
@@ -384,7 +279,7 @@ export function useNumberInput<MIXED = "mixed">({
           const committed = safeCommit(currentValue, true);
           if (committed) {
             setInternalValue(
-              formatValueWithSuffix(
+              n.formatValueWithSuffix(
                 currentValue,
                 suffix,
                 scale,
@@ -395,7 +290,7 @@ export function useNumberInput<MIXED = "mixed">({
             );
           } else {
             setInternalValue(
-              formatValueWithSuffix(
+              n.formatValueWithSuffix(
                 (value as number | "") ?? "",
                 suffix,
                 scale,
@@ -407,7 +302,7 @@ export function useNumberInput<MIXED = "mixed">({
           }
         } else {
           setInternalValue(
-            formatValueWithSuffix(
+            n.formatValueWithSuffix(
               (value as number | "") ?? "",
               suffix,
               scale,
@@ -421,7 +316,7 @@ export function useNumberInput<MIXED = "mixed">({
         setInternalValue(
           mixed
             ? "mixed"
-            : formatValueWithSuffix(
+            : n.formatValueWithSuffix(
                 (value as number | "") ?? "",
                 suffix,
                 scale,
@@ -464,7 +359,7 @@ export function useNumberInput<MIXED = "mixed">({
       const multiplier = e.shiftKey ? 10 : 1;
 
       if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        const currentValue = parseValueWithScaling(
+        const currentValue = n.parseValueWithScaling(
           String(internalValue),
           type,
           suffix,
@@ -487,7 +382,7 @@ export function useNumberInput<MIXED = "mixed">({
 
         if (clampedValue !== currentValue) {
           setInternalValue(
-            formatValueWithSuffix(
+            n.formatValueWithSuffix(
               clampedValue,
               suffix,
               scale,
@@ -515,7 +410,7 @@ export function useNumberInput<MIXED = "mixed">({
 
       // Handle Enter/Tab keys for both modes (same logic)
       if (e.key === "Enter" || e.key === "Tab") {
-        const currentValue = parseValueWithScaling(
+        const currentValue = n.parseValueWithScaling(
           String(internalValue),
           type,
           suffix,
@@ -547,8 +442,19 @@ export function useNumberInput<MIXED = "mixed">({
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const txt = e.target.value;
-      const value = parseValueWithScaling(txt, type, suffix, scale);
-      setInternalValue(txt);
+
+      // For inputs with suffix, show raw user input until commit
+      // This prevents the "1%2" issue when typing "12" in a percentage input
+      if (suffix) {
+        setInternalValue(txt);
+      } else {
+        // For inputs without suffix, parse and show the value
+        const value = n.parseValueWithScaling(txt, type, suffix, scale);
+        setInternalValue(txt);
+      }
+
+      // Always parse the value for callbacks, even if we don't display it
+      const value = n.parseValueWithScaling(txt, type, suffix, scale);
 
       switch (mode) {
         case "auto":
@@ -576,7 +482,7 @@ export function useNumberInput<MIXED = "mixed">({
       if (!el) return;
       if (el.contains(e.target as Node)) return;
 
-      const currentValue = parseValueWithScaling(
+      const currentValue = n.parseValueWithScaling(
         String(internalValue),
         type,
         suffix,
