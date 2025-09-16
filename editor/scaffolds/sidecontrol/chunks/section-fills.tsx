@@ -35,11 +35,12 @@ export function SectionFills({ node_id }: { node_id: string }) {
   }));
 
   const gradientMode =
-    content_edit_mode?.type === "fill/gradient" &&
-    content_edit_mode.node_id === node_id
+    content_edit_mode?.type === "paint/gradient" &&
+    content_edit_mode.node_id === node_id &&
+    (content_edit_mode.paint_target ?? "fill") === "fill"
       ? content_edit_mode
       : undefined;
-  const gradientFillIndex = gradientMode?.fill_index ?? 0;
+  const gradientPaintIndex = gradientMode?.paint_index ?? 0;
 
   const actions = useNodeActions(node_id)!;
   const isCanvasBackend = backend === "canvas";
@@ -66,7 +67,7 @@ export function SectionFills({ node_id }: { node_id: string }) {
     index: number
   ) => {
     const selectedGradientStop =
-      gradientMode && gradientFillIndex === index
+      gradientMode && gradientPaintIndex === index
         ? gradientMode.selected_stop
         : undefined;
 
@@ -88,13 +89,15 @@ export function SectionFills({ node_id }: { node_id: string }) {
               selectedGradientStop={selectedGradientStop}
               onSelectedGradientStopChange={(stop) => {
                 instance.selectGradientStop(node_id, stop, {
-                  fillIndex: index,
+                  paintTarget: "fill",
+                  paintIndex: index,
                 });
               }}
               onOpenChange={(open) => {
                 if (open) {
-                  instance.tryEnterContentEditMode(node_id, "fill/gradient", {
-                    fillIndex: index,
+                  instance.tryEnterContentEditMode(node_id, "paint/gradient", {
+                    paintTarget: "fill",
+                    paintIndex: index,
                   });
                 } else {
                   instance.tryExitContentEditMode();

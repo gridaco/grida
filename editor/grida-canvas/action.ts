@@ -137,6 +137,10 @@ interface GradientStopQuery extends IGradientStopIdx {
    * index of the paint under fills/strokes
    */
   paint_index?: number;
+  /**
+   * target paint channel
+   */
+  paint_target?: "fill" | "stroke";
 }
 
 export type TCanvasEventTargetDragGestureState = {
@@ -737,7 +741,7 @@ export type SurfaceAction =
   | EditorSurface_ChangeBrushSizeAction
   | EditorSurface_ChangeBrushOpacityAction
   | EditorSurface_EnterContentEditMode
-  | EditorSurface_EnterFillGradientContentEditMode
+  | EditorSurface_EnterPaintGradientContentEditMode
   | EditorSurface_ExitContentEditMode
   //
   | EditorSurface_CursorMode
@@ -781,10 +785,11 @@ export type EditorSurface_EnterContentEditMode = {
   type: "surface/content-edit-mode/try-enter";
 };
 
-export type EditorSurface_EnterFillGradientContentEditMode = {
+export type EditorSurface_EnterPaintGradientContentEditMode = {
   node_id: string;
-  type: "surface/content-edit-mode/fill/gradient";
-  fill_index?: number;
+  type: "surface/content-edit-mode/paint/gradient";
+  paint_target?: "fill" | "stroke";
+  paint_index?: number;
 };
 
 export type EditorSurface_ExitContentEditMode = {

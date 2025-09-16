@@ -15,6 +15,7 @@ import { StrokeAlignControl } from "../controls/stroke-align";
 import { StrokeCapControl } from "../controls/stroke-cap";
 import { Button } from "@/components/ui-editor/button";
 import { PlusIcon, MinusIcon } from "@radix-ui/react-icons";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import {
   useBackendState,
   useNodeActions,
@@ -34,6 +35,10 @@ export function SectionStrokes({
     stroke_cap: "on" | "off";
   };
 }) {
+  const instance = useCurrentEditor();
+  const { content_edit_mode } = useEditorState(instance, (state) => ({
+    content_edit_mode: state.content_edit_mode,
+  }));
   const backend = useBackendState();
   // TODO: LEGACY_PAINT_MODEL
   const { stroke, strokes, strokeWidth, strokeAlign, strokeCap, type } =
@@ -79,59 +84,89 @@ export function SectionStrokes({
   const renderStrokeControl = (
     paint: grida.program.nodes.i.props.PropsPaintValue | undefined,
     index: number
-  ) => (
-    <PropertyLine key={index}>
-      <div className="flex items-center w-full gap-2">
-        <div className="flex-1">
-          <PaintControl
-            value={paint}
-            onValueChange={(value) => {
+  ) => {
+    const gradientMode =
+      content_edit_mode?.type === "paint/gradient" &&
+      content_edit_mode.node_id === node_id &&
+      (content_edit_mode.paint_target ?? "fill") === "stroke"
+        ? content_edit_mode
+        : undefined;
+    const selectedGradientStop =
+      gradientMode && gradientMode.paint_index === index
+        ? gradientMode.selected_stop
+        : undefined;
+
+    return (
+      <PropertyLine key={index}>
+        <div className="flex items-center w-full gap-2">
+          <div className="flex-1">
+            <PaintControl
+              value={paint}
+              onValueChange={(value) => {
+                const currentStrokes = Array.isArray(strokes)
+                  ? [...strokes]
+                  : stroke
+                    ? [stroke]
+                    : [];
+                currentStrokes[index] = value as any;
+                actions.strokes(currentStrokes);
+              }}
+              onValueAdd={(value) => {
+                const currentStrokes = Array.isArray(strokes)
+                  ? [...strokes]
+                  : stroke
+                    ? [stroke]
+                    : [];
+                currentStrokes[index] = value as any;
+                actions.strokes(currentStrokes);
+                if (!strokeWidth || strokeWidth === 0) {
+                  actions.strokeWidth({ type: "set", value: 1 });
+                }
+                if (is_text_node && !strokeAlign) {
+                  actions.strokeAlign("outside");
+                }
+              }}
+              selectedGradientStop={selectedGradientStop}
+              onSelectedGradientStopChange={(stop) => {
+                instance.selectGradientStop(node_id, stop, {
+                  paintTarget: "stroke",
+                  paintIndex: index,
+                });
+              }}
+              onOpenChange={(open) => {
+                if (open) {
+                  instance.tryEnterContentEditMode(node_id, "paint/gradient", {
+                    paintTarget: "stroke",
+                    paintIndex: index,
+                  });
+                } else {
+                  instance.tryExitContentEditMode();
+                }
+              }}
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
               const currentStrokes = Array.isArray(strokes)
                 ? [...strokes]
                 : stroke
                   ? [stroke]
                   : [];
-              currentStrokes[index] = value as any;
+              currentStrokes.splice(index, 1);
               actions.strokes(currentStrokes);
             }}
-            onValueAdd={(value) => {
-              const currentStrokes = Array.isArray(strokes)
-                ? [...strokes]
-                : stroke
-                  ? [stroke]
-                  : [];
-              currentStrokes[index] = value as any;
-              actions.strokes(currentStrokes);
-              if (!strokeWidth || strokeWidth === 0) {
-                actions.strokeWidth({ type: "set", value: 1 });
-              }
-              if (is_text_node && !strokeAlign) {
-                actions.strokeAlign("outside");
-              }
-            }}
-          />
+            className="cursor-pointer"
+            tabIndex={-1}
+          >
+            <MinusIcon className="size-3.5" />
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            const currentStrokes = Array.isArray(strokes)
-              ? [...strokes]
-              : stroke
-                ? [stroke]
-                : [];
-            currentStrokes.splice(index, 1);
-            actions.strokes(currentStrokes);
-          }}
-          className="cursor-pointer"
-          tabIndex={-1}
-        >
-          <MinusIcon className="size-3.5" />
-        </Button>
-      </div>
-    </PropertyLine>
-  );
+      </PropertyLine>
+    );
+  };
 
   const empty = paints.length === 0;
 

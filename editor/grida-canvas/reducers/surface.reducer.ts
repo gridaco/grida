@@ -86,16 +86,18 @@ function __self_guide_delete(draft: editor.state.IEditorState, idx: number) {
   scene.guides.splice(idx, 1);
 }
 
-function __self_try_content_edit_mode_fill_gradient(
+function __self_try_content_edit_mode_paint_gradient(
   draft: editor.state.IEditorState,
   node_id: string,
-  fill_index: number = 0
+  paint_target: "fill" | "stroke" = "fill",
+  paint_index: number = 0
 ) {
   draft.content_edit_mode = {
     node_id: node_id,
-    type: "fill/gradient",
+    type: "paint/gradient",
+    paint_target,
     selected_stop: 0,
-    fill_index,
+    paint_index,
   };
 }
 
@@ -864,12 +866,17 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
         __self_try_enter_content_edit_mode_auto(draft, node_id, context);
         break;
       }
-      case "surface/content-edit-mode/fill/gradient": {
-        const { node_id, fill_index } = action;
-        __self_try_content_edit_mode_fill_gradient(
+      case "surface/content-edit-mode/paint/gradient": {
+        const {
+          node_id,
+          paint_target = "fill",
+          paint_index = 0,
+        } = action;
+        __self_try_content_edit_mode_paint_gradient(
           draft,
           node_id,
-          fill_index ?? 0
+          paint_target,
+          paint_index ?? 0
         );
         break;
       }

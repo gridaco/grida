@@ -948,7 +948,7 @@ export namespace editor.state {
     | VariableWidthContentEditMode
     | VectorContentEditMode
     | BitmapContentEditMode
-    | FillGradientContentEditMode;
+    | PaintGradientContentEditMode;
 
   type TextContentEditMode = {
     type: "text";
@@ -1098,19 +1098,53 @@ export namespace editor.state {
   };
 
   /**
-   * surface gradient edit mode
+   * Content edit mode for editing gradient paints (both fill and stroke)
+   *
+   * This mode allows users to interactively edit gradient properties including
+   * control points, color stops, and stop positions for both fill and stroke paints.
+   *
+   * @example
+   * ```typescript
+   * // Edit fill gradient at index 0
+   * const mode: PaintGradientContentEditMode = {
+   *   type: "paint/gradient",
+   *   node_id: "node-123",
+   *   paint_target: "fill",
+   *   paint_index: 0,
+   *   selected_stop: 1
+   * };
+   *
+   * // Edit stroke gradient at index 1
+   * const strokeMode: PaintGradientContentEditMode = {
+   *   type: "paint/gradient",
+   *   node_id: "node-123",
+   *   paint_target: "stroke",
+   *   paint_index: 1,
+   *   selected_stop: 0
+   * };
+   * ```
    */
-  export type FillGradientContentEditMode = {
-    type: "fill/gradient";
+  export type PaintGradientContentEditMode = {
+    /** The content edit mode type identifier */
+    type: "paint/gradient";
+    /** The ID of the node being edited */
     node_id: string;
+    /** Whether to edit fill or stroke paints */
+    paint_target: "fill" | "stroke";
     /**
-     * index of the fill being edited
+     * Index of the paint being edited within the paint array
+     *
+     * For nodes with multiple fills/strokes, this specifies which one to edit.
+     * Will be clamped to valid range [0, paints.length-1].
      *
      * @default 0
      */
-    fill_index: number;
+    paint_index: number;
     /**
-     * index of the focused stop, if any
+     * Index of the currently focused gradient stop
+     *
+     * This determines which color stop is selected for editing.
+     * Will be clamped to valid range [0, stops.length-1].
      *
      * @default 0
      */
@@ -2438,8 +2472,11 @@ export namespace editor.api {
     tryEnterContentEditMode(): void;
     tryEnterContentEditMode(
       node_id?: string,
-      mode?: "auto" | "fill/gradient",
-      options?: { fillIndex?: number }
+      mode?: "auto" | "paint/gradient",
+      options?: {
+        paintIndex?: number;
+        paintTarget?: "fill" | "stroke";
+      }
     ): void;
     //
 
@@ -2549,7 +2586,7 @@ export namespace editor.api {
     /**
      * select the gradient stop by the given index
      *
-     * only effective when content edit mode is {@link editor.state.FillGradientContentEditMode}
+     * only effective when content edit mode is {@link editor.state.PaintGradientContentEditMode}
      *
      * @param node_id node id
      * @param stop index of the stop
@@ -2557,7 +2594,10 @@ export namespace editor.api {
     selectGradientStop(
       node_id: NodeID,
       stop: number,
-      options?: { fillIndex?: number }
+      options?: {
+        paintIndex?: number;
+        paintTarget?: "fill" | "stroke";
+      }
     ): void;
     //
 

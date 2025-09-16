@@ -394,7 +394,7 @@ export function EditorSurface() {
                 node_id={content_edit_mode.node_id}
               />
             )}
-            {content_edit_mode?.type === "fill/gradient" && (
+            {content_edit_mode?.type === "paint/gradient" && (
               <SurfaceGradientEditor
                 key="gradient-editor"
                 node_id={content_edit_mode.node_id}

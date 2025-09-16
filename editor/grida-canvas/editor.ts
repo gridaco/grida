@@ -745,8 +745,11 @@ export class Editor
    */
   tryEnterContentEditMode(
     node_id?: string,
-    mode: "auto" | "fill/gradient" = "auto",
-    options?: { fillIndex?: number }
+    mode: "auto" | "paint/gradient" = "auto",
+    options?: {
+      paintIndex?: number;
+      paintTarget?: "fill" | "stroke";
+    }
   ) {
     node_id = node_id ?? this.state.selection[0];
     switch (mode) {
@@ -754,12 +757,15 @@ export class Editor
         return this.dispatch({
           type: "surface/content-edit-mode/try-enter",
         });
-      case "fill/gradient":
+      case "paint/gradient":
         if (node_id) {
+          const paintTarget = options?.paintTarget ?? "fill";
+          const paintIndex = options?.paintIndex ?? 0;
           return this.dispatch({
-            type: "surface/content-edit-mode/fill/gradient",
+            type: "surface/content-edit-mode/paint/gradient",
             node_id: node_id ?? this.state.selection[0],
-            fill_index: options?.fillIndex ?? 0,
+            paint_target: paintTarget,
+            paint_index: paintIndex,
           });
         } else {
           // no-op
@@ -1182,14 +1188,20 @@ export class Editor
   public selectGradientStop(
     node_id: editor.NodeID,
     stop: number,
-    options?: { fillIndex?: number }
+    options?: {
+      paintIndex?: number;
+      paintTarget?: "fill" | "stroke";
+    }
   ): void {
+    const paintTarget = options?.paintTarget ?? "fill";
+    const paintIndex = options?.paintIndex ?? 0;
     this.dispatch({
       type: "select-gradient-stop",
       target: {
         node_id,
         stop,
-        paint_index: options?.fillIndex,
+        paint_index: paintIndex,
+        paint_target: paintTarget,
       },
     });
   }
