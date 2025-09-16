@@ -13,22 +13,6 @@ pub fn sk_solid_paint(paint: impl Into<SolidPaint>) -> skia_safe::Paint {
     skia_paint
 }
 
-pub fn sk_paint(paint: &Paint, size: (f32, f32)) -> skia_safe::Paint {
-    let mut skia_paint = skia_safe::Paint::default();
-    skia_paint.set_anti_alias(true);
-    if let Some(shader) = shader_from_paint(paint, size, None) {
-        skia_paint.set_shader(shader);
-    }
-
-    // Apply paint-level opacity for image paints using Skia's built-in alpha property
-    if let Paint::Image(img) = paint {
-        skia_paint.set_alpha_f(img.opacity);
-    }
-
-    skia_paint.set_blend_mode(paint.blend_mode().into());
-    skia_paint
-}
-
 /// Combines multiple paints into a single Skia paint using shader blending.
 ///
 /// This function efficiently stacks multiple paints by blending their shaders together,

@@ -1,346 +1,310 @@
-//! # Grida Canvas Skia - Golden Fills Example
+//! # Grida Canvas Skia - Stacked Paints Example
 //!
-//! This example demonstrates efficient paint stacking using only Skia API (not CG module functions)
-//! to draw multiple fills in the most efficient and accurate way.
+//! This example demonstrates how the shared CG paint definitions and the painter
+//! conversion helpers can be used to efficiently render complex paint combinations
+//! using shader stacking.
 //!
 //! ## Goal
-//! Our goal is to make LEFT and RIGHT columns visually identical, proving that our shader stacking
-//! optimization produces the same results as the traditional approach.
+//! Our goal is to showcase the shader stacking capabilities provided by
+//! `cg::painter::cvt::sk_paint_stack`, which combines multiple paints into a single
+//! optimized shader for improved performance.
 //!
 //! ## What it demonstrates:
-//! - Only use Skia API to draw multiple fills (paint stacking)
-//! - Skia native way to draw multiple paints in a single paint call (merge shader)
-//! - Uses local DemoPaint enum instead of importing from CG module
-//! - Minimal, unique demos of various fill combinations:
+//! - Uses the core `Paint` types from `cg::types`
+//! - Converts paints to Skia using `cg::painter::cvt::sk_paint_stack`
+//! - Comprehensive demos of various fill combinations:
 //!   - Single solid fill
-//!   - Single linear gradient fill  
+//!   - Single linear gradient fill
 //!   - Solid fill + solid fill (with different alphas)
 //!   - Solid fill + linear gradient fill (stacked)
 //!   - Linear gradient + linear gradient fill (stacked)
 //!   - Linear gradient + radial gradient fill (stacked)
-//!   - Image + radial gradient fill (stacked) - uses checker.png from fixtures/images
+//!   - Image + radial gradient fill (stacked)
 //!   - ALL MIXED: solid + linear + radial + image (all with alpha) - comprehensive test
 //!
 //! ## Layout
-//! Single PNG with 2-column layout:
-//! - **LEFT = ACCURATE**: Non-stacked, loop-painted, most accurate way (slow)
-//!   - Each paint drawn separately with individual `canvas.draw_rect()` calls
-//!   - Uses Skia's native compositing for alpha blending
-//!   - This is the ground truth reference that cannot be wrong
-//!
-//! - **RIGHT = OPTIMIZED**: Stacked, single paint call, fast
-//!   - All paints combined into a single shader using `shaders::blend()`
-//!   - Uses `BlendMode::SrcOver` for proper alpha compositing
-//!   - Must match LEFT column to prove optimization correctness
+//! Single PNG with 8 examples in a 5-column grid layout:
+//! - Each example demonstrates a different paint combination
+//! - All paints use opacity values less than 1.0 to test alpha blending
+//! - Images are properly loaded and rendered with opacity
 //!
 //! ## Benefits of shader stacking:
-//! - Reduced draw calls (1 vs N calls)
+//! - Single draw call per paint combination
 //! - Better GPU utilization
 //! - Improved performance for complex fill combinations
 //! - Maintains visual accuracy through proper alpha blending
+//! - Efficient handling of opacity and blend modes
 
-use math2::transform::AffineTransform;
-use skia_safe::shaders;
-use skia_safe::{
-    self as sk, surfaces, BlendMode, Color, Color4f, Data, Font, Image, Matrix, Paint as SkPaint,
-    Point, Rect, SamplingOptions, Shader, TileMode,
+use cg::resources::ByteStore;
+use cg::{
+    cg::types::{
+        BlendMode, CGColor, GradientStop, ImageFilters, ImagePaint, LinearGradientPaint, Paint,
+        RadialGradientPaint, ResourceRef, SolidPaint,
+    },
+    painter::cvt,
+    runtime::image_repository::ImageRepository,
+};
+use math2::{box_fit::BoxFit, transform::AffineTransform};
+use skia_safe::{surfaces, Color, Point, Rect};
+use std::{
+    hash::Hash,
+    sync::{Arc, Mutex},
 };
 
-// Local demo paint types - no need to import from CG
-#[derive(Clone, Copy)]
-pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
-
-#[derive(Clone)]
-pub struct GradientStop {
-    pub offset: f32,
-    pub color: CGColor,
-}
-
-#[derive(Clone)]
-pub struct SolidPaint {
-    pub color: CGColor,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-}
-
-impl From<CGColor> for SolidPaint {
-    fn from(color: CGColor) -> Self {
-        SolidPaint {
-            color,
-            opacity: 1.0,
-            blend_mode: BlendMode::SrcOver,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct LinearGradientPaint {
-    pub transform: AffineTransform,
-    pub stops: Vec<GradientStop>,
-    pub opacity: f32,
-}
-
-#[derive(Clone)]
-pub struct RadialGradientPaint {
-    pub transform: AffineTransform,
-    pub stops: Vec<GradientStop>,
-    pub opacity: f32,
-}
-
-#[derive(Clone)]
-pub struct ImagePaint {
-    pub image: Image,
-    pub opacity: f32,
-}
-
-#[derive(Clone)]
-pub enum DemoPaint {
-    Solid(SolidPaint),
-    LinearGradient(LinearGradientPaint),
-    RadialGradient(RadialGradientPaint),
-    Image(ImagePaint),
-}
-
 thread_local! {
-    static FONT: Font = Font::new(cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES), 8.0);
+    static FONT: skia_safe::Font = skia_safe::Font::new(
+        cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES),
+        8.0,
+    );
 }
 
 fn main() {
-    let tile = 80.0;
+    let tile = 200.0;
     let padding = 20.0;
-    let column_gap = 40.0;
     let row_gap = 20.0;
+    let column_gap = 20.0;
     let label_height = 20.0;
-    let width = (padding * 2.0 + tile * 2.0 + column_gap) as i32;
-    let height = (padding * 2.0 + tile * 8.0 + row_gap * 7.0 + label_height * 8.0) as i32;
+    let columns = 3;
+    let rows = 3; // 8 examples in 3 columns = 3 rows (3 + 3 + 2)
+    let width = (padding * 2.0 + tile * columns as f32 + column_gap * (columns - 1) as f32) as i32;
+    let height = (padding * 2.0
+        + tile * rows as f32
+        + row_gap * (rows - 1) as f32
+        + label_height * rows as f32) as i32;
 
     let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    let mut y = padding;
+    let (image_repository, checker_image_ref) = load_checker_image();
 
-    // 1. single solid
-    let fills = vec![DemoPaint::Solid(SolidPaint::from(CGColor(255, 0, 0, 255)))];
-    draw_pair(canvas, padding, y, tile, &fills);
-    draw_label(canvas, padding, y + tile + 10.0, "1. Single Solid");
-    y += tile + row_gap + label_height;
-
-    // 2. single linear gradient
-    let fills = vec![DemoPaint::LinearGradient(LinearGradientPaint {
-        transform: AffineTransform::default(),
-        stops: vec![
-            GradientStop {
-                offset: 0.0,
-                color: CGColor(255, 0, 0, 255),
-            },
-            GradientStop {
-                offset: 1.0,
-                color: CGColor(0, 0, 255, 255),
-            },
-        ],
-        opacity: 1.0,
-    })];
-    draw_pair(canvas, padding, y, tile, &fills);
-    draw_label(
-        canvas,
-        padding,
-        y + tile + 10.0,
-        "2. Single Linear Gradient",
-    );
-    y += tile + row_gap + label_height;
-
-    // 3. solid + solid
-    let fills = vec![
-        DemoPaint::Solid(SolidPaint::from(CGColor(255, 0, 0, 128))),
-        DemoPaint::Solid(SolidPaint::from(CGColor(0, 0, 255, 128))),
+    // Define all examples
+    let examples = vec![
+        // 1. single solid
+        (
+            vec![Paint::from(CGColor(255, 0, 0, 200))], // opacity 0.78
+            "1. Single Solid",
+        ),
+        // 2. single linear gradient
+        (
+            vec![Paint::LinearGradient(LinearGradientPaint {
+                transform: AffineTransform::identity(),
+                stops: vec![
+                    GradientStop {
+                        offset: 0.0,
+                        color: CGColor(255, 0, 0, 255),
+                    },
+                    GradientStop {
+                        offset: 1.0,
+                        color: CGColor(0, 0, 255, 255),
+                    },
+                ],
+                opacity: 1.0,
+                blend_mode: BlendMode::Normal,
+            })],
+            "2. Single Linear Gradient",
+        ),
+        // 3. solid + solid with multiply blend
+        (
+            vec![
+                Paint::Solid(SolidPaint {
+                    color: CGColor(255, 0, 0, 100), // opacity 0.39
+                    blend_mode: BlendMode::Normal,
+                }),
+                Paint::Solid(SolidPaint {
+                    color: CGColor(0, 0, 255, 100), // opacity 0.39
+                    blend_mode: BlendMode::Multiply,
+                }),
+            ],
+            "3. Solid + Solid (Multiply)",
+        ),
+        // 4. solid + linear gradient with screen blend
+        (
+            vec![
+                Paint::Solid(SolidPaint {
+                    color: CGColor(255, 255, 0, 180), // opacity 0.71
+                    blend_mode: BlendMode::Normal,
+                }),
+                Paint::LinearGradient(LinearGradientPaint {
+                    transform: AffineTransform::identity(),
+                    stops: vec![
+                        GradientStop {
+                            offset: 0.0,
+                            color: CGColor(255, 0, 255, 255),
+                        },
+                        GradientStop {
+                            offset: 1.0,
+                            color: CGColor(0, 255, 255, 255),
+                        },
+                    ],
+                    opacity: 0.6,
+                    blend_mode: BlendMode::Screen,
+                }),
+            ],
+            "4. Solid + Linear (Screen)",
+        ),
+        // 5. linear + linear gradient with overlay blend
+        (
+            vec![
+                Paint::LinearGradient(LinearGradientPaint {
+                    transform: AffineTransform::identity(),
+                    stops: vec![
+                        GradientStop {
+                            offset: 0.0,
+                            color: CGColor(255, 0, 0, 255),
+                        },
+                        GradientStop {
+                            offset: 1.0,
+                            color: CGColor(255, 255, 0, 255),
+                        },
+                    ],
+                    opacity: 0.7,
+                    blend_mode: BlendMode::Normal,
+                }),
+                Paint::LinearGradient(LinearGradientPaint {
+                    transform: AffineTransform::identity(),
+                    stops: vec![
+                        GradientStop {
+                            offset: 0.0,
+                            color: CGColor(0, 255, 0, 255),
+                        },
+                        GradientStop {
+                            offset: 1.0,
+                            color: CGColor(0, 0, 255, 255),
+                        },
+                    ],
+                    opacity: 0.5,
+                    blend_mode: BlendMode::Overlay,
+                }),
+            ],
+            "5. Linear + Linear (Overlay)",
+        ),
+        // 6. linear + radial gradient with soft light blend
+        (
+            vec![
+                Paint::LinearGradient(LinearGradientPaint {
+                    transform: AffineTransform::identity(),
+                    stops: vec![
+                        GradientStop {
+                            offset: 0.0,
+                            color: CGColor(255, 165, 0, 255),
+                        },
+                        GradientStop {
+                            offset: 1.0,
+                            color: CGColor(0, 255, 0, 255),
+                        },
+                    ],
+                    opacity: 0.7,
+                    blend_mode: BlendMode::Normal,
+                }),
+                Paint::RadialGradient(RadialGradientPaint {
+                    transform: AffineTransform::identity(),
+                    stops: vec![
+                        GradientStop {
+                            offset: 0.0,
+                            color: CGColor(255, 255, 255, 255),
+                        },
+                        GradientStop {
+                            offset: 1.0,
+                            color: CGColor(0, 0, 0, 0),
+                        },
+                    ],
+                    opacity: 0.5,
+                    blend_mode: BlendMode::SoftLight,
+                }),
+            ],
+            "6. Linear + Radial (SoftLight)",
+        ),
+        // 7. image + radial gradient with hard light blend
+        (
+            vec![
+                Paint::Image(ImagePaint {
+                    transform: AffineTransform::identity(),
+                    image: checker_image_ref.clone(),
+                    fit: BoxFit::Fill,
+                    opacity: 0.5,
+                    blend_mode: BlendMode::Normal,
+                    filters: ImageFilters::default(),
+                }),
+                Paint::RadialGradient(RadialGradientPaint {
+                    transform: AffineTransform::identity(),
+                    stops: vec![
+                        GradientStop {
+                            offset: 0.0,
+                            color: CGColor(255, 255, 255, 255),
+                        },
+                        GradientStop {
+                            offset: 1.0,
+                            color: CGColor(0, 0, 0, 0),
+                        },
+                    ],
+                    opacity: 0.5,
+                    blend_mode: BlendMode::HardLight,
+                }),
+            ],
+            "7. Image + Radial (HardLight)",
+        ),
+        // 8. all mixed: solid + linear + radial + image with various blend modes
+        (
+            vec![
+                Paint::Solid(SolidPaint {
+                    color: CGColor(255, 0, 0, 200), // opacity 0.78
+                    blend_mode: BlendMode::Normal,
+                }),
+                Paint::LinearGradient(LinearGradientPaint {
+                    transform: AffineTransform::identity(),
+                    stops: vec![
+                        GradientStop {
+                            offset: 0.0,
+                            color: CGColor(0, 255, 0, 255),
+                        },
+                        GradientStop {
+                            offset: 1.0,
+                            color: CGColor(0, 0, 255, 255),
+                        },
+                    ],
+                    opacity: 0.6,
+                    blend_mode: BlendMode::Multiply,
+                }),
+                Paint::RadialGradient(RadialGradientPaint {
+                    transform: AffineTransform::identity(),
+                    stops: vec![
+                        GradientStop {
+                            offset: 0.0,
+                            color: CGColor(255, 255, 255, 255),
+                        },
+                        GradientStop {
+                            offset: 1.0,
+                            color: CGColor(255, 255, 0, 0),
+                        },
+                    ],
+                    opacity: 0.5,
+                    blend_mode: BlendMode::Screen,
+                }),
+                Paint::Image(ImagePaint {
+                    transform: AffineTransform::identity(),
+                    image: checker_image_ref,
+                    fit: BoxFit::Fill,
+                    opacity: 0.5,
+                    blend_mode: BlendMode::Overlay,
+                    filters: ImageFilters::default(),
+                }),
+            ],
+            "8. All Mixed (Various Blends)",
+        ),
     ];
-    draw_pair(canvas, padding, y, tile, &fills);
-    draw_label(canvas, padding, y + tile + 10.0, "3. Solid + Solid (Alpha)");
-    y += tile + row_gap + label_height;
 
-    // 4. solid + linear gradient
-    let fills = vec![
-        DemoPaint::Solid(SolidPaint::from(CGColor(255, 255, 0, 255))),
-        DemoPaint::LinearGradient(LinearGradientPaint {
-            transform: AffineTransform::default(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(255, 0, 255, 255),
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(0, 255, 255, 255),
-                },
-            ],
-            opacity: 0.6,
-        }),
-    ];
-    draw_pair(canvas, padding, y, tile, &fills);
-    draw_label(
-        canvas,
-        padding,
-        y + tile + 10.0,
-        "4. Solid + Linear Gradient",
-    );
-    y += tile + row_gap + label_height;
+    // Draw examples in grid layout
+    for (i, (fills, label)) in examples.iter().enumerate() {
+        let col = i % columns;
+        let row = i / columns;
 
-    // 5. linear gradient + linear gradient
-    let fills = vec![
-        DemoPaint::LinearGradient(LinearGradientPaint {
-            transform: AffineTransform::default(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(255, 0, 0, 255),
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(255, 255, 0, 255),
-                },
-            ],
-            opacity: 1.0,
-        }),
-        DemoPaint::LinearGradient(LinearGradientPaint {
-            transform: AffineTransform::default(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(0, 255, 0, 255),
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(0, 0, 255, 255),
-                },
-            ],
-            opacity: 0.5,
-        }),
-    ];
-    draw_pair(canvas, padding, y, tile, &fills);
-    draw_label(
-        canvas,
-        padding,
-        y + tile + 10.0,
-        "5. Linear + Linear Gradient",
-    );
-    y += tile + row_gap + label_height;
+        let x = padding + col as f32 * (tile + column_gap);
+        let y = padding + row as f32 * (tile + row_gap + label_height);
 
-    // 6. linear gradient + radial gradient
-    let fills = vec![
-        DemoPaint::LinearGradient(LinearGradientPaint {
-            transform: AffineTransform::default(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(255, 0, 0, 255),
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(0, 255, 0, 255),
-                },
-            ],
-            opacity: 1.0,
-        }),
-        DemoPaint::RadialGradient(RadialGradientPaint {
-            transform: AffineTransform::default(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(255, 255, 255, 255),
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(0, 0, 0, 0),
-                },
-            ],
-            opacity: 0.5,
-        }),
-    ];
-    draw_pair(canvas, padding, y, tile, &fills);
-    draw_label(
-        canvas,
-        padding,
-        y + tile + 10.0,
-        "6. Linear + Radial Gradient",
-    );
-    y += tile + row_gap + label_height;
-
-    // 7. image + radial gradient
-    let image = load_fixture_image("checker.png", tile as i32, tile as i32);
-    let fills = vec![
-        DemoPaint::Image(ImagePaint {
-            image: image.clone(),
-            opacity: 1.0,
-        }),
-        DemoPaint::RadialGradient(RadialGradientPaint {
-            transform: AffineTransform::default(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(255, 255, 255, 255),
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(0, 0, 0, 0),
-                },
-            ],
-            opacity: 0.5,
-        }),
-    ];
-    draw_pair(canvas, padding, y, tile, &fills);
-    draw_label(
-        canvas,
-        padding,
-        y + tile + 10.0,
-        "7. Image + Radial Gradient",
-    );
-    y += tile + row_gap + label_height;
-
-    // 8. ALL MIXED: solid + linear + radial + image (all with alpha)
-    let image = load_fixture_image("checker.png", tile as i32, tile as i32);
-    let fills = vec![
-        DemoPaint::Solid(SolidPaint::from(CGColor(255, 0, 0, 255))),
-        DemoPaint::LinearGradient(LinearGradientPaint {
-            transform: AffineTransform::default(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(0, 255, 0, 255),
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(0, 0, 255, 255),
-                },
-            ],
-            opacity: 0.6,
-        }),
-        DemoPaint::RadialGradient(RadialGradientPaint {
-            transform: AffineTransform::default(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(255, 255, 255, 255),
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(255, 255, 0, 0),
-                },
-            ],
-            opacity: 0.5,
-        }),
-        DemoPaint::Image(ImagePaint {
-            image,
-            opacity: 0.8,
-        }),
-    ];
-    draw_pair(canvas, padding, y, tile, &fills);
-    draw_label(
-        canvas,
-        padding,
-        y + tile + 10.0,
-        "8. All Mixed (Solid + Linear + Radial + Image)",
-    );
+        draw_stacked(canvas, x, y, tile, fills, &image_repository);
+        draw_label(canvas, x, y + tile + 10.0, label);
+    }
 
     // save png
     let image = surface.image_snapshot();
@@ -354,200 +318,70 @@ fn main() {
     .unwrap();
 }
 
-fn draw_pair(canvas: &sk::Canvas, x: f32, y: f32, size: f32, fills: &[DemoPaint]) {
-    let rect_l = Rect::from_xywh(x, y, size, size);
-    draw_accurate(canvas, rect_l, fills);
-    let rect_r = Rect::from_xywh(x + size + 20.0, y, size, size);
-    draw_stacked(canvas, rect_r, fills);
-}
+fn draw_stacked(
+    canvas: &skia_safe::Canvas,
+    x: f32,
+    y: f32,
+    size: f32,
+    fills: &[Paint],
+    images: &ImageRepository,
+) {
+    // Use canvas transform and save/restore like production code
+    canvas.save();
+    canvas.translate((x, y));
 
-fn draw_accurate(canvas: &sk::Canvas, rect: Rect, fills: &[DemoPaint]) {
-    for paint in fills {
-        if let Some(p) = paint_to_sk_paint(paint, rect) {
-            canvas.draw_rect(rect, &p);
-        }
+    // Create rectangle at origin (0, 0) with the tile size
+    let rect = Rect::from_xywh(0.0, 0.0, size, size);
+    let size_tuple = (size, size);
+
+    // Create a path from the rectangle to match production code behavior
+    let mut path = skia_safe::Path::new();
+    path.add_rect(rect, None);
+
+    // Reverse the order so first paint appears on top
+    let reversed_fills: Vec<Paint> = fills.iter().rev().cloned().collect();
+    if let Some(paint) = cvt::sk_paint_stack(&reversed_fills, size_tuple, images) {
+        canvas.draw_path(&path, &paint);
     }
+
+    canvas.restore();
 }
 
-fn draw_stacked(canvas: &sk::Canvas, rect: Rect, fills: &[DemoPaint]) {
-    if let Some(shader) = stack_shaders(fills, rect) {
-        let mut paint = SkPaint::default();
-        paint.set_shader(shader);
-        paint.set_anti_alias(true);
-        canvas.draw_rect(rect, &paint);
-    }
-}
-
-fn paint_to_sk_paint(p: &DemoPaint, rect: Rect) -> Option<SkPaint> {
-    let mut paint = SkPaint::default();
-    paint.set_anti_alias(true);
-    match p {
-        DemoPaint::Solid(s) => {
-            paint.set_color4f(cgcolor_to_color4f(s.color, s.opacity), None);
-            Some(paint)
-        }
-        DemoPaint::LinearGradient(g) => {
-            let shader = linear_gradient_shader(g, rect)?;
-            paint.set_shader(shader);
-            Some(paint)
-        }
-        DemoPaint::RadialGradient(g) => {
-            let shader = radial_gradient_shader(g, rect)?;
-            paint.set_shader(shader);
-            Some(paint)
-        }
-        DemoPaint::Image(img) => {
-            // Create image shader with proper positioning and opacity
-            let mut matrix = Matrix::new_identity();
-            matrix.set_translate((rect.left(), rect.top()));
-            let sampling = SamplingOptions::default();
-            let image_shader = img.image.to_shader(
-                Some((TileMode::Clamp, TileMode::Clamp)),
-                sampling,
-                Some(&matrix),
-            )?;
-
-            paint.set_shader(image_shader);
-            // Apply opacity through paint alpha
-            if img.opacity < 1.0 {
-                paint.set_color4f(Color4f::new(1.0, 1.0, 1.0, img.opacity), None);
-            }
-            Some(paint)
-        }
-    }
-}
-
-fn stack_shaders(fills: &[DemoPaint], rect: Rect) -> Option<Shader> {
-    let mut iter = fills.iter();
-    let first = iter.next()?;
-    let mut shader = shader_from_paint(first, rect)?;
-    for p in iter {
-        let next = shader_from_paint(p, rect)?;
-        shader = shaders::blend(BlendMode::SrcOver, shader, next);
-    }
-    Some(shader)
-}
-
-fn shader_from_paint(p: &DemoPaint, rect: Rect) -> Option<Shader> {
-    match p {
-        DemoPaint::Solid(s) => {
-            let color4f = cgcolor_to_color4f(s.color, s.opacity);
-            let color = Color::from_argb(
-                (color4f.a * 255.0) as u8,
-                (color4f.r * 255.0) as u8,
-                (color4f.g * 255.0) as u8,
-                (color4f.b * 255.0) as u8,
-            );
-            Some(shaders::color(color))
-        }
-        DemoPaint::LinearGradient(g) => linear_gradient_shader(g, rect),
-        DemoPaint::RadialGradient(g) => radial_gradient_shader(g, rect),
-        DemoPaint::Image(img) => {
-            // Create image shader with proper positioning
-            let mut matrix = Matrix::new_identity();
-            matrix.set_translate((rect.left(), rect.top()));
-            let sampling = SamplingOptions::default();
-            img.image
-                .to_shader(
-                    Some((TileMode::Clamp, TileMode::Clamp)),
-                    sampling,
-                    Some(&matrix),
-                )
-                .map(|shader| {
-                    // Apply opacity using the same method as direct drawing
-                    if img.opacity < 1.0 {
-                        let opacity_color =
-                            Color::from_argb((img.opacity * 255.0) as u8, 255, 255, 255);
-                        shaders::blend(BlendMode::DstIn, shader, shaders::color(opacity_color))
-                    } else {
-                        shader
-                    }
-                })
-        }
-    }
-}
-
-fn linear_gradient_shader(p: &LinearGradientPaint, rect: Rect) -> Option<Shader> {
-    let pts = (
-        Point::new(rect.left(), rect.top()),
-        Point::new(rect.right(), rect.bottom()),
-    );
-    let (colors, positions) = stops_to_arrays(&p.stops, p.opacity);
-    Shader::linear_gradient(
-        pts,
-        colors.as_slice(),
-        Some(positions.as_slice()),
-        TileMode::Clamp,
-        None,
-        None,
-    )
-}
-
-fn radial_gradient_shader(p: &RadialGradientPaint, rect: Rect) -> Option<Shader> {
-    let center = Point::new(
-        rect.left() + rect.width() / 2.0,
-        rect.top() + rect.height() / 2.0,
-    );
-    let radius = rect.width().max(rect.height()) / 2.0;
-    let (colors, positions) = stops_to_arrays(&p.stops, p.opacity);
-    Shader::radial_gradient(
-        center,
-        radius,
-        colors.as_slice(),
-        Some(positions.as_slice()),
-        TileMode::Clamp,
-        None,
-        None,
-    )
-}
-
-fn stops_to_arrays(stops: &[GradientStop], opacity: f32) -> (Vec<Color4f>, Vec<f32>) {
-    let mut colors = Vec::with_capacity(stops.len());
-    let mut positions = Vec::with_capacity(stops.len());
-    for s in stops {
-        colors.push(cgcolor_to_color4f(s.color, opacity));
-        positions.push(s.offset);
-    }
-    (colors, positions)
-}
-
-fn cgcolor_to_color4f(c: CGColor, opacity: f32) -> Color4f {
-    Color4f::new(
-        c.0 as f32 / 255.0,
-        c.1 as f32 / 255.0,
-        c.2 as f32 / 255.0,
-        (c.3 as f32 / 255.0) * opacity,
-    )
-}
-
-fn load_fixture_image(filename: &str, w: i32, h: i32) -> Image {
-    // Load image from fixtures directory (project root)
-    let fixture_path = format!(
-        "{}/../../fixtures/images/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        filename
-    );
-    let data = std::fs::read(&fixture_path).expect("Failed to read fixture image");
-    let data = Data::new_copy(&data);
-    let image = Image::from_encoded(data).expect("Failed to decode image");
-
-    // Create a surface and draw the image scaled to the desired size
-    let mut surface = surfaces::raster_n32_premul((w, h)).expect("surface");
-    let canvas = surface.canvas();
-    let mut paint = SkPaint::default();
-    paint.set_anti_alias(true);
-    canvas.draw_image_rect(&image, None, Rect::from_wh(w as f32, h as f32), &paint);
-
-    surface.image_snapshot()
-}
-
-fn draw_label(canvas: &sk::Canvas, x: f32, y: f32, text: &str) {
+fn draw_label(canvas: &skia_safe::Canvas, x: f32, y: f32, text: &str) {
     FONT.with(|font| {
-        let mut text_paint = SkPaint::default();
+        let mut text_paint = skia_safe::Paint::default();
         text_paint.set_color(Color::BLACK);
-        text_paint.set_anti_alias(true);
 
         let text_point = Point::new(x, y);
         canvas.draw_str(text, text_point, font, &text_paint);
     });
+}
+
+fn load_checker_image() -> (ImageRepository, ResourceRef) {
+    let path = format!(
+        "{}/../../fixtures/images/checker.png",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let bytes = std::fs::read(&path).expect("Failed to read fixture image");
+    let hash = hash_bytes(&bytes);
+
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    store.lock().unwrap().insert(hash, bytes);
+
+    let mut repository = ImageRepository::new(store);
+    let image_src = "res://fixtures/checker.png".to_string();
+    repository
+        .insert(image_src.clone(), hash)
+        .expect("Failed to insert image into repository");
+
+    (repository, ResourceRef::RID(image_src))
+}
+
+fn hash_bytes(bytes: &[u8]) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hasher;
+
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish()
 }
