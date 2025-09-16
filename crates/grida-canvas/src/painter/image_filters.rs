@@ -5,7 +5,7 @@
 //! All filters use Skia's color matrix for efficient GPU-accelerated processing.
 
 use crate::cg::types::ImageFilters;
-use skia_safe::{self as sk, color_filters, ColorMatrix};
+use skia_safe::{self as sk, color_filters, runtime_effect::RuntimeEffect, ColorMatrix, Data};
 
 /// Creates a color filter for exposure adjustment
 ///
@@ -186,6 +186,92 @@ pub fn create_tint_filter(green_multiplier: f32) -> sk::ColorFilter {
     color_filters::matrix(&matrix, None)
 }
 
+/// Parameters for the shadows/highlights filter
+#[derive(Debug, Clone)]
+pub struct ShadowsHighlightsParams {
+    /// Shadow adjustment [-1.0, +1.0] (>0 lift shadows, <0 crush)
+    pub shadows: f32,
+    /// Highlight adjustment [-1.0, +1.0] (>0 recover/compress brights, <0 boost)
+    pub highlights: f32,
+    /// Shadow mask window low threshold (e.g., 0.25)
+    pub sh_lo: f32,
+    /// Shadow mask window high threshold (e.g., 0.80)
+    pub sh_hi: f32,
+    /// Highlight mask window low threshold (e.g., 0.20)
+    pub hi_lo: f32,
+    /// Highlight mask window high threshold (e.g., 0.90)
+    pub hi_hi: f32,
+    /// Chroma preservation factor [0.0, 1.0] (0 = grayscale-only, 1 = hue-preserving)
+    pub chroma_preserve: f32,
+    /// Luma coefficients for linear RGB (R, G, B)
+    pub luma_coeff: (f32, f32, f32),
+}
+
+impl Default for ShadowsHighlightsParams {
+    fn default() -> Self {
+        Self {
+            shadows: 0.0,
+            highlights: 0.0,
+            sh_lo: 0.25,
+            sh_hi: 0.80,
+            hi_lo: 0.20,
+            hi_hi: 0.90,
+            chroma_preserve: 0.85,
+            luma_coeff: (0.2126, 0.7152, 0.0722),
+        }
+    }
+}
+
+/// Compile the shadows/highlights SkSL shader
+fn runtime_effect_shadows_highlights() -> RuntimeEffect {
+    let sksl = include_str!("../shaders/shadows_highlights.sksl");
+    RuntimeEffect::make_for_color_filter(sksl, None)
+        .expect("Failed to compile shadows/highlights SkSL")
+}
+
+/// Creates a color filter for shadows/highlights adjustment using SkSL
+///
+/// This filter provides advanced shadow and highlight recovery/compression
+/// with chroma preservation and smooth masking. It operates in linear light
+/// space for more accurate color processing.
+///
+/// # Math
+/// The filter uses smooth masking to selectively adjust shadows and highlights:
+/// - Shadow mask: smooth transition from shadows to midtones
+/// - Highlight mask: smooth transition from midtones to highlights
+/// - Luma adjustment: Y' = Y + shadow_adjust + highlight_adjust
+/// - Chroma preservation: RGB' = lerp(grayscale, RGB * factor, chroma_preserve)
+///
+/// # Arguments
+/// * `params` - The ShadowsHighlightsParams containing all filter parameters
+///
+/// # Returns
+/// A Skia ColorFilter that can be applied to images or paints
+pub fn create_shadows_highlights_filter(params: ShadowsHighlightsParams) -> sk::ColorFilter {
+    let effect = runtime_effect_shadows_highlights();
+
+    // Create uniform data buffer
+    // The uniforms are packed in the order they appear in the SkSL shader
+    let mut uniform_data = Vec::new();
+
+    // Pack uniforms as f32 values in the order they appear in the shader
+    uniform_data.extend_from_slice(&params.shadows.to_le_bytes());
+    uniform_data.extend_from_slice(&params.highlights.to_le_bytes());
+    uniform_data.extend_from_slice(&params.sh_lo.to_le_bytes());
+    uniform_data.extend_from_slice(&params.sh_hi.to_le_bytes());
+    uniform_data.extend_from_slice(&params.hi_lo.to_le_bytes());
+    uniform_data.extend_from_slice(&params.hi_hi.to_le_bytes());
+    uniform_data.extend_from_slice(&params.chroma_preserve.to_le_bytes());
+    uniform_data.extend_from_slice(&params.luma_coeff.0.to_le_bytes());
+    uniform_data.extend_from_slice(&params.luma_coeff.1.to_le_bytes());
+    uniform_data.extend_from_slice(&params.luma_coeff.2.to_le_bytes());
+
+    let data = Data::new_copy(&uniform_data);
+    effect
+        .make_color_filter(data, None)
+        .expect("Failed to create shadows/highlights color filter")
+}
+
 /// Combines multiple color filters into a single filter for efficient processing
 ///
 /// This function allows combining multiple linear color adjustments into a single
@@ -337,5 +423,28 @@ mod tests {
         filters.saturation = Some(0.8);
         let result = create_image_filters_color_filter(&filters);
         assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_shadows_highlights_filter_default() {
+        let params = ShadowsHighlightsParams::default();
+        let _filter = create_shadows_highlights_filter(params);
+        // The filter creation should not panic
+    }
+
+    #[test]
+    fn test_shadows_highlights_filter_custom() {
+        let params = ShadowsHighlightsParams {
+            shadows: 0.5,
+            highlights: 0.3,
+            sh_lo: 0.2,
+            sh_hi: 0.7,
+            hi_lo: 0.3,
+            hi_hi: 0.8,
+            chroma_preserve: 0.9,
+            luma_coeff: (0.2126, 0.7152, 0.0722),
+        };
+        let _filter = create_shadows_highlights_filter(params);
+        // The filter creation should not panic
     }
 }

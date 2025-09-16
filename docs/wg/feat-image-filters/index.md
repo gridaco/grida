@@ -101,6 +101,22 @@ Below are the top five we will implement first. Each is widely exposed as a **to
 - **UX**: Default `gK = 1`. Range `~0.9…1.1` (or slider `−100…+100`). Label “Green ↔ Magenta”.
 - **Cross‑app**: Figma Tint, Apple Tint, Photoshop/Resolve Tint. (No direct CSS filter.)
 
+### 6) Highlights
+
+- **Why**: Allows fine control over bright areas, recovering detail or boosting brightness selectively without affecting midtones or shadows.
+- **Math**: Non-linear curve or LUT applied to pixels above a brightness threshold; adjusts luminance with smooth falloff.
+- **Skia**: Implemented via LUT or runtime shader applying a non-linear curve; order sensitive.
+- **UX**: Default neutral (no change). Range typically from reducing highlights (negative values) to enhancing them (positive values). Useful for preventing highlight clipping or artistic effects.
+- **Cross‑app**: Apple Photos Highlights, Photoshop Highlights, Resolve Highlights. No direct CSS equivalent.
+
+### 7) Shadows
+
+- **Why**: Enables selective adjustment of dark areas to recover shadow detail or deepen shadows for contrast.
+- **Math**: Non-linear curve or LUT applied to pixels below a brightness threshold; modifies luminance with smooth transition.
+- **Skia**: Implemented via LUT or runtime shader applying a non-linear curve; order sensitive.
+- **UX**: Default neutral. Range from lightening shadows (positive values) to darkening (negative values). Helps balance image contrast and reveal shadow detail.
+- **Cross‑app**: Apple Photos Shadows, Photoshop Shadows, Resolve Shadows. No direct CSS equivalent.
+
 ## References
 
 - **CSS Filter Effects (MDN):** [filter](https://developer.mozilla.org/en-US/docs/Web/CSS/filter) — includes `brightness()`, `contrast()`, `saturate()`, `grayscale()`, `sepia()`, `hue-rotate()`, `invert()`
