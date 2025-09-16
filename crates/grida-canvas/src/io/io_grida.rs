@@ -54,6 +54,8 @@ pub enum JSONPaint {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
         #[serde(default)]
         blend_mode: BlendMode,
     },
@@ -62,6 +64,8 @@ pub enum JSONPaint {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
         #[serde(default)]
         blend_mode: BlendMode,
     },
@@ -70,6 +74,8 @@ pub enum JSONPaint {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
         #[serde(default)]
         blend_mode: BlendMode,
     },
@@ -78,6 +84,8 @@ pub enum JSONPaint {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
         #[serde(default)]
         blend_mode: BlendMode,
     },
@@ -88,6 +96,8 @@ pub enum JSONPaint {
         transform: Option<[[f32; 3]; 2]>,
         #[serde(default)]
         fit: CSSObjectFit,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
         #[serde(default)]
         blend_mode: BlendMode,
         // Image filters
@@ -169,12 +179,12 @@ impl From<Option<JSONPaint>> for Paint {
         match fill {
             Some(JSONPaint::Solid { color, blend_mode }) => Paint::Solid(SolidPaint {
                 color: color.map_or(CGColor::TRANSPARENT, |c| c.into()),
-                opacity: 1.0,
                 blend_mode,
             }),
             Some(JSONPaint::LinearGradient {
                 transform,
                 stops,
+                opacity,
                 blend_mode,
                 ..
             }) => {
@@ -184,13 +194,14 @@ impl From<Option<JSONPaint>> for Paint {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
-                    opacity: 1.0,
+                    opacity,
                     blend_mode,
                 })
             }
             Some(JSONPaint::RadialGradient {
                 transform,
                 stops,
+                opacity,
                 blend_mode,
                 ..
             }) => {
@@ -200,13 +211,14 @@ impl From<Option<JSONPaint>> for Paint {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
-                    opacity: 1.0,
+                    opacity,
                     blend_mode,
                 })
             }
             Some(JSONPaint::DiamondGradient {
                 transform,
                 stops,
+                opacity,
                 blend_mode,
                 ..
             }) => {
@@ -216,13 +228,14 @@ impl From<Option<JSONPaint>> for Paint {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
-                    opacity: 1.0,
+                    opacity,
                     blend_mode,
                 })
             }
             Some(JSONPaint::SweepGradient {
                 transform,
                 stops,
+                opacity,
                 blend_mode,
                 ..
             }) => {
@@ -232,7 +245,7 @@ impl From<Option<JSONPaint>> for Paint {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
-                    opacity: 1.0,
+                    opacity,
                     blend_mode,
                 })
             }
@@ -240,6 +253,7 @@ impl From<Option<JSONPaint>> for Paint {
                 src,
                 transform,
                 fit,
+                opacity,
                 blend_mode,
                 filters,
             }) => {
@@ -250,7 +264,7 @@ impl From<Option<JSONPaint>> for Paint {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     fit: fit.into(),
-                    opacity: 1.0,
+                    opacity,
                     blend_mode,
                     filters,
                 };
@@ -259,7 +273,6 @@ impl From<Option<JSONPaint>> for Paint {
             }
             None => Paint::Solid(SolidPaint {
                 color: CGColor::TRANSPARENT,
-                opacity: 1.0,
                 blend_mode: BlendMode::default(),
             }),
         }
@@ -993,6 +1006,7 @@ impl From<JSONImageNode> for Node {
                 src: h,
                 transform: t,
                 fit,
+                opacity,
                 blend_mode,
                 filters,
             }) => {
@@ -1003,7 +1017,7 @@ impl From<JSONImageNode> for Node {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     fit: fit.into(),
-                    opacity: 1.0,
+                    opacity,
                     blend_mode,
                     filters,
                 };

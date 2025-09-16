@@ -44,18 +44,18 @@ pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
 impl CGColor {
     pub const TRANSPARENT: Self = Self(0, 0, 0, 0);
-    pub const BLACK: Self = Self(0, 0, 0, 255);
-    pub const WHITE: Self = Self(255, 255, 255, 255);
-    pub const RED: Self = Self(255, 0, 0, 255);
-    pub const GREEN: Self = Self(0, 255, 0, 255);
-    pub const BLUE: Self = Self(0, 0, 255, 255);
+    pub const BLACK: Self = Self(0, 0, 0, 0xff);
+    pub const WHITE: Self = Self(0xff, 0xff, 0xff, 0xff);
+    pub const RED: Self = Self(0xff, 0, 0, 0xff);
+    pub const GREEN: Self = Self(0, 0xff, 0, 0xff);
+    pub const BLUE: Self = Self(0, 0, 0xff, 0xff);
 
     pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self(r, g, b, a)
     }
 
     pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
-        Self(r, g, b, 255)
+        Self(r, g, b, 0xff)
     }
 
     pub fn r(&self) -> u8 {
@@ -76,7 +76,6 @@ impl From<CGColor> for SolidPaint {
     fn from(color: CGColor) -> Self {
         SolidPaint {
             color,
-            opacity: 1.0,
             blend_mode: BlendMode::default(),
         }
     }
@@ -902,7 +901,7 @@ pub enum Paint {
 impl Paint {
     pub fn opacity(&self) -> f32 {
         match self {
-            Paint::Solid(solid) => solid.opacity,
+            Paint::Solid(solid) => solid.opacity(),
             Paint::LinearGradient(gradient) => gradient.opacity,
             Paint::RadialGradient(gradient) => gradient.opacity,
             Paint::SweepGradient(gradient) => gradient.opacity,
@@ -935,7 +934,7 @@ impl Paint {
         match self {
             Paint::Solid(solid) => {
                 solid.color.0.hash(hasher);
-                solid.opacity.to_bits().hash(hasher);
+                solid.opacity().to_bits().hash(hasher);
                 solid.blend_mode.hash(hasher);
             }
             Paint::LinearGradient(gradient) => {
@@ -1004,7 +1003,6 @@ impl GradientPaint {
 #[derive(Debug, Clone)]
 pub struct SolidPaint {
     pub color: CGColor,
-    pub opacity: f32,
     pub blend_mode: BlendMode,
 }
 
@@ -1012,44 +1010,42 @@ impl SolidPaint {
     pub fn new_color(color: CGColor) -> Self {
         Self {
             color,
-            opacity: 1.0,
             blend_mode: BlendMode::default(),
         }
     }
 
+    /// Returns the opacity as a value between 0.0 and 1.0, derived from the color's alpha channel.
+    pub fn opacity(&self) -> f32 {
+        self.color.a() as f32 / 255.0
+    }
+
     pub const TRANSPARENT: Self = Self {
         color: CGColor::TRANSPARENT,
-        opacity: 0.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const BLACK: Self = Self {
         color: CGColor::BLACK,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const WHITE: Self = Self {
         color: CGColor::WHITE,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const RED: Self = Self {
         color: CGColor::RED,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const BLUE: Self = Self {
         color: CGColor::BLUE,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const GREEN: Self = Self {
         color: CGColor::GREEN,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 }

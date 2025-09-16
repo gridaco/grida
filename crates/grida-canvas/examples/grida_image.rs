@@ -39,6 +39,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
         blend_mode: BlendMode::Normal,
+        filters: ImageFilters::default(),
     }));
     rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
     rect1.stroke_width = 2.0;

@@ -34,7 +34,6 @@ impl NodeFactory {
     fn default_solid_paint(color: CGColor) -> Paint {
         Paint::Solid(SolidPaint {
             color,
-            opacity: 1.0,
             blend_mode: BlendMode::default(),
         })
     }

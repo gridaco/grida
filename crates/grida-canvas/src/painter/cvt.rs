@@ -8,7 +8,7 @@ pub fn sk_solid_paint(paint: impl Into<SolidPaint>) -> skia_safe::Paint {
     let mut skia_paint = skia_safe::Paint::default();
     skia_paint.set_anti_alias(true);
     let CGColor(r, g, b, a) = p.color;
-    let final_alpha = (a as f32 * p.opacity) as u8;
+    let final_alpha = (a as f32 * p.opacity()) as u8;
     skia_paint.set_color(skia_safe::Color::from_argb(final_alpha, r, g, b));
     skia_paint
 }
@@ -98,7 +98,7 @@ pub fn shader_from_paint(
     match paint {
         Paint::Solid(solid) => {
             let CGColor(r, g, b, a) = solid.color;
-            let final_alpha = (a as f32 * opacity * solid.opacity).round() as u8;
+            let final_alpha = (a as f32 * opacity * solid.opacity()).round() as u8;
             Some(shaders::color(Color::from_argb(final_alpha, r, g, b)))
         }
         Paint::LinearGradient(g) => gradient::linear_gradient_paint(g, opacity, size).shader(),

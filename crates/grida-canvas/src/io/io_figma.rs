@@ -48,11 +48,18 @@ impl From<&Box<Rgba>> for CGColor {
 impl From<&FigmaPaint> for Paint {
     fn from(paint: &FigmaPaint) -> Self {
         match paint {
-            FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
-                color: CGColor::from(&solid.color),
-                opacity: solid.opacity.unwrap_or(1.0) as f32,
-                blend_mode: BlendMode::default(),
-            }),
+            FigmaPaint::SolidPaint(solid) => {
+                let mut color = CGColor::from(&solid.color);
+                let opacity = solid.opacity.unwrap_or(1.0) as f32;
+                // Apply opacity to the color's alpha channel
+                let CGColor(r, g, b, a) = color;
+                let final_alpha = (a as f32 * opacity).round() as u8;
+                color = CGColor(r, g, b, final_alpha);
+                Paint::Solid(SolidPaint {
+                    color,
+                    blend_mode: BlendMode::default(),
+                })
+            }
             FigmaPaint::ImagePaint(image) => {
                 let transform =
                     image
@@ -82,6 +89,7 @@ impl From<&FigmaPaint> for Paint {
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),
+                    filters: ImageFilters::default(),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -139,7 +147,6 @@ impl From<&FigmaPaint> for Paint {
             }
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
-                opacity: 1.0,
                 blend_mode: BlendMode::default(),
             }),
         }
@@ -285,11 +292,18 @@ impl FigmaConverter {
     /// Convert Figma's paint to our Paint
     fn convert_paint(&self, paint: &FigmaPaint) -> Paint {
         match paint {
-            FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
-                color: CGColor::from(&solid.color),
-                opacity: solid.opacity.unwrap_or(1.0) as f32,
-                blend_mode: BlendMode::default(),
-            }),
+            FigmaPaint::SolidPaint(solid) => {
+                let mut color = CGColor::from(&solid.color);
+                let opacity = solid.opacity.unwrap_or(1.0) as f32;
+                // Apply opacity to the color's alpha channel
+                let CGColor(r, g, b, a) = color;
+                let final_alpha = (a as f32 * opacity).round() as u8;
+                color = CGColor(r, g, b, final_alpha);
+                Paint::Solid(SolidPaint {
+                    color,
+                    blend_mode: BlendMode::default(),
+                })
+            }
             FigmaPaint::ImagePaint(image) => {
                 let url = self
                     .image_urls
@@ -324,6 +338,7 @@ impl FigmaConverter {
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),
+                    filters: ImageFilters::default(),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -381,7 +396,6 @@ impl FigmaConverter {
             }
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
-                opacity: 1.0,
                 blend_mode: BlendMode::default(),
             }),
         }

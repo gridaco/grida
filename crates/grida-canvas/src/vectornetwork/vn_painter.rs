@@ -286,7 +286,6 @@ mod tests {
         let painter = VNPainter::new(canvas);
         let fills = vec![Paint::Solid(SolidPaint {
             color: CGColor::RED,
-            opacity: 1.0,
             blend_mode: BlendMode::default(),
         })];
         painter.draw(&vn, &fills, None, 0.0);
