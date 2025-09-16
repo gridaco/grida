@@ -3,9 +3,116 @@
 //! This module provides the core image filter functions that implement the
 //! standard color adjustments as defined in the image filters proposal.
 //! All filters use Skia's color matrix for efficient GPU-accelerated processing.
+//!
+//! ## Normalized vs Physical Values
+//!
+//! The module provides two sets of functions:
+//! - **Normalized functions** (default): Accept values in the range [-1.0, 1.0] where:
+//!   - `-1.0` = maximum negative adjustment
+//!   - `0.0` = no change (neutral)
+//!   - `1.0` = maximum positive adjustment
+//! - **Physical functions**: Accept values in their original physical ranges for
+//!   backward compatibility and direct control
+//!
+//! ## Filter Specifications
+//!
+//! ### Exposure
+//! Controls the overall brightness of the image using the formula `RGB' = RGB * k`.
+//! - **Normalized range**: [-1.0, 1.0] → Physical range: [0.25, 4.0]
+//! - **Physical values**:
+//!   - `0.25` = very dark (like -2 EV)
+//!   - `0.5` = dark (like -1 EV)
+//!   - `1.0` = original (no change)
+//!   - `2.0` = bright (like +1 EV)
+//!   - `4.0` = very bright (like +2 EV)
+//!
+//! ### Contrast
+//! Controls the difference between light and dark areas using the formula `c' = (c - p) * k + p` where `p = 0.5` (pivot point).
+//! - **Normalized range**: [-1.0, 1.0] → Physical range: [0.25, 4.0]
+//! - **Physical values**:
+//!   - `0.25` = very low contrast
+//!   - `0.5` = low contrast
+//!   - `1.0` = original contrast
+//!   - `2.0` = high contrast
+//!   - `4.0` = very high contrast
+//!
+//! ### Saturation
+//! Controls the intensity of colors using the formula `color' = lerp(luma, color, k)` where `luma` is grayscale.
+//! - **Normalized range**: [-1.0, 1.0] → Physical range: [0.0, 2.0]
+//! - **Physical values**:
+//!   - `0.0` = grayscale (no color)
+//!   - `0.5` = desaturated
+//!   - `1.0` = original saturation
+//!   - `1.5` = oversaturated
+//!   - `2.0` = highly oversaturated
+//!
+//! ### Temperature
+//! Controls the warm/cool color balance using the formula `R' = R * rK`, `B' = B * bK` where `rK` and `bK` are temperature factors.
+//! - **Normalized range**: [-1.0, 1.0] → Physical range: [-0.4, 0.4]
+//! - **Physical values**:
+//!   - `-0.4` = very cool (blue tint)
+//!   - `-0.2` = cool (slight blue tint)
+//!   - `0.0` = neutral (no change)
+//!   - `0.2` = warm (slight orange tint)
+//!   - `0.4` = very warm (strong orange tint)
+//!
+//! ### Tint
+//! Controls the green/magenta color balance using the formula `G' = G * gK` where `gK` is the green multiplier.
+//! - **Normalized range**: [-1.0, 1.0] → Physical range: [0.6, 1.4]
+//! - **Physical values**:
+//!   - `0.6` = strong magenta tint
+//!   - `0.8` = slight magenta tint
+//!   - `1.0` = neutral (no change)
+//!   - `1.2` = slight green tint
+//!   - `1.4` = strong green tint
 
 use crate::cg::types::ImageFilters;
 use skia_safe::{self as sk, color_filters, runtime_effect::RuntimeEffect, ColorMatrix, Data};
+
+/// Conversion functions between normalized and physical values
+
+/// Convert normalized exposure value (-1.0 to 1.0) to physical value (0.25 to 4.0)
+fn normalized_to_physical_exposure(normalized: f32) -> f32 {
+    // Map [-1.0, 1.0] to [0.25, 4.0] using exponential scaling
+    // This preserves the EV relationship: k = 2^E
+    if normalized <= 0.0 {
+        // Map [-1.0, 0.0] to [0.25, 1.0]
+        0.25 + (1.0 - 0.25) * (normalized + 1.0)
+    } else {
+        // Map [0.0, 1.0] to [1.0, 4.0]
+        1.0 + (4.0 - 1.0) * normalized
+    }
+}
+
+/// Convert normalized contrast value (-1.0 to 1.0) to physical value (0.25 to 4.0)
+fn normalized_to_physical_contrast(normalized: f32) -> f32 {
+    // Map [-1.0, 1.0] to [0.25, 4.0] using exponential scaling
+    if normalized <= 0.0 {
+        // Map [-1.0, 0.0] to [0.25, 1.0]
+        0.25 + (1.0 - 0.25) * (normalized + 1.0)
+    } else {
+        // Map [0.0, 1.0] to [1.0, 4.0]
+        1.0 + (4.0 - 1.0) * normalized
+    }
+}
+
+/// Convert normalized saturation value (-1.0 to 1.0) to physical value (0.0 to 2.0)
+fn normalized_to_physical_saturation(normalized: f32) -> f32 {
+    // Map [-1.0, 1.0] to [0.0, 2.0]
+    1.0 + normalized
+}
+
+/// Convert normalized temperature value (-1.0 to 1.0) to physical value (-0.4 to 0.4)
+fn normalized_to_physical_temperature(normalized: f32) -> f32 {
+    // Map [-1.0, 1.0] to [-0.4, 0.4]
+    0.4 * normalized
+}
+
+/// Convert normalized tint value (-1.0 to 1.0) to physical value (0.6 to 1.4)
+fn normalized_to_physical_tint(normalized: f32) -> f32 {
+    // Map [-1.0, 1.0] to [0.6, 1.4]
+    1.0 + 0.4 * normalized
+}
 
 /// Creates a color filter for exposure adjustment
 ///
@@ -307,14 +414,15 @@ pub fn combine_color_filters(filters: &[sk::ColorFilter]) -> Option<sk::ColorFil
     Some(combined)
 }
 
-/// Creates a combined color filter from ImageFilters struct
+/// Creates a combined color filter from ImageFilters struct using normalized values
 ///
-/// This function takes an ImageFilters struct and creates a single combined
-/// color filter that applies all the specified filters in the correct order.
-/// The filters are applied in the order: Exposure -> Contrast -> Saturation -> Temperature -> Tint
+/// This function takes an ImageFilters struct with normalized values (-1.0 to 1.0)
+/// and creates a single combined color filter that applies all the specified filters
+/// in the correct order. The filters are applied in the order:
+/// Exposure -> Contrast -> Saturation -> Temperature -> Tint
 ///
 /// # Arguments
-/// * `filters` - The ImageFilters struct containing filter parameters
+/// * `filters` - The ImageFilters struct containing normalized filter parameters
 ///
 /// # Returns
 /// A combined Skia ColorFilter, or None if no filters are specified
@@ -323,28 +431,109 @@ pub fn create_image_filters_color_filter(filters: &ImageFilters) -> Option<sk::C
 
     // Apply filters in the correct order for optimal results
     // 1. Exposure (brightness adjustment)
-    if let Some(exposure) = filters.exposure {
-        color_filters.push(create_exposure_filter(exposure));
+    if filters.exposure != 0.0 {
+        let physical_exposure = normalized_to_physical_exposure(filters.exposure);
+        color_filters.push(create_exposure_filter(physical_exposure));
     }
 
     // 2. Contrast (dynamic range adjustment)
-    if let Some(contrast) = filters.contrast {
-        color_filters.push(create_contrast_filter(contrast));
+    if filters.contrast != 0.0 {
+        let physical_contrast = normalized_to_physical_contrast(filters.contrast);
+        color_filters.push(create_contrast_filter(physical_contrast));
     }
 
     // 3. Saturation (color intensity adjustment)
-    if let Some(saturation) = filters.saturation {
-        color_filters.push(create_saturation_filter(saturation));
+    if filters.saturation != 0.0 {
+        let physical_saturation = normalized_to_physical_saturation(filters.saturation);
+        color_filters.push(create_saturation_filter(physical_saturation));
     }
 
     // 4. Temperature (warm/cool color adjustment)
-    if let Some(temperature) = filters.temperature {
-        color_filters.push(create_temperature_filter(temperature));
+    if filters.temperature != 0.0 {
+        let physical_temperature = normalized_to_physical_temperature(filters.temperature);
+        color_filters.push(create_temperature_filter(physical_temperature));
     }
 
     // 5. Tint (green/magenta adjustment)
-    if let Some(tint) = filters.tint {
-        color_filters.push(create_tint_filter(tint));
+    if filters.tint != 0.0 {
+        let physical_tint = normalized_to_physical_tint(filters.tint);
+        color_filters.push(create_tint_filter(physical_tint));
+    }
+
+    // 6. Highlights and Shadows (using the existing shadows/highlights filter)
+    if filters.highlights != 0.0 || filters.shadows != 0.0 {
+        let params = ShadowsHighlightsParams {
+            shadows: filters.shadows,
+            highlights: filters.highlights,
+            sh_lo: 0.25,
+            sh_hi: 0.80,
+            hi_lo: 0.20,
+            hi_hi: 0.90,
+            chroma_preserve: 0.85,
+            luma_coeff: (0.2126, 0.7152, 0.0722),
+        };
+        color_filters.push(create_shadows_highlights_filter(params));
+    }
+
+    // Combine all filters into a single color filter
+    combine_color_filters(&color_filters)
+}
+
+/// Creates a combined color filter from ImageFilters struct using physical values
+///
+/// This function takes an ImageFilters struct with physical values and creates a single
+/// combined color filter that applies all the specified filters in the correct order.
+/// This is provided for backward compatibility and direct control over filter parameters.
+///
+/// # Arguments
+/// * `filters` - The ImageFilters struct containing physical filter parameters
+///
+/// # Returns
+/// A combined Skia ColorFilter, or None if no filters are specified
+pub fn create_image_filters_color_filter_physical(
+    filters: &ImageFilters,
+) -> Option<sk::ColorFilter> {
+    let mut color_filters = Vec::new();
+
+    // Apply filters in the correct order for optimal results
+    // 1. Exposure (brightness adjustment)
+    if filters.exposure != 1.0 {
+        color_filters.push(create_exposure_filter(filters.exposure));
+    }
+
+    // 2. Contrast (dynamic range adjustment)
+    if filters.contrast != 1.0 {
+        color_filters.push(create_contrast_filter(filters.contrast));
+    }
+
+    // 3. Saturation (color intensity adjustment)
+    if filters.saturation != 1.0 {
+        color_filters.push(create_saturation_filter(filters.saturation));
+    }
+
+    // 4. Temperature (warm/cool color adjustment)
+    if filters.temperature != 0.0 {
+        color_filters.push(create_temperature_filter(filters.temperature));
+    }
+
+    // 5. Tint (green/magenta adjustment)
+    if filters.tint != 1.0 {
+        color_filters.push(create_tint_filter(filters.tint));
+    }
+
+    // 6. Highlights and Shadows (using the existing shadows/highlights filter)
+    if filters.highlights != 0.0 || filters.shadows != 0.0 {
+        let params = ShadowsHighlightsParams {
+            shadows: filters.shadows,
+            highlights: filters.highlights,
+            sh_lo: 0.25,
+            sh_hi: 0.80,
+            hi_lo: 0.20,
+            hi_hi: 0.90,
+            chroma_preserve: 0.85,
+            luma_coeff: (0.2126, 0.7152, 0.0722),
+        };
+        color_filters.push(create_shadows_highlights_filter(params));
     }
 
     // Combine all filters into a single color filter
@@ -410,7 +599,7 @@ mod tests {
     #[test]
     fn test_create_image_filters_color_filter_single() {
         let mut filters = ImageFilters::default();
-        filters.exposure = Some(1.5);
+        filters.exposure = 0.5; // Normalized value
         let result = create_image_filters_color_filter(&filters);
         assert!(result.is_some());
     }
@@ -418,10 +607,28 @@ mod tests {
     #[test]
     fn test_create_image_filters_color_filter_multiple() {
         let mut filters = ImageFilters::default();
-        filters.exposure = Some(1.2);
-        filters.contrast = Some(1.1);
-        filters.saturation = Some(0.8);
+        filters.exposure = 0.2; // Normalized value
+        filters.contrast = 0.1; // Normalized value
+        filters.saturation = -0.2; // Normalized value
         let result = create_image_filters_color_filter(&filters);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_create_image_filters_color_filter_physical_single() {
+        let mut filters = ImageFilters::default();
+        filters.exposure = 1.5; // Physical value
+        let result = create_image_filters_color_filter_physical(&filters);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_create_image_filters_color_filter_physical_multiple() {
+        let mut filters = ImageFilters::default();
+        filters.exposure = 1.2; // Physical value
+        filters.contrast = 1.1; // Physical value
+        filters.saturation = 0.8; // Physical value
+        let result = create_image_filters_color_filter_physical(&filters);
         assert!(result.is_some());
     }
 

@@ -20,6 +20,7 @@
 //! - Desaturated (k = 0.0, grayscale)
 //! - Oversaturated (k = 2.0)
 
+use cg::cg::types::ImageFilters;
 use cg::painter::image_filters;
 use skia_safe::{self as sk, surfaces, Color, Data, Font, Image, Paint as SkPaint, Point, Rect};
 
@@ -39,9 +40,9 @@ fn main() {
         ("8k.jpg", "8K"),
     ];
 
-    // Saturation values for each column (0.0, 0.5, 1.0, 1.5, 2.0)
-    let saturation_values = [0.0, 0.5, 1.0, 1.5, 2.0];
-    let saturation_labels = ["0.0x", "0.5x", "Original", "1.5x", "2.0x"];
+    // Saturation values for each column (normalized -1.0 to 1.0)
+    let saturation_values = [-1.0, -0.5, 0.0, 0.5, 1.0];
+    let saturation_labels = ["-1.0", "-0.5", "Original", "+0.5", "+1.0"];
 
     let cell_width = 400.0;
     let cell_height = 350.0;
@@ -67,15 +68,27 @@ fn main() {
             // Load and draw image
             let image = load_fixture_image(image_file, image_size as i32, image_size as i32);
 
-            if saturation_k == 1.0 {
+            if saturation_k == 0.0 {
                 // Original image (no filter)
                 canvas.draw_image(&image, (x_offset, y_offset), None);
             } else {
-                // Apply saturation filter
-                let filter = image_filters::create_saturation_filter(saturation_k);
-                let mut paint = SkPaint::default();
-                paint.set_color_filter(filter);
-                canvas.draw_image(&image, (x_offset, y_offset), Some(&paint));
+                // Apply saturation filter using normalized values
+                let filters = ImageFilters {
+                    exposure: 0.0,
+                    contrast: 0.0,
+                    saturation: saturation_k,
+                    temperature: 0.0,
+                    tint: 0.0,
+                    highlights: 0.0,
+                    shadows: 0.0,
+                };
+                if let Some(filter) = image_filters::create_image_filters_color_filter(&filters) {
+                    let mut paint = SkPaint::default();
+                    paint.set_color_filter(filter);
+                    canvas.draw_image(&image, (x_offset, y_offset), Some(&paint));
+                } else {
+                    canvas.draw_image(&image, (x_offset, y_offset), None);
+                }
             }
 
             // Draw column label

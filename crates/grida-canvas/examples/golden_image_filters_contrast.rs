@@ -20,6 +20,7 @@
 //! - Low contrast (k = 0.5)
 //! - High contrast (k = 2.0)
 
+use cg::cg::types::ImageFilters;
 use cg::painter::image_filters;
 use skia_safe::{self as sk, surfaces, Color, Data, Font, Image, Paint as SkPaint, Point, Rect};
 
@@ -39,9 +40,9 @@ fn main() {
         ("8k.jpg", "8K"),
     ];
 
-    // Contrast values for each column (0.25, 0.5, 1.0, 2.0, 4.0)
-    let contrast_values = [0.25, 0.5, 1.0, 2.0, 4.0];
-    let contrast_labels = ["0.25x", "0.5x", "Original", "2.0x", "4.0x"];
+    // Contrast values for each column (normalized -1.0 to 1.0)
+    let contrast_values = [-1.0, -0.5, 0.0, 0.5, 1.0];
+    let contrast_labels = ["-1.0", "-0.5", "Original", "+0.5", "+1.0"];
 
     let cell_width = 400.0;
     let cell_height = 350.0;
@@ -67,15 +68,27 @@ fn main() {
             // Load and draw image
             let image = load_fixture_image(image_file, image_size as i32, image_size as i32);
 
-            if contrast_k == 1.0 {
+            if contrast_k == 0.0 {
                 // Original image (no filter)
                 canvas.draw_image(&image, (x_offset, y_offset), None);
             } else {
-                // Apply contrast filter
-                let filter = image_filters::create_contrast_filter(contrast_k);
-                let mut paint = SkPaint::default();
-                paint.set_color_filter(filter);
-                canvas.draw_image(&image, (x_offset, y_offset), Some(&paint));
+                // Apply contrast filter using normalized values
+                let filters = ImageFilters {
+                    exposure: 0.0,
+                    contrast: contrast_k,
+                    saturation: 0.0,
+                    temperature: 0.0,
+                    tint: 0.0,
+                    highlights: 0.0,
+                    shadows: 0.0,
+                };
+                if let Some(filter) = image_filters::create_image_filters_color_filter(&filters) {
+                    let mut paint = SkPaint::default();
+                    paint.set_color_filter(filter);
+                    canvas.draw_image(&image, (x_offset, y_offset), Some(&paint));
+                } else {
+                    canvas.draw_image(&image, (x_offset, y_offset), None);
+                }
             }
 
             // Draw column label

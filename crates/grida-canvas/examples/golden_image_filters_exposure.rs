@@ -15,6 +15,7 @@
 //! - Underexposed (-1 EV, k = 0.5)
 //! - Overexposed (+1 EV, k = 2.0)
 
+use cg::cg::types::ImageFilters;
 use cg::painter::image_filters;
 use skia_safe::{self as sk, surfaces, Color, Data, Font, Image, Paint as SkPaint, Point, Rect};
 
@@ -34,9 +35,9 @@ fn main() {
         ("8k.jpg", "8K"),
     ];
 
-    // Exposure values for each column (-2, -1, 0, +1, +2 EV)
-    let exposure_values = [0.25, 0.5, 1.0, 2.0, 4.0]; // k values: 2^(-2), 2^(-1), 2^0, 2^1, 2^2
-    let exposure_labels = ["-2 EV", "-1 EV", "Original", "+1 EV", "+2 EV"];
+    // Exposure values for each column (normalized -1.0 to 1.0)
+    let exposure_values = [-1.0, -0.5, 0.0, 0.5, 1.0]; // Normalized values
+    let exposure_labels = ["-1.0", "-0.5", "Original", "+0.5", "+1.0"];
 
     let cell_width = 400.0;
     let cell_height = 350.0;
@@ -62,15 +63,27 @@ fn main() {
             // Load and draw image
             let image = load_fixture_image(image_file, image_size as i32, image_size as i32);
 
-            if exposure_k == 1.0 {
+            if exposure_k == 0.0 {
                 // Original image (no filter)
                 canvas.draw_image(&image, (x_offset, y_offset), None);
             } else {
-                // Apply exposure filter
-                let filter = image_filters::create_exposure_filter(exposure_k);
-                let mut paint = SkPaint::default();
-                paint.set_color_filter(filter);
-                canvas.draw_image(&image, (x_offset, y_offset), Some(&paint));
+                // Apply exposure filter using normalized values
+                let filters = ImageFilters {
+                    exposure: exposure_k,
+                    contrast: 0.0,
+                    saturation: 0.0,
+                    temperature: 0.0,
+                    tint: 0.0,
+                    highlights: 0.0,
+                    shadows: 0.0,
+                };
+                if let Some(filter) = image_filters::create_image_filters_color_filter(&filters) {
+                    let mut paint = SkPaint::default();
+                    paint.set_color_filter(filter);
+                    canvas.draw_image(&image, (x_offset, y_offset), Some(&paint));
+                } else {
+                    canvas.draw_image(&image, (x_offset, y_offset), None);
+                }
             }
 
             // Draw column label

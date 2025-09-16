@@ -1257,89 +1257,79 @@ pub enum ResourceRef {
 
 /// Image filter parameters for color adjustments
 ///
-/// All values are optional - when `None`, no filter is applied for that property.
-/// When `Some(value)`, the filter is applied with the specified intensity.
+/// All values are normalized to the range [-1.0, 1.0] where:
+/// - `-1.0` = maximum negative adjustment
+/// - `0.0` = no change (neutral)
+/// - `1.0` = maximum positive adjustment
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct ImageFilters {
-    /// Exposure adjustment factor (0.25 to 4.0, default: 1.0)
+    /// Exposure adjustment (-1.0 to 1.0, default: 0.0)
     ///
-    /// Controls the overall brightness of the image using the formula `RGB' = RGB * k`.
-    ///
-    /// **Range**: `0.25` to `4.0`  
-    /// **Default**: `1.0` (no change)  
-    /// **Values**:
-    /// - `0.25` = very dark (like -2 EV)
-    /// - `0.5` = dark (like -1 EV)
-    /// - `1.0` = original (no change)
-    /// - `2.0` = bright (like +1 EV)
-    /// - `4.0` = very bright (like +2 EV)
-    pub exposure: Option<f32>,
+    /// Controls the overall brightness of the image.
+    /// - `-1.0` = very dark
+    /// - `0.0` = original (no change)
+    /// - `1.0` = very bright
+    pub exposure: f32,
 
-    /// Contrast adjustment factor (0.25 to 4.0, default: 1.0)
+    /// Contrast adjustment (-0.3 to 0.3, default: 0.0)
     ///
-    /// Controls the difference between light and dark areas using the formula `c' = (c - p) * k + p` where `p = 0.5` (pivot point).
-    ///
-    /// **Range**: `0.25` to `4.0`  
-    /// **Default**: `1.0` (no change)  
-    /// **Values**:
-    /// - `0.25` = very low contrast
-    /// - `0.5` = low contrast
-    /// - `1.0` = original contrast
-    /// - `2.0` = high contrast
-    /// - `4.0` = very high contrast
-    pub contrast: Option<f32>,
+    /// Controls the difference between light and dark areas.
+    /// - `-0.3` = low contrast (UI cap)
+    /// - `0.0` = original contrast
+    /// - `0.3` = high contrast (UI cap)
+    pub contrast: f32,
 
-    /// Saturation adjustment factor (0.0 to 2.0, default: 1.0)
+    /// Saturation adjustment (-1.0 to 1.0, default: 0.0)
     ///
-    /// Controls the intensity of colors using the formula `color' = lerp(luma, color, k)` where `luma` is grayscale.
-    ///
-    /// **Range**: `0.0` to `2.0`  
-    /// **Default**: `1.0` (no change)  
-    /// **Values**:
-    /// - `0.0` = grayscale (no color)
-    /// - `0.5` = desaturated
-    /// - `1.0` = original saturation
-    /// - `1.5` = oversaturated
-    /// - `2.0` = highly oversaturated
-    pub saturation: Option<f32>,
+    /// Controls the intensity of colors.
+    /// - `-1.0` = grayscale (no color)
+    /// - `0.0` = original saturation
+    /// - `1.0` = highly oversaturated
+    pub saturation: f32,
 
-    /// Temperature adjustment (-0.4 to 0.4, default: 0.0)
+    /// Temperature adjustment (-1.0 to 1.0, default: 0.0)
     ///
-    /// Controls the warm/cool color balance using the formula `R' = R * rK`, `B' = B * bK` where `rK` and `bK` are temperature factors.
-    ///
-    /// **Range**: `-0.4` to `0.4`  
-    /// **Default**: `0.0` (no change)  
-    /// **Values**:
-    /// - `-0.4` = very cool (blue tint)
-    /// - `-0.2` = cool (slight blue tint)
+    /// Controls the warm/cool color balance.
+    /// - `-1.0` = very cool (blue tint)
     /// - `0.0` = neutral (no change)
-    /// - `0.2` = warm (slight orange tint)
-    /// - `0.4` = very warm (strong orange tint)
-    pub temperature: Option<f32>,
+    /// - `1.0` = very warm (orange tint)
+    pub temperature: f32,
 
-    /// Tint adjustment factor (0.6 to 1.4, default: 1.0)
+    /// Tint adjustment (-1.0 to 1.0, default: 0.0)
     ///
-    /// Controls the green/magenta color balance using the formula `G' = G * gK` where `gK` is the green multiplier.
+    /// Controls the green/magenta color balance.
+    /// - `-1.0` = strong magenta tint
+    /// - `0.0` = neutral (no change)
+    /// - `1.0` = strong green tint
+    pub tint: f32,
+
+    /// Highlights adjustment (-1.0 to 1.0, default: 0.0)
     ///
-    /// **Range**: `0.6` to `1.4`  
-    /// **Default**: `1.0` (no change)  
-    /// **Values**:
-    /// - `0.6` = strong magenta tint
-    /// - `0.8` = slight magenta tint
-    /// - `1.0` = neutral (no change)
-    /// - `1.2` = slight green tint
-    /// - `1.4` = strong green tint
-    pub tint: Option<f32>,
+    /// Controls the brightness of highlight areas.
+    /// - `-1.0` = darken highlights
+    /// - `0.0` = no change
+    /// - `1.0` = brighten highlights
+    pub highlights: f32,
+
+    /// Shadows adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the brightness of shadow areas.
+    /// - `-1.0` = darken shadows
+    /// - `0.0` = no change
+    /// - `1.0` = brighten shadows
+    pub shadows: f32,
 }
 
 impl ImageFilters {
-    /// Check if any filters are active
+    /// Check if any filters are active (non-zero values)
     pub fn has_filters(&self) -> bool {
-        self.exposure.is_some()
-            || self.contrast.is_some()
-            || self.saturation.is_some()
-            || self.temperature.is_some()
-            || self.tint.is_some()
+        self.exposure != 0.0
+            || self.contrast != 0.0
+            || self.saturation != 0.0
+            || self.temperature != 0.0
+            || self.tint != 0.0
+            || self.highlights != 0.0
+            || self.shadows != 0.0
     }
 }
 

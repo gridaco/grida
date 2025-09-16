@@ -20,6 +20,7 @@
 //! - Warmer (+0.3, more red)
 
 use cg::painter::image_filters;
+use cg::cg::types::ImageFilters;
 use skia_safe::{self as sk, surfaces, Color, Data, Font, Image, Paint as SkPaint, Point, Rect};
 
 thread_local! {
@@ -38,9 +39,9 @@ fn main() {
         ("8k.jpg", "8K"),
     ];
 
-    // Temperature values for each column (-0.4, -0.2, 0.0, +0.2, +0.4)
-    let temperature_values = [-0.4, -0.2, 0.0, 0.2, 0.4];
-    let temperature_labels = ["-0.4", "-0.2", "Original", "+0.2", "+0.4"];
+    // Temperature values for each column (normalized -1.0 to 1.0)
+    let temperature_values = [-1.0, -0.5, 0.0, 0.5, 1.0];
+    let temperature_labels = ["-1.0", "-0.5", "Original", "+0.5", "+1.0"];
 
     let cell_width = 400.0;
     let cell_height = 350.0;
@@ -70,11 +71,23 @@ fn main() {
                 // Original image (no filter)
                 canvas.draw_image(&image, (x_offset, y_offset), None);
             } else {
-                // Apply temperature filter
-                let filter = image_filters::create_temperature_filter(temperature_t);
-                let mut paint = SkPaint::default();
-                paint.set_color_filter(filter);
-                canvas.draw_image(&image, (x_offset, y_offset), Some(&paint));
+                // Apply temperature filter using normalized values
+                let filters = ImageFilters {
+                    exposure: 0.0,
+                    contrast: 0.0,
+                    saturation: 0.0,
+                    temperature: temperature_t,
+                    tint: 0.0,
+                    highlights: 0.0,
+                    shadows: 0.0,
+                };
+                if let Some(filter) = image_filters::create_image_filters_color_filter(&filters) {
+                    let mut paint = SkPaint::default();
+                    paint.set_color_filter(filter);
+                    canvas.draw_image(&image, (x_offset, y_offset), Some(&paint));
+                } else {
+                    canvas.draw_image(&image, (x_offset, y_offset), None);
+                }
             }
 
             // Draw column label
