@@ -255,16 +255,16 @@ export function useMixedProperties(ids: string[]) {
 
   const fill = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      // Apply fill to all selected nodes, not just ones that already have fill
-      instance.changeNodeFill(ids, value);
+      const paints = value === null ? [] : [value as cg.Paint];
+      instance.changeNodeFills(ids, paints);
     },
     [ids, instance]
   );
 
   const stroke = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
-      // Apply stroke to all selected nodes, not just ones that already have stroke
-      instance.changeNodeStroke(ids, value);
+      const paints = value === null ? [] : [value as cg.Paint];
+      instance.changeNodeStrokes(ids, paints);
     },
     [ids, instance]
   );
@@ -485,14 +485,11 @@ export function useMixedPaints() {
   const setPaint = useCallback(
     (
       index: number,
-      value:
-        | grida.program.nodes.i.props.SolidPaintToken
-        | cg.Paint
-        | null
-        | null
+      value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
     ) => {
       const group = paints[index];
-      instance.changeNodeFill(group.ids, value);
+      const paintsArray = value === null ? [] : [value as cg.Paint];
+      instance.changeNodeFills(group.ids, paintsArray);
     },
     [paints, instance]
   );

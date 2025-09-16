@@ -113,7 +113,7 @@ function __self_evt_on_click(
     case "insert":
       const parent = __get_insertion_target(draft);
 
-      const nnode = initialNode(draft.tool.node);
+      const nnode = initialNode(draft.tool.node, {}, context.paint_constraints);
 
       let relpos: cmath.Vector2;
       if (parent) {
@@ -362,12 +362,16 @@ function __self_evt_on_drag_start(
         height: 1,
       };
       //
-      const nnode = initialNode(draft.tool.node, {
-        left: initial_rect.x,
-        top: initial_rect.y,
-        width: initial_rect.width,
-        height: initial_rect.height as 0, // casting for line node
-      });
+      const nnode = initialNode(
+        draft.tool.node,
+        {
+          left: initial_rect.x,
+          top: initial_rect.y,
+          width: initial_rect.width,
+          height: initial_rect.height as 0, // casting for line node
+        },
+        context.paint_constraints
+      );
 
       let pending: {
         node_id: string;

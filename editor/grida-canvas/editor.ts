@@ -488,6 +488,12 @@ export class Editor
         width: this.viewport.size.width,
         height: this.viewport.size.height,
       },
+      backend: this.backend,
+      // TODO: LEGACY_PAINT_MODEL
+      paint_constraints: {
+        fill: this.backend === "dom" ? "fill" : "fills",
+        stroke: this.backend === "dom" ? "stroke" : "strokes",
+      },
     });
     this._tid++;
     this.listeners.forEach((l) => l(this, action));
@@ -503,6 +509,12 @@ export class Editor
           viewport: {
             width: this.viewport.size.width,
             height: this.viewport.size.height,
+          },
+          backend: this.backend,
+          // TODO: LEGACY_PAINT_MODEL
+          paint_constraints: {
+            fill: this.backend === "dom" ? "fill" : "fills",
+            stroke: this.backend === "dom" ? "stroke" : "strokes",
           },
         }),
       this.mstate
@@ -733,7 +745,8 @@ export class Editor
    */
   tryEnterContentEditMode(
     node_id?: string,
-    mode: "auto" | "fill/gradient" = "auto"
+    mode: "auto" | "fill/gradient" = "auto",
+    options?: { fillIndex?: number }
   ) {
     node_id = node_id ?? this.state.selection[0];
     switch (mode) {
@@ -746,6 +759,7 @@ export class Editor
           return this.dispatch({
             type: "surface/content-edit-mode/fill/gradient",
             node_id: node_id ?? this.state.selection[0],
+            fill_index: options?.fillIndex ?? 0,
           });
         } else {
           // no-op
@@ -1165,12 +1179,17 @@ export class Editor
     });
   }
 
-  public selectGradientStop(node_id: editor.NodeID, stop: number): void {
+  public selectGradientStop(
+    node_id: editor.NodeID,
+    stop: number,
+    options?: { fillIndex?: number }
+  ): void {
     this.dispatch({
       type: "select-gradient-stop",
       target: {
         node_id,
         stop,
+        paint_index: options?.fillIndex,
       },
     });
   }
@@ -1995,31 +2014,81 @@ export class Editor
     });
   }
 
-  changeNodeFill(
-    node_id: string | string[],
-    fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-  ) {
+  changeNodeFills(node_id: string | string[], fills: cg.Paint[]) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     this.dispatchAll(
       node_ids.map((node_id) => ({
         type: "node/change/*",
         node_id,
-        fill: fill as cg.Paint,
+        fills,
       }))
     );
   }
 
-  changeNodeStroke(
-    node_id: string | string[],
-    stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-  ) {
+  changeNodeStrokes(node_id: string | string[], strokes: cg.Paint[]) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     this.dispatchAll(
       node_ids.map((node_id) => ({
         type: "node/change/*",
         node_id,
-        stroke: stroke as cg.Paint,
+        strokes,
       }))
+    );
+  }
+
+  addNodeFill(
+    node_id: string | string[],
+    fill: cg.Paint,
+    at: "start" | "end" = "start"
+  ) {
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => {
+        const current = this.getNodeSnapshotById(node_id);
+        const currentFills = Array.isArray((current as any).fills)
+          ? ((current as any).fills as cg.Paint[])
+          : (current as any).fill
+            ? [(current as any).fill as cg.Paint]
+            : [];
+
+        const newFills =
+          at === "start" ? [fill, ...currentFills] : [...currentFills, fill];
+
+        return {
+          type: "node/change/*",
+          node_id,
+          fills: newFills,
+        };
+      })
+    );
+  }
+
+  addNodeStroke(
+    node_id: string | string[],
+    stroke: cg.Paint,
+    at: "start" | "end" = "start"
+  ) {
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => {
+        const current = this.getNodeSnapshotById(node_id);
+        const currentStrokes = Array.isArray((current as any).strokes)
+          ? ((current as any).strokes as cg.Paint[])
+          : (current as any).stroke
+            ? [(current as any).stroke as cg.Paint]
+            : [];
+
+        const newStrokes =
+          at === "start"
+            ? [stroke, ...currentStrokes]
+            : [...currentStrokes, stroke];
+
+        return {
+          type: "node/change/*",
+          node_id,
+          strokes: newStrokes,
+        };
+      })
     );
   }
 

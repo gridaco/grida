@@ -455,18 +455,29 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           const mode =
             draft.content_edit_mode as editor.state.FillGradientContentEditMode;
           const node = dq.__getNodeById(draft, node_id)!;
-          if (
-            node &&
-            "fill" in node &&
-            cg.isGradientPaint(node.fill as cg.Paint)
-          ) {
-            const fill = node.fill as cg.GradientPaint;
+          const fillIndex = mode.fill_index ?? 0;
+          // TODO: LEGACY_PAINT_MODEL
+          const fills = Array.isArray((node as any).fills)
+            ? ((node as any).fills as cg.Paint[])
+            : undefined;
+          const target = fills?.[fillIndex] ?? ((node as any).fill as cg.Paint);
+
+          if (target && cg.isGradientPaint(target)) {
+            const fill = target as cg.GradientPaint;
             if (fill.stops.length > 2) {
               fill.stops.splice(mode.selected_stop, 1);
               mode.selected_stop = Math.min(
                 mode.selected_stop,
                 fill.stops.length - 1
               );
+            }
+
+            // TODO: LEGACY_PAINT_MODEL
+            if (fills) {
+              fills[fillIndex] = fill;
+              (node as any).fill = fills[0];
+            } else {
+              (node as any).fill = fill;
             }
           }
         });
@@ -687,12 +698,22 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       if (state.content_edit_mode) {
         switch (state.content_edit_mode.type) {
           case "fill/gradient": {
-            const { node_id, selected_stop } = state.content_edit_mode;
+            const {
+              node_id,
+              selected_stop,
+              fill_index = 0,
+            } = state.content_edit_mode;
             return produce(state, (draft) => {
               const node = dq.__getNodeById(draft, node_id);
+              // TODO: LEGACY_PAINT_MODEL
+              const fills = Array.isArray((node as any).fills)
+                ? ((node as any).fills as cg.Paint[])
+                : undefined;
+              const target =
+                fills?.[fill_index] ?? ((node as any).fill as cg.Paint);
               const fill: cg.GradientPaint | undefined =
-                "fill" in node && cg.isGradientPaint(node?.fill as cg.Paint)
-                  ? (node.fill as cg.GradientPaint)
+                target && cg.isGradientPaint(target)
+                  ? (target as cg.GradientPaint)
                   : undefined;
               const mod = shiftKey ? 0.1 : 0.01;
 
@@ -703,6 +724,14 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 1,
                 Math.max(0, stop.offset + direction_1d * mod)
               );
+
+              // TODO: LEGACY_PAINT_MODEL
+              if (fills) {
+                fills[fill_index] = fill;
+                (node as any).fill = fills[0];
+              } else {
+                (node as any).fill = fill;
+              }
             });
             break;
           }
@@ -1436,12 +1465,15 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "select-gradient-stop": {
       return produce(state, (draft) => {
         const { target } = <EditorSelectGradientStopAction>action;
-        const { node_id, stop } = target;
+        const { node_id, stop, paint_index } = target;
         const node = dq.__getNodeById(draft, node_id);
         assert(node);
         if (draft.content_edit_mode?.type === "fill/gradient") {
           draft.content_edit_mode.node_id = node_id;
           draft.content_edit_mode.selected_stop = stop;
+          if (typeof paint_index === "number") {
+            draft.content_edit_mode.fill_index = paint_index;
+          }
         }
       });
     }

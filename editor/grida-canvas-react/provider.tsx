@@ -157,12 +157,13 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeNodeInnerRadius(node_id, value),
       arcData: (value: grida.program.nodes.i.IEllipseArcData) =>
         instance.changeNodeArcData(node_id, value),
-      fill: (
-        value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-      ) => instance.changeNodeFill(node_id, value),
-      stroke: (
-        value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-      ) => instance.changeNodeStroke(node_id, value),
+      fills: (fills: cg.Paint[]) => instance.changeNodeFills(node_id, fills),
+      strokes: (strokes: cg.Paint[]) =>
+        instance.changeNodeStrokes(node_id, strokes),
+      addFill: (fill: cg.Paint, at?: "start" | "end") =>
+        instance.addNodeFill(node_id, fill, at),
+      addStroke: (stroke: cg.Paint, at?: "start" | "end") =>
+        instance.addNodeStroke(node_id, stroke, at),
       strokeWidth: (change: editor.api.NumberChange) =>
         instance.changeNodeStrokeWidth(node_id, change),
       strokeAlign: (value: cg.StrokeAlign) =>

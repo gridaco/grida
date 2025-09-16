@@ -131,6 +131,33 @@ export namespace editor.config {
        */
       faux_weight: boolean;
     };
+
+    /**
+     * Paint constraints that determine whether nodes should use single paint properties
+     * or multiple paint arrays based on the rendering backend.
+     *
+     * - For DOM backend: Uses single paint properties (`"fill"`, `"stroke"`) for compatibility
+     * - For Canvas backend: Uses multiple paint arrays (`"fills"`, `"strokes"`) for advanced rendering
+     *
+     * @example
+     * ```typescript
+     * // DOM backend constraints
+     * paint_constraints: {
+     *   fill: "fill",    // Creates nodes with single fill property
+     *   stroke: "stroke" // Creates nodes with single stroke property
+     * }
+     *
+     * // Canvas backend constraints
+     * paint_constraints: {
+     *   fill: "fills",    // Creates nodes with fills array
+     *   stroke: "strokes" // Creates nodes with strokes array
+     * }
+     * ```
+     */
+    paint_constraints: {
+      fill: "fill" | "fills";
+      stroke: "stroke" | "strokes";
+    };
   }
 
   /**
@@ -1077,6 +1104,12 @@ export namespace editor.state {
     type: "fill/gradient";
     node_id: string;
     /**
+     * index of the fill being edited
+     *
+     * @default 0
+     */
+    fill_index: number;
+    /**
      * index of the focused stop, if any
      *
      * @default 0
@@ -1998,21 +2031,21 @@ export namespace editor.api {
       node_id: NodeID,
       arcData: grida.program.nodes.i.IEllipseArcData
     ): void;
-    changeNodeFill(
+    changeNodeFills(node_id: NodeID, fills: cg.Paint[]): void;
+    changeNodeFills(node_id: NodeID[], fills: cg.Paint[]): void;
+    changeNodeStrokes(node_id: NodeID, strokes: cg.Paint[]): void;
+    changeNodeStrokes(node_id: NodeID[], strokes: cg.Paint[]): void;
+    addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
+    addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;
+    addNodeStroke(
       node_id: NodeID,
-      fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
+      stroke: cg.Paint,
+      at?: "start" | "end"
     ): void;
-    changeNodeFill(
+    addNodeStroke(
       node_id: NodeID[],
-      fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-    ): void;
-    changeNodeStroke(
-      node_id: NodeID,
-      stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-    ): void;
-    changeNodeStroke(
-      node_id: NodeID[],
-      stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
+      stroke: cg.Paint,
+      at?: "start" | "end"
     ): void;
     changeNodeStrokeWidth(
       node_id: NodeID,
@@ -2405,7 +2438,8 @@ export namespace editor.api {
     tryEnterContentEditMode(): void;
     tryEnterContentEditMode(
       node_id?: string,
-      mode?: "auto" | "fill/gradient"
+      mode?: "auto" | "fill/gradient",
+      options?: { fillIndex?: number }
     ): void;
     //
 
@@ -2520,7 +2554,11 @@ export namespace editor.api {
      * @param node_id node id
      * @param stop index of the stop
      */
-    selectGradientStop(node_id: NodeID, stop: number): void;
+    selectGradientStop(
+      node_id: NodeID,
+      stop: number,
+      options?: { fillIndex?: number }
+    ): void;
     //
 
     //

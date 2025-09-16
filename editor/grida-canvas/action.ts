@@ -133,6 +133,10 @@ interface GradientStopQuery extends IGradientStopIdx {
    * node id (must be a gradient node)
    */
   node_id: NodeID;
+  /**
+   * index of the paint under fills/strokes
+   */
+  paint_index?: number;
 }
 
 export type TCanvasEventTargetDragGestureState = {
@@ -780,6 +784,7 @@ export type EditorSurface_EnterContentEditMode = {
 export type EditorSurface_EnterFillGradientContentEditMode = {
   node_id: string;
   type: "surface/content-edit-mode/fill/gradient";
+  fill_index?: number;
 };
 
 export type EditorSurface_ExitContentEditMode = {

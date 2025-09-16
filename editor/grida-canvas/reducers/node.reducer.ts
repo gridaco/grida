@@ -9,6 +9,124 @@ import { editor } from "@/grida-canvas";
 type UN = grida.program.nodes.UnknwonNode;
 type DYN_TODO = grida.program.nodes.UnknwonNode | any; // TODO: remove casting of this usage.
 
+type PaintValue = grida.program.nodes.i.props.PropsPaintValue;
+
+function normalizePaintValue(paint: PaintValue): PaintValue {
+  if (!paint || typeof paint !== "object") {
+    return paint;
+  }
+
+  if (!("type" in paint)) {
+    return paint;
+  }
+
+  switch (paint.type) {
+    case "solid":
+    case "image":
+    case "linear_gradient":
+    case "radial_gradient":
+    case "sweep_gradient":
+    case "diamond_gradient":
+      return { ...paint } as PaintValue;
+    default:
+      return paint;
+  }
+}
+
+// TODO: LEGACY_PAINT_MODEL
+function readPaints(
+  draft: grida.program.nodes.UnknownNodeProperties,
+  key: "fill" | "stroke"
+): PaintValue[] {
+  const pluralKey = key === "fill" ? "fills" : "strokes";
+  const paints: PaintValue[] = [];
+  const existing = (draft as any)[pluralKey] as PaintValue[] | undefined;
+
+  if (Array.isArray(existing) && existing.length > 0) {
+    for (const paint of existing) {
+      if (paint) {
+        paints.push(normalizePaintValue(paint));
+      }
+    }
+    return paints;
+  }
+
+  const single = (draft as any)[key] as PaintValue | undefined;
+  if (single) {
+    paints.push(normalizePaintValue(single));
+  }
+
+  return paints;
+}
+
+// TODO: LEGACY_PAINT_MODEL
+function writePaints(
+  draft: grida.program.nodes.UnknownNodeProperties,
+  key: "fill" | "stroke",
+  paints: PaintValue[]
+) {
+  const pluralKey = key === "fill" ? "fills" : "strokes";
+
+  if (!paints || paints.length === 0) {
+    (draft as any)[pluralKey] = undefined;
+    (draft as any)[key] = undefined;
+    return;
+  }
+
+  const normalized = paints.map((paint) => normalizePaintValue(paint));
+  (draft as any)[pluralKey] = normalized;
+  (draft as any)[key] = normalized[0];
+}
+
+function applyPaintAtIndex(
+  draft: grida.program.nodes.UnknownNodeProperties,
+  key: "fill" | "stroke",
+  index: number,
+  paint: PaintValue | null | undefined
+) {
+  const paints = readPaints(draft, key);
+
+  if (paint === null || typeof paint === "undefined") {
+    if (index < 0 || index >= paints.length) {
+      return;
+    }
+    paints.splice(index, 1);
+  } else {
+    const normalized = normalizePaintValue(paint);
+    if (index < 0) {
+      return;
+    }
+    if (index < paints.length) {
+      paints[index] = normalized;
+    } else if (index === paints.length) {
+      paints.push(normalized);
+    } else if (paints.length === 0 && index === 0) {
+      paints.push(normalized);
+    } else {
+      return;
+    }
+  }
+
+  writePaints(draft, key, paints);
+}
+
+function insertPaintAtIndex(
+  draft: grida.program.nodes.UnknownNodeProperties,
+  key: "fill" | "stroke",
+  index: number,
+  paint: PaintValue
+) {
+  const paints = readPaints(draft, key);
+  const normalized = normalizePaintValue(paint);
+
+  if (index < 0 || index > paints.length) {
+    return;
+  }
+
+  paints.splice(index, 0, normalized);
+  writePaints(draft, key, paints);
+}
+
 function defineNodeProperty<
   K extends keyof grida.program.nodes.UnknwonNode,
 >(handlers: {
@@ -153,32 +271,30 @@ const safe_properties: Partial<
       node.type === "container" ||
       node.type === "component",
     apply: (draft, value, prev) => {
-      if (value === null) {
-        (draft as UN).fill = undefined;
+      const target = draft as grida.program.nodes.UnknownNodeProperties;
+      const next = value as unknown as PaintValue | null;
+
+      if (next === null) {
+        writePaints(target, "fill", []);
         return;
       }
 
-      switch (value.type) {
-        case "linear_gradient":
-        case "radial_gradient":
-        case "sweep_gradient":
-        case "diamond_gradient":
-          (draft as UN).fill = {
-            ...(value as
-              | cg.LinearGradientPaint
-              | cg.RadialGradientPaint
-              | cg.SweepGradientPaint),
-          };
-          break;
-        case "solid":
-          (draft as DYN_TODO).fill = value as
-            | grida.program.nodes.i.props.SolidPaintToken
-            | cg.SolidPaint;
-          break;
-        case "image":
-          (draft as UN).fill = value as any; // Allow image paint type
-          break;
+      writePaints(target, "fill", [next]);
+    },
+  }),
+  fills: defineNodeProperty<"fills">({
+    apply: (draft, value, prev) => {
+      const target = draft as grida.program.nodes.UnknownNodeProperties;
+      const paints = Array.isArray(value)
+        ? (value as unknown as PaintValue[])
+        : [];
+
+      if (!paints.length) {
+        writePaints(target, "fill", []);
+        return;
       }
+
+      writePaints(target, "fill", paints);
     },
   }),
   cornerRadius: defineNodeProperty<"cornerRadius">({
@@ -250,32 +366,30 @@ const safe_properties: Partial<
       node.type === "ellipse" ||
       node.type === "text",
     apply: (draft, value, prev) => {
-      if (value === null) {
-        draft.stroke = undefined;
+      const target = draft as grida.program.nodes.UnknownNodeProperties;
+      const next = value as unknown as PaintValue | null;
+
+      if (next === null) {
+        writePaints(target, "stroke", []);
         return;
       }
 
-      switch (value.type) {
-        case "linear_gradient":
-        case "radial_gradient":
-        case "sweep_gradient":
-        case "diamond_gradient":
-          draft.stroke = {
-            ...(value as
-              | cg.LinearGradientPaint
-              | cg.RadialGradientPaint
-              | cg.SweepGradientPaint),
-          };
-          break;
-        case "solid":
-          draft.stroke = value as
-            | grida.program.nodes.i.props.SolidPaintToken
-            | cg.SolidPaint;
-          break;
-        case "image":
-          draft.stroke = value as any; // Allow image paint type
-          break;
+      writePaints(target, "stroke", [next]);
+    },
+  }),
+  strokes: defineNodeProperty<"strokes">({
+    apply: (draft, value, prev) => {
+      const target = draft as grida.program.nodes.UnknownNodeProperties;
+      const paints = Array.isArray(value)
+        ? (value as unknown as PaintValue[])
+        : [];
+
+      if (!paints.length) {
+        writePaints(target, "stroke", []);
+        return;
       }
+
+      writePaints(target, "stroke", paints);
     },
   }),
   strokeWidth: defineNodeProperty<"strokeWidth">({
@@ -640,7 +754,8 @@ export default function nodeReducer<
   return produce(node, (draft) => {
     switch (action.type) {
       case "node/change/*": {
-        const { type: _, node_id: __, ...values } = action;
+        const { type: _, node_id: __, ...values } = action as NodeChangeAction;
+
         for (const [key, value] of Object.entries(values)) {
           applyNodeProperty(
             draft as grida.program.nodes.UnknownNodeProperties,

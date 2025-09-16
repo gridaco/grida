@@ -57,6 +57,7 @@ import {
   Crosshair2Icon,
   LockClosedIcon,
   LockOpen1Icon,
+  MinusIcon,
   MixerVerticalIcon,
   PlusIcon,
 } from "@radix-ui/react-icons";
@@ -101,6 +102,8 @@ import { FeControl } from "./controls/fe";
 import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
 import { ModeVectorEditModeProperties } from "./chunks/mode-vector";
+import { SectionFills } from "./chunks/section-fills";
+import { SectionStrokes } from "./chunks/section-strokes";
 import { OpsControl } from "./controls/ext-ops";
 import { MaskControl } from "./controls/ext-mask";
 import {
@@ -656,17 +659,9 @@ function ModeMixedNodeProperties({
           <PropertyLine>
             <PropertyLineLabel>Fill</PropertyLineLabel>
             {fill?.mixed || fill?.partial ? (
-              <PaintControl
-                value={undefined}
-                onValueChange={change.fill}
-                removable
-              />
+              <PaintControl value={undefined} onValueChange={change.fill} />
             ) : (
-              <PaintControl
-                value={fill?.value}
-                onValueChange={change.fill}
-                removable
-              />
+              <PaintControl value={fill?.value} onValueChange={change.fill} />
             )}
           </PropertyLine>
         </SidebarMenuSectionContent>
@@ -689,10 +684,6 @@ function ModeMixedNodeProperties({
                       change.strokeWidth({ type: "set", value: 1 });
                     }
                   }}
-                  onValueRemove={() => {
-                    change.stroke(null);
-                  }}
-                  removable
                 />
               ) : (
                 <PaintControl
@@ -704,10 +695,6 @@ function ModeMixedNodeProperties({
                       change.strokeWidth({ type: "set", value: 1 });
                     }
                   }}
-                  onValueRemove={() => {
-                    change.stroke(null);
-                  }}
-                  removable
                 />
               )}
             </PropertyLine>
@@ -1595,138 +1582,6 @@ function SectionProps({ node_id }: { node_id: string }) {
           <p className="text-xs text-muted-foreground">No properties defined</p>
         </SidebarMenuSectionContent>
       )}
-    </SidebarSection>
-  );
-}
-
-function SectionFills({ node_id }: { node_id: string }) {
-  const instance = useCurrentEditor();
-  const { content_edit_mode } = useEditorState(instance, (state) => ({
-    content_edit_mode: state.content_edit_mode,
-  }));
-
-  const { fill } = useNodeState(node_id, (node) => ({
-    fill: node.fill,
-  }));
-
-  const selectedGradientStop =
-    content_edit_mode?.type === "fill/gradient"
-      ? content_edit_mode.selected_stop
-      : undefined;
-
-  const actions = useNodeActions(node_id)!;
-
-  return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Fill</PropertyLineLabel>
-          <FillControl
-            value={fill}
-            onValueChange={actions.fill}
-            removable
-            selectedGradientStop={selectedGradientStop}
-            onSelectedGradientStopChange={(stop) => {
-              instance.selectGradientStop(node_id, stop);
-            }}
-            onOpenChange={(open) => {
-              if (open) {
-                instance.tryEnterContentEditMode(node_id, "fill/gradient");
-              } else {
-                instance.tryExitContentEditMode();
-              }
-              //
-            }}
-          />
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
-  );
-}
-
-function SectionStrokes({
-  node_id,
-  config = {
-    stroke_cap: "on",
-  },
-}: {
-  node_id: string;
-  config?: {
-    stroke_cap: "on" | "off";
-  };
-}) {
-  const { stroke, strokeWidth, strokeAlign, strokeCap, type } = useNodeState(
-    node_id,
-    (node) => ({
-      stroke: node.stroke,
-      strokeWidth: node.strokeWidth,
-      strokeAlign: node.strokeAlign,
-      strokeCap: node.strokeCap,
-      type: node.type,
-    })
-  );
-
-  const is_text_node = type === "text";
-  const has_stroke_paint = stroke !== undefined;
-  const actions = useNodeActions(node_id)!;
-
-  return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Color</PropertyLineLabel>
-          <PaintControl
-            value={stroke}
-            onValueChange={actions.stroke}
-            onValueAdd={(value) => {
-              actions.stroke(value);
-              if (!strokeWidth || strokeWidth === 0) {
-                actions.strokeWidth({ type: "set", value: 1 });
-              }
-
-              // set outside as default for text nodes (if none set)
-              if (is_text_node && !strokeAlign) {
-                actions.strokeAlign("outside");
-              }
-            }}
-            onValueRemove={() => {
-              actions.stroke(null);
-            }}
-            removable
-          />
-        </PropertyLine>
-        {has_stroke_paint && (
-          <>
-            <PropertyLine>
-              <PropertyLineLabel>Width</PropertyLineLabel>
-              <StrokeWidthControl
-                value={strokeWidth}
-                onValueCommit={actions.strokeWidth}
-              />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Align</PropertyLineLabel>
-              <StrokeAlignControl
-                value={strokeAlign}
-                onValueChange={actions.strokeAlign}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={config.stroke_cap === "off"}>
-              <PropertyLineLabel>Cap</PropertyLineLabel>
-              <StrokeCapControl
-                value={strokeCap}
-                onValueChange={actions.strokeCap}
-              />
-            </PropertyLine>
-          </>
-        )}
-      </SidebarMenuSectionContent>
     </SidebarSection>
   );
 }

@@ -88,12 +88,14 @@ function __self_guide_delete(draft: editor.state.IEditorState, idx: number) {
 
 function __self_try_content_edit_mode_fill_gradient(
   draft: editor.state.IEditorState,
-  node_id: string
+  node_id: string,
+  fill_index: number = 0
 ) {
   draft.content_edit_mode = {
     node_id: node_id,
     type: "fill/gradient",
     selected_stop: 0,
+    fill_index,
   };
 }
 
@@ -863,8 +865,12 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
         break;
       }
       case "surface/content-edit-mode/fill/gradient": {
-        const { node_id } = action;
-        __self_try_content_edit_mode_fill_gradient(draft, node_id);
+        const { node_id, fill_index } = action;
+        __self_try_content_edit_mode_fill_gradient(
+          draft,
+          node_id,
+          fill_index ?? 0
+        );
         break;
       }
       case "surface/content-edit-mode/try-exit": {
