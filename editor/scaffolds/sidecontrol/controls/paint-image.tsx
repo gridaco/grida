@@ -6,6 +6,7 @@ import { RotateCwIcon, UploadIcon } from "lucide-react";
 import { ImageIcon } from "@radix-ui/react-icons";
 import { useFilePicker } from "use-file-picker";
 import { useCurrentEditor, ImageView } from "@/grida-canvas-react";
+import { Transparency } from "@/grida-canvas-react/components/transparency";
 import cg from "@grida/cg";
 
 const IMAGE_FILTERS = [
@@ -144,7 +145,7 @@ function ImagePreview({
   return (
     <div className="relative w-full aspect-square bg-muted rounded-md border overflow-hidden group select-none">
       {Image ? (
-        Image
+        <Transparency className="w-full h-full">{Image}</Transparency>
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
           <div className="text-center">
@@ -159,7 +160,7 @@ function ImagePreview({
         <Button
           onClick={onImageUpload}
           size="xs"
-          className="w-full"
+          className="w-full bg-background/60 text-foreground backdrop-blur-sm hover:bg-background/70"
           disabled={isUploading}
         >
           <UploadIcon className="w-4 h-4 mr-2" />
