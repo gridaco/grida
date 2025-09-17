@@ -53,6 +53,17 @@ export function NodeTypeIcon({
     case "instance":
       return <ComponentInstanceIcon className={className} />;
     case "rectangle":
+      // Check if rectangle has image fill(s)
+      if (node.fill && node.fill.type === "image") {
+        return <ImageIcon className={className} />;
+      }
+      if (
+        node.fills &&
+        node.fills.length === 1 &&
+        node.fills[0].type === "image"
+      ) {
+        return <ImageIcon className={className} />;
+      }
       return <BoxIcon className={className} />;
     case "ellipse":
       return <CircleIcon className={className} />;

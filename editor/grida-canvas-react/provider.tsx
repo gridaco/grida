@@ -11,7 +11,7 @@ import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import { io } from "@grida/io";
 import type { tokens } from "@grida/tokens";
-import type cg from "@grida/cg";
+import cg from "@grida/cg";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 import {
   DataProvider,
@@ -732,14 +732,26 @@ export function useDataTransferEventTarget() {
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
-      // TODO: uploader is not implemented. use uploader configured by user.
       const bytes = await file.arrayBuffer();
       const image = await instance.createImage(new Uint8Array(bytes));
-      const node = instance.createImageNode(image);
+
+      // Create rectangle node with image paint instead of image node
+      const node = instance.createRectangleNode();
       node.$.position = "absolute";
       node.$.name = name;
       node.$.left = x;
       node.$.top = y;
+      node.$.width = image.width;
+      node.$.height = image.height;
+      node.$.fill = {
+        type: "image",
+        src: image.url,
+        fit: "cover",
+        transform: cmath.transform.identity,
+        filters: cg.def.IMAGE_FILTERS,
+        blendMode: cg.def.BLENDMODE,
+        opacity: 1,
+      } as cg.ImagePaint;
     },
     [instance]
   );
