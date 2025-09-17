@@ -74,7 +74,7 @@ function useImageUpload(onImageUploaded: (imageUrl: string) => void) {
   const [isUploading, setIsUploading] = useState(false);
   const editor = useCurrentEditor();
 
-  const { openFilePicker, plainFiles } = useFilePicker({
+  const { openFilePicker, plainFiles, clear } = useFilePicker({
     accept: "image/png,image/jpeg,image/webp,image/gif",
     multiple: false,
   });
@@ -105,17 +105,19 @@ function useImageUpload(onImageUploaded: (imageUrl: string) => void) {
           console.error("Failed to create image:", error);
         } finally {
           setIsUploading(false);
+          clear();
         }
       };
 
       reader.onerror = () => {
         console.error("Failed to read file");
         setIsUploading(false);
+        clear();
       };
 
       reader.readAsArrayBuffer(file);
     }
-  }, [plainFiles, editor, onImageUploaded]);
+  }, [plainFiles, editor, onImageUploaded, clear]);
 
   return {
     openFilePicker,
