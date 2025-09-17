@@ -10,13 +10,16 @@
     "@grida/cmath": "workspace:*",
     "fast-png": "^6.3.0",
     "fast-xml-parser": "^5.2.3",
-    "fflate": "^0.8.2"
+    "fflate": "^0.8.2",
+    "image-size": "^2.0.2"
   },
   "devDependencies": {
     "@grida/cg": "workspace:*",
     "@grida/schema": "workspace:*"
   },
   "jest": {
-    "preset": "ts-jest"
+    "preset": "ts-jest",
+    "testTimeout": 120000,
+    "maxWorkers": 1
   }
 }

@@ -203,3 +203,6 @@ node-compile-cache/
 
 # rust
 /target
+
+# Test artifacts
+**/__tests__/artifacts/

@@ -3,6 +3,18 @@ import type cmath from "@grida/cmath";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 import { encode, decode, type PngDataArray } from "fast-png";
 import { XMLParser } from "fast-xml-parser";
+import { imageSize } from "image-size";
+
+const IMAGE_TYPE_TO_MIME_TYPE: Record<
+  string,
+  grida.program.document.ImageType
+> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+};
 
 export namespace io {
   export namespace clipboard {
@@ -324,12 +336,29 @@ export namespace io {
         bitmaps: _x_bitmaps,
       } = unpacked;
 
-      // convert images to blob URLs
-      // for (const key in images) {
-      //   const image = images[key];
-      //   const blob = new Blob([image], { type: "image/png" });
-      //   const url = URL.createObjectURL(blob);
-      // }
+      // convert images to blob URLs and create ImageRef objects
+      const images: Record<string, grida.program.document.ImageRef> = {};
+      for (const [key, imageData] of Object.entries(_x_images)) {
+        // Get image dimensions using image-size package
+        const dimensions = imageSize(new Uint8Array(imageData));
+        if (!dimensions || !dimensions.width || !dimensions.height) {
+          throw new Error(`Failed to get dimensions for image: ${key}`);
+        }
+
+        const { width, height, type } = dimensions;
+
+        const mimeType = IMAGE_TYPE_TO_MIME_TYPE[type || "png"] || "image/png";
+        const blob = new Blob([imageData], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+
+        images[url] = {
+          url,
+          width,
+          height,
+          bytes: imageData.byteLength,
+          type: mimeType,
+        };
+      }
 
       // load bitmaps
       const bitmaps: LoadedDocument["document"]["bitmaps"] = {};
@@ -345,7 +374,7 @@ export namespace io {
 
       return {
         version,
-        document: { ...document, bitmaps: bitmaps },
+        document: { ...document, bitmaps: bitmaps, images: images },
       } satisfies LoadedDocument;
     }
 
@@ -379,6 +408,7 @@ export namespace io {
         document: {
           nodes: json.document.nodes,
           scenes: json.document.scenes,
+          entry_scene_id: json.document.entry_scene_id,
           bitmaps: bitmaps,
           images: json.document.images ?? {},
           properties: json.document.properties ?? {},
@@ -397,7 +427,10 @@ export namespace io {
   }
 
   export namespace archive {
-    export function pack(mem: JSONDocumentFileModel): Uint8Array {
+    export function pack(
+      mem: JSONDocumentFileModel,
+      images?: Record<string, Uint8ClampedArray>
+    ): Uint8Array {
       const archive_targeted_document = {
         version: mem.version,
         document: {
@@ -413,6 +446,14 @@ export namespace io {
         "images/": new Uint8Array(), // ensures images folder exists
         "bitmaps/": new Uint8Array(), // ensures bitmaps folder exists
       };
+
+      // Add raw images to archive
+      if (images) {
+        for (const [key, imageData] of Object.entries(images)) {
+          files[`images/${key}`] = new Uint8Array(imageData);
+        }
+      }
+
       if (mem.document.bitmaps) {
         for (const [key, bitmap] of Object.entries(mem.document.bitmaps)) {
           files[`bitmaps/${key}.png`] = new Uint8Array(
@@ -432,6 +473,8 @@ export namespace io {
       const documentJson = strFromU8(files["document.json"]);
       const document = io.json.parse(documentJson);
       const bitmaps: Record<string, cmath.raster.Bitmap> = {};
+      const images: Record<string, Uint8ClampedArray> = {};
+
       for (const key in files) {
         if (
           key.startsWith("bitmaps/") &&
@@ -446,13 +489,16 @@ export namespace io {
             height: pngd.height,
             data: __norm_png_data(pngd.data),
           };
+        } else if (key.startsWith("images/") && key !== "images/") {
+          const filename = key.substring("images/".length); // e.g "images/photo.jpg" => "photo.jpg"
+          images[filename] = new Uint8ClampedArray(files[key]);
         }
       }
 
       return {
         version: document.version,
         document: document,
-        images: {}, // TODO: image archive support
+        images: images,
         bitmaps: bitmaps,
       } satisfies io.ArchiveFileModel;
     }
