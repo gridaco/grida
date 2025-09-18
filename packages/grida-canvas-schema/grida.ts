@@ -1,7 +1,7 @@
 import type { tokens } from "@grida/tokens";
 import type { TokenizableExcept } from "@grida/tokens/utils";
 import type vn from "@grida/vn";
-import type cg from "@grida/cg";
+import cg from "@grida/cg";
 import type cmath from "@grida/cmath";
 import * as CSS from "csstype";
 
@@ -1056,11 +1056,11 @@ export namespace grida.program.nodes {
       opacity: number;
     }
 
-    export interface IBlendMode {
+    export interface ILayerBlendMode {
       /**
-       * @default "normal"
+       * @default "pass-through"
        */
-      blendMode?: cg.BlendMode;
+      blendMode?: cg.LayerBlendMode;
     }
 
     export interface IZIndex {
@@ -1316,6 +1316,7 @@ export namespace grida.program.nodes {
     export interface ICSSStylable
       extends IStylable<css.ExplicitlySupportedCSSProperties>,
         IOpacity,
+        ILayerBlendMode,
         IRotation,
         IZIndex,
         IPositioning,
@@ -1812,7 +1813,7 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IOpacity,
-      i.IBlendMode,
+      i.ILayerBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
@@ -1845,7 +1846,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       i.IFixedDimension,
       i.IOpacity,
-      i.IBlendMode,
+      i.ILayerBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1862,7 +1863,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       i.IFixedDimension,
       i.IOpacity,
-      i.IBlendMode,
+      i.ILayerBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1880,7 +1881,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       i.IFixedDimension,
       i.IOpacity,
-      i.IBlendMode,
+      i.ILayerBlendMode,
       i.IZIndex,
       i.IRotation,
       i.ICornerRadius,
@@ -1924,7 +1925,7 @@ export namespace grida.program.nodes {
       i.IStroke,
       i.IFixedDimension,
       i.IOpacity,
-      i.IBlendMode,
+      i.ILayerBlendMode,
       i.IZIndex,
       i.IRotation {
     readonly type: "line";
@@ -1956,7 +1957,7 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IOpacity,
-      i.IBlendMode,
+      i.ILayerBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1995,7 +1996,7 @@ export namespace grida.program.nodes {
       i.IFixedDimension,
       i.IEllipseArcData,
       i.IOpacity,
-      i.IBlendMode,
+      i.ILayerBlendMode,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -2132,7 +2133,7 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
-            blendMode: "normal",
+            blendMode: cg.def.LAYER_BLENDMODE,
             zIndex: 0,
             rotation: 0,
             width: 0,
@@ -2324,6 +2325,7 @@ export namespace grida.program.nodes {
         rotation: 0,
         zIndex: 0,
         opacity: 1,
+        blendMode: cg.def.LAYER_BLENDMODE,
         position: "absolute",
         layout: "flow",
         direction: "horizontal",

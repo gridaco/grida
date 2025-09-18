@@ -7,12 +7,11 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui-editor/button";
 
-export const items: EnumItem<cg.BlendMode>[] = [
+const items_blend_mode: EnumItem<cg.BlendMode>[] = [
   {
     value: "normal",
     label: "Normal",
@@ -79,41 +78,49 @@ export const items: EnumItem<cg.BlendMode>[] = [
   },
 ];
 
-export function BlendModeSelect({
-  value = "normal",
-  onValueChange,
-}: {
-  value?: TMixed<cg.BlendMode>;
-  onValueChange?: (value: cg.BlendMode) => void;
-}) {
-  return (
-    <PropertyEnum<cg.BlendMode>
-      enum={items}
-      value={value}
-      onValueChange={onValueChange}
-    />
-  );
+const items_layer_blend_mode: EnumItem<cg.LayerBlendMode>[] = [
+  {
+    value: "pass-through",
+    label: "Pass Through",
+  },
+  ...items_blend_mode,
+];
+
+// Generic interface for type-safe props
+interface Props<T extends "paint" | "layer"> {
+  type: T;
+  value?: TMixed<T extends "paint" ? cg.BlendMode : cg.LayerBlendMode>;
+  onValueChange?: (
+    value: T extends "paint" ? cg.BlendMode : cg.LayerBlendMode
+  ) => void;
 }
 
 export function BlendModeDropdown({
-  value = "normal",
+  type,
+  value = type === "layer" ? "pass-through" : "normal",
   onValueChange,
-}: {
-  value?: TMixed<cg.BlendMode>;
-  onValueChange?: (value: cg.BlendMode) => void;
-}) {
-  const activevalue = !!value && value !== "normal";
+}: Props<"paint" | "layer">) {
+  const isNonDefault =
+    !!value && value !== (type === "layer" ? "pass-through" : "normal");
+
+  // Type cast based on the type prop
+  const items = type === "layer" ? items_layer_blend_mode : items_blend_mode;
+  const typedValue =
+    type === "layer"
+      ? (value as TMixed<cg.LayerBlendMode>)
+      : (value as TMixed<cg.BlendMode>);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild tabIndex={-1}>
         <Button variant="ghost" size="xs">
-          <BlendModeIcon active={activevalue} />
+          <BlendModeIcon active={isNonDefault} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent collisionPadding={16}>
         {items.map((item, i) => (
           <DropdownMenuCheckboxItem
-            checked={enumEq(value as any, item)}
+            checked={enumEq(typedValue as any, item)}
             key={i}
             className="text-xs"
             onCheckedChange={(checked) => {

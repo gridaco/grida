@@ -1148,7 +1148,7 @@ export namespace editor.state {
      * Will be clamped to valid range [0, stops.length-1].
      *
      * @default 0
-    */
+     */
     selected_stop: number;
   };
 
@@ -2104,7 +2104,7 @@ export namespace editor.api {
     changeNodeStrokeAlign(node_id: NodeID, strokeAlign: cg.StrokeAlign): void;
     changeNodeFit(node_id: NodeID, fit: cg.BoxFit): void;
     changeNodeOpacity(node_id: NodeID, opacity: editor.api.NumberChange): void;
-    changeNodeBlendMode(node_id: NodeID, blendMode: cg.BlendMode): void;
+    changeNodeBlendMode(node_id: NodeID, blendMode: cg.LayerBlendMode): void;
     changeNodeRotation(
       node_id: NodeID,
       rotation: editor.api.NumberChange

@@ -124,6 +124,12 @@ export namespace cg {
   };
 
   /**
+   * only applicable to layers, not paints.
+   * if this is used for non supported, it will fallback to "normal".
+   */
+  export type LayerBlendMode = "pass-through" | BlendMode;
+
+  /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/blend-mode
    */
   export type BlendMode =
@@ -1041,6 +1047,7 @@ export namespace cg {
    * this is aligned in cg crate's default values.
    */
   export namespace def {
+    export const LAYER_BLENDMODE: cg.LayerBlendMode = "pass-through";
     export const BLENDMODE: cg.BlendMode = "normal";
 
     export const IMAGE_FILTERS: cg.ImageFilters = {

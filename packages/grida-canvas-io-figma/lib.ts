@@ -82,7 +82,7 @@ export namespace iofigma {
       };
 
       export const blendModeMap: Record<BlendMode, cg.BlendMode> = {
-        PASS_THROUGH: "normal", // No blending, default behavior.
+        PASS_THROUGH: "normal", // no-op here
         NORMAL: "normal", // Matches the default blend mode.
         DARKEN: "darken",
         MULTIPLY: "multiply",
@@ -101,6 +101,11 @@ export namespace iofigma {
         SATURATION: "saturation",
         COLOR: "color",
         LUMINOSITY: "luminosity",
+      };
+
+      export const layerBlendModeMap: Record<BlendMode, cg.LayerBlendMode> = {
+        ...blendModeMap,
+        PASS_THROUGH: "pass-through",
       };
     }
 
@@ -317,6 +322,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: 1,
+              blendMode: "pass-through",
               zIndex: 0,
               type: "container",
               expanded: false,
@@ -408,6 +414,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "container",
               expanded: false,
@@ -473,6 +480,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "container",
               expanded: false,
@@ -555,6 +563,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "text",
               text: node.characters,
@@ -645,6 +654,7 @@ export namespace iofigma {
                 locked: node.locked ?? false,
                 rotation: node.rotation ?? 0,
                 opacity: node.opacity ?? 1,
+                blendMode: map.layerBlendModeMap[node.blendMode],
                 zIndex: 0,
                 type: "image",
                 src: images[first_visible_fill.imageRef!],
@@ -682,7 +692,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.blendModeMap[node.blendMode],
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "rectangle",
               //
@@ -722,7 +732,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.blendModeMap[node.blendMode],
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "ellipse",
               //
@@ -765,7 +775,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.blendModeMap[node.blendMode],
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "line",
               position: "absolute",
@@ -838,7 +848,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.blendModeMap[node.blendMode],
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "svgpath",
               //

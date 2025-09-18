@@ -943,6 +943,7 @@ function ModeNodeProperties({
           <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
           <SidebarSectionHeaderActions>
             <BlendModeDropdown
+              type="layer"
               value={blendMode}
               onValueChange={actions.blendMode}
             />

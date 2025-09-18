@@ -174,7 +174,7 @@ export function useNodeActions(node_id: string | undefined) {
       // stylable
       opacity: (change: editor.api.NumberChange) =>
         instance.changeNodeOpacity(node_id, change),
-      blendMode: (value: cg.BlendMode) =>
+      blendMode: (value: cg.LayerBlendMode) =>
         instance.changeNodeBlendMode(node_id, value),
       rotation: (change: editor.api.NumberChange) =>
         instance.changeNodeRotation(node_id, change),
@@ -743,15 +743,17 @@ export function useDataTransferEventTarget() {
       node.$.top = y;
       node.$.width = image.width;
       node.$.height = image.height;
-      node.$.fill = {
-        type: "image",
-        src: image.url,
-        fit: "cover",
-        transform: cmath.transform.identity,
-        filters: cg.def.IMAGE_FILTERS,
-        blendMode: cg.def.BLENDMODE,
-        opacity: 1,
-      } as cg.ImagePaint;
+      node.$.fills = [
+        {
+          type: "image",
+          src: image.url,
+          fit: "cover",
+          transform: cmath.transform.identity,
+          filters: cg.def.IMAGE_FILTERS,
+          blendMode: cg.def.BLENDMODE,
+          opacity: 1,
+        } as cg.ImagePaint,
+      ];
     },
     [instance]
   );

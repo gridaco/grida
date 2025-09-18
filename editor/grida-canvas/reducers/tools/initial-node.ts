@@ -1,5 +1,5 @@
 import grida from "@grida/schema";
-import type cg from "@grida/cg";
+import cg from "@grida/cg";
 import nid from "./id";
 import { editor } from "@/grida-canvas/editor.i";
 
@@ -79,6 +79,7 @@ export default function initialNode(
 
   const styles: grida.program.nodes.i.ICSSStylable = {
     opacity: 1,
+    blendMode: cg.def.LAYER_BLENDMODE,
     zIndex: 0,
     rotation: 0,
     fill: constraints.fill === "fills" ? undefined : gray,

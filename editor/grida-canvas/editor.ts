@@ -1932,7 +1932,10 @@ export class Editor
       }
     });
   }
-  changeNodeBlendMode(node_id: editor.NodeID, blendMode: cg.BlendMode): void {
+  changeNodeBlendMode(
+    node_id: editor.NodeID,
+    blendMode: cg.LayerBlendMode
+  ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,

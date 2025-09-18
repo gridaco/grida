@@ -111,6 +111,7 @@ function getNextPaintForType(
         case "image": {
           return {
             ...DEFAULT_IMAGE_PAINT,
+            blendMode,
             opacity: opacity,
           };
         }
@@ -129,6 +130,7 @@ function getNextPaintForType(
               ...current.stops[0].color,
               a: opacity,
             },
+            blendMode,
           };
         }
         case "linear_gradient":
@@ -146,6 +148,7 @@ function getNextPaintForType(
         case "image": {
           return {
             ...DEFAULT_IMAGE_PAINT,
+            blendMode,
             opacity: opacity,
           };
         }
@@ -158,6 +161,7 @@ function getNextPaintForType(
           return {
             type: "solid",
             color: { r: 128, g: 128, b: 128, a: opacity }, // Default gray with preserved opacity
+            blendMode,
           };
         }
         case "linear_gradient":
@@ -514,6 +518,7 @@ function SolidPaintTrigger({
         onBlur={onInputBlur}
         onValueChange={(color) => {
           onValueChange?.({
+            ...value,
             type: "solid",
             color: { ...color, a: value.color.a },
           });
@@ -524,6 +529,7 @@ function SolidPaintTrigger({
         value={value.color.a}
         onValueCommit={(opacity) => {
           onValueChange?.({
+            ...value,
             type: "solid",
             color: { ...value.color, a: opacity },
           });
@@ -676,6 +682,7 @@ function PaintTabsHeader({
       </TabsList>
       <div className="flex items-center">
         <BlendModeDropdown
+          type="paint"
           value={value?.blendMode || cg.def.BLENDMODE}
           onValueChange={(blendMode) => {
             if (value) {
@@ -728,6 +735,7 @@ function PaintTabsContent({
           color={value.color}
           onColorChange={(color) => {
             onValueChange?.({
+              ...value,
               type: "solid",
               color,
             });
@@ -736,6 +744,7 @@ function PaintTabsContent({
         <ContextVariableColors
           onSelect={(token) => {
             onValueChange?.({
+              ...value,
               type: "solid",
               // @ts-ignore
               color: token,
