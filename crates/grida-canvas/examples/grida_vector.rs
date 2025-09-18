@@ -30,7 +30,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("triangle open".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x, base_y, 0.0),
-                fills: vec![],
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -40,7 +40,7 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor::RED)],
+                strokes: Paints::new([Paint::from(CGColor::RED)]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
@@ -60,7 +60,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("triangle closed".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x + spacing * 1.0, base_y, 0.0),
-                fills: vec![],
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -71,7 +71,7 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor::RED)],
+                strokes: Paints::new([Paint::from(CGColor::RED)]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
@@ -92,7 +92,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("Vector 2".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x + spacing * 2.0, base_y, 0.0),
-                fills: vec![],
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0), (100.0, 0.0)],
                     segments: vec![
@@ -103,7 +103,7 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor(255, 0, 0, 255))],
+                strokes: Paints::new([Paint::from(CGColor(255, 0, 0, 255))]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
@@ -123,7 +123,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("Vector 3".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x + spacing * 3.0, base_y, 0.0),
-                fills: vec![],
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (0.0, 100.0), (100.0, 100.0)],
                     segments: vec![
@@ -134,7 +134,7 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor::RED)],
+                strokes: Paints::new([Paint::from(CGColor::RED)]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
@@ -155,7 +155,7 @@ async fn demo_vectors() -> Scene {
                 name: Some("Vector 1_5".to_string()),
                 active: true,
                 transform: AffineTransform::new(start_x + spacing * 4.0, base_y, 0.0),
-                fills: vec![],
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (0.0, 100.0), (100.0, 100.0)],
                     segments: vec![
@@ -168,7 +168,7 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor::RED)],
+                strokes: Paints::new([Paint::from(CGColor::RED)]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
@@ -196,7 +196,7 @@ async fn demo_vectors() -> Scene {
                     base_y + spacing * 1.0,
                     0.0,
                 ),
-                fills: vec![],
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 50.0), (100.0, 50.0)],
                     segments: vec![VectorNetworkSegment {
@@ -208,7 +208,7 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor(0, 100, 255, 255))],
+                strokes: Paints::new([Paint::from(CGColor(0, 100, 255, 255))]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
@@ -233,14 +233,14 @@ async fn demo_vectors() -> Scene {
                     base_y + spacing * 1.0,
                     0.0,
                 ),
-                fills: vec![],
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0)],
                     segments: vec![VectorNetworkSegment::ab(0, 1)],
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor(0, 100, 255, 255))],
+                strokes: Paints::new([Paint::from(CGColor(0, 100, 255, 255))]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
@@ -268,7 +268,7 @@ async fn demo_vectors() -> Scene {
                     base_y + spacing * 2.0,
                     0.0,
                 ),
-                fills: vec![Paint::from(CGColor(255, 100, 100, 255))],
+                fills: Paints::new([Paint::from(CGColor(255, 100, 100, 255))]),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -279,7 +279,7 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 4.0,
-                strokes: vec![Paint::from(CGColor(200, 0, 0, 255))],
+                strokes: Paints::new([Paint::from(CGColor(200, 0, 0, 255))]),
                 stroke_width: 2.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
@@ -304,7 +304,7 @@ async fn demo_vectors() -> Scene {
                     base_y + spacing * 2.0,
                     0.0,
                 ),
-                fills: vec![Paint::from(CGColor(100, 255, 100, 255))],
+                fills: Paints::new([Paint::from(CGColor(100, 255, 100, 255))]),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -316,7 +316,7 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor(0, 150, 0, 255))],
+                strokes: Paints::new([Paint::from(CGColor(0, 150, 0, 255))]),
                 stroke_width: 2.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,

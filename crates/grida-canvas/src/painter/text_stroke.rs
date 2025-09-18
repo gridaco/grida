@@ -1,5 +1,5 @@
 use crate::cg::types::{Paint, StrokeAlign};
-use crate::painter::cvt;
+use crate::painter::paint;
 use crate::runtime::image_repository::ImageRepository;
 use crate::shape::stroke::stroke_geometry;
 use skia_safe::{self, path::AddPathMode, Canvas, Font, GlyphId, Matrix, PaintStyle, Path, Point};
@@ -45,7 +45,7 @@ pub fn draw_text_stroke(
     // Prepare paint for filling the stroke geometry.
     let bounds = stroke_path.compute_tight_bounds();
     let size = (bounds.width(), bounds.height());
-    let Some(mut sk_paint) = cvt::sk_paint_stack(strokes, size, images) else {
+    let Some(mut sk_paint) = paint::sk_paint_stack(strokes, size, images) else {
         return;
     };
     sk_paint.set_style(PaintStyle::Fill);
@@ -108,7 +108,7 @@ pub fn draw_text_stroke_outside_fast_pre(
     // Prepare a stroke paint. We double the stroke width so that when the
     // paragraph is painted afterwards, it covers the inner half leaving only
     // the "outside" portion visible.
-    let Some(mut sk_paint) = cvt::sk_paint_stack(strokes, layout_size, images) else {
+    let Some(mut sk_paint) = paint::sk_paint_stack(strokes, layout_size, images) else {
         return;
     };
     sk_paint.set_style(PaintStyle::Stroke);

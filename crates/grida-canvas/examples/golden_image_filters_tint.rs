@@ -17,8 +17,8 @@
 //! - More Magenta (gK = 0.8, less green)
 //! - More Green (gK = 1.2, more green)
 
-use cg::painter::image_filters;
 use cg::cg::types::ImageFilters;
+use cg::painter::image_filters;
 use skia_safe::{self as sk, surfaces, Color, Data, Font, Image, Paint as SkPaint, Point, Rect};
 
 thread_local! {

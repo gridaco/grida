@@ -31,11 +31,11 @@ async fn demo_fills() -> Scene {
         height: 150.0,
     };
     multi_solid_rect.corner_radius = RectangularCornerRadius::circular(20.0);
-    multi_solid_rect.fills = vec![
+    multi_solid_rect.fills = Paints::new([
         Paint::from(CGColor(255, 0, 0, 255)),
         Paint::from(CGColor(0, 255, 0, 255)),
         Paint::from(CGColor(0, 0, 255, 255)),
-    ];
+    ]);
     multi_solid_rect.stroke_width = 3.0;
     ids.push(multi_solid_rect.id.clone());
     repository.insert(Node::Rectangle(multi_solid_rect));
@@ -49,7 +49,7 @@ async fn demo_fills() -> Scene {
         height: 150.0,
     };
     solid_gradient_rect.corner_radius = RectangularCornerRadius::circular(20.0);
-    solid_gradient_rect.fills = vec![
+    solid_gradient_rect.fills = Paints::from([
         Paint::from(CGColor(255, 255, 0, 255)),
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(45.0),
@@ -66,7 +66,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.6,
             blend_mode: BlendMode::Normal,
         }),
-    ];
+    ]);
     solid_gradient_rect.stroke_width = 3.0;
     ids.push(solid_gradient_rect.id.clone());
     repository.insert(Node::Rectangle(solid_gradient_rect));
@@ -80,7 +80,7 @@ async fn demo_fills() -> Scene {
         height: 150.0,
     };
     solid_radial_rect.corner_radius = RectangularCornerRadius::circular(20.0);
-    solid_radial_rect.fills = vec![
+    solid_radial_rect.fills = Paints::new([
         Paint::from(CGColor(128, 128, 128, 255)),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::identity(),
@@ -101,7 +101,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.7,
             blend_mode: BlendMode::Normal,
         }),
-    ];
+    ]);
     solid_radial_rect.stroke_width = 3.0;
     ids.push(solid_radial_rect.id.clone());
     repository.insert(Node::Rectangle(solid_radial_rect));
@@ -115,7 +115,7 @@ async fn demo_fills() -> Scene {
         height: 150.0,
     };
     gradient_gradient_rect.corner_radius = RectangularCornerRadius::circular(20.0);
-    gradient_gradient_rect.fills = vec![
+    gradient_gradient_rect.fills = Paints::new([
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(90.0),
             stops: vec![
@@ -148,7 +148,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.5,
             blend_mode: BlendMode::Normal,
         }),
-    ];
+    ]);
     gradient_gradient_rect.stroke_width = 3.0;
     ids.push(gradient_gradient_rect.id.clone());
     repository.insert(Node::Rectangle(gradient_gradient_rect));
@@ -161,7 +161,7 @@ async fn demo_fills() -> Scene {
         width: 150.0,
         height: 150.0,
     };
-    multi_radial_ellipse.fills = vec![
+    multi_radial_ellipse.fills = Paints::new([
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::identity(),
             stops: vec![
@@ -207,7 +207,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.6,
             blend_mode: BlendMode::Normal,
         }),
-    ];
+    ]);
     multi_radial_ellipse.stroke_width = 3.0;
     ids.push(multi_radial_ellipse.id.clone());
     repository.insert(Node::Ellipse(multi_radial_ellipse));
@@ -227,7 +227,7 @@ async fn demo_fills() -> Scene {
     complex_fill_polygon.name = Some("Complex Multi-Fill Polygon".to_string());
     complex_fill_polygon.transform = AffineTransform::new(start_x + spacing, base_y + spacing, 0.0);
     complex_fill_polygon.points = pentagon_points;
-    complex_fill_polygon.fills = vec![
+    complex_fill_polygon.fills = Paints::new([
         Paint::from(CGColor(255, 128, 0, 255)),
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(30.0),
@@ -261,7 +261,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.5,
             blend_mode: BlendMode::Normal,
         }),
-    ];
+    ]);
     complex_fill_polygon.stroke_width = 4.0;
     ids.push(complex_fill_polygon.id.clone());
     repository.insert(Node::Polygon(complex_fill_polygon));
@@ -276,7 +276,7 @@ async fn demo_fills() -> Scene {
         height: 150.0,
     };
     multi_linear_polygon.point_count = 6; // Hexagon
-    multi_linear_polygon.fills = vec![
+    multi_linear_polygon.fills = Paints::new([
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(0.0),
             stops: vec![
@@ -322,7 +322,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.6,
             blend_mode: BlendMode::Normal,
         }),
-    ];
+    ]);
     multi_linear_polygon.stroke_width = 3.0;
     ids.push(multi_linear_polygon.id.clone());
     repository.insert(Node::RegularPolygon(multi_linear_polygon));
@@ -336,7 +336,7 @@ async fn demo_fills() -> Scene {
         width: 150.0,
         height: 150.0,
     };
-    multi_fill_container.fills = vec![
+    multi_fill_container.fills = Paints::new([
         Paint::from(CGColor(128, 0, 128, 255)),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::identity(),
@@ -357,7 +357,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.6,
             blend_mode: BlendMode::Normal,
         }),
-    ];
+    ]);
     multi_fill_container.stroke_width = 3.0;
     ids.push(multi_fill_container.id.clone());
     repository.insert(Node::Container(multi_fill_container));

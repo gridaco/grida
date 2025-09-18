@@ -44,7 +44,7 @@ fn main() {
         let stroke_options = StrokeOptions {
             width: 5.0, // Increased stroke width for visibility
             align: cg::cg::types::StrokeAlign::Center,
-            paints: vec![Paint::from(color)],
+            paints: Paints::new([Paint::from(color)]),
             width_profile: None,
         };
 

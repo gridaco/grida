@@ -981,6 +981,182 @@ impl Paint {
     }
 }
 
+/// Ordered stack of [`Paint`] values that are composited sequentially.
+///
+/// Entries are interpreted in **paint order**: the first item is drawn first,
+/// and every subsequent item is composited on top of the pixels produced by the
+/// previous paints. This matches Figma and other graphics editors where, for
+/// example, `Paints::new([solid, image])` results in the image appearing
+/// above the solid color when rendered. User interfaces may display the list in
+/// reverse order (top-most paint first); `Paints` always stores the canonical
+/// engine order to avoid ambiguity in the renderer and conversion layers.
+///
+/// The [`BlendMode`] assigned to each [`Paint`] applies to that specific entry
+/// while it is composited over the accumulated result. It never retroactively
+/// affects paints that were drawn earlier in the stack.
+#[derive(Debug, Clone, Default)]
+pub struct Paints {
+    paints: Vec<Paint>,
+}
+
+impl Paints {
+    /// Create a new [`Paints`] collection from an ordered list of paints.
+    ///
+    /// Supports both `Vec<Paint>` and array literals:
+    /// - `Paints::new(vec![paint1, paint2])` - traditional approach
+    /// - `Paints::new([paint1, paint2])` - ergonomic array literals
+    pub fn new<T>(paints: T) -> Self
+    where
+        T: IntoPaints,
+    {
+        Self {
+            paints: paints.into_paints(),
+        }
+    }
+
+    /// Returns `true` when there are no paints in the collection.
+    pub fn is_empty(&self) -> bool {
+        self.paints.is_empty()
+    }
+
+    /// Number of paints in the stack.
+    pub fn len(&self) -> usize {
+        self.paints.len()
+    }
+
+    /// Immutable slice access to the ordered paints.
+    pub fn as_slice(&self) -> &[Paint] {
+        &self.paints
+    }
+
+    /// Mutable slice access to the ordered paints.
+    pub fn as_mut_slice(&mut self) -> &mut [Paint] {
+        &mut self.paints
+    }
+
+    /// Consume the collection and return the underlying vector.
+    pub fn into_vec(self) -> Vec<Paint> {
+        self.paints
+    }
+
+    /// Append a new paint to the top of the stack.
+    pub fn push(&mut self, paint: Paint) {
+        self.paints.push(paint);
+    }
+
+    /// Iterate over paints in paint order.
+    pub fn iter(&self) -> std::slice::Iter<'_, Paint> {
+        self.paints.iter()
+    }
+
+    /// Mutable iterator over paints in paint order.
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Paint> {
+        self.paints.iter_mut()
+    }
+}
+
+impl From<Vec<Paint>> for Paints {
+    fn from(value: Vec<Paint>) -> Self {
+        Paints::new(value)
+    }
+}
+
+impl From<Paints> for Vec<Paint> {
+    fn from(value: Paints) -> Self {
+        value.paints
+    }
+}
+
+// Custom trait to support both Vec<Paint> and array literals in Paints::new()
+pub trait IntoPaints {
+    fn into_paints(self) -> Vec<Paint>;
+}
+
+impl IntoPaints for Vec<Paint> {
+    fn into_paints(self) -> Vec<Paint> {
+        self
+    }
+}
+
+impl<const N: usize> IntoPaints for [Paint; N] {
+    fn into_paints(self) -> Vec<Paint> {
+        self.to_vec()
+    }
+}
+
+impl FromIterator<Paint> for Paints {
+    fn from_iter<I: IntoIterator<Item = Paint>>(iter: I) -> Self {
+        Paints::new(iter.into_iter().collect::<Vec<_>>())
+    }
+}
+
+// Support for array literals - much more ergonomic than vec![]
+impl<const N: usize> From<[Paint; N]> for Paints {
+    fn from(value: [Paint; N]) -> Self {
+        // Most efficient: direct construction without intermediate allocations
+        Paints {
+            paints: value.to_vec(),
+        }
+    }
+}
+
+// Support for single Paint conversion
+impl From<Paint> for Paints {
+    fn from(value: Paint) -> Self {
+        // More efficient: avoid the intermediate Vec allocation
+        Paints {
+            paints: vec![value],
+        }
+    }
+}
+
+impl IntoIterator for Paints {
+    type Item = Paint;
+    type IntoIter = std::vec::IntoIter<Paint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.paints.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Paints {
+    type Item = &'a Paint;
+    type IntoIter = std::slice::Iter<'a, Paint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.paints.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Paints {
+    type Item = &'a mut Paint;
+    type IntoIter = std::slice::IterMut<'a, Paint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.paints.iter_mut()
+    }
+}
+
+impl std::ops::Deref for Paints {
+    type Target = [Paint];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl std::ops::DerefMut for Paints {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
+    }
+}
+
+impl Extend<Paint> for Paints {
+    fn extend<I: IntoIterator<Item = Paint>>(&mut self, iter: I) {
+        self.paints.extend(iter);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum GradientPaint {
     Linear(LinearGradientPaint),

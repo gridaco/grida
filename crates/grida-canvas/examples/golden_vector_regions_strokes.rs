@@ -31,12 +31,12 @@ fn main() {
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::from(CGColor(200, 200, 200, 255))]),
+                fills: Some(Paints::new([Paint::from(CGColor(200, 200, 200, 255))])),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![4, 5, 6, 7])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::from(CGColor(200, 200, 200, 255))]),
+                fills: Some(Paints::new([Paint::from(CGColor(200, 200, 200, 255))])),
             },
         ],
     };
@@ -61,7 +61,7 @@ fn main() {
         let options = StrokeOptions {
             width: stroke_width,
             align: *align,
-            paints: vec![Paint::from(stroke_color)],
+            paints: Paints::new([Paint::from(stroke_color)]),
             width_profile: None,
         };
         painter.draw(&network, &[], Some(&options), 0.0);

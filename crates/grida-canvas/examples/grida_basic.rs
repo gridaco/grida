@@ -60,7 +60,7 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 200.0,
     };
-    ellipse_node.fills = vec![Paint::RadialGradient(RadialGradientPaint {
+    ellipse_node.fills = Paints::new([Paint::RadialGradient(RadialGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -78,7 +78,7 @@ async fn demo_basic() -> Scene {
         ],
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
-    })];
+    })]);
     ellipse_node.stroke_width = 6.0;
 
     // Create a test polygon node (pentagon)
@@ -97,8 +97,8 @@ async fn demo_basic() -> Scene {
     polygon_node.blend_mode = BlendMode::Screen;
     polygon_node.transform = AffineTransform::new(600.0, 50.0, 0.0);
     polygon_node.points = pentagon_points;
-    polygon_node.fills = vec![Paint::from(CGColor(255, 200, 0, 255))];
-    polygon_node.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+    polygon_node.fills = Paints::new([Paint::from(CGColor(255, 200, 0, 255))]);
+    polygon_node.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
     polygon_node.stroke_width = 5.0;
 
     // Create a test regular polygon node (hexagon)
@@ -111,7 +111,7 @@ async fn demo_basic() -> Scene {
         height: 200.0,
     };
     regular_polygon_node.point_count = 6; // hexagon
-    regular_polygon_node.fills = vec![Paint::from(CGColor(0, 200, 255, 255))];
+    regular_polygon_node.fills = Paints::new([Paint::from(CGColor(0, 200, 255, 255))]);
     regular_polygon_node.stroke_width = 4.0;
     regular_polygon_node.opacity = 0.5;
 
@@ -124,7 +124,7 @@ async fn demo_basic() -> Scene {
     text_span_node.text_style = TextStyleRec::from_font(font_caveat_family.as_str(), 32.0);
     text_span_node.text_align = TextAlign::Center;
     text_span_node.text_align_vertical = TextAlignVertical::Center;
-    text_span_node.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+    text_span_node.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
     text_span_node.stroke_width = 4.0;
 
     // Create a test path node
@@ -132,7 +132,7 @@ async fn demo_basic() -> Scene {
     path_node.name = Some("Test Path".to_string());
     path_node.transform = AffineTransform::new(550.0, 300.0, 0.0);
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
-    path_node.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
+    path_node.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     path_node.stroke_width = 4.0;
 
     // Create a test line node with solid color
@@ -144,7 +144,7 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 0.0, // ignored
     };
-    line_node.strokes = vec![Paint::from(CGColor(0, 255, 0, 255))];
+    line_node.strokes = Paints::new([Paint::from(CGColor(0, 255, 0, 255))]);
     line_node.stroke_width = 4.0;
 
     // Create a group node for the shapes (rectangle, ellipse, polygon)

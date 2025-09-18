@@ -48,8 +48,8 @@ use skia_safe::Path;
 /// // Layer definition
 /// let layer = PainterPictureLayer {
 ///     shape: shape,
-///     fills: vec![fill],
-///     strokes: vec![stroke],
+///     fills: Paints::new([fill]),
+///     strokes: Paints::new([stroke]),
 ///     effects: vec![],
 /// };
 ///
@@ -132,8 +132,8 @@ pub struct PainterPictureShapeLayer {
     pub base: PainterPictureLayerBase,
     pub shape: PainterShape,
     pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
+    pub strokes: Paints,
+    pub fills: Paints,
     pub stroke_path: Option<skia_safe::Path>,
 }
 
@@ -141,8 +141,8 @@ pub struct PainterPictureShapeLayer {
 pub struct PainterPictureTextLayer {
     pub base: PainterPictureLayerBase,
     pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
+    pub strokes: Paints,
+    pub fills: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_path: Option<skia_safe::Path>,
@@ -162,8 +162,8 @@ pub struct PainterPictureTextLayer {
 pub struct PainterPictureVectorLayer {
     pub base: PainterPictureLayerBase,
     pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
+    pub strokes: Paints,
+    pub fills: Paints,
     pub shape: PainterShape,
     pub vector: VectorNetwork,
     pub stroke_width: f32,
@@ -456,7 +456,7 @@ impl LayerList {
                         shape,
                         effects: n.effects.clone(),
                         strokes: n.strokes.clone(),
-                        fills: vec![],
+                        fills: Paints::default(),
                         stroke_path,
                     }))
                 }
@@ -592,7 +592,7 @@ impl LayerList {
                         shape,
                         effects: n.effects.clone(),
                         strokes: n.strokes.clone(),
-                        fills: vec![Paint::Image(n.fill.clone())], // TODO: Optimize - avoid clone if possible
+                        fills: Paints::new([Paint::Image(n.fill.clone())]), // TODO: Optimize - avoid clone if possible
                         stroke_path,
                     }))
                 }
@@ -609,8 +609,8 @@ impl LayerList {
                         },
                         shape,
                         effects: LayerEffects::default(),
-                        strokes: vec![],
-                        fills: vec![],
+                        strokes: Paints::default(),
+                        fills: Paints::default(),
                         stroke_path: None,
                     }))
                 }

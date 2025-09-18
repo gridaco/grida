@@ -53,12 +53,12 @@ async fn demo_shapes() -> Scene {
             width: base_size * (1.0 + (i as f32 * 0.1)), // 1.0x to 1.9x width
             height: base_size,
         };
-        ellipse.fills = vec![Paint::from(CGColor(
+        ellipse.fills = Paints::new([Paint::from(CGColor(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             255,
-        ))]; // Fading gray
+        ))]); // Fading gray
         all_shape_ids.push(ellipse.id.clone());
         repository.insert(Node::Ellipse(ellipse));
     }
@@ -82,12 +82,12 @@ async fn demo_shapes() -> Scene {
         polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
         polygon.points = points;
         polygon.corner_radius = 8.0;
-        polygon.fills = vec![Paint::from(CGColor(
+        polygon.fills = Paints::new([Paint::from(CGColor(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             255,
-        ))]; // Fading gray
+        ))]); // Fading gray
         all_shape_ids.push(polygon.id.clone());
         repository.insert(Node::Polygon(polygon));
     }
@@ -102,12 +102,12 @@ async fn demo_shapes() -> Scene {
             height: base_size,
         };
         regular_polygon.point_count = 3 + i; // 3 to 12 points
-        regular_polygon.fills = vec![Paint::from(CGColor(
+        regular_polygon.fills = Paints::new([Paint::from(CGColor(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             255,
-        ))]; // Fading gray
+        ))]); // Fading gray
         regular_polygon.corner_radius = 8.0;
         all_shape_ids.push(regular_polygon.id.clone());
         repository.insert(Node::RegularPolygon(regular_polygon));
@@ -131,12 +131,12 @@ async fn demo_shapes() -> Scene {
         path.name = Some(format!("Path {}", i + 1));
         path.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         path.data = data.to_string();
-        path.fills = vec![Paint::from(CGColor(
+        path.fills = Paints::new([Paint::from(CGColor(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             255,
-        ))]; // Fading gray
+        ))]); // Fading gray
         all_shape_ids.push(path.id.clone());
         repository.insert(Node::SVGPath(path));
     }
@@ -152,12 +152,12 @@ async fn demo_shapes() -> Scene {
         };
         star.point_count = 3 + i; // 3 to 12 points
         star.inner_radius = 0.7 - (i as f32 * 0.05); // 0.3 to 0.75 inner radius
-        star.fills = vec![Paint::from(CGColor(
+        star.fills = Paints::new([Paint::from(CGColor(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             255,
-        ))]; // Fading gray
+        ))]); // Fading gray
         star.corner_radius = 8.0;
         all_shape_ids.push(star.id.clone());
         repository.insert(Node::RegularStarPolygon(star));
@@ -175,12 +175,12 @@ async fn demo_shapes() -> Scene {
         arc.start_angle = 0.0;
         arc.angle = Some(45.0 + (i as f32 * 31.5)); // 45 to 360 degrees
         arc.inner_radius = Some(0.3); // Fixed inner radius for visibility
-        arc.fills = vec![Paint::from(CGColor(
+        arc.fills = Paints::new([Paint::from(CGColor(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             255,
-        ))]; // Fading gray
+        ))]); // Fading gray
         arc.corner_radius = Some(8.0);
         all_shape_ids.push(arc.id.clone());
         repository.insert(Node::Ellipse(arc));

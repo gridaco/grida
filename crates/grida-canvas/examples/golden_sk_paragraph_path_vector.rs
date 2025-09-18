@@ -13,7 +13,7 @@
 //! - Typography showcase with rich content
 
 use cg::{
-    cg::types::{CGColor, Paint, StrokeAlign},
+    cg::types::*,
     vectornetwork::{StrokeOptions, VNPainter, VectorNetwork},
 };
 use skia_safe::{
@@ -207,7 +207,7 @@ fn scenario_geist(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             let stroke = StrokeOptions {
                 width: 1.5,
                 align: StrokeAlign::Center,
-                paints: vec![Paint::from(CGColor::from_rgba(0, 0, 0, 100))],
+                paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 100))]),
                 width_profile: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
@@ -294,7 +294,7 @@ fn scenario_roboto_flex(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             let stroke = StrokeOptions {
                 width: 1.5,
                 align: StrokeAlign::Center,
-                paints: vec![Paint::from(CGColor::from_rgba(0, 0, 0, 100))],
+                paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 100))]),
                 width_profile: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
@@ -398,7 +398,7 @@ fn scenario_multiscript(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             let stroke = StrokeOptions {
                 width: 1.0,
                 align: StrokeAlign::Center,
-                paints: vec![Paint::from(CGColor::from_rgba(0, 0, 0, 80))],
+                paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 80))]),
                 width_profile: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
@@ -474,7 +474,7 @@ fn scenario_variable_fonts(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             let stroke = StrokeOptions {
                 width: 1.2,
                 align: StrokeAlign::Center,
-                paints: vec![Paint::from(CGColor::from_rgba(0, 0, 0, 120))],
+                paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 120))]),
                 width_profile: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);

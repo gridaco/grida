@@ -30,12 +30,19 @@ pub fn sk_paint_stack(
     size: (f32, f32),
     images: &ImageRepository,
 ) -> Option<skia_safe::Paint> {
+    // Paint stacking semantics:
+    // - `paints` is ordered bottom → top (the last entry is visually top-most).
+    // - Skia's `shaders::blend(mode, dst, src)` interprets the first shader as the
+    //   destination/background, and the second as the source/foreground.
+    // - Therefore we must blend with (dst = accumulated background, src = current paint),
+    //   so each subsequent paint is composited on top of the previous result.
     let mut iter = paints.iter();
     let first = iter.next()?;
     let mut shader = shader_from_paint(first, size, Some(images))?;
     for p in iter {
         if let Some(s) = shader_from_paint(p, size, Some(images)) {
-            shader = shaders::blend(p.blend_mode(), s, shader);
+            // Compose current paint (src) over the accumulated shader (dst)
+            shader = shaders::blend(p.blend_mode(), shader, s);
         }
     }
     let mut paint = skia_safe::Paint::default();
@@ -60,12 +67,14 @@ pub fn sk_paint_stack_without_images(
     paints: &[Paint],
     size: (f32, f32),
 ) -> Option<skia_safe::Paint> {
+    // Same ordering rules as `sk_paint_stack` (bottom → top).
     let mut iter = paints.iter();
     let first = iter.next()?;
     let mut shader = shader_from_paint(first, size, None)?;
     for p in iter {
         if let Some(s) = shader_from_paint(p, size, None) {
-            shader = shaders::blend(p.blend_mode(), s, shader);
+            // Compose current paint (src) over the accumulated shader (dst)
+            shader = shaders::blend(p.blend_mode(), shader, s);
         }
     }
     let mut paint = skia_safe::Paint::default();

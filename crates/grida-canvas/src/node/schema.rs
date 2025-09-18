@@ -125,10 +125,10 @@ pub struct UnknownNodeProperties {
     pub corner_radius_bottom_left: Option<Radius>,
     // #endregion
     /// The paint used to fill the interior of the shape.
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// The stroke paint used to outline the shape.
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
     /// The stroke width used to outline the shape.
     pub stroke_width: f32,
     /// The stroke align used to outline the shape.
@@ -238,12 +238,12 @@ impl NodeTrait for Node {
 
 pub trait NodeFillsMixin {
     fn set_fill(&mut self, fill: Paint);
-    fn set_fills(&mut self, fills: Vec<Paint>);
+    fn set_fills(&mut self, fills: Paints);
 }
 
 pub trait NodeStrokesMixin {
     fn set_stroke(&mut self, stroke: Paint);
-    fn set_strokes(&mut self, strokes: Vec<Paint>);
+    fn set_strokes(&mut self, strokes: Paints);
 }
 
 pub trait NodeTransformMixin {
@@ -399,8 +399,8 @@ pub struct ContainerNodeRec {
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
     pub children: Vec<NodeId>,
-    pub fills: Vec<Paint>,
-    pub strokes: Vec<Paint>,
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -435,10 +435,10 @@ impl ContainerNodeRec {
 
 impl NodeFillsMixin for ContainerNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -498,8 +498,8 @@ pub struct RectangleNodeRec {
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
-    pub fills: Vec<Paint>,
-    pub strokes: Vec<Paint>,
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -520,10 +520,10 @@ impl RectangleNodeRec {
 
 impl NodeFillsMixin for RectangleNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -582,7 +582,7 @@ pub struct LineNodeRec {
     pub active: bool,
     pub transform: AffineTransform,
     pub size: Size, // height is always 0 (ignored)
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub _data_stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -618,7 +618,7 @@ pub struct ImageNodeRec {
     /// Single image fill - intentionally not supporting multiple fills to align with
     /// web development patterns where `<img>` elements have one image source.
     pub fill: ImagePaint,
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -630,10 +630,10 @@ pub struct ImageNodeRec {
 
 impl NodeStrokesMixin for ImageNodeRec {
     fn set_stroke(&mut self, stroke: Paint) {
-        self.strokes = vec![stroke];
+        self.strokes = Paints::new([stroke]);
     }
 
-    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+    fn set_strokes(&mut self, strokes: Paints) {
         self.strokes = strokes;
     }
 }
@@ -700,8 +700,8 @@ pub struct EllipseNodeRec {
     pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
-    pub fills: Vec<Paint>,
-    pub strokes: Vec<Paint>,
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -724,10 +724,10 @@ pub struct EllipseNodeRec {
 
 impl NodeFillsMixin for EllipseNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -818,8 +818,8 @@ pub struct BooleanPathOperationNodeRec {
     pub op: BooleanPathOperation,
     pub corner_radius: Option<f32>,
     pub children: Vec<NodeId>,
-    pub fills: Vec<Paint>,
-    pub strokes: Vec<Paint>,
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -830,20 +830,20 @@ pub struct BooleanPathOperationNodeRec {
 
 impl NodeFillsMixin for BooleanPathOperationNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
 
 impl NodeStrokesMixin for BooleanPathOperationNodeRec {
     fn set_stroke(&mut self, stroke: Paint) {
-        self.strokes = vec![stroke];
+        self.strokes = Paints::new([stroke]);
     }
 
-    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+    fn set_strokes(&mut self, strokes: Paints) {
         self.strokes = strokes;
     }
 }
@@ -861,8 +861,8 @@ pub struct VectorNodeRec {
     /// The corner radius of the vector node.
     pub corner_radius: f32,
     /// The fill paints of the vector node.
-    pub fills: Vec<Paint>,
-    pub strokes: Vec<Paint>,
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_width_profile: Option<cg::varwidth::VarWidthProfile>,
     /// Requested stroke alignment. For open paths, `Inside` and `Outside`
@@ -876,20 +876,20 @@ pub struct VectorNodeRec {
 
 impl NodeFillsMixin for VectorNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
 
 impl NodeStrokesMixin for VectorNodeRec {
     fn set_stroke(&mut self, stroke: Paint) {
-        self.strokes = vec![stroke];
+        self.strokes = Paints::new([stroke]);
     }
 
-    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+    fn set_strokes(&mut self, strokes: Paints) {
         self.strokes = strokes;
     }
 }
@@ -928,9 +928,9 @@ pub struct SVGPathNodeRec {
     pub name: Option<String>,
     pub active: bool,
     pub transform: AffineTransform,
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
     pub data: String,
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
@@ -941,20 +941,20 @@ pub struct SVGPathNodeRec {
 
 impl NodeFillsMixin for SVGPathNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
 
 impl NodeStrokesMixin for SVGPathNodeRec {
     fn set_stroke(&mut self, stroke: Paint) {
-        self.strokes = vec![stroke];
+        self.strokes = Paints::new([stroke]);
     }
 
-    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+    fn set_strokes(&mut self, strokes: Paints) {
         self.strokes = strokes;
     }
 }
@@ -994,10 +994,10 @@ pub struct PolygonNodeRec {
     pub corner_radius: f32,
 
     /// The paint used to fill the interior of the polygon.
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// The stroke paint used to outline the polygon.
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
@@ -1012,20 +1012,20 @@ pub struct PolygonNodeRec {
 
 impl NodeFillsMixin for PolygonNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
 
 impl NodeStrokesMixin for PolygonNodeRec {
     fn set_stroke(&mut self, stroke: Paint) {
-        self.strokes = vec![stroke];
+        self.strokes = Paints::new([stroke]);
     }
 
-    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+    fn set_strokes(&mut self, strokes: Paints) {
         self.strokes = strokes;
     }
 }
@@ -1095,10 +1095,10 @@ pub struct RegularPolygonNodeRec {
     pub corner_radius: f32,
 
     /// Fill paint (solid or gradient)
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// The stroke paint used to outline the polygon.
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
@@ -1112,10 +1112,10 @@ pub struct RegularPolygonNodeRec {
 
 impl NodeFillsMixin for RegularPolygonNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -1221,10 +1221,10 @@ pub struct RegularStarPolygonNodeRec {
     pub corner_radius: f32,
 
     /// Fill paint (solid or gradient)
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// The stroke paint used to outline the polygon.
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
@@ -1238,10 +1238,10 @@ pub struct RegularStarPolygonNodeRec {
 
 impl NodeFillsMixin for RegularStarPolygonNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -1444,10 +1444,10 @@ pub struct TextSpanNodeRec {
     pub ellipsis: Option<String>,
 
     /// Fill paints stack (solid, gradient, etc.)
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// Stroke paints stack (solid, gradient, etc.)
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
 
     /// Stroke width
     pub stroke_width: f32,

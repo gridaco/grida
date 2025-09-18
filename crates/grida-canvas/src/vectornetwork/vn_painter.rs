@@ -1,6 +1,6 @@
 use crate::cg::types::*;
 use crate::cg::varwidth::*;
-use crate::painter::cvt;
+use crate::painter::paint;
 use crate::runtime::image_repository::ImageRepository;
 use crate::shape::build_corner_radius_path;
 use crate::shape::stroke::stroke_geometry;
@@ -14,7 +14,7 @@ use super::vn::{PiecewiseVectorNetworkGeometry, VectorNetwork};
 pub struct StrokeOptions {
     pub width: f32,
     pub align: StrokeAlign,
-    pub paints: Vec<Paint>,
+    pub paints: Paints,
     pub width_profile: Option<VarWidthProfile>,
 }
 
@@ -239,12 +239,12 @@ impl<'a> VNPainter<'a> {
         let size = (bounds.width(), bounds.height());
 
         if let Some(images) = self.images {
-            if let Some(mut paint) = cvt::sk_paint_stack(paints, size, images) {
+            if let Some(mut paint) = paint::sk_paint_stack(paints, size, images) {
                 paint.set_style(PaintStyle::Fill);
                 self.canvas.draw_path(path, &paint);
             }
         } else {
-            if let Some(mut paint) = cvt::sk_paint_stack_without_images(paints, size) {
+            if let Some(mut paint) = paint::sk_paint_stack_without_images(paints, size) {
                 paint.set_style(PaintStyle::Fill);
                 self.canvas.draw_path(path, &paint);
             }
@@ -322,14 +322,14 @@ mod tests {
             regions: vec![VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(vec![Paint::Image(ImagePaint {
+                fills: Some(Paints::new([Paint::Image(ImagePaint {
                     transform: AffineTransform::identity(),
                     image: ResourceRef::RID("img".to_string()),
                     fit: BoxFit::Fill,
                     opacity: 1.0,
                     blend_mode: BlendMode::default(),
                     filters: ImageFilters::default(),
-                })]),
+                })])),
             }],
         };
 
@@ -380,14 +380,14 @@ mod tests {
         let stroke = StrokeOptions {
             width: 4.0,
             align: StrokeAlign::Center,
-            paints: vec![Paint::Image(ImagePaint {
+            paints: Paints::new([Paint::Image(ImagePaint {
                 transform: AffineTransform::identity(),
                 image: ResourceRef::RID("stroke_img".to_string()),
                 fit: BoxFit::Fill,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
                 filters: ImageFilters::default(),
-            })],
+            })]),
             width_profile: None,
         };
         painter.draw(&vn, &[], Some(&stroke), 0.0);

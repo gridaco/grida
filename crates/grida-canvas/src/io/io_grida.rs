@@ -313,8 +313,8 @@ impl From<CSSObjectFit> for BoxFit {
 /// - if no paint and no paints, use []
 /// - if both paint and paints, if paints is empty, use [paint]
 /// - if both paint and paints, if paints >= 1, use paints
-pub fn merge_paints(paint: Option<JSONPaint>, paints: Option<Vec<JSONPaint>>) -> Vec<Paint> {
-    match (paint, paints) {
+pub fn merge_paints(paint: Option<JSONPaint>, paints: Option<Vec<JSONPaint>>) -> Paints {
+    let paints_vec = match (paint, paints) {
         (Some(p), None) => vec![Paint::from(Some(p))],
         (None, None) => vec![],
         (Some(p), Some(paints_vec)) => {
@@ -335,7 +335,9 @@ pub fn merge_paints(paint: Option<JSONPaint>, paints: Option<Vec<JSONPaint>>) ->
                 .map(|p| Paint::from(Some(p)))
                 .collect()
         }
-    }
+    };
+
+    Paints::from(paints_vec)
 }
 
 #[derive(Debug, Deserialize)]

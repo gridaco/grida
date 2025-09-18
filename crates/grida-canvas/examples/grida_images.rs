@@ -38,7 +38,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
     }));
-    rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
+    rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     rect1.stroke_width = 2.0;
 
     // Second example: Rectangle with ImagePaint fill and stroke
@@ -57,14 +57,14 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
     }));
-    rect2.strokes = vec![Paint::Image(ImagePaint {
+    rect2.strokes = Paints::new([Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
-    })];
+    })]);
     rect2.stroke_width = 10.0;
 
     // Third example: Rectangle with ImagePaint stroke only
@@ -77,14 +77,14 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     };
     rect3.corner_radius = RectangularCornerRadius::circular(40.0);
     rect3.set_fill(Paint::from(CGColor(240, 240, 240, 255)));
-    rect3.strokes = vec![Paint::Image(ImagePaint {
+    rect3.strokes = Paints::new([Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
-    })];
+    })]);
     rect3.stroke_width = 10.0;
 
     // Fourth example: Rectangle with ImagePaint fill using a custom transform

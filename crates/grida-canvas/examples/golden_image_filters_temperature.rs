@@ -19,8 +19,8 @@
 //! - Cooler (-0.3, more blue)
 //! - Warmer (+0.3, more red)
 
-use cg::painter::image_filters;
 use cg::cg::types::ImageFilters;
+use cg::painter::image_filters;
 use skia_safe::{self as sk, surfaces, Color, Data, Font, Image, Paint as SkPaint, Point, Rect};
 
 thread_local! {

@@ -41,7 +41,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
     }));
-    rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
+    rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     rect1.stroke_width = 2.0;
 
     let mut repository = NodeRepository::new();

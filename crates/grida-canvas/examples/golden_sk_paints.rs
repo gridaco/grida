@@ -23,7 +23,7 @@
 //!   - ALL MIXED: solid + linear + radial + image (all with alpha) - comprehensive test
 //!
 //! ## Layout
-//! Single PNG with 8 examples in a 5-column grid layout:
+//! Single PNG with 9 examples in a 3-column grid layout:
 //! - Each example demonstrates a different paint combination
 //! - All paints use opacity values less than 1.0 to test alpha blending
 //! - Images are properly loaded and rendered with opacity
@@ -39,9 +39,9 @@ use cg::resources::ByteStore;
 use cg::{
     cg::types::{
         BlendMode, CGColor, GradientStop, ImageFilters, ImagePaint, LinearGradientPaint, Paint,
-        RadialGradientPaint, ResourceRef, SolidPaint,
+        Paints, RadialGradientPaint, ResourceRef, SolidPaint,
     },
-    painter::cvt,
+    painter::paint,
     runtime::image_repository::ImageRepository,
 };
 use math2::{box_fit::BoxFit, transform::AffineTransform};
@@ -65,7 +65,7 @@ fn main() {
     let column_gap = 20.0;
     let label_height = 20.0;
     let columns = 3;
-    let rows = 3; // 8 examples in 3 columns = 3 rows (3 + 3 + 2)
+    let rows = 3; // 9 examples in 3 columns = 3 rows (3 + 3 + 3)
     let width = (padding * 2.0 + tile * columns as f32 + column_gap * (columns - 1) as f32) as i32;
     let height = (padding * 2.0
         + tile * rows as f32
@@ -82,12 +82,12 @@ fn main() {
     let examples = vec![
         // 1. single solid
         (
-            vec![Paint::from(CGColor(255, 0, 0, 200))], // opacity 0.78
+            Paints::new([Paint::from(CGColor(255, 0, 0, 200))]), // opacity 0.78
             "1. Single Solid",
         ),
         // 2. single linear gradient
         (
-            vec![Paint::LinearGradient(LinearGradientPaint {
+            Paints::new([Paint::LinearGradient(LinearGradientPaint {
                 transform: AffineTransform::identity(),
                 stops: vec![
                     GradientStop {
@@ -101,12 +101,12 @@ fn main() {
                 ],
                 opacity: 1.0,
                 blend_mode: BlendMode::Normal,
-            })],
+            })]),
             "2. Single Linear Gradient",
         ),
         // 3. solid + solid with multiply blend
         (
-            vec![
+            Paints::new([
                 Paint::Solid(SolidPaint {
                     color: CGColor(255, 0, 0, 100), // opacity 0.39
                     blend_mode: BlendMode::Normal,
@@ -115,12 +115,12 @@ fn main() {
                     color: CGColor(0, 0, 255, 100), // opacity 0.39
                     blend_mode: BlendMode::Multiply,
                 }),
-            ],
+            ]),
             "3. Solid + Solid (Multiply)",
         ),
         // 4. solid + linear gradient with screen blend
         (
-            vec![
+            Paints::new([
                 Paint::Solid(SolidPaint {
                     color: CGColor(255, 255, 0, 180), // opacity 0.71
                     blend_mode: BlendMode::Normal,
@@ -140,12 +140,12 @@ fn main() {
                     opacity: 0.6,
                     blend_mode: BlendMode::Screen,
                 }),
-            ],
+            ]),
             "4. Solid + Linear (Screen)",
         ),
         // 5. linear + linear gradient with overlay blend
         (
-            vec![
+            Paints::new([
                 Paint::LinearGradient(LinearGradientPaint {
                     transform: AffineTransform::identity(),
                     stops: vec![
@@ -176,12 +176,12 @@ fn main() {
                     opacity: 0.5,
                     blend_mode: BlendMode::Overlay,
                 }),
-            ],
+            ]),
             "5. Linear + Linear (Overlay)",
         ),
         // 6. linear + radial gradient with soft light blend
         (
-            vec![
+            Paints::new([
                 Paint::LinearGradient(LinearGradientPaint {
                     transform: AffineTransform::identity(),
                     stops: vec![
@@ -212,12 +212,30 @@ fn main() {
                     opacity: 0.5,
                     blend_mode: BlendMode::SoftLight,
                 }),
-            ],
+            ]),
             "6. Linear + Radial (SoftLight)",
         ),
-        // 7. image + radial gradient with hard light blend
+        // 7. image + solid with multiply blend
         (
-            vec![
+            Paints::new([
+                Paint::Image(ImagePaint {
+                    transform: AffineTransform::identity(),
+                    image: checker_image_ref.clone(),
+                    fit: BoxFit::Fill,
+                    opacity: 0.6,
+                    blend_mode: BlendMode::Normal,
+                    filters: ImageFilters::default(),
+                }),
+                Paint::Solid(SolidPaint {
+                    color: CGColor(0, 0, 0, 200),
+                    blend_mode: BlendMode::Multiply,
+                }),
+            ]),
+            "7. Image + Solid (Multiply)",
+        ),
+        // 8. image + radial gradient with hard light blend
+        (
+            Paints::new([
                 Paint::Image(ImagePaint {
                     transform: AffineTransform::identity(),
                     image: checker_image_ref.clone(),
@@ -241,12 +259,12 @@ fn main() {
                     opacity: 0.5,
                     blend_mode: BlendMode::HardLight,
                 }),
-            ],
-            "7. Image + Radial (HardLight)",
+            ]),
+            "8. Image + Radial (HardLight)",
         ),
-        // 8. all mixed: solid + linear + radial + image with various blend modes
+        // 9. all mixed: solid + linear + radial + image with various blend modes
         (
-            vec![
+            Paints::new([
                 Paint::Solid(SolidPaint {
                     color: CGColor(255, 0, 0, 200), // opacity 0.78
                     blend_mode: BlendMode::Normal,
@@ -289,8 +307,8 @@ fn main() {
                     blend_mode: BlendMode::Overlay,
                     filters: ImageFilters::default(),
                 }),
-            ],
-            "8. All Mixed (Various Blends)",
+            ]),
+            "9. All Mixed (Various Blends)",
         ),
     ];
 
@@ -323,7 +341,7 @@ fn draw_stacked(
     x: f32,
     y: f32,
     size: f32,
-    fills: &[Paint],
+    fills: &Paints,
     images: &ImageRepository,
 ) {
     // Use canvas transform and save/restore like production code
@@ -338,9 +356,10 @@ fn draw_stacked(
     let mut path = skia_safe::Path::new();
     path.add_rect(rect, None);
 
-    // Reverse the order so first paint appears on top
-    let reversed_fills: Vec<Paint> = fills.iter().rev().cloned().collect();
-    if let Some(paint) = cvt::sk_paint_stack(&reversed_fills, size_tuple, images) {
+    // Paint order semantics:
+    // - `fills` is bottom → top. We pass as-is to the stacker, which composes
+    //   each subsequent paint on top of the accumulated background.
+    if let Some(paint) = paint::sk_paint_stack(fills, size_tuple, images) {
         canvas.draw_path(&path, &paint);
     }
 

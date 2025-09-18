@@ -1,6 +1,6 @@
-use super::cvt;
 use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
+use super::paint;
 use super::shadow;
 use super::text_stroke;
 use crate::cache::geometry::GeometryCache;
@@ -286,7 +286,7 @@ impl<'a> Painter<'a> {
         if fills.is_empty() {
             return;
         }
-        if let Some(paint) = cvt::sk_paint_stack(
+        if let Some(paint) = paint::sk_paint_stack(
             fills,
             (shape.rect.width(), shape.rect.height()),
             self.images,
@@ -324,7 +324,7 @@ impl<'a> Painter<'a> {
         if strokes.is_empty() {
             return;
         }
-        if let Some(paint) = cvt::sk_paint_stack(
+        if let Some(paint) = paint::sk_paint_stack(
             strokes,
             (shape.rect.width(), shape.rect.height()),
             self.images,

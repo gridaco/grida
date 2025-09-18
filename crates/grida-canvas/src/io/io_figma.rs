@@ -402,10 +402,10 @@ impl FigmaConverter {
     }
 
     /// Convert Figma's fills to our Paint vector
-    fn convert_fills(&self, fills: Option<&Vec<FigmaPaint>>) -> Vec<Paint> {
-        fills.map_or(Vec::new(), |paints| {
+    fn convert_fills(&self, fills: Option<&Vec<FigmaPaint>>) -> Paints {
+        fills.map_or_else(Paints::default, |paints| {
             // Filter out invisible paints and convert visible ones
-            paints
+            let paints: Vec<Paint> = paints
                 .iter()
                 .filter(|paint| match paint {
                     FigmaPaint::SolidPaint(solid) => solid.visible.unwrap_or(true),
@@ -414,17 +414,18 @@ impl FigmaConverter {
                     _ => true,
                 })
                 .map(|paint| self.convert_paint(paint))
-                .collect()
+                .collect();
+            Paints::from(paints)
         })
     }
 
     /// Convert Figma's strokes to our Paint vector
-    fn convert_strokes(&self, strokes: Option<&Option<Vec<FigmaPaint>>>) -> Vec<Paint> {
+    fn convert_strokes(&self, strokes: Option<&Option<Vec<FigmaPaint>>>) -> Paints {
         strokes
             .and_then(|s| s.as_ref())
-            .map_or(Vec::new(), |paints| {
+            .map_or_else(Paints::default, |paints| {
                 // Filter out invisible paints and convert visible ones
-                paints
+                let paints: Vec<Paint> = paints
                     .iter()
                     .filter(|paint| match paint {
                         FigmaPaint::SolidPaint(solid) => solid.visible.unwrap_or(true),
@@ -433,7 +434,8 @@ impl FigmaConverter {
                         _ => true,
                     })
                     .map(|paint| self.convert_paint(paint))
-                    .collect()
+                    .collect();
+                Paints::from(paints)
             })
     }
 
@@ -710,7 +712,7 @@ impl FigmaConverter {
             corner_radius: RectangularCornerRadius::zero(),
             children,
             fills: self.convert_fills(Some(&section.fills.as_ref())),
-            strokes: vec![],
+            strokes: Paints::default(),
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
@@ -977,7 +979,7 @@ impl FigmaConverter {
                     transform: AffineTransform::identity(),
                     fills: self.convert_fills(Some(&origin.fills)),
                     data: geometry.path.clone(),
-                    strokes: vec![],
+                    strokes: Paints::default(),
                     stroke_width: 0.0,
                     stroke_align: StrokeAlign::Inside,
                     stroke_dash_array: None,
@@ -999,7 +1001,7 @@ impl FigmaConverter {
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
                     transform: AffineTransform::identity(),
-                    fills: vec![],
+                    fills: Paints::default(),
                     data: geometry.path.clone(),
                     strokes: self.convert_strokes(Some(&origin.strokes)),
                     stroke_width: 0.0,
@@ -1023,8 +1025,8 @@ impl FigmaConverter {
             transform: Self::convert_transform(origin.relative_transform.as_ref()),
             size: Self::convert_size(origin.size.as_ref()),
             corner_radius: RectangularCornerRadius::zero(),
-            fills: vec![TRANSPARENT],
-            strokes: vec![],
+            fills: Paints::new([TRANSPARENT]),
+            strokes: Paints::default(),
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
