@@ -147,7 +147,7 @@ export function BlendModeDropdown({
   );
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild tabIndex={-1}>
         <Button variant="ghost" size="xs">
           <BlendModeIcon active={isNonDefault} />

@@ -314,12 +314,12 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
   );
 
   // Determine if right sidebar should be visible
-  const showSidebarRight =
+  const should_show_sidebar_right =
     ui.sidebar_right === "visible" ||
     (ui.sidebar_right === "floating-when-selection" && hasSelection);
 
   // Determine the variant for the right sidebar
-  const sidebarRightVariant =
+  const sidebar_right_variant =
     ui.sidebar_right === "floating-when-selection" ? "floating" : "sidebar";
 
   useDisableSwipeBack();
@@ -398,7 +398,9 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
               </EditorSurfaceContextMenu>
             </EditorSurfaceDropzone>
           </EditorSurfaceClipboardSyncProvider>
-          {showSidebarRight && <SidebarRight variant={sidebarRightVariant} />}
+          {should_show_sidebar_right && (
+            <SidebarRight variant={sidebar_right_variant} />
+          )}
         </div>
       </PreviewProvider>
 
@@ -527,7 +529,7 @@ function SidebarRight({
   const should_show_artboards_list = useArtboardListCondition();
 
   return (
-    <aside className="relative">
+    <aside id="sidebar-right" className="relative">
       <Sidebar
         side="right"
         variant={variant}
