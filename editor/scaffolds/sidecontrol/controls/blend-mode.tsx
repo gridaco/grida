@@ -120,9 +120,14 @@ export function BlendModeDropdown({
       <DropdownMenuContent collisionPadding={16}>
         {items.map((item, i) => (
           <DropdownMenuCheckboxItem
+            onSeeked={console.log}
             checked={enumEq(typedValue as any, item)}
             key={i}
             className="text-xs"
+            // FIXME: temporary hack. we don't yet have preview system
+            onPointerEnter={() => {
+              onValueChange?.(enumValue(item));
+            }}
             onCheckedChange={(checked) => {
               if (checked) {
                 onValueChange?.(enumValue(item));
