@@ -10,7 +10,7 @@ use crate::{
     resources::{self, ByteStore, Resources},
     runtime::{
         camera::Camera2D, config::RuntimeRendererConfig, font_repository::FontRepository,
-        image_repository::ImageRepository,
+        image_repository::ImageRepository, system_images,
     },
 };
 
@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 fn normalize_image_id(id: &str) -> String {
-    if id.starts_with("res://") {
+    if id.starts_with("res://") || id.starts_with("system://") {
         id.to_string()
     } else {
         format!("res://images/{}", id)
@@ -213,12 +213,13 @@ impl Renderer {
         store: Arc<Mutex<ByteStore>>,
         options: RendererOptions,
     ) -> Self {
-        let resources = Resources::with_store(store.clone());
+        let mut resources = Resources::with_store(store.clone());
         let mut font_repository = FontRepository::new(store.clone());
         if options.use_embedded_fonts {
             font_repository.register_embedded_fonts();
         }
-        let image_repository = ImageRepository::new(store);
+        let mut image_repository = ImageRepository::new(store);
+        system_images::register(&mut resources, &mut image_repository);
         Self {
             backend,
             scene: None,

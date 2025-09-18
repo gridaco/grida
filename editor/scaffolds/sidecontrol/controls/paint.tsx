@@ -53,8 +53,7 @@ const gradient_types = [
 
 const DEFAULT_IMAGE_PAINT: cg.ImagePaint = {
   type: "image",
-  // FIXME: not registered.
-  src: "res://system/images/checker.png",
+  src: "system://images/checker-16-strip-L98L92.png",
   fit: "cover",
   transform: cmath.transform.identity,
   filters: cg.def.IMAGE_FILTERS,
