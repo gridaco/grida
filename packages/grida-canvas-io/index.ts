@@ -21,15 +21,46 @@ export namespace io {
     const __data_grida_io_prefix = "data-grida-io-";
     const __data_grida_clipboard = "data-grida-io-clipboard";
 
-    export interface ClipboardPayload {
+    interface ClipboardPayloadBase {
       payload_id: string;
+    }
+
+    export type PrototypesClipboardPayload = ClipboardPayloadBase & {
+      type: "prototypes";
       prototypes: grida.program.nodes.NodePrototype[];
       ids: string[];
-    }
+    };
+
+    export type PropertiesClipboardPayload = ClipboardPayloadBase & {
+      type: "properties";
+      properties: grida.program.nodes.UnknownNodeProperties;
+    };
+
+    type SerializedImagePaint = {
+      type: "image";
+      [key: string]: unknown;
+    };
+
+    export type PropertyFillImagePaintClipboardPayload = ClipboardPayloadBase & {
+      type: "property/fill-image-paint";
+      paint: SerializedImagePaint;
+      paint_target: "fill" | "stroke";
+      paint_index: number;
+      node_id: string;
+      document_key?: string;
+    };
+
+    export type ClipboardPayload =
+      | PrototypesClipboardPayload
+      | PropertiesClipboardPayload
+      | PropertyFillImagePaintClipboardPayload;
 
     export function encode(
       payload: ClipboardPayload
     ): Record<string, string | Blob> | null {
+      if (payload.type !== "prototypes") {
+        return null;
+      }
       const result: Record<string, string | Blob> = {};
 
       if (payload.prototypes.length === 0) {
@@ -58,6 +89,9 @@ export namespace io {
     export function encodeClipboardText(
       payload: ClipboardPayload
     ): string | null {
+      if (payload.type !== "prototypes") {
+        return null;
+      }
       let __text_plain = "";
       for (const p of payload.prototypes) {
         if (p.type === "text") {

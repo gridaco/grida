@@ -12,6 +12,7 @@ import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
+import type { io } from "@grida/io";
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -826,18 +827,7 @@ export namespace editor.state {
     /**
      * user clipboard - copied data
      */
-    user_clipboard?: {
-      /** unique payload id for distinguishing clipboard contents */
-      payload_id: string;
-      /**
-       * copied node data as prototype
-       */
-      prototypes: grida.program.nodes.NodePrototype[];
-      /**
-       * original node ids (top ids)
-       */
-      ids: string[];
-    };
+    user_clipboard?: io.clipboard.ClipboardPayload;
     user_clipboard_color?: cg.RGBA8888;
   }
 

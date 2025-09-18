@@ -126,6 +126,34 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "copy":
     case "cut": {
+      if (state.content_edit_mode?.type === "paint/image") {
+        const { node_id, paint_target, paint_index } = state.content_edit_mode;
+        const node = dq.__getNodeById(state, node_id);
+        assert(node, `node not found with node_id: "${node_id}"`);
+        const { paints, resolvedIndex } = resolvePaints(
+          node as grida.program.nodes.UnknwonNode,
+          paint_target,
+          paint_index
+        );
+        const targetPaint = paints[resolvedIndex];
+        if (!cg.isImagePaint(targetPaint)) {
+          return state;
+        }
+        const serialized = JSON.parse(
+          JSON.stringify(targetPaint)
+        ) as cg.ImagePaint;
+        return produce(state, (draft) => {
+          draft.user_clipboard = {
+            payload_id: v4(),
+            type: "property/fill-image-paint",
+            document_key: draft.document_key,
+            node_id,
+            paint_target,
+            paint_index: resolvedIndex,
+            paint: serialized,
+          };
+        });
+      }
       if (state.content_edit_mode?.type === "vector") {
         const {
           node_id,
@@ -167,6 +195,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         // [copy]
         draft.user_clipboard = {
           payload_id: v4(),
+          type: "prototypes",
           ids: target_node_ids,
           prototypes: target_node_ids.map((id) =>
             grida.program.nodes.factory.createPrototypeFromSnapshot(
@@ -184,6 +213,65 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "paste": {
+      if (state.user_clipboard?.type === "property/fill-image-paint") {
+        const clipboard = state.user_clipboard;
+        if (
+          clipboard.document_key &&
+          state.document_key &&
+          clipboard.document_key !== state.document_key
+        ) {
+          return state;
+        }
+        if (state.selection.length === 0) {
+          return state;
+        }
+        const selectionIds = [...state.selection];
+        return produce(state, (draft) => {
+          const payload = draft.user_clipboard;
+          if (!payload || payload.type !== "property/fill-image-paint") {
+            return;
+          }
+          if (
+            payload.document_key &&
+            draft.document_key &&
+            payload.document_key !== draft.document_key
+          ) {
+            return;
+          }
+          const target = payload.paint_target;
+          const pluralKey = target === "stroke" ? "strokes" : "fills";
+          const singularKey = target === "stroke" ? "stroke" : "fill";
+          let applied = false;
+
+          for (const node_id of selectionIds) {
+            const node = dq.__getNodeById(draft, node_id);
+            if (!node) continue;
+
+            const existing: cg.Paint[] = Array.isArray((node as any)[pluralKey])
+              ? ([...(node as any)[pluralKey]] as cg.Paint[])
+              : (node as any)[singularKey]
+                ? [(node as any)[singularKey] as cg.Paint]
+                : [];
+
+            const clonedPaint = JSON.parse(
+              JSON.stringify(payload.paint)
+            ) as cg.ImagePaint;
+
+            // Simply push the paint to the end without any checks
+            existing.push(clonedPaint);
+
+            (node as any)[pluralKey] = existing;
+            if (existing.length > 0) {
+              (node as any)[singularKey] = existing[0];
+            }
+            applied = true;
+          }
+
+          if (!applied) {
+            return;
+          }
+        });
+      }
       if (action.vector_network) {
         if (state.content_edit_mode?.type === "vector") {
           const net = action.vector_network;
@@ -341,6 +429,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       }
 
       if (!state.user_clipboard) break;
+      if (state.user_clipboard.type !== "prototypes") break;
       const { user_clipboard, selection } = state;
       const { ids, prototypes } = user_clipboard;
 

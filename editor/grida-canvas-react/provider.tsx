@@ -891,7 +891,7 @@ export function useDataTransferEventTarget() {
           ) {
             instance.paste();
             pasted_from_data_transfer = true;
-          } else {
+          } else if (grida_payload.clipboard.type === "prototypes") {
             grida_payload.clipboard.prototypes.forEach((p) => {
               const sub =
                 grida.program.nodes.factory.create_packed_scene_document_from_prototype(
@@ -900,6 +900,9 @@ export function useDataTransferEventTarget() {
                 );
               instance.insert({ document: sub });
             });
+            pasted_from_data_transfer = true;
+          } else {
+            instance.paste();
             pasted_from_data_transfer = true;
           }
         }
@@ -1016,9 +1019,7 @@ export function useClipboardSync() {
         const txt = `grida:vn:${btoa(JSON.stringify(vector_clipboard))}`;
         navigator.clipboard.writeText(txt);
       } else if (user_clipboard) {
-        const items = io.clipboard.encode(
-          user_clipboard as io.clipboard.ClipboardPayload
-        );
+        const items = io.clipboard.encode(user_clipboard);
 
         if (items) {
           const clipboardItem = new ClipboardItem(items);

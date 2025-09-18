@@ -688,12 +688,20 @@ export namespace cg {
     | SweepGradientPaint
     | DiamondGradientPaint;
 
-  export function isGradientPaint(paint: cg.Paint): paint is cg.GradientPaint {
+  export function isSolidPaint(paint?: cg.Paint): paint is cg.SolidPaint {
+    return paint?.type === "solid";
+  }
+
+  export function isImagePaint(paint?: cg.Paint): paint is cg.ImagePaint {
+    return paint?.type === "image";
+  }
+
+  export function isGradientPaint(paint?: cg.Paint): paint is cg.GradientPaint {
     return (
-      paint.type === "linear_gradient" ||
-      paint.type === "radial_gradient" ||
-      paint.type === "sweep_gradient" ||
-      paint.type === "diamond_gradient"
+      paint?.type === "linear_gradient" ||
+      paint?.type === "radial_gradient" ||
+      paint?.type === "sweep_gradient" ||
+      paint?.type === "diamond_gradient"
     );
   }
 

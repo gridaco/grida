@@ -70,6 +70,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
   const targetSingleOrSelection =
     ids.length === 1 ? (ids[0] as string) : "selection";
 
+  // FIXME: use global on paste
   const handlePaste = useCallback(async () => {
     try {
       const clipboardItems = await navigator.clipboard.read();
