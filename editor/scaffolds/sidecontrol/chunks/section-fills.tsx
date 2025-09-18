@@ -59,7 +59,8 @@ export function SectionFills({ node_id }: { node_id: string }) {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: paints.length > 0 ? 0.5 : 1 },
     };
-    actions.addFill(paint, "start");
+    // Append new paint to the end (top-most in render order)
+    actions.addFill(paint, "end");
   }, [actions, paints.length]);
 
   const renderFillControl = (
@@ -149,9 +150,12 @@ export function SectionFills({ node_id }: { node_id: string }) {
       </SidebarSectionHeaderItem>
       {!empty && (
         <SidebarMenuSectionContent className="space-y-2">
-          {isCanvasBackend
-            ? paints.map((paint, index) => renderFillControl(paint, index))
-            : renderFillControl(paints[0], 0)}
+          {paints
+            .slice()
+            .reverse()
+            .map((paint, displayIndex) =>
+              renderFillControl(paint, paints.length - 1 - displayIndex)
+            )}
         </SidebarMenuSectionContent>
       )}
     </SidebarSection>

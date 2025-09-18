@@ -70,7 +70,8 @@ export function SectionStrokes({
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: paints.length > 0 ? 0.5 : 1 },
     };
-    actions.addStroke(paint, "start");
+    // Append new paint to the end (top-most in render order)
+    actions.addStroke(paint, "end");
 
     if (!strokeWidth || strokeWidth === 0) {
       actions.strokeWidth({ type: "set", value: 1 });
@@ -189,9 +190,12 @@ export function SectionStrokes({
       </SidebarSectionHeaderItem>
       {!empty && (
         <SidebarMenuSectionContent className="space-y-2">
-          {isCanvasBackend
-            ? paints.map((paint, index) => renderStrokeControl(paint, index))
-            : renderStrokeControl(paints[0], 0)}
+          {paints
+            .slice()
+            .reverse()
+            .map((paint, displayIndex) =>
+              renderStrokeControl(paint, paints.length - 1 - displayIndex)
+            )}
           {has_stroke_paint && (
             <div className="mt-4 space-y-2">
               <PropertyLine>

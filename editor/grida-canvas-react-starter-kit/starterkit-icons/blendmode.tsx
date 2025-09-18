@@ -33,9 +33,9 @@ export const BlendModeIcon = ({
         fillRule="evenodd"
         clipRule="evenodd"
         d="M7.5 2.87357C5.02686 5.27195 4 7.11203 4 9C4 10.888 6 12.5 7.5 12.5C9 12.5 11 11 11 9C11 7 9.65265 5.12106 7.5 2.87357Z"
-        fill="transparent"
-        className="group-data-[active=true]/icon:fill-current"
-        fill-opacity="0.5"
+        className="group-data-[active=true]/icon:opacity-50"
+        fill="currentColor"
+        opacity="0"
       />
     </svg>
   );
