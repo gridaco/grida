@@ -1,7 +1,7 @@
 import React from "react";
 import { TMixed } from "./utils/types";
 import { enumEq, enumLabel, EnumItem, PropertyEnum, enumValue } from "../ui";
-import { BlendingModeIcon } from "@radix-ui/react-icons";
+import { BlendModeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons";
 import type cg from "@grida/cg";
 import {
   DropdownMenu,
@@ -102,11 +102,12 @@ export function BlendModeDropdown({
   value?: TMixed<cg.BlendMode>;
   onValueChange?: (value: cg.BlendMode) => void;
 }) {
+  const activevalue = !!value && value !== "normal";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild tabIndex={-1}>
         <Button variant="ghost" size="xs">
-          <BlendingModeIcon />
+          <BlendModeIcon active={activevalue} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent collisionPadding={16}>
