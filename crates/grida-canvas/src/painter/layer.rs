@@ -122,7 +122,7 @@ pub struct PainterPictureLayerBase {
     pub id: NodeId,
     pub z_index: usize,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub transform: AffineTransform,
     pub clip_path: Option<skia_safe::Path>,
 }
@@ -603,7 +603,7 @@ impl LayerList {
                             id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
-                            blend_mode: BlendMode::Normal,
+                            blend_mode: LayerBlendMode::PassThrough,
                             transform,
                             clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
                         },

@@ -165,10 +165,59 @@ pub enum BooleanPathOperation {
 /// - Flutter `Clip*` wrapping a subtree → (potential future **shape clip**, not implemented)
 pub type ContainerClipFlag = bool;
 
-/// Blend modes for compositing layers, compatible with Skia and SVG/CSS.
+/// Layer-level compositing mode.
+///
+/// - `Blend(BlendMode)`: The layer is **isolated** and composited as a single surface
+///   using the given blend mode (e.g., `Normal/SrcOver`, `Multiply`, etc.).
+/// - `PassThrough`: The layer **does not** create a compositing boundary. Its children
+///   (or its internal paint stack) are drawn directly into the parent and may blend with
+///   content beneath the layer. Group opacity should be applied multiplicatively to
+///   descendants rather than forcing isolation.
+///
+/// This mirrors Figma’s semantics:
+/// - Groups default to **PassThrough** (non-isolated).
+/// - Switching a group to a specific blend mode (e.g., `Normal`) isolates and flattens it.
+///
+/// Closest CSS analogy:
+/// - `PassThrough` ≈ `isolation: auto`
+/// - `Blend(BlendMode::Normal)` ≈ `isolation: isolate` + normal compositing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(untagged)]
+pub enum LayerBlendMode {
+    /// Non-isolated group/layer; children/paints blend directly with the backdrop.
+    #[serde(rename = "pass-through")]
+    PassThrough,
+    /// Isolated layer composited with a specific blend mode.
+    Blend(BlendMode),
+}
+
+impl From<BlendMode> for LayerBlendMode {
+    #[inline]
+    fn from(mode: BlendMode) -> Self {
+        LayerBlendMode::Blend(mode)
+    }
+}
+
+impl Into<BlendMode> for LayerBlendMode {
+    fn into(self) -> BlendMode {
+        match self {
+            LayerBlendMode::PassThrough => BlendMode::Normal,
+            LayerBlendMode::Blend(mode) => mode,
+        }
+    }
+}
+
+impl Default for LayerBlendMode {
+    fn default() -> Self {
+        LayerBlendMode::PassThrough
+    }
+}
+
+/// Blend functions for compositing paints or isolated layers (does **not** include PassThrough).
 ///
 /// - SVG: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/mix-blend-mode
 /// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
+/// - Flutter: https://api.flutter.dev/flutter/dart-ui/BlendMode.html
 /// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 pub enum BlendMode {
@@ -220,11 +269,6 @@ pub enum BlendMode {
     // Skia: kLuminosity
     #[serde(rename = "luminosity")]
     Luminosity,
-
-    /// Like `Normal`, but means no blending at all (pass-through).
-    /// This is Figma-specific, and typically treated the same as `Normal`.
-    #[serde(rename = "pass-through")]
-    PassThrough,
 }
 
 impl Default for BlendMode {

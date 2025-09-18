@@ -46,7 +46,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode: LayerBlendMode::default(),
                 effects: LayerEffects::default(),
             };
 
@@ -77,7 +77,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode: LayerBlendMode::default(),
                 effects: LayerEffects::default(),
             };
 
@@ -109,7 +109,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode: LayerBlendMode::default(),
                 effects: LayerEffects::default(),
             };
 
@@ -140,7 +140,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode: LayerBlendMode::default(),
                 effects: LayerEffects::default(),
             };
 
@@ -174,7 +174,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode: LayerBlendMode::default(),
                 effects: LayerEffects::default(),
             };
 
@@ -214,7 +214,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode: LayerBlendMode::default(),
                 effects: LayerEffects::default(),
             };
 
@@ -246,7 +246,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode: LayerBlendMode::default(),
                 effects: LayerEffects::default(),
             };
 
@@ -285,7 +285,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode: LayerBlendMode::default(),
                 effects: LayerEffects::default(),
             };
 
@@ -322,7 +322,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
                 opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode: LayerBlendMode::default(),
                 effects: LayerEffects::default(),
             };
 

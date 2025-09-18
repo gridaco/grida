@@ -90,10 +90,18 @@ impl<'a> Painter<'a> {
     }
 
     /// If blend mode is not Normal, wrap drawing in a save_layer with blend mode; else draw directly.
-    fn with_blendmode<F: FnOnce()>(&self, blend_mode: BlendMode, f: F) {
+    fn with_blendmode<F: FnOnce()>(&self, layer_blend_mode: LayerBlendMode, f: F) {
         let canvas = self.canvas;
-        if blend_mode != BlendMode::Normal {
+
+        // let mut paint = SkPaint::default();
+        // paint.set_blend_mode(blend_mode.into());
+        // canvas.save_layer(&SaveLayerRec::default().paint(&paint));
+        // f();
+        // canvas.restore();
+
+        if layer_blend_mode != LayerBlendMode::PassThrough {
             let mut paint = SkPaint::default();
+            let blend_mode: BlendMode = layer_blend_mode.into();
             paint.set_blend_mode(blend_mode.into());
             canvas.save_layer(&SaveLayerRec::default().paint(&paint));
             f();

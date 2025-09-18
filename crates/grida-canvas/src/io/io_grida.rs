@@ -365,8 +365,12 @@ pub struct JSONUnknownNodeProperties {
     // blend
     #[serde(rename = "opacity", default = "default_opacity")]
     pub opacity: f32,
-    #[serde(rename = "blendMode", default)]
-    pub blend_mode: BlendMode,
+    #[serde(
+        rename = "blendMode",
+        default,
+        deserialize_with = "de_layer_blend_mode"
+    )]
+    pub blend_mode: LayerBlendMode,
     #[serde(rename = "zIndex", default = "default_z_index")]
     pub z_index: i32,
     // css
@@ -1420,6 +1424,29 @@ fn merge_effects(
     effects
 }
 
+// Custom deserializer for layer blend mode strings used by JSON input
+fn de_layer_blend_mode<'de, D>(deserializer: D) -> Result<LayerBlendMode, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // Accept either missing/null (default) or string values
+    let val: Option<String> = Option::deserialize(deserializer)?;
+    let Some(s) = val else {
+        return Ok(LayerBlendMode::default());
+    };
+
+    if s == "pass-through" {
+        return Ok(LayerBlendMode::PassThrough);
+    }
+
+    // Delegate to BlendMode for other strings like "normal", "multiply", ...
+    match serde_json::from_str::<BlendMode>(&format!("\"{}\"", s)) {
+        Ok(bm) => Ok(LayerBlendMode::from(bm)),
+        // Fallback: any unknown/invalid string becomes PassThrough
+        Err(_) => Ok(LayerBlendMode::PassThrough),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1902,5 +1929,94 @@ mod tests {
         }]);
         let result = merge_paints(paint, paints);
         assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn deserialize_layer_blend_mode_pass_through() {
+        let json = r#"{
+            "id": "rect-pt",
+            "name": "PassThrough Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "blendMode": "pass-through"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize rectangle with pass-through blend mode");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.blend_mode, LayerBlendMode::PassThrough));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_blend_mode_normal() {
+        let json = r#"{
+            "id": "rect-normal",
+            "name": "Normal Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "blendMode": "normal"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize rectangle with normal blend mode");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(
+                    rect.base.blend_mode,
+                    LayerBlendMode::Blend(BlendMode::Normal)
+                ));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_paint_blend_mode_normal() {
+        let json = r#"{
+            "type": "solid",
+            "blendMode": "normal"
+        }"#;
+
+        let paint: JSONPaint =
+            serde_json::from_str(json).expect("failed to deserialize paint with normal blend mode");
+        match paint {
+            JSONPaint::Solid { blend_mode, .. } => {
+                assert!(matches!(blend_mode, BlendMode::Normal));
+            }
+            _ => panic!("Expected Solid paint"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_blend_mode_invalid_falls_back_to_pass_through() {
+        let json = r#"{
+            "id": "rect-invalid",
+            "name": "Invalid Blend Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "blendMode": "definitely-not-a-valid-mode"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("deserializing with invalid blendMode should not error");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.blend_mode, LayerBlendMode::PassThrough));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
     }
 }

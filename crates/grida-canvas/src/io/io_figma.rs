@@ -706,7 +706,7 @@ impl FigmaConverter {
             id: section.id.clone(),
             name: Some(format!("[Section] {}", section.name)),
             active: section.visible.unwrap_or(true),
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::PassThrough,
             transform: Self::convert_transform(section.relative_transform.as_ref()),
             size: Self::convert_size(section.size.as_ref()),
             corner_radius: RectangularCornerRadius::zero(),
@@ -847,27 +847,37 @@ impl FigmaConverter {
     }
 
     /// Convert Figma's blend mode to our BlendMode
-    fn convert_blend_mode(blend_mode: figma_api::models::BlendMode) -> BlendMode {
+    fn convert_blend_mode(blend_mode: figma_api::models::BlendMode) -> LayerBlendMode {
         match blend_mode {
-            figma_api::models::BlendMode::Normal => BlendMode::Normal,
-            figma_api::models::BlendMode::Multiply => BlendMode::Multiply,
-            figma_api::models::BlendMode::Screen => BlendMode::Screen,
-            figma_api::models::BlendMode::Overlay => BlendMode::Overlay,
-            figma_api::models::BlendMode::Darken => BlendMode::Darken,
-            figma_api::models::BlendMode::Lighten => BlendMode::Lighten,
-            figma_api::models::BlendMode::ColorDodge => BlendMode::ColorDodge,
-            figma_api::models::BlendMode::ColorBurn => BlendMode::ColorBurn,
-            figma_api::models::BlendMode::HardLight => BlendMode::HardLight,
-            figma_api::models::BlendMode::SoftLight => BlendMode::SoftLight,
-            figma_api::models::BlendMode::Difference => BlendMode::Difference,
-            figma_api::models::BlendMode::Exclusion => BlendMode::Exclusion,
-            figma_api::models::BlendMode::Hue => BlendMode::Hue,
-            figma_api::models::BlendMode::Saturation => BlendMode::Saturation,
-            figma_api::models::BlendMode::Color => BlendMode::Color,
-            figma_api::models::BlendMode::Luminosity => BlendMode::Luminosity,
-            figma_api::models::BlendMode::PassThrough => BlendMode::Normal,
-            figma_api::models::BlendMode::LinearBurn => BlendMode::ColorBurn,
-            figma_api::models::BlendMode::LinearDodge => BlendMode::ColorDodge,
+            figma_api::models::BlendMode::PassThrough => LayerBlendMode::PassThrough,
+            figma_api::models::BlendMode::Normal => LayerBlendMode::Blend(BlendMode::Normal),
+            figma_api::models::BlendMode::Multiply => LayerBlendMode::Blend(BlendMode::Multiply),
+            figma_api::models::BlendMode::Screen => LayerBlendMode::Blend(BlendMode::Screen),
+            figma_api::models::BlendMode::Overlay => LayerBlendMode::Blend(BlendMode::Overlay),
+            figma_api::models::BlendMode::Darken => LayerBlendMode::Blend(BlendMode::Darken),
+            figma_api::models::BlendMode::Lighten => LayerBlendMode::Blend(BlendMode::Lighten),
+            figma_api::models::BlendMode::ColorDodge => {
+                LayerBlendMode::Blend(BlendMode::ColorDodge)
+            }
+            figma_api::models::BlendMode::ColorBurn => LayerBlendMode::Blend(BlendMode::ColorBurn),
+            figma_api::models::BlendMode::HardLight => LayerBlendMode::Blend(BlendMode::HardLight),
+            figma_api::models::BlendMode::SoftLight => LayerBlendMode::Blend(BlendMode::SoftLight),
+            figma_api::models::BlendMode::Difference => {
+                LayerBlendMode::Blend(BlendMode::Difference)
+            }
+            figma_api::models::BlendMode::Exclusion => LayerBlendMode::Blend(BlendMode::Exclusion),
+            figma_api::models::BlendMode::Hue => LayerBlendMode::Blend(BlendMode::Hue),
+            figma_api::models::BlendMode::Saturation => {
+                LayerBlendMode::Blend(BlendMode::Saturation)
+            }
+            figma_api::models::BlendMode::Color => LayerBlendMode::Blend(BlendMode::Color),
+            figma_api::models::BlendMode::Luminosity => {
+                LayerBlendMode::Blend(BlendMode::Luminosity)
+            }
+            figma_api::models::BlendMode::LinearBurn => LayerBlendMode::Blend(BlendMode::ColorBurn),
+            figma_api::models::BlendMode::LinearDodge => {
+                LayerBlendMode::Blend(BlendMode::ColorDodge)
+            }
         }
     }
 

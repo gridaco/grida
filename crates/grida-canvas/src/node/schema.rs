@@ -100,7 +100,7 @@ pub struct UnknownNodeProperties {
     pub transform: AffineTransform,
     pub children: Option<Vec<NodeId>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
 
     pub size: Option<Size>,
     pub point_count: Option<usize>,
@@ -387,7 +387,7 @@ pub struct GroupNodeRec {
     pub transform: Option<AffineTransform>,
     pub children: Vec<NodeId>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -405,7 +405,7 @@ pub struct ContainerNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
     /// Content-only clipping switch.
     ///
@@ -504,7 +504,7 @@ pub struct RectangleNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 }
 
@@ -587,7 +587,7 @@ pub struct LineNodeRec {
     pub _data_stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 }
 
@@ -623,7 +623,7 @@ pub struct ImageNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
     pub image: ResourceRef,
 }
@@ -706,7 +706,7 @@ pub struct EllipseNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 
     /// inner radius - 0 ~ 1
@@ -824,7 +824,7 @@ pub struct BooleanPathOperationNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 }
 
@@ -870,7 +870,7 @@ pub struct VectorNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 }
 
@@ -935,7 +935,7 @@ pub struct SVGPathNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 }
 
@@ -1006,7 +1006,7 @@ pub struct PolygonNodeRec {
 
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 }
 
@@ -1106,7 +1106,7 @@ pub struct RegularPolygonNodeRec {
     pub stroke_dash_array: Option<Vec<f32>>,
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 }
 
@@ -1231,7 +1231,7 @@ pub struct RegularStarPolygonNodeRec {
     pub stroke_align: StrokeAlign,
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
     pub stroke_dash_array: Option<Vec<f32>>,
 }
@@ -1454,7 +1454,7 @@ pub struct TextSpanNodeRec {
     pub stroke_align: StrokeAlign,
     /// Overall node opacity.
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 }
 
@@ -1488,7 +1488,7 @@ pub struct TextNodeRec {
     /// Only `Center` alignment is honored for now.
     pub stroke_align: StrokeAlign,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
 }
 
 // endregion

@@ -38,6 +38,9 @@ pub fn sk_paint_stack(
     //   so each subsequent paint is composited on top of the previous result.
     let mut iter = paints.iter();
     let first = iter.next()?;
+    // Track the base (bottom-most) paint's blend mode so it can apply
+    // against the canvas backdrop when the composed paint is drawn.
+    let base_blend_mode = first.blend_mode();
     let mut shader = shader_from_paint(first, size, Some(images))?;
     for p in iter {
         if let Some(s) = shader_from_paint(p, size, Some(images)) {
@@ -48,6 +51,9 @@ pub fn sk_paint_stack(
     let mut paint = skia_safe::Paint::default();
     paint.set_anti_alias(true);
     paint.set_shader(shader);
+    // Apply the base paint's blend mode at the paint level so the first
+    // fill can blend with the canvas/background, matching editor semantics.
+    paint.set_blend_mode(base_blend_mode.into());
     // Don't set blend mode - defaults to SrcOver, and blending is already handled in shader composition
     Some(paint)
 }
@@ -70,6 +76,7 @@ pub fn sk_paint_stack_without_images(
     // Same ordering rules as `sk_paint_stack` (bottom → top).
     let mut iter = paints.iter();
     let first = iter.next()?;
+    let base_blend_mode = first.blend_mode();
     let mut shader = shader_from_paint(first, size, None)?;
     for p in iter {
         if let Some(s) = shader_from_paint(p, size, None) {
@@ -80,6 +87,10 @@ pub fn sk_paint_stack_without_images(
     let mut paint = skia_safe::Paint::default();
     paint.set_anti_alias(true);
     paint.set_shader(shader);
+    // Apply the base paint's blend mode at the paint level so the first
+    // fill can blend with the canvas/background, matching editor semantics.
+    paint.set_blend_mode(base_blend_mode.into());
+
     // Don't set blend mode - defaults to SrcOver, and blending is already handled in shader composition
     Some(paint)
 }

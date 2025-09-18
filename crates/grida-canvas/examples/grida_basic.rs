@@ -54,7 +54,7 @@ async fn demo_basic() -> Scene {
     // Create a test ellipse node with radial gradient and a visible stroke
     let mut ellipse_node = nf.create_ellipse_node();
     ellipse_node.name = Some("Test Ellipse".to_string());
-    ellipse_node.blend_mode = BlendMode::Multiply;
+    ellipse_node.blend_mode = BlendMode::Multiply.into();
     ellipse_node.transform = AffineTransform::new(550.0, 50.0, 0.0);
     ellipse_node.size = Size {
         width: 200.0,
@@ -94,7 +94,7 @@ async fn demo_basic() -> Scene {
 
     let mut polygon_node = nf.create_polygon_node();
     polygon_node.name = Some("Test Polygon".to_string());
-    polygon_node.blend_mode = BlendMode::Screen;
+    polygon_node.blend_mode = BlendMode::Screen.into();
     polygon_node.transform = AffineTransform::new(600.0, 50.0, 0.0);
     polygon_node.points = pentagon_points;
     polygon_node.fills = Paints::new([Paint::from(CGColor(255, 200, 0, 255))]);
@@ -104,7 +104,7 @@ async fn demo_basic() -> Scene {
     // Create a test regular polygon node (hexagon)
     let mut regular_polygon_node = nf.create_regular_polygon_node();
     regular_polygon_node.name = Some("Test Regular Polygon".to_string());
-    regular_polygon_node.blend_mode = BlendMode::Overlay;
+    regular_polygon_node.blend_mode = BlendMode::Overlay.into();
     regular_polygon_node.transform = AffineTransform::new(50.0, 300.0, 0.0);
     regular_polygon_node.size = Size {
         width: 200.0,

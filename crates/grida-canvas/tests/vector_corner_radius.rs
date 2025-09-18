@@ -1,4 +1,4 @@
-use cg::cg::types::{BlendMode, FillRule, Paints, StrokeAlign};
+use cg::cg::types::*;
 use cg::node::schema::{LayerEffects, VectorNodeRec};
 use cg::vectornetwork::{
     VectorNetwork, VectorNetworkLoop, VectorNetworkRegion, VectorNetworkSegment,
@@ -60,7 +60,7 @@ fn make_node(corner_radius: f32) -> VectorNodeRec {
         stroke_align: StrokeAlign::Inside,
         stroke_dash_array: None,
         opacity: 1.0,
-        blend_mode: BlendMode::Normal,
+        blend_mode: LayerBlendMode::default(),
         effects: LayerEffects::default(),
     }
 }

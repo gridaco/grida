@@ -65,7 +65,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
         }
     }
@@ -87,7 +87,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
             corner_radius: None,
         }
@@ -109,7 +109,7 @@ impl NodeFactory {
             _data_stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
         }
     }
@@ -134,7 +134,7 @@ impl NodeFactory {
             stroke_width: 0.0,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
         }
     }
@@ -148,7 +148,7 @@ impl NodeFactory {
             transform: None,
             children: Vec::new(),
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
         }
     }
 
@@ -168,7 +168,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
             clip: true,
         }
@@ -188,7 +188,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
         }
     }
@@ -209,7 +209,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
         }
     }
@@ -230,7 +230,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
         }
     }
@@ -249,7 +249,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
         }
     }
@@ -269,7 +269,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
             image: ResourceRef::RID(String::new()),
         }
