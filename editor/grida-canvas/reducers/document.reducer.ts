@@ -1564,6 +1564,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "surface/pixel-grid":
     case "surface/content-edit-mode/try-enter":
     case "surface/content-edit-mode/paint/gradient":
+    case "surface/content-edit-mode/paint/image":
     case "surface/content-edit-mode/try-exit":
     case "surface/tool":
     case "surface/brush":

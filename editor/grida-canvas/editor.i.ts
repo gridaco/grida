@@ -948,7 +948,8 @@ export namespace editor.state {
     | VariableWidthContentEditMode
     | VectorContentEditMode
     | BitmapContentEditMode
-    | PaintGradientContentEditMode;
+    | PaintGradientContentEditMode
+    | PaintImageContentEditMode;
 
   type TextContentEditMode = {
     type: "text";
@@ -1147,8 +1148,22 @@ export namespace editor.state {
      * Will be clamped to valid range [0, stops.length-1].
      *
      * @default 0
-     */
+    */
     selected_stop: number;
+  };
+
+  /**
+   * Content edit mode for manipulating image paints via the surface editor.
+   */
+  export type PaintImageContentEditMode = {
+    /** The content edit mode type identifier. */
+    type: "paint/image";
+    /** The ID of the node whose paint is being edited. */
+    node_id: string;
+    /** Whether the targeted paint is a fill or stroke. */
+    paint_target: "fill" | "stroke";
+    /** Index of the targeted paint within the fill/stroke array. */
+    paint_index: number;
   };
 
   /**
@@ -2472,7 +2487,7 @@ export namespace editor.api {
     tryEnterContentEditMode(): void;
     tryEnterContentEditMode(
       node_id?: string,
-      mode?: "auto" | "paint/gradient",
+      mode?: "auto" | "paint/gradient" | "paint/image",
       options?: {
         paintIndex?: number;
         paintTarget?: "fill" | "stroke";

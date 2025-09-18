@@ -742,6 +742,7 @@ export type SurfaceAction =
   | EditorSurface_ChangeBrushOpacityAction
   | EditorSurface_EnterContentEditMode
   | EditorSurface_EnterPaintGradientContentEditMode
+  | EditorSurface_EnterPaintImageContentEditMode
   | EditorSurface_ExitContentEditMode
   //
   | EditorSurface_CursorMode
@@ -788,6 +789,13 @@ export type EditorSurface_EnterContentEditMode = {
 export type EditorSurface_EnterPaintGradientContentEditMode = {
   node_id: string;
   type: "surface/content-edit-mode/paint/gradient";
+  paint_target?: "fill" | "stroke";
+  paint_index?: number;
+};
+
+export type EditorSurface_EnterPaintImageContentEditMode = {
+  node_id: string;
+  type: "surface/content-edit-mode/paint/image";
   paint_target?: "fill" | "stroke";
   paint_index?: number;
 };

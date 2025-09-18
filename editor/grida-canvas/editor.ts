@@ -745,7 +745,7 @@ export class Editor
    */
   tryEnterContentEditMode(
     node_id?: string,
-    mode: "auto" | "paint/gradient" = "auto",
+    mode: "auto" | "paint/gradient" | "paint/image" = "auto",
     options?: {
       paintIndex?: number;
       paintTarget?: "fill" | "stroke";
@@ -763,12 +763,23 @@ export class Editor
           const paintIndex = options?.paintIndex ?? 0;
           return this.dispatch({
             type: "surface/content-edit-mode/paint/gradient",
-            node_id: node_id ?? this.state.selection[0],
+            node_id: node_id,
             paint_target: paintTarget,
             paint_index: paintIndex,
           });
         } else {
           // no-op
+        }
+      case "paint/image":
+        if (node_id) {
+          const paintTarget = options?.paintTarget ?? "fill";
+          const paintIndex = options?.paintIndex ?? 0;
+          return this.dispatch({
+            type: "surface/content-edit-mode/paint/image",
+            node_id: node_id,
+            paint_target: paintTarget,
+            paint_index: paintIndex,
+          });
         }
     }
   }
@@ -844,6 +855,10 @@ export class Editor
           if (state.tool.type !== "cursor") {
             steps.push("escape-tool");
           }
+          break;
+        }
+        case "paint/gradient":
+        case "paint/image": {
           break;
         }
       }
