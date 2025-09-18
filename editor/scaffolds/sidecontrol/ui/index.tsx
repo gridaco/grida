@@ -129,6 +129,7 @@ export type EnumItem<T extends string> =
       value: T;
       disabled?: boolean;
       title?: string;
+      group?: string;
     };
 
 export function enumLabel<T extends string>(e: EnumItem<T>) {
