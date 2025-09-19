@@ -529,11 +529,15 @@ function SidebarRight({
   const should_show_artboards_list = useArtboardListCondition();
 
   return (
-    <aside id="sidebar-right" className="relative">
+    <aside
+      data-variant={variant}
+      id="sidebar-right"
+      className="relative data-[variant=floating]:absolute"
+    >
       <Sidebar
         side="right"
         variant={variant}
-        className="hidden sm:block group-data-[variant=floating]:pt-8 group-data-[variant=floating]:pb-4 group-data-[variant=floating]:pl-0 group-data-[variant=floating]:pr-4"
+        className="group-data-[variant=floating]:pt-8 group-data-[variant=floating]:pb-4 group-data-[variant=floating]:pl-0 group-data-[variant=floating]:pr-4"
       >
         <SidebarHeader className="p-0">
           <header className="flex h-11 px-2 justify-between items-center gap-2">
