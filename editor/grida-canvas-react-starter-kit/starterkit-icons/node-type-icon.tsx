@@ -15,7 +15,7 @@ import {
   VideoIcon,
   GlobeIcon,
   GroupIcon,
-  MaskOnIcon,
+  Half2Icon,
 } from "@radix-ui/react-icons";
 import { SquaresUniteIcon } from "lucide-react";
 
@@ -27,7 +27,7 @@ export function NodeTypeIcon({
   className?: string;
 }) {
   if ("mask" in node) {
-    return <MaskOnIcon className={className} />;
+    return <Half2Icon className={className} />;
   }
 
   switch (node.type) {

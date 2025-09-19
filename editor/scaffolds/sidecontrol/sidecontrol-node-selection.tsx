@@ -165,6 +165,7 @@ function Header() {
       <div className="p-2 w-full flex items-center justify-end gap-2">
         <MaskControl
           disabled={!has_selection || !supports_masking}
+          // active={...}
           onClick={() => {
             editor.groupMask(selection);
           }}
