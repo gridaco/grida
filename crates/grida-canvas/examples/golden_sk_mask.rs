@@ -1,6 +1,7 @@
 use cg::cg::types::*;
-use skia_safe::color_filters;
-use skia_safe::{surfaces, BlendMode, Color, Paint, Path, Point, Rect, Shader, TileMode};
+use skia_safe::{
+    luma_color_filter, surfaces, BlendMode, Color, Paint, Path, Point, Rect, Shader, TileMode,
+};
 
 fn draw_demo_content(canvas: &skia_safe::Canvas, area: Rect) {
     // Draw colorful content to visualize masking results
@@ -135,18 +136,8 @@ fn draw_luminance_mask(canvas: &skia_safe::Canvas, area: Rect) {
     )
     .unwrap();
 
-    // Color matrix to map luminance to alpha, zeroing RGB
-    const LUMA_R: f32 = 0.2126;
-    const LUMA_G: f32 = 0.7152;
-    const LUMA_B: f32 = 0.0722;
-    #[rustfmt::skip]
-    let matrix = skia_safe::ColorMatrix::new(
-        0.0, 0.0, 0.0, 0.0, 0.0, // R'
-        0.0, 0.0, 0.0, 0.0, 0.0, // G'
-        0.0, 0.0, 0.0, 0.0, 0.0, // B'
-        LUMA_R, LUMA_G, LUMA_B, 0.0, 0.0, // A' = dot(rgb, luma)
-    );
-    let cf = color_filters::matrix(&matrix, None);
+    // Built-in luma color filter to convert luminance to alpha
+    let cf = luma_color_filter::new();
 
     // Draw mask rectangle: shader provides RGB, color filter moves luminance into alpha, DstIn applies mask
     let mut mask_paint = Paint::default();
