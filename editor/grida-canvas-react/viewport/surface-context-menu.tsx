@@ -67,6 +67,7 @@ function ContextMenuContent() {
       <ActionItem action={actions.sendToBack} />
       <ContextMenuSeparator />
       <ActionItem action={actions.flatten} />
+      <ActionItem action={actions.groupMask} />
       <ContextMenuSub>
         <ContextMenuSubTrigger className="text-xs">
           Edit Vector...

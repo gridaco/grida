@@ -18,8 +18,6 @@ import {
   CornerRadiusControl,
 } from "./controls/corner-radius";
 import { BorderControl } from "./controls/border";
-import { FillControl } from "./controls/fill";
-import { StringValueControl } from "./controls/string-value";
 import { PaddingControl } from "./controls/padding";
 import { GapControl } from "./controls/gap";
 import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
@@ -57,7 +55,6 @@ import {
   Crosshair2Icon,
   LockClosedIcon,
   LockOpen1Icon,
-  MinusIcon,
   MixerVerticalIcon,
   PlusIcon,
 } from "@radix-ui/react-icons";
@@ -95,7 +92,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 import { dq } from "@/grida-canvas/query";
-import { StrokeAlignControl } from "./controls/stroke-align";
 import { TextDetails } from "./controls/widgets/text-details";
 import cg from "@grida/cg";
 import { FeControl } from "./controls/fe";
@@ -117,6 +113,7 @@ import {
   useCurrentFontFamily,
 } from "./controls/context/font";
 import { PropertyLineLabelWithNumberGesture } from "./ui/label-with-number-gesture";
+import { MaskTypeControl } from "./controls/mask-type";
 
 function FontStyleControlScaffold({ selection }: { selection: string[] }) {
   const editor = useCurrentEditor();
@@ -155,31 +152,30 @@ function Align() {
   );
 }
 
-function BooleanOperations() {
+function Header() {
   const editor = useCurrentEditor();
   const { selection } = useSelectionState();
   const backend = useBackendState();
   const has_selection = selection.length >= 1;
+  const supports_masking = backend === "canvas";
   const supports_boolean = backend === "canvas";
 
   return (
-    <SidebarSection className="mt-2 flex justify-center">
-      <OpsControl
-        disabled={!has_selection || !supports_boolean}
-        onOp={(op) => {
-          editor.op(selection, op);
-        }}
-      />
-    </SidebarSection>
-  );
-}
-
-function Header() {
-  return (
     <>
-      <div className="w-full flex items-center justify-end gap-1">
-        <MaskControl disabled />
-        <BooleanOperations />
+      <div className="p-2 w-full flex items-center justify-end gap-2">
+        <MaskControl
+          disabled={!has_selection || !supports_masking}
+          onClick={() => {
+            editor.groupMask(selection);
+          }}
+        />
+        <OpsControl
+          disabled={!has_selection || !supports_boolean}
+          onOp={(op) => {
+            editor.op(selection, op);
+          }}
+          className="flex justify-center"
+        />
       </div>
       <hr />
     </>
@@ -938,6 +934,8 @@ function ModeNodeProperties({
         <SectionProps node_id={node_id} />
       )}
 
+      <SectionMask node_id={node_id} />
+
       <SidebarSection hidden={!is_stylable} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
@@ -1042,6 +1040,7 @@ function ModeNodeProperties({
           )}
         </SidebarMenuSectionContent>
       </SidebarSection>
+
       {config.text === "on" && is_text && <SectionText node_id={node_id} />}
       <SidebarSection
         hidden={config.image === "off" || !is_image}
@@ -1583,6 +1582,26 @@ function SectionProps({ node_id }: { node_id: string }) {
           <p className="text-xs text-muted-foreground">No properties defined</p>
         </SidebarMenuSectionContent>
       )}
+    </SidebarSection>
+  );
+}
+
+function SectionMask({ node_id }: { node_id: string }) {
+  const actions = useNodeActions(node_id)!;
+  const { mask } = useNodeState(node_id, (node) => ({
+    mask: node.mask,
+  }));
+
+  if (!mask) return null;
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Mask</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <MaskTypeControl value={mask} onValueChange={actions.maskType} />
+      </SidebarMenuSectionContent>
     </SidebarSection>
   );
 }

@@ -176,6 +176,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeNodeOpacity(node_id, change),
       blendMode: (value: cg.LayerBlendMode) =>
         instance.changeNodeBlendMode(node_id, value),
+      maskType: (value: cg.LayerMaskType) =>
+        instance.changeNodeMaskType(node_id, value),
       rotation: (change: editor.api.NumberChange) =>
         instance.changeNodeRotation(node_id, change),
       width: (value: grida.program.css.LengthPercentage | "auto") =>

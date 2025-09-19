@@ -259,6 +259,12 @@ const safe_properties: Partial<
       (draft as UN).blendMode = value;
     },
   }),
+  mask: defineNodeProperty<"mask">({
+    assert: (node) => typeof node.mask === "string",
+    apply: (draft, value, prev) => {
+      (draft as UN).mask = value;
+    },
+  }),
   fill: defineNodeProperty<"fill">({
     assert: (node) =>
       node.type === "svgpath" ||

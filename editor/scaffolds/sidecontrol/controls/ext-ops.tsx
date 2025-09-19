@@ -18,14 +18,19 @@ import {
 export function OpsControl({
   disabled,
   onOp,
+  className,
 }: {
   disabled?: boolean;
   onOp?: (op: cg.BooleanOperation) => void;
+  className?: string;
 }) {
   return (
     <div
       aria-disabled={disabled}
-      className={cn("group/ops flex items-center justify-center gap-0")}
+      className={cn(
+        "group/ops flex items-center justify-center gap-0",
+        className
+      )}
     >
       <button
         disabled={disabled}

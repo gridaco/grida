@@ -2540,6 +2540,7 @@ export namespace editor.api {
     subtract(target: ReadonlyArray<NodeID>): void;
     intersect(target: ReadonlyArray<NodeID>): void;
     exclude(target: ReadonlyArray<NodeID>): void;
+    groupMask(target: ReadonlyArray<NodeID>): void;
 
     setClipboardColor(color: cg.RGBA8888): void;
 

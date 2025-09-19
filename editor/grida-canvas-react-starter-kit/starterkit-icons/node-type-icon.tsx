@@ -15,6 +15,7 @@ import {
   VideoIcon,
   GlobeIcon,
   GroupIcon,
+  MaskOnIcon,
 } from "@radix-ui/react-icons";
 import { SquaresUniteIcon } from "lucide-react";
 
@@ -25,6 +26,10 @@ export function NodeTypeIcon({
   node: grida.program.nodes.Node;
   className?: string;
 }) {
+  if ("mask" in node) {
+    return <MaskOnIcon className={className} />;
+  }
+
   switch (node.type) {
     case "iframe":
       return <GlobeIcon className={className} />;

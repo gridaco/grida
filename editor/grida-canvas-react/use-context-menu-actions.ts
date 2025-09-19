@@ -23,6 +23,7 @@ type ContextMenuActionType =
   | "autoLayout"
   | "flatten"
   | "planarize"
+  | "groupMask"
   | "toggleActive"
   | "zoomToFit"
   | "toggleLocked"
@@ -160,6 +161,11 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Planarize",
         disabled: !canPlanarize,
         onSelect: () => editor.planarize(ids),
+      },
+      groupMask: {
+        label: "Use as Mask",
+        disabled: true,
+        onSelect: () => editor.groupMask(ids),
       },
       toggleActive: {
         label: "Set Active/Inactive",

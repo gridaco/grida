@@ -1038,6 +1038,14 @@ export class Editor
     });
   }
 
+  public groupMask(target: ReadonlyArray<editor.NodeID>) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: target[0],
+      mask: "alpha",
+    });
+  }
+
   public setClipboardColor(color: cg.RGBA8888) {
     this.dispatch({
       type: "clip/color",
@@ -1940,6 +1948,13 @@ export class Editor
       type: "node/change/*",
       node_id: node_id,
       blendMode,
+    });
+  }
+  changeNodeMaskType(node_id: string, mask: cg.LayerMaskType) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      mask,
     });
   }
   changeNodeRotation(node_id: string, rotation: editor.api.NumberChange) {

@@ -293,6 +293,7 @@ function NodeHierarchyItemContextMenuWrapper({
           }}
         />
         <ActionItem action={actions.flatten} />
+        <ActionItem action={actions.groupMask} />
         <ContextMenuSeparator />
         <ActionItem action={actions.bringToFront} />
         <ActionItem action={actions.sendToBack} />
