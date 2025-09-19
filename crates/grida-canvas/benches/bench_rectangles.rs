@@ -21,7 +21,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             active: true,
             opacity: 1.0,
             blend_mode: LayerBlendMode::default(),
-            mask_type: LayerMaskType::default(),
+            mask: None,
             transform: AffineTransform::identity(),
             size: Size {
                 width: 100.0,
@@ -58,7 +58,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         children: ids.clone(),
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),
-        mask_type: LayerMaskType::default(),
+        mask: None,
     };
 
     repository.insert(Node::Group(root_group));

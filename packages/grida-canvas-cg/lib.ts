@@ -123,6 +123,9 @@ export namespace cg {
     a: number;
   };
 
+  export type LayerMaskType = "geometry" | ImageMaskType;
+  export type ImageMaskType = "alpha" | "luminance";
+
   /**
    * only applicable to layers, not paints.
    * if this is used for non supported, it will fallback to "normal".

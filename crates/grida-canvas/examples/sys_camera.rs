@@ -54,7 +54,7 @@ fn create_static_scene() -> Scene {
         children: ids,
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),
-        mask_type: LayerMaskType::default(),
+        mask: None,
     };
 
     repository.insert(Node::Group(root_group));

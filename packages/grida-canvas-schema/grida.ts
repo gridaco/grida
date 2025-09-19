@@ -1063,6 +1063,13 @@ export namespace grida.program.nodes {
       blendMode?: cg.LayerBlendMode;
     }
 
+    export interface ILayerMaskType {
+      /**
+       * @default undefined
+       */
+      mask?: cg.LayerMaskType | null | undefined;
+    }
+
     export interface IZIndex {
       /**
        * z-index of the node.
@@ -1317,6 +1324,7 @@ export namespace grida.program.nodes {
       extends IStylable<css.ExplicitlySupportedCSSProperties>,
         IOpacity,
         ILayerBlendMode,
+        ILayerMaskType,
         IRotation,
         IZIndex,
         IPositioning,
@@ -1814,6 +1822,7 @@ export namespace grida.program.nodes {
       i.IFixedDimension,
       i.IOpacity,
       i.ILayerBlendMode,
+      i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
@@ -1847,6 +1856,7 @@ export namespace grida.program.nodes {
       i.IFixedDimension,
       i.IOpacity,
       i.ILayerBlendMode,
+      i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1882,6 +1892,7 @@ export namespace grida.program.nodes {
       i.IFixedDimension,
       i.IOpacity,
       i.ILayerBlendMode,
+      i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
       i.ICornerRadius,
@@ -1926,6 +1937,7 @@ export namespace grida.program.nodes {
       i.IFixedDimension,
       i.IOpacity,
       i.ILayerBlendMode,
+      i.ILayerMaskType,
       i.IZIndex,
       i.IRotation {
     readonly type: "line";
@@ -1997,6 +2009,7 @@ export namespace grida.program.nodes {
       i.IEllipseArcData,
       i.IOpacity,
       i.ILayerBlendMode,
+      i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,

@@ -1,4 +1,4 @@
-use cg::cg::types::LayerMaskType;
+use cg::cg::types::*;
 use skia_safe::color_filters;
 use skia_safe::{surfaces, BlendMode, Color, Paint, Path, Point, Rect, Shader, TileMode};
 
@@ -159,20 +159,25 @@ fn draw_luminance_mask(canvas: &skia_safe::Canvas, area: Rect) {
     canvas.restore();
 }
 
-fn draw_panel(canvas: &skia_safe::Canvas, origin: Point, size: (f32, f32), kind: LayerMaskType) {
+fn draw_panel(
+    canvas: &skia_safe::Canvas,
+    origin: Point,
+    size: (f32, f32),
+    kind: Option<LayerMaskType>,
+) {
     let area = Rect::from_xywh(origin.x, origin.y, size.0, size.1);
     match kind {
-        LayerMaskType::None => {
-            draw_demo_content(canvas, area);
-        }
-        LayerMaskType::Geometry => {
+        Some(LayerMaskType::Geometry) => {
             draw_geometry_mask(canvas, area);
         }
-        LayerMaskType::Alpha => {
+        Some(LayerMaskType::Image(ImageMaskType::Alpha)) => {
             draw_alpha_mask(canvas, area);
         }
-        LayerMaskType::Luminance => {
+        Some(LayerMaskType::Image(ImageMaskType::Luminance)) => {
             draw_luminance_mask(canvas, area);
+        }
+        None => {
+            draw_demo_content(canvas, area);
         }
     }
 
@@ -200,11 +205,11 @@ fn main() {
     let top = 20.0;
     let mut left = 20.0;
 
-    let kinds = [
-        LayerMaskType::None,
-        LayerMaskType::Geometry,
-        LayerMaskType::Alpha,
-        LayerMaskType::Luminance,
+    let kinds: Vec<Option<LayerMaskType>> = vec![
+        None,
+        Some(LayerMaskType::Geometry),
+        Some(LayerMaskType::Image(ImageMaskType::Alpha)),
+        Some(LayerMaskType::Image(ImageMaskType::Luminance)),
     ];
 
     for kind in kinds.iter() {

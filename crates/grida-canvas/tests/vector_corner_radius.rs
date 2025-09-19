@@ -52,7 +52,7 @@ fn make_node(corner_radius: f32) -> VectorNodeRec {
         active: true,
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),
-        mask_type: LayerMaskType::default(),
+        mask: None,
         effects: LayerEffects::default(),
         transform: AffineTransform::identity(),
         network: make_square_network(),

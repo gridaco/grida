@@ -365,12 +365,10 @@ pub struct JSONUnknownNodeProperties {
     // blend
     #[serde(rename = "opacity", default = "default_opacity")]
     pub opacity: f32,
-    #[serde(
-        rename = "blendMode",
-        default,
-        deserialize_with = "de_layer_blend_mode"
-    )]
-    pub blend_mode: LayerBlendMode,
+    #[serde(rename = "blendMode", default)]
+    pub blend_mode: JSONLayerBlendMode,
+    #[serde(rename = "mask")]
+    pub mask: Option<JSONLayerMaskType>,
     #[serde(rename = "zIndex", default = "default_z_index")]
     pub z_index: i32,
     // css
@@ -781,8 +779,8 @@ impl From<JSONGroupNode> for GroupNodeRec {
             transform: Some(transform),
             children: node.children.unwrap_or_default(),
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            mask_type: LayerMaskType::default(),
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
         }
     }
 }
@@ -816,7 +814,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
+            blend_mode: node.base.blend_mode.into(),
             opacity: node.base.opacity,
             effects: merge_effects(
                 node.base.fe_shadows,
@@ -825,7 +823,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             ),
             children: node.children.unwrap_or_default(),
             clip: true,
-            mask_type: LayerMaskType::default(),
+            mask: node.base.mask.map(|m| m.into()),
         }
     }
 }
@@ -904,9 +902,9 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            blend_mode: node.base.blend_mode,
+            blend_mode: node.base.blend_mode.into(),
             opacity: node.base.opacity,
-            mask_type: LayerMaskType::default(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -931,13 +929,13 @@ impl From<JSONEllipseNode> for Node {
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
-            mask_type: LayerMaskType::default(),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -972,8 +970,8 @@ impl From<JSONRectangleNode> for Node {
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            mask_type: LayerMaskType::default(),
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -1050,13 +1048,13 @@ impl From<JSONImageNode> for Node {
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
-            mask_type: LayerMaskType::default(),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -1094,8 +1092,8 @@ impl From<JSONRegularPolygonNode> for Node {
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            mask_type: LayerMaskType::default(),
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -1132,8 +1130,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            mask_type: LayerMaskType::default(),
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -1172,8 +1170,8 @@ impl From<JSONSVGPathNode> for Node {
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            mask_type: LayerMaskType::default(),
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -1211,8 +1209,8 @@ impl From<JSONLineNode> for Node {
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            mask_type: LayerMaskType::default(),
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -1252,8 +1250,8 @@ impl From<JSONVectorNode> for Node {
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            mask_type: LayerMaskType::default(),
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -1288,8 +1286,8 @@ impl From<JSONBooleanOperationNode> for Node {
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            mask_type: LayerMaskType::default(),
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -1436,26 +1434,93 @@ fn merge_effects(
     effects
 }
 
-// Custom deserializer for layer blend mode strings used by JSON input
-fn de_layer_blend_mode<'de, D>(deserializer: D) -> Result<LayerBlendMode, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    // Accept either missing/null (default) or string values
-    let val: Option<String> = Option::deserialize(deserializer)?;
-    let Some(s) = val else {
-        return Ok(LayerBlendMode::default());
-    };
+/// Flattened JSON representation of LayerBlendMode for easier deserialization
+#[derive(Debug, Deserialize)]
+pub enum JSONLayerBlendMode {
+    #[serde(rename = "pass-through")]
+    PassThrough,
+    #[serde(rename = "normal")]
+    Normal,
+    #[serde(rename = "multiply")]
+    Multiply,
+    #[serde(rename = "screen")]
+    Screen,
+    #[serde(rename = "overlay")]
+    Overlay,
+    #[serde(rename = "darken")]
+    Darken,
+    #[serde(rename = "lighten")]
+    Lighten,
+    #[serde(rename = "color-dodge")]
+    ColorDodge,
+    #[serde(rename = "color-burn")]
+    ColorBurn,
+    #[serde(rename = "hard-light")]
+    HardLight,
+    #[serde(rename = "soft-light")]
+    SoftLight,
+    #[serde(rename = "difference")]
+    Difference,
+    #[serde(rename = "exclusion")]
+    Exclusion,
+    #[serde(rename = "hue")]
+    Hue,
+    #[serde(rename = "saturation")]
+    Saturation,
+    #[serde(rename = "color")]
+    Color,
+    #[serde(rename = "luminosity")]
+    Luminosity,
+}
 
-    if s == "pass-through" {
-        return Ok(LayerBlendMode::PassThrough);
+impl Default for JSONLayerBlendMode {
+    fn default() -> Self {
+        JSONLayerBlendMode::PassThrough
     }
+}
 
-    // Delegate to BlendMode for other strings like "normal", "multiply", ...
-    match serde_json::from_str::<BlendMode>(&format!("\"{}\"", s)) {
-        Ok(bm) => Ok(LayerBlendMode::from(bm)),
-        // Fallback: any unknown/invalid string becomes PassThrough
-        Err(_) => Ok(LayerBlendMode::PassThrough),
+impl Into<LayerBlendMode> for JSONLayerBlendMode {
+    fn into(self) -> LayerBlendMode {
+        match self {
+            JSONLayerBlendMode::PassThrough => LayerBlendMode::PassThrough,
+            JSONLayerBlendMode::Normal => LayerBlendMode::Blend(BlendMode::Normal),
+            JSONLayerBlendMode::Multiply => LayerBlendMode::Blend(BlendMode::Multiply),
+            JSONLayerBlendMode::Screen => LayerBlendMode::Blend(BlendMode::Screen),
+            JSONLayerBlendMode::Overlay => LayerBlendMode::Blend(BlendMode::Overlay),
+            JSONLayerBlendMode::Darken => LayerBlendMode::Blend(BlendMode::Darken),
+            JSONLayerBlendMode::Lighten => LayerBlendMode::Blend(BlendMode::Lighten),
+            JSONLayerBlendMode::ColorDodge => LayerBlendMode::Blend(BlendMode::ColorDodge),
+            JSONLayerBlendMode::ColorBurn => LayerBlendMode::Blend(BlendMode::ColorBurn),
+            JSONLayerBlendMode::HardLight => LayerBlendMode::Blend(BlendMode::HardLight),
+            JSONLayerBlendMode::SoftLight => LayerBlendMode::Blend(BlendMode::SoftLight),
+            JSONLayerBlendMode::Difference => LayerBlendMode::Blend(BlendMode::Difference),
+            JSONLayerBlendMode::Exclusion => LayerBlendMode::Blend(BlendMode::Exclusion),
+            JSONLayerBlendMode::Hue => LayerBlendMode::Blend(BlendMode::Hue),
+            JSONLayerBlendMode::Saturation => LayerBlendMode::Blend(BlendMode::Saturation),
+            JSONLayerBlendMode::Color => LayerBlendMode::Blend(BlendMode::Color),
+            JSONLayerBlendMode::Luminosity => LayerBlendMode::Blend(BlendMode::Luminosity),
+        }
+    }
+}
+
+/// Flattened JSON representation of LayerMaskType for easier deserialization
+#[derive(Debug, Deserialize)]
+pub enum JSONLayerMaskType {
+    #[serde(rename = "geometry")]
+    Geometry,
+    #[serde(rename = "alpha")]
+    Alpha,
+    #[serde(rename = "luminance")]
+    Luminance,
+}
+
+impl Into<LayerMaskType> for JSONLayerMaskType {
+    fn into(self) -> LayerMaskType {
+        match self {
+            JSONLayerMaskType::Geometry => LayerMaskType::Geometry,
+            JSONLayerMaskType::Alpha => LayerMaskType::Image(ImageMaskType::Alpha),
+            JSONLayerMaskType::Luminance => LayerMaskType::Image(ImageMaskType::Luminance),
+        }
     }
 }
 
@@ -1960,7 +2025,10 @@ mod tests {
             .expect("failed to deserialize rectangle with pass-through blend mode");
         match node {
             JSONNode::Rectangle(rect) => {
-                assert!(matches!(rect.base.blend_mode, LayerBlendMode::PassThrough));
+                assert!(matches!(
+                    rect.base.blend_mode,
+                    JSONLayerBlendMode::PassThrough
+                ));
             }
             _ => panic!("Expected Rectangle node"),
         }
@@ -1983,10 +2051,7 @@ mod tests {
             .expect("failed to deserialize rectangle with normal blend mode");
         match node {
             JSONNode::Rectangle(rect) => {
-                assert!(matches!(
-                    rect.base.blend_mode,
-                    LayerBlendMode::Blend(BlendMode::Normal)
-                ));
+                assert!(matches!(rect.base.blend_mode, JSONLayerBlendMode::Normal));
             }
             _ => panic!("Expected Rectangle node"),
         }
@@ -2010,25 +2075,138 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_layer_blend_mode_invalid_falls_back_to_pass_through() {
+    fn deserialize_layer_blend_mode_multiply() {
         let json = r#"{
-            "id": "rect-invalid",
-            "name": "Invalid Blend Rect",
+            "id": "rect-multiply",
+            "name": "Multiply Blend Rect",
             "type": "rectangle",
             "left": 0.0,
             "top": 0.0,
             "width": 100.0,
             "height": 100.0,
-            "blendMode": "definitely-not-a-valid-mode"
+            "blendMode": "multiply"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
-            .expect("deserializing with invalid blendMode should not error");
+            .expect("deserializing with multiply blendMode should not error");
         match node {
             JSONNode::Rectangle(rect) => {
-                assert!(matches!(rect.base.blend_mode, LayerBlendMode::PassThrough));
+                assert!(matches!(rect.base.blend_mode, JSONLayerBlendMode::Multiply));
             }
             _ => panic!("Expected Rectangle node"),
         }
+    }
+
+    #[test]
+    fn deserialize_layer_blend_mode_into_conversion() {
+        // Test the Into conversion
+        let json_blend = JSONLayerBlendMode::PassThrough;
+        let layer_blend: LayerBlendMode = json_blend.into();
+        assert!(matches!(layer_blend, LayerBlendMode::PassThrough));
+
+        let json_blend = JSONLayerBlendMode::Normal;
+        let layer_blend: LayerBlendMode = json_blend.into();
+        assert!(matches!(
+            layer_blend,
+            LayerBlendMode::Blend(BlendMode::Normal)
+        ));
+
+        let json_blend = JSONLayerBlendMode::Multiply;
+        let layer_blend: LayerBlendMode = json_blend.into();
+        assert!(matches!(
+            layer_blend,
+            LayerBlendMode::Blend(BlendMode::Multiply)
+        ));
+    }
+
+    #[test]
+    fn deserialize_layer_mask_type_geometry() {
+        let json = r#"{
+            "id": "rect-geometry-mask",
+            "name": "Geometry Mask Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "mask": "geometry"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("deserializing with geometry mask should not error");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.mask, Some(JSONLayerMaskType::Geometry)));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_mask_type_alpha() {
+        let json = r#"{
+            "id": "rect-alpha-mask",
+            "name": "Alpha Mask Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "mask": "alpha"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("deserializing with alpha mask should not error");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.mask, Some(JSONLayerMaskType::Alpha)));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_mask_type_luminance() {
+        let json = r#"{
+            "id": "rect-luminance-mask",
+            "name": "Luminance Mask Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "mask": "luminance"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("deserializing with luminance mask should not error");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.mask, Some(JSONLayerMaskType::Luminance)));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_mask_type_into_conversion() {
+        // Test the Into conversion
+        let json_mask = JSONLayerMaskType::Geometry;
+        let layer_mask: LayerMaskType = json_mask.into();
+        assert!(matches!(layer_mask, LayerMaskType::Geometry));
+
+        let json_mask = JSONLayerMaskType::Alpha;
+        let layer_mask: LayerMaskType = json_mask.into();
+        assert!(matches!(
+            layer_mask,
+            LayerMaskType::Image(ImageMaskType::Alpha)
+        ));
+
+        let json_mask = JSONLayerMaskType::Luminance;
+        let layer_mask: LayerMaskType = json_mask.into();
+        assert!(matches!(
+            layer_mask,
+            LayerMaskType::Image(ImageMaskType::Luminance)
+        ));
     }
 }

@@ -388,7 +388,7 @@ pub struct GroupNodeRec {
 
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
 
     pub transform: Option<AffineTransform>,
     pub children: Vec<NodeId>,
@@ -402,7 +402,7 @@ pub struct ContainerNodeRec {
 
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
 
     pub transform: AffineTransform,
     pub size: Size,
@@ -506,7 +506,7 @@ pub struct RectangleNodeRec {
 
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
 
     pub transform: AffineTransform,
     pub size: Size,
@@ -594,7 +594,7 @@ pub struct LineNodeRec {
 
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 
     pub transform: AffineTransform,
@@ -630,7 +630,7 @@ pub struct ImageNodeRec {
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
 
     pub transform: AffineTransform,
     pub size: Size,
@@ -719,7 +719,7 @@ pub struct EllipseNodeRec {
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
 
     pub transform: AffineTransform,
     pub size: Size,
@@ -837,7 +837,7 @@ pub struct BooleanPathOperationNodeRec {
 
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 
     pub transform: Option<AffineTransform>,
@@ -882,7 +882,7 @@ pub struct VectorNodeRec {
 
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 
     pub transform: AffineTransform,
@@ -956,7 +956,7 @@ pub struct SVGPathNodeRec {
 
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 
     pub transform: AffineTransform,
@@ -1016,7 +1016,7 @@ pub struct PolygonNodeRec {
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 
     /// 2D affine transform matrix applied to the shape.
@@ -1114,7 +1114,7 @@ pub struct RegularPolygonNodeRec {
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 
     /// Affine transform applied to this node
@@ -1231,7 +1231,7 @@ pub struct RegularStarPolygonNodeRec {
 
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 
     /// Affine transform applied to this node
@@ -1488,7 +1488,7 @@ pub struct TextSpanNodeRec {
     /// Overall node opacity.
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 }
 
@@ -1523,7 +1523,7 @@ pub struct TextNodeRec {
     pub stroke_align: StrokeAlign,
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
-    pub mask_type: LayerMaskType,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 }
 

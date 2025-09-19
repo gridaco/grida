@@ -95,8 +95,8 @@ impl From<CGColor> for SolidPaint {
 /// For more information, see the [MDN documentation on mask-type](https://developer.mozilla.org/en-US/docs/Web/CSS/mask-type).
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum LayerMaskType {
-    #[serde(rename = "none")]
-    None,
+    Image(ImageMaskType),
+
     /// Vector-based masking (clipPath).
     ///
     /// Uses the vector geometry path to define the visible area of the content.
@@ -105,6 +105,16 @@ pub enum LayerMaskType {
     /// it falls inside or outside the defined vector path. This is equivalent to CSS `clip-path`.
     #[serde(rename = "geometry")]
     Geometry,
+}
+
+impl Default for LayerMaskType {
+    fn default() -> Self {
+        LayerMaskType::Image(ImageMaskType::default())
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub enum ImageMaskType {
     /// Alpha channel masking.
     ///
     /// Uses the alpha channel of the mask to determine the opacity of the masked content.
@@ -119,9 +129,9 @@ pub enum LayerMaskType {
     Luminance,
 }
 
-impl Default for LayerMaskType {
+impl Default for ImageMaskType {
     fn default() -> Self {
-        LayerMaskType::None
+        ImageMaskType::Alpha
     }
 }
 
