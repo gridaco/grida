@@ -271,7 +271,7 @@ function ComputedPaintControl({
   };
 
   return (
-    <Popover onOpenChange={onOpenChange}>
+    <Popover modal={false} onOpenChange={onOpenChange}>
       {!value ? (
         <NewPaintTrigger onAddPaint={onAddPaint} />
       ) : (
@@ -307,7 +307,7 @@ function TokenizedPaintControl({
   const identifier = value.color;
 
   return (
-    <Popover onOpenChange={onOpenChange}>
+    <Popover modal={false} onOpenChange={onOpenChange}>
       <PopoverTrigger>
         <PaintInputContainer>
           <PaintChip paint={computed.value as any as ComputedPaint} />

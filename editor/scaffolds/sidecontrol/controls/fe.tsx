@@ -57,7 +57,7 @@ export function FeControl({
 }) {
   const Icon = getIcon(value);
   return (
-    <Popover>
+    <Popover modal={false}>
       <div className="flex items-center w-full gap-2">
         <PopoverTrigger>
           <Icon />

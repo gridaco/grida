@@ -91,7 +91,7 @@ import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
 import { resolveDropInsertionIndex } from "./dnd-index";
 
-const toReversedCopy = <T,>(items?: T[]) => {
+const toReversedCopy = <T,>(items: T[]) => {
   if (!items || items.length <= 1) {
     return items;
   }
@@ -426,9 +426,7 @@ export function NodeHierarchyList() {
           if (parentId === "<root>") {
             return children ?? [];
           }
-          return editor.state.document_ctx.__ctx_nid_to_children_ids[
-            parentId
-          ];
+          return editor.state.document_ctx.__ctx_nid_to_children_ids[parentId];
         },
         inversed: true,
       });

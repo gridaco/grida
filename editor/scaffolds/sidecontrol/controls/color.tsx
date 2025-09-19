@@ -51,7 +51,7 @@ export function RGBAColorControl({
   }, []);
 
   return (
-    <Popover>
+    <Popover modal={false}>
       <div
         className={cn(
           "flex items-center border cursor-default",

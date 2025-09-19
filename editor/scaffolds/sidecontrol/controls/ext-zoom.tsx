@@ -27,7 +27,7 @@ export function ZoomControl({ className }: { className?: string }) {
   const pct = Math.round(scaleX * 100);
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger className={cn("flex items-center", className)}>
         <span className="text-xs text-muted-foreground">{pct + "%"}</span>
         <CaretDownIcon className="ms-1" />
