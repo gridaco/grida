@@ -29,6 +29,7 @@ async fn scene() -> Scene {
         stroke_align: StrokeAlign::Outside,
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),
+        mask_type: LayerMaskType::default(),
         effects: LayerEffects::default(),
     };
     let text_outside_id = text_outside.id.clone();
@@ -54,6 +55,7 @@ async fn scene() -> Scene {
         stroke_align: StrokeAlign::Center,
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),
+        mask_type: LayerMaskType::default(),
         effects: LayerEffects::default(),
     };
     let text_center_id = text_center.id.clone();
@@ -79,6 +81,7 @@ async fn scene() -> Scene {
         stroke_align: StrokeAlign::Inside,
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),
+        mask_type: LayerMaskType::default(),
         effects: LayerEffects::default(),
     };
     let text_inside_id = text_inside.id.clone();

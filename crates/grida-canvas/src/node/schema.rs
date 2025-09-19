@@ -101,6 +101,7 @@ pub struct UnknownNodeProperties {
     pub children: Option<Vec<NodeId>>,
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
 
     pub size: Option<Size>,
     pub point_count: Option<usize>,
@@ -384,10 +385,13 @@ pub struct GroupNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
-    pub transform: Option<AffineTransform>,
-    pub children: Vec<NodeId>,
+
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+
+    pub transform: Option<AffineTransform>,
+    pub children: Vec<NodeId>,
 }
 
 #[derive(Debug, Clone)]
@@ -395,6 +399,11 @@ pub struct ContainerNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
@@ -404,8 +413,7 @@ pub struct ContainerNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
+
     pub effects: LayerEffects,
     /// Content-only clipping switch.
     ///
@@ -495,6 +503,11 @@ pub struct RectangleNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
@@ -503,8 +516,6 @@ pub struct RectangleNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
     pub effects: LayerEffects,
 }
 
@@ -580,15 +591,18 @@ pub struct LineNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+    pub effects: LayerEffects,
+
     pub transform: AffineTransform,
     pub size: Size, // height is always 0 (ignored)
     pub strokes: Paints,
     pub stroke_width: f32,
     pub _data_stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
-    pub effects: LayerEffects,
 }
 
 impl LineNodeRec {
@@ -612,6 +626,12 @@ pub struct ImageNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub effects: LayerEffects,
+    pub mask_type: LayerMaskType,
+
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
@@ -622,9 +642,6 @@ pub struct ImageNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
-    pub effects: LayerEffects,
     pub image: ResourceRef,
 }
 
@@ -698,6 +715,12 @@ pub struct EllipseNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub effects: LayerEffects,
+    pub mask_type: LayerMaskType,
+
     pub transform: AffineTransform,
     pub size: Size,
     pub fills: Paints,
@@ -705,9 +728,6 @@ pub struct EllipseNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
-    pub effects: LayerEffects,
 
     /// inner radius - 0 ~ 1
     pub inner_radius: Option<f32>,
@@ -814,6 +834,12 @@ pub struct BooleanPathOperationNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+    pub effects: LayerEffects,
+
     pub transform: Option<AffineTransform>,
     pub op: BooleanPathOperation,
     pub corner_radius: Option<f32>,
@@ -823,9 +849,6 @@ pub struct BooleanPathOperationNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
-    pub effects: LayerEffects,
 }
 
 impl NodeFillsMixin for BooleanPathOperationNodeRec {
@@ -856,6 +879,12 @@ pub struct VectorNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+    pub effects: LayerEffects,
+
     pub transform: AffineTransform,
     pub network: VectorNetwork,
     /// The corner radius of the vector node.
@@ -869,9 +898,6 @@ pub struct VectorNodeRec {
     /// alignments are treated as `Center`.
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
-    pub effects: LayerEffects,
 }
 
 impl NodeFillsMixin for VectorNodeRec {
@@ -927,6 +953,12 @@ pub struct SVGPathNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+    pub effects: LayerEffects,
+
     pub transform: AffineTransform,
     pub fills: Paints,
     pub data: String,
@@ -934,9 +966,6 @@ pub struct SVGPathNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
-    pub effects: LayerEffects,
 }
 
 impl NodeFillsMixin for SVGPathNodeRec {
@@ -984,6 +1013,12 @@ pub struct PolygonNodeRec {
     pub name: Option<String>,
     pub active: bool,
 
+    /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+    pub effects: LayerEffects,
+
     /// 2D affine transform matrix applied to the shape.
     pub transform: AffineTransform,
 
@@ -1003,11 +1038,6 @@ pub struct PolygonNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-
-    /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
-    pub effects: LayerEffects,
 }
 
 impl NodeFillsMixin for PolygonNodeRec {
@@ -1081,6 +1111,11 @@ pub struct RegularPolygonNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+    /// Overall node opacity (0.0–1.0)
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+    pub effects: LayerEffects,
 
     /// Affine transform applied to this node
     pub transform: AffineTransform,
@@ -1104,10 +1139,6 @@ pub struct RegularPolygonNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    /// Overall node opacity (0.0–1.0)
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
-    pub effects: LayerEffects,
 }
 
 impl NodeFillsMixin for RegularPolygonNodeRec {
@@ -1198,6 +1229,11 @@ pub struct RegularStarPolygonNodeRec {
     pub name: Option<String>,
     pub active: bool,
 
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+    pub effects: LayerEffects,
+
     /// Affine transform applied to this node
     pub transform: AffineTransform,
 
@@ -1230,9 +1266,6 @@ pub struct RegularStarPolygonNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     /// Overall node opacity (0.0–1.0)
-    pub opacity: f32,
-    pub blend_mode: LayerBlendMode,
-    pub effects: LayerEffects,
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
@@ -1455,6 +1488,7 @@ pub struct TextSpanNodeRec {
     /// Overall node opacity.
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
     pub effects: LayerEffects,
 }
 
@@ -1489,6 +1523,8 @@ pub struct TextNodeRec {
     pub stroke_align: StrokeAlign,
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
+    pub effects: LayerEffects,
 }
 
 // endregion

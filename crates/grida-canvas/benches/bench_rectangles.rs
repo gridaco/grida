@@ -19,6 +19,9 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             id: id.clone(),
             name: None,
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
             transform: AffineTransform::identity(),
             size: Size {
                 width: 100.0,
@@ -30,8 +33,6 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             stroke_width: 1.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: LayerBlendMode::default(),
             effects: if with_effects {
                 LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
                     dx: 2.0,
@@ -57,6 +58,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         children: ids.clone(),
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),
+        mask_type: LayerMaskType::default(),
     };
 
     repository.insert(Node::Group(root_group));

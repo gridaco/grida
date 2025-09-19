@@ -50,6 +50,10 @@ fn make_node(corner_radius: f32) -> VectorNodeRec {
         id: "node".into(),
         name: None,
         active: true,
+        opacity: 1.0,
+        blend_mode: LayerBlendMode::default(),
+        mask_type: LayerMaskType::default(),
+        effects: LayerEffects::default(),
         transform: AffineTransform::identity(),
         network: make_square_network(),
         corner_radius,
@@ -59,9 +63,6 @@ fn make_node(corner_radius: f32) -> VectorNodeRec {
         stroke_width_profile: None,
         stroke_align: StrokeAlign::Inside,
         stroke_dash_array: None,
-        opacity: 1.0,
-        blend_mode: LayerBlendMode::default(),
-        effects: LayerEffects::default(),
     }
 }
 

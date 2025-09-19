@@ -29,6 +29,10 @@ async fn demo_vectors() -> Scene {
                 id: "1".to_string(),
                 name: Some("triangle open".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask_type: LayerMaskType::default(),
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x, base_y, 0.0),
                 fills: Paints::default(),
                 network: VectorNetwork {
@@ -45,9 +49,6 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_1_tri_open.id.clone());
@@ -59,6 +60,10 @@ async fn demo_vectors() -> Scene {
                 id: "2".to_string(),
                 name: Some("triangle closed".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask_type: LayerMaskType::default(),
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x + spacing * 1.0, base_y, 0.0),
                 fills: Paints::default(),
                 network: VectorNetwork {
@@ -76,9 +81,6 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_2_tri_closed.id.clone());
@@ -91,6 +93,10 @@ async fn demo_vectors() -> Scene {
                 id: "3".to_string(),
                 name: Some("Vector 2".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask_type: LayerMaskType::default(),
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x + spacing * 2.0, base_y, 0.0),
                 fills: Paints::default(),
                 network: VectorNetwork {
@@ -108,9 +114,6 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_3.id.clone());
@@ -122,6 +125,10 @@ async fn demo_vectors() -> Scene {
                 id: "vector_3".to_string(),
                 name: Some("Vector 3".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask_type: LayerMaskType::default(),
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x + spacing * 3.0, base_y, 0.0),
                 fills: Paints::default(),
                 network: VectorNetwork {
@@ -139,9 +146,6 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_4.id.clone());
@@ -154,6 +158,10 @@ async fn demo_vectors() -> Scene {
                 id: "1_5".to_string(),
                 name: Some("Vector 1_5".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask_type: LayerMaskType::default(),
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x + spacing * 4.0, base_y, 0.0),
                 fills: Paints::default(),
                 network: VectorNetwork {
@@ -173,9 +181,6 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_1_5.id.clone());
@@ -191,6 +196,10 @@ async fn demo_vectors() -> Scene {
                 id: "5".to_string(),
                 name: Some("S-curve".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask_type: LayerMaskType::default(),
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(
                     start_x + spacing * 0.0,
                     base_y + spacing * 1.0,
@@ -213,9 +222,6 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_5.id.clone());
@@ -228,6 +234,10 @@ async fn demo_vectors() -> Scene {
                 id: "5_5".to_string(),
                 name: Some("90deg line".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask_type: LayerMaskType::default(),
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(
                     start_x + spacing * 1.0,
                     base_y + spacing * 1.0,
@@ -245,9 +255,6 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_5_5.id.clone());
@@ -263,6 +270,10 @@ async fn demo_vectors() -> Scene {
                 id: "6".to_string(),
                 name: Some("filled triangle".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask_type: LayerMaskType::default(),
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(
                     start_x + spacing * 0.0,
                     base_y + spacing * 2.0,
@@ -284,9 +295,6 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_6.id.clone());
@@ -299,6 +307,10 @@ async fn demo_vectors() -> Scene {
                 id: "7".to_string(),
                 name: Some("filled rectangle".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask_type: LayerMaskType::default(),
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(
                     start_x + spacing * 1.0,
                     base_y + spacing * 2.0,
@@ -321,9 +333,6 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_7.id.clone());

@@ -56,6 +56,9 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
@@ -64,8 +67,6 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
         }
     }
@@ -76,6 +77,10 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            effects: LayerEffects::default(),
+            mask_type: LayerMaskType::default(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             inner_radius: None,
@@ -86,9 +91,6 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
             corner_radius: None,
         }
     }
@@ -99,6 +101,10 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             size: Size {
                 width: Self::DEFAULT_SIZE.width,
@@ -108,9 +114,6 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             _data_stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
         }
     }
 
@@ -135,6 +138,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
             effects: LayerEffects::default(),
         }
     }
@@ -149,6 +153,7 @@ impl NodeFactory {
             children: Vec::new(),
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
         }
     }
 
@@ -158,6 +163,9 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
@@ -167,8 +175,6 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
             effects: LayerEffects::default(),
             clip: true,
         }
@@ -180,6 +186,10 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             data: String::new(),
@@ -187,9 +197,6 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
         }
     }
 
@@ -199,6 +206,10 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             point_count: 3, // Triangle by default
@@ -208,9 +219,6 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
         }
     }
 
@@ -219,6 +227,10 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             point_count: 5,    // 5-pointed star by default
@@ -229,9 +241,6 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
         }
     }
 
@@ -240,6 +249,10 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             points: Vec::new(),
             corner_radius: 0.0,
@@ -248,9 +261,6 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
         }
     }
 
@@ -260,6 +270,10 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            effects: LayerEffects::default(),
+            mask_type: LayerMaskType::default(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
@@ -268,9 +282,6 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
             image: ResourceRef::RID(String::new()),
         }
     }

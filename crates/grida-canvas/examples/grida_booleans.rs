@@ -58,6 +58,10 @@ async fn demo_booleans() -> Scene {
             id: "bool_union_1".to_string(),
             name: Some("Union Operation".to_string()),
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
+            effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Union,
             corner_radius: None,
@@ -67,9 +71,6 @@ async fn demo_booleans() -> Scene {
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes
@@ -121,6 +122,10 @@ async fn demo_booleans() -> Scene {
             id: "bool_intersection_1".to_string(),
             name: Some("Intersection Operation".to_string()),
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
+            effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Intersection,
             children: vec![circle1.id.clone(), circle2.id.clone()],
@@ -130,9 +135,6 @@ async fn demo_booleans() -> Scene {
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes
@@ -184,6 +186,10 @@ async fn demo_booleans() -> Scene {
             id: "bool_difference_1".to_string(),
             name: Some("Difference Operation".to_string()),
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
+            effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Difference,
             corner_radius: None,
@@ -193,9 +199,6 @@ async fn demo_booleans() -> Scene {
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes
@@ -247,6 +250,10 @@ async fn demo_booleans() -> Scene {
             id: "bool_xor_1".to_string(),
             name: Some("XOR Operation".to_string()),
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask_type: LayerMaskType::default(),
+            effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Xor,
             corner_radius: None,
@@ -256,9 +263,6 @@ async fn demo_booleans() -> Scene {
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: LayerBlendMode::default(),
-            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes

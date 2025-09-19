@@ -782,6 +782,7 @@ impl From<JSONGroupNode> for GroupNodeRec {
             children: node.children.unwrap_or_default(),
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode,
+            mask_type: LayerMaskType::default(),
         }
     }
 }
@@ -824,6 +825,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             ),
             children: node.children.unwrap_or_default(),
             clip: true,
+            mask_type: LayerMaskType::default(),
         }
     }
 }
@@ -904,6 +906,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
+            mask_type: LayerMaskType::default(),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -927,6 +930,14 @@ impl From<JSONEllipseNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+            mask_type: LayerMaskType::default(),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -937,13 +948,6 @@ impl From<JSONEllipseNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
 
             inner_radius: node.inner_radius,
             start_angle: node.angle_offset.unwrap_or(0.0),
@@ -967,6 +971,9 @@ impl From<JSONRectangleNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            mask_type: LayerMaskType::default(),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -984,8 +991,6 @@ impl From<JSONRectangleNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -1044,6 +1049,14 @@ impl From<JSONImageNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
+            mask_type: LayerMaskType::default(),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -1061,13 +1074,6 @@ impl From<JSONImageNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
             image: fill.image.clone(),
         })
     }
@@ -1087,6 +1093,14 @@ impl From<JSONRegularPolygonNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            mask_type: LayerMaskType::default(),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -1098,13 +1112,6 @@ impl From<JSONRegularPolygonNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
             point_count: node.point_count,
         })
     }
@@ -1124,6 +1131,14 @@ impl From<JSONRegularStarPolygonNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            mask_type: LayerMaskType::default(),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -1136,13 +1151,6 @@ impl From<JSONRegularStarPolygonNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
             point_count: node.point_count,
         })
     }
@@ -1163,6 +1171,14 @@ impl From<JSONSVGPathNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            mask_type: LayerMaskType::default(),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform,
             fills: merge_paints(node.base.fill, node.base.fills),
             data: node.paths.map_or("".to_string(), |paths| {
@@ -1176,13 +1192,6 @@ impl From<JSONSVGPathNode> for Node {
             stroke_width: 0.0,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
         })
     }
 }
@@ -1201,6 +1210,14 @@ impl From<JSONLineNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            mask_type: LayerMaskType::default(),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -1210,13 +1227,6 @@ impl From<JSONLineNode> for Node {
             stroke_width: node.base.stroke_width,
             _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
         })
     }
 }
@@ -1241,6 +1251,14 @@ impl From<JSONVectorNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            mask_type: LayerMaskType::default(),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform,
             network,
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
@@ -1250,13 +1268,6 @@ impl From<JSONVectorNode> for Node {
             stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
         })
     }
 }
@@ -1276,6 +1287,14 @@ impl From<JSONBooleanOperationNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode,
+            mask_type: LayerMaskType::default(),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform: Some(transform),
             op: node.op,
             corner_radius: node.base.corner_radius,
@@ -1285,13 +1304,6 @@ impl From<JSONBooleanOperationNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
         })
     }
 }
