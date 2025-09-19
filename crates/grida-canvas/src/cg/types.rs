@@ -81,6 +81,50 @@ impl From<CGColor> for SolidPaint {
     }
 }
 
+/// Defines the type of masking applied to a layer.
+///
+/// This corresponds to the CSS `mask-type` property and is related to `clip-path` functionality.
+/// The mask type determines how the mask is interpreted and applied to the layer content.
+///
+/// # CSS Equivalents
+/// - **None**: No masking is applied
+/// - **Geometry**: Vector-based masking (equivalent to `clip-path` in CSS)
+/// - **Alpha**: Alpha channel masking (equivalent to `mask-type: alpha` in CSS)
+/// - **Luminance**: Luminance-based masking (equivalent to `mask-type: luminance` in CSS)
+///
+/// For more information, see the [MDN documentation on mask-type](https://developer.mozilla.org/en-US/docs/Web/CSS/mask-type).
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub enum LayerMaskType {
+    #[serde(rename = "none")]
+    None,
+    /// Vector-based masking (clipPath).
+    ///
+    /// Uses the vector geometry path to define the visible area of the content.
+    /// Unlike alpha or luminance masking, this type does not use opacity or brightness values.
+    /// The mask is purely geometric - content is either fully visible or fully hidden based on whether
+    /// it falls inside or outside the defined vector path. This is equivalent to CSS `clip-path`.
+    #[serde(rename = "geometry")]
+    Geometry,
+    /// Alpha channel masking.
+    ///
+    /// Uses the alpha channel of the mask to determine the opacity of the masked content.
+    /// Areas with higher alpha values in the mask will show the content more opaquely.
+    #[serde(rename = "alpha")]
+    Alpha,
+    /// Luminance-based masking.
+    ///
+    /// Uses the luminance (brightness) of the mask to determine the opacity of the masked content.
+    /// Brighter areas in the mask will show the content more opaquely, while darker areas will be more transparent.
+    #[serde(rename = "luminance")]
+    Luminance,
+}
+
+impl Default for LayerMaskType {
+    fn default() -> Self {
+        LayerMaskType::None
+    }
+}
+
 /// Boolean path operation.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum BooleanPathOperation {
