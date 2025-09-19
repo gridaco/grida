@@ -89,6 +89,7 @@ import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/node-type-icon";
 import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
+import { resolveDropInsertionIndex } from "./dnd-index";
 
 const toReversedCopy = <T,>(items?: T[]) => {
   if (!items || items.length <= 1) {
@@ -418,8 +419,19 @@ export function NodeHierarchyList() {
     onDrop(items, target) {
       const ids = items.map((item) => item.getId());
       const target_id = target.item.getId();
-      const index =
-        "insertionIndex" in target ? target.insertionIndex : undefined;
+      const index = resolveDropInsertionIndex({
+        target,
+        draggedItemIds: ids,
+        getActualChildren: (parentId) => {
+          if (parentId === "<root>") {
+            return children ?? [];
+          }
+          return editor.state.document_ctx.__ctx_nid_to_children_ids[
+            parentId
+          ];
+        },
+        inversed: true,
+      });
       editor.mv(ids, target_id, index);
     },
     indent: 6,
