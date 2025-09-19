@@ -90,6 +90,13 @@ import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/
 import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
 
+const toReversedCopy = <T,>(items?: T[]) => {
+  if (!items || items.length <= 1) {
+    return items;
+  }
+  return [...items].reverse();
+};
+
 function SceneItemContextMenuWrapper({
   scene_id,
   onStartRenaming,
@@ -174,7 +181,7 @@ export function ScenesList() {
       },
       getChildren: (itemId) => {
         if (itemId === "<document>") {
-          return scenes.map((s) => s.id);
+          return toReversedCopy(scenes.map((s) => s.id));
         }
         return [];
       },
@@ -422,9 +429,11 @@ export function NodeHierarchyList() {
       },
       getChildren: (itemId) => {
         if (itemId === "<root>") {
-          return children;
+          return toReversedCopy(children);
         }
-        return editor.state.document_ctx.__ctx_nid_to_children_ids[itemId];
+        return toReversedCopy(
+          editor.state.document_ctx.__ctx_nid_to_children_ids[itemId]
+        );
       },
     },
     features: [
