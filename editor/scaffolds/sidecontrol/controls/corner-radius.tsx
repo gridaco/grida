@@ -79,7 +79,7 @@ export function CornerRadius4Control({
   }, [value]);
 
   return (
-    <Popover>
+    <Popover modal={false}>
       <div className="flex flex-col gap-2">
         <div
           className={WorkbenchUI.inputVariants({

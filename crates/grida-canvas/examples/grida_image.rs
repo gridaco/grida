@@ -32,14 +32,16 @@ async fn demo_image() -> (Scene, Vec<u8>) {
     rect1.name = Some("ImageFillRect".to_string());
     rect1.transform = AffineTransform::identity();
     rect1.size = image8ksize.clone();
+    let url = format!("res://images/{}", hash_str.clone());
     rect1.set_fill(Paint::Image(ImagePaint {
-        hash: hash_str.clone(),
+        image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
         blend_mode: BlendMode::Normal,
+        filters: ImageFilters::default(),
     }));
-    rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
+    rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     rect1.stroke_width = 2.0;
 
     let mut repository = NodeRepository::new();

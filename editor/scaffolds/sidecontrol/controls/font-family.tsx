@@ -269,7 +269,7 @@ export function FontFamilyControl({
   const [open, setOpen] = React.useState<boolean>(false);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover modal={false} open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"

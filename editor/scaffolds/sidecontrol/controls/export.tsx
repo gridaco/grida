@@ -120,7 +120,7 @@ export function ExportNodeControl({
           node_id={node_id}
         />
       )}
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             disabled={disabled}
@@ -245,7 +245,7 @@ function AdvancedExportDialog({
   };
 
   return (
-    <Dialog {...props}>
+    <Dialog modal={false} {...props}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Advanced Export</DialogTitle>

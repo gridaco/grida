@@ -7,8 +7,8 @@
     "dev:no-turbopack": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "lint:fix": "next lint --fix",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
     "test": "jest",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
@@ -154,6 +154,7 @@
     "handlebars": "^4.7.8",
     "html-to-image": "^1.11.11",
     "i18next": "^23.7.9",
+    "idb": "^8.0.3",
     "image-size": "^2.0.2",
     "immer": "^9.0.3",
     "input-otp": "^1.4.2",

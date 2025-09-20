@@ -4,6 +4,7 @@ describe("clipboard", () => {
   // Using a simple test payload instead of the full ClipboardPayload type
   // This is just for testing the IO functionality
   const testPayload: io.clipboard.ClipboardPayload = {
+    type: "prototypes",
     ids: ["<id>"],
     payload_id: "52b698ef-d06a-4f9c-ac4c-c26e744c8567",
     prototypes: [
@@ -71,5 +72,26 @@ describe("clipboard", () => {
         '<span data-grida-io-clipboard="b64:invalid"></span>'
       )
     ).toBeNull();
+  });
+
+  it("does not encode non-prototype payloads to transferable clipboard items", () => {
+    const payload: io.clipboard.ClipboardPayload = {
+      payload_id: "payload-2",
+      type: "property/fill-image-paint",
+      paint: {
+        type: "image",
+        opacity: 1,
+        visible: true,
+        transform: [1, 0, 0, 1, 0, 0],
+        scaleMode: "fill",
+        imageRef: { type: "project_asset", id: "asset" },
+      },
+      paint_target: "fill",
+      paint_index: 0,
+      node_id: "node",
+    };
+
+    expect(io.clipboard.encode(payload)).toBeNull();
+    expect(io.clipboard.encodeClipboardText(payload)).toBeNull();
   });
 });

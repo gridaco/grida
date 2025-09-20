@@ -1,10 +1,7 @@
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./color";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import cmath from "@grida/cmath";
 import { GradientStopsSlider } from "@/grida-canvas-react-gradient/gradient-stops-slider";
-import { ArrowRightLeftIcon, RotateCwIcon } from "lucide-react";
-import { Button } from "@/components/ui-editor/button";
 import { Label } from "@/components/ui/label";
 import InputPropertyPercentage from "../ui/percentage";
 
@@ -27,48 +24,8 @@ export function GradientControl({
 }) {
   const { stops } = value;
 
-  const onFlipStopsClick = () => {
-    const flippedStops = stops
-      .map((stop, index) => ({
-        ...stop,
-        offset: 1 - stop.offset,
-      }))
-      .reverse();
-    onValueChange?.({ ...value, stops: flippedStops });
-  };
-
-  const onRotateClick = () => {
-    const currentAngle = value.transform
-      ? cmath.transform.angle(value.transform)
-      : 0;
-    const newAngle = currentAngle + 45;
-    const t = cmath.transform.computeRelativeLinearGradientTransform(newAngle);
-    onValueChange?.({
-      ...value,
-      transform: t,
-    });
-  };
-
   return (
     <div className="w-full">
-      <div className="flex items-center justify-end gap-2 mb-2">
-        <Button
-          onClick={onFlipStopsClick}
-          title="Flip"
-          variant="ghost"
-          size="icon"
-        >
-          <ArrowRightLeftIcon className="size-3.5" />
-        </Button>
-        <Button
-          onClick={onRotateClick}
-          title="Rotate"
-          variant="ghost"
-          size="icon"
-        >
-          <RotateCwIcon className="size-3.5" />
-        </Button>
-      </div>
       <GradientStopsSlider
         stops={stops}
         selectedStop={selectedStop}

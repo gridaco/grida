@@ -1,33 +1,25 @@
 "use client";
 
-import React from "react";
-
+import * as React from "react";
 import {
   SidebarMenuSectionContent,
   SidebarSection,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
 import { PropertyEnumTabs, PropertyLine, PropertyLineLabel } from "../ui";
 import InputPropertyNumber from "../ui/number";
 import useVectorContentEditMode from "@/grida-canvas-react/use-sub-vector-network-editor";
 import useTangentMirroring from "./use-tangent-mirroring";
 import vn from "@grida/vn";
-import grida from "@grida/schema";
 import type { editor } from "@/grida-canvas";
-import {
-  useA11yActions,
-  useNodeActions,
-  useNodeState,
-} from "@/grida-canvas-react/provider";
+import { useA11yActions } from "@/grida-canvas-react/provider";
 import { encodeTranslateVectorCommand } from "@/grida-canvas/reducers/methods";
-import { FillControl } from "../controls/fill";
 import {
   MirroringAll,
   MirroringAngle,
   MirroringNone,
 } from "@/grida-canvas-react-starter-kit/starterkit-icons/tangent-mirroring-mode";
 import { computeMixed } from "./compute-mixed";
+import { SectionFills } from "./section-fills";
 
 export function ModeVectorEditModeProperties({ node_id }: { node_id: string }) {
   return (
@@ -164,26 +156,4 @@ function SectionGeometry({ node_id }: { node_id: string }) {
     </SidebarSection>
   );
   //
-}
-
-function SectionFills({ node_id }: { node_id: string }) {
-  const { fill } = useNodeState(node_id, (node) => ({
-    fill: node.fill,
-  }));
-
-  const actions = useNodeActions(node_id)!;
-
-  return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Fill</PropertyLineLabel>
-          <FillControl value={fill} onValueChange={actions.fill} removable />
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
-  );
 }

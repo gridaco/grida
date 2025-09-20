@@ -14,7 +14,10 @@ type NodeFeatureProperty =
   | "cornerRadius4"
   | "border"
   | "children"
+  | "fill"
+  | "fills"
   | "stroke"
+  | "strokes"
   | "feDropShadow"
   | "strokeCap"
   | "pointCount"
@@ -52,6 +55,18 @@ const GRIDA_TCANVAS_RECTANGLE_NODE: INodePropertiesConfig = {
 
 const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   arcData: [],
+  fill: [
+    "svgpath",
+    "vector",
+    "image",
+    "rectangle",
+    "ellipse",
+    "text",
+    "richtext",
+    "container",
+    "component",
+  ],
+  fills: [],
   cornerRadius: [
     "rectangle",
     "image",
@@ -71,6 +86,7 @@ const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   border: ["container", "component", "instance", "image", "video"],
   children: ["container", "component", "instance"],
   stroke: ["vector", "line", "rectangle", "ellipse", "polygon", "star"],
+  strokes: [],
   feDropShadow: ["container", "component", "instance"],
   /**
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
@@ -82,6 +98,19 @@ const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
 
 const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   arcData: ["ellipse"],
+  fill: [],
+  fills: [
+    "svgpath",
+    "vector",
+    "image",
+    "rectangle",
+    "ellipse",
+    "text",
+    "richtext",
+    "container",
+    "component",
+    "boolean",
+  ],
   cornerRadius: [
     "rectangle",
     "polygon",
@@ -105,6 +134,23 @@ const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   border: [],
   children: ["container", "component", "instance", "boolean"],
   stroke: [
+    "container",
+    "rectangle",
+    "image",
+    "video",
+    "container",
+    "vector",
+    "line",
+    "rectangle",
+    "ellipse",
+    "polygon",
+    "star",
+    "text",
+    "component",
+    "instance",
+    "boolean",
+  ],
+  strokes: [
     "container",
     "rectangle",
     "image",
@@ -188,12 +234,36 @@ export namespace supports {
         return canvas_supports.children.includes(type);
     }
   };
+  export const fill = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.fill.includes(type);
+      case "canvas":
+        return canvas_supports.fill.includes(type);
+    }
+  };
+  export const fills = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.fills.includes(type);
+      case "canvas":
+        return canvas_supports.fills.includes(type);
+    }
+  };
   export const stroke = (type: NodeType, context: Context) => {
     switch (context.backend) {
       case "dom":
         return dom_supports.stroke.includes(type);
       case "canvas":
         return canvas_supports.stroke.includes(type);
+    }
+  };
+  export const strokes = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.strokes.includes(type);
+      case "canvas":
+        return canvas_supports.strokes.includes(type);
     }
   };
   export const strokeCap = (type: NodeType, context: Context) => {

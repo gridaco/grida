@@ -48,8 +48,8 @@ use skia_safe::Path;
 /// // Layer definition
 /// let layer = PainterPictureLayer {
 ///     shape: shape,
-///     fills: vec![fill],
-///     strokes: vec![stroke],
+///     fills: Paints::new([fill]),
+///     strokes: Paints::new([stroke]),
 ///     effects: vec![],
 /// };
 ///
@@ -122,7 +122,7 @@ pub struct PainterPictureLayerBase {
     pub id: NodeId,
     pub z_index: usize,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub transform: AffineTransform,
     pub clip_path: Option<skia_safe::Path>,
 }
@@ -132,8 +132,8 @@ pub struct PainterPictureShapeLayer {
     pub base: PainterPictureLayerBase,
     pub shape: PainterShape,
     pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
+    pub strokes: Paints,
+    pub fills: Paints,
     pub stroke_path: Option<skia_safe::Path>,
 }
 
@@ -141,8 +141,8 @@ pub struct PainterPictureShapeLayer {
 pub struct PainterPictureTextLayer {
     pub base: PainterPictureLayerBase,
     pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
+    pub strokes: Paints,
+    pub fills: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_path: Option<skia_safe::Path>,
@@ -162,13 +162,14 @@ pub struct PainterPictureTextLayer {
 pub struct PainterPictureVectorLayer {
     pub base: PainterPictureLayerBase,
     pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
+    pub strokes: Paints,
+    pub fills: Paints,
     pub shape: PainterShape,
     pub vector: VectorNetwork,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
+    pub corner_radius: f32,
 }
 
 /// Flat list of [`PainterPictureLayer`] entries.
@@ -260,7 +261,7 @@ impl LayerList {
                 Node::BooleanOperation(n) => {
                     let opacity = parent_opacity * n.opacity;
                     if let Some(shape) = boolean_operation_shape(n, repo, scene_cache.geometry()) {
-                        let stroke_path = if n.stroke.is_some() && n.stroke_width > 0.0 {
+                        let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
                             Some(stroke_geometry(
                                 &shape.to_path(),
                                 n.stroke_width,
@@ -281,8 +282,8 @@ impl LayerList {
                             },
                             shape,
                             effects: n.effects.clone(),
-                            strokes: n.stroke.clone().into_iter().collect(),
-                            fills: vec![n.fill.clone()],
+                            strokes: n.strokes.clone(),
+                            fills: n.fills.clone(),
                             stroke_path,
                         }));
                     } else {
@@ -455,7 +456,7 @@ impl LayerList {
                         shape,
                         effects: n.effects.clone(),
                         strokes: n.strokes.clone(),
-                        fills: vec![],
+                        fills: Paints::default(),
                         stroke_path,
                     }))
                 }
@@ -540,8 +541,8 @@ impl LayerList {
                         },
                         shape,
                         effects: n.effects.clone(),
-                        strokes: n.stroke.clone().into_iter().collect(),
-                        fills: vec![n.fill.clone()],
+                        strokes: n.strokes.clone(),
+                        fills: n.fills.clone(),
                         stroke_path,
                     }))
                 }
@@ -559,11 +560,12 @@ impl LayerList {
                         shape,
                         effects: n.effects.clone(),
                         strokes: n.strokes.clone(),
-                        fills: n.fill.clone().into_iter().collect(),
+                        fills: n.fills.clone(),
                         vector: n.network.clone(),
                         stroke_width: n.stroke_width,
                         stroke_align: n.get_stroke_align(),
                         stroke_width_profile: n.stroke_width_profile.clone(),
+                        corner_radius: n.corner_radius,
                     }))
                 }
                 Node::Image(n) => {
@@ -589,8 +591,8 @@ impl LayerList {
                         },
                         shape,
                         effects: n.effects.clone(),
-                        strokes: vec![n.stroke.clone()],
-                        fills: vec![Paint::Image(n.fill.clone())],
+                        strokes: n.strokes.clone(),
+                        fills: Paints::new([Paint::Image(n.fill.clone())]), // TODO: Optimize - avoid clone if possible
                         stroke_path,
                     }))
                 }
@@ -601,14 +603,14 @@ impl LayerList {
                             id: n.id.clone(),
                             z_index: out.len(),
                             opacity: parent_opacity * n.opacity,
-                            blend_mode: BlendMode::Normal,
+                            blend_mode: LayerBlendMode::PassThrough,
                             transform,
                             clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
                         },
                         shape,
                         effects: LayerEffects::default(),
-                        strokes: vec![],
-                        fills: vec![],
+                        strokes: Paints::default(),
+                        fills: Paints::default(),
                         stroke_path: None,
                     }))
                 }

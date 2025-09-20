@@ -11,7 +11,7 @@ import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import { io } from "@grida/io";
 import type { tokens } from "@grida/tokens";
-import type cg from "@grida/cg";
+import cg from "@grida/cg";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 import {
   DataProvider,
@@ -157,12 +157,13 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeNodeInnerRadius(node_id, value),
       arcData: (value: grida.program.nodes.i.IEllipseArcData) =>
         instance.changeNodeArcData(node_id, value),
-      fill: (
-        value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-      ) => instance.changeNodeFill(node_id, value),
-      stroke: (
-        value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-      ) => instance.changeNodeStroke(node_id, value),
+      fills: (fills: cg.Paint[]) => instance.changeNodeFills(node_id, fills),
+      strokes: (strokes: cg.Paint[]) =>
+        instance.changeNodeStrokes(node_id, strokes),
+      addFill: (fill: cg.Paint, at?: "start" | "end") =>
+        instance.addNodeFill(node_id, fill, at),
+      addStroke: (stroke: cg.Paint, at?: "start" | "end") =>
+        instance.addNodeStroke(node_id, stroke, at),
       strokeWidth: (change: editor.api.NumberChange) =>
         instance.changeNodeStrokeWidth(node_id, change),
       strokeAlign: (value: cg.StrokeAlign) =>
@@ -173,8 +174,10 @@ export function useNodeActions(node_id: string | undefined) {
       // stylable
       opacity: (change: editor.api.NumberChange) =>
         instance.changeNodeOpacity(node_id, change),
-      blendMode: (value: cg.BlendMode) =>
+      blendMode: (value: cg.LayerBlendMode) =>
         instance.changeNodeBlendMode(node_id, value),
+      maskType: (value: cg.LayerMaskType) =>
+        instance.changeNodeMaskType(node_id, value),
       rotation: (change: editor.api.NumberChange) =>
         instance.changeNodeRotation(node_id, change),
       width: (value: grida.program.css.LengthPercentage | "auto") =>
@@ -731,14 +734,28 @@ export function useDataTransferEventTarget() {
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
-      // TODO: uploader is not implemented. use uploader configured by user.
-      const url = URL.createObjectURL(file);
-      const image = await instance.createImage(url);
-      const node = instance.createImageNode(image);
+      const bytes = await file.arrayBuffer();
+      const image = await instance.createImage(new Uint8Array(bytes));
+
+      // Create rectangle node with image paint instead of image node
+      const node = instance.createRectangleNode();
       node.$.position = "absolute";
       node.$.name = name;
       node.$.left = x;
       node.$.top = y;
+      node.$.width = image.width;
+      node.$.height = image.height;
+      node.$.fills = [
+        {
+          type: "image",
+          src: image.url,
+          fit: "cover",
+          transform: cmath.transform.identity,
+          filters: cg.def.IMAGE_FILTERS,
+          blendMode: cg.def.BLENDMODE,
+          opacity: 1,
+        } as cg.ImagePaint,
+      ];
     },
     [instance]
   );
@@ -876,7 +893,7 @@ export function useDataTransferEventTarget() {
           ) {
             instance.paste();
             pasted_from_data_transfer = true;
-          } else {
+          } else if (grida_payload.clipboard.type === "prototypes") {
             grida_payload.clipboard.prototypes.forEach((p) => {
               const sub =
                 grida.program.nodes.factory.create_packed_scene_document_from_prototype(
@@ -885,6 +902,9 @@ export function useDataTransferEventTarget() {
                 );
               instance.insert({ document: sub });
             });
+            pasted_from_data_transfer = true;
+          } else {
+            instance.paste();
             pasted_from_data_transfer = true;
           }
         }
@@ -1001,9 +1021,7 @@ export function useClipboardSync() {
         const txt = `grida:vn:${btoa(JSON.stringify(vector_clipboard))}`;
         navigator.clipboard.writeText(txt);
       } else if (user_clipboard) {
-        const items = io.clipboard.encode(
-          user_clipboard as io.clipboard.ClipboardPayload
-        );
+        const items = io.clipboard.encode(user_clipboard);
 
         if (items) {
           const clipboardItem = new ClipboardItem(items);

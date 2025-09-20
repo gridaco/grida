@@ -57,7 +57,7 @@ export function FeControl({
 }) {
   const Icon = getIcon(value);
   return (
-    <Popover>
+    <Popover modal={false}>
       <div className="flex items-center w-full gap-2">
         <PopoverTrigger>
           <Icon />
@@ -101,6 +101,7 @@ export function FeControl({
               onRemove?.();
             }}
             className="ms-2 cursor-pointer"
+            tabIndex={-1}
           >
             <MinusIcon className="size-3.5" />
           </Button>
@@ -235,17 +236,17 @@ function FeGaussianBlurProperties({
 }) {
   return (
     <div className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Blur</PropertyLineLabel>
-          <InputPropertyNumber
-            mode="fixed"
-            value={value?.radius}
-            max={editor.config.DEFAULT_MAX_BLUR_RADIUS}
-            onValueCommit={(v) => onValueChange?.({ ...value, radius: v || 0 })}
-          />
-        </PropertyLine>
-      </div>
-    );
+      <PropertyLine>
+        <PropertyLineLabel>Blur</PropertyLineLabel>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value?.radius}
+          max={editor.config.DEFAULT_MAX_BLUR_RADIUS}
+          onValueCommit={(v) => onValueChange?.({ ...value, radius: v || 0 })}
+        />
+      </PropertyLine>
+    </div>
+  );
 }
 
 function FeProgressiveBlurProperties({

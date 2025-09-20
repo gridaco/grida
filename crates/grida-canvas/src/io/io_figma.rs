@@ -48,11 +48,18 @@ impl From<&Box<Rgba>> for CGColor {
 impl From<&FigmaPaint> for Paint {
     fn from(paint: &FigmaPaint) -> Self {
         match paint {
-            FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
-                color: CGColor::from(&solid.color),
-                opacity: solid.opacity.unwrap_or(1.0) as f32,
-                blend_mode: BlendMode::default(),
-            }),
+            FigmaPaint::SolidPaint(solid) => {
+                let mut color = CGColor::from(&solid.color);
+                let opacity = solid.opacity.unwrap_or(1.0) as f32;
+                // Apply opacity to the color's alpha channel
+                let CGColor(r, g, b, a) = color;
+                let final_alpha = (a as f32 * opacity).round() as u8;
+                color = CGColor(r, g, b, final_alpha);
+                Paint::Solid(SolidPaint {
+                    color,
+                    blend_mode: BlendMode::default(),
+                })
+            }
             FigmaPaint::ImagePaint(image) => {
                 let transform =
                     image
@@ -78,10 +85,11 @@ impl From<&FigmaPaint> for Paint {
 
                 Paint::Image(ImagePaint {
                     transform,
-                    hash: image.image_ref.clone(),
+                    image: ResourceRef::RID(image.image_ref.clone()),
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),
+                    filters: ImageFilters::default(),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -139,7 +147,6 @@ impl From<&FigmaPaint> for Paint {
             }
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
-                opacity: 1.0,
                 blend_mode: BlendMode::default(),
             }),
         }
@@ -285,11 +292,18 @@ impl FigmaConverter {
     /// Convert Figma's paint to our Paint
     fn convert_paint(&self, paint: &FigmaPaint) -> Paint {
         match paint {
-            FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
-                color: CGColor::from(&solid.color),
-                opacity: solid.opacity.unwrap_or(1.0) as f32,
-                blend_mode: BlendMode::default(),
-            }),
+            FigmaPaint::SolidPaint(solid) => {
+                let mut color = CGColor::from(&solid.color);
+                let opacity = solid.opacity.unwrap_or(1.0) as f32;
+                // Apply opacity to the color's alpha channel
+                let CGColor(r, g, b, a) = color;
+                let final_alpha = (a as f32 * opacity).round() as u8;
+                color = CGColor(r, g, b, final_alpha);
+                Paint::Solid(SolidPaint {
+                    color,
+                    blend_mode: BlendMode::default(),
+                })
+            }
             FigmaPaint::ImagePaint(image) => {
                 let url = self
                     .image_urls
@@ -320,10 +334,11 @@ impl FigmaConverter {
 
                 Paint::Image(ImagePaint {
                     transform,
-                    hash: url,
+                    image: ResourceRef::RID(url),
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),
+                    filters: ImageFilters::default(),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -381,17 +396,16 @@ impl FigmaConverter {
             }
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
-                opacity: 1.0,
                 blend_mode: BlendMode::default(),
             }),
         }
     }
 
     /// Convert Figma's fills to our Paint vector
-    fn convert_fills(&self, fills: Option<&Vec<FigmaPaint>>) -> Vec<Paint> {
-        fills.map_or(Vec::new(), |paints| {
+    fn convert_fills(&self, fills: Option<&Vec<FigmaPaint>>) -> Paints {
+        fills.map_or_else(Paints::default, |paints| {
             // Filter out invisible paints and convert visible ones
-            paints
+            let paints: Vec<Paint> = paints
                 .iter()
                 .filter(|paint| match paint {
                     FigmaPaint::SolidPaint(solid) => solid.visible.unwrap_or(true),
@@ -400,17 +414,18 @@ impl FigmaConverter {
                     _ => true,
                 })
                 .map(|paint| self.convert_paint(paint))
-                .collect()
+                .collect();
+            Paints::from(paints)
         })
     }
 
     /// Convert Figma's strokes to our Paint vector
-    fn convert_strokes(&self, strokes: Option<&Option<Vec<FigmaPaint>>>) -> Vec<Paint> {
+    fn convert_strokes(&self, strokes: Option<&Option<Vec<FigmaPaint>>>) -> Paints {
         strokes
             .and_then(|s| s.as_ref())
-            .map_or(Vec::new(), |paints| {
+            .map_or_else(Paints::default, |paints| {
                 // Filter out invisible paints and convert visible ones
-                paints
+                let paints: Vec<Paint> = paints
                     .iter()
                     .filter(|paint| match paint {
                         FigmaPaint::SolidPaint(solid) => solid.visible.unwrap_or(true),
@@ -419,7 +434,8 @@ impl FigmaConverter {
                         _ => true,
                     })
                     .map(|paint| self.convert_paint(paint))
-                    .collect()
+                    .collect();
+                Paints::from(paints)
             })
     }
 
@@ -562,7 +578,9 @@ impl FigmaConverter {
             id: component.id.clone(),
             name: Some(component.name.clone()),
             active: component.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(component.visible),
             blend_mode: Self::convert_blend_mode(component.blend_mode),
+            mask: None,
             transform,
             size,
             corner_radius: Self::convert_corner_radius(
@@ -585,7 +603,6 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&component.effects),
             children,
-            opacity: Self::convert_opacity(component.visible),
             clip: component.clips_content,
         }))
     }
@@ -650,7 +667,9 @@ impl FigmaConverter {
             id: instance.id.clone(),
             name: Some(instance.name.clone()),
             active: instance.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(instance.visible),
             blend_mode: Self::convert_blend_mode(instance.blend_mode),
+            mask: None,
             transform,
             size,
             corner_radius: Self::convert_corner_radius(
@@ -673,7 +692,6 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&instance.effects),
             children,
-            opacity: Self::convert_opacity(instance.visible),
             clip: instance.clips_content,
         }))
     }
@@ -690,17 +708,18 @@ impl FigmaConverter {
             id: section.id.clone(),
             name: Some(format!("[Section] {}", section.name)),
             active: section.visible.unwrap_or(true),
-            blend_mode: BlendMode::Normal,
+            opacity: Self::convert_opacity(section.visible),
+            blend_mode: LayerBlendMode::PassThrough,
+            mask: None,
             transform: Self::convert_transform(section.relative_transform.as_ref()),
             size: Self::convert_size(section.size.as_ref()),
             corner_radius: RectangularCornerRadius::zero(),
             children,
             fills: self.convert_fills(Some(&section.fills.as_ref())),
-            strokes: vec![],
+            strokes: Paints::default(),
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            opacity: Self::convert_opacity(section.visible),
             effects: LayerEffects::default(),
             clip: false,
         }))
@@ -802,7 +821,9 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            mask: None,
             transform,
             size,
             corner_radius: Self::convert_corner_radius(
@@ -825,33 +846,42 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&origin.effects),
             children,
-            opacity: Self::convert_opacity(origin.visible),
             clip: origin.clips_content,
         }))
     }
 
     /// Convert Figma's blend mode to our BlendMode
-    fn convert_blend_mode(blend_mode: figma_api::models::BlendMode) -> BlendMode {
+    fn convert_blend_mode(blend_mode: figma_api::models::BlendMode) -> LayerBlendMode {
         match blend_mode {
-            figma_api::models::BlendMode::Normal => BlendMode::Normal,
-            figma_api::models::BlendMode::Multiply => BlendMode::Multiply,
-            figma_api::models::BlendMode::Screen => BlendMode::Screen,
-            figma_api::models::BlendMode::Overlay => BlendMode::Overlay,
-            figma_api::models::BlendMode::Darken => BlendMode::Darken,
-            figma_api::models::BlendMode::Lighten => BlendMode::Lighten,
-            figma_api::models::BlendMode::ColorDodge => BlendMode::ColorDodge,
-            figma_api::models::BlendMode::ColorBurn => BlendMode::ColorBurn,
-            figma_api::models::BlendMode::HardLight => BlendMode::HardLight,
-            figma_api::models::BlendMode::SoftLight => BlendMode::SoftLight,
-            figma_api::models::BlendMode::Difference => BlendMode::Difference,
-            figma_api::models::BlendMode::Exclusion => BlendMode::Exclusion,
-            figma_api::models::BlendMode::Hue => BlendMode::Hue,
-            figma_api::models::BlendMode::Saturation => BlendMode::Saturation,
-            figma_api::models::BlendMode::Color => BlendMode::Color,
-            figma_api::models::BlendMode::Luminosity => BlendMode::Luminosity,
-            figma_api::models::BlendMode::PassThrough => BlendMode::Normal,
-            figma_api::models::BlendMode::LinearBurn => BlendMode::ColorBurn,
-            figma_api::models::BlendMode::LinearDodge => BlendMode::ColorDodge,
+            figma_api::models::BlendMode::PassThrough => LayerBlendMode::PassThrough,
+            figma_api::models::BlendMode::Normal => LayerBlendMode::Blend(BlendMode::Normal),
+            figma_api::models::BlendMode::Multiply => LayerBlendMode::Blend(BlendMode::Multiply),
+            figma_api::models::BlendMode::Screen => LayerBlendMode::Blend(BlendMode::Screen),
+            figma_api::models::BlendMode::Overlay => LayerBlendMode::Blend(BlendMode::Overlay),
+            figma_api::models::BlendMode::Darken => LayerBlendMode::Blend(BlendMode::Darken),
+            figma_api::models::BlendMode::Lighten => LayerBlendMode::Blend(BlendMode::Lighten),
+            figma_api::models::BlendMode::ColorDodge => {
+                LayerBlendMode::Blend(BlendMode::ColorDodge)
+            }
+            figma_api::models::BlendMode::ColorBurn => LayerBlendMode::Blend(BlendMode::ColorBurn),
+            figma_api::models::BlendMode::HardLight => LayerBlendMode::Blend(BlendMode::HardLight),
+            figma_api::models::BlendMode::SoftLight => LayerBlendMode::Blend(BlendMode::SoftLight),
+            figma_api::models::BlendMode::Difference => {
+                LayerBlendMode::Blend(BlendMode::Difference)
+            }
+            figma_api::models::BlendMode::Exclusion => LayerBlendMode::Blend(BlendMode::Exclusion),
+            figma_api::models::BlendMode::Hue => LayerBlendMode::Blend(BlendMode::Hue),
+            figma_api::models::BlendMode::Saturation => {
+                LayerBlendMode::Blend(BlendMode::Saturation)
+            }
+            figma_api::models::BlendMode::Color => LayerBlendMode::Blend(BlendMode::Color),
+            figma_api::models::BlendMode::Luminosity => {
+                LayerBlendMode::Blend(BlendMode::Luminosity)
+            }
+            figma_api::models::BlendMode::LinearBurn => LayerBlendMode::Blend(BlendMode::ColorBurn),
+            figma_api::models::BlendMode::LinearDodge => {
+                LayerBlendMode::Blend(BlendMode::ColorDodge)
+            }
         }
     }
 
@@ -945,6 +975,7 @@ impl FigmaConverter {
             stroke_align: StrokeAlign::Inside,
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            mask: None,
             effects: Self::convert_effects(&origin.effects),
         }))
     }
@@ -960,20 +991,17 @@ impl FigmaConverter {
                     id: format!("{}-path-{}", origin.id, path_index),
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
+                    opacity: Self::convert_opacity(origin.visible),
+                    blend_mode: Self::convert_blend_mode(origin.blend_mode),
+                    mask: None,
+                    effects: Self::convert_effects(&origin.effects),
                     transform: AffineTransform::identity(),
-                    fill: self
-                        .convert_fills(Some(&origin.fills))
-                        .first()
-                        .cloned()
-                        .unwrap_or(TRANSPARENT),
+                    fills: self.convert_fills(Some(&origin.fills)),
                     data: geometry.path.clone(),
-                    stroke: None,
+                    strokes: Paints::default(),
                     stroke_width: 0.0,
                     stroke_align: StrokeAlign::Inside,
                     stroke_dash_array: None,
-                    opacity: Self::convert_opacity(origin.visible),
-                    blend_mode: Self::convert_blend_mode(origin.blend_mode),
-                    effects: Self::convert_effects(&origin.effects),
                 });
                 children.push(self.repository.insert(path_node));
                 path_index += 1;
@@ -988,20 +1016,17 @@ impl FigmaConverter {
                     id: format!("{}-path-{}", origin.id, path_index),
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
+                    opacity: Self::convert_opacity(origin.visible),
+                    blend_mode: Self::convert_blend_mode(origin.blend_mode),
+                    mask: None,
+                    effects: Self::convert_effects(&origin.effects),
                     transform: AffineTransform::identity(),
-                    fill: self
-                        .convert_strokes(Some(&origin.strokes))
-                        .first()
-                        .cloned()
-                        .unwrap_or(TRANSPARENT),
+                    fills: Paints::default(),
                     data: geometry.path.clone(),
-                    stroke: None,
+                    strokes: self.convert_strokes(Some(&origin.strokes)),
                     stroke_width: 0.0,
                     stroke_align: StrokeAlign::Inside,
                     stroke_dash_array: None,
-                    opacity: Self::convert_opacity(origin.visible),
-                    blend_mode: Self::convert_blend_mode(origin.blend_mode),
-                    effects: Self::convert_effects(&origin.effects),
                 });
                 children.push(self.repository.insert(path_node));
                 path_index += 1;
@@ -1013,18 +1038,19 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            mask: None,
             transform: Self::convert_transform(origin.relative_transform.as_ref()),
             size: Self::convert_size(origin.size.as_ref()),
             corner_radius: RectangularCornerRadius::zero(),
-            fills: vec![TRANSPARENT],
-            strokes: vec![],
+            fills: Paints::new([TRANSPARENT]),
+            strokes: Paints::default(),
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             effects: LayerEffects::default(),
             children,
-            opacity: Self::convert_opacity(origin.visible),
             clip: false,
         }))
     }
@@ -1060,17 +1086,17 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            mask: None,
+            effects: Self::convert_effects(&origin.effects),
             transform: Some(transform),
             op: op,
             children,
             // map this
             corner_radius: None,
-            fill: self
-                .convert_fills(Some(&origin.fills))
-                .first()
-                .cloned()
-                .unwrap_or(TRANSPARENT),
-            stroke: self.convert_strokes(Some(&origin.strokes)).first().cloned(),
+            fills: self.convert_fills(Some(&origin.fills)),
+            strokes: self.convert_strokes(Some(&origin.strokes)),
             stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 origin
@@ -1083,9 +1109,6 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effects: Self::convert_effects(&origin.effects),
-            opacity: Self::convert_opacity(origin.visible),
-            blend_mode: Self::convert_blend_mode(origin.blend_mode),
         }))
     }
 
@@ -1097,6 +1120,10 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            mask: None,
+            effects: Self::convert_effects(&origin.effects),
             transform,
             size,
             // not available in api?
@@ -1117,9 +1144,6 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(origin.visible),
-            blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(&origin.effects),
         }))
     }
 
@@ -1132,6 +1156,10 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            mask: None,
+            effects: Self::convert_effects(&origin.effects),
             transform,
             size,
             strokes: self
@@ -1150,9 +1178,6 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(origin.visible),
-            blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(&origin.effects),
         }))
     }
 
@@ -1168,6 +1193,10 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            effects: Self::convert_effects(&origin.effects),
+            mask: None,
             transform,
             size,
             fills: self.convert_fills(Some(&origin.fills)),
@@ -1184,9 +1213,6 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(origin.visible),
-            blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(&origin.effects),
 
             // arc data
             inner_radius: Some(origin.arc_data.inner_radius as f32),
@@ -1208,6 +1234,10 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            mask: None,
+            effects: Self::convert_effects(&origin.effects),
             transform,
             size,
             // No count in api ?
@@ -1227,9 +1257,6 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(origin.visible),
-            blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(&origin.effects),
         }))
     }
 
@@ -1241,6 +1268,10 @@ impl FigmaConverter {
             id: origin.id.clone(),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            mask: None,
+            effects: Self::convert_effects(&origin.effects),
             transform,
             size,
             corner_radius: Self::convert_corner_radius(
@@ -1261,9 +1292,6 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(origin.visible),
-            blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            effects: Self::convert_effects(&origin.effects),
         }))
     }
 
@@ -1283,6 +1311,7 @@ impl FigmaConverter {
             children,
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            mask: None,
         }))
     }
 }

@@ -3,7 +3,8 @@ import init, { type Scene } from "@grida/canvas-wasm";
 import locateFile from "./locate-file";
 
 export function useGrida2D(
-  canvasRef: React.RefObject<HTMLCanvasElement | null>
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  onMount?: (surface: Scene) => void
 ) {
   const rendererRef = useRef<Scene | null>(null);
   const isInitializedRef = useRef(false);
@@ -22,6 +23,7 @@ export function useGrida2D(
         // grida.setVerbose(true);
 
         rendererRef.current = grida;
+        onMount?.(grida);
         console.log("grida wasm initialized");
 
         if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {

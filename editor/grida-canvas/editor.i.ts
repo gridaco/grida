@@ -12,6 +12,7 @@ import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
+import type { io } from "@grida/io";
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -130,6 +131,33 @@ export namespace editor.config {
        * renderer allows fake weight
        */
       faux_weight: boolean;
+    };
+
+    /**
+     * Paint constraints that determine whether nodes should use single paint properties
+     * or multiple paint arrays based on the rendering backend.
+     *
+     * - For DOM backend: Uses single paint properties (`"fill"`, `"stroke"`) for compatibility
+     * - For Canvas backend: Uses multiple paint arrays (`"fills"`, `"strokes"`) for advanced rendering
+     *
+     * @example
+     * ```typescript
+     * // DOM backend constraints
+     * paint_constraints: {
+     *   fill: "fill",    // Creates nodes with single fill property
+     *   stroke: "stroke" // Creates nodes with single stroke property
+     * }
+     *
+     * // Canvas backend constraints
+     * paint_constraints: {
+     *   fill: "fills",    // Creates nodes with fills array
+     *   stroke: "strokes" // Creates nodes with strokes array
+     * }
+     * ```
+     */
+    paint_constraints: {
+      fill: "fill" | "fills";
+      stroke: "stroke" | "strokes";
     };
   }
 
@@ -799,18 +827,7 @@ export namespace editor.state {
     /**
      * user clipboard - copied data
      */
-    user_clipboard?: {
-      /** unique payload id for distinguishing clipboard contents */
-      payload_id: string;
-      /**
-       * copied node data as prototype
-       */
-      prototypes: grida.program.nodes.NodePrototype[];
-      /**
-       * original node ids (top ids)
-       */
-      ids: string[];
-    };
+    user_clipboard?: io.clipboard.ClipboardPayload;
     user_clipboard_color?: cg.RGBA8888;
   }
 
@@ -921,7 +938,8 @@ export namespace editor.state {
     | VariableWidthContentEditMode
     | VectorContentEditMode
     | BitmapContentEditMode
-    | FillGradientContentEditMode;
+    | PaintGradientContentEditMode
+    | PaintImageContentEditMode;
 
   type TextContentEditMode = {
     type: "text";
@@ -1071,17 +1089,71 @@ export namespace editor.state {
   };
 
   /**
-   * surface gradient edit mode
+   * Content edit mode for editing gradient paints (both fill and stroke)
+   *
+   * This mode allows users to interactively edit gradient properties including
+   * control points, color stops, and stop positions for both fill and stroke paints.
+   *
+   * @example
+   * ```typescript
+   * // Edit fill gradient at index 0
+   * const mode: PaintGradientContentEditMode = {
+   *   type: "paint/gradient",
+   *   node_id: "node-123",
+   *   paint_target: "fill",
+   *   paint_index: 0,
+   *   selected_stop: 1
+   * };
+   *
+   * // Edit stroke gradient at index 1
+   * const strokeMode: PaintGradientContentEditMode = {
+   *   type: "paint/gradient",
+   *   node_id: "node-123",
+   *   paint_target: "stroke",
+   *   paint_index: 1,
+   *   selected_stop: 0
+   * };
+   * ```
    */
-  export type FillGradientContentEditMode = {
-    type: "fill/gradient";
+  export type PaintGradientContentEditMode = {
+    /** The content edit mode type identifier */
+    type: "paint/gradient";
+    /** The ID of the node being edited */
     node_id: string;
+    /** Whether to edit fill or stroke paints */
+    paint_target: "fill" | "stroke";
     /**
-     * index of the focused stop, if any
+     * Index of the paint being edited within the paint array
+     *
+     * For nodes with multiple fills/strokes, this specifies which one to edit.
+     * Will be clamped to valid range [0, paints.length-1].
+     *
+     * @default 0
+     */
+    paint_index: number;
+    /**
+     * Index of the currently focused gradient stop
+     *
+     * This determines which color stop is selected for editing.
+     * Will be clamped to valid range [0, stops.length-1].
      *
      * @default 0
      */
     selected_stop: number;
+  };
+
+  /**
+   * Content edit mode for manipulating image paints via the surface editor.
+   */
+  export type PaintImageContentEditMode = {
+    /** The content edit mode type identifier. */
+    type: "paint/image";
+    /** The ID of the node whose paint is being edited. */
+    node_id: string;
+    /** Whether the targeted paint is a fill or stroke. */
+    paint_target: "fill" | "stroke";
+    /** Index of the targeted paint within the fill/stroke array. */
+    paint_index: number;
   };
 
   /**
@@ -1820,6 +1892,13 @@ export namespace editor.api {
     }
   }
 
+  export interface ImageInstance {
+    readonly type: grida.program.document.ImageType;
+    getBytes(): Uint8Array;
+    getDataURL(): Promise<string>;
+    getSize(): { width: number; height: number };
+  }
+
   export type FontStyleChangeDescription = {
     fontStyleKey: editor.font_spec.FontStyleKey;
   };
@@ -1991,21 +2070,21 @@ export namespace editor.api {
       node_id: NodeID,
       arcData: grida.program.nodes.i.IEllipseArcData
     ): void;
-    changeNodeFill(
+    changeNodeFills(node_id: NodeID, fills: cg.Paint[]): void;
+    changeNodeFills(node_id: NodeID[], fills: cg.Paint[]): void;
+    changeNodeStrokes(node_id: NodeID, strokes: cg.Paint[]): void;
+    changeNodeStrokes(node_id: NodeID[], strokes: cg.Paint[]): void;
+    addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
+    addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;
+    addNodeStroke(
       node_id: NodeID,
-      fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
+      stroke: cg.Paint,
+      at?: "start" | "end"
     ): void;
-    changeNodeFill(
+    addNodeStroke(
       node_id: NodeID[],
-      fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-    ): void;
-    changeNodeStroke(
-      node_id: NodeID,
-      stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-    ): void;
-    changeNodeStroke(
-      node_id: NodeID[],
-      stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
+      stroke: cg.Paint,
+      at?: "start" | "end"
     ): void;
     changeNodeStrokeWidth(
       node_id: NodeID,
@@ -2015,7 +2094,7 @@ export namespace editor.api {
     changeNodeStrokeAlign(node_id: NodeID, strokeAlign: cg.StrokeAlign): void;
     changeNodeFit(node_id: NodeID, fit: cg.BoxFit): void;
     changeNodeOpacity(node_id: NodeID, opacity: editor.api.NumberChange): void;
-    changeNodeBlendMode(node_id: NodeID, blendMode: cg.BlendMode): void;
+    changeNodeBlendMode(node_id: NodeID, blendMode: cg.LayerBlendMode): void;
     changeNodeRotation(
       node_id: NodeID,
       rotation: editor.api.NumberChange
@@ -2392,20 +2471,17 @@ export namespace editor.api {
     ): void;
 
     //
-    /**
-     * creates an image (data) from the given src, registers it to the document
-     * @param src
-     */
-    createImage(src: string): Promise<grida.program.document.ImageRef>;
-
-    //
     setTool(tool: editor.state.ToolMode): void;
     tryExitContentEditMode(): void;
     tryToggleContentEditMode(): void;
     tryEnterContentEditMode(): void;
     tryEnterContentEditMode(
       node_id?: string,
-      mode?: "auto" | "fill/gradient"
+      mode?: "auto" | "paint/gradient" | "paint/image",
+      options?: {
+        paintIndex?: number;
+        paintTarget?: "fill" | "stroke";
+      }
     ): void;
     //
 
@@ -2464,6 +2540,7 @@ export namespace editor.api {
     subtract(target: ReadonlyArray<NodeID>): void;
     intersect(target: ReadonlyArray<NodeID>): void;
     exclude(target: ReadonlyArray<NodeID>): void;
+    groupMask(target: ReadonlyArray<NodeID>): void;
 
     setClipboardColor(color: cg.RGBA8888): void;
 
@@ -2515,12 +2592,19 @@ export namespace editor.api {
     /**
      * select the gradient stop by the given index
      *
-     * only effective when content edit mode is {@link editor.state.FillGradientContentEditMode}
+     * only effective when content edit mode is {@link editor.state.PaintGradientContentEditMode}
      *
      * @param node_id node id
      * @param stop index of the stop
      */
-    selectGradientStop(node_id: NodeID, stop: number): void;
+    selectGradientStop(
+      node_id: NodeID,
+      stop: number,
+      options?: {
+        paintIndex?: number;
+        paintTarget?: "fill" | "stroke";
+      }
+    ): void;
     //
 
     //
@@ -2632,6 +2716,30 @@ export namespace editor.api {
 
   export interface IVectorInterfaceActions {
     toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+  }
+
+  export interface IDocumentImageInterfaceActions {
+    //
+
+    /**
+     * creates an image (data) from the given data, registers it to the document
+     * @param data
+     */
+    createImage(
+      data: Uint8Array | File
+    ): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * creates an image (data) from the given src, registers it to the document
+     * @param src
+     */
+    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * gets the image instance from the given ref
+     * @param ref
+     */
+    getImage(ref: string): ImageInstance | null;
   }
 
   export interface IFontLoaderActions {

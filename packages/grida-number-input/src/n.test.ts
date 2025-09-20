@@ -358,6 +358,83 @@ describe("n.formatValueWithPrecision", () => {
   });
 });
 
+describe("n.parseValueWithSuffix", () => {
+  test("should parse values with suffix", () => {
+    expect(n.parseValueWithSuffix("123%", "number", "%")).toBe(123);
+    expect(n.parseValueWithSuffix("45px", "number", "px")).toBe(45);
+    expect(n.parseValueWithSuffix("12.5%", "number", "%")).toBe(12.5);
+  });
+
+  test("should parse values without suffix", () => {
+    expect(n.parseValueWithSuffix("123", "number", "%")).toBe(123);
+    expect(n.parseValueWithSuffix("45", "number", "px")).toBe(45);
+    expect(n.parseValueWithSuffix("12.5", "number", "%")).toBe(12.5);
+  });
+
+  test("should return NaN for invalid values", () => {
+    expect(n.parseValueWithSuffix("", "number", "%")).toBeNaN();
+    expect(n.parseValueWithSuffix("abc", "number", "%")).toBeNaN();
+    expect(n.parseValueWithSuffix("abc%", "number", "%")).toBeNaN();
+  });
+
+  test("should handle integer type", () => {
+    expect(n.parseValueWithSuffix("123%", "integer", "%")).toBe(123);
+    expect(n.parseValueWithSuffix("12.5%", "integer", "%")).toBe(12);
+  });
+});
+
+describe("n.formatValueWithSuffix", () => {
+  test("should format values with suffix", () => {
+    expect(n.formatValueWithSuffix(123, "%")).toBe("123%");
+    expect(n.formatValueWithSuffix(45, "px")).toBe("45px");
+    expect(n.formatValueWithSuffix(12.5, "%")).toBe("12.5%");
+  });
+
+  test("should format values without suffix", () => {
+    expect(n.formatValueWithSuffix(123)).toBe("123");
+    expect(n.formatValueWithSuffix(45)).toBe("45");
+    expect(n.formatValueWithSuffix(12.5)).toBe("12.5");
+  });
+
+  test("should handle scaling", () => {
+    expect(n.formatValueWithSuffix(0.5, "%", 100)).toBe("50%");
+    expect(n.formatValueWithSuffix(0.75, "%", 100)).toBe("75%");
+    expect(n.formatValueWithSuffix(1, "%", 100)).toBe("100%");
+  });
+
+  test("should handle mixed values", () => {
+    expect(n.formatValueWithSuffix("mixed", "%")).toBe("mixed");
+    expect(n.formatValueWithSuffix("", "%")).toBe("");
+  });
+
+  test("should handle precision with step", () => {
+    expect(
+      n.formatValueWithSuffix(1.234, "%", undefined, 0.01, "number", 2)
+    ).toBe("1.23%");
+    expect(
+      n.formatValueWithSuffix(1.234, "%", undefined, 0.1, "number", 1)
+    ).toBe("1.2%");
+  });
+});
+
+describe("n.parseValueWithScaling", () => {
+  test("should parse and apply inverse scaling", () => {
+    expect(n.parseValueWithScaling("50%", "number", "%", 100)).toBe(0.5);
+    expect(n.parseValueWithScaling("75%", "number", "%", 100)).toBe(0.75);
+    expect(n.parseValueWithScaling("100%", "number", "%", 100)).toBe(1);
+  });
+
+  test("should parse without scaling", () => {
+    expect(n.parseValueWithScaling("50", "number", undefined, 100)).toBe(0.5);
+    expect(n.parseValueWithScaling("75", "number", undefined, 100)).toBe(0.75);
+  });
+
+  test("should handle values without suffix", () => {
+    expect(n.parseValueWithScaling("50", "number", "%", 100)).toBe(0.5);
+    expect(n.parseValueWithScaling("75", "number", "px", 100)).toBe(0.75);
+  });
+});
+
 describe("Integration tests", () => {
   test("should work together correctly", () => {
     const value = 1.234567;
@@ -383,5 +460,35 @@ describe("Integration tests", () => {
 
     expect(rounded).toBe(2); // 1.9 → 2
     expect(formatted).toBe("2"); // 1.9 → 2
+  });
+
+  test("should handle percentage input workflow", () => {
+    // Simulate percentage input: 0.5 internal value → 50% display
+    const internalValue = 0.5;
+    const displayValue = n.formatValueWithSuffix(
+      internalValue,
+      "%",
+      100,
+      0.01,
+      "number",
+      1
+    );
+    expect(displayValue).toBe("50%");
+
+    // Simulate user typing "75" → parse back to internal value
+    const userInput = "75";
+    const parsedValue = n.parseValueWithScaling(userInput, "number", "%", 100);
+    expect(parsedValue).toBe(0.75);
+
+    // Format the parsed value back to display
+    const formattedValue = n.formatValueWithSuffix(
+      parsedValue,
+      "%",
+      100,
+      0.01,
+      "number",
+      1
+    );
+    expect(formattedValue).toBe("75%");
   });
 });

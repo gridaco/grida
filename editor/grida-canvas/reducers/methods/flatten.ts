@@ -84,10 +84,27 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
     top: (node as any).top!,
   } as grida.program.nodes.VectorNode;
 
+  __dangerously_delete_non_vector_properties(vectornode);
+
   const delta = normalizeVectorNodeBBox(vectornode);
 
   draft.document.nodes[node_id] = vectornode;
   return { node: vectornode, delta };
+}
+
+/**
+ * FIXME: the safe and correct way is to "recreate" rather then reusing the existing one.
+ */
+function __dangerously_delete_non_vector_properties(
+  node: grida.program.nodes.Node
+) {
+  // Remove primitive-only properties that should not persist on vector nodes.
+  // star
+  delete (node as any).pointCount;
+  delete (node as any).innerRadius;
+
+  // text
+  delete (node as any).text;
 }
 
 function modeCornerRadius(node: grida.program.nodes.Node): number | undefined {

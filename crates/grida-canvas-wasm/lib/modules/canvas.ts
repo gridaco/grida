@@ -9,6 +9,14 @@ const ApplicationCommandID = {
   Pan: 4,
 } as const;
 
+export interface CreateImageResourceResult {
+  hash: string;
+  url: string;
+  width: number;
+  height: number;
+  type: string;
+}
+
 export class Scene {
   private appptr: number;
   private module: createGridaCanvas.GridaCanvasWasmBindings;
@@ -85,16 +93,47 @@ export class Scene {
     this.module._deallocate(ptr, len);
   }
 
-  addImage(data: Uint8Array): string {
+  addImage(data: Uint8Array): CreateImageResourceResult | false {
     const len = data.length;
     const ptr = this.module._allocate(len);
     this.module.HEAPU8.set(data, ptr);
     const out = this.module._add_image(this.appptr, ptr, len);
     this.module._deallocate(ptr, len);
-    const hash = this.module.UTF8ToString(out);
-    const hlen = this.module.lengthBytesUTF8(hash) + 1;
+    if (out === 0) return false;
+    const txt = this.module.UTF8ToString(out);
+    const hlen = this.module.lengthBytesUTF8(txt) + 1;
     this._free_string(out, hlen);
-    return hash;
+    try {
+      return JSON.parse(txt) as CreateImageResourceResult;
+    } catch {
+      return false;
+    }
+  }
+
+  getImageBytes(ref: string): Uint8Array | null {
+    const [ptr, len] = this._alloc_string(ref);
+    const outptr = this.module._get_image_bytes(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+    if (outptr === 0) return null;
+    const lengthBytes = this.module.HEAPU8.slice(outptr, outptr + 4);
+    const dataLength = new Uint32Array(
+      lengthBytes.buffer,
+      lengthBytes.byteOffset,
+      1
+    )[0];
+    const data = this.module.HEAPU8.slice(outptr + 4, outptr + 4 + dataLength);
+    this.module._deallocate(outptr, 4 + dataLength);
+    return new Uint8Array(data);
+  }
+
+  getImageSize(ref: string): { width: number; height: number } | null {
+    const [ptr, len] = this._alloc_string(ref);
+    const outptr = this.module._get_image_size(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+    if (outptr === 0) return null;
+    const view = this.module.HEAPU32.slice(outptr >> 2, (outptr >> 2) + 2);
+    this.module._deallocate(outptr, 4 * 2);
+    return { width: view[0], height: view[1] };
   }
 
   hasMissingFonts(): boolean {

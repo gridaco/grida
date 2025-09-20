@@ -19,19 +19,20 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             id: id.clone(),
             name: None,
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
             transform: AffineTransform::identity(),
             size: Size {
                 width: 100.0,
                 height: 100.0,
             },
             corner_radius: RectangularCornerRadius::zero(),
-            fills: vec![Paint::from(CGColor(255, 0, 0, 255))],
-            strokes: vec![],
+            fills: Paints::new([Paint::from(CGColor(255, 0, 0, 255))]),
+            strokes: Paints::default(),
             stroke_width: 1.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
             effects: if with_effects {
                 LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
                     dx: 2.0,
@@ -56,7 +57,8 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         transform: None,
         children: ids.clone(),
         opacity: 1.0,
-        blend_mode: BlendMode::Normal,
+        blend_mode: LayerBlendMode::default(),
+        mask: None,
     };
 
     repository.insert(Node::Group(root_group));

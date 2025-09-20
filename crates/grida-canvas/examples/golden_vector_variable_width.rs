@@ -1,4 +1,4 @@
-use cg::cg::types::CGColor;
+use cg::cg::types::*;
 use cg::cg::varwidth::*;
 use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
 use cg::vectornetwork::vn_painter::VNPainter;
@@ -80,9 +80,9 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     let painter = VNPainter::new(canvas);
-    painter.draw_stroke_variable_width(&curve_1, CGColor::BLACK, &width_profile_1);
-    painter.draw_stroke_variable_width(&curve_2, CGColor::BLACK, &width_profile_1);
-    painter.draw_stroke_variable_width(&curve_3, CGColor::BLACK, &width_profile_1);
+    painter.draw_stroke_variable_width(&curve_1, &[Paint::from(CGColor::BLACK)], &width_profile_1);
+    painter.draw_stroke_variable_width(&curve_2, &[Paint::from(CGColor::BLACK)], &width_profile_1);
+    painter.draw_stroke_variable_width(&curve_3, &[Paint::from(CGColor::BLACK)], &width_profile_1);
 
     let image = surface.image_snapshot();
     let data = image

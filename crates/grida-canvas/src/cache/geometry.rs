@@ -185,7 +185,7 @@ impl GeometryCache {
 
                 let render_bounds = compute_render_bounds_from_style(
                     world_bounds,
-                    if n.stroke.is_some() {
+                    if !n.strokes.is_empty() {
                         n.stroke_width
                     } else {
                         0.0

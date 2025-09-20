@@ -84,7 +84,10 @@ namespace n {
     }
 
     // Apply precision tolerance to prevent floating point issues
-    return applyPrecision(result, precision);
+    // But don't override step precision - use the higher of step precision or tolerance
+    const stepPrecision = countDecimalPlaces(step);
+    const effectivePrecision = Math.max(stepPrecision, precision);
+    return applyPrecision(result, effectivePrecision);
   }
 
   /**
@@ -187,6 +190,112 @@ namespace n {
     }
 
     return value;
+  }
+
+  /**
+   * Parses a string value into a number, handling optional suffix removal.
+   * Returns NaN for empty or invalid values instead of 0 to prevent unwanted commits.
+   *
+   * @param value - The string value to parse
+   * @param type - Whether to parse as integer or number
+   * @param suffix - Optional suffix to remove (e.g., "%", "px")
+   * @returns Parsed number or NaN if invalid/empty
+   *
+   * @example
+   * parseValueWithSuffix("123%", "number", "%") // Returns 123
+   * parseValueWithSuffix("", "number")          // Returns NaN
+   * parseValueWithSuffix("abc", "number")       // Returns NaN
+   */
+  export function parseValueWithSuffix(
+    value: string,
+    type: "integer" | "number",
+    suffix?: string
+  ): number {
+    if (!value) return NaN;
+
+    // Remove suffix if present
+    let cleanValue = value;
+    if (suffix && value.endsWith(suffix)) {
+      cleanValue = value.slice(0, -suffix.length);
+    }
+
+    // Parse the numeric value
+    const parsed =
+      type === "integer" ? parseInt(cleanValue) : parseFloat(cleanValue);
+
+    return isNaN(parsed) ? NaN : parsed;
+  }
+
+  /**
+   * Formats a value for display with optional suffix, scaling, and precision.
+   *
+   * @param value - The value to format (number, string, or "mixed")
+   * @param suffix - Optional suffix to append (e.g., "%", "px")
+   * @param scale - Optional scale factor for display (e.g., 100 for percentages)
+   * @param step - Optional step value to determine precision
+   * @param type - The input type ('integer' or 'number')
+   * @param precision - Maximum precision tolerance (default: 1)
+   * @returns Formatted string for display
+   *
+   * @example
+   * formatValueWithSuffix(0.5, "%", 100, 0.1, 'number') // Returns "50%"
+   * formatValueWithSuffix("mixed")                      // Returns "mixed"
+   * formatValueWithSuffix("")                           // Returns ""
+   */
+  export function formatValueWithSuffix(
+    value: string | number,
+    suffix?: string,
+    scale?: number,
+    step?: number,
+    type: "integer" | "number" = "number",
+    precision: number = 1
+  ): string {
+    if (value === "mixed") return "mixed";
+    if (value === "") return "";
+
+    let numericValue =
+      typeof value === "number" ? value : parseFloat(String(value));
+
+    // Apply scaling if provided (e.g., for percentages: 0.01 -> 1)
+    if (scale && typeof numericValue === "number") {
+      numericValue = numericValue * scale;
+    }
+
+    // Format with proper precision based on step and type
+    const formattedValue = step
+      ? formatValueWithPrecision(numericValue, step, type, precision)
+      : String(applyPrecision(numericValue, precision));
+
+    return suffix ? `${formattedValue}${suffix}` : formattedValue;
+  }
+
+  /**
+   * Parses a string value into a number with optional suffix removal and inverse scaling.
+   *
+   * @param value - The string value to parse
+   * @param type - Whether to parse as integer or number
+   * @param suffix - Optional suffix to remove (e.g., "%", "px")
+   * @param scale - Optional scale factor for inverse scaling (e.g., 100 for percentages)
+   * @returns Parsed number with inverse scaling applied, or NaN if invalid
+   *
+   * @example
+   * parseValueWithScaling("50%", "number", "%", 100) // Returns 0.5
+   * parseValueWithScaling("123", "number", undefined, 100) // Returns 1.23
+   */
+  export function parseValueWithScaling(
+    value: string,
+    type: "integer" | "number",
+    suffix?: string,
+    scale?: number
+  ): number {
+    const parsedValue = parseValueWithSuffix(value, type, suffix);
+
+    // Apply inverse scaling if provided (e.g., for percentages: 1 -> 0.01)
+    if (scale && typeof parsedValue === "number") {
+      return parsedValue / scale;
+    }
+
+    return parsedValue;
   }
 }
 

@@ -100,7 +100,8 @@ pub struct UnknownNodeProperties {
     pub transform: AffineTransform,
     pub children: Option<Vec<NodeId>>,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
+    pub mask_type: LayerMaskType,
 
     pub size: Option<Size>,
     pub point_count: Option<usize>,
@@ -125,10 +126,10 @@ pub struct UnknownNodeProperties {
     pub corner_radius_bottom_left: Option<Radius>,
     // #endregion
     /// The paint used to fill the interior of the shape.
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// The stroke paint used to outline the shape.
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
     /// The stroke width used to outline the shape.
     pub stroke_width: f32,
     /// The stroke align used to outline the shape.
@@ -238,12 +239,12 @@ impl NodeTrait for Node {
 
 pub trait NodeFillsMixin {
     fn set_fill(&mut self, fill: Paint);
-    fn set_fills(&mut self, fills: Vec<Paint>);
+    fn set_fills(&mut self, fills: Paints);
 }
 
 pub trait NodeStrokesMixin {
     fn set_stroke(&mut self, stroke: Paint);
-    fn set_strokes(&mut self, strokes: Vec<Paint>);
+    fn set_strokes(&mut self, strokes: Paints);
 }
 
 pub trait NodeTransformMixin {
@@ -384,10 +385,13 @@ pub struct GroupNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+
     pub transform: Option<AffineTransform>,
     pub children: Vec<NodeId>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -395,17 +399,21 @@ pub struct ContainerNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
     pub children: Vec<NodeId>,
-    pub fills: Vec<Paint>,
-    pub strokes: Vec<Paint>,
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
+
     pub effects: LayerEffects,
     /// Content-only clipping switch.
     ///
@@ -435,10 +443,10 @@ impl ContainerNodeRec {
 
 impl NodeFillsMixin for ContainerNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -495,16 +503,19 @@ pub struct RectangleNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
-    pub fills: Vec<Paint>,
-    pub strokes: Vec<Paint>,
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
     pub effects: LayerEffects,
 }
 
@@ -520,10 +531,10 @@ impl RectangleNodeRec {
 
 impl NodeFillsMixin for RectangleNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -580,15 +591,18 @@ pub struct LineNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
+
     pub transform: AffineTransform,
     pub size: Size, // height is always 0 (ignored)
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub _data_stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
 }
 
 impl LineNodeRec {
@@ -598,23 +612,47 @@ impl LineNodeRec {
     }
 }
 
+/// A node representing an image element, similar to HTML `<img>`.
+///
+/// Unlike other shape nodes, ImageNodeRec intentionally supports only a single image fill
+/// to align with web development patterns where `<img>` elements have a single image source,
+/// rather than using images as backgrounds for `<div>` elements (which would support multiple fills).
+///
+/// This design choice reflects the common distinction in web development:
+/// - `<img>` = single image content (what this node represents)
+/// - `<div style="background-image: ...">` = multiple background layers (use other shape nodes)
 #[derive(Debug, Clone)]
 pub struct ImageNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub effects: LayerEffects,
+    pub mask: Option<LayerMaskType>,
+
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
+    /// Single image fill - intentionally not supporting multiple fills to align with
+    /// web development patterns where `<img>` elements have one image source.
     pub fill: ImagePaint,
-    pub stroke: Paint,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
-    pub hash: String,
+    pub image: ResourceRef,
+}
+
+impl NodeStrokesMixin for ImageNodeRec {
+    fn set_stroke(&mut self, stroke: Paint) {
+        self.strokes = Paints::new([stroke]);
+    }
+
+    fn set_strokes(&mut self, strokes: Paints) {
+        self.strokes = strokes;
+    }
 }
 
 impl ImageNodeRec {
@@ -648,7 +686,7 @@ impl NodeGeometryMixin for ImageNodeRec {
     }
 
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.stroke.opacity() > 0.0
+        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
@@ -677,16 +715,19 @@ pub struct EllipseNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub effects: LayerEffects,
+    pub mask: Option<LayerMaskType>,
+
     pub transform: AffineTransform,
     pub size: Size,
-    pub fills: Vec<Paint>,
-    pub strokes: Vec<Paint>,
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
 
     /// inner radius - 0 ~ 1
     pub inner_radius: Option<f32>,
@@ -703,10 +744,10 @@ pub struct EllipseNodeRec {
 
 impl NodeFillsMixin for EllipseNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -793,18 +834,41 @@ pub struct BooleanPathOperationNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
+
     pub transform: Option<AffineTransform>,
     pub op: BooleanPathOperation,
     pub corner_radius: Option<f32>,
     pub children: Vec<NodeId>,
-    pub fill: Paint,
-    pub stroke: Option<Paint>,
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
+}
+
+impl NodeFillsMixin for BooleanPathOperationNodeRec {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = Paints::new([fill]);
+    }
+
+    fn set_fills(&mut self, fills: Paints) {
+        self.fills = fills;
+    }
+}
+
+impl NodeStrokesMixin for BooleanPathOperationNodeRec {
+    fn set_stroke(&mut self, stroke: Paint) {
+        self.strokes = Paints::new([stroke]);
+    }
+
+    fn set_strokes(&mut self, strokes: Paints) {
+        self.strokes = strokes;
+    }
 }
 
 ///
@@ -815,22 +879,45 @@ pub struct VectorNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
+
     pub transform: AffineTransform,
     pub network: VectorNetwork,
     /// The corner radius of the vector node.
     pub corner_radius: f32,
-    /// The fill paint of the vector node. (currently only one fill is supported)
-    pub fill: Option<Paint>,
-    pub strokes: Vec<Paint>,
+    /// The fill paints of the vector node.
+    pub fills: Paints,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_width_profile: Option<cg::varwidth::VarWidthProfile>,
     /// Requested stroke alignment. For open paths, `Inside` and `Outside`
     /// alignments are treated as `Center`.
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
+}
+
+impl NodeFillsMixin for VectorNodeRec {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = Paints::new([fill]);
+    }
+
+    fn set_fills(&mut self, fills: Paints) {
+        self.fills = fills;
+    }
+}
+
+impl NodeStrokesMixin for VectorNodeRec {
+    fn set_stroke(&mut self, stroke: Paint) {
+        self.strokes = Paints::new([stroke]);
+    }
+
+    fn set_strokes(&mut self, strokes: Paints) {
+        self.strokes = strokes;
+    }
 }
 
 impl VectorNodeRec {
@@ -866,16 +953,39 @@ pub struct SVGPathNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
+
     pub transform: AffineTransform,
-    pub fill: Paint,
+    pub fills: Paints,
     pub data: String,
-    pub stroke: Option<Paint>,
+    pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
+}
+
+impl NodeFillsMixin for SVGPathNodeRec {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = Paints::new([fill]);
+    }
+
+    fn set_fills(&mut self, fills: Paints) {
+        self.fills = fills;
+    }
+}
+
+impl NodeStrokesMixin for SVGPathNodeRec {
+    fn set_stroke(&mut self, stroke: Paint) {
+        self.strokes = Paints::new([stroke]);
+    }
+
+    fn set_strokes(&mut self, strokes: Paints) {
+        self.strokes = strokes;
+    }
 }
 
 impl NodeTransformMixin for SVGPathNodeRec {
@@ -903,6 +1013,12 @@ pub struct PolygonNodeRec {
     pub name: Option<String>,
     pub active: bool,
 
+    /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
+
     /// 2D affine transform matrix applied to the shape.
     pub transform: AffineTransform,
 
@@ -913,38 +1029,33 @@ pub struct PolygonNodeRec {
     pub corner_radius: f32,
 
     /// The paint used to fill the interior of the polygon.
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// The stroke paint used to outline the polygon.
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-
-    /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
 }
 
 impl NodeFillsMixin for PolygonNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
 
 impl NodeStrokesMixin for PolygonNodeRec {
     fn set_stroke(&mut self, stroke: Paint) {
-        self.strokes = vec![stroke];
+        self.strokes = Paints::new([stroke]);
     }
 
-    fn set_strokes(&mut self, strokes: Vec<Paint>) {
+    fn set_strokes(&mut self, strokes: Paints) {
         self.strokes = strokes;
     }
 }
@@ -1000,6 +1111,11 @@ pub struct RegularPolygonNodeRec {
     pub id: NodeId,
     pub name: Option<String>,
     pub active: bool,
+    /// Overall node opacity (0.0–1.0)
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
 
     /// Affine transform applied to this node
     pub transform: AffineTransform,
@@ -1014,27 +1130,23 @@ pub struct RegularPolygonNodeRec {
     pub corner_radius: f32,
 
     /// Fill paint (solid or gradient)
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// The stroke paint used to outline the polygon.
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
-    /// Overall node opacity (0.0–1.0)
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
 }
 
 impl NodeFillsMixin for RegularPolygonNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -1117,6 +1229,11 @@ pub struct RegularStarPolygonNodeRec {
     pub name: Option<String>,
     pub active: bool,
 
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
+
     /// Affine transform applied to this node
     pub transform: AffineTransform,
 
@@ -1140,27 +1257,24 @@ pub struct RegularStarPolygonNodeRec {
     pub corner_radius: f32,
 
     /// Fill paint (solid or gradient)
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// The stroke paint used to outline the polygon.
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     /// Overall node opacity (0.0–1.0)
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-    pub effects: LayerEffects,
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
 impl NodeFillsMixin for RegularStarPolygonNodeRec {
     fn set_fill(&mut self, fill: Paint) {
-        self.fills = vec![fill];
+        self.fills = Paints::new([fill]);
     }
 
-    fn set_fills(&mut self, fills: Vec<Paint>) {
+    fn set_fills(&mut self, fills: Paints) {
         self.fills = fills;
     }
 }
@@ -1363,17 +1477,18 @@ pub struct TextSpanNodeRec {
     pub ellipsis: Option<String>,
 
     /// Fill paints stack (solid, gradient, etc.)
-    pub fills: Vec<Paint>,
+    pub fills: Paints,
 
     /// Stroke paints stack (solid, gradient, etc.)
-    pub strokes: Vec<Paint>,
+    pub strokes: Paints,
 
     /// Stroke width
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     /// Overall node opacity.
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
 }
 
@@ -1407,7 +1522,9 @@ pub struct TextNodeRec {
     /// Only `Center` alignment is honored for now.
     pub stroke_align: StrokeAlign,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
 }
 
 // endregion

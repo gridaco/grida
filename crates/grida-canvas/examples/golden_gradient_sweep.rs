@@ -28,7 +28,7 @@ fn main() {
         blend_mode: BlendMode::Normal,
     };
 
-    let paint = sweep_gradient_paint(&gradient, 1.0, (width as f32, height as f32));
+    let paint = sweep_gradient_paint(&gradient, (width as f32, height as f32));
 
     canvas.draw_rect(
         Rect::from_xywh(0.0, 0.0, width as f32, height as f32),

@@ -82,7 +82,7 @@ export namespace iofigma {
       };
 
       export const blendModeMap: Record<BlendMode, cg.BlendMode> = {
-        PASS_THROUGH: "normal", // No blending, default behavior.
+        PASS_THROUGH: "normal", // no-op here
         NORMAL: "normal", // Matches the default blend mode.
         DARKEN: "darken",
         MULTIPLY: "multiply",
@@ -101,6 +101,11 @@ export namespace iofigma {
         SATURATION: "saturation",
         COLOR: "color",
         LUMINOSITY: "luminosity",
+      };
+
+      export const layerBlendModeMap: Record<BlendMode, cg.LayerBlendMode> = {
+        ...blendModeMap,
+        PASS_THROUGH: "pass-through",
       };
     }
 
@@ -161,6 +166,8 @@ export namespace iofigma {
                 { offset: 0, color: { r: 217, g: 217, b: 217, a: 1 } },
                 { offset: 1, color: { r: 115, g: 115, b: 115, a: 1 } },
               ],
+              blendMode: map.blendModeMap[paint.blendMode],
+              opacity: 1,
             };
         }
       }
@@ -173,6 +180,14 @@ export namespace iofigma {
         arr: T[]
       ): T | undefined {
         return arr.filter((f) => f.visible !== false)[0];
+      }
+
+      /**
+       * Get all visible paints from a Figma paint array
+       * @returns array of visible paints
+       */
+      function visible_paints<T extends { visible?: boolean }>(arr: T[]): T[] {
+        return arr.filter((f) => f.visible !== false);
       }
 
       function rectangleCornerRadius(
@@ -286,10 +301,19 @@ export namespace iofigma {
           case "SECTION": {
             const { fills, strokes, strokeWeight, strokeAlign } = node;
 
+            const visible_fills = visible_paints(fills);
+            const visible_strokes = strokes ? visible_paints(strokes) : [];
             const first_visible_fill = first_visible(fills);
             const first_visible_stroke = strokes
               ? first_visible(strokes)
               : undefined;
+
+            const fills_paints = visible_fills
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
 
             return {
               id: node.id,
@@ -298,6 +322,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: 1,
+              blendMode: "pass-through",
               zIndex: 0,
               type: "container",
               expanded: false,
@@ -309,6 +334,7 @@ export namespace iofigma {
               height: node.size!.y,
 
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fills: fills_paints.length > 0 ? fills_paints : undefined,
               //
               border:
                 first_visible_stroke?.type === "SOLID"
@@ -367,10 +393,19 @@ export namespace iofigma {
               // strokesIncludedInLayout // ignored
             } = node;
 
+            const visible_fills = visible_paints(fills);
+            const visible_strokes = strokes ? visible_paints(strokes) : [];
             const first_visible_fill = first_visible(fills);
             const first_visible_stroke = strokes
               ? first_visible(strokes)
               : undefined;
+
+            const fills_paints = visible_fills
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
 
             return {
               id: node.id,
@@ -379,6 +414,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "container",
               expanded: false,
@@ -390,6 +426,7 @@ export namespace iofigma {
               height: node.size!.y,
 
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fills: fills_paints.length > 0 ? fills_paints : undefined,
               //
               border:
                 first_visible_stroke?.type === "SOLID"
@@ -443,6 +480,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "container",
               expanded: false,
@@ -473,10 +511,19 @@ export namespace iofigma {
           case "TEXT": {
             const { fills, strokes, strokeWeight, strokeDashes } = node;
 
+            const visible_fills = visible_paints(fills);
+            const visible_strokes = strokes ? visible_paints(strokes) : [];
             const first_visible_fill = first_visible(fills);
             const first_visible_stroke = strokes
               ? first_visible(strokes)
               : undefined;
+
+            const fills_paints = visible_fills
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
 
             const figma_text_resizing_model = node.style.textAutoResize;
             const figma_constraints_horizontal = node.constraints?.horizontal;
@@ -516,6 +563,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "text",
               text: node.characters,
@@ -536,10 +584,12 @@ export namespace iofigma {
                   ? "auto"
                   : fixedheight,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fills: fills_paints.length > 0 ? fills_paints : undefined,
               //
               stroke: first_visible_stroke
                 ? paint(first_visible_stroke)
                 : undefined,
+              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
               strokeWidth: strokeWeight ?? 0,
               border:
                 first_visible_stroke?.type === "SOLID"
@@ -582,10 +632,19 @@ export namespace iofigma {
             const { fills, strokes, strokeDashes, strokeWeight, strokeCap } =
               node;
 
+            const visible_fills = visible_paints(fills);
+            const visible_strokes = strokes ? visible_paints(strokes) : [];
             const first_visible_fill = first_visible(fills);
             const first_visible_stroke = strokes
               ? first_visible(strokes)
               : undefined;
+
+            const fills_paints = visible_fills
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
 
             if (first_visible_fill?.type === "IMAGE") {
               return {
@@ -595,6 +654,7 @@ export namespace iofigma {
                 locked: node.locked ?? false,
                 rotation: node.rotation ?? 0,
                 opacity: node.opacity ?? 1,
+                blendMode: map.layerBlendModeMap[node.blendMode],
                 zIndex: 0,
                 type: "image",
                 src: images[first_visible_fill.imageRef!],
@@ -632,7 +692,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.blendModeMap[node.blendMode],
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "rectangle",
               //
@@ -642,6 +702,7 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fills: fills_paints.length > 0 ? fills_paints : undefined,
               strokeWidth: strokeWeight ?? 0,
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
@@ -651,9 +712,18 @@ export namespace iofigma {
             } satisfies grida.program.nodes.RectangleNode;
           }
           case "ELLIPSE": {
-            const { fills, strokeWeight, strokeCap } = node;
+            const { fills, strokes, strokeWeight, strokeCap } = node;
 
+            const visible_fills = visible_paints(fills);
+            const visible_strokes = strokes ? visible_paints(strokes) : [];
             const first_visible_fill = first_visible(fills);
+
+            const fills_paints = visible_fills
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
 
             return {
               id: node.id,
@@ -662,7 +732,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.blendModeMap[node.blendMode],
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "ellipse",
               //
@@ -672,6 +742,7 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fills: fills_paints.length > 0 ? fills_paints : undefined,
               strokeWidth: strokeWeight ?? 0,
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
@@ -688,8 +759,14 @@ export namespace iofigma {
           case "BOOLEAN_OPERATION": {
           }
           case "LINE": {
-            const { fills, strokeWeight, strokeCap, strokeAlign } = node;
-            const first_visible_stroke = first_visible(node.strokes ?? []);
+            const { fills, strokes, strokeWeight, strokeCap, strokeAlign } =
+              node;
+            const visible_strokes = strokes ? visible_paints(strokes) : [];
+            const first_visible_stroke = first_visible(strokes ?? []);
+
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
 
             return {
               id: node.id,
@@ -698,13 +775,14 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.blendModeMap[node.blendMode],
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "line",
               position: "absolute",
               stroke: first_visible_stroke
                 ? paint(first_visible_stroke)
                 : undefined,
+              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
               strokeWidth: strokeWeight ?? 0,
               strokeAlign: strokeAlign
                 ? (map.strokeAlignMap[strokeAlign] ?? "inside")
@@ -724,7 +802,7 @@ export namespace iofigma {
           case "REGULAR_POLYGON":
           case "STAR":
           case "VECTOR": {
-            const { fills, fillGeometry, strokeGeometry } = node;
+            const { fills, strokes, fillGeometry, strokeGeometry } = node;
 
             // check if vector can be converted to line
             // if (
@@ -752,7 +830,16 @@ export namespace iofigma {
             //   }
             // }
 
+            const visible_fills = visible_paints(fills);
+            const visible_strokes = strokes ? visible_paints(strokes) : [];
             const first_visible_fill = first_visible(fills);
+
+            const fills_paints = visible_fills
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
 
             return {
               id: node.id,
@@ -761,7 +848,7 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.blendModeMap[node.blendMode],
+              blendMode: map.layerBlendModeMap[node.blendMode],
               zIndex: 0,
               type: "svgpath",
               //
@@ -771,6 +858,7 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fills: fills_paints.length > 0 ? fills_paints : undefined,
               // effects: [], // TODO:
               // cornerRadius: node.cornerRadius
               //   ? node.cornerRadius

@@ -1,3 +1,5 @@
+import documentReducer from "../document.reducer";
+
 jest.mock("@grida/vn", () => {
   class VectorNetworkEditor {
     private _net: any;
@@ -92,8 +94,6 @@ jest.mock("../surface.reducer", () => ({
   __esModule: true,
   default: jest.fn(),
 }));
-
-const documentReducer = require("../document.reducer").default;
 
 describe("document reducer - vector cut", () => {
   test("cuts selected vector network", () => {

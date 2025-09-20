@@ -44,37 +44,65 @@ impl From<JSONGradientStop> for GradientStop {
 #[serde(tag = "type")]
 pub enum JSONPaint {
     #[serde(rename = "solid")]
-    Solid { color: Option<JSONRGBA> },
+    Solid {
+        color: Option<JSONRGBA>,
+        #[serde(rename = "blendMode", default)]
+        blend_mode: BlendMode,
+    },
     #[serde(rename = "linear_gradient")]
     LinearGradient {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
+        #[serde(rename = "blendMode", default)]
+        blend_mode: BlendMode,
     },
     #[serde(rename = "radial_gradient")]
     RadialGradient {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
+        #[serde(rename = "blendMode", default)]
+        blend_mode: BlendMode,
     },
     #[serde(rename = "diamond_gradient")]
     DiamondGradient {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
+        #[serde(rename = "blendMode", default)]
+        blend_mode: BlendMode,
     },
     #[serde(rename = "sweep_gradient")]
     SweepGradient {
         id: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         stops: Vec<JSONGradientStop>,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
+        #[serde(rename = "blendMode", default)]
+        blend_mode: BlendMode,
     },
     #[serde(rename = "image")]
     Image {
-        hash: String,
+        #[serde(default)]
+        src: Option<String>,
         transform: Option<[[f32; 3]; 2]>,
         #[serde(default)]
         fit: CSSObjectFit,
+        #[serde(default = "default_opacity")]
+        opacity: f32,
+        #[serde(rename = "blendMode", default)]
+        blend_mode: BlendMode,
+        // Image filters
+        #[serde(default)]
+        filters: ImageFilters,
     },
 }
 
@@ -149,13 +177,16 @@ impl From<JSONFeShadow> for FeShadow {
 impl From<Option<JSONPaint>> for Paint {
     fn from(fill: Option<JSONPaint>) -> Self {
         match fill {
-            Some(JSONPaint::Solid { color }) => Paint::Solid(SolidPaint {
+            Some(JSONPaint::Solid { color, blend_mode }) => Paint::Solid(SolidPaint {
                 color: color.map_or(CGColor::TRANSPARENT, |c| c.into()),
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
+                blend_mode,
             }),
             Some(JSONPaint::LinearGradient {
-                transform, stops, ..
+                transform,
+                stops,
+                opacity,
+                blend_mode,
+                ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::LinearGradient(LinearGradientPaint {
@@ -163,12 +194,16 @@ impl From<Option<JSONPaint>> for Paint {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
-                    opacity: 1.0,
-                    blend_mode: BlendMode::default(),
+                    opacity,
+                    blend_mode,
                 })
             }
             Some(JSONPaint::RadialGradient {
-                transform, stops, ..
+                transform,
+                stops,
+                opacity,
+                blend_mode,
+                ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::RadialGradient(RadialGradientPaint {
@@ -176,12 +211,16 @@ impl From<Option<JSONPaint>> for Paint {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
-                    opacity: 1.0,
-                    blend_mode: BlendMode::default(),
+                    opacity,
+                    blend_mode,
                 })
             }
             Some(JSONPaint::DiamondGradient {
-                transform, stops, ..
+                transform,
+                stops,
+                opacity,
+                blend_mode,
+                ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::DiamondGradient(DiamondGradientPaint {
@@ -189,12 +228,16 @@ impl From<Option<JSONPaint>> for Paint {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
-                    opacity: 1.0,
-                    blend_mode: BlendMode::default(),
+                    opacity,
+                    blend_mode,
                 })
             }
             Some(JSONPaint::SweepGradient {
-                transform, stops, ..
+                transform,
+                stops,
+                opacity,
+                blend_mode,
+                ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::SweepGradient(SweepGradientPaint {
@@ -202,26 +245,34 @@ impl From<Option<JSONPaint>> for Paint {
                         .map(|m| AffineTransform { matrix: m })
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
-                    opacity: 1.0,
-                    blend_mode: BlendMode::default(),
+                    opacity,
+                    blend_mode,
                 })
             }
             Some(JSONPaint::Image {
-                hash,
+                src,
                 transform,
                 fit,
-            }) => Paint::Image(ImagePaint {
-                hash,
-                transform: transform
-                    .map(|m| AffineTransform { matrix: m })
-                    .unwrap_or_else(AffineTransform::identity),
-                fit: fit.into(),
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-            }),
+                opacity,
+                blend_mode,
+                filters,
+            }) => {
+                let url = src.unwrap_or_default();
+                let image_paint = ImagePaint {
+                    image: ResourceRef::RID(url),
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    fit: fit.into(),
+                    opacity,
+                    blend_mode,
+                    filters,
+                };
+
+                Paint::Image(image_paint)
+            }
             None => Paint::Solid(SolidPaint {
                 color: CGColor::TRANSPARENT,
-                opacity: 1.0,
                 blend_mode: BlendMode::default(),
             }),
         }
@@ -257,6 +308,38 @@ impl From<CSSObjectFit> for BoxFit {
     }
 }
 
+/// Utility function to merge single and multiple paint properties according to the specified logic:
+/// - if paint and no paints, use [paint]
+/// - if no paint and no paints, use []
+/// - if both paint and paints, if paints is empty, use [paint]
+/// - if both paint and paints, if paints >= 1, use paints
+pub fn merge_paints(paint: Option<JSONPaint>, paints: Option<Vec<JSONPaint>>) -> Paints {
+    let paints_vec = match (paint, paints) {
+        (Some(p), None) => vec![Paint::from(Some(p))],
+        (None, None) => vec![],
+        (Some(p), Some(paints_vec)) => {
+            if paints_vec.is_empty() {
+                vec![Paint::from(Some(p))]
+            } else {
+                // Optimize: avoid repeated Paint::from() calls by using collect with map
+                paints_vec
+                    .into_iter()
+                    .map(|p| Paint::from(Some(p)))
+                    .collect()
+            }
+        }
+        (None, Some(paints_vec)) => {
+            // Optimize: avoid repeated Paint::from() calls by using collect with map
+            paints_vec
+                .into_iter()
+                .map(|p| Paint::from(Some(p)))
+                .collect()
+        }
+    };
+
+    Paints::from(paints_vec)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct JSONScene {
     pub id: String,
@@ -282,8 +365,10 @@ pub struct JSONUnknownNodeProperties {
     // blend
     #[serde(rename = "opacity", default = "default_opacity")]
     pub opacity: f32,
-    #[serde(rename = "blendMode", default = "BlendMode::default")]
-    pub blend_mode: BlendMode,
+    #[serde(rename = "blendMode", default)]
+    pub blend_mode: JSONLayerBlendMode,
+    #[serde(rename = "mask")]
+    pub mask: Option<JSONLayerMaskType>,
     #[serde(rename = "zIndex", default = "default_z_index")]
     pub z_index: i32,
     // css
@@ -347,6 +432,8 @@ pub struct JSONUnknownNodeProperties {
     // fill
     #[serde(rename = "fill")]
     pub fill: Option<JSONPaint>,
+    #[serde(rename = "fills")]
+    pub fills: Option<Vec<JSONPaint>>,
     // stroke
     #[serde(rename = "strokeWidth", default = "default_stroke_width")]
     pub stroke_width: f32,
@@ -358,6 +445,8 @@ pub struct JSONUnknownNodeProperties {
     pub stroke_cap: Option<String>,
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
+    #[serde(rename = "strokes")]
+    pub strokes: Option<Vec<JSONPaint>>,
     // effects
     #[serde(rename = "feShadows")]
     pub fe_shadows: Option<Vec<JSONFeShadow>>,
@@ -576,25 +665,9 @@ pub struct JSONImageNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
     #[serde(rename = "src")]
-    pub src: JSONImageSrc,
+    pub src: Option<String>,
     #[serde(rename = "fit", default)]
     pub fit: CSSObjectFit,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum JSONImageSrc {
-    Url(String),
-    Hash { hash: String },
-}
-
-impl JSONImageSrc {
-    fn hash(&self) -> String {
-        match self {
-            JSONImageSrc::Url(url) => extract_image_hash(url),
-            JSONImageSrc::Hash { hash } => hash.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -706,7 +779,8 @@ impl From<JSONGroupNode> for GroupNodeRec {
             transform: Some(transform),
             children: node.children.unwrap_or_default(),
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
         }
     }
 }
@@ -735,12 +809,12 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 node.base.corner_radius_bottom_right,
                 node.base.corner_radius_bottom_left,
             ),
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
+            blend_mode: node.base.blend_mode.into(),
             opacity: node.base.opacity,
             effects: merge_effects(
                 node.base.fe_shadows,
@@ -749,6 +823,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             ),
             children: node.children.unwrap_or_default(),
             clip: true,
+            mask: node.base.mask.map(|m| m.into()),
         }
     }
 }
@@ -823,17 +898,13 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,
-            fills: vec![node.base.fill.into()],
-            strokes: node
-                .base
-                .stroke
-                .map(|s| Paint::from(Some(s)))
-                .into_iter()
-                .collect(),
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            blend_mode: node.base.blend_mode,
+            blend_mode: node.base.blend_mode.into(),
             opacity: node.base.opacity,
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -857,23 +928,24 @@ impl From<JSONEllipseNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform,
-            size: Size {
-                width: node.base.width.length(0.0),
-                height: node.base.height.length(0.0),
-            },
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
-            stroke_width: node.base.stroke_width,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
+            transform,
+            size: Size {
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
+            },
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
 
             inner_radius: node.inner_radius,
             start_angle: node.angle_offset.unwrap_or(0.0),
@@ -897,6 +969,9 @@ impl From<JSONRectangleNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -909,13 +984,11 @@ impl From<JSONRectangleNode> for Node {
                 node.base.corner_radius_bottom_right,
                 node.base.corner_radius_bottom_left,
             ),
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -935,28 +1008,38 @@ impl From<JSONImageNode> for Node {
             node.base.rotation,
         );
 
-        let hash = node.src.hash();
+        let url = node.src.clone().unwrap_or_default();
 
         let fill = match node.base.fill {
             Some(JSONPaint::Image {
-                hash: h,
+                src: h,
                 transform: t,
                 fit,
-            }) => ImagePaint {
-                hash: if h.is_empty() { hash.clone() } else { h },
-                transform: t
-                    .map(|m| AffineTransform { matrix: m })
-                    .unwrap_or_else(AffineTransform::identity),
-                fit: fit.into(),
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-            },
+                opacity,
+                blend_mode,
+                filters,
+            }) => {
+                let resolved = h.unwrap_or_else(|| url.clone());
+                let image_paint = ImagePaint {
+                    image: ResourceRef::RID(resolved),
+                    transform: t
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    fit: fit.into(),
+                    opacity,
+                    blend_mode,
+                    filters,
+                };
+
+                image_paint
+            }
             _ => ImagePaint {
-                hash: hash.clone(),
+                image: ResourceRef::RID(url.clone()),
                 transform: AffineTransform::identity(),
                 fit: node.fit.into(),
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
+                filters: ImageFilters::default(),
             },
         };
 
@@ -964,6 +1047,14 @@ impl From<JSONImageNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -977,18 +1068,11 @@ impl From<JSONImageNode> for Node {
                 node.base.corner_radius_bottom_left,
             ),
             fill: fill.clone(),
-            stroke: node.base.stroke.into(),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
-            hash: fill.hash,
+            image: fill.image.clone(),
         })
     }
 }
@@ -1007,24 +1091,25 @@ impl From<JSONRegularPolygonNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
                 height: node.base.height.length(0.0),
             },
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
             point_count: node.point_count,
         })
     }
@@ -1044,6 +1129,14 @@ impl From<JSONRegularStarPolygonNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform,
             size: Size {
                 width: node.base.width.length(0.0),
@@ -1051,18 +1144,11 @@ impl From<JSONRegularStarPolygonNode> for Node {
             },
             corner_radius: node.base.corner_radius.unwrap_or(0.0),
             inner_radius: node.inner_radius,
-            fills: vec![node.base.fill.into()],
-            strokes: vec![node.base.stroke.into()],
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
             point_count: node.point_count,
         })
     }
@@ -1083,8 +1169,16 @@ impl From<JSONSVGPathNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+            ),
             transform,
-            fill: node.base.fill.into(),
+            fills: merge_paints(node.base.fill, node.base.fills),
             data: node.paths.map_or("".to_string(), |paths| {
                 paths
                     .iter()
@@ -1092,17 +1186,10 @@ impl From<JSONSVGPathNode> for Node {
                     .collect::<Vec<String>>()
                     .join(" ")
             }),
-            stroke: None,
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: 0.0,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
-            opacity: node.base.opacity,
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-            ),
         })
     }
 }
@@ -1121,22 +1208,23 @@ impl From<JSONLineNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform,
-            size: Size {
-                width: node.base.width.length(0.0),
-                height: 0.0,
-            },
-            strokes: vec![node.base.stroke.into()],
-            stroke_width: node.base.stroke_width,
-            _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
-            stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
+            transform,
+            size: Size {
+                width: node.base.width.length(0.0),
+                height: 0.0,
+            },
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            stroke_width: node.base.stroke_width,
+            _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
+            stroke_dash_array: None,
         })
     }
 }
@@ -1161,22 +1249,23 @@ impl From<JSONVectorNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform,
-            network,
-            corner_radius: node.base.corner_radius.unwrap_or(0.0),
-            fill: Some(node.base.fill.into()),
-            strokes: vec![node.base.stroke.into()],
-            stroke_width: node.base.stroke_width,
-            stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
-            blend_mode: node.base.blend_mode,
             opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
+            transform,
+            network,
+            corner_radius: node.base.corner_radius.unwrap_or(0.0),
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            stroke_width: node.base.stroke_width,
+            stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
         })
     }
 }
@@ -1196,22 +1285,23 @@ impl From<JSONBooleanOperationNode> for Node {
             id: node.base.id,
             name: node.base.name,
             active: node.base.active,
-            transform: Some(transform),
-            op: node.op,
-            corner_radius: node.base.corner_radius,
-            children: node.children,
-            fill: node.base.fill.into(),
-            stroke: node.base.stroke.map(|s| Paint::from(Some(s))),
-            stroke_width: node.base.stroke_width,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
             opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
+            transform: Some(transform),
+            op: node.op,
+            corner_radius: node.base.corner_radius,
+            children: node.children,
+            fills: merge_paints(node.base.fill, node.base.fills),
+            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            stroke_width: node.base.stroke_width,
+            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+            stroke_dash_array: None,
         })
     }
 }
@@ -1344,8 +1434,94 @@ fn merge_effects(
     effects
 }
 
-fn extract_image_hash(src: &str) -> String {
-    src.split('/').last().unwrap_or(src).to_string()
+/// Flattened JSON representation of LayerBlendMode for easier deserialization
+#[derive(Debug, Deserialize)]
+pub enum JSONLayerBlendMode {
+    #[serde(rename = "pass-through")]
+    PassThrough,
+    #[serde(rename = "normal")]
+    Normal,
+    #[serde(rename = "multiply")]
+    Multiply,
+    #[serde(rename = "screen")]
+    Screen,
+    #[serde(rename = "overlay")]
+    Overlay,
+    #[serde(rename = "darken")]
+    Darken,
+    #[serde(rename = "lighten")]
+    Lighten,
+    #[serde(rename = "color-dodge")]
+    ColorDodge,
+    #[serde(rename = "color-burn")]
+    ColorBurn,
+    #[serde(rename = "hard-light")]
+    HardLight,
+    #[serde(rename = "soft-light")]
+    SoftLight,
+    #[serde(rename = "difference")]
+    Difference,
+    #[serde(rename = "exclusion")]
+    Exclusion,
+    #[serde(rename = "hue")]
+    Hue,
+    #[serde(rename = "saturation")]
+    Saturation,
+    #[serde(rename = "color")]
+    Color,
+    #[serde(rename = "luminosity")]
+    Luminosity,
+}
+
+impl Default for JSONLayerBlendMode {
+    fn default() -> Self {
+        JSONLayerBlendMode::PassThrough
+    }
+}
+
+impl Into<LayerBlendMode> for JSONLayerBlendMode {
+    fn into(self) -> LayerBlendMode {
+        match self {
+            JSONLayerBlendMode::PassThrough => LayerBlendMode::PassThrough,
+            JSONLayerBlendMode::Normal => LayerBlendMode::Blend(BlendMode::Normal),
+            JSONLayerBlendMode::Multiply => LayerBlendMode::Blend(BlendMode::Multiply),
+            JSONLayerBlendMode::Screen => LayerBlendMode::Blend(BlendMode::Screen),
+            JSONLayerBlendMode::Overlay => LayerBlendMode::Blend(BlendMode::Overlay),
+            JSONLayerBlendMode::Darken => LayerBlendMode::Blend(BlendMode::Darken),
+            JSONLayerBlendMode::Lighten => LayerBlendMode::Blend(BlendMode::Lighten),
+            JSONLayerBlendMode::ColorDodge => LayerBlendMode::Blend(BlendMode::ColorDodge),
+            JSONLayerBlendMode::ColorBurn => LayerBlendMode::Blend(BlendMode::ColorBurn),
+            JSONLayerBlendMode::HardLight => LayerBlendMode::Blend(BlendMode::HardLight),
+            JSONLayerBlendMode::SoftLight => LayerBlendMode::Blend(BlendMode::SoftLight),
+            JSONLayerBlendMode::Difference => LayerBlendMode::Blend(BlendMode::Difference),
+            JSONLayerBlendMode::Exclusion => LayerBlendMode::Blend(BlendMode::Exclusion),
+            JSONLayerBlendMode::Hue => LayerBlendMode::Blend(BlendMode::Hue),
+            JSONLayerBlendMode::Saturation => LayerBlendMode::Blend(BlendMode::Saturation),
+            JSONLayerBlendMode::Color => LayerBlendMode::Blend(BlendMode::Color),
+            JSONLayerBlendMode::Luminosity => LayerBlendMode::Blend(BlendMode::Luminosity),
+        }
+    }
+}
+
+/// Flattened JSON representation of LayerMaskType for easier deserialization
+#[derive(Debug, Deserialize)]
+pub enum JSONLayerMaskType {
+    #[serde(rename = "geometry")]
+    Geometry,
+    #[serde(rename = "alpha")]
+    Alpha,
+    #[serde(rename = "luminance")]
+    Luminance,
+}
+
+impl Into<LayerMaskType> for JSONLayerMaskType {
+    fn into(self) -> LayerMaskType {
+        match self {
+            JSONLayerMaskType::Geometry => LayerMaskType::Geometry,
+            JSONLayerMaskType::Alpha => LayerMaskType::Image(ImageMaskType::Alpha),
+            JSONLayerMaskType::Luminance => LayerMaskType::Image(ImageMaskType::Luminance),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1743,5 +1919,294 @@ mod tests {
         assert_eq!(network.segments[3].b, 0);
         assert_eq!(network.segments[3].ta, (0.0, 0.0));
         assert_eq!(network.segments[3].tb, (0.0, 0.0));
+    }
+
+    #[test]
+    fn test_merge_paints_logic() {
+        use super::merge_paints;
+        use super::JSONPaint;
+
+        // Test case 1: paint and no paints, use [paint]
+        let paint = Some(JSONPaint::Solid {
+            color: Some(JSONRGBA {
+                r: 255,
+                g: 0,
+                b: 0,
+                a: 1.0,
+            }),
+            blend_mode: BlendMode::default(),
+        });
+        let paints = None;
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 1);
+
+        // Test case 2: no paint and no paints, use []
+        let paint = None;
+        let paints = None;
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 0);
+
+        // Test case 3: both paint and paints, if paints is empty, use [paint]
+        let paint = Some(JSONPaint::Solid {
+            color: Some(JSONRGBA {
+                r: 255,
+                g: 0,
+                b: 0,
+                a: 1.0,
+            }),
+            blend_mode: BlendMode::default(),
+        });
+        let paints = Some(vec![]);
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 1);
+
+        // Test case 4: both paint and paints, if paints >= 1, use paints
+        let paint = Some(JSONPaint::Solid {
+            color: Some(JSONRGBA {
+                r: 255,
+                g: 0,
+                b: 0,
+                a: 1.0,
+            }),
+            blend_mode: BlendMode::default(),
+        });
+        let paints = Some(vec![
+            JSONPaint::Solid {
+                color: Some(JSONRGBA {
+                    r: 0,
+                    g: 255,
+                    b: 0,
+                    a: 1.0,
+                }),
+                blend_mode: BlendMode::default(),
+            },
+            JSONPaint::Solid {
+                color: Some(JSONRGBA {
+                    r: 0,
+                    g: 0,
+                    b: 255,
+                    a: 1.0,
+                }),
+                blend_mode: BlendMode::default(),
+            },
+        ]);
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 2);
+
+        // Test case 5: no paint but has paints, use paints
+        let paint = None;
+        let paints = Some(vec![JSONPaint::Solid {
+            color: Some(JSONRGBA {
+                r: 0,
+                g: 255,
+                b: 0,
+                a: 1.0,
+            }),
+            blend_mode: BlendMode::default(),
+        }]);
+        let result = merge_paints(paint, paints);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn deserialize_layer_blend_mode_pass_through() {
+        let json = r#"{
+            "id": "rect-pt",
+            "name": "PassThrough Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "blendMode": "pass-through"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize rectangle with pass-through blend mode");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(
+                    rect.base.blend_mode,
+                    JSONLayerBlendMode::PassThrough
+                ));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_blend_mode_normal() {
+        let json = r#"{
+            "id": "rect-normal",
+            "name": "Normal Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "blendMode": "normal"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize rectangle with normal blend mode");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.blend_mode, JSONLayerBlendMode::Normal));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_paint_blend_mode_normal() {
+        let json = r#"{
+            "type": "solid",
+            "blendMode": "normal"
+        }"#;
+
+        let paint: JSONPaint =
+            serde_json::from_str(json).expect("failed to deserialize paint with normal blend mode");
+        match paint {
+            JSONPaint::Solid { blend_mode, .. } => {
+                assert!(matches!(blend_mode, BlendMode::Normal));
+            }
+            _ => panic!("Expected Solid paint"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_blend_mode_multiply() {
+        let json = r#"{
+            "id": "rect-multiply",
+            "name": "Multiply Blend Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "blendMode": "multiply"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("deserializing with multiply blendMode should not error");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.blend_mode, JSONLayerBlendMode::Multiply));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_blend_mode_into_conversion() {
+        // Test the Into conversion
+        let json_blend = JSONLayerBlendMode::PassThrough;
+        let layer_blend: LayerBlendMode = json_blend.into();
+        assert!(matches!(layer_blend, LayerBlendMode::PassThrough));
+
+        let json_blend = JSONLayerBlendMode::Normal;
+        let layer_blend: LayerBlendMode = json_blend.into();
+        assert!(matches!(
+            layer_blend,
+            LayerBlendMode::Blend(BlendMode::Normal)
+        ));
+
+        let json_blend = JSONLayerBlendMode::Multiply;
+        let layer_blend: LayerBlendMode = json_blend.into();
+        assert!(matches!(
+            layer_blend,
+            LayerBlendMode::Blend(BlendMode::Multiply)
+        ));
+    }
+
+    #[test]
+    fn deserialize_layer_mask_type_geometry() {
+        let json = r#"{
+            "id": "rect-geometry-mask",
+            "name": "Geometry Mask Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "mask": "geometry"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("deserializing with geometry mask should not error");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.mask, Some(JSONLayerMaskType::Geometry)));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_mask_type_alpha() {
+        let json = r#"{
+            "id": "rect-alpha-mask",
+            "name": "Alpha Mask Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "mask": "alpha"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("deserializing with alpha mask should not error");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.mask, Some(JSONLayerMaskType::Alpha)));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_mask_type_luminance() {
+        let json = r#"{
+            "id": "rect-luminance-mask",
+            "name": "Luminance Mask Rect",
+            "type": "rectangle",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 100.0,
+            "height": 100.0,
+            "mask": "luminance"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("deserializing with luminance mask should not error");
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert!(matches!(rect.base.mask, Some(JSONLayerMaskType::Luminance)));
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_layer_mask_type_into_conversion() {
+        // Test the Into conversion
+        let json_mask = JSONLayerMaskType::Geometry;
+        let layer_mask: LayerMaskType = json_mask.into();
+        assert!(matches!(layer_mask, LayerMaskType::Geometry));
+
+        let json_mask = JSONLayerMaskType::Alpha;
+        let layer_mask: LayerMaskType = json_mask.into();
+        assert!(matches!(
+            layer_mask,
+            LayerMaskType::Image(ImageMaskType::Alpha)
+        ));
+
+        let json_mask = JSONLayerMaskType::Luminance;
+        let layer_mask: LayerMaskType = json_mask.into();
+        assert!(matches!(
+            layer_mask,
+            LayerMaskType::Image(ImageMaskType::Luminance)
+        ));
     }
 }

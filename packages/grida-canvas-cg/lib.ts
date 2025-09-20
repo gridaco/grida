@@ -123,6 +123,15 @@ export namespace cg {
     a: number;
   };
 
+  export type LayerMaskType = "geometry" | ImageMaskType;
+  export type ImageMaskType = "alpha" | "luminance";
+
+  /**
+   * only applicable to layers, not paints.
+   * if this is used for non supported, it will fallback to "normal".
+   */
+  export type LayerBlendMode = "pass-through" | BlendMode;
+
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/blend-mode
    */
@@ -640,7 +649,8 @@ export namespace cg {
     | LinearGradientPaint
     | RadialGradientPaint
     | SweepGradientPaint
-    | DiamondGradientPaint;
+    | DiamondGradientPaint
+    | ImagePaint;
 
   export namespace paints {
     export const transparent: Paint = {
@@ -664,13 +674,15 @@ export namespace cg {
       Partial<LinearGradientPaint> &
       Partial<RadialGradientPaint> &
       Partial<SweepGradientPaint> &
-      Partial<DiamondGradientPaint>,
+      Partial<DiamondGradientPaint> &
+      Partial<ImagePaint>,
     "type"
   > & { type: Paint["type"] };
 
   export type SolidPaint = {
     type: "solid";
     color: cg.RGBA8888;
+    blendMode?: cg.BlendMode;
   };
 
   export type GradientPaint =
@@ -679,12 +691,20 @@ export namespace cg {
     | SweepGradientPaint
     | DiamondGradientPaint;
 
-  export function isGradientPaint(paint: cg.Paint): paint is cg.GradientPaint {
+  export function isSolidPaint(paint?: cg.Paint): paint is cg.SolidPaint {
+    return paint?.type === "solid";
+  }
+
+  export function isImagePaint(paint?: cg.Paint): paint is cg.ImagePaint {
+    return paint?.type === "image";
+  }
+
+  export function isGradientPaint(paint?: cg.Paint): paint is cg.GradientPaint {
     return (
-      paint.type === "linear_gradient" ||
-      paint.type === "radial_gradient" ||
-      paint.type === "sweep_gradient" ||
-      paint.type === "diamond_gradient"
+      paint?.type === "linear_gradient" ||
+      paint?.type === "radial_gradient" ||
+      paint?.type === "sweep_gradient" ||
+      paint?.type === "diamond_gradient"
     );
   }
 
@@ -692,25 +712,142 @@ export namespace cg {
     type: "linear_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
   };
 
   export type RadialGradientPaint = {
     type: "radial_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
   };
 
   export type SweepGradientPaint = {
     type: "sweep_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
   };
 
   export type DiamondGradientPaint = {
     type: "diamond_gradient";
     transform: AffineTransform;
     stops: Array<GradientStop>;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
   };
+
+  export type ImagePaint = {
+    type: "image";
+    src: string;
+    fit: BoxFit;
+    transform: AffineTransform;
+    filters: ImageFilters;
+
+    /**
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode: cg.BlendMode;
+
+    /**
+     * @default 1
+     */
+    opacity: number;
+  };
+
+  export interface ImageFilters {
+    /**
+     * Exposure adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the overall brightness of the image.
+     * - -1.0 = very dark
+     * - 0.0 = original (no change)
+     * - 1.0 = very bright
+     */
+    exposure: number;
+    /**
+     * Contrast adjustment (-0.3 to 0.3, default: 0.0)
+     * Controls the difference between light and dark areas.
+     * - -0.3 = low contrast (UI cap)
+     * - 0.0 = original contrast
+     * - 0.3 = high contrast (UI cap)
+     */
+    contrast: number;
+    /**
+     * Saturation adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the intensity of colors.
+     * - -1.0 = grayscale (no color)
+     * - 0.0 = original saturation
+     * - 1.0 = highly oversaturated
+     */
+    saturation: number;
+    /**
+     * Temperature adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the warm/cool color balance.
+     * - -1.0 = very cool (blue tint)
+     * - 0.0 = neutral (no change)
+     * - 1.0 = very warm (orange tint)
+     */
+    temperature: number;
+    /**
+     * Tint adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the green/magenta color balance.
+     * - -1.0 = strong magenta tint
+     * - 0.0 = neutral (no change)
+     * - 1.0 = strong green tint
+     */
+    tint: number;
+    /**
+     * Highlights adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the brightness of highlight areas.
+     * - -1.0 = darken highlights
+     * - 0.0 = no change
+     * - 1.0 = brighten highlights
+     */
+    highlights: number;
+    /**
+     * Shadows adjustment (-1.0 to 1.0, default: 0.0)
+     * Controls the brightness of shadow areas.
+     * - -1.0 = darken shadows
+     * - 0.0 = no change
+     * - 1.0 = brighten shadows
+     */
+    shadows: number;
+  }
 
   export type GradientStop = {
     /**
@@ -911,4 +1048,27 @@ export namespace cg {
   export type VariableWidthProfile = {
     stops: VariableWidthStop[];
   };
+
+  /**
+   * strict, solid default values.
+   * not all types have default values.
+   *
+   * only struct, widely aknowledged, de-facto standard defaults will be set.
+   *
+   * this is aligned in cg crate's default values.
+   */
+  export namespace def {
+    export const LAYER_BLENDMODE: cg.LayerBlendMode = "pass-through";
+    export const BLENDMODE: cg.BlendMode = "normal";
+
+    export const IMAGE_FILTERS: cg.ImageFilters = {
+      exposure: 0.0,
+      contrast: 0.0,
+      saturation: 0.0,
+      temperature: 0.0,
+      tint: 0.0,
+      highlights: 0.0,
+      shadows: 0.0,
+    };
+  }
 }

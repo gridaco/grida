@@ -20,6 +20,8 @@ export type ReducerContext = {
     width: number;
     height: number;
   };
+  backend: "dom" | "canvas";
+  paint_constraints: editor.config.IEditorRenderingConfig["paint_constraints"];
 };
 
 export default function reducer<S extends editor.state.IEditorState>(

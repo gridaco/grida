@@ -29,8 +29,12 @@ async fn demo_vectors() -> Scene {
                 id: "1".to_string(),
                 name: Some("triangle open".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x, base_y, 0.0),
-                fill: None,
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -40,14 +44,11 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor::RED)],
+                strokes: Paints::new([Paint::from(CGColor::RED)]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_1_tri_open.id.clone());
@@ -59,8 +60,12 @@ async fn demo_vectors() -> Scene {
                 id: "2".to_string(),
                 name: Some("triangle closed".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x + spacing * 1.0, base_y, 0.0),
-                fill: None,
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -71,14 +76,11 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor::RED)],
+                strokes: Paints::new([Paint::from(CGColor::RED)]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_2_tri_closed.id.clone());
@@ -91,8 +93,12 @@ async fn demo_vectors() -> Scene {
                 id: "3".to_string(),
                 name: Some("Vector 2".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x + spacing * 2.0, base_y, 0.0),
-                fill: None,
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0), (100.0, 0.0)],
                     segments: vec![
@@ -103,14 +109,11 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor(255, 0, 0, 255))],
+                strokes: Paints::new([Paint::from(CGColor(255, 0, 0, 255))]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_3.id.clone());
@@ -122,8 +125,12 @@ async fn demo_vectors() -> Scene {
                 id: "vector_3".to_string(),
                 name: Some("Vector 3".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x + spacing * 3.0, base_y, 0.0),
-                fill: None,
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (0.0, 100.0), (100.0, 100.0)],
                     segments: vec![
@@ -134,14 +141,11 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor::RED)],
+                strokes: Paints::new([Paint::from(CGColor::RED)]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_4.id.clone());
@@ -154,8 +158,12 @@ async fn demo_vectors() -> Scene {
                 id: "1_5".to_string(),
                 name: Some("Vector 1_5".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(start_x + spacing * 4.0, base_y, 0.0),
-                fill: None,
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (0.0, 100.0), (100.0, 100.0)],
                     segments: vec![
@@ -168,14 +176,11 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor::RED)],
+                strokes: Paints::new([Paint::from(CGColor::RED)]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_1_5.id.clone());
@@ -191,12 +196,16 @@ async fn demo_vectors() -> Scene {
                 id: "5".to_string(),
                 name: Some("S-curve".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(
                     start_x + spacing * 0.0,
                     base_y + spacing * 1.0,
                     0.0,
                 ),
-                fill: None,
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 50.0), (100.0, 50.0)],
                     segments: vec![VectorNetworkSegment {
@@ -208,14 +217,11 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor(0, 100, 255, 255))],
+                strokes: Paints::new([Paint::from(CGColor(0, 100, 255, 255))]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_5.id.clone());
@@ -228,26 +234,27 @@ async fn demo_vectors() -> Scene {
                 id: "5_5".to_string(),
                 name: Some("90deg line".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(
                     start_x + spacing * 1.0,
                     base_y + spacing * 1.0,
                     0.0,
                 ),
-                fill: None,
+                fills: Paints::default(),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0)],
                     segments: vec![VectorNetworkSegment::ab(0, 1)],
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor(0, 100, 255, 255))],
+                strokes: Paints::new([Paint::from(CGColor(0, 100, 255, 255))]),
                 stroke_width: 3.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_5_5.id.clone());
@@ -263,12 +270,16 @@ async fn demo_vectors() -> Scene {
                 id: "6".to_string(),
                 name: Some("filled triangle".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(
                     start_x + spacing * 0.0,
                     base_y + spacing * 2.0,
                     0.0,
                 ),
-                fill: Some(Paint::from(CGColor(255, 100, 100, 255))),
+                fills: Paints::new([Paint::from(CGColor(255, 100, 100, 255))]),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -279,14 +290,11 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 4.0,
-                strokes: vec![Paint::from(CGColor(200, 0, 0, 255))],
+                strokes: Paints::new([Paint::from(CGColor(200, 0, 0, 255))]),
                 stroke_width: 2.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_6.id.clone());
@@ -299,12 +307,16 @@ async fn demo_vectors() -> Scene {
                 id: "7".to_string(),
                 name: Some("filled rectangle".to_string()),
                 active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                effects: LayerEffects::default(),
                 transform: AffineTransform::new(
                     start_x + spacing * 1.0,
                     base_y + spacing * 2.0,
                     0.0,
                 ),
-                fill: Some(Paint::from(CGColor(100, 255, 100, 255))),
+                fills: Paints::new([Paint::from(CGColor(100, 255, 100, 255))]),
                 network: VectorNetwork {
                     vertices: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
                     segments: vec![
@@ -316,14 +328,11 @@ async fn demo_vectors() -> Scene {
                     regions: vec![],
                 },
                 corner_radius: 0.0,
-                strokes: vec![Paint::from(CGColor(0, 150, 0, 255))],
+                strokes: Paints::new([Paint::from(CGColor(0, 150, 0, 255))]),
                 stroke_width: 2.0,
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
-                opacity: 1.0,
-                blend_mode: BlendMode::default(),
-                effects: LayerEffects::default(),
             };
 
             ids.push(vector_node_7.id.clone());

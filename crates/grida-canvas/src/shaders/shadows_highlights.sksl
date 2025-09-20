@@ -1,0 +1,96 @@
+// SkSL color filter: Shadows/Highlights in linear light with chroma preservation
+// Inputs:
+//   uShadows      in [-1, +1]  ( >0 lift shadows, <0 crush )
+//   uHighlights   in [-1, +1]  ( >0 recover/compress brights, <0 boost )
+//   uShLo, uShHi  shadow mask window (e.g., 0.25, 0.80)
+//   uHiLo, uHiHi  highlight mask window (e.g., 0.20, 0.90)
+//   uChromaPreserve in [0,1]    0 = grayscale-only luma change, 1 = hue-preserving rescale
+//   uLumaCoeff    luma coefficients for linear RGB (e.g., 0.2126,0.7152,0.0722)
+
+// sRGB <-> Linear helpers (approx safe for color ops; half precision is fine on GPU)
+inline half srgbToLinearChan(half c) {
+    return (c <= 0.04045) ? (c / 12.92) : pow((c + 0.055) / 1.055, 2.4);
+}
+inline half linearToSrgbChan(half c) {
+    return (c <= 0.0031308) ? (c * 12.92) : (1.055 * pow(c, 1.0/2.4) - 0.055);
+}
+inline half3 srgbToLinear(half3 c) {
+    return half3(srgbToLinearChan(c.r), srgbToLinearChan(c.g), srgbToLinearChan(c.b));
+}
+inline half3 linearToSrgb(half3 c) {
+    return half3(linearToSrgbChan(c.r), linearToSrgbChan(c.g), linearToSrgbChan(c.b));
+}
+
+inline half smoothMask(half x, half lo, half hi, bool invert) {
+    half t = clamp((x - lo) / max(hi - lo, 1e-3), 0.0, 1.0);
+    // smoothstep
+    t = t * t * (3.0 - 2.0 * t);
+    return invert ? (1.0 - t) : t;
+}
+
+// Soft gamut compression toward luma: pulls overs/unders toward neutral instead of hard clipping.
+inline half3 softGamutCompress(half3 rgb, half Y) {
+    // If any channel is outside [0,1], compress toward Y with a soft knee.
+    half3 result = rgb;
+    half3 over = max(result - 1.0, 0.0);
+    half3 under = max(-result, 0.0);
+
+    half overAmt = max(max(over.r, over.g), over.b);
+    half underAmt = max(max(under.r, under.g), under.b);
+
+    // Soft factor using a gentle curve
+    half fOver = overAmt > 0.0 ? overAmt / (1.0 + overAmt) : 0.0;
+    half fUnder = underAmt > 0.0 ? underAmt / (1.0 + underAmt) : 0.0;
+
+    half3 neutral = half3(Y, Y, Y);
+    result = mix(result, neutral, max(fOver, fUnder));
+    return clamp(result, 0.0, 1.0);
+}
+
+uniform half uShadows;          // [-1, +1]
+uniform half uHighlights;       // [-1, +1]
+uniform half uShLo, uShHi;
+uniform half uHiLo, uHiHi;
+uniform half uChromaPreserve;   // [0,1]
+uniform half3 uLumaCoeff;       // e.g. (0.2126, 0.7152, 0.0722)
+
+half4 main(half4 inColor) {
+    half a = inColor.a;
+    half3 srgb = inColor.rgb;
+    half3 lin  = srgbToLinear(srgb);
+
+    // Linear-light luminance
+    half Y = dot(lin, uLumaCoeff);
+
+    // Range masks
+    half mSh = smoothMask(Y, uShLo, uShHi, /*invert*/true);  // 1 in shadows
+    half mHi = smoothMask(Y, uHiLo, uHiHi, /*invert*/false); // 1 in highlights
+
+    // Target luma adjustments (S/H are signed):
+    // For shadows: lift when uShadows>0, crush when <0
+    half Y_sh = (uShadows >= 0.0)
+        ? (Y + uShadows * mSh * (1.0 - Y))   // lift
+        : (Y - (-uShadows) * mSh * Y);       // crush
+
+    // For highlights: recover/compress when >0, boost when <0
+    half Y_hi = (uHighlights >= 0.0)
+        ? (Y - uHighlights * mHi * Y)        // compress (pull down brights)
+        : (Y + (-uHighlights) * mHi * (1.0 - Y)); // boost (push up brights)
+
+    // Combine effects: apply shadows first, then highlights on the result's luma
+    // (commonly stable; you can swap if your UX prefers)
+    half Y1 = Y_sh;
+    half Y2 = mix(Y1, Y_hi, mHi); // blend toward highlight-adjusted where highlight mask is strong
+
+    // Reconstruct RGB with chroma preservation control.
+    // factor rescales toward the new luma; mixing with 1.0 lets you fade how strongly you preserve hue.
+    half eps = 1e-4;
+    half fac = Y2 / max(Y, eps);
+    half3 lin_recon = mix(half3(Y2, Y2, Y2), lin * fac, uChromaPreserve);
+
+    // Soft gamut compress instead of hard clamp to mitigate hue shifts
+    lin_recon = softGamutCompress(lin_recon, Y2);
+
+    half3 out_srgb = linearToSrgb(lin_recon);
+    return half4(out_srgb, a);
+}

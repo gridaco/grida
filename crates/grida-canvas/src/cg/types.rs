@@ -44,18 +44,18 @@ pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
 impl CGColor {
     pub const TRANSPARENT: Self = Self(0, 0, 0, 0);
-    pub const BLACK: Self = Self(0, 0, 0, 255);
-    pub const WHITE: Self = Self(255, 255, 255, 255);
-    pub const RED: Self = Self(255, 0, 0, 255);
-    pub const GREEN: Self = Self(0, 255, 0, 255);
-    pub const BLUE: Self = Self(0, 0, 255, 255);
+    pub const BLACK: Self = Self(0, 0, 0, 0xff);
+    pub const WHITE: Self = Self(0xff, 0xff, 0xff, 0xff);
+    pub const RED: Self = Self(0xff, 0, 0, 0xff);
+    pub const GREEN: Self = Self(0, 0xff, 0, 0xff);
+    pub const BLUE: Self = Self(0, 0, 0xff, 0xff);
 
     pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self(r, g, b, a)
     }
 
     pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
-        Self(r, g, b, 255)
+        Self(r, g, b, 0xff)
     }
 
     pub fn r(&self) -> u8 {
@@ -76,9 +76,62 @@ impl From<CGColor> for SolidPaint {
     fn from(color: CGColor) -> Self {
         SolidPaint {
             color,
-            opacity: 1.0,
             blend_mode: BlendMode::default(),
         }
+    }
+}
+
+/// Defines the type of masking applied to a layer.
+///
+/// This corresponds to the CSS `mask-type` property and is related to `clip-path` functionality.
+/// The mask type determines how the mask is interpreted and applied to the layer content.
+///
+/// # CSS Equivalents
+/// - **None**: No masking is applied
+/// - **Geometry**: Vector-based masking (equivalent to `clip-path` in CSS)
+/// - **Alpha**: Alpha channel masking (equivalent to `mask-type: alpha` in CSS)
+/// - **Luminance**: Luminance-based masking (equivalent to `mask-type: luminance` in CSS)
+///
+/// For more information, see the [MDN documentation on mask-type](https://developer.mozilla.org/en-US/docs/Web/CSS/mask-type).
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub enum LayerMaskType {
+    Image(ImageMaskType),
+
+    /// Vector-based masking (clipPath).
+    ///
+    /// Uses the vector geometry path to define the visible area of the content.
+    /// Unlike alpha or luminance masking, this type does not use opacity or brightness values.
+    /// The mask is purely geometric - content is either fully visible or fully hidden based on whether
+    /// it falls inside or outside the defined vector path. This is equivalent to CSS `clip-path`.
+    #[serde(rename = "geometry")]
+    Geometry,
+}
+
+impl Default for LayerMaskType {
+    fn default() -> Self {
+        LayerMaskType::Image(ImageMaskType::default())
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub enum ImageMaskType {
+    /// Alpha channel masking.
+    ///
+    /// Uses the alpha channel of the mask to determine the opacity of the masked content.
+    /// Areas with higher alpha values in the mask will show the content more opaquely.
+    #[serde(rename = "alpha")]
+    Alpha,
+    /// Luminance-based masking.
+    ///
+    /// Uses the luminance (brightness) of the mask to determine the opacity of the masked content.
+    /// Brighter areas in the mask will show the content more opaquely, while darker areas will be more transparent.
+    #[serde(rename = "luminance")]
+    Luminance,
+}
+
+impl Default for ImageMaskType {
+    fn default() -> Self {
+        ImageMaskType::Alpha
     }
 }
 
@@ -166,10 +219,59 @@ pub enum BooleanPathOperation {
 /// - Flutter `Clip*` wrapping a subtree → (potential future **shape clip**, not implemented)
 pub type ContainerClipFlag = bool;
 
-/// Blend modes for compositing layers, compatible with Skia and SVG/CSS.
+/// Layer-level compositing mode.
+///
+/// - `Blend(BlendMode)`: The layer is **isolated** and composited as a single surface
+///   using the given blend mode (e.g., `Normal/SrcOver`, `Multiply`, etc.).
+/// - `PassThrough`: The layer **does not** create a compositing boundary. Its children
+///   (or its internal paint stack) are drawn directly into the parent and may blend with
+///   content beneath the layer. Group opacity should be applied multiplicatively to
+///   descendants rather than forcing isolation.
+///
+/// This mirrors Figma’s semantics:
+/// - Groups default to **PassThrough** (non-isolated).
+/// - Switching a group to a specific blend mode (e.g., `Normal`) isolates and flattens it.
+///
+/// Closest CSS analogy:
+/// - `PassThrough` ≈ `isolation: auto`
+/// - `Blend(BlendMode::Normal)` ≈ `isolation: isolate` + normal compositing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(untagged)]
+pub enum LayerBlendMode {
+    /// Non-isolated group/layer; children/paints blend directly with the backdrop.
+    #[serde(rename = "pass-through")]
+    PassThrough,
+    /// Isolated layer composited with a specific blend mode.
+    Blend(BlendMode),
+}
+
+impl From<BlendMode> for LayerBlendMode {
+    #[inline]
+    fn from(mode: BlendMode) -> Self {
+        LayerBlendMode::Blend(mode)
+    }
+}
+
+impl Into<BlendMode> for LayerBlendMode {
+    fn into(self) -> BlendMode {
+        match self {
+            LayerBlendMode::PassThrough => BlendMode::Normal,
+            LayerBlendMode::Blend(mode) => mode,
+        }
+    }
+}
+
+impl Default for LayerBlendMode {
+    fn default() -> Self {
+        LayerBlendMode::PassThrough
+    }
+}
+
+/// Blend functions for compositing paints or isolated layers (does **not** include PassThrough).
 ///
 /// - SVG: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/mix-blend-mode
 /// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
+/// - Flutter: https://api.flutter.dev/flutter/dart-ui/BlendMode.html
 /// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 pub enum BlendMode {
@@ -221,11 +323,6 @@ pub enum BlendMode {
     // Skia: kLuminosity
     #[serde(rename = "luminosity")]
     Luminosity,
-
-    /// Like `Normal`, but means no blending at all (pass-through).
-    /// This is Figma-specific, and typically treated the same as `Normal`.
-    #[serde(rename = "pass-through")]
-    PassThrough,
 }
 
 impl Default for BlendMode {
@@ -902,7 +999,7 @@ pub enum Paint {
 impl Paint {
     pub fn opacity(&self) -> f32 {
         match self {
-            Paint::Solid(solid) => solid.opacity,
+            Paint::Solid(solid) => solid.opacity(),
             Paint::LinearGradient(gradient) => gradient.opacity,
             Paint::RadialGradient(gradient) => gradient.opacity,
             Paint::SweepGradient(gradient) => gradient.opacity,
@@ -935,7 +1032,7 @@ impl Paint {
         match self {
             Paint::Solid(solid) => {
                 solid.color.0.hash(hasher);
-                solid.opacity.to_bits().hash(hasher);
+                solid.opacity().to_bits().hash(hasher);
                 solid.blend_mode.hash(hasher);
             }
             Paint::LinearGradient(gradient) => {
@@ -971,12 +1068,190 @@ impl Paint {
                 }
             }
             Paint::Image(image) => {
-                // For image paints, hash the image hash
-                image.hash.hash(hasher);
+                // For image paints, hash the referenced resource identifier
+                match &image.image {
+                    ResourceRef::HASH(h) | ResourceRef::RID(h) => h.hash(hasher),
+                };
                 image.opacity.to_bits().hash(hasher);
                 image.blend_mode.hash(hasher);
             }
         }
+    }
+}
+
+/// Ordered stack of [`Paint`] values that are composited sequentially.
+///
+/// Entries are interpreted in **paint order**: the first item is drawn first,
+/// and every subsequent item is composited on top of the pixels produced by the
+/// previous paints. This matches Figma and other graphics editors where, for
+/// example, `Paints::new([solid, image])` results in the image appearing
+/// above the solid color when rendered. User interfaces may display the list in
+/// reverse order (top-most paint first); `Paints` always stores the canonical
+/// engine order to avoid ambiguity in the renderer and conversion layers.
+///
+/// The [`BlendMode`] assigned to each [`Paint`] applies to that specific entry
+/// while it is composited over the accumulated result. It never retroactively
+/// affects paints that were drawn earlier in the stack.
+#[derive(Debug, Clone, Default)]
+pub struct Paints {
+    paints: Vec<Paint>,
+}
+
+impl Paints {
+    /// Create a new [`Paints`] collection from an ordered list of paints.
+    ///
+    /// Supports both `Vec<Paint>` and array literals:
+    /// - `Paints::new(vec![paint1, paint2])` - traditional approach
+    /// - `Paints::new([paint1, paint2])` - ergonomic array literals
+    pub fn new<T>(paints: T) -> Self
+    where
+        T: IntoPaints,
+    {
+        Self {
+            paints: paints.into_paints(),
+        }
+    }
+
+    /// Returns `true` when there are no paints in the collection.
+    pub fn is_empty(&self) -> bool {
+        self.paints.is_empty()
+    }
+
+    /// Number of paints in the stack.
+    pub fn len(&self) -> usize {
+        self.paints.len()
+    }
+
+    /// Immutable slice access to the ordered paints.
+    pub fn as_slice(&self) -> &[Paint] {
+        &self.paints
+    }
+
+    /// Mutable slice access to the ordered paints.
+    pub fn as_mut_slice(&mut self) -> &mut [Paint] {
+        &mut self.paints
+    }
+
+    /// Consume the collection and return the underlying vector.
+    pub fn into_vec(self) -> Vec<Paint> {
+        self.paints
+    }
+
+    /// Append a new paint to the top of the stack.
+    pub fn push(&mut self, paint: Paint) {
+        self.paints.push(paint);
+    }
+
+    /// Iterate over paints in paint order.
+    pub fn iter(&self) -> std::slice::Iter<'_, Paint> {
+        self.paints.iter()
+    }
+
+    /// Mutable iterator over paints in paint order.
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Paint> {
+        self.paints.iter_mut()
+    }
+}
+
+impl From<Vec<Paint>> for Paints {
+    fn from(value: Vec<Paint>) -> Self {
+        Paints::new(value)
+    }
+}
+
+impl From<Paints> for Vec<Paint> {
+    fn from(value: Paints) -> Self {
+        value.paints
+    }
+}
+
+// Custom trait to support both Vec<Paint> and array literals in Paints::new()
+pub trait IntoPaints {
+    fn into_paints(self) -> Vec<Paint>;
+}
+
+impl IntoPaints for Vec<Paint> {
+    fn into_paints(self) -> Vec<Paint> {
+        self
+    }
+}
+
+impl<const N: usize> IntoPaints for [Paint; N] {
+    fn into_paints(self) -> Vec<Paint> {
+        self.to_vec()
+    }
+}
+
+impl FromIterator<Paint> for Paints {
+    fn from_iter<I: IntoIterator<Item = Paint>>(iter: I) -> Self {
+        Paints::new(iter.into_iter().collect::<Vec<_>>())
+    }
+}
+
+// Support for array literals - much more ergonomic than vec![]
+impl<const N: usize> From<[Paint; N]> for Paints {
+    fn from(value: [Paint; N]) -> Self {
+        // Most efficient: direct construction without intermediate allocations
+        Paints {
+            paints: value.to_vec(),
+        }
+    }
+}
+
+// Support for single Paint conversion
+impl From<Paint> for Paints {
+    fn from(value: Paint) -> Self {
+        // More efficient: avoid the intermediate Vec allocation
+        Paints {
+            paints: vec![value],
+        }
+    }
+}
+
+impl IntoIterator for Paints {
+    type Item = Paint;
+    type IntoIter = std::vec::IntoIter<Paint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.paints.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Paints {
+    type Item = &'a Paint;
+    type IntoIter = std::slice::Iter<'a, Paint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.paints.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Paints {
+    type Item = &'a mut Paint;
+    type IntoIter = std::slice::IterMut<'a, Paint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.paints.iter_mut()
+    }
+}
+
+impl std::ops::Deref for Paints {
+    type Target = [Paint];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl std::ops::DerefMut for Paints {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
+    }
+}
+
+impl Extend<Paint> for Paints {
+    fn extend<I: IntoIterator<Item = Paint>>(&mut self, iter: I) {
+        self.paints.extend(iter);
     }
 }
 
@@ -1002,7 +1277,6 @@ impl GradientPaint {
 #[derive(Debug, Clone)]
 pub struct SolidPaint {
     pub color: CGColor,
-    pub opacity: f32,
     pub blend_mode: BlendMode,
 }
 
@@ -1010,44 +1284,42 @@ impl SolidPaint {
     pub fn new_color(color: CGColor) -> Self {
         Self {
             color,
-            opacity: 1.0,
             blend_mode: BlendMode::default(),
         }
     }
 
+    /// Returns the opacity as a value between 0.0 and 1.0, derived from the color's alpha channel.
+    pub fn opacity(&self) -> f32 {
+        self.color.a() as f32 / 255.0
+    }
+
     pub const TRANSPARENT: Self = Self {
         color: CGColor::TRANSPARENT,
-        opacity: 0.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const BLACK: Self = Self {
         color: CGColor::BLACK,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const WHITE: Self = Self {
         color: CGColor::WHITE,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const RED: Self = Self {
         color: CGColor::RED,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const BLUE: Self = Self {
         color: CGColor::BLUE,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const GREEN: Self = Self {
         color: CGColor::GREEN,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 }
@@ -1207,13 +1479,142 @@ pub struct SweepGradientPaint {
     pub blend_mode: BlendMode,
 }
 
+/// A reference to a resource that can be identified either by a logical Resource ID (RID) or by a hash.
+///
+/// `ResourceRef` is used throughout the Grida Canvas to reference external resources like images,
+/// fonts, or other binary data. It provides two ways to identify resources:
+///
+/// ## Variants
+///
+/// - **`HASH(String)`**: References a resource by its content hash. This is typically used for
+///   resources that are stored in memory with a `mem://` URL format. The hash is computed from
+///   the resource's binary content using a hashing algorithm.
+///
+/// - **`RID(String)`**: References a resource by a logical Resource ID. This is typically used
+///   for resources that have a human-readable identifier like `res://images/logo.png` or
+///   external URLs. RIDs provide a stable way to reference resources that may be loaded
+///   from different sources.
+///
+/// ## Usage
+///
+/// `ResourceRef` is commonly used in:
+/// - [`ImagePaint`] to reference image resources
+/// - Resource management systems to track and resolve resource dependencies
+/// - Import/export operations to maintain resource references across different formats
+///
+/// ## Examples
+///
+/// ```ignore
+/// // Reference by logical ID
+/// let image_ref = ResourceRef::RID("res://images/logo.png".to_string());
+///
+/// // Reference by content hash (for in-memory resources)
+/// let mem_ref = ResourceRef::HASH("a1b2c3d4e5f6".to_string());
+/// ```
+///
+/// ## Resource Resolution
+///
+/// The actual resolution of a `ResourceRef` depends on the context:
+/// - RID references are typically resolved through a resource index that maps logical IDs to
+///   actual resource locations or content hashes
+/// - HASH references are typically resolved directly from a byte store using the hash as a key
+///
+/// Both variants are treated uniformly in most contexts, allowing the resource management
+/// system to handle different resource types transparently.
+#[derive(Debug, Clone)]
+pub enum ResourceRef {
+    /// Reference by content hash, typically used for in-memory resources with `mem://` URLs
+    HASH(String),
+    /// Reference by logical Resource ID, typically used for named resources with `res://` URLs
+    RID(String),
+}
+
+/// Image filter parameters for color adjustments
+///
+/// All values are normalized to the range [-1.0, 1.0] where:
+/// - `-1.0` = maximum negative adjustment
+/// - `0.0` = no change (neutral)
+/// - `1.0` = maximum positive adjustment
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct ImageFilters {
+    /// Exposure adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the overall brightness of the image.
+    /// - `-1.0` = very dark
+    /// - `0.0` = original (no change)
+    /// - `1.0` = very bright
+    pub exposure: f32,
+
+    /// Contrast adjustment (-0.3 to 0.3, default: 0.0)
+    ///
+    /// Controls the difference between light and dark areas.
+    /// - `-0.3` = low contrast (UI cap)
+    /// - `0.0` = original contrast
+    /// - `0.3` = high contrast (UI cap)
+    pub contrast: f32,
+
+    /// Saturation adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the intensity of colors.
+    /// - `-1.0` = grayscale (no color)
+    /// - `0.0` = original saturation
+    /// - `1.0` = highly oversaturated
+    pub saturation: f32,
+
+    /// Temperature adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the warm/cool color balance.
+    /// - `-1.0` = very cool (blue tint)
+    /// - `0.0` = neutral (no change)
+    /// - `1.0` = very warm (orange tint)
+    pub temperature: f32,
+
+    /// Tint adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the green/magenta color balance.
+    /// - `-1.0` = strong magenta tint
+    /// - `0.0` = neutral (no change)
+    /// - `1.0` = strong green tint
+    pub tint: f32,
+
+    /// Highlights adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the brightness of highlight areas.
+    /// - `-1.0` = darken highlights
+    /// - `0.0` = no change
+    /// - `1.0` = brighten highlights
+    pub highlights: f32,
+
+    /// Shadows adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the brightness of shadow areas.
+    /// - `-1.0` = darken shadows
+    /// - `0.0` = no change
+    /// - `1.0` = brighten shadows
+    pub shadows: f32,
+}
+
+impl ImageFilters {
+    /// Check if any filters are active (non-zero values)
+    pub fn has_filters(&self) -> bool {
+        self.exposure != 0.0
+            || self.contrast != 0.0
+            || self.saturation != 0.0
+            || self.temperature != 0.0
+            || self.tint != 0.0
+            || self.highlights != 0.0
+            || self.shadows != 0.0
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ImagePaint {
     pub transform: AffineTransform,
-    pub hash: String,
+    pub image: ResourceRef,
     pub fit: BoxFit,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub filters: ImageFilters,
 }
 
 impl Default for RadialGradientPaint {
@@ -1253,10 +1654,11 @@ impl Default for ImagePaint {
     fn default() -> Self {
         Self {
             transform: AffineTransform::default(),
-            hash: String::new(),
+            image: ResourceRef::RID(String::new()),
             fit: BoxFit::Cover,
             opacity: 1.0,
             blend_mode: BlendMode::default(),
+            filters: ImageFilters::default(),
         }
     }
 }

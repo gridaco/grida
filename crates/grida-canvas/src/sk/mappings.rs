@@ -38,7 +38,6 @@ impl Into<skia_safe::Blender> for BlendMode {
             BlendMode::Saturation => Saturation,
             BlendMode::Color => Color,
             BlendMode::Luminosity => Luminosity,
-            BlendMode::PassThrough => SrcOver, // Pass-through maps to normal
         };
         skia_safe::Blender::mode(sk_blend_mode)
     }
@@ -64,7 +63,6 @@ impl From<BlendMode> for skia_safe::BlendMode {
             BlendMode::Saturation => Saturation,
             BlendMode::Color => Color,
             BlendMode::Luminosity => Luminosity,
-            BlendMode::PassThrough => SrcOver, // fallback
         }
     }
 }

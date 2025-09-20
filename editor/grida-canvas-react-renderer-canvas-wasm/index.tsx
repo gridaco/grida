@@ -31,13 +31,7 @@ function CanvasContent({
   className?: string;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const rendererRef = useGrida2D(canvasRef);
-
-  useLayoutEffect(() => {
-    if (rendererRef.current) {
-      onMount?.(rendererRef.current);
-    }
-  }, [rendererRef.current]);
+  const rendererRef = useGrida2D(canvasRef, onMount);
 
   useLayoutEffect(() => {
     if (rendererRef.current) {

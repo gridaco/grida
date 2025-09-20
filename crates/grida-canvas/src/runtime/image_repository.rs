@@ -43,14 +43,18 @@ impl ImageRepository {
     }
 
     /// Adds an image to the repository from bytes referenced by `hash`.
-    pub fn insert(&mut self, src: String, hash: u64) {
+    pub fn insert(&mut self, src: String, hash: u64) -> Option<(u32, u32)> {
         if let Some(bytes) = self.store.lock().unwrap().get(hash) {
             let data = skia_safe::Data::new_copy(bytes);
             if let Some(image) = Image::from_encoded(data) {
+                let width = image.width() as u32;
+                let height = image.height() as u32;
                 let set = ImageMipmaps::from_image(image, &self.config);
                 self.images.insert(src, set);
+                return Some((width, height));
             }
         }
+        None
     }
 
     /// Gets a reference to an image by its source URL and desired size.
@@ -58,6 +62,11 @@ impl ImageRepository {
         self.images
             .get(src)
             .and_then(|set| set.best_for_size(width, height))
+    }
+
+    /// Gets the dimensions of an image by its source URL.
+    pub fn get_size(&self, src: &str) -> Option<(u32, u32)> {
+        self.images.get(src).and_then(|set| set.dimensions())
     }
 
     /// Removes an image from the repository by its source URL.

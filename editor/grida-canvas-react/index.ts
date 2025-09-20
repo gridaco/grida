@@ -27,3 +27,4 @@ export {
   type ContextMenuAction,
   type ContextMenuActions,
 } from "./use-context-menu-actions";
+export { ImageView } from "./components/image";
