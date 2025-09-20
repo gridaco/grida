@@ -131,7 +131,11 @@ function __ContextMenuContent({
         }}
       />
       <ActionItem action={actions.flatten} />
-      <ActionItem action={actions.groupMask} />
+      {actions.removeMask.disabled ? (
+        <ActionItem action={actions.groupMask} />
+      ) : (
+        <ActionItem action={actions.removeMask} />
+      )}
       <ContextMenuSeparator />
       <ActionItem action={actions.bringToFront} />
       <ActionItem action={actions.sendToBack} />

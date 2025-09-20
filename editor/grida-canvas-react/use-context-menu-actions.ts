@@ -3,6 +3,7 @@ import { useCurrentEditor, useEditorState } from "./use-editor";
 import { useBackendState, useDataTransferEventTarget } from "./provider";
 import { supportsFlatten } from "@/grida-canvas/reducers/methods/flatten";
 import grida from "@grida/schema";
+import assert from "assert";
 
 export interface ContextMenuAction {
   label: string;
@@ -24,6 +25,7 @@ type ContextMenuActionType =
   | "flatten"
   | "planarize"
   | "groupMask"
+  | "removeMask"
   | "toggleActive"
   | "zoomToFit"
   | "toggleLocked"
@@ -35,6 +37,7 @@ export type ContextMenuActions = Record<
 >;
 
 export function useContextMenuActions(ids: string[]): ContextMenuActions {
+  assert(Array.isArray(ids), "ids must be an array");
   const editor = useCurrentEditor();
   const backend = useBackendState();
   const { insertText } = useDataTransferEventTarget();
@@ -48,7 +51,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
   });
 
   const hasSelection = ids.length > 0;
-
+  const isSingle = ids.length === 1;
   const canGroup = backend === "canvas" && hasSelection;
 
   const canFlatten =
@@ -67,6 +70,9 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
     backend === "canvas" &&
     hasSelection &&
     ids.every((id) => nodes[id].type === "vector");
+
+  const canGroupMask = canGroup;
+  const canRemoveMask = isSingle && editor.isMask(ids[0]);
 
   const targetSingleOrSelection =
     ids.length === 1 ? (ids[0] as string) : "selection";
@@ -164,8 +170,13 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       },
       groupMask: {
         label: "Use as Mask",
-        disabled: true,
+        disabled: !canGroupMask,
         onSelect: () => editor.groupMask(ids),
+      },
+      removeMask: {
+        label: "Remove Mask",
+        disabled: !canRemoveMask,
+        onSelect: () => editor.removeMask(ids[0]),
       },
       toggleActive: {
         label: "Set Active/Inactive",

@@ -1038,12 +1038,47 @@ export class Editor
     });
   }
 
+  /**
+   * groups targets as mask, if multiple, if single && is mask, remove mask
+   * @param target
+   */
+  public toggleMask(target: ReadonlyArray<editor.NodeID>) {
+    if (target.length === 0) return;
+    if (target.length === 1) {
+      if (this.isMask(target[0])) {
+        this.removeMask(target[0]);
+        return;
+      }
+    }
+    this.groupMask(target);
+  }
+
   public groupMask(target: ReadonlyArray<editor.NodeID>) {
+    assert(Array.isArray(target), "target must be an array");
+    this.group(target);
     this.dispatch({
       type: "node/change/*",
       node_id: target[0],
       mask: "alpha",
     });
+  }
+
+  public removeMask(target: editor.NodeID) {
+    if (!this.isMask(target)) return;
+    this.dispatch({
+      type: "node/change/*",
+      node_id: target,
+      mask: null,
+    });
+  }
+
+  /**
+   * Checks if a node is being used as a mask
+   * @param target the node to test
+   */
+  public isMask(target: editor.NodeID) {
+    const n = this.getNodeSnapshotById(target);
+    return "mask" in n && n.mask;
   }
 
   public setClipboardColor(color: cg.RGBA8888) {

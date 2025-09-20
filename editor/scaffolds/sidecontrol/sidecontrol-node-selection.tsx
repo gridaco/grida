@@ -57,6 +57,7 @@ import {
   LockOpen1Icon,
   MixerVerticalIcon,
   PlusIcon,
+  TrashIcon,
 } from "@radix-ui/react-icons";
 import { supports } from "@/grida-canvas/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
@@ -114,6 +115,7 @@ import {
 } from "./controls/context/font";
 import { PropertyLineLabelWithNumberGesture } from "./ui/label-with-number-gesture";
 import { MaskTypeControl } from "./controls/mask-type";
+import { Editor } from "@/grida-canvas/editor";
 
 function FontStyleControlScaffold({ selection }: { selection: string[] }) {
   const editor = useCurrentEditor();
@@ -157,17 +159,22 @@ function Header() {
   const { selection } = useSelectionState();
   const backend = useBackendState();
   const has_selection = selection.length >= 1;
+  const is_single = selection.length === 1;
   const supports_masking = backend === "canvas";
   const supports_boolean = backend === "canvas";
+
+  // TODO: this won't change immediately since useSelectionState only checks the selection itself, not the mask property for the node.
+  // we'll fix this when reliable, performant selector based query is ready
+  const is_mask = is_single && editor.isMask(selection[0]);
 
   return (
     <>
       <div className="p-2 w-full flex items-center justify-end gap-2">
         <MaskControl
           disabled={!has_selection || !supports_masking}
-          // active={...}
+          active={Boolean(is_mask)}
           onClick={() => {
-            editor.groupMask(selection);
+            editor.toggleMask(selection);
           }}
         />
         <OpsControl
@@ -935,7 +942,7 @@ function ModeNodeProperties({
         <SectionProps node_id={node_id} />
       )}
 
-      <SectionMask node_id={node_id} />
+      <SectionMask node_id={node_id} editor={instance} />
 
       <SidebarSection hidden={!is_stylable} className="border-b pb-4">
         <SidebarSectionHeaderItem>
@@ -1587,7 +1594,7 @@ function SectionProps({ node_id }: { node_id: string }) {
   );
 }
 
-function SectionMask({ node_id }: { node_id: string }) {
+function SectionMask({ node_id, editor }: { node_id: string; editor: Editor }) {
   const actions = useNodeActions(node_id)!;
   const { mask } = useNodeState(node_id, (node) => ({
     mask: node.mask,
@@ -1599,6 +1606,17 @@ function SectionMask({ node_id }: { node_id: string }) {
     <SidebarSection className="border-b pb-4">
       <SidebarSectionHeaderItem>
         <SidebarSectionHeaderLabel>Mask</SidebarSectionHeaderLabel>
+        <SidebarSectionHeaderActions>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              editor.removeMask(node_id);
+            }}
+          >
+            <TrashIcon className="size-3" />
+          </Button>
+        </SidebarSectionHeaderActions>
       </SidebarSectionHeaderItem>
       <SidebarMenuSectionContent className="space-y-2">
         <MaskTypeControl value={mask} onValueChange={actions.maskType} />
