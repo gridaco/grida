@@ -15,6 +15,7 @@ export interface ContextMenuAction {
 type ContextMenuActionType =
   | "copy"
   | "paste"
+  | "copyAsSVG"
   | "copyAsPNG"
   | "bringToFront"
   | "sendToBack"
@@ -111,6 +112,13 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       paste: {
         label: "Paste",
         onSelect: handlePaste,
+      },
+      copyAsSVG: {
+        label: "Copy as SVG",
+        disabled: backend !== "canvas" || !hasSelection,
+        onSelect: () => {
+          void editor.a11yCopyAsSVG();
+        },
       },
       copyAsPNG: {
         label: "Copy as PNG",

@@ -944,6 +944,34 @@ export class Editor
     return true;
   }
 
+  public async writeClipboardSVG(
+    target: "selection" | editor.NodeID
+  ): Promise<boolean> {
+    assert(this.backend === "canvas", "Editor is not using canvas backend");
+    const ids = target === "selection" ? this.mstate.selection : [target];
+    if (ids.length === 0) return false;
+    const id = ids[0];
+    const data = await this.exportNodeAs(id, "SVG");
+    if (typeof data !== "string") {
+      return false;
+    }
+
+    const svgBlob = new Blob([data], { type: "image/svg+xml" });
+    const textBlob = new Blob([data], { type: "text/plain" });
+    const item = new ClipboardItem({
+      "image/svg+xml": svgBlob,
+      "text/plain": textBlob,
+    });
+
+    try {
+      await navigator.clipboard.write([item]);
+    } catch (error) {
+      await navigator.clipboard.writeText(data);
+    }
+
+    return true;
+  }
+
   public async a11yCopyAsImage(format: "png"): Promise<boolean> {
     if (this.mstate.content_edit_mode?.type === "vector") {
       const { selected_vertices, selected_segments, selected_tangents } =
@@ -957,6 +985,22 @@ export class Editor
       if (this.mstate.selection.length === 0) return false;
     }
     return await this.writeClipboardMedia("selection", format);
+  }
+
+  public async a11yCopyAsSVG(): Promise<boolean> {
+    if (this.mstate.content_edit_mode?.type === "vector") {
+      const { selected_vertices, selected_segments, selected_tangents } =
+        this.mstate.content_edit_mode.selection;
+      const hasSelection =
+        selected_vertices.length > 0 ||
+        selected_segments.length > 0 ||
+        selected_tangents.length > 0;
+      if (!hasSelection) return false;
+    } else {
+      if (this.mstate.selection.length === 0) return false;
+    }
+
+    return await this.writeClipboardSVG("selection");
   }
 
   public a11yCopy() {

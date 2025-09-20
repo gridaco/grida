@@ -59,6 +59,7 @@ function ContextMenuContent() {
           Copy/Paste as...
         </ContextMenuSubTrigger>
         <ContextMenuSubContent>
+          <ActionItem action={actions.copyAsSVG} />
           <ActionItem action={actions.copyAsPNG} />
         </ContextMenuSubContent>
       </ContextMenuSub>

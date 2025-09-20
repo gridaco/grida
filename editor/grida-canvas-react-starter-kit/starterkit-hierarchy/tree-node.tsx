@@ -65,6 +65,9 @@ import {
   ContextMenuSeparator,
   ContextMenuShortcut,
   ContextMenuTrigger,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
 import {
   LockClosedIcon,
@@ -123,6 +126,15 @@ function __ContextMenuContent({
   return (
     <>
       <ActionItem action={actions.copy} />
+      <ContextMenuSub>
+        <ContextMenuSubTrigger className="text-xs">
+          Copy/Paste as...
+        </ContextMenuSubTrigger>
+        <ContextMenuSubContent>
+          <ActionItem action={actions.copyAsSVG} />
+          <ActionItem action={actions.copyAsPNG} />
+        </ContextMenuSubContent>
+      </ContextMenuSub>
       <ActionItem
         action={{
           label: "Rename",
