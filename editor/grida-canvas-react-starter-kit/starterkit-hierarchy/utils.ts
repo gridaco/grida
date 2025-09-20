@@ -1,5 +1,12 @@
 import type { DragTarget } from "@headless-tree/core";
 
+export const toReversedCopy = <T>(items: T[]) => {
+  if (!items || items.length <= 1) {
+    return items;
+  }
+  return [...items].reverse();
+};
+
 export type GetActualChildren = (
   parentId: string
 ) => readonly string[] | undefined;
