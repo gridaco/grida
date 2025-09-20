@@ -21,7 +21,7 @@ export function MaskTypeControl({
           value: "luminance" satisfies cg.LayerMaskType,
         },
         {
-          label: "Shape",
+          label: "Shape Only",
           value: "geometry" satisfies cg.LayerMaskType,
         },
       ]}
