@@ -45,12 +45,7 @@ import {
   useContextMenuActions,
   ContextMenuAction,
 } from "@/grida-canvas-react";
-import {
-  Tree,
-  TreeDragLine,
-  TreeItem,
-  TreeItemLabel,
-} from "@/components/ui-editor/tree";
+import { Tree, TreeDragLine } from "@/components/ui-editor/tree";
 import {
   dragAndDropFeature,
   selectionFeature,
@@ -69,18 +64,11 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
-import {
-  LockClosedIcon,
-  EyeOpenIcon,
-  EyeClosedIcon,
-  LockOpen1Icon,
-} from "@radix-ui/react-icons";
 import { useCurrentSceneState } from "@/grida-canvas-react/provider";
-import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/node-type-icon";
-import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
 import { resolveDropInsertionIndex, toReversedCopy } from "./utils";
-import { NameInput } from "./tree-item-name-input";
+import { NodeHierarchyTreeItem } from "./node-hierarchy-tree-item";
+import { computeNodeMaskMap } from "./mask";
 
 function NodeHierarchyItemContextMenuWrapper({
   node_id,
@@ -170,9 +158,24 @@ function __ContextMenuContent({
 export function NodeHierarchyList() {
   const editor = useCurrentEditor();
   const document_ctx = useEditorState(editor, (state) => state.document_ctx);
+  const nodes = useEditorState(
+    editor,
+    (state) => state.document.nodes,
+    (a, b) => a === b
+  );
 
   const { id, name, children, selection, hovered_node_id } =
     useCurrentSceneState();
+
+  const maskInfoMap = useMemo(
+    () =>
+      computeNodeMaskMap({
+        documentCtx: document_ctx,
+        nodes,
+        sceneChildren: children,
+      }),
+    [children, document_ctx, nodes]
+  );
 
   // Track user's manual expansion state - preserve across selection changes
   const [userExpandedItems, setUserExpandedItems] = useState<string[]>([]);
@@ -346,6 +349,10 @@ export function NodeHierarchyList() {
 
         const isRenaming = item.isRenaming();
         const isHovered = hovered_node_id === node.id;
+        const maskInfo = maskInfoMap.get(node.id);
+        const mask = maskInfo?.mask ?? "none";
+        const maskIndicatorVariant =
+          maskInfo?.mask === "masked" ? "masked" : undefined;
 
         return (
           <NodeHierarchyItemContextMenuWrapper
@@ -358,72 +365,30 @@ export function NodeHierarchyList() {
               }, 200);
             }}
           >
-            <TreeItem
+            <NodeHierarchyTreeItem
               item={item}
-              className="w-full h-7 max-h-7 py-0.5"
+              node={node}
+              isHovered={isHovered}
+              isRenaming={isRenaming}
+              mask={mask}
+              maskIndicatorVariant={maskIndicatorVariant}
               onPointerEnter={() => {
                 editor.hoverNode(node.id, "enter");
               }}
               onPointerLeave={() => {
                 editor.hoverNode(node.id, "leave");
               }}
-            >
-              <TreeItemLabel
-                className={cn(
-                  "h-full px-1 py-1 bg-transparent",
-                  isHovered && "bg-accent"
-                )}
-              >
-                <div
-                  className="flex items-center gap-2 min-w-0 flex-1"
-                  onDoubleClick={() => {
-                    item.startRenaming();
-                  }}
-                >
-                  <NodeTypeIcon node={node} className="size-3 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <NameInput
-                      isRenaming={isRenaming}
-                      initialValue={node.name}
-                      onValueCommit={(name) => {
-                        editor.changeNodeName(node.id, name);
-                        tree.abortRenaming();
-                      }}
-                      className="px-1 py-0.5 font-normal text-[11px]"
-                    />
-                  </div>
-                </div>
-                <div
-                  aria-label="actions"
-                  className="items-center gap-2 px-2 hidden shrink-0 group-hover/item:flex group-data-[renaming=true]/item:hidden"
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      editor.toggleNodeLocked(node.id);
-                    }}
-                  >
-                    {node.locked ? (
-                      <LockClosedIcon className="size-3" />
-                    ) : (
-                      <LockOpen1Icon className="size-3" />
-                    )}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      editor.toggleNodeActive(node.id);
-                    }}
-                  >
-                    {node.active ? (
-                      <EyeOpenIcon className="size-3" />
-                    ) : (
-                      <EyeClosedIcon className="size-3" />
-                    )}
-                  </button>
-                </div>
-              </TreeItemLabel>
-            </TreeItem>
+              onRenameCommit={(name) => {
+                editor.changeNodeName(node.id, name);
+                tree.abortRenaming();
+              }}
+              onToggleLocked={() => {
+                editor.toggleNodeLocked(node.id);
+              }}
+              onToggleActive={() => {
+                editor.toggleNodeActive(node.id);
+              }}
+            />
           </NodeHierarchyItemContextMenuWrapper>
         );
       })}
