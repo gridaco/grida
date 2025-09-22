@@ -457,7 +457,7 @@ function _ImagePaintEditor({
       </div>
       <DebugLayer
         debug={debug}
-        corners={corners}
+        transform={previewTransform}
         width={width}
         height={height}
         scaleX={scaleX}
@@ -471,19 +471,14 @@ function _ImagePaintEditor({
 
 function DebugLayer({
   debug,
-  corners,
+  transform,
   width,
   height,
   scaleX,
   scaleY,
 }: {
   debug: boolean;
-  corners: {
-    nw: cmath.Vector2; // northwest = top-left
-    ne: cmath.Vector2; // northeast = top-right
-    se: cmath.Vector2; // southeast = bottom-right
-    sw: cmath.Vector2; // southwest = bottom-left
-  };
+  transform: cg.AffineTransform;
   width: number;
   height: number;
   scaleX: number;
@@ -491,19 +486,16 @@ function DebugLayer({
 }) {
   const debuglayerMatrix = useMemo(() => {
     if (!debug) return null;
-    const w = width || 1;
-    const h = height || 1;
-    const widthVector = cmath.vector2.sub(corners.ne, corners.nw); // northeast - northwest
-    const heightVector = cmath.vector2.sub(corners.sw, corners.nw); // southwest - northwest
-    return {
-      a: (widthVector[0] / w) * scaleX,
-      b: (widthVector[1] / w) * scaleY,
-      c: (heightVector[0] / h) * scaleX,
-      d: (heightVector[1] / h) * scaleY,
-      e: corners.nw[0] * scaleX, // northwest = top-left
-      f: corners.nw[1] * scaleY, // northwest = top-left
-    };
-  }, [debug, corners, width, height, scaleX, scaleY]);
+    // Apply only viewport scaling to the raw transform matrix
+    // The container already handles box-relative scaling
+    const a = transform[0][0] * scaleX;
+    const b = transform[1][0] * scaleY;
+    const c = transform[0][1] * scaleX;
+    const d = transform[1][1] * scaleY;
+    const e = transform[0][2] * scaleX;
+    const f = transform[1][2] * scaleY;
+    return { a, b, c, d, e, f };
+  }, [debug, transform, scaleX, scaleY]);
 
   if (!debug || !debuglayerMatrix) return null;
 
@@ -519,7 +511,7 @@ function DebugLayer({
           overflow: "visible",
         }}
       >
-        {/* Debug overlay - red rectangle with same transform as image */}
+        {/* Debug overlay - exactly the raw matrix (box-relative → pixels) */}
         <rect
           x={0}
           y={0}
@@ -529,7 +521,7 @@ function DebugLayer({
           stroke="rgba(255,0,0,0.8)"
           strokeWidth={2}
           transform={`matrix(${debuglayerMatrix.a} ${debuglayerMatrix.b} ${debuglayerMatrix.c} ${debuglayerMatrix.d} ${debuglayerMatrix.e} ${debuglayerMatrix.f})`}
-          style={{ pointerEvents: "none" }}
+          style={{ pointerEvents: "none", transformOrigin: "0 0" }}
         />
       </svg>
     </div>
