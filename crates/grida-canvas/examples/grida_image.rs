@@ -36,8 +36,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
     rect1.set_fill(Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
-        transform: AffineTransform::identity(),
-        fit: BoxFit::Cover,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
     }));

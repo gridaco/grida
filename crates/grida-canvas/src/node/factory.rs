@@ -43,8 +43,7 @@ impl NodeFactory {
             // TODO: use the built in image ref
             image: ResourceRef::RID(String::new()),
             opacity: 1.0,
-            transform: AffineTransform::identity(),
-            fit: BoxFit::Cover,
+            fit: ImagePaintFit::Fit(BoxFit::Cover),
             blend_mode: BlendMode::default(),
             filters: ImageFilters::default(),
         }

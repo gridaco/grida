@@ -775,8 +775,16 @@ export namespace cg {
   export type ImagePaint = {
     type: "image";
     src: string;
-    fit: BoxFit;
-    transform: AffineTransform;
+    /**
+     * box fit or custom transform
+     */
+    fit: BoxFit | "transform";
+    /**
+     * transform will only take effect if fit is "transform"
+     *
+     * @default identity
+     */
+    transform?: AffineTransform;
     filters: ImageFilters;
 
     /**

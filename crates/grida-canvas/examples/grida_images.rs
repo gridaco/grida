@@ -33,8 +33,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     rect1.set_fill(Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
-        transform: AffineTransform::identity(),
-        fit: BoxFit::Cover,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
     }));
@@ -52,16 +51,14 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     rect2.set_fill(Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
-        transform: AffineTransform::identity(),
-        fit: BoxFit::Cover,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
     }));
     rect2.strokes = Paints::new([Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
-        transform: AffineTransform::identity(),
-        fit: BoxFit::Cover,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
     })]);
@@ -80,8 +77,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     rect3.strokes = Paints::new([Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
-        transform: AffineTransform::identity(),
-        fit: BoxFit::Cover,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
     })]);
@@ -99,7 +95,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         // Rotate the image 45 degrees with BoxFit::None to showcase the paint transform
-        transform: AffineTransform {
+        fit: ImagePaintFit::Transform(AffineTransform {
             matrix: [
                 [
                     std::f32::consts::FRAC_1_SQRT_2,
@@ -112,8 +108,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
                     0.0,
                 ],
             ],
-        },
-        fit: BoxFit::None,
+        }),
         blend_mode: BlendMode::Normal,
         filters: ImageFilters::default(),
     }));

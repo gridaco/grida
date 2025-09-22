@@ -1,14 +1,113 @@
 use crate::cg::types::*;
 use crate::cg::varwidth::{VarWidthProfile, WidthStop};
-use crate::io::io_css::{
-    de_css_dimension, default_height_css, default_width_css, CSSDimension, CSSObjectFit,
-};
+use crate::io::io_css::{de_css_dimension, default_height_css, default_width_css, CSSDimension};
 use crate::node::schema::*;
 use crate::vectornetwork::*;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+
+/// JSON representation of a 2D transform matrix.
+///
+/// This provides a reliable way to handle transform matrices in JSON,
+/// with proper default values and validation.
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub struct JSONTransform2D([[f32; 3]; 2]);
+
+impl Default for JSONTransform2D {
+    fn default() -> Self {
+        Self([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]) // Identity matrix
+    }
+}
+
+impl From<JSONTransform2D> for AffineTransform {
+    fn from(json_transform: JSONTransform2D) -> Self {
+        AffineTransform {
+            matrix: json_transform.0,
+        }
+    }
+}
+
+impl From<AffineTransform> for JSONTransform2D {
+    fn from(transform: AffineTransform) -> Self {
+        Self(transform.matrix)
+    }
+}
+
+impl JSONTransform2D {
+    /// Get the matrix as a reference
+    pub fn matrix(&self) -> &[[f32; 3]; 2] {
+        &self.0
+    }
+}
+
+/// JSON representation of image paint fitting modes.
+///
+/// This enum handles the deserialization of image fitting from JSON,
+/// supporting both standard CSS-like fitting modes and custom transforms.
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum JSONImagePaintFit {
+    /// Standard fitting modes as simple strings
+    Standard(String),
+    /// Transform mode with explicit transform matrix
+    Transform {
+        #[serde(rename = "fit")]
+        fit: String,
+        #[serde(default)]
+        transform: JSONTransform2D,
+    },
+}
+
+impl Default for JSONImagePaintFit {
+    fn default() -> Self {
+        JSONImagePaintFit::Standard("cover".to_string())
+    }
+}
+
+impl From<JSONImagePaintFit> for ImagePaintFit {
+    fn from(json_fit: JSONImagePaintFit) -> Self {
+        match json_fit {
+            JSONImagePaintFit::Standard(fit_str) => match fit_str.as_str() {
+                "contain" => ImagePaintFit::Fit(BoxFit::Contain),
+                "cover" => ImagePaintFit::Fit(BoxFit::Cover),
+                "fill" => ImagePaintFit::Fit(BoxFit::Fill),
+                "none" => ImagePaintFit::Fit(BoxFit::None),
+                _ => ImagePaintFit::Fit(BoxFit::Cover), // Default fallback
+            },
+            JSONImagePaintFit::Transform { transform, .. } => {
+                ImagePaintFit::Transform(transform.into())
+            }
+        }
+    }
+}
+
+/// Helper function to convert JSON paint fields to ImagePaintFit
+/// This handles the logic where transform is only used when fit is "transform"
+fn json_paint_to_image_paint_fit(
+    fit: JSONImagePaintFit,
+    transform: Option<JSONTransform2D>,
+) -> ImagePaintFit {
+    match fit {
+        JSONImagePaintFit::Transform {
+            transform: fit_transform,
+            ..
+        } => {
+            // Use the transform from the fit variant
+            ImagePaintFit::Transform(fit_transform.into())
+        }
+        JSONImagePaintFit::Standard(fit_str) if fit_str == "transform" => {
+            // Handle case where fit is "transform" but we need to use the separate transform field
+            let json_transform = transform.unwrap_or_default();
+            ImagePaintFit::Transform(json_transform.into())
+        }
+        _ => {
+            // For non-transform fits, ignore the transform field and use the fit
+            fit.into()
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct JSONCanvasFile {
@@ -52,7 +151,7 @@ pub enum JSONPaint {
     #[serde(rename = "linear_gradient")]
     LinearGradient {
         id: Option<String>,
-        transform: Option<[[f32; 3]; 2]>,
+        transform: Option<JSONTransform2D>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -62,7 +161,7 @@ pub enum JSONPaint {
     #[serde(rename = "radial_gradient")]
     RadialGradient {
         id: Option<String>,
-        transform: Option<[[f32; 3]; 2]>,
+        transform: Option<JSONTransform2D>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -72,7 +171,7 @@ pub enum JSONPaint {
     #[serde(rename = "diamond_gradient")]
     DiamondGradient {
         id: Option<String>,
-        transform: Option<[[f32; 3]; 2]>,
+        transform: Option<JSONTransform2D>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -82,7 +181,7 @@ pub enum JSONPaint {
     #[serde(rename = "sweep_gradient")]
     SweepGradient {
         id: Option<String>,
-        transform: Option<[[f32; 3]; 2]>,
+        transform: Option<JSONTransform2D>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -93,9 +192,10 @@ pub enum JSONPaint {
     Image {
         #[serde(default)]
         src: Option<String>,
-        transform: Option<[[f32; 3]; 2]>,
         #[serde(default)]
-        fit: CSSObjectFit,
+        transform: Option<JSONTransform2D>,
+        #[serde(default)]
+        fit: JSONImagePaintFit,
         #[serde(default = "default_opacity")]
         opacity: f32,
         #[serde(rename = "blendMode", default)]
@@ -191,7 +291,7 @@ impl From<Option<JSONPaint>> for Paint {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::LinearGradient(LinearGradientPaint {
                     transform: transform
-                        .map(|m| AffineTransform { matrix: m })
+                        .map(|t| t.into())
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity,
@@ -208,7 +308,7 @@ impl From<Option<JSONPaint>> for Paint {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::RadialGradient(RadialGradientPaint {
                     transform: transform
-                        .map(|m| AffineTransform { matrix: m })
+                        .map(|t| t.into())
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity,
@@ -225,7 +325,7 @@ impl From<Option<JSONPaint>> for Paint {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::DiamondGradient(DiamondGradientPaint {
                     transform: transform
-                        .map(|m| AffineTransform { matrix: m })
+                        .map(|t| t.into())
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity,
@@ -242,7 +342,7 @@ impl From<Option<JSONPaint>> for Paint {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::SweepGradient(SweepGradientPaint {
                     transform: transform
-                        .map(|m| AffineTransform { matrix: m })
+                        .map(|t| t.into())
                         .unwrap_or_else(AffineTransform::identity),
                     stops,
                     opacity,
@@ -260,10 +360,7 @@ impl From<Option<JSONPaint>> for Paint {
                 let url = src.unwrap_or_default();
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(url),
-                    transform: transform
-                        .map(|m| AffineTransform { matrix: m })
-                        .unwrap_or_else(AffineTransform::identity),
-                    fit: fit.into(),
+                    fit: json_paint_to_image_paint_fit(fit, transform),
                     opacity,
                     blend_mode,
                     filters,
@@ -293,17 +390,6 @@ impl From<JSONVarWidthStop> for WidthStop {
         WidthStop {
             u: stop.u,
             r: stop.r,
-        }
-    }
-}
-
-impl From<CSSObjectFit> for BoxFit {
-    fn from(fit: CSSObjectFit) -> Self {
-        match fit {
-            CSSObjectFit::Contain => BoxFit::Contain,
-            CSSObjectFit::Cover => BoxFit::Cover,
-            CSSObjectFit::Fill => BoxFit::Fill,
-            CSSObjectFit::None => BoxFit::None,
         }
     }
 }
@@ -667,7 +753,7 @@ pub struct JSONImageNode {
     #[serde(rename = "src")]
     pub src: Option<String>,
     #[serde(rename = "fit", default)]
-    pub fit: CSSObjectFit,
+    pub fit: JSONImagePaintFit,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1022,10 +1108,7 @@ impl From<JSONImageNode> for Node {
                 let resolved = h.unwrap_or_else(|| url.clone());
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(resolved),
-                    transform: t
-                        .map(|m| AffineTransform { matrix: m })
-                        .unwrap_or_else(AffineTransform::identity),
-                    fit: fit.into(),
+                    fit: json_paint_to_image_paint_fit(fit, t),
                     opacity,
                     blend_mode,
                     filters,
@@ -1035,7 +1118,6 @@ impl From<JSONImageNode> for Node {
             }
             _ => ImagePaint {
                 image: ResourceRef::RID(url.clone()),
-                transform: AffineTransform::identity(),
                 fit: node.fit.into(),
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
@@ -2208,5 +2290,125 @@ mod tests {
             layer_mask,
             LayerMaskType::Image(ImageMaskType::Luminance)
         ));
+    }
+
+    #[test]
+    fn deserialize_json_image_paint_fit_standard_modes() {
+        // Test standard fitting modes as simple strings
+        let json_contain = r#""contain""#;
+        let fit: JSONImagePaintFit =
+            serde_json::from_str(json_contain).expect("Failed to parse contain");
+        assert!(matches!(fit, JSONImagePaintFit::Standard(ref s) if s == "contain"));
+
+        let json_cover = r#""cover""#;
+        let fit: JSONImagePaintFit =
+            serde_json::from_str(json_cover).expect("Failed to parse cover");
+        assert!(matches!(fit, JSONImagePaintFit::Standard(ref s) if s == "cover"));
+
+        let json_fill = r#""fill""#;
+        let fit: JSONImagePaintFit = serde_json::from_str(json_fill).expect("Failed to parse fill");
+        assert!(matches!(fit, JSONImagePaintFit::Standard(ref s) if s == "fill"));
+
+        let json_none = r#""none""#;
+        let fit: JSONImagePaintFit = serde_json::from_str(json_none).expect("Failed to parse none");
+        assert!(matches!(fit, JSONImagePaintFit::Standard(ref s) if s == "none"));
+    }
+
+    #[test]
+    fn deserialize_json_image_paint_fit_transform() {
+        // Test transform mode (flattened structure)
+        let json_transform =
+            r#"{"fit": "transform", "transform": [[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]}"#;
+        let fit: JSONImagePaintFit =
+            serde_json::from_str(json_transform).expect("Failed to parse transform");
+
+        match fit {
+            JSONImagePaintFit::Transform { transform, .. } => {
+                assert_eq!(transform.matrix()[0], [1.0, 0.0, 10.0]);
+                assert_eq!(transform.matrix()[1], [0.0, 1.0, 20.0]);
+            }
+            _ => panic!("Expected Transform variant"),
+        }
+    }
+
+    #[test]
+    fn json_image_paint_fit_into_conversion() {
+        // Test conversion to ImagePaintFit
+        let json_contain = JSONImagePaintFit::Standard("contain".to_string());
+        let image_fit: ImagePaintFit = json_contain.into();
+        assert!(matches!(image_fit, ImagePaintFit::Fit(BoxFit::Contain)));
+
+        let json_cover = JSONImagePaintFit::Standard("cover".to_string());
+        let image_fit: ImagePaintFit = json_cover.into();
+        assert!(matches!(image_fit, ImagePaintFit::Fit(BoxFit::Cover)));
+
+        let json_transform = JSONImagePaintFit::Transform {
+            fit: "transform".to_string(),
+            transform: JSONTransform2D([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]),
+        };
+        let image_fit: ImagePaintFit = json_transform.into();
+        match image_fit {
+            ImagePaintFit::Transform(transform) => {
+                assert_eq!(transform.matrix[0], [2.0, 0.0, 5.0]);
+                assert_eq!(transform.matrix[1], [0.0, 2.0, 10.0]);
+            }
+            _ => panic!("Expected Transform variant"),
+        }
+    }
+
+    #[test]
+    fn deserialize_json_transform2d() {
+        // Test JSONTransform2D deserialization (flattened structure)
+        let json_transform = r#"[[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]"#;
+        let transform: JSONTransform2D =
+            serde_json::from_str(json_transform).expect("Failed to parse transform");
+        assert_eq!(transform.matrix()[0], [1.0, 0.0, 10.0]);
+        assert_eq!(transform.matrix()[1], [0.0, 1.0, 20.0]);
+
+        // Test default value
+        let default_transform = JSONTransform2D::default();
+        assert_eq!(default_transform.matrix()[0], [1.0, 0.0, 0.0]);
+        assert_eq!(default_transform.matrix()[1], [0.0, 1.0, 0.0]);
+    }
+
+    #[test]
+    fn json_transform2d_conversion() {
+        // Test conversion to AffineTransform
+        let json_transform = JSONTransform2D([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]);
+        let affine: AffineTransform = json_transform.into();
+        assert_eq!(affine.matrix[0], [2.0, 0.0, 5.0]);
+        assert_eq!(affine.matrix[1], [0.0, 2.0, 10.0]);
+
+        // Test conversion from AffineTransform
+        let affine_transform = AffineTransform {
+            matrix: [[3.0, 0.0, 15.0], [0.0, 3.0, 30.0]],
+        };
+        let json_transform: JSONTransform2D = affine_transform.into();
+        assert_eq!(json_transform.matrix()[0], [3.0, 0.0, 15.0]);
+        assert_eq!(json_transform.matrix()[1], [0.0, 3.0, 30.0]);
+    }
+
+    #[test]
+    fn json_paint_to_image_paint_fit_helper() {
+        // Test the helper function with standard fits (transform should be ignored)
+        let fit = JSONImagePaintFit::Standard("cover".to_string());
+        let transform = Some(JSONTransform2D([[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]));
+        let result = json_paint_to_image_paint_fit(fit, transform);
+        assert!(matches!(result, ImagePaintFit::Fit(BoxFit::Cover)));
+
+        // Test with transform fit
+        let fit = JSONImagePaintFit::Transform {
+            fit: "transform".to_string(),
+            transform: JSONTransform2D([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]),
+        };
+        let transform = Some(JSONTransform2D([[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]])); // Should be ignored
+        let result = json_paint_to_image_paint_fit(fit, transform);
+        match result {
+            ImagePaintFit::Transform(affine) => {
+                assert_eq!(affine.matrix[0], [2.0, 0.0, 5.0]);
+                assert_eq!(affine.matrix[1], [0.0, 2.0, 10.0]);
+            }
+            _ => panic!("Expected Transform variant"),
+        }
     }
 }

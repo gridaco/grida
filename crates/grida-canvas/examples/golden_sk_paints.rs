@@ -38,8 +38,8 @@
 use cg::resources::ByteStore;
 use cg::{
     cg::types::{
-        BlendMode, CGColor, GradientStop, ImageFilters, ImagePaint, LinearGradientPaint, Paint,
-        Paints, RadialGradientPaint, ResourceRef, SolidPaint,
+        BlendMode, CGColor, GradientStop, ImageFilters, ImagePaint, ImagePaintFit,
+        LinearGradientPaint, Paint, Paints, RadialGradientPaint, ResourceRef, SolidPaint,
     },
     painter::paint,
     runtime::image_repository::ImageRepository,
@@ -219,9 +219,8 @@ fn main() {
         (
             Paints::new([
                 Paint::Image(ImagePaint {
-                    transform: AffineTransform::identity(),
                     image: checker_image_ref.clone(),
-                    fit: BoxFit::Fill,
+                    fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.6,
                     blend_mode: BlendMode::Normal,
                     filters: ImageFilters::default(),
@@ -237,9 +236,8 @@ fn main() {
         (
             Paints::new([
                 Paint::Image(ImagePaint {
-                    transform: AffineTransform::identity(),
                     image: checker_image_ref.clone(),
-                    fit: BoxFit::Fill,
+                    fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.5,
                     blend_mode: BlendMode::Normal,
                     filters: ImageFilters::default(),
@@ -300,9 +298,8 @@ fn main() {
                     blend_mode: BlendMode::Screen,
                 }),
                 Paint::Image(ImagePaint {
-                    transform: AffineTransform::identity(),
                     image: checker_image_ref,
-                    fit: BoxFit::Fill,
+                    fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.5,
                     blend_mode: BlendMode::Overlay,
                     filters: ImageFilters::default(),

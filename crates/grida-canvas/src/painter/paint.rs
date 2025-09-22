@@ -1,6 +1,5 @@
 use super::{gradient, image_filters};
 use crate::{cg::types::*, runtime::image_repository::ImageRepository, sk};
-use math2::box_fit::BoxFit;
 use skia_safe::{self, shaders, Color, SamplingOptions, Shader, TileMode};
 
 pub fn sk_solid_paint(paint: impl Into<SolidPaint>) -> skia_safe::Paint {
@@ -166,18 +165,12 @@ pub fn image_paint_matrix(
     container_size: (f32, f32),
 ) -> [[f32; 3]; 2] {
     match paint.fit {
-        BoxFit::None => {
-            BoxFit::None
-                .calculate_transform(image_size, container_size)
-                .compose(&paint.transform)
-                .matrix
-        }
-        _ => {
-            paint
-                .fit
+        ImagePaintFit::Fit(box_fit) => {
+            box_fit
                 .calculate_transform(image_size, container_size)
                 .matrix
         }
+        ImagePaintFit::Transform(transform) => transform.matrix,
     }
 }
 

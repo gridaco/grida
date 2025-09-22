@@ -1607,13 +1607,119 @@ impl ImageFilters {
     }
 }
 
+/// Defines how an image should be fitted within its container.
+///
+/// `ImagePaintFit` provides two modes for positioning and scaling images:
+/// - **Fit**: Uses standard fitting modes that match CSS `object-fit` and Flutter `BoxFit` behavior
+/// - **Transform**: Applies custom affine transformations for precise control
+///
+/// Both variants output a definite transform matrix that will be applied to the image.
+/// The key difference is that `Fit` uses predefined algorithms, while `Transform` gives
+/// you 100% customization over how the image will be transformed.
+///
+/// ## Standard Fitting Modes (Fit)
+///
+/// The `Fit` variant uses predefined fitting modes that are consistent across
+/// web and mobile platforms:
+///
+/// - **`Contain`**: Scales the image to fit entirely within the container while
+///   preserving aspect ratio. Similar to CSS `object-fit: contain`
+/// - **`Cover`**: Scales the image to fill the entire container while preserving
+///   aspect ratio. Parts of the image may be cropped. Similar to CSS `object-fit: cover`
+/// - **`Fill`**: Scales the image to fill the container exactly, potentially
+///   distorting the aspect ratio. Similar to CSS `object-fit: fill`
+/// - **`None`**: No scaling applied, image is positioned at its natural size.
+///   Similar to CSS `object-fit: none`
+///
+/// ## Custom Transformations (Transform)
+///
+/// The `Transform` variant allows for custom affine transformations, providing
+/// precise control over:
+///
+/// - **Translation**: Move the image by specific x,y offsets
+/// - **Rotation**: Rotate the image by any angle
+/// - **Scaling**: Scale the image by different factors on x and y axes
+/// - **Skewing**: Apply shear transformations
+/// - **Combined operations**: Chain multiple transformations together
+///
+/// This is particularly useful for:
+/// - **Cropping**: Position the image to show specific regions
+/// - **Rotation**: Rotate the image to any angle
+/// - **Displacement**: Move the image within its bounding box
+/// - **Custom scaling**: Apply non-uniform scaling for artistic effects
+///
+/// ## Special Case: Identity Transform
+///
+/// When the `Transform` is identity (no transformation), it behaves identically
+/// to `BoxFit::Fill` - the image will fill the entire container exactly.
+///
+///
+/// ## Platform Compatibility
+///
+/// The `Fit` modes are designed to match the behavior of:
+/// - CSS `object-fit` property
+/// - Flutter `BoxFit` enum
+/// - React Native `resizeMode` prop
+///
+/// This ensures consistent image fitting behavior across web, mobile, and desktop platforms.
+#[derive(Debug, Clone)]
+pub enum ImagePaintFit {
+    /// Use standard fitting modes that match CSS `object-fit` and Flutter `BoxFit`
+    Fit(BoxFit),
+    /// Apply custom affine transformation for precise control
+    Transform(AffineTransform),
+}
+
+/// Defines how an image should be painted within its container.
+///
+/// `ImagePaint` combines an image resource with fitting behavior, visual properties,
+/// and effects to create a complete image painting specification.
+///
+/// ## Key Properties
+///
+/// - **`image`**: Reference to the image resource to be painted
+/// - **`fit`**: Defines how the image should be fitted within its container
+/// - **`opacity`**: Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)
+/// - **`blend_mode`**: Determines how the image blends with underlying content
+/// - **`filters`**: Applies visual effects like brightness, contrast, saturation, etc.
+///
+/// ## Usage Examples
+///
+/// ```rust
+/// use grida_canvas::cg::types::{ImagePaint, ImagePaintFit};
+/// use math2::{box_fit::BoxFit, transform::AffineTransform};
+///
+/// // Standard fitting with cover behavior
+/// let cover_paint = ImagePaint {
+///     image: ResourceRef::new("path/to/image.png"),
+///     fit: ImagePaintFit::Fit(BoxFit::Cover),
+///     opacity: 1.0,
+///     blend_mode: BlendMode::default(),
+///     filters: ImageFilters::default(),
+/// };
+///
+/// // Custom transformation for cropping and rotation
+/// let custom_paint = ImagePaint {
+///     image: ResourceRef::new("path/to/image.png"),
+///     fit: ImagePaintFit::Transform(
+///         AffineTransform::new(10.0, 20.0, 45.0) // translate and rotate
+///     ),
+///     opacity: 0.8,
+///     blend_mode: BlendMode::Multiply,
+///     filters: ImageFilters::default(),
+/// };
+/// ```
 #[derive(Debug, Clone)]
 pub struct ImagePaint {
-    pub transform: AffineTransform,
+    /// Reference to the image resource to be painted
     pub image: ResourceRef,
-    pub fit: BoxFit,
+    /// Defines how the image should be fitted within its container
+    pub fit: ImagePaintFit,
+    /// Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)
     pub opacity: f32,
+    /// Determines how the image blends with underlying content
     pub blend_mode: BlendMode,
+    /// Applies visual effects like brightness, contrast, saturation, etc.
     pub filters: ImageFilters,
 }
 
@@ -1653,9 +1759,8 @@ impl Default for SweepGradientPaint {
 impl Default for ImagePaint {
     fn default() -> Self {
         Self {
-            transform: AffineTransform::default(),
             image: ResourceRef::RID(String::new()),
-            fit: BoxFit::Cover,
+            fit: ImagePaintFit::Fit(BoxFit::Cover),
             opacity: 1.0,
             blend_mode: BlendMode::default(),
             filters: ImageFilters::default(),

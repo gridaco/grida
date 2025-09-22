@@ -261,7 +261,7 @@ mod tests {
     use crate::resources::ByteStore;
     use crate::runtime::image_repository::ImageRepository;
     use crate::vectornetwork::{VectorNetworkLoop, VectorNetworkRegion, VectorNetworkSegment};
-    use math2::{box_fit::BoxFit, transform::AffineTransform};
+    use math2::box_fit::BoxFit;
     use skia_safe::{surfaces, Color, EncodedImageFormat};
     use std::sync::{Arc, Mutex};
 
@@ -323,9 +323,8 @@ mod tests {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
                 fill_rule: FillRule::NonZero,
                 fills: Some(Paints::new([Paint::Image(ImagePaint {
-                    transform: AffineTransform::identity(),
                     image: ResourceRef::RID("img".to_string()),
-                    fit: BoxFit::Fill,
+                    fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 1.0,
                     blend_mode: BlendMode::default(),
                     filters: ImageFilters::default(),
@@ -381,9 +380,8 @@ mod tests {
             width: 4.0,
             align: StrokeAlign::Center,
             paints: Paints::new([Paint::Image(ImagePaint {
-                transform: AffineTransform::identity(),
                 image: ResourceRef::RID("stroke_img".to_string()),
-                fit: BoxFit::Fill,
+                fit: ImagePaintFit::Fit(BoxFit::Fill),
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
                 filters: ImageFilters::default(),
