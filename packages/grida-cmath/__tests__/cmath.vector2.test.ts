@@ -447,4 +447,194 @@ describe("cmath.vector2", () => {
       expect(result).toEqual([5, 5]); // Expected: same point regardless of t
     });
   });
+
+  describe("dot", () => {
+    it("calculates dot product of basic vectors", () => {
+      const a: cmath.Vector2 = [3, 4];
+      const b: cmath.Vector2 = [1, 2];
+      const result = cmath.vector2.dot(a, b);
+      expect(result).toBe(11); // 3*1 + 4*2 = 11
+    });
+
+    it("calculates dot product with negative components", () => {
+      const a: cmath.Vector2 = [-2, 3];
+      const b: cmath.Vector2 = [4, -1];
+      const result = cmath.vector2.dot(a, b);
+      expect(result).toBe(-11); // (-2)*4 + 3*(-1) = -8 - 3 = -11
+    });
+
+    it("returns 0 for perpendicular vectors", () => {
+      const a: cmath.Vector2 = [1, 0];
+      const b: cmath.Vector2 = [0, 1];
+      const result = cmath.vector2.dot(a, b);
+      expect(result).toBe(0);
+    });
+
+    it("returns 0 for perpendicular vectors with negative components", () => {
+      const a: cmath.Vector2 = [1, 1];
+      const b: cmath.Vector2 = [1, -1];
+      const result = cmath.vector2.dot(a, b);
+      expect(result).toBe(0); // 1*1 + 1*(-1) = 0
+    });
+
+    it("calculates dot product of parallel vectors", () => {
+      const a: cmath.Vector2 = [2, 3];
+      const b: cmath.Vector2 = [4, 6]; // 2 * [2, 3]
+      const result = cmath.vector2.dot(a, b);
+      expect(result).toBe(26); // 2*4 + 3*6 = 8 + 18 = 26
+    });
+
+    it("calculates dot product of anti-parallel vectors", () => {
+      const a: cmath.Vector2 = [2, 3];
+      const b: cmath.Vector2 = [-4, -6]; // -2 * [2, 3]
+      const result = cmath.vector2.dot(a, b);
+      expect(result).toBe(-26); // 2*(-4) + 3*(-6) = -8 - 18 = -26
+    });
+
+    it("returns 0 for zero vector", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [3, 4];
+      const result = cmath.vector2.dot(a, b);
+      expect(result).toBe(0);
+    });
+
+    it("calculates dot product of identical vectors", () => {
+      const a: cmath.Vector2 = [3, 4];
+      const b: cmath.Vector2 = [3, 4];
+      const result = cmath.vector2.dot(a, b);
+      expect(result).toBe(25); // 3*3 + 4*4 = 9 + 16 = 25 (squared magnitude)
+    });
+
+    it("handles unit vectors", () => {
+      const a: cmath.Vector2 = [1, 0];
+      const b: cmath.Vector2 = [1, 0];
+      const result = cmath.vector2.dot(a, b);
+      expect(result).toBe(1); // Unit vector dot product with itself
+    });
+  });
+
+  describe("cross", () => {
+    it("calculates cross product of basic vectors", () => {
+      const a: cmath.Vector2 = [3, 4];
+      const b: cmath.Vector2 = [1, 2];
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBe(2); // 3*2 - 4*1 = 6 - 4 = 2
+    });
+
+    it("calculates cross product with negative components", () => {
+      const a: cmath.Vector2 = [-2, 3];
+      const b: cmath.Vector2 = [4, -1];
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBe(-10); // (-2)*(-1) - 3*4 = 2 - 12 = -10
+    });
+
+    it("returns 0 for parallel vectors", () => {
+      const a: cmath.Vector2 = [2, 4];
+      const b: cmath.Vector2 = [1, 2]; // parallel to a (b = 0.5 * a)
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBe(0);
+    });
+
+    it("returns 0 for anti-parallel vectors", () => {
+      const a: cmath.Vector2 = [2, 4];
+      const b: cmath.Vector2 = [-1, -2]; // anti-parallel to a (b = -0.5 * a)
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBe(0);
+    });
+
+    it("calculates cross product of perpendicular vectors", () => {
+      const a: cmath.Vector2 = [1, 0];
+      const b: cmath.Vector2 = [0, 1];
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBe(1); // 1*1 - 0*0 = 1
+    });
+
+    it("calculates cross product of perpendicular vectors (negative)", () => {
+      const a: cmath.Vector2 = [0, 1];
+      const b: cmath.Vector2 = [1, 0];
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBe(-1); // 0*0 - 1*1 = -1
+    });
+
+    it("returns 0 for zero vector", () => {
+      const a: cmath.Vector2 = [0, 0];
+      const b: cmath.Vector2 = [3, 4];
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBe(0);
+    });
+
+    it("calculates cross product of identical vectors", () => {
+      const a: cmath.Vector2 = [3, 4];
+      const b: cmath.Vector2 = [3, 4];
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBe(0); // 3*4 - 4*3 = 0
+    });
+
+    it("handles unit vectors", () => {
+      const a: cmath.Vector2 = [1, 0];
+      const b: cmath.Vector2 = [0, 1];
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBe(1); // Unit vectors cross product
+    });
+
+    it("demonstrates orientation (counter-clockwise)", () => {
+      const a: cmath.Vector2 = [1, 0]; // right
+      const b: cmath.Vector2 = [0, 1]; // up
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBeGreaterThan(0); // Positive = counter-clockwise
+    });
+
+    it("demonstrates orientation (clockwise)", () => {
+      const a: cmath.Vector2 = [0, 1]; // up
+      const b: cmath.Vector2 = [1, 0]; // right
+      const result = cmath.vector2.cross(a, b);
+      expect(result).toBeLessThan(0); // Negative = clockwise
+    });
+  });
+
+  describe("project", () => {
+    it("projects vector onto x-axis", () => {
+      const vector: cmath.Vector2 = [3, 4];
+      const axis: cmath.Vector2 = [1, 0];
+      const result = cmath.vector2.project(vector, axis);
+      expect(result).toEqual([3, 0]);
+    });
+
+    it("projects vector onto y-axis", () => {
+      const vector: cmath.Vector2 = [3, 4];
+      const axis: cmath.Vector2 = [0, 1];
+      const result = cmath.vector2.project(vector, axis);
+      expect(result).toEqual([0, 4]);
+    });
+
+    it("projects vector onto diagonal axis", () => {
+      const vector: cmath.Vector2 = [2, 3];
+      const axis: cmath.Vector2 = [1, 1];
+      const result = cmath.vector2.project(vector, axis);
+      expect(result[0]).toBeCloseTo(2.5);
+      expect(result[1]).toBeCloseTo(2.5);
+    });
+
+    it("handles zero axis vector", () => {
+      const vector: cmath.Vector2 = [3, 4];
+      const axis: cmath.Vector2 = [0, 0];
+      const result = cmath.vector2.project(vector, axis);
+      expect(result).toEqual([0, 0]);
+    });
+
+    it("handles perpendicular vectors", () => {
+      const vector: cmath.Vector2 = [0, 5];
+      const axis: cmath.Vector2 = [1, 0];
+      const result = cmath.vector2.project(vector, axis);
+      expect(result).toEqual([0, 0]);
+    });
+
+    it("handles parallel vectors", () => {
+      const vector: cmath.Vector2 = [6, 8];
+      const axis: cmath.Vector2 = [3, 4];
+      const result = cmath.vector2.project(vector, axis);
+      expect(result[0]).toBeCloseTo(6);
+      expect(result[1]).toBeCloseTo(8);
+    });
+  });
 });

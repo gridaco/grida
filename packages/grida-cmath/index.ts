@@ -932,6 +932,126 @@ namespace cmath {
     export function identical(a: Vector2, b: Vector2): boolean {
       return a[0] === b[0] && a[1] === b[1];
     }
+
+    /**
+     * Computes the dot product of two vectors.
+     *
+     * The dot product is a scalar value that represents the magnitude of the projection
+     * of one vector onto another, multiplied by the magnitude of the target vector.
+     * It's fundamental for many vector operations including projection, angle calculation,
+     * and determining orthogonality.
+     *
+     * @param a - The first vector.
+     * @param b - The second vector.
+     * @returns The dot product of vectors `a` and `b`.
+     *
+     * @example
+     * ```typescript
+     * const a: cmath.Vector2 = [3, 4];
+     * const b: cmath.Vector2 = [1, 2];
+     * const result = cmath.vector2.dot(a, b);
+     * console.log(result); // 11 (3*1 + 4*2)
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Check if vectors are perpendicular (dot product = 0)
+     * const a: cmath.Vector2 = [1, 0];
+     * const b: cmath.Vector2 = [0, 1];
+     * const isPerpendicular = cmath.vector2.dot(a, b) === 0;
+     * console.log(isPerpendicular); // true
+     * ```
+     *
+     * @remarks
+     * - The mathematical formula is: `a · b = a₁b₁ + a₂b₂`
+     * - Dot product of 0 indicates perpendicular vectors
+     * - Positive dot product indicates acute angle between vectors
+     * - Negative dot product indicates obtuse angle between vectors
+     */
+    export function dot(a: Vector2, b: Vector2): number {
+      return a[0] * b[0] + a[1] * b[1];
+    }
+
+    /**
+     * Computes the cross product of two vectors.
+     *
+     * The cross product in 2D returns a scalar value representing the signed area
+     * of the parallelogram formed by the two vectors. It's useful for determining
+     * orientation, calculating areas, and checking if vectors are parallel.
+     *
+     * @param a - The first vector.
+     * @param b - The second vector.
+     * @returns The cross product of vectors `a` and `b`.
+     *
+     * @example
+     * ```typescript
+     * const a: cmath.Vector2 = [3, 4];
+     * const b: cmath.Vector2 = [1, 2];
+     * const result = cmath.vector2.cross(a, b);
+     * console.log(result); // 2 (3*2 - 4*1)
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Check if vectors are parallel (cross product = 0)
+     * const a: cmath.Vector2 = [2, 4];
+     * const b: cmath.Vector2 = [1, 2]; // parallel to a
+     * const isParallel = cmath.vector2.cross(a, b) === 0;
+     * console.log(isParallel); // true
+     * ```
+     *
+     * @remarks
+     * - The mathematical formula is: `a × b = a₁b₂ - a₂b₁`
+     * - Cross product of 0 indicates parallel vectors
+     * - Positive cross product indicates counter-clockwise rotation from a to b
+     * - Negative cross product indicates clockwise rotation from a to b
+     * - The magnitude equals the area of the parallelogram formed by the vectors
+     */
+    export function cross(a: Vector2, b: Vector2): number {
+      return a[0] * b[1] - a[1] * b[0];
+    }
+
+    /**
+     * Projects one vector onto another vector.
+     *
+     * This function computes the orthogonal projection of `vector` onto `axis`.
+     * The result is a vector that lies on the line defined by `axis` and represents
+     * the closest point on that line to the original `vector`.
+     *
+     * @param vector - The vector to project.
+     * @param axis - The target vector/axis to project onto.
+     * @returns The projection of `vector` onto `axis`.
+     *
+     * @example
+     * ```typescript
+     * const vector: cmath.Vector2 = [3, 4];
+     * const axis: cmath.Vector2 = [1, 0];
+     * const projection = cmath.vector2.project(vector, axis);
+     * console.log(projection); // [3, 0] - projected onto x-axis
+     * ```
+     *
+     * @example
+     * ```typescript
+     * const vector: cmath.Vector2 = [2, 3];
+     * const axis: cmath.Vector2 = [1, 1];
+     * const projection = cmath.vector2.project(vector, axis);
+     * console.log(projection); // [2.5, 2.5] - projected onto diagonal
+     * ```
+     *
+     * @remarks
+     * - If `axis` is the zero vector, returns `[0, 0]`.
+     * - The mathematical formula is: `proj_axis(vector) = (vector · axis / |axis|²) × axis`
+     * - This is a fundamental operation in linear algebra for vector decomposition.
+     */
+    export function project(vector: Vector2, axis: Vector2): Vector2 {
+      const lengthSq = axis[0] * axis[0] + axis[1] * axis[1];
+      if (lengthSq < 1e-10) {
+        return [0, 0];
+      }
+      const dotProduct = dot(vector, axis);
+      const scale = dotProduct / lengthSq;
+      return [axis[0] * scale, axis[1] * scale];
+    }
   }
   export namespace vector4 {
     export function identical(a: Vector4, b: Vector4): boolean {
