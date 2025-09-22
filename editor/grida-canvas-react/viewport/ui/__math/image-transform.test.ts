@@ -27,16 +27,13 @@ describe("image transform reducer", () => {
 
     const cornersBeforeRotation = getImageRectCorners(transform, size);
 
-    expect(cornersBeforeRotation.topLeft[0]).toBeCloseTo(20);
-    expect(cornersBeforeRotation.topLeft[1]).toBeCloseTo(-5);
-    expect(cornersBeforeRotation.topRight[0]).toBeCloseTo(250);
-    expect(cornersBeforeRotation.bottomRight[1]).toBeCloseTo(110);
+    expect(cornersBeforeRotation.nw[0]).toBeCloseTo(20);
+    expect(cornersBeforeRotation.nw[1]).toBeCloseTo(-5);
+    expect(cornersBeforeRotation.ne[0]).toBeCloseTo(250);
+    expect(cornersBeforeRotation.se[1]).toBeCloseTo(110);
 
     const center = cmath.vector2.multiply(
-      cmath.vector2.add(
-        cornersBeforeRotation.topLeft,
-        cornersBeforeRotation.bottomRight
-      ),
+      cmath.vector2.add(cornersBeforeRotation.nw, cornersBeforeRotation.se),
       [0.5, 0.5]
     );
 
@@ -51,24 +48,24 @@ describe("image transform reducer", () => {
       return cmath.vector2.add(center, rotated);
     };
 
-    const rotatedTopRight = rotatePoint(cornersBeforeRotation.topRight);
+    const rotatedTopRight = rotatePoint(cornersBeforeRotation.ne);
     const rotationDelta: cmath.Vector2 = [
-      rotatedTopRight[0] - cornersBeforeRotation.topRight[0],
-      rotatedTopRight[1] - cornersBeforeRotation.topRight[1],
+      rotatedTopRight[0] - cornersBeforeRotation.ne[0],
+      rotatedTopRight[1] - cornersBeforeRotation.ne[1],
     ];
 
     transform = reduceImageTransform(
       transform,
-      { type: "rotate", corner: "top-right", delta: rotationDelta },
+      { type: "rotate", corner: "ne", delta: rotationDelta },
       { size }
     );
 
     const cornersAfterRotation = getImageRectCorners(transform, size);
     const expectedCorners = {
-      topLeft: rotatePoint(cornersBeforeRotation.topLeft),
-      topRight: rotatedTopRight,
-      bottomRight: rotatePoint(cornersBeforeRotation.bottomRight),
-      bottomLeft: rotatePoint(cornersBeforeRotation.bottomLeft),
+      nw: rotatePoint(cornersBeforeRotation.nw),
+      ne: rotatedTopRight,
+      se: rotatePoint(cornersBeforeRotation.se),
+      sw: rotatePoint(cornersBeforeRotation.sw),
     };
 
     (

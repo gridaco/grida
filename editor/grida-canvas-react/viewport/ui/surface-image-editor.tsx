@@ -14,8 +14,6 @@ import { resolvePaints } from "@/grida-canvas/utils/paint-resolution";
 import {
   getImageRectCorners,
   reduceImageTransform,
-  type ImageTransformCorner,
-  type ImageTransformSide,
 } from "./__math/image-transform";
 
 function cloneTransform(transform: cg.AffineTransform): cg.AffineTransform {
@@ -38,31 +36,32 @@ type ActiveHandle =
     }
   | {
       type: "scale";
-      side: ImageTransformSide;
+      side: cmath.RectangleSide;
       base: cg.AffineTransform;
       start: cmath.Vector2;
       pointerId: number;
     }
   | {
       type: "rotate";
-      corner: ImageTransformCorner;
+      corner: cmath.IntercardinalDirection;
       base: cg.AffineTransform;
       start: cmath.Vector2;
       pointerId: number;
     };
 
-const SIDE_CURSOR: Record<ImageTransformSide, React.CSSProperties["cursor"]> = {
-  left: "ew-resize",
-  right: "ew-resize",
-  top: "ns-resize",
-  bottom: "ns-resize",
-};
+const SIDE_CURSOR: Record<cmath.RectangleSide, React.CSSProperties["cursor"]> =
+  {
+    left: "ew-resize",
+    right: "ew-resize",
+    top: "ns-resize",
+    bottom: "ns-resize",
+  };
 
-const CORNER_ORDER: ImageTransformCorner[] = [
-  "top-left",
-  "top-right",
-  "bottom-right",
-  "bottom-left",
+const CORNER_ORDER: cmath.IntercardinalDirection[] = [
+  "nw", // northwest = top-left
+  "ne", // northeast = top-right
+  "se", // southeast = bottom-right
+  "sw", // southwest = bottom-left
 ];
 
 export function SurfaceImageEditor({ node_id }: { node_id: string }) {
@@ -258,19 +257,19 @@ function _ImagePaintEditor({
       point[1] * scaleY,
     ];
     return {
-      topLeft: toScreen(corners.topLeft),
-      topRight: toScreen(corners.topRight),
-      bottomRight: toScreen(corners.bottomRight),
-      bottomLeft: toScreen(corners.bottomLeft),
+      nw: toScreen(corners.nw), // northwest = top-left
+      ne: toScreen(corners.ne), // northeast = top-right
+      se: toScreen(corners.se), // southeast = bottom-right
+      sw: toScreen(corners.sw), // southwest = bottom-left
     };
   }, [corners, scaleX, scaleY]);
 
   const polygonPoints = useMemo(() => {
     return [
-      screenCorners.topLeft,
-      screenCorners.topRight,
-      screenCorners.bottomRight,
-      screenCorners.bottomLeft,
+      screenCorners.nw, // northwest = top-left
+      screenCorners.ne, // northeast = top-right
+      screenCorners.se, // southeast = bottom-right
+      screenCorners.sw, // southwest = bottom-left
     ]
       .map(([x, y]) => `${x},${y}`)
       .join(" ");
@@ -279,9 +278,9 @@ function _ImagePaintEditor({
   const isPointInsideImage = useCallback(
     (point: cmath.Vector2) => {
       // Use the original corners (in local coordinates) for hit testing
-      const rel = cmath.vector2.sub(point, corners.topLeft);
-      const u = cmath.vector2.sub(corners.topRight, corners.topLeft);
-      const v = cmath.vector2.sub(corners.bottomLeft, corners.topLeft);
+      const rel = cmath.vector2.sub(point, corners.nw); // northwest = top-left
+      const u = cmath.vector2.sub(corners.ne, corners.nw); // northeast - northwest
+      const v = cmath.vector2.sub(corners.sw, corners.nw); // southwest - northwest
       const det = u[0] * v[1] - u[1] * v[0];
       if (Math.abs(det) < 1e-6) return false;
       const s = (rel[0] * v[1] - rel[1] * v[0]) / det;
@@ -310,7 +309,7 @@ function _ImagePaintEditor({
 
   const createScaleHandle = useCallback(
     (
-      side: ImageTransformSide,
+      side: cmath.RectangleSide,
       position: cmath.Vector2,
       angle: number,
       length: number
@@ -348,7 +347,7 @@ function _ImagePaintEditor({
   );
 
   const createCornerHandle = useCallback(
-    (corner: ImageTransformCorner, position: cmath.Vector2) => {
+    (corner: cmath.IntercardinalDirection, position: cmath.Vector2) => {
       return (
         <div
           key={`corner-${corner}`}
@@ -387,17 +386,17 @@ function _ImagePaintEditor({
     const sideHandles: React.ReactNode[] = [];
     const cornerHandles: React.ReactNode[] = [];
 
-    const { topLeft, topRight, bottomRight, bottomLeft } = screenCorners;
+    const { nw, ne, se, sw } = screenCorners; // northwest, northeast, southeast, southwest
 
     const sides: Array<{
-      side: ImageTransformSide;
+      side: cmath.RectangleSide;
       a: cmath.Vector2;
       b: cmath.Vector2;
     }> = [
-      { side: "top", a: topLeft, b: topRight },
-      { side: "right", a: topRight, b: bottomRight },
-      { side: "bottom", a: bottomLeft, b: bottomRight },
-      { side: "left", a: topLeft, b: bottomLeft },
+      { side: "top", a: nw, b: ne }, // northwest to northeast
+      { side: "right", a: ne, b: se }, // northeast to southeast
+      { side: "bottom", a: sw, b: se }, // southwest to southeast
+      { side: "left", a: nw, b: sw }, // northwest to southwest
     ];
 
     for (const { side, a, b } of sides) {
@@ -408,12 +407,13 @@ function _ImagePaintEditor({
       sideHandles.push(createScaleHandle(side, midpoint, angle, length));
     }
 
-    const cornerPositions: Record<ImageTransformCorner, cmath.Vector2> = {
-      "top-left": topLeft,
-      "top-right": topRight,
-      "bottom-right": bottomRight,
-      "bottom-left": bottomLeft,
-    };
+    const cornerPositions: Record<cmath.IntercardinalDirection, cmath.Vector2> =
+      {
+        nw: nw, // northwest = top-left
+        ne: ne, // northeast = top-right
+        se: se, // southeast = bottom-right
+        sw: sw, // southwest = bottom-left
+      };
 
     for (const corner of CORNER_ORDER) {
       cornerHandles.push(createCornerHandle(corner, cornerPositions[corner]));
@@ -479,10 +479,10 @@ function DebugLayer({
 }: {
   debug: boolean;
   corners: {
-    topLeft: cmath.Vector2;
-    topRight: cmath.Vector2;
-    bottomRight: cmath.Vector2;
-    bottomLeft: cmath.Vector2;
+    nw: cmath.Vector2; // northwest = top-left
+    ne: cmath.Vector2; // northeast = top-right
+    se: cmath.Vector2; // southeast = bottom-right
+    sw: cmath.Vector2; // southwest = bottom-left
   };
   width: number;
   height: number;
@@ -493,15 +493,15 @@ function DebugLayer({
     if (!debug) return null;
     const w = width || 1;
     const h = height || 1;
-    const widthVector = cmath.vector2.sub(corners.topRight, corners.topLeft);
-    const heightVector = cmath.vector2.sub(corners.bottomLeft, corners.topLeft);
+    const widthVector = cmath.vector2.sub(corners.ne, corners.nw); // northeast - northwest
+    const heightVector = cmath.vector2.sub(corners.sw, corners.nw); // southwest - northwest
     return {
       a: (widthVector[0] / w) * scaleX,
       b: (widthVector[1] / w) * scaleY,
       c: (heightVector[0] / h) * scaleX,
       d: (heightVector[1] / h) * scaleY,
-      e: corners.topLeft[0] * scaleX,
-      f: corners.topLeft[1] * scaleY,
+      e: corners.nw[0] * scaleX, // northwest = top-left
+      f: corners.nw[1] * scaleY, // northwest = top-left
     };
   }, [debug, corners, width, height, scaleX, scaleY]);
 

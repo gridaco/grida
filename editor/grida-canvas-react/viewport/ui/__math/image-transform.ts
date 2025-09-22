@@ -1,14 +1,6 @@
 import cmath from "@grida/cmath";
 import type cg from "@grida/cg";
 
-export type ImageTransformCorner =
-  | "top-left"
-  | "top-right"
-  | "bottom-right"
-  | "bottom-left";
-
-export type ImageTransformSide = "left" | "right" | "top" | "bottom";
-
 export type ImageTransformAction =
   | {
       type: "translate";
@@ -16,12 +8,12 @@ export type ImageTransformAction =
     }
   | {
       type: "scale-side";
-      side: ImageTransformSide;
+      side: cmath.RectangleSide;
       delta: cmath.Vector2;
     }
   | {
       type: "rotate";
-      corner: ImageTransformCorner;
+      corner: cmath.IntercardinalDirection;
       delta: cmath.Vector2;
     };
 
@@ -31,13 +23,11 @@ export interface ImageTransformOptions {
 
 const EPSILON = 1e-6;
 
-type PixelMatrix = cmath.Transform;
-
 export type ImageRectCorners = {
-  topLeft: cmath.Vector2;
-  topRight: cmath.Vector2;
-  bottomRight: cmath.Vector2;
-  bottomLeft: cmath.Vector2;
+  nw: cmath.Vector2; // northwest = top-left
+  ne: cmath.Vector2; // northeast = top-right
+  se: cmath.Vector2; // southeast = bottom-right
+  sw: cmath.Vector2; // southwest = bottom-left
 };
 
 /**
@@ -50,15 +40,11 @@ export function reduceImageTransform(
 ): cg.AffineTransform {
   const { size } = options;
   const baseMatrix = toPixelMatrix(base, size);
-  let nextMatrix: PixelMatrix = baseMatrix;
+  let nextMatrix: cmath.Transform = baseMatrix;
 
   switch (action.type) {
     case "translate": {
-      const [dx, dy] = action.delta;
-      nextMatrix = [
-        [baseMatrix[0][0], baseMatrix[0][1], baseMatrix[0][2] + dx],
-        [baseMatrix[1][0], baseMatrix[1][1], baseMatrix[1][2] + dy],
-      ];
+      nextMatrix = cmath.transform.translate(baseMatrix, action.delta);
       break;
     }
     case "scale-side": {
@@ -88,17 +74,21 @@ export function getImageRectCorners(
 function toPixelMatrix(
   transform: cg.AffineTransform,
   size: cmath.Vector2
-): PixelMatrix {
+): cmath.Transform {
   const width = size[0] || 1;
   const height = size[1] || 1;
   return [
     [transform[0][0] * width, transform[0][1] * width, transform[0][2] * width],
-    [transform[1][0] * height, transform[1][1] * height, transform[1][2] * height],
+    [
+      transform[1][0] * height,
+      transform[1][1] * height,
+      transform[1][2] * height,
+    ],
   ];
 }
 
 function fromPixelMatrix(
-  matrix: PixelMatrix,
+  matrix: cmath.Transform,
   size: cmath.Vector2
 ): cg.AffineTransform {
   const width = size[0] || 1;
@@ -109,75 +99,59 @@ function fromPixelMatrix(
   ];
 }
 
-function getCornersFromMatrix(matrix: PixelMatrix): ImageRectCorners {
-  const topLeft: cmath.Vector2 = [matrix[0][2], matrix[1][2]];
+function getCornersFromMatrix(matrix: cmath.Transform): ImageRectCorners {
+  const nw: cmath.Vector2 = [matrix[0][2], matrix[1][2]]; // northwest = top-left
   const widthVector: cmath.Vector2 = [matrix[0][0], matrix[1][0]];
   const heightVector: cmath.Vector2 = [matrix[0][1], matrix[1][1]];
-  const topRight = cmath.vector2.add(topLeft, widthVector);
-  const bottomLeft = cmath.vector2.add(topLeft, heightVector);
-  const bottomRight = cmath.vector2.add(topLeft, widthVector, heightVector);
+  const ne = cmath.vector2.add(nw, widthVector); // northeast = top-right
+  const sw = cmath.vector2.add(nw, heightVector); // southwest = bottom-left
+  const se = cmath.vector2.add(nw, widthVector, heightVector); // southeast = bottom-right
 
-  return { topLeft, topRight, bottomRight, bottomLeft };
+  return { nw, ne, se, sw };
 }
 
-function pickCorner(
-  corners: ImageRectCorners,
-  corner: ImageTransformCorner
-): cmath.Vector2 {
-  switch (corner) {
-    case "top-left":
-      return corners.topLeft;
-    case "top-right":
-      return corners.topRight;
-    case "bottom-right":
-      return corners.bottomRight;
-    case "bottom-left":
-      return corners.bottomLeft;
-  }
-}
-
-function matrixFromCorners(corners: ImageRectCorners): PixelMatrix {
-  const { topLeft, topRight, bottomLeft } = corners;
-  const widthVector = cmath.vector2.sub(topRight, topLeft);
-  const heightVector = cmath.vector2.sub(bottomLeft, topLeft);
+function matrixFromCorners(corners: ImageRectCorners): cmath.Transform {
+  const { nw, ne, sw } = corners; // northwest, northeast, southwest
+  const widthVector = cmath.vector2.sub(ne, nw); // northeast - northwest
+  const heightVector = cmath.vector2.sub(sw, nw); // southwest - northwest
   return [
-    [widthVector[0], heightVector[0], topLeft[0]],
-    [widthVector[1], heightVector[1], topLeft[1]],
+    [widthVector[0], heightVector[0], nw[0]],
+    [widthVector[1], heightVector[1], nw[1]],
   ];
 }
 
 function resizeBySide(
-  matrix: PixelMatrix,
-  side: ImageTransformSide,
+  matrix: cmath.Transform,
+  side: cmath.RectangleSide,
   delta: cmath.Vector2
-): PixelMatrix {
+): cmath.Transform {
   const corners = getCornersFromMatrix(matrix);
   const axis =
     side === "left" || side === "right"
-      ? cmath.vector2.sub(corners.topRight, corners.topLeft)
-      : cmath.vector2.sub(corners.bottomLeft, corners.topLeft);
+      ? cmath.vector2.sub(corners.ne, corners.nw) // northeast - northwest
+      : cmath.vector2.sub(corners.sw, corners.nw); // southwest - northwest
 
-  const projected = project(delta, axis);
+  const projected = cmath.vector2.project(delta, axis);
 
   switch (side) {
     case "left": {
-      corners.topLeft = cmath.vector2.add(corners.topLeft, projected);
-      corners.bottomLeft = cmath.vector2.add(corners.bottomLeft, projected);
+      corners.nw = cmath.vector2.add(corners.nw, projected); // northwest
+      corners.sw = cmath.vector2.add(corners.sw, projected); // southwest
       break;
     }
     case "right": {
-      corners.topRight = cmath.vector2.add(corners.topRight, projected);
-      corners.bottomRight = cmath.vector2.add(corners.bottomRight, projected);
+      corners.ne = cmath.vector2.add(corners.ne, projected); // northeast
+      corners.se = cmath.vector2.add(corners.se, projected); // southeast
       break;
     }
     case "top": {
-      corners.topLeft = cmath.vector2.add(corners.topLeft, projected);
-      corners.topRight = cmath.vector2.add(corners.topRight, projected);
+      corners.nw = cmath.vector2.add(corners.nw, projected); // northwest
+      corners.ne = cmath.vector2.add(corners.ne, projected); // northeast
       break;
     }
     case "bottom": {
-      corners.bottomLeft = cmath.vector2.add(corners.bottomLeft, projected);
-      corners.bottomRight = cmath.vector2.add(corners.bottomRight, projected);
+      corners.sw = cmath.vector2.add(corners.sw, projected); // southwest
+      corners.se = cmath.vector2.add(corners.se, projected); // southeast
       break;
     }
   }
@@ -186,17 +160,17 @@ function resizeBySide(
 }
 
 function rotateByCorner(
-  matrix: PixelMatrix,
-  corner: ImageTransformCorner,
+  matrix: cmath.Transform,
+  corner: cmath.IntercardinalDirection,
   delta: cmath.Vector2
-): PixelMatrix {
+): cmath.Transform {
   const corners = getCornersFromMatrix(matrix);
   const center = cmath.vector2.multiply(
-    cmath.vector2.add(corners.topLeft, corners.bottomRight),
+    cmath.vector2.add(corners.nw, corners.se), // northwest + southeast
     [0.5, 0.5]
   );
 
-  const cornerPoint = pickCorner(corners, corner);
+  const cornerPoint = corners[corner];
   const target = cmath.vector2.add(cornerPoint, delta);
   const baseVector = cmath.vector2.sub(cornerPoint, center);
   const targetVector = cmath.vector2.sub(target, center);
@@ -216,45 +190,16 @@ function rotateByCorner(
     (targetVector[1] / targetLength) * baseLength,
   ] as cmath.Vector2;
 
-  const dot =
-    baseVector[0] * normalizedTarget[0] +
-    baseVector[1] * normalizedTarget[1];
-  const cross =
-    baseVector[0] * normalizedTarget[1] -
-    baseVector[1] * normalizedTarget[0];
+  const dot = cmath.vector2.dot(baseVector, normalizedTarget);
+  const cross = cmath.vector2.cross(baseVector, normalizedTarget);
   const angle = Math.atan2(cross, dot);
 
   if (Math.abs(angle) < EPSILON) {
     return matrix;
   }
 
-  const rotation: PixelMatrix = [
-    [Math.cos(angle), -Math.sin(angle), 0],
-    [Math.sin(angle), Math.cos(angle), 0],
-  ];
-  const toOrigin: PixelMatrix = [
-    [1, 0, -center[0]],
-    [0, 1, -center[1]],
-  ];
-  const back: PixelMatrix = [
-    [1, 0, center[0]],
-    [0, 1, center[1]],
-  ];
+  // Convert angle from radians to degrees for cmath.transform.rotate
+  const angleDegrees = (angle * 180) / Math.PI;
 
-  const rotateAroundCenter = cmath.transform.multiply(
-    back,
-    cmath.transform.multiply(rotation, toOrigin)
-  );
-
-  return cmath.transform.multiply(rotateAroundCenter, matrix);
-}
-
-function project(delta: cmath.Vector2, axis: cmath.Vector2): cmath.Vector2 {
-  const lengthSq = axis[0] * axis[0] + axis[1] * axis[1];
-  if (lengthSq < EPSILON) {
-    return [0, 0];
-  }
-  const dot = delta[0] * axis[0] + delta[1] * axis[1];
-  const scale = dot / lengthSq;
-  return [axis[0] * scale, axis[1] * scale];
+  return cmath.transform.rotate(matrix, angleDegrees, center);
 }
