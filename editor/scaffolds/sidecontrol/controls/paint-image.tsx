@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { PropertySlider } from "./utils/slider-fat";
 import { Button } from "@/components/ui-editor/button";
-import { BoxFitControl } from "./box-fit";
+import { ImageFitControl } from "./image-fit";
 import { RotateCwIcon, UploadIcon } from "lucide-react";
 import { ImageIcon } from "@radix-ui/react-icons";
 import { useFilePicker } from "use-file-picker";
@@ -234,8 +234,8 @@ export function ImagePaintControl({
     [value, onValueChange]
   );
 
-  const handleBoxFitChange = useCallback(
-    (fit: cg.BoxFit) => {
+  const handleImageFitChange = useCallback(
+    (fit: cg.ImagePaint["fit"]) => {
       if (!value.src) return; // Don't update if no image source
 
       onValueChange?.({
@@ -250,9 +250,9 @@ export function ImagePaintControl({
     <div className="w-full space-y-4">
       {/* Header with Box Fit and Rotate */}
       <div className="flex items-center justify-between gap-8">
-        <BoxFitControl
+        <ImageFitControl
           value={value.fit}
-          onValueChange={handleBoxFitChange}
+          onValueChange={handleImageFitChange}
           className="w-24"
         />
         <Button
