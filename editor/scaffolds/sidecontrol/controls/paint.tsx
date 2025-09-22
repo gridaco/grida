@@ -855,7 +855,7 @@ function GradientActions({
             : 0;
           const newAngle = currentAngle + 45;
           const t =
-            cmath.transform.computeRelativeLinearGradientTransform(newAngle);
+            cmath.ui.gradient.computeRelativeLinearGradientTransform(newAngle);
           onValueChange?.({
             ...value,
             transform: t,

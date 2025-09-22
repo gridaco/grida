@@ -104,8 +104,8 @@ function __self_evt_on_click(
     case "zoom":
       // TODO: also support zoom out (with alt key modifier) - needs to be handled separately
       draft.transform = cmath.transform.scale(
-        2,
         draft.transform,
+        2,
         // map the cursor position back to surface space
         cmath.vector2.transform(draft.pointer.position, draft.transform)
       );

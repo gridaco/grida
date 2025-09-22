@@ -5153,7 +5153,13 @@ namespace cmath {
       [0, 1, 0],
     ];
 
-    /** 2x3 matrix multiply: C = A * B */
+    /**
+     * Multiplies two 2×3 affine transforms: `C = A · B`.
+     *
+     * **Order (column-vector convention):**
+     * - `C = A · B` means **apply `B` first, then `A`**.
+     * - This matches CSS/SVG/Canvas2D/Skia semantics.
+     */
     export function multiply(A: Transform, B: Transform): Transform {
       return [
         [
@@ -5170,72 +5176,145 @@ namespace cmath {
     }
 
     /**
-     * Applies a scaling transformation to a 2D transform matrix around a specified absolute origin.
+     * Applies a **scaling** to an existing 2D transform **about an absolute (world-space) origin**.
      *
-     * This function adjusts the scaling of an existing transformation matrix
-     * by translating to a defined `transformOrigin`, applying the scaling, and then translating back.
+     * Internally builds `T(origin) · S(scaleX, scaleY) · T(−origin)` and **pre-multiplies** it:
+     * `M' = T(origin) · S · T(−origin) · M`.
      *
-     * @param scale - The scaling factor. Can be a single number (uniform scaling) or a `Vector2` for non-uniform scaling.
-     * @param transform - The original 2D transform matrix to which the scaling will be applied.
-     * @param transformOrigin - The absolute origin `[originX, originY]` around which the scaling is performed.
-     * @returns A new transform matrix with the scaling applied around the specified `transformOrigin`.
+     * @param M - The original 2D transform to update.
+     * @param scale - Uniform scale (number) or non-uniform scale `[scaleX, scaleY]`.
+     * @param origin - World-space pivot `[ox, oy]` about which the scaling is performed.
+     * @returns A new transform with scaling applied about `origin`.
      *
-     * ### Example
-     * ```typescript
+     * @example
+     * // World-space scaling about (50, 50), applied to a translated object
+     * const M: Transform = [
+     *   [1, 0, 10], // a, c, tx
+     *   [0, 1, 20], // b, d, ty
+     * ];
+     * const scaled = scale(M, 2, [50, 50]);
+     * console.log(scaled);
+     * // =>
+     * // [
+     * //   [2, 0, -30],
+     * //   [0, 2, -10],
+     * // ]
+     *
+     * @remarks
+     * - **Coordinate space:** `origin` is **absolute/world** coordinates. If you need
+     *   **local/object** pivot (e.g., intrinsic image center), you should post-multiply:
+     *   `M' = M · T(o) · S · T(−o)`.
+     * - **Order:** Pre-multiplication means the scale happens **in world space** on the
+     *   already-placed object.
+     */
+    export function scale(
+      M: Transform,
+      scale: number | Vector2,
+      origin: Vector2
+    ): Transform {
+      const [sx, sy] = typeof scale === "number" ? [scale, scale] : scale;
+
+      // T(origin)
+      const T: Transform = [
+        [1, 0, origin[0]],
+        [0, 1, origin[1]],
+      ];
+      // S(sx, sy)
+      const S: Transform = [
+        [sx, 0, 0],
+        [0, sy, 0],
+      ];
+      // T(-origin)
+      const Tinv: Transform = [
+        [1, 0, -origin[0]],
+        [0, 1, -origin[1]],
+      ];
+
+      // M' = T · S · Tinv · M
+      return multiply(multiply(multiply(T, S), Tinv), M);
+    }
+
+    /**
+     * Applies a **rotation** to an existing 2D transform **about an absolute (world-space) origin**.
+     *
+     * Internally builds `T(origin) · R(θ) · T(−origin)` in closed form and **pre-multiplies** it:
+     * `M' = T(origin) · R · T(−origin) · M`.
+     *
+     * @param M - The original 2D transform to update.
+     * @param deg - Rotation in degrees (positive = counter-clockwise).
+     * @param origin - World-space pivot `[ox, oy]` about which the rotation is performed.
+     * @returns A new transform with rotation applied about `origin`.
+     *
+     * @example
+     * // Rotate 90° about (200, 100) in world space
+     * const M: Transform = [
+     *   [1, 0, 200],
+     *   [0, 1, 100],
+     * ];
+     * const R = rotate(M, 90, [200, 100]);
+     * console.log(R);
+     * // One valid result is:
+     * // [
+     * //   [ 0, -1, 300 ],
+     * //   [ 1,  0, -100 ],
+     * // ]
+     *
+     * @remarks
+     * - **Coordinate space:** `origin` is **absolute/world** coordinates. For a **local/object**
+     *   pivot, use post-multiplication: `M' = M · T(o) · R · T(−o)`.
+     * - The closed-form embeds the pivot into `tx, ty`; no extra “origin” is stored in the matrix.
+     */
+    export function rotate(
+      M: Transform,
+      deg: number,
+      origin: Vector2
+    ): Transform {
+      const [ox, oy] = origin;
+      const rad = (deg * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      // Closed-form: T(ox, oy) · R · T(-ox, -oy)
+      const R: Transform = [
+        [cos, -sin, ox - cos * ox + sin * oy],
+        [sin, cos, oy - sin * ox - cos * oy],
+      ];
+
+      // M' = R_with_pivot · M  (pre-multiply → world-space rotation)
+      return multiply(R, M);
+    }
+
+    /**
+     * Applies a translation to a 2D transform matrix.
+     *
+     * @param transform - The original 2D transform matrix.
+     * @param delta - The translation vector `[deltaX, deltaY]` to apply.
+     * @returns A new transform matrix with the translation applied.
+     *
+     * @example
      * const transform: cmath.Transform = [
      *   [1, 0, 10], // ScaleX, ShearY, TranslateX
      *   [0, 1, 20], // ShearX, ScaleY, TranslateY
      * ];
-     * const scaleFactor: number = 2;
-     * const transformOrigin: cmath.Vector2 = [50, 50];
-     *
-     * const scaled = cmath.transform.scale(scaleFactor, transform, transformOrigin);
-     * console.log(scaled);
-     * // Output: [
-     * //   [2, 0, -40], // Adjusted scaling and translation
-     * //   [0, 2, -80],
+     * const delta: cmath.Vector2 = [5, -10];
+     * const translated = cmath.transform.translate(transform, delta);
+     * console.log(translated);
+     * // Output:
+     * // [
+     * //   [1, 0, 15], // TranslateX becomes 10 + 5 = 15
+     * //   [0, 1, 10], // TranslateY becomes 20 - 10 = 10
      * // ]
-     * ```
-     *
-     * ### Remarks
-     * - The `transformOrigin` is provided in absolute coordinates.
-     * - The function ensures the scaling operation is performed relative to the specified origin.
-     * - Uniform scaling is applied if `scale` is a single number; otherwise, non-uniform scaling is applied.
      */
-    export function scale(
-      scale: number | cmath.Vector2,
+    export function translate(
       transform: Transform,
-      transformOrigin: cmath.Vector2
+      delta: cmath.Vector2
     ): Transform {
-      const [scaleX, scaleY] =
-        typeof scale === "number" ? [scale, scale] : scale;
+      const [deltaX, deltaY] = delta;
 
-      // Translate to origin
-      const translateToOrigin: Transform = [
-        [1, 0, -transformOrigin[0]],
-        [0, 1, -transformOrigin[1]],
+      return [
+        [transform[0][0], transform[0][1], transform[0][2] + deltaX],
+        [transform[1][0], transform[1][1], transform[1][2] + deltaY],
       ];
-
-      // Apply scaling
-      const scalingMatrix: Transform = [
-        [scaleX, 0, 0],
-        [0, scaleY, 0],
-      ];
-
-      // Translate back from origin
-      const translateBack: Transform = [
-        [1, 0, transformOrigin[0]],
-        [0, 1, transformOrigin[1]],
-      ];
-
-      // Combine: Translate to origin -> Scale -> Translate back
-      const scaledTransform = multiply(
-        translateBack,
-        multiply(scalingMatrix, translateToOrigin)
-      );
-
-      // Apply scaling to the existing transform
-      return multiply(scaledTransform, transform);
     }
 
     /**
@@ -5321,74 +5400,6 @@ namespace cmath {
      */
     export function getTranslate(transform: cmath.Transform): cmath.Vector2 {
       return [transform[0][2], transform[1][2]];
-    }
-
-    /**
-     * Applies a translation to a 2D transform matrix.
-     *
-     * @param transform - The original 2D transform matrix.
-     * @param delta - The translation vector `[deltaX, deltaY]` to apply.
-     * @returns A new transform matrix with the translation applied.
-     *
-     * @example
-     * const transform: cmath.Transform = [
-     *   [1, 0, 10], // ScaleX, ShearY, TranslateX
-     *   [0, 1, 20], // ShearX, ScaleY, TranslateY
-     * ];
-     * const delta: cmath.Vector2 = [5, -10];
-     * const translated = cmath.transform.translate(transform, delta);
-     * console.log(translated);
-     * // Output:
-     * // [
-     * //   [1, 0, 15], // TranslateX becomes 10 + 5 = 15
-     * //   [0, 1, 10], // TranslateY becomes 20 - 10 = 10
-     * // ]
-     */
-    export function translate(
-      transform: Transform,
-      delta: cmath.Vector2
-    ): Transform {
-      const [deltaX, deltaY] = delta;
-
-      return [
-        [transform[0][0], transform[0][1], transform[0][2] + deltaX],
-        [transform[1][0], transform[1][1], transform[1][2] + deltaY],
-      ];
-    }
-
-    /**
-     * Produces a relative 2D transform matrix for a linear gradient at `deg` degrees
-     * in a normalized 1x1 space (Figma-like behavior).
-     */
-    export function computeRelativeLinearGradientTransform(
-      deg: number
-    ): Transform {
-      // Convert to radians
-      const rad = (deg * Math.PI) / 180;
-      const cos = Math.cos(rad);
-      const sin = Math.sin(rad);
-
-      // Translate center to origin
-      const Tneg: Transform = [
-        [1, 0, -0.5],
-        [0, 1, -0.5],
-      ];
-
-      // Rotate
-      const R: Transform = [
-        [cos, -sin, 0],
-        [sin, cos, 0],
-      ];
-
-      // Translate origin back to center
-      const Tpos: Transform = [
-        [1, 0, 0.5],
-        [0, 1, 0.5],
-      ];
-
-      // Compose final = Tpos * R * Tneg
-      const TR = multiply(R, Tneg);
-      return multiply(Tpos, TR);
     }
 
     /**
@@ -7124,6 +7135,41 @@ namespace cmath {
           [a, b, tx],
           [d, e, ty],
         ];
+      }
+
+      /**
+       * Produces a relative 2D transform matrix for a linear gradient at `deg` degrees
+       * in a normalized 1x1 space (Figma-like behavior).
+       */
+      export function computeRelativeLinearGradientTransform(
+        deg: number
+      ): Transform {
+        // Convert to radians
+        const rad = (deg * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        // Translate center to origin
+        const Tneg: Transform = [
+          [1, 0, -0.5],
+          [0, 1, -0.5],
+        ];
+
+        // Rotate
+        const R: Transform = [
+          [cos, -sin, 0],
+          [sin, cos, 0],
+        ];
+
+        // Translate origin back to center
+        const Tpos: Transform = [
+          [1, 0, 0.5],
+          [0, 1, 0.5],
+        ];
+
+        // Compose final = Tpos * R * Tneg
+        const TR = cmath.transform.multiply(R, Tneg);
+        return cmath.transform.multiply(Tpos, TR);
       }
     }
   }
