@@ -30,3 +30,9 @@ cargo build
 # run dev (mostly requires window)
 cargo run --example <example-name>
 ```
+
+## Package Docs
+
+```sh
+cargo doc --package skia-safe --open --no-deps
+```

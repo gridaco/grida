@@ -1,12 +1,10 @@
 use super::geometry::*;
-use super::layer::{LayerList, PainterPictureLayer};
+use super::layer::{Layer, LayerList, PainterMaskGroup, PainterPictureLayer, PainterRenderCommand};
 use super::paint;
 use super::shadow;
 use super::text_stroke;
-use crate::cache::geometry::GeometryCache;
 use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
 use crate::cg::types::*;
-use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use crate::shape::*;
@@ -14,7 +12,8 @@ use crate::sk;
 use crate::vectornetwork::vn_painter::StrokeOptions;
 use math2::transform::AffineTransform;
 use skia_safe::{
-    canvas::SaveLayerRec, path::AddPathMode, textlayout, Paint as SkPaint, Path, Point,
+    canvas::SaveLayerRec, path::AddPathMode, textlayout, Paint as SkPaint, Path, Point, Rect,
+    Shader,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -27,6 +26,7 @@ pub struct Painter<'a> {
     images: &'a ImageRepository,
     path_cache: RefCell<VectorPathCache>,
     scene_cache: Option<&'a SceneCache>,
+    cache_hits: RefCell<usize>,
 }
 
 impl<'a> Painter<'a> {
@@ -43,6 +43,7 @@ impl<'a> Painter<'a> {
             images,
             path_cache: RefCell::new(VectorPathCache::new()),
             scene_cache: Some(scene_cache), // Store reference to scene cache
+            cache_hits: RefCell::new(0),
         }
     }
 
@@ -61,6 +62,27 @@ impl<'a> Painter<'a> {
         } else {
             f();
         }
+    }
+
+    /// Wrap drawing in an alpha mask using a shader.
+    ///
+    /// Steps:
+    /// 1) save_layer(bounds)
+    /// 2) draw content via closure
+    /// 3) draw a rect with DstIn using the provided shader as the alpha mask
+    pub fn with_alpha_mask<F: FnOnce()>(&self, bounds: Rect, mask_shader: Shader, draw_content: F) {
+        let rec = SaveLayerRec::default().bounds(&bounds);
+        self.canvas.save_layer(&rec);
+
+        draw_content();
+
+        let mut p = SkPaint::default();
+        p.set_anti_alias(true);
+        p.set_blend_mode(skia_safe::BlendMode::DstIn);
+        p.set_shader(mask_shader);
+        self.canvas.draw_rect(bounds, &p);
+
+        self.canvas.restore();
     }
 
     /// Save/restore transform state and apply a 2×3 matrix
@@ -654,10 +676,95 @@ impl<'a> Painter<'a> {
         }
     }
 
+    fn draw_render_commands(&self, commands: &[PainterRenderCommand]) {
+        for command in commands {
+            match command {
+                PainterRenderCommand::Draw(layer) => {
+                    // Prefer cached picture if available
+                    if let Some(scene_cache) = self.scene_cache {
+                        if let Some(pic) = scene_cache.picture.get_node_picture(layer.id()) {
+                            self.canvas.draw_picture(pic, None, None);
+                            *self.cache_hits.borrow_mut() += 1;
+                            continue;
+                        }
+                    }
+                    self.draw_layer(layer)
+                }
+                PainterRenderCommand::MaskGroup(group) => self.draw_mask_group(group),
+            }
+        }
+    }
+
+    fn draw_mask_group(&self, group: &PainterMaskGroup) {
+        match group.mask_type {
+            LayerMaskType::Geometry => self.draw_geometry_mask_group(group),
+            LayerMaskType::Image(image_mask) => self.draw_image_mask_group(group, image_mask),
+        }
+    }
+
+    fn draw_geometry_mask_group(&self, group: &PainterMaskGroup) {
+        let mut clip_path = Path::new();
+        self.collect_mask_paths_for_masks(&group.mask_commands, &mut clip_path);
+        if clip_path.is_empty() {
+            return;
+        }
+
+        self.canvas.save();
+        self.canvas.clip_path(&clip_path, None, true);
+        self.draw_render_commands(&group.content_commands);
+        self.canvas.restore();
+    }
+
+    fn draw_image_mask_group(&self, group: &PainterMaskGroup, mask_type: ImageMaskType) {
+        self.canvas.save_layer(&SaveLayerRec::default());
+        self.draw_render_commands(&group.content_commands);
+
+        let mut paint = SkPaint::default();
+        paint.set_blend_mode(skia_safe::BlendMode::DstIn);
+
+        if let ImageMaskType::Luminance = mask_type {
+            // Use Skia-safe's built-in luma color filter constructor
+            paint.set_color_filter(skia_safe::luma_color_filter::new());
+        }
+
+        self.canvas
+            .save_layer(&SaveLayerRec::default().paint(&paint));
+        self.draw_render_commands(&group.mask_commands);
+        self.canvas.restore();
+        self.canvas.restore();
+    }
+
+    /// Collect only mask geometry paths (ignoring content of nested groups).
+    fn collect_mask_paths_for_masks(&self, commands: &[PainterRenderCommand], out_path: &mut Path) {
+        for command in commands {
+            match command {
+                PainterRenderCommand::Draw(layer) => {
+                    if let Some(layer_path) = Self::layer_to_path(layer) {
+                        out_path.add_path(&layer_path, (0.0, 0.0), AddPathMode::Append);
+                    }
+                }
+                PainterRenderCommand::MaskGroup(group) => {
+                    // Recurse only into further mask commands
+                    self.collect_mask_paths_for_masks(&group.mask_commands, out_path);
+                }
+            }
+        }
+    }
+
+    fn layer_to_path(layer: &PainterPictureLayer) -> Option<Path> {
+        let shape = layer.shape();
+        let mut path = shape.to_path();
+        let transform = layer.transform().matrix;
+        path.transform(&sk::sk_matrix(transform));
+        Some(path)
+    }
+
     /// Draw all layers in a [`LayerList`].
     pub fn draw_layer_list(&self, list: &LayerList) {
-        for layer in &list.layers {
-            self.draw_layer(layer);
-        }
+        self.draw_render_commands(&list.commands);
+    }
+
+    pub fn cache_picture_hits(&self) -> usize {
+        *self.cache_hits.borrow()
     }
 }

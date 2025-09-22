@@ -519,7 +519,6 @@ impl Renderer {
         height: f32,
     ) -> DrawResult {
         let __before_paint = Instant::now();
-        let mut cache_picture_used = 0;
 
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
@@ -537,6 +536,9 @@ impl Renderer {
 
         // Apply camera transform
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
+
+        // Always draw via command pipeline. Tiles are drawn first (as a backdrop),
+        // then the full command stream composes the final result.
 
         // draw image cache tiles
         for tk in plan.tiles.iter() {
@@ -569,33 +571,22 @@ impl Renderer {
             }
         }
 
-        // draw picture regions
-        for (region, indices) in &plan.regions {
+        // Prefill picture cache for visible layers so Painter can reuse pictures even with masks
+        for (_region, indices) in &plan.regions {
             for idx in indices {
-                if let Some(layer) = self.scene_cache.layers.layers.get(*idx) {
-                    let layer = layer.clone();
-                    let picture = self.with_recording_cached(&layer.id(), |painter| {
+                if let Some(layer) = self.scene_cache.layers.layers.get(*idx).cloned() {
+                    let id = layer.id().clone();
+                    let _ = self.with_recording_cached(&id, |painter| {
                         painter.draw_layer(&layer);
                     });
-
-                    if let Some(pic) = picture {
-                        // clip to region
-                        canvas.save();
-                        canvas.clip_rect(
-                            Rect::from_xywh(region.x, region.y, region.width, region.height),
-                            None,
-                            false,
-                        );
-                        canvas.draw_picture(pic, None, None);
-                        canvas.restore();
-                        cache_picture_used += 1;
-                    }
-                } else {
-                    // report error
-                    println!("layer not found: {}", idx);
                 }
             }
         }
+
+        let painter =
+            Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
+        painter.draw_layer_list(&self.scene_cache.layers);
+        let cache_picture_used = painter.cache_picture_hits();
 
         let __painter_duration = __before_paint.elapsed();
 
@@ -644,21 +635,10 @@ impl Renderer {
         // Apply camera transform
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // draw picture regions
+        // Always use the command pipeline for export to ensure masks are applied
         let painter =
             Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
-        for (_region, indices) in &plan.regions {
-            for idx in indices {
-                if let Some(layer) = self.scene_cache.layers.layers.get(*idx) {
-                    let layer = layer.clone();
-
-                    painter.draw_layer(&layer);
-                } else {
-                    // report error
-                    println!("layer not found: {}", idx);
-                }
-            }
-        }
+        painter.draw_layer_list(&self.scene_cache.layers);
 
         let __painter_duration = __before_paint.elapsed();
 
