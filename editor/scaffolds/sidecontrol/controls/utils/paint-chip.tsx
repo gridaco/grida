@@ -50,12 +50,12 @@ export function RGBAChip({
   return (
     <ChipContainer className={className}>
       <div
-        className="absolute w-full h-full"
+        className="absolute w-full h-full z-10"
         style={{
           backgroundColor: css.toRGBAString(rgba),
         }}
       />
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
     </ChipContainer>
   );
 }
@@ -70,12 +70,12 @@ export function LinearGradientPaintChip({
   return (
     <ChipContainer className={className}>
       <div
-        className="absolute w-full h-full"
+        className="absolute w-full h-full z-10"
         style={{
           background: css.toLinearGradientString(paint),
         }}
       />
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
     </ChipContainer>
   );
 }
@@ -90,7 +90,7 @@ export function RadialGradientPaintChip({
   return (
     <ChipContainer className={className}>
       <div
-        className="absolute w-full h-full"
+        className="absolute w-full h-full z-10"
         style={{
           background: css.toRadialGradientString(paint),
         }}
@@ -110,12 +110,12 @@ export function SweepGradientPaintChip({
   return (
     <ChipContainer className={className}>
       <div
-        className="absolute w-full h-full"
+        className="absolute w-full h-full z-10"
         style={{
           background: css.toConicGradientString(paint),
         }}
       />
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
     </ChipContainer>
   );
 }
@@ -159,7 +159,7 @@ export function DiamondGradientPaintChip({
           }),
         }}
       />
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
     </ChipContainer>
   );
 }
@@ -177,14 +177,14 @@ export function ImagePaintChip({
         <ImageView
           src={paint.src}
           alt="Paint image"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover z-10"
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
           <ImageIcon className="w-3 h-3 text-muted-foreground/50" />
         </div>
       )}
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
     </ChipContainer>
   );
 }
