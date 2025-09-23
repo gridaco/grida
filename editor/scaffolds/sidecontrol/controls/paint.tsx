@@ -202,6 +202,7 @@ export interface PaintControlProps {
   onOpenChange?: (open: boolean) => void;
   selectedGradientStop?: number;
   onSelectedGradientStopChange?: (stop: number) => void;
+  open?: boolean;
 }
 
 export function PaintControl({
@@ -211,6 +212,7 @@ export function PaintControl({
   selectedGradientStop,
   onOpenChange,
   onSelectedGradientStopChange,
+  open,
 }: PaintControlProps) {
   if (tokens.is.tokenized(value)) {
     return (
@@ -228,6 +230,7 @@ export function PaintControl({
         onOpenChange={onOpenChange}
         selectedGradientStop={selectedGradientStop}
         onSelectedGradientStopChange={onSelectedGradientStopChange}
+        open={open}
       />
     );
   }
@@ -243,6 +246,7 @@ function ComputedPaintControl({
   onOpenChange,
   selectedGradientStop,
   onSelectedGradientStopChange,
+  open,
 }: {
   value?: ComputedPaint;
   onValueChange?: (value: ComputedPaint | null) => void;
@@ -250,6 +254,7 @@ function ComputedPaintControl({
   onOpenChange?: (open: boolean) => void;
   selectedGradientStop?: number;
   onSelectedGradientStopChange?: (stop: number) => void;
+  open?: boolean;
 }) {
   const onTypeChange = useCallback(
     (type: cg.Paint["type"] | "image" | "gradient") => {
@@ -275,7 +280,7 @@ function ComputedPaintControl({
   };
 
   return (
-    <Popover modal={false} onOpenChange={onOpenChange}>
+    <Popover modal={false} open={open} onOpenChange={onOpenChange}>
       {!value ? (
         <NewPaintTrigger onAddPaint={onAddPaint} />
       ) : (

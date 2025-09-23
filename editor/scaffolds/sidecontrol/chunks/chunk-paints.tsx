@@ -116,6 +116,7 @@ export interface ChunkPaintsProps {
     selectedGradientStop?: number;
     onSelectedGradientStopChange?: (stop: number) => void;
     onOpenChange?: (open: boolean) => void;
+    open?: boolean;
   }>;
   onAddPaint?: (paint: cg.Paint) => void;
   onRemovePaint?: (index: number) => void;
@@ -166,6 +167,42 @@ export function ChunkPaints({
       ? content_edit_mode
       : undefined;
   const gradientPaintIndex = gradientMode?.paint_index ?? 0;
+
+  const imageMode =
+    content_edit_mode?.type === "paint/image" &&
+    content_edit_mode.node_id === node_id &&
+    (content_edit_mode.paint_target ?? "fill") === paintTarget
+      ? content_edit_mode
+      : undefined;
+  const imagePaintIndex = imageMode?.paint_index ?? 0;
+
+  // Track which paint is currently open (user-controlled state)
+  const [openPaintIndex, setOpenPaintIndex] = React.useState<number | null>(
+    null
+  );
+
+  // Determine which paint should be open
+  // Priority: 1) User opened paint, 2) Image edit mode, 3) None
+  const currentlyOpenIndex = React.useMemo((): number | null => {
+    // If user has opened a paint, that takes priority
+    if (openPaintIndex !== null) {
+      return openPaintIndex;
+    }
+
+    // If in image edit mode, open that paint
+    if (imageMode) {
+      return imagePaintIndex;
+    }
+
+    return null;
+  }, [openPaintIndex, imageMode, imagePaintIndex]);
+
+  // Reset user-controlled state when content edit mode changes or node changes
+  React.useEffect(() => {
+    if (!content_edit_mode || content_edit_mode.node_id !== node_id) {
+      setOpenPaintIndex(null);
+    }
+  }, [content_edit_mode, node_id]);
 
   const actions = useNodeActions(node_id)!;
   const isCanvasBackend = backend === "canvas";
@@ -265,7 +302,12 @@ export function ChunkPaints({
   const handleOpenChange = React.useCallback(
     (paintIndex: number, open: boolean) => {
       if (open) {
-        const paint_at_index = paints[paintIndex];
+        // User opened a paint - this takes priority
+        setOpenPaintIndex(paintIndex);
+
+        const paint_at_index = paintList[paintIndex];
+        if (!paint_at_index) return; // Safety check
+
         switch (paint_at_index.type) {
           case "linear_gradient":
           case "radial_gradient":
@@ -286,10 +328,12 @@ export function ChunkPaints({
           }
         }
       } else {
+        // User closed the paint
+        setOpenPaintIndex(null);
         instance.tryExitContentEditMode();
       }
     },
-    [instance, node_id, paintTarget, paints]
+    [instance, node_id, paintTarget, paintList]
   );
 
   // Use the custom hook for drag and drop sorting
@@ -355,6 +399,9 @@ export function ChunkPaints({
                       ? gradientMode.selected_stop
                       : undefined;
 
+                  // Use centralized open state logic
+                  const isOpen = currentlyOpenIndex === index;
+
                   return (
                     <PaintRow
                       key={id}
@@ -369,6 +416,7 @@ export function ChunkPaints({
                       onOpenChange={handleOpenChange}
                       selectedGradientStop={selectedGradientStop}
                       disableSorting={!shouldEnableSorting}
+                      open={isOpen}
                     />
                   );
                 })}
@@ -394,6 +442,7 @@ interface PaintRowProps {
   onOpenChange: (index: number, open: boolean) => void;
   selectedGradientStop?: number;
   disableSorting?: boolean;
+  open?: boolean;
 }
 
 function PaintRow({
@@ -408,6 +457,7 @@ function PaintRow({
   onOpenChange,
   selectedGradientStop,
   disableSorting,
+  open,
 }: PaintRowProps) {
   const {
     attributes,
@@ -452,6 +502,7 @@ function PaintRow({
             onOpenChange={(open) => {
               onOpenChange(index, open);
             }}
+            open={open}
           />
         </div>
         <Button
