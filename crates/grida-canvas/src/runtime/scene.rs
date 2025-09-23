@@ -419,7 +419,7 @@ impl Renderer {
             bounds.x + bounds.width,
             bounds.y + bounds.height,
         );
-        let canvas = recorder.begin_recording(sk_bounds, None);
+        let canvas = recorder.begin_recording(sk_bounds, true);
         let painter =
             Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
         draw(&painter);

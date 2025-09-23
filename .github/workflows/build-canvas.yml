@@ -53,10 +53,7 @@ jobs:
         run: pnpm install --filter "@grida/canvas-wasm..." --frozen-lockfile
 
       - name: Install Emscripten SDK
-        run: |
-          cd third_party/externals/emsdk
-          ./emsdk install latest
-          ./emsdk activate latest
+        run: python3 bin/activate-emsdk
 
       - name: Fix missing xlocale.h header for Emscripten
         run: |
