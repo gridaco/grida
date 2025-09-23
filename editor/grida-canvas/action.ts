@@ -796,8 +796,8 @@ export type EditorSurface_EnterPaintGradientContentEditMode = {
 export type EditorSurface_EnterPaintImageContentEditMode = {
   node_id: string;
   type: "surface/content-edit-mode/paint/image";
-  paint_target?: "fill" | "stroke";
-  paint_index?: number;
+  paint_target: "fill" | "stroke";
+  paint_index: number;
 };
 
 export type EditorSurface_ExitContentEditMode = {

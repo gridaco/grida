@@ -139,17 +139,20 @@ export function ChunkPaints({
     content_edit_mode: state.content_edit_mode,
   }));
 
-  // Get paint data based on target
-  const paintData = useNodeState(node_id, (node) => {
+  // TODO: LEGACY_PAINT_MODEL
+  const paintData = useNodeState<{
+    paint: cg.Paint;
+    paints: cg.Paint[];
+  }>(node_id, (node) => {
     if (paintTarget === "fill") {
       return {
-        paint: node.fill,
-        paints: node.fills,
+        paint: node.fill as cg.Paint,
+        paints: node.fills as cg.Paint[],
       };
     } else {
       return {
-        paint: node.stroke,
-        paints: node.strokes,
+        paint: node.stroke as cg.Paint,
+        paints: node.strokes as cg.Paint[],
       };
     }
   });
@@ -262,15 +265,31 @@ export function ChunkPaints({
   const handleOpenChange = React.useCallback(
     (paintIndex: number, open: boolean) => {
       if (open) {
-        instance.tryEnterContentEditMode(node_id, "paint/gradient", {
-          paintTarget,
-          paintIndex,
-        });
+        const paint_at_index = paints[paintIndex];
+        switch (paint_at_index.type) {
+          case "linear_gradient":
+          case "radial_gradient":
+          case "sweep_gradient":
+          case "diamond_gradient": {
+            instance.tryEnterContentEditMode(node_id, "paint/gradient", {
+              paintTarget,
+              paintIndex,
+            });
+            break;
+          }
+          case "image": {
+            instance.tryEnterContentEditMode(node_id, "paint/image", {
+              paintTarget,
+              paintIndex,
+            });
+            break;
+          }
+        }
       } else {
         instance.tryExitContentEditMode();
       }
     },
-    [instance, node_id, paintTarget]
+    [instance, node_id, paintTarget, paints]
   );
 
   // Use the custom hook for drag and drop sorting

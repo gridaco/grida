@@ -104,13 +104,13 @@ function __self_try_content_edit_mode_paint_gradient(
 function __self_try_content_edit_mode_paint_image(
   draft: editor.state.IEditorState,
   node_id: string,
-  paint_target: "fill" | "stroke" = "fill",
+  paint_target: "fill" | "stroke",
   paint_index: number = 0
 ) {
   draft.content_edit_mode = {
     node_id,
     type: "paint/image",
-    paint_target,
+    paint_target: paint_target,
     paint_index,
   };
 }
@@ -184,41 +184,61 @@ export function __self_try_enter_content_edit_mode_vector(
   }
 }
 
-function __has_image_paint(node: grida.program.nodes.Node): {
+function __has_image_paint(
+  node: grida.program.nodes.Node,
+  paint_target: "fill" | "stroke"
+): {
   hasImage: boolean;
   paintTarget: "fill" | "stroke";
   paintIndex: number;
 } | null {
   if (node.type === "text") return null;
 
-  // Check fills
-  const fills = Array.isArray((node as any).fills)
-    ? ((node as any).fills as grida.program.nodes.i.props.PropsPaintValue[])
-    : (node as any).fill
-      ? [(node as any).fill as grida.program.nodes.i.props.PropsPaintValue]
-      : [];
-  const fillImageIndex = fills.findIndex((paint) => paint?.type === "image");
+  switch (paint_target) {
+    case "fill": {
+      // Check fills
+      const fills = Array.isArray((node as any).fills)
+        ? ((node as any).fills as grida.program.nodes.i.props.PropsPaintValue[])
+        : (node as any).fill
+          ? [(node as any).fill as grida.program.nodes.i.props.PropsPaintValue]
+          : [];
+      const fillImageIndex = fills.findIndex(
+        (paint) => paint?.type === "image"
+      );
 
-  if (fillImageIndex !== -1) {
-    return { hasImage: true, paintTarget: "fill", paintIndex: fillImageIndex };
-  }
+      if (fillImageIndex !== -1) {
+        return {
+          hasImage: true,
+          paintTarget: "fill",
+          paintIndex: fillImageIndex,
+        };
+      }
+      break;
+    }
+    case "stroke": {
+      // Check strokes
+      const strokes = Array.isArray((node as any).strokes)
+        ? ((node as any)
+            .strokes as grida.program.nodes.i.props.PropsPaintValue[])
+        : (node as any).stroke
+          ? [
+              (node as any)
+                .stroke as grida.program.nodes.i.props.PropsPaintValue,
+            ]
+          : [];
+      const strokeImageIndex = strokes.findIndex(
+        (paint) => paint?.type === "image"
+      );
 
-  // Check strokes
-  const strokes = Array.isArray((node as any).strokes)
-    ? ((node as any).strokes as grida.program.nodes.i.props.PropsPaintValue[])
-    : (node as any).stroke
-      ? [(node as any).stroke as grida.program.nodes.i.props.PropsPaintValue]
-      : [];
-  const strokeImageIndex = strokes.findIndex(
-    (paint) => paint?.type === "image"
-  );
-
-  if (strokeImageIndex !== -1) {
-    return {
-      hasImage: true,
-      paintTarget: "stroke",
-      paintIndex: strokeImageIndex,
-    };
+      if (strokeImageIndex !== -1) {
+        return {
+          hasImage: true,
+          paintTarget: "stroke",
+          paintIndex: strokeImageIndex,
+        };
+      }
+      break;
+    }
   }
 
   return null;
@@ -251,12 +271,12 @@ function __self_try_enter_content_edit_mode_auto(
     case "ellipse":
     case "line": {
       // Check for image paints first
-      const imagePaintInfo = __has_image_paint(node);
+      const imagePaintInfo = __has_image_paint(node, "fill");
       if (imagePaintInfo?.hasImage) {
         return __self_try_content_edit_mode_paint_image(
           draft,
           node_id,
-          imagePaintInfo.paintTarget,
+          "fill",
           imagePaintInfo.paintIndex
         );
       }
@@ -942,7 +962,7 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
         break;
       }
       case "surface/content-edit-mode/paint/image": {
-        const { node_id, paint_target = "fill", paint_index = 0 } = action;
+        const { node_id, paint_target, paint_index = 0 } = action;
         __self_try_content_edit_mode_paint_image(
           draft,
           node_id,

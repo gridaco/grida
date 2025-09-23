@@ -9,8 +9,9 @@ import { cn } from "@/components/lib/utils/index";
 const popover_content_on_pointer_down_outside: PopoverContentProps["onPointerDownOutside"] =
   (e) => {
     // if the target contains 'data-popover-no-close', ignore the event
+    // Handle both HTMLElement and SVGElement
     if (
-      e.target instanceof HTMLElement &&
+      e.target instanceof Element &&
       e.target.closest("[data-popover-no-close]")
     ) {
       e.preventDefault();

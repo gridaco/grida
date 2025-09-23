@@ -83,6 +83,11 @@ export function SurfaceImageEditor({ node_id }: { node_id: string }) {
     return null;
   }
 
+  // Only enable the image editor when fit is "transform"
+  if (paint.fit !== "transform") {
+    return null;
+  }
+
   return (
     <div className="fixed left-0 top-0 w-0 h-0 z-10 pointer-events-none">
       <div
@@ -275,21 +280,6 @@ function _ImagePaintEditor({
       .join(" ");
   }, [screenCorners]);
 
-  const isPointInsideImage = useCallback(
-    (point: cmath.Vector2) => {
-      // Use the original corners (in local coordinates) for hit testing
-      const rel = cmath.vector2.sub(point, corners.nw); // northwest = top-left
-      const u = cmath.vector2.sub(corners.ne, corners.nw); // northeast - northwest
-      const v = cmath.vector2.sub(corners.sw, corners.nw); // southwest - northwest
-      const det = u[0] * v[1] - u[1] * v[0];
-      if (Math.abs(det) < 1e-6) return false;
-      const s = (rel[0] * v[1] - rel[1] * v[0]) / det;
-      const t = (rel[1] * u[0] - rel[0] * u[1]) / det;
-      return s >= 0 && s <= 1 && t >= 0 && t <= 1;
-    },
-    [corners]
-  );
-
   const handleSurfacePointerDown = useCallback(
     (event: React.PointerEvent<SVGPolygonElement>) => {
       if (activeHandle) return;
@@ -340,6 +330,7 @@ function _ImagePaintEditor({
             cursor: SIDE_CURSOR[side],
             pointerEvents: "auto",
           }}
+          data-popover-no-close
         />
       );
     },
@@ -363,23 +354,20 @@ function _ImagePaintEditor({
               pointerId: event.pointerId,
             });
           }}
+          className={`absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 cursor-grab pointer-events-auto ${
+            debug
+              ? "rounded-full border-2 border-muted-foreground/70 bg-muted-foreground/20"
+              : ""
+          }`}
           style={{
-            position: "absolute",
             left: position[0],
             top: position[1],
-            width: 16,
-            height: 16,
-            transform: "translate(-50%, -50%)",
-            borderRadius: 999,
-            border: "2px solid rgba(59,130,246,0.7)",
-            background: "rgba(59,130,246,0.2)",
-            cursor: "grab",
-            pointerEvents: "auto",
           }}
+          data-popover-no-close
         />
       );
     },
-    [previewTransform, toLocalPoint]
+    [previewTransform, toLocalPoint, debug]
   );
 
   const handles = useMemo(() => {
@@ -448,10 +436,11 @@ function _ImagePaintEditor({
           <polygon
             onPointerDown={handleSurfacePointerDown}
             points={polygonPoints}
-            stroke="rgba(59,130,246,0.7)"
+            stroke="var(--muted-foreground)"
             strokeWidth={1}
             fill="transparent"
-            style={{ pointerEvents: "auto", cursor: "grab" }}
+            className="pointer-events-auto cursor-move"
+            data-popover-no-close
           />
         </svg>
       </div>
