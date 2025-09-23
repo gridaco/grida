@@ -25,7 +25,7 @@ impl CachedScene {
         // Create a recorder to capture the static scene
         let mut recorder = PictureRecorder::new();
         let bounds = Rect::new(0.0, 0.0, width, height);
-        let canvas = recorder.begin_recording(bounds, None);
+        let canvas = recorder.begin_recording(bounds, true);
 
         // Draw some static content
         Self::draw_static_content(canvas);
