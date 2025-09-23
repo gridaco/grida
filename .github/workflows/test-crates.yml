@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     name: cargo test
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,14 +18,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            clang \
             libexpat1-dev \
             libfontconfig1-dev \
             libfreetype6-dev \
             libgl1-mesa-dev \
             libgles2-mesa-dev \
-            libssl-dev \
             libwayland-dev \
             libx11-dev \
             libx11-xcb-dev \
@@ -37,10 +34,7 @@ jobs:
             libxinerama-dev \
             libxrandr-dev \
             libxxf86vm-dev \
-            mesa-common-dev \
-            ninja-build \
-            pkg-config \
-            python3
+            mesa-common-dev
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
