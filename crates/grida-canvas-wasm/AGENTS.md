@@ -218,14 +218,10 @@ The steps below were tested on a fresh Ubuntu container and produced
    ```
 
 3. **(Ubuntu only) provide missing locale headers**
-   Some Ubuntu images lack `xlocale.h` which breaks the Skia build. A simple shim fixes it:
+   Some Ubuntu images lack `xlocale.h` which breaks the Skia build. A simple symbolic link fixes it:
 
    ```bash
-   cat <<'SHIM' | sudo tee /usr/include/xlocale.h
-   #include <locale.h>
-   #define strtoll_l(nptr,endptr,base,loc) strtoll((nptr),(endptr),(base))
-   #define strtoull_l(nptr,endptr,base,loc) strtoull((nptr),(endptr),(base))
-   SHIM
+   sudo ln -s /usr/include/locale.h /usr/include/xlocale.h
    ```
 
 4. **Build the crate**
