@@ -322,7 +322,12 @@ function TokenizedPaintControl({
           </span>
         </PaintInputContainer>
       </PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent
+        onPointerDown={(e) =>
+          // prevent popover content from causing dnd
+          e.stopPropagation()
+        }
+      >
         <ContextVariableColors
           onSelect={(token) => {
             onValueChange?.({
@@ -641,7 +646,16 @@ function PaintPopoverContent({
   onSelectedGradientStopChange?: (stop: number) => void;
 }) {
   return (
-    <PopoverContent align="start" side="right" sideOffset={8} className="p-0">
+    <PopoverContent
+      align="start"
+      side="right"
+      sideOffset={8}
+      className="p-0"
+      onPointerDown={(e) =>
+        // prevent popover content from causing dnd
+        e.stopPropagation()
+      }
+    >
       <Tabs
         value={
           value?.type === "linear_gradient" ||

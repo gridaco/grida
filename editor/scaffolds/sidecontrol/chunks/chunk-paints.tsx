@@ -2,6 +2,21 @@
 
 import React from "react";
 import {
+  DndContext,
+  PointerSensor,
+  type DragEndEvent,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   SidebarMenuSectionContent,
   SidebarSection,
   SidebarSectionHeaderActions,
@@ -20,6 +35,75 @@ import {
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import cg from "@grida/cg";
 import grida from "@grida/schema";
+
+// Hook for managing drag and drop sorting logic
+interface PaintItem {
+  id: string;
+  paint: any;
+  index: number;
+}
+
+interface UsePaintSortingProps {
+  displayPaintItems: PaintItem[];
+  shouldEnableSorting: boolean;
+  onUpdatePaints: (paints: any[]) => void;
+}
+
+function usePaintSorting({
+  displayPaintItems,
+  shouldEnableSorting,
+  onUpdatePaints,
+}: UsePaintSortingProps) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 4,
+      },
+    })
+  );
+
+  const handleDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      if (!shouldEnableSorting) {
+        return;
+      }
+
+      const { active, over } = event;
+
+      if (!over || active.id === over.id) {
+        return;
+      }
+
+      const oldIndex = displayPaintItems.findIndex(
+        (item) => item.id === active.id
+      );
+      const newIndex = displayPaintItems.findIndex(
+        (item) => item.id === over.id
+      );
+
+      if (oldIndex === -1 || newIndex === -1) {
+        return;
+      }
+
+      const newDisplayOrder = arrayMove(displayPaintItems, oldIndex, newIndex);
+      const newPaintOrder = newDisplayOrder
+        .slice()
+        .reverse()
+        .map((item) => item.paint);
+
+      onUpdatePaints(newPaintOrder);
+    },
+    [displayPaintItems, shouldEnableSorting, onUpdatePaints]
+  );
+
+  const modifiers = shouldEnableSorting ? [restrictToVerticalAxis] : undefined;
+
+  return {
+    sensors,
+    handleDragEnd,
+    modifiers,
+  };
+}
 
 export interface ChunkPaintsProps {
   node_id: string;
@@ -92,6 +176,110 @@ export function ChunkPaints({
       ? [paint]
       : [];
 
+  const paintItems = React.useMemo(
+    () =>
+      paintList.map((paintItem, index) => ({
+        id: `paint-${index}`,
+        paint: paintItem,
+        index,
+      })),
+    [paintList]
+  );
+
+  const displayPaintItems = React.useMemo(
+    () => [...paintItems].reverse(),
+    [paintItems]
+  );
+
+  const shouldEnableSorting =
+    isCanvasBackend && Array.isArray(paints) && paintItems.length > 1;
+
+  const updatePaints = React.useCallback(
+    (nextPaints: any[]) => {
+      if (onUpdatePaints) {
+        onUpdatePaints(nextPaints);
+      } else {
+        paintTarget === "fill"
+          ? actions.fills(nextPaints as any)
+          : actions.strokes(nextPaints as any);
+      }
+    },
+    [actions, onUpdatePaints, paintTarget]
+  );
+
+  const createPaintsCopy = React.useCallback(() => {
+    return Array.isArray(paints) ? [...paints] : paint ? [paint] : [];
+  }, [paint, paints]);
+
+  const handleValueChange = React.useCallback(
+    (index: number, value: any) => {
+      const currentPaints = createPaintsCopy();
+      currentPaints[index] = value;
+      updatePaints(currentPaints);
+    },
+    [createPaintsCopy, updatePaints]
+  );
+
+  const handleTogglePaintActive = React.useCallback(
+    (index: number, active: boolean) => {
+      const currentPaints = createPaintsCopy();
+      const targetPaint = currentPaints[index];
+
+      if (!targetPaint) {
+        return;
+      }
+
+      currentPaints[index] = { ...targetPaint, active };
+      updatePaints(currentPaints);
+    },
+    [createPaintsCopy, updatePaints]
+  );
+
+  const handleRemovePaintAt = React.useCallback(
+    (index: number) => {
+      if (onRemovePaint) {
+        onRemovePaint(index);
+        return;
+      }
+
+      const currentPaints = createPaintsCopy();
+      currentPaints.splice(index, 1);
+      updatePaints(currentPaints);
+    },
+    [createPaintsCopy, onRemovePaint, updatePaints]
+  );
+
+  const handleSelectGradientStop = React.useCallback(
+    (paintIndex: number, stop: number) => {
+      instance.selectGradientStop(node_id, stop, {
+        paintTarget,
+        paintIndex,
+      });
+    },
+    [instance, node_id, paintTarget]
+  );
+
+  const handleOpenChange = React.useCallback(
+    (paintIndex: number, open: boolean) => {
+      if (open) {
+        instance.tryEnterContentEditMode(node_id, "paint/gradient", {
+          paintTarget,
+          paintIndex,
+        });
+      } else {
+        instance.tryExitContentEditMode();
+      }
+    },
+    [instance, node_id, paintTarget]
+  );
+
+  // Use the custom hook for drag and drop sorting
+  const { sensors, handleDragEnd, modifiers } = usePaintSorting({
+    displayPaintItems,
+    shouldEnableSorting,
+    onUpdatePaints: updatePaints,
+  });
+
   const handleAddPaint = React.useCallback(() => {
     const newPaint: cg.Paint = {
       type: "solid",
@@ -110,104 +298,6 @@ export function ChunkPaints({
       }
     }
   }, [actions, paintList.length, paintTarget, onAddPaint]);
-
-  const renderPaintControl = (
-    paint: grida.program.nodes.i.props.PropsPaintValue | undefined,
-    index: number
-  ) => {
-    const selectedGradientStop =
-      gradientMode && gradientPaintIndex === index
-        ? gradientMode.selected_stop
-        : undefined;
-
-    const onValueChangeAt = (index: number, value: any) => {
-      const currentPaints = Array.isArray(paints)
-        ? [...paints]
-        : paint
-          ? [paint]
-          : [];
-      currentPaints[index] = value;
-
-      if (onUpdatePaints) {
-        onUpdatePaints(currentPaints);
-      } else {
-        paintTarget === "fill"
-          ? actions.fills(currentPaints as any)
-          : actions.strokes(currentPaints as any);
-      }
-    };
-
-    return (
-      <PropertyLine key={index}>
-        <div className="flex items-center w-full gap-2">
-          <Checkbox
-            checked={Boolean(paint?.active)}
-            onCheckedChange={(checked) => {
-              onValueChangeAt(index, { ...paint, active: Boolean(checked) });
-            }}
-          />
-          <div className="flex-1">
-            <ControlComponent
-              value={paint}
-              onValueChange={(value) => {
-                onValueChangeAt(index, value);
-              }}
-              selectedGradientStop={selectedGradientStop}
-              onSelectedGradientStopChange={(stop) => {
-                instance.selectGradientStop(node_id, stop, {
-                  paintTarget,
-                  paintIndex: index,
-                });
-              }}
-              onOpenChange={(open) => {
-                if (open) {
-                  instance.tryEnterContentEditMode(node_id, "paint/gradient", {
-                    paintTarget,
-                    paintIndex: index,
-                  });
-                } else {
-                  instance.tryExitContentEditMode();
-                }
-              }}
-            />
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onRemovePaint) {
-                onRemovePaint(index);
-              } else {
-                // Default behavior
-                if (paintTarget === "fill") {
-                  const currentFills = Array.isArray(paints)
-                    ? [...paints]
-                    : paint
-                      ? [paint]
-                      : [];
-                  currentFills.splice(index, 1);
-                  actions.fills(currentFills as any);
-                } else {
-                  const currentStrokes = Array.isArray(paints)
-                    ? [...paints]
-                    : paint
-                      ? [paint]
-                      : [];
-                  currentStrokes.splice(index, 1);
-                  actions.strokes(currentStrokes as any);
-                }
-              }
-            }}
-            className="cursor-pointer"
-            tabIndex={-1}
-          >
-            <MinusIcon className="size-3.5" />
-          </Button>
-        </div>
-      </PropertyLine>
-    );
-  };
 
   const empty = paintList.length === 0;
 
@@ -230,15 +320,137 @@ export function ChunkPaints({
       </SidebarSectionHeaderItem>
       {!empty && (
         <SidebarMenuSectionContent className="space-y-2">
-          {paintList
-            .slice()
-            .reverse()
-            .map((paint, displayIndex) =>
-              renderPaintControl(paint, paintList.length - 1 - displayIndex)
-            )}
+          <DndContext
+            sensors={sensors}
+            onDragEnd={handleDragEnd}
+            modifiers={modifiers}
+          >
+            <SortableContext
+              items={displayPaintItems.map((item) => item.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {displayPaintItems.map(({ id, paint: itemPaint, index }) => {
+                  const selectedGradientStop =
+                    gradientMode && gradientPaintIndex === index
+                      ? gradientMode.selected_stop
+                      : undefined;
+
+                  return (
+                    <PaintRow
+                      key={id}
+                      id={id}
+                      paint={itemPaint}
+                      index={index}
+                      ControlComponent={ControlComponent}
+                      onToggleActive={handleTogglePaintActive}
+                      onValueChange={handleValueChange}
+                      onRemove={handleRemovePaintAt}
+                      onSelectGradientStop={handleSelectGradientStop}
+                      onOpenChange={handleOpenChange}
+                      selectedGradientStop={selectedGradientStop}
+                      disableSorting={!shouldEnableSorting}
+                    />
+                  );
+                })}
+              </div>
+            </SortableContext>
+          </DndContext>
           {additionalContent}
         </SidebarMenuSectionContent>
       )}
     </SidebarSection>
+  );
+}
+
+interface PaintRowProps {
+  id: string;
+  paint: grida.program.nodes.i.props.PropsPaintValue | undefined;
+  index: number;
+  ControlComponent: ChunkPaintsProps["ControlComponent"];
+  onToggleActive: (index: number, active: boolean) => void;
+  onValueChange: (index: number, value: any) => void;
+  onRemove: (index: number) => void;
+  onSelectGradientStop: (index: number, stop: number) => void;
+  onOpenChange: (index: number, open: boolean) => void;
+  selectedGradientStop?: number;
+  disableSorting?: boolean;
+}
+
+function PaintRow({
+  id,
+  paint,
+  index,
+  ControlComponent,
+  onToggleActive,
+  onValueChange,
+  onRemove,
+  onSelectGradientStop,
+  onOpenChange,
+  selectedGradientStop,
+  disableSorting,
+}: PaintRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled: disableSorting });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform) ?? undefined,
+    transition,
+    opacity: isDragging ? 0.6 : undefined,
+  };
+
+  return (
+    <PropertyLine>
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="flex items-center w-full gap-2"
+        {...attributes}
+        {...listeners}
+      >
+        <Checkbox
+          checked={Boolean(paint?.active)}
+          onCheckedChange={(checked) => {
+            onToggleActive(index, Boolean(checked));
+          }}
+        />
+        <div className="flex-1">
+          <ControlComponent
+            value={paint}
+            onValueChange={(value) => {
+              onValueChange(index, value);
+            }}
+            selectedGradientStop={selectedGradientStop}
+            onSelectedGradientStopChange={(stop) => {
+              onSelectGradientStop(index, stop);
+            }}
+            onOpenChange={(open) => {
+              onOpenChange(index, open);
+            }}
+          />
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove(index);
+          }}
+          className="cursor-pointer"
+          tabIndex={-1}
+        >
+          <MinusIcon className="size-3.5" />
+        </Button>
+      </div>
+    </PropertyLine>
   );
 }
