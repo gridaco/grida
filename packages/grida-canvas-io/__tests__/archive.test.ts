@@ -112,6 +112,7 @@ describe("archive comprehensive", () => {
           fill: {
             type: "solid",
             color: { r: 255, g: 0, b: 0, a: 1 },
+            active: true,
           },
         },
       },
