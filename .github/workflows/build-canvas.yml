@@ -38,10 +38,6 @@ jobs:
             ninja-build \
             just
 
-      - name: Fix missing xlocale.h header
-        run: |
-          sudo ln -s /usr/include/locale.h /usr/include/xlocale.h
-
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -61,6 +57,10 @@ jobs:
           cd third_party/externals/emsdk
           ./emsdk install latest
           ./emsdk activate latest
+
+      - name: Fix missing xlocale.h header for Emscripten
+        run: |
+          sudo ln -s /usr/include/locale.h /usr/include/xlocale.h
 
       - name: Build canvas wasm artifacts
         run: just build
