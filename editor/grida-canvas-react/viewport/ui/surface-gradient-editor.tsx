@@ -180,6 +180,7 @@ function EditorUser({
         transform,
         blendMode: gradient.blendMode,
         opacity: gradient.opacity || 1,
+        active: true,
       });
     },
     [gradient.type, gradientType, stops, onValueChange]
@@ -203,6 +204,7 @@ function EditorUser({
         transform,
         blendMode: gradient.blendMode,
         opacity: gradient.opacity || 1,
+        active: true,
       });
     },
     [stops, points, gradient.type, gradientType, onValueChange]
@@ -231,6 +233,7 @@ function EditorUser({
         transform,
         blendMode: gradient.blendMode,
         opacity: gradient.opacity || 1,
+        active: true,
       });
     },
     [stops, points, gradient.type, gradientType, onValueChange]

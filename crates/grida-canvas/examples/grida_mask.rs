@@ -113,6 +113,7 @@ fn build_alpha_mask(
         ],
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
+        active: true,
     })]);
     mask.mask = Some(LayerMaskType::Image(ImageMaskType::Alpha));
     let id = mask.id.clone();
@@ -150,6 +151,7 @@ fn build_luminance_mask(
         ],
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
+        active: true,
     })]);
     mask.mask = Some(LayerMaskType::Image(ImageMaskType::Luminance));
     let id = mask.id.clone();

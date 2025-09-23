@@ -31,13 +31,21 @@ const document: editor.state.IEditorStateInit = {
     nodes: {
       a: grida.program.nodes.factory.createContainerNode("a", {
         name: "A",
-        fill: { type: "solid", color: cmath.color.hex_to_rgba8888("#00f") },
+        fill: {
+          type: "solid",
+          color: cmath.color.hex_to_rgba8888("#00f"),
+          active: true,
+        },
         left: 0,
         top: 0,
       }),
       b: grida.program.nodes.factory.createContainerNode("b", {
         name: "B",
-        fill: { type: "solid", color: cmath.color.hex_to_rgba8888("#0f0") },
+        fill: {
+          type: "solid",
+          color: cmath.color.hex_to_rgba8888("#0f0"),
+          active: true,
+        },
         left: 200,
         top: 100,
       }),

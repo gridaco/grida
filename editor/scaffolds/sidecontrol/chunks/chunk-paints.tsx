@@ -95,6 +95,7 @@ export function ChunkPaints({
     const newPaint: cg.Paint = {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: paintList.length > 0 ? 0.5 : 1 },
+      active: true,
     };
 
     if (onAddPaint) {

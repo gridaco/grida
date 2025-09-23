@@ -59,6 +59,7 @@ fn main() {
         opacity: 1.0,
         transform: AffineTransform::identity(),
         blend_mode: BlendMode::Normal,
+        active: true,
     };
 
     // Draw rectangles with varying widths in a single row
@@ -86,6 +87,7 @@ fn main() {
         opacity: linear_gradient.opacity,
         transform: AffineTransform::new(-0.5, -0.5, 0.0), // Move gradient center to top-left
         blend_mode: BlendMode::Normal,
+        active: true,
     };
 
     let mut current_x = start_x;
@@ -110,6 +112,7 @@ fn main() {
         opacity: linear_gradient.opacity,
         transform: AffineTransform::new(0.0, 0.0, 45.0), // Rotate the gradient by 45 degrees
         blend_mode: BlendMode::Normal,
+        active: true,
     };
 
     let mut current_x = start_x;

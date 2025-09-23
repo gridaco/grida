@@ -59,6 +59,7 @@ const DEFAULT_IMAGE_PAINT: cg.ImagePaint = {
   filters: cg.def.IMAGE_FILTERS,
   blendMode: cg.def.BLENDMODE,
   opacity: 1,
+  active: true,
 };
 
 function getNextPaintForType(
@@ -130,6 +131,7 @@ function getNextPaintForType(
               a: opacity,
             },
             blendMode,
+            active: true,
           };
         }
         case "linear_gradient":
@@ -161,6 +163,7 @@ function getNextPaintForType(
             type: "solid",
             color: { r: 128, g: 128, b: 128, a: opacity }, // Default gray with preserved opacity
             blendMode,
+            active: true,
           };
         }
         case "linear_gradient":
@@ -262,6 +265,7 @@ function ComputedPaintControl({
     const paint: ComputedPaint = {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: 1 },
+      active: true,
     };
     if (onValueAdd) {
       onValueAdd(paint);
@@ -324,6 +328,7 @@ function TokenizedPaintControl({
             onValueChange?.({
               type: "solid",
               color: token,
+              active: true,
             });
           }}
         />
@@ -357,7 +362,9 @@ function ContextVariableColors({
             onSelect?.(exp);
           }}
         >
-          <PaintChip paint={{ type: "solid", color: def.default }} />
+          <PaintChip
+            paint={{ type: "solid", color: def.default, active: true }}
+          />
           <span className="text-xs">{key}</span>
         </Button>
       ))}
@@ -520,6 +527,7 @@ function SolidPaintTrigger({
             ...value,
             type: "solid",
             color: { ...color, a: value.color.a },
+            active: true,
           });
         }}
       />
@@ -531,6 +539,7 @@ function SolidPaintTrigger({
             ...value,
             type: "solid",
             color: { ...value.color, a: opacity },
+            active: true,
           });
         }}
         onFocus={onInputFocus}
@@ -737,6 +746,7 @@ function PaintTabsContent({
               ...value,
               type: "solid",
               color,
+              active: true,
             });
           }}
         />
@@ -747,6 +757,7 @@ function PaintTabsContent({
               type: "solid",
               // @ts-ignore
               color: token,
+              active: true,
             });
           }}
         />

@@ -58,6 +58,7 @@ impl From<&FigmaPaint> for Paint {
                 Paint::Solid(SolidPaint {
                     color,
                     blend_mode: BlendMode::default(),
+                    active: solid.visible.unwrap_or(true),
                 })
             }
             FigmaPaint::ImagePaint(image) => {
@@ -89,6 +90,7 @@ impl From<&FigmaPaint> for Paint {
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),
                     filters: ImageFilters::default(),
+                    active: image.visible.unwrap_or(true),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -110,6 +112,7 @@ impl From<&FigmaPaint> for Paint {
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
+                            active: gradient.visible.unwrap_or(true),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
@@ -120,6 +123,7 @@ impl From<&FigmaPaint> for Paint {
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
+                            active: gradient.visible.unwrap_or(true),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientDiamond => {
@@ -130,6 +134,7 @@ impl From<&FigmaPaint> for Paint {
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
+                            active: gradient.visible.unwrap_or(true),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientAngular => {
@@ -140,6 +145,7 @@ impl From<&FigmaPaint> for Paint {
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
+                            active: gradient.visible.unwrap_or(true),
                         })
                     }
                 }
@@ -147,6 +153,7 @@ impl From<&FigmaPaint> for Paint {
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
                 blend_mode: BlendMode::default(),
+                active: true,
             }),
         }
     }
@@ -301,6 +308,7 @@ impl FigmaConverter {
                 Paint::Solid(SolidPaint {
                     color,
                     blend_mode: BlendMode::default(),
+                    active: solid.visible.unwrap_or(true),
                 })
             }
             FigmaPaint::ImagePaint(image) => {
@@ -337,6 +345,7 @@ impl FigmaConverter {
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),
                     filters: ImageFilters::default(),
+                    active: image.visible.unwrap_or(true),
                 })
             }
             FigmaPaint::GradientPaint(gradient) => {
@@ -358,6 +367,7 @@ impl FigmaConverter {
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
+                            active: gradient.visible.unwrap_or(true),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
@@ -368,6 +378,7 @@ impl FigmaConverter {
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
+                            active: gradient.visible.unwrap_or(true),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientDiamond => {
@@ -378,6 +389,7 @@ impl FigmaConverter {
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
+                            active: gradient.visible.unwrap_or(true),
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientAngular => {
@@ -388,6 +400,7 @@ impl FigmaConverter {
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
+                            active: gradient.visible.unwrap_or(true),
                         })
                     }
                 }
@@ -395,6 +408,7 @@ impl FigmaConverter {
             _ => Paint::Solid(SolidPaint {
                 color: CGColor(0, 0, 0, 255),
                 blend_mode: BlendMode::default(),
+                active: true,
             }),
         }
     }

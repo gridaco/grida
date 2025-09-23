@@ -75,6 +75,7 @@ impl CGColor {
 impl From<CGColor> for SolidPaint {
     fn from(color: CGColor) -> Self {
         SolidPaint {
+            active: true,
             color,
             blend_mode: BlendMode::default(),
         }
@@ -997,6 +998,17 @@ pub enum Paint {
 }
 
 impl Paint {
+    pub fn active(&self) -> bool {
+        match self {
+            Paint::Solid(solid) => solid.active,
+            Paint::LinearGradient(gradient) => gradient.active,
+            Paint::RadialGradient(gradient) => gradient.active,
+            Paint::SweepGradient(gradient) => gradient.active,
+            Paint::DiamondGradient(gradient) => gradient.active,
+            Paint::Image(image) => image.active,
+        }
+    }
+
     pub fn opacity(&self) -> f32 {
         match self {
             Paint::Solid(solid) => solid.opacity(),
@@ -1006,6 +1018,48 @@ impl Paint {
             Paint::DiamondGradient(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
         }
+    }
+
+    /// Returns `true` if the paint is visible, `false` otherwise.
+    ///
+    /// A paint is considered visible when:
+    /// - It is active (`active() == true`)
+    /// - It has non-zero opacity (`opacity() > 0.0`)
+    ///
+    /// This method combines the `active` and `opacity` properties to determine
+    /// whether the paint should be rendered. A paint that is inactive or has
+    /// zero opacity is considered invisible and will not be drawn.
+    ///
+    /// ## Performance Note
+    ///
+    /// Paints with `opacity == 0.0` have no visual effect regardless of blend mode,
+    /// so they can be safely removed from the render list to optimize performance.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let solid_paint = Paint::Solid(SolidPaint {
+    ///     active: true,
+    ///     color: CGColor::RED,
+    ///     blend_mode: BlendMode::Normal,
+    /// });
+    /// assert!(solid_paint.visible()); // active and opaque
+    ///
+    /// let transparent_paint = Paint::Solid(SolidPaint {
+    ///     active: true,
+    ///     color: CGColor::TRANSPARENT,
+    ///     blend_mode: BlendMode::Normal,
+    /// });
+    /// assert!(!transparent_paint.visible()); // active but transparent
+    /// ```
+    pub fn visible(&self) -> bool {
+        if !self.active() {
+            return false;
+        }
+        if self.opacity() == 0.0 {
+            return false;
+        }
+        return true;
     }
 
     pub fn blend_mode(&self) -> BlendMode {
@@ -1276,6 +1330,7 @@ impl GradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct SolidPaint {
+    pub active: bool,
     pub color: CGColor,
     pub blend_mode: BlendMode,
 }
@@ -1283,6 +1338,7 @@ pub struct SolidPaint {
 impl SolidPaint {
     pub fn new_color(color: CGColor) -> Self {
         Self {
+            active: true,
             color,
             blend_mode: BlendMode::default(),
         }
@@ -1294,31 +1350,37 @@ impl SolidPaint {
     }
 
     pub const TRANSPARENT: Self = Self {
+        active: true,
         color: CGColor::TRANSPARENT,
         blend_mode: BlendMode::Normal,
     };
 
     pub const BLACK: Self = Self {
+        active: true,
         color: CGColor::BLACK,
         blend_mode: BlendMode::Normal,
     };
 
     pub const WHITE: Self = Self {
+        active: true,
         color: CGColor::WHITE,
         blend_mode: BlendMode::Normal,
     };
 
     pub const RED: Self = Self {
+        active: true,
         color: CGColor::RED,
         blend_mode: BlendMode::Normal,
     };
 
     pub const BLUE: Self = Self {
+        active: true,
         color: CGColor::BLUE,
         blend_mode: BlendMode::Normal,
     };
 
     pub const GREEN: Self = Self {
+        active: true,
         color: CGColor::GREEN,
         blend_mode: BlendMode::Normal,
     };
@@ -1339,6 +1401,7 @@ pub struct GradientStop {
 
 #[derive(Debug, Clone)]
 pub struct LinearGradientPaint {
+    pub active: bool,
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
@@ -1348,6 +1411,7 @@ pub struct LinearGradientPaint {
 impl LinearGradientPaint {
     pub fn from_colors(colors: Vec<CGColor>) -> Self {
         Self {
+            active: true,
             transform: AffineTransform::default(),
             stops: colors
                 .iter()
@@ -1366,6 +1430,7 @@ impl LinearGradientPaint {
 impl Default for LinearGradientPaint {
     fn default() -> Self {
         Self {
+            active: true,
             transform: AffineTransform::default(),
             stops: Vec::new(),
             opacity: 1.0,
@@ -1376,6 +1441,7 @@ impl Default for LinearGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct RadialGradientPaint {
+    pub active: bool,
     /// # Radial Gradient Transform Model
     ///
     /// ## Coordinate Space
@@ -1417,6 +1483,7 @@ pub struct RadialGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct DiamondGradientPaint {
+    pub active: bool,
     /// # Diamond Gradient Transform Model
     ///
     /// Figma's Diamond Gradient is equivalent to a radial gradient evaluated
@@ -1440,6 +1507,7 @@ pub struct DiamondGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct SweepGradientPaint {
+    pub active: bool,
     /// # Sweep Gradient Transform Model
     ///
     /// ## Coordinate Space
@@ -1477,6 +1545,42 @@ pub struct SweepGradientPaint {
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+}
+
+impl Default for RadialGradientPaint {
+    fn default() -> Self {
+        Self {
+            active: true,
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for DiamondGradientPaint {
+    fn default() -> Self {
+        Self {
+            active: true,
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
+impl Default for SweepGradientPaint {
+    fn default() -> Self {
+        Self {
+            active: true,
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
 }
 
 /// A reference to a resource that can be identified either by a logical Resource ID (RID) or by a hash.
@@ -1683,34 +1787,9 @@ pub enum ImagePaintFit {
 /// - **`blend_mode`**: Determines how the image blends with underlying content
 /// - **`filters`**: Applies visual effects like brightness, contrast, saturation, etc.
 ///
-/// ## Usage Examples
-///
-/// ```rust
-/// use grida_canvas::cg::types::{ImagePaint, ImagePaintFit};
-/// use math2::{box_fit::BoxFit, transform::AffineTransform};
-///
-/// // Standard fitting with cover behavior
-/// let cover_paint = ImagePaint {
-///     image: ResourceRef::new("path/to/image.png"),
-///     fit: ImagePaintFit::Fit(BoxFit::Cover),
-///     opacity: 1.0,
-///     blend_mode: BlendMode::default(),
-///     filters: ImageFilters::default(),
-/// };
-///
-/// // Custom transformation for cropping and rotation
-/// let custom_paint = ImagePaint {
-///     image: ResourceRef::new("path/to/image.png"),
-///     fit: ImagePaintFit::Transform(
-///         AffineTransform::new(10.0, 20.0, 45.0) // translate and rotate
-///     ),
-///     opacity: 0.8,
-///     blend_mode: BlendMode::Multiply,
-///     filters: ImageFilters::default(),
-/// };
-/// ```
 #[derive(Debug, Clone)]
 pub struct ImagePaint {
+    pub active: bool,
     /// Reference to the image resource to be painted
     pub image: ResourceRef,
     /// Defines how the image should be fitted within its container
@@ -1721,51 +1800,6 @@ pub struct ImagePaint {
     pub blend_mode: BlendMode,
     /// Applies visual effects like brightness, contrast, saturation, etc.
     pub filters: ImageFilters,
-}
-
-impl Default for RadialGradientPaint {
-    fn default() -> Self {
-        Self {
-            transform: AffineTransform::default(),
-            stops: Vec::new(),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        }
-    }
-}
-
-impl Default for DiamondGradientPaint {
-    fn default() -> Self {
-        Self {
-            transform: AffineTransform::default(),
-            stops: Vec::new(),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        }
-    }
-}
-
-impl Default for SweepGradientPaint {
-    fn default() -> Self {
-        Self {
-            transform: AffineTransform::default(),
-            stops: Vec::new(),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        }
-    }
-}
-
-impl Default for ImagePaint {
-    fn default() -> Self {
-        Self {
-            image: ResourceRef::RID(String::new()),
-            fit: ImagePaintFit::Fit(BoxFit::Cover),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-            filters: ImageFilters::default(),
-        }
-    }
 }
 
 // #endregion

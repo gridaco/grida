@@ -147,6 +147,8 @@ pub enum JSONPaint {
         color: Option<JSONRGBA>,
         #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
+        #[serde(default = "default_active")]
+        active: bool,
     },
     #[serde(rename = "linear_gradient")]
     LinearGradient {
@@ -157,6 +159,8 @@ pub enum JSONPaint {
         opacity: f32,
         #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
+        #[serde(default = "default_active")]
+        active: bool,
     },
     #[serde(rename = "radial_gradient")]
     RadialGradient {
@@ -167,6 +171,8 @@ pub enum JSONPaint {
         opacity: f32,
         #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
+        #[serde(default = "default_active")]
+        active: bool,
     },
     #[serde(rename = "diamond_gradient")]
     DiamondGradient {
@@ -177,6 +183,8 @@ pub enum JSONPaint {
         opacity: f32,
         #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
+        #[serde(default = "default_active")]
+        active: bool,
     },
     #[serde(rename = "sweep_gradient")]
     SweepGradient {
@@ -187,6 +195,8 @@ pub enum JSONPaint {
         opacity: f32,
         #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
+        #[serde(default = "default_active")]
+        active: bool,
     },
     #[serde(rename = "image")]
     Image {
@@ -203,6 +213,8 @@ pub enum JSONPaint {
         // Image filters
         #[serde(default)]
         filters: ImageFilters,
+        #[serde(default = "default_active")]
+        active: bool,
     },
 }
 
@@ -277,15 +289,21 @@ impl From<JSONFeShadow> for FeShadow {
 impl From<Option<JSONPaint>> for Paint {
     fn from(fill: Option<JSONPaint>) -> Self {
         match fill {
-            Some(JSONPaint::Solid { color, blend_mode }) => Paint::Solid(SolidPaint {
+            Some(JSONPaint::Solid {
+                color,
+                blend_mode,
+                active,
+            }) => Paint::Solid(SolidPaint {
                 color: color.map_or(CGColor::TRANSPARENT, |c| c.into()),
                 blend_mode,
+                active,
             }),
             Some(JSONPaint::LinearGradient {
                 transform,
                 stops,
                 opacity,
                 blend_mode,
+                active,
                 ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
@@ -296,6 +314,7 @@ impl From<Option<JSONPaint>> for Paint {
                     stops,
                     opacity,
                     blend_mode,
+                    active,
                 })
             }
             Some(JSONPaint::RadialGradient {
@@ -303,6 +322,7 @@ impl From<Option<JSONPaint>> for Paint {
                 stops,
                 opacity,
                 blend_mode,
+                active,
                 ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
@@ -313,6 +333,7 @@ impl From<Option<JSONPaint>> for Paint {
                     stops,
                     opacity,
                     blend_mode,
+                    active,
                 })
             }
             Some(JSONPaint::DiamondGradient {
@@ -320,6 +341,7 @@ impl From<Option<JSONPaint>> for Paint {
                 stops,
                 opacity,
                 blend_mode,
+                active,
                 ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
@@ -330,6 +352,7 @@ impl From<Option<JSONPaint>> for Paint {
                     stops,
                     opacity,
                     blend_mode,
+                    active,
                 })
             }
             Some(JSONPaint::SweepGradient {
@@ -337,6 +360,7 @@ impl From<Option<JSONPaint>> for Paint {
                 stops,
                 opacity,
                 blend_mode,
+                active,
                 ..
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
@@ -347,6 +371,7 @@ impl From<Option<JSONPaint>> for Paint {
                     stops,
                     opacity,
                     blend_mode,
+                    active,
                 })
             }
             Some(JSONPaint::Image {
@@ -356,6 +381,7 @@ impl From<Option<JSONPaint>> for Paint {
                 opacity,
                 blend_mode,
                 filters,
+                active,
             }) => {
                 let url = src.unwrap_or_default();
                 let image_paint = ImagePaint {
@@ -364,6 +390,7 @@ impl From<Option<JSONPaint>> for Paint {
                     opacity,
                     blend_mode,
                     filters,
+                    active,
                 };
 
                 Paint::Image(image_paint)
@@ -371,6 +398,7 @@ impl From<Option<JSONPaint>> for Paint {
             None => Paint::Solid(SolidPaint {
                 color: CGColor::TRANSPARENT,
                 blend_mode: BlendMode::default(),
+                active: true,
             }),
         }
     }
@@ -1104,6 +1132,7 @@ impl From<JSONImageNode> for Node {
                 opacity,
                 blend_mode,
                 filters,
+                active,
             }) => {
                 let resolved = h.unwrap_or_else(|| url.clone());
                 let image_paint = ImagePaint {
@@ -1112,6 +1141,7 @@ impl From<JSONImageNode> for Node {
                     opacity,
                     blend_mode,
                     filters,
+                    active,
                 };
 
                 image_paint
@@ -1122,6 +1152,7 @@ impl From<JSONImageNode> for Node {
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
                 filters: ImageFilters::default(),
+                active: true,
             },
         };
 
@@ -2017,6 +2048,7 @@ mod tests {
                 a: 1.0,
             }),
             blend_mode: BlendMode::default(),
+            active: true,
         });
         let paints = None;
         let result = merge_paints(paint, paints);
@@ -2037,6 +2069,7 @@ mod tests {
                 a: 1.0,
             }),
             blend_mode: BlendMode::default(),
+            active: true,
         });
         let paints = Some(vec![]);
         let result = merge_paints(paint, paints);
@@ -2051,6 +2084,7 @@ mod tests {
                 a: 1.0,
             }),
             blend_mode: BlendMode::default(),
+            active: true,
         });
         let paints = Some(vec![
             JSONPaint::Solid {
@@ -2061,6 +2095,7 @@ mod tests {
                     a: 1.0,
                 }),
                 blend_mode: BlendMode::default(),
+                active: true,
             },
             JSONPaint::Solid {
                 color: Some(JSONRGBA {
@@ -2070,6 +2105,7 @@ mod tests {
                     a: 1.0,
                 }),
                 blend_mode: BlendMode::default(),
+                active: true,
             },
         ]);
         let result = merge_paints(paint, paints);
@@ -2085,6 +2121,7 @@ mod tests {
                 a: 1.0,
             }),
             blend_mode: BlendMode::default(),
+            active: true,
         }]);
         let result = merge_paints(paint, paints);
         assert_eq!(result.len(), 1);

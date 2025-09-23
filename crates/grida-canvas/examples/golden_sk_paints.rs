@@ -101,6 +101,7 @@ fn main() {
                 ],
                 opacity: 1.0,
                 blend_mode: BlendMode::Normal,
+                active: true,
             })]),
             "2. Single Linear Gradient",
         ),
@@ -110,10 +111,12 @@ fn main() {
                 Paint::Solid(SolidPaint {
                     color: CGColor(255, 0, 0, 100), // opacity 0.39
                     blend_mode: BlendMode::Normal,
+                    active: true,
                 }),
                 Paint::Solid(SolidPaint {
                     color: CGColor(0, 0, 255, 100), // opacity 0.39
                     blend_mode: BlendMode::Multiply,
+                    active: true,
                 }),
             ]),
             "3. Solid + Solid (Multiply)",
@@ -124,6 +127,7 @@ fn main() {
                 Paint::Solid(SolidPaint {
                     color: CGColor(255, 255, 0, 180), // opacity 0.71
                     blend_mode: BlendMode::Normal,
+                    active: true,
                 }),
                 Paint::LinearGradient(LinearGradientPaint {
                     transform: AffineTransform::identity(),
@@ -139,6 +143,7 @@ fn main() {
                     ],
                     opacity: 0.6,
                     blend_mode: BlendMode::Screen,
+                    active: true,
                 }),
             ]),
             "4. Solid + Linear (Screen)",
@@ -160,6 +165,7 @@ fn main() {
                     ],
                     opacity: 0.7,
                     blend_mode: BlendMode::Normal,
+                    active: true,
                 }),
                 Paint::LinearGradient(LinearGradientPaint {
                     transform: AffineTransform::identity(),
@@ -175,6 +181,7 @@ fn main() {
                     ],
                     opacity: 0.5,
                     blend_mode: BlendMode::Overlay,
+                    active: true,
                 }),
             ]),
             "5. Linear + Linear (Overlay)",
@@ -196,6 +203,7 @@ fn main() {
                     ],
                     opacity: 0.7,
                     blend_mode: BlendMode::Normal,
+                    active: true,
                 }),
                 Paint::RadialGradient(RadialGradientPaint {
                     transform: AffineTransform::identity(),
@@ -211,6 +219,7 @@ fn main() {
                     ],
                     opacity: 0.5,
                     blend_mode: BlendMode::SoftLight,
+                    active: true,
                 }),
             ]),
             "6. Linear + Radial (SoftLight)",
@@ -223,11 +232,13 @@ fn main() {
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.6,
                     blend_mode: BlendMode::Normal,
+                    active: true,
                     filters: ImageFilters::default(),
                 }),
                 Paint::Solid(SolidPaint {
                     color: CGColor(0, 0, 0, 200),
                     blend_mode: BlendMode::Multiply,
+                    active: true,
                 }),
             ]),
             "7. Image + Solid (Multiply)",
@@ -240,6 +251,7 @@ fn main() {
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.5,
                     blend_mode: BlendMode::Normal,
+                    active: true,
                     filters: ImageFilters::default(),
                 }),
                 Paint::RadialGradient(RadialGradientPaint {
@@ -256,6 +268,7 @@ fn main() {
                     ],
                     opacity: 0.5,
                     blend_mode: BlendMode::HardLight,
+                    active: true,
                 }),
             ]),
             "8. Image + Radial (HardLight)",
@@ -266,6 +279,7 @@ fn main() {
                 Paint::Solid(SolidPaint {
                     color: CGColor(255, 0, 0, 200), // opacity 0.78
                     blend_mode: BlendMode::Normal,
+                    active: true,
                 }),
                 Paint::LinearGradient(LinearGradientPaint {
                     transform: AffineTransform::identity(),
@@ -281,6 +295,7 @@ fn main() {
                     ],
                     opacity: 0.6,
                     blend_mode: BlendMode::Multiply,
+                    active: true,
                 }),
                 Paint::RadialGradient(RadialGradientPaint {
                     transform: AffineTransform::identity(),
@@ -296,12 +311,14 @@ fn main() {
                     ],
                     opacity: 0.5,
                     blend_mode: BlendMode::Screen,
+                    active: true,
                 }),
                 Paint::Image(ImagePaint {
                     image: checker_image_ref,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.5,
                     blend_mode: BlendMode::Overlay,
+                    active: true,
                     filters: ImageFilters::default(),
                 }),
             ]),

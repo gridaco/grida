@@ -349,7 +349,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             height: 0,
             rotation: 0,
             zIndex: 0,
-            stroke: { type: "solid", color: black },
+            stroke: { type: "solid", color: black, active: true },
             strokeCap: "butt",
             strokeWidth: 1,
             vectorNetwork: net,

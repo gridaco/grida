@@ -24,7 +24,11 @@ const ArtboardList = () => {
       name: item.name,
       width: item.width,
       height: item.height,
-      fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 1 } },
+      fill: {
+        type: "solid",
+        color: { r: 255, g: 255, b: 255, a: 1 },
+        active: true,
+      },
       children: [],
     });
   };

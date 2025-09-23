@@ -35,6 +35,7 @@ export namespace prototypes {
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
+          active: true,
         },
         strokeWidth: 0,
         strokeCap: "butt",
@@ -52,6 +53,7 @@ export namespace prototypes {
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
+          active: true,
         },
         strokeWidth: 0,
         strokeCap: "butt",
@@ -69,6 +71,7 @@ export namespace prototypes {
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
+          active: true,
         },
         strokeWidth: 0,
         strokeCap: "butt",
@@ -151,6 +154,7 @@ export namespace prototypes {
     fill: {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: 1 },
+      active: true,
     },
     children: [
       {
@@ -167,6 +171,7 @@ export namespace prototypes {
         fill: {
           type: "solid",
           color: { r: 255, g: 255, b: 255, a: 1 },
+          active: true,
         },
         textAlign: "center",
         textAlignVertical: "center",
@@ -201,6 +206,7 @@ export namespace prototypes {
     fill: {
       type: "solid",
       color: { r: 255, g: 255, b: 255, a: 1 },
+      active: true,
     },
     children: [
       {

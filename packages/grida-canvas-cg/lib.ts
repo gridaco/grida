@@ -656,16 +656,19 @@ export namespace cg {
     export const transparent: Paint = {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: 0 },
+      active: true,
     };
 
     export const black: Paint = {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: 1 },
+      active: true,
     };
 
     export const white: Paint = {
       type: "solid",
       color: { r: 255, g: 255, b: 255, a: 1 },
+      active: true,
     };
   }
 
@@ -683,6 +686,7 @@ export namespace cg {
     type: "solid";
     color: cg.RGBA8888;
     blendMode?: cg.BlendMode;
+    active: boolean;
   };
 
   export type GradientPaint =
@@ -722,6 +726,7 @@ export namespace cg {
      * @default 1
      */
     opacity: number;
+    active: boolean;
   };
 
   export type RadialGradientPaint = {
@@ -738,6 +743,7 @@ export namespace cg {
      * @default 1
      */
     opacity: number;
+    active: boolean;
   };
 
   export type SweepGradientPaint = {
@@ -754,6 +760,7 @@ export namespace cg {
      * @default 1
      */
     opacity: number;
+    active: boolean;
   };
 
   export type DiamondGradientPaint = {
@@ -770,6 +777,7 @@ export namespace cg {
      * @default 1
      */
     opacity: number;
+    active: boolean;
   };
 
   export type ImagePaint = {
@@ -796,6 +804,7 @@ export namespace cg {
      * @default 1
      */
     opacity: number;
+    active: boolean;
   };
 
   export interface ImageFilters {

@@ -35,6 +35,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
+        active: true,
         filters: ImageFilters::default(),
     }));
     rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
@@ -53,6 +54,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
+        active: true,
         filters: ImageFilters::default(),
     }));
     rect2.strokes = Paints::new([Paint::Image(ImagePaint {
@@ -60,6 +62,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
+        active: true,
         filters: ImageFilters::default(),
     })]);
     rect2.stroke_width = 10.0;
@@ -79,6 +82,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
+        active: true,
         filters: ImageFilters::default(),
     })]);
     rect3.stroke_width = 10.0;
@@ -110,6 +114,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
             ],
         }),
         blend_mode: BlendMode::Normal,
+        active: true,
         filters: ImageFilters::default(),
     }));
 

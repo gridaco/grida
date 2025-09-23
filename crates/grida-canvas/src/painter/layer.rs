@@ -199,6 +199,20 @@ pub struct LayerList {
 }
 
 impl LayerList {
+    /// Filter paints to only include visible ones for performance optimization.
+    ///
+    /// This removes paints that are inactive or have zero opacity, which have no visual effect
+    /// regardless of blend mode and can be safely skipped during rendering.
+    fn filter_visible_paints(paints: &Paints) -> Paints {
+        Paints::new(
+            paints
+                .iter()
+                .filter(|paint| paint.visible())
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
+    }
+
     /// Flatten an entire scene into a layer list using the provided scene cache.
     pub fn from_scene(scene: &Scene, scene_cache: &SceneCache) -> Self {
         let mut list = LayerList::default();
@@ -286,8 +300,8 @@ impl LayerList {
                     },
                     shape,
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: n.fills.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
                 out.push(layer.clone());
@@ -324,8 +338,8 @@ impl LayerList {
                         },
                         shape,
                         effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: n.fills.clone(),
+                        strokes: Self::filter_visible_paints(&n.strokes),
+                        fills: Self::filter_visible_paints(&n.fills),
                         stroke_path,
                     });
                     out.push(layer.clone());
@@ -369,8 +383,8 @@ impl LayerList {
                     },
                     shape,
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: n.fills.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
                 out.push(layer.clone());
@@ -402,8 +416,8 @@ impl LayerList {
                     },
                     shape,
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: n.fills.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
                 out.push(layer.clone());
@@ -435,8 +449,8 @@ impl LayerList {
                     },
                     shape,
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: n.fills.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
                 out.push(layer.clone());
@@ -468,8 +482,8 @@ impl LayerList {
                     },
                     shape,
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: n.fills.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
                 out.push(layer.clone());
@@ -501,8 +515,8 @@ impl LayerList {
                     },
                     shape,
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: n.fills.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
                 out.push(layer.clone());
@@ -584,8 +598,8 @@ impl LayerList {
                     max_lines: n.max_lines,
                     ellipsis: n.ellipsis.clone(),
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: n.fills.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
                     stroke_width: n.stroke_width,
                     stroke_align: n.stroke_align,
                     stroke_path: None,
@@ -625,8 +639,8 @@ impl LayerList {
                     },
                     shape,
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: n.fills.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
                 out.push(layer.clone());
@@ -648,8 +662,8 @@ impl LayerList {
                     },
                     shape,
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: n.fills.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
                     vector: n.network.clone(),
                     stroke_width: n.stroke_width,
                     stroke_align: n.get_stroke_align(),
@@ -685,8 +699,10 @@ impl LayerList {
                     },
                     shape,
                     effects: n.effects.clone(),
-                    strokes: n.strokes.clone(),
-                    fills: Paints::new([Paint::Image(n.fill.clone())]),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&Paints::new([Paint::Image(
+                        n.fill.clone(),
+                    )])),
                     stroke_path,
                 });
                 out.push(layer.clone());

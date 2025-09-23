@@ -6,16 +6,19 @@ import { editor } from "@/grida-canvas/editor.i";
 export const gray: cg.Paint = {
   type: "solid",
   color: { r: 217, g: 217, b: 217, a: 1 },
+  active: true,
 };
 
 export const white: cg.Paint = {
   type: "solid",
   color: { r: 255, g: 255, b: 255, a: 1 },
+  active: true,
 };
 
 export const black: cg.Paint = {
   type: "solid",
   color: { r: 0, g: 0, b: 0, a: 1 },
+  active: true,
 };
 
 /**

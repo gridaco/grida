@@ -54,6 +54,7 @@ export function SectionStrokes({
     const paint: cg.Paint = {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: paints.length > 0 ? 0.5 : 1 },
+      active: true,
     };
     // Append new paint to the end (top-most in render order)
     actions.addStroke(paint, "end");

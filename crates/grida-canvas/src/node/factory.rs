@@ -35,6 +35,7 @@ impl NodeFactory {
         Paint::Solid(SolidPaint {
             color,
             blend_mode: BlendMode::default(),
+            active: true,
         })
     }
 
@@ -46,6 +47,7 @@ impl NodeFactory {
             fit: ImagePaintFit::Fit(BoxFit::Cover),
             blend_mode: BlendMode::default(),
             filters: ImageFilters::default(),
+            active: true,
         }
     }
 

@@ -72,6 +72,7 @@ async fn demo_paints() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         }));
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -107,6 +108,7 @@ async fn demo_paints() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         }));
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -127,12 +129,12 @@ async fn demo_paints() -> Scene {
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
 
         // Solid color stroke with varying colors
-          rect.strokes = Paints::new([Paint::from(CGColor(
+        rect.strokes = Paints::new([Paint::from(CGColor(
             255 - (i * 25) as u8,
             100 + (i * 15) as u8,
             50 + (i * 20) as u8,
             255,
-        ))]); 
+        ))]);
         rect.stroke_width = 4.0; // Consistent stroke width
 
         all_shape_ids.push(rect.id.clone());
@@ -157,7 +159,7 @@ async fn demo_paints() -> Scene {
         let angle = (i as f32 * 36.0) * std::f32::consts::PI / 180.0; // 0 to 360 degrees
         let transform = AffineTransform::new(0.0, 0.0, angle);
 
-          rect.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
+        rect.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
             transform,
             stops: vec![
                 GradientStop {
@@ -171,6 +173,7 @@ async fn demo_paints() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         })]);
         rect.stroke_width = 4.0; // Consistent stroke width
 
@@ -197,7 +200,7 @@ async fn demo_paints() -> Scene {
         let center_y = 0.2 + (i as f32 * 0.06); // 0.2 to 0.8
         let transform = AffineTransform::new(center_x * base_size, center_y * base_size, 0.0);
 
-          rect.strokes = Paints::new([Paint::RadialGradient(RadialGradientPaint {
+        rect.strokes = Paints::new([Paint::RadialGradient(RadialGradientPaint {
             transform,
             stops: vec![
                 GradientStop {
@@ -211,6 +214,7 @@ async fn demo_paints() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         })]);
         rect.stroke_width = 4.0; // Consistent stroke width
 

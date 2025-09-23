@@ -38,6 +38,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
+        active: true,
         filters: ImageFilters::default(),
     }));
     rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);

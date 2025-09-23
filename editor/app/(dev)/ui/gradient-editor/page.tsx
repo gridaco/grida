@@ -96,6 +96,7 @@ function GradientEditorContent() {
       transform,
       blendMode: "normal",
       opacity: 1,
+      active: true,
     });
   }, [gradientType, stops, points]);
 

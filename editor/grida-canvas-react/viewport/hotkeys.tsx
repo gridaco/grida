@@ -575,7 +575,11 @@ export function useEditorHotKeys() {
               sRGBHex: string;
             }) => {
               const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
-              const solidPaint: cg.SolidPaint = { type: "solid", color: rgba };
+              const solidPaint: cg.SolidPaint = {
+                type: "solid",
+                color: rgba,
+                active: true,
+              };
 
               if (selection.length > 0) {
                 editor.changeNodeFills(selection, [solidPaint]);

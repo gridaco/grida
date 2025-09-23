@@ -287,6 +287,7 @@ mod tests {
         let fills = vec![Paint::Solid(SolidPaint {
             color: CGColor::RED,
             blend_mode: BlendMode::default(),
+            active: true,
         })];
         painter.draw(&vn, &fills, None, 0.0);
 
@@ -328,6 +329,7 @@ mod tests {
                     opacity: 1.0,
                     blend_mode: BlendMode::default(),
                     filters: ImageFilters::default(),
+                    active: true,
                 })])),
             }],
         };
@@ -385,6 +387,7 @@ mod tests {
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
                 filters: ImageFilters::default(),
+                active: true,
             })]),
             width_profile: None,
         };

@@ -236,6 +236,7 @@ async fn demo_strokes() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         })]);
         rect.stroke_width = 8.0;
         all_shape_ids.push(rect.id.clone());
@@ -265,6 +266,7 @@ async fn demo_strokes() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         })]);
         rect.stroke_width = 8.0;
         all_shape_ids.push(rect.id.clone());
@@ -298,6 +300,7 @@ async fn demo_strokes() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         })]);
         rect.stroke_width = 8.0;
         all_shape_ids.push(rect.id.clone());
@@ -367,6 +370,7 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 0.7,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
         ]);
         rect.stroke_width = 10.0;
@@ -397,6 +401,7 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 1.0,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
             Paint::LinearGradient(LinearGradientPaint {
                 transform: AffineTransform::from_rotatation(90.0),
@@ -412,6 +417,7 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 0.8,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
         ]);
         ellipse.stroke_width = 12.0;
@@ -444,6 +450,7 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 0.6,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
             Paint::RadialGradient(RadialGradientPaint {
                 transform: AffineTransform {
@@ -461,6 +468,7 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 0.5,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
         ]);
         polygon.stroke_width = 15.0; // Very thick to show all layers

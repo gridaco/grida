@@ -92,6 +92,7 @@ async fn demo_scene() -> Scene {
         ],
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
+        active: true,
     }));
     rect_gradient.stroke_width = 3.0;
     rect_gradient.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
@@ -113,7 +114,7 @@ async fn demo_scene() -> Scene {
         width: 180.0,
         height: 150.0,
     };
-      ellipse_radial.fills = Paints::new([Paint::RadialGradient(RadialGradientPaint {
+    ellipse_radial.fills = Paints::new([Paint::RadialGradient(RadialGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -131,6 +132,7 @@ async fn demo_scene() -> Scene {
         ],
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
+        active: true,
     })]);
     ellipse_radial.stroke_width = 4.0;
     ellipse_radial.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
@@ -200,7 +202,7 @@ async fn demo_scene() -> Scene {
         width: 200.0,
         height: 0.0,
     };
-      line.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
+    line.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -218,6 +220,7 @@ async fn demo_scene() -> Scene {
         ],
         opacity: 1.0,
         blend_mode: BlendMode::default(),
+        active: true,
     })]);
     line.stroke_width = 8.0;
     all_node_ids.push(line.id.clone());

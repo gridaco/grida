@@ -138,6 +138,7 @@ export namespace iofigma {
               paint.opacity ?? 1
             ),
           })),
+          active: paint.visible ?? true,
         } as cg.GradientPaint;
       }
 
@@ -150,6 +151,7 @@ export namespace iofigma {
                 cmath.color.rgbaf_to_rgba8888(paint.color),
                 paint.opacity ?? 1
               ),
+              active: paint.visible ?? true,
             };
           }
           case "GRADIENT_LINEAR":
@@ -162,6 +164,7 @@ export namespace iofigma {
             return {
               type: "linear_gradient",
               transform: cmath.transform.identity,
+              active: paint.visible ?? true,
               stops: [
                 { offset: 0, color: { r: 217, g: 217, b: 217, a: 1 } },
                 { offset: 1, color: { r: 115, g: 115, b: 115, a: 1 } },
