@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useCurrentEditor, useEditorState } from "./use-editor";
-import { useBackendState, useDataTransferEventTarget } from "./provider";
+import { useBackendState } from "./provider";
+import { useDataTransferEventTarget } from "./use-data-transfer";
 import { supportsFlatten } from "@/grida-canvas/reducers/methods/flatten";
 import grida from "@grida/schema";
 import assert from "assert";
