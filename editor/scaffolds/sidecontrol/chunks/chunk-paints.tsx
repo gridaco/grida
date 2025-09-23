@@ -10,6 +10,7 @@ import {
 } from "@/components/sidebar";
 import { PropertyLine } from "../ui";
 import { Button } from "@/components/ui-editor/button";
+import { Checkbox } from "@/components/ui-editor/checkbox";
 import { PlusIcon, MinusIcon } from "@radix-ui/react-icons";
 import {
   useBackendState,
@@ -119,41 +120,37 @@ export function ChunkPaints({
         ? gradientMode.selected_stop
         : undefined;
 
+    const onValueChangeAt = (index: number, value: any) => {
+      const currentPaints = Array.isArray(paints)
+        ? [...paints]
+        : paint
+          ? [paint]
+          : [];
+      currentPaints[index] = value;
+
+      if (onUpdatePaints) {
+        onUpdatePaints(currentPaints);
+      } else {
+        paintTarget === "fill"
+          ? actions.fills(currentPaints as any)
+          : actions.strokes(currentPaints as any);
+      }
+    };
+
     return (
       <PropertyLine key={index}>
         <div className="flex items-center w-full gap-2">
+          <Checkbox
+            checked={Boolean(paint?.active)}
+            onCheckedChange={(checked) => {
+              onValueChangeAt(index, { ...paint, active: Boolean(checked) });
+            }}
+          />
           <div className="flex-1">
             <ControlComponent
               value={paint}
               onValueChange={(value) => {
-                if (onUpdatePaints) {
-                  const currentPaints = Array.isArray(paints)
-                    ? [...paints]
-                    : paint
-                      ? [paint]
-                      : [];
-                  currentPaints[index] = value as any;
-                  onUpdatePaints(currentPaints);
-                } else {
-                  // Default behavior
-                  if (paintTarget === "fill") {
-                    const currentFills = Array.isArray(paints)
-                      ? [...paints]
-                      : paint
-                        ? [paint]
-                        : [];
-                    currentFills[index] = value as any;
-                    actions.fills(currentFills as any);
-                  } else {
-                    const currentStrokes = Array.isArray(paints)
-                      ? [...paints]
-                      : paint
-                        ? [paint]
-                        : [];
-                    currentStrokes[index] = value as any;
-                    actions.strokes(currentStrokes as any);
-                  }
-                }
+                onValueChangeAt(index, value);
               }}
               selectedGradientStop={selectedGradientStop}
               onSelectedGradientStopChange={(stop) => {
