@@ -66,6 +66,36 @@ impl Default for JSONImagePaintFit {
     }
 }
 
+#[derive(Debug, Deserialize, Clone, Copy)]
+#[serde(rename_all = "kebab-case")]
+pub enum JSONImageRepeat {
+    NoRepeat,
+    RepeatX,
+    RepeatY,
+    Repeat,
+}
+
+impl Default for JSONImageRepeat {
+    fn default() -> Self {
+        JSONImageRepeat::NoRepeat
+    }
+}
+
+impl From<JSONImageRepeat> for ImageRepeat {
+    fn from(repeat: JSONImageRepeat) -> Self {
+        match repeat {
+            JSONImageRepeat::NoRepeat => ImageRepeat::NoRepeat,
+            JSONImageRepeat::RepeatX => ImageRepeat::RepeatX,
+            JSONImageRepeat::RepeatY => ImageRepeat::RepeatY,
+            JSONImageRepeat::Repeat => ImageRepeat::Repeat,
+        }
+    }
+}
+
+fn default_image_scale() -> f32 {
+    1.0
+}
+
 impl From<JSONImagePaintFit> for ImagePaintFit {
     fn from(json_fit: JSONImagePaintFit) -> Self {
         match json_fit {
@@ -206,6 +236,10 @@ pub enum JSONPaint {
         transform: Option<JSONTransform2D>,
         #[serde(default)]
         fit: JSONImagePaintFit,
+        #[serde(default)]
+        repeat: JSONImageRepeat,
+        #[serde(default = "default_image_scale")]
+        scale: f32,
         #[serde(default = "default_opacity")]
         opacity: f32,
         #[serde(rename = "blendMode", default)]
@@ -378,6 +412,8 @@ impl From<Option<JSONPaint>> for Paint {
                 src,
                 transform,
                 fit,
+                repeat,
+                scale,
                 opacity,
                 blend_mode,
                 filters,
@@ -387,6 +423,8 @@ impl From<Option<JSONPaint>> for Paint {
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(url),
                     fit: json_paint_to_image_paint_fit(fit, transform),
+                    repeat: repeat.into(),
+                    scale,
                     opacity,
                     blend_mode,
                     filters,
@@ -1129,6 +1167,8 @@ impl From<JSONImageNode> for Node {
                 src: h,
                 transform: t,
                 fit,
+                repeat,
+                scale,
                 opacity,
                 blend_mode,
                 filters,
@@ -1138,6 +1178,8 @@ impl From<JSONImageNode> for Node {
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(resolved),
                     fit: json_paint_to_image_paint_fit(fit, t),
+                    repeat: repeat.into(),
+                    scale,
                     opacity,
                     blend_mode,
                     filters,
@@ -1149,6 +1191,8 @@ impl From<JSONImageNode> for Node {
             _ => ImagePaint {
                 image: ResourceRef::RID(url.clone()),
                 fit: node.fit.into(),
+                repeat: ImageRepeat::default(),
+                scale: 1.0,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
                 filters: ImageFilters::default(),

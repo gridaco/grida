@@ -256,7 +256,8 @@ impl<'a> VNPainter<'a> {
 mod tests {
     use super::*;
     use crate::cg::types::{
-        BlendMode, CGColor, FillRule, ImagePaint, Paint, ResourceRef, SolidPaint, StrokeAlign,
+        BlendMode, CGColor, FillRule, ImagePaint, ImageRepeat, Paint, ResourceRef, SolidPaint,
+        StrokeAlign,
     };
     use crate::resources::ByteStore;
     use crate::runtime::image_repository::ImageRepository;
@@ -326,6 +327,8 @@ mod tests {
                 fills: Some(Paints::new([Paint::Image(ImagePaint {
                     image: ResourceRef::RID("img".to_string()),
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
+                    repeat: ImageRepeat::default(),
+                    scale: 1.0,
                     opacity: 1.0,
                     blend_mode: BlendMode::default(),
                     filters: ImageFilters::default(),
@@ -384,6 +387,8 @@ mod tests {
             paints: Paints::new([Paint::Image(ImagePaint {
                 image: ResourceRef::RID("stroke_img".to_string()),
                 fit: ImagePaintFit::Fit(BoxFit::Fill),
+                repeat: ImageRepeat::default(),
+                scale: 1.0,
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
                 filters: ImageFilters::default(),

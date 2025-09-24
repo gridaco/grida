@@ -1774,6 +1774,32 @@ pub enum ImagePaintFit {
     Transform(AffineTransform),
 }
 
+/// Defines how an image should repeat when painted within its container.
+///
+/// This mirrors the behavior of CSS `background-repeat` values, allowing
+/// images to tile horizontally, vertically, both, or not at all.
+///
+/// See also:
+/// - https://developer.mozilla.org/en-US/docs/Web/CSS/background-repeat
+/// - https://api.flutter.dev/flutter/painting/ImageRepeat.html
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageRepeat {
+    /// Do not repeat the image. Areas outside the image bounds remain transparent.
+    NoRepeat,
+    /// Repeat the image horizontally (X axis) only.
+    RepeatX,
+    /// Repeat the image vertically (Y axis) only.
+    RepeatY,
+    /// Repeat the image in both directions.
+    Repeat,
+}
+
+impl Default for ImageRepeat {
+    fn default() -> Self {
+        ImageRepeat::NoRepeat
+    }
+}
+
 /// Defines how an image should be painted within its container.
 ///
 /// `ImagePaint` combines an image resource with fitting behavior, visual properties,
@@ -1794,6 +1820,10 @@ pub struct ImagePaint {
     pub image: ResourceRef,
     /// Defines how the image should be fitted within its container
     pub fit: ImagePaintFit,
+    /// Determines how the image should repeat within its container
+    pub repeat: ImageRepeat,
+    /// Uniform scale factor applied on top of the fit transform (1.0 = original size)
+    pub scale: f32,
     /// Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)
     pub opacity: f32,
     /// Determines how the image blends with underlying content

@@ -38,7 +38,7 @@
 use cg::resources::ByteStore;
 use cg::{
     cg::types::{
-        BlendMode, CGColor, GradientStop, ImageFilters, ImagePaint, ImagePaintFit,
+        BlendMode, CGColor, GradientStop, ImageFilters, ImagePaint, ImagePaintFit, ImageRepeat,
         LinearGradientPaint, Paint, Paints, RadialGradientPaint, ResourceRef, SolidPaint,
     },
     painter::paint,
@@ -230,6 +230,8 @@ fn main() {
                 Paint::Image(ImagePaint {
                     image: checker_image_ref.clone(),
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
+                    repeat: ImageRepeat::NoRepeat,
+                    scale: 1.0,
                     opacity: 0.6,
                     blend_mode: BlendMode::Normal,
                     active: true,
@@ -249,6 +251,8 @@ fn main() {
                 Paint::Image(ImagePaint {
                     image: checker_image_ref.clone(),
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
+                    repeat: ImageRepeat::NoRepeat,
+                    scale: 1.0,
                     opacity: 0.5,
                     blend_mode: BlendMode::Normal,
                     active: true,
@@ -316,6 +320,8 @@ fn main() {
                 Paint::Image(ImagePaint {
                     image: checker_image_ref,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
+                    repeat: ImageRepeat::NoRepeat,
+                    scale: 1.0,
                     opacity: 0.5,
                     blend_mode: BlendMode::Overlay,
                     active: true,

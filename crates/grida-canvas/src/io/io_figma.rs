@@ -84,9 +84,16 @@ impl From<&FigmaPaint> for Paint {
                     }
                 };
 
+                let repeat = match image.scale_mode {
+                    figma_api::models::image_paint::ScaleMode::Tile => ImageRepeat::Repeat,
+                    _ => ImageRepeat::default(),
+                };
+
                 Paint::Image(ImagePaint {
                     image: ResourceRef::RID(image.image_ref.clone()),
                     fit: ImagePaintFit::Fit(fit),
+                    repeat,
+                    scale: 1.0,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),
                     filters: ImageFilters::default(),
@@ -339,9 +346,16 @@ impl FigmaConverter {
                     }
                 };
 
+                let repeat = match image.scale_mode {
+                    figma_api::models::image_paint::ScaleMode::Tile => ImageRepeat::Repeat,
+                    _ => ImageRepeat::default(),
+                };
+
                 Paint::Image(ImagePaint {
                     image: ResourceRef::RID(url),
                     fit: ImagePaintFit::Fit(fit),
+                    repeat,
+                    scale: 1.0,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                     blend_mode: BlendMode::default(),
                     filters: ImageFilters::default(),

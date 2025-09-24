@@ -45,6 +45,8 @@ impl NodeFactory {
             image: ResourceRef::RID(String::new()),
             opacity: 1.0,
             fit: ImagePaintFit::Fit(BoxFit::Cover),
+            repeat: ImageRepeat::default(),
+            scale: 1.0,
             blend_mode: BlendMode::default(),
             filters: ImageFilters::default(),
             active: true,

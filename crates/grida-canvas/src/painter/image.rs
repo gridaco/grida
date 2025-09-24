@@ -3,6 +3,15 @@ use crate::{cg::types::*, sk};
 use math2::transform::AffineTransform;
 use skia_safe::{self, shaders, Color, SamplingOptions, Shader, TileMode};
 
+fn tile_modes_for_repeat(repeat: ImageRepeat) -> (TileMode, TileMode) {
+    match repeat {
+        ImageRepeat::NoRepeat => (TileMode::Decal, TileMode::Decal),
+        ImageRepeat::RepeatX => (TileMode::Repeat, TileMode::Decal),
+        ImageRepeat::RepeatY => (TileMode::Decal, TileMode::Repeat),
+        ImageRepeat::Repeat => (TileMode::Repeat, TileMode::Repeat),
+    }
+}
+
 /// Creates an image shader from an ImagePaint and Skia image.
 ///
 /// This function handles the transformation matrix calculation, sampling options,
@@ -26,15 +35,8 @@ pub fn image_shader(
         size,
     ));
     let sampling = SamplingOptions::default();
-    let mut shader = image.to_shader(
-        // Use `Decal` tile mode so Skia doesn't extend edge pixels
-        // when the image is scaled beyond its natural bounds. This
-        // prevents the visual artifacts where the last row/column is
-        // repeated to fill the remaining area.
-        Some((TileMode::Decal, TileMode::Decal)),
-        sampling,
-        Some(&matrix),
-    )?;
+    let tile_modes = tile_modes_for_repeat(img.repeat);
+    let mut shader = image.to_shader(Some(tile_modes), sampling, Some(&matrix))?;
 
     // Apply image filters if any are specified
     if img.filters.has_filters() {
@@ -71,18 +73,66 @@ pub fn image_paint_matrix(
     image_size: (f32, f32),
     container_size: (f32, f32),
 ) -> [[f32; 3]; 2] {
-    match paint.fit {
+    let scale = sanitize_scale(paint.scale);
+
+    match &paint.fit {
         ImagePaintFit::Fit(box_fit) => {
-            box_fit
+            let matrix = box_fit
                 .calculate_transform(image_size, container_size)
-                .matrix
+                .matrix;
+            apply_scale_for_fit(matrix, scale, image_size, container_size)
         }
         // For custom transforms, we handle the complete image-to-container mapping
         // directly without composing with BoxFit::Fill, which would create double transformation.
         ImagePaintFit::Transform(transform) => {
-            calculate_raw_transform(&transform, image_size, container_size)
+            let mut matrix = calculate_raw_transform(transform, image_size, container_size);
+            if (scale - 1.0).abs() > f32::EPSILON {
+                apply_scale_about_origin(&mut matrix, scale);
+            }
+            matrix
         }
     }
+}
+
+fn sanitize_scale(scale: f32) -> f32 {
+    if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    }
+}
+
+fn apply_scale_about_origin(matrix: &mut [[f32; 3]; 2], scale: f32) {
+    matrix[0][0] *= scale;
+    matrix[0][1] *= scale;
+    matrix[1][0] *= scale;
+    matrix[1][1] *= scale;
+}
+
+fn apply_scale_for_fit(
+    mut matrix: [[f32; 3]; 2],
+    scale: f32,
+    image_size: (f32, f32),
+    container_size: (f32, f32),
+) -> [[f32; 3]; 2] {
+    if (scale - 1.0).abs() <= f32::EPSILON {
+        return matrix;
+    }
+
+    apply_scale_about_origin(&mut matrix, scale);
+
+    let scaled_width = image_size.0 * matrix[0][0];
+    let scaled_height = image_size.1 * matrix[1][1];
+
+    if container_size.0.is_finite() {
+        matrix[0][2] = (container_size.0 - scaled_width) / 2.0;
+    }
+
+    if container_size.1.is_finite() {
+        matrix[1][2] = (container_size.1 - scaled_height) / 2.0;
+    }
+
+    matrix
 }
 
 /// Calculates the raw transform matrix for a custom transform.
@@ -131,6 +181,7 @@ pub fn calculate_raw_transform(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use math2::box_fit::BoxFit;
     use math2::transform::AffineTransform;
 
     #[test]
@@ -177,5 +228,48 @@ mod tests {
         // Final: scale_x = 2.0 * 2.0 = 4.0, scale_y = 2.0 * 0.5 = 1.0
         assert_eq!(matrix[0], [4.0, 0.0, 0.0]);
         assert_eq!(matrix[1], [0.0, 1.0, 0.0]);
+    }
+
+    #[test]
+    fn test_image_paint_matrix_scale_fit_centers() {
+        let paint = ImagePaint {
+            active: true,
+            image: ResourceRef::RID(String::new()),
+            fit: ImagePaintFit::Fit(BoxFit::Contain),
+            repeat: ImageRepeat::NoRepeat,
+            scale: 2.0,
+            opacity: 1.0,
+            blend_mode: BlendMode::Normal,
+            filters: ImageFilters::default(),
+        };
+
+        let matrix = image_paint_matrix(&paint, (100.0, 100.0), (200.0, 200.0));
+
+        assert!((matrix[0][0] - 4.0).abs() < 1e-6);
+        assert!((matrix[1][1] - 4.0).abs() < 1e-6);
+        let expected_translation = (200.0 - 100.0 * 4.0) / 2.0;
+        assert!((matrix[0][2] - expected_translation).abs() < 1e-6);
+        assert!((matrix[1][2] - expected_translation).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_image_paint_matrix_scale_transform_origin() {
+        let paint = ImagePaint {
+            active: true,
+            image: ResourceRef::RID(String::new()),
+            fit: ImagePaintFit::Transform(AffineTransform::identity()),
+            repeat: ImageRepeat::NoRepeat,
+            scale: 0.5,
+            opacity: 1.0,
+            blend_mode: BlendMode::Normal,
+            filters: ImageFilters::default(),
+        };
+
+        let matrix = image_paint_matrix(&paint, (100.0, 100.0), (200.0, 200.0));
+
+        assert!((matrix[0][0] - 1.0).abs() < 1e-6);
+        assert!((matrix[1][1] - 1.0).abs() < 1e-6);
+        assert!((matrix[0][2]).abs() < 1e-6);
+        assert!((matrix[1][2]).abs() < 1e-6);
     }
 }

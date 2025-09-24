@@ -34,6 +34,8 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
+        repeat: ImageRepeat::NoRepeat,
+        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -53,6 +55,8 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
+        repeat: ImageRepeat::NoRepeat,
+        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -61,6 +65,8 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
+        repeat: ImageRepeat::NoRepeat,
+        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -81,6 +87,8 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
+        repeat: ImageRepeat::NoRepeat,
+        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -113,6 +121,27 @@ async fn demo_images() -> (Scene, Vec<u8>) {
                 ],
             ],
         }),
+        repeat: ImageRepeat::NoRepeat,
+        scale: 1.0,
+        blend_mode: BlendMode::Normal,
+        active: true,
+        filters: ImageFilters::default(),
+    }));
+
+    // Fifth example: Rectangle demonstrating repeating image tiles
+    let mut rect5 = nf.create_rectangle_node();
+    rect5.name = Some("ImageRepeatRect".to_string());
+    rect5.transform = AffineTransform::new(300.0, 300.0, 0.0);
+    rect5.size = Size {
+        width: 200.0,
+        height: 200.0,
+    };
+    rect5.set_fill(Paint::Image(ImagePaint {
+        image: ResourceRef::RID(url.clone()),
+        opacity: 1.0,
+        fit: ImagePaintFit::Fit(BoxFit::None),
+        repeat: ImageRepeat::Repeat,
+        scale: 0.1,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -124,13 +153,15 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     let rect2_id = rect2.id.clone();
     let rect3_id = rect3.id.clone();
     let rect4_id = rect4.id.clone();
+    let rect5_id = rect5.id.clone();
 
     repository.insert(Node::Rectangle(rect1));
     repository.insert(Node::Rectangle(rect2));
     repository.insert(Node::Rectangle(rect3));
     repository.insert(Node::Rectangle(rect4));
+    repository.insert(Node::Rectangle(rect5));
 
-    root.children = vec![rect1_id, rect2_id, rect3_id, rect4_id];
+    root.children = vec![rect1_id, rect2_id, rect3_id, rect4_id, rect5_id];
     let root_id = root.id.clone();
     repository.insert(Node::Container(root));
 
