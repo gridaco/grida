@@ -1,5 +1,8 @@
 use super::image_filters;
-use crate::{cg::types::*, sk};
+use crate::{
+    cg::{alignment::Alignment, types::*},
+    sk,
+};
 use math2::transform::AffineTransform;
 use skia_safe::{self, shaders, Color, SamplingOptions, Shader, TileMode};
 
@@ -89,7 +92,13 @@ pub fn image_paint_matrix(
             let matrix = box_fit
                 .calculate_transform(oriented_image_size, container_size)
                 .matrix;
-            apply_scale_for_fit(matrix, 1.0, oriented_image_size, container_size)
+            let matrix = apply_scale_for_fit(matrix, 1.0, oriented_image_size, container_size);
+            apply_alignment_to_matrix(
+                matrix,
+                &paint.alignement,
+                oriented_image_size,
+                container_size,
+            )
         }
         // For custom transforms, we handle the complete image-to-container mapping
         // directly without composing with BoxFit::Fill, which would create double transformation.
@@ -100,7 +109,18 @@ pub fn image_paint_matrix(
         ImagePaintFit::Tile(tile) => {
             // For tile mode, the scale controls how many tiles fit in the container
             let scale = sanitize_scale(tile.scale);
-            calculate_tile_transform_with_scale(tile, oriented_image_size, container_size, scale)
+            let matrix = calculate_tile_transform_with_scale(
+                tile,
+                oriented_image_size,
+                container_size,
+                scale,
+            );
+            apply_alignment_to_matrix(
+                matrix,
+                &paint.alignement,
+                oriented_image_size,
+                container_size,
+            )
         }
     };
 
@@ -135,8 +155,8 @@ fn apply_scale_for_fit(
 
     apply_scale_about_origin(&mut matrix, scale);
 
-    let scaled_width = image_size.0 * matrix[0][0];
-    let scaled_height = image_size.1 * matrix[1][1];
+    let scaled_width = image_size.0 * matrix[0][0].abs();
+    let scaled_height = image_size.1 * matrix[1][1].abs();
 
     if container_size.0.is_finite() {
         matrix[0][2] = (container_size.0 - scaled_width) / 2.0;
@@ -144,6 +164,27 @@ fn apply_scale_for_fit(
 
     if container_size.1.is_finite() {
         matrix[1][2] = (container_size.1 - scaled_height) / 2.0;
+    }
+
+    matrix
+}
+
+fn apply_alignment_to_matrix(
+    mut matrix: [[f32; 3]; 2],
+    alignment: &Alignment,
+    image_size: (f32, f32),
+    container_size: (f32, f32),
+) -> [[f32; 3]; 2] {
+    if container_size.0.is_finite() && image_size.0.is_finite() {
+        let scaled_width = image_size.0 * matrix[0][0].abs();
+        let gap = container_size.0 - scaled_width;
+        matrix[0][2] = gap * ((alignment.x() + 1.0) * 0.5);
+    }
+
+    if container_size.1.is_finite() && image_size.1.is_finite() {
+        let scaled_height = image_size.1 * matrix[1][1].abs();
+        let gap = container_size.1 - scaled_height;
+        matrix[1][2] = gap * ((alignment.y() + 1.0) * 0.5);
     }
 
     matrix
@@ -312,6 +353,7 @@ mod tests {
             active: true,
             image: ResourceRef::RID(String::new()),
             quarter_turns,
+            alignement: Alignment::CENTER,
             fit,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,

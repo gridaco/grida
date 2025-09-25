@@ -3,6 +3,8 @@ use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::Deserialize;
 use std::hash::Hash;
 
+use super::alignment::Alignment;
+
 /// A 2D point with x and y coordinates.
 #[derive(Debug, Clone, Copy)]
 pub struct CGPoint {
@@ -1854,6 +1856,7 @@ impl Default for ImageRepeat {
 ///
 /// - **`image`**: Reference to the image resource to be painted
 /// - **`quarter_turns`**: Clockwise 90° rotations applied before layout/fitting
+/// - **`alignement`**: Positions the fitted image within its container using normalized coordinates
 /// - **`fit`**: Defines how the image should be fitted within its container
 /// - **`opacity`**: Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)
 /// - **`blend_mode`**: Determines how the image blends with underlying content
@@ -1955,6 +1958,12 @@ pub struct ImagePaint {
     /// - CSS `image-orientation` (discrete image-space correction).  [oai_citation:5‡MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation)
     /// - Flutter `RotatedBox::quarterTurns`.  [oai_citation:6‡api.flutter.dev](https://api.flutter.dev/flutter/widgets/RotatedBox/quarterTurns.html)
     pub quarter_turns: u8,
+    /// Positions the fitted image within its container.
+    ///
+    /// Uses normalized coordinates where `(-1.0, -1.0)` represents the top-left corner,
+    /// `(0.0, 0.0)` represents the center, and `(1.0, 1.0)` represents the bottom-right corner.
+    /// This behaves similarly to CSS `object-position`.
+    pub alignement: Alignment,
     /// Defines how the image should be fitted within its container
     pub fit: ImagePaintFit,
     /// Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)

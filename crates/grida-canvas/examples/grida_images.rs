@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::{types::*, *};
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -19,7 +19,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     root.name = Some("Root".to_string());
     root.size = Size {
         width: 800.0,
-        height: 600.0,
+        height: 800.0,
     };
 
     // First example: Rectangle with ImagePaint fill
@@ -34,6 +34,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
         opacity: 1.0,
+        alignement: Alignment::CENTER,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         active: true,
@@ -54,6 +55,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
         opacity: 1.0,
+        alignement: Alignment::CENTER,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         active: true,
@@ -63,6 +65,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
         opacity: 1.0,
+        alignement: Alignment::CENTER,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         active: true,
@@ -84,6 +87,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
         opacity: 1.0,
+        alignement: Alignment::CENTER,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         active: true,
@@ -103,13 +107,14 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
         opacity: 1.0,
-        // Rotate the image 45 degrees with BoxFit::None to showcase the paint transform
+        alignement: Alignment::CENTER,
+        // Rotate the image 45 degrees with a smaller translation to keep it visible
         fit: ImagePaintFit::Transform(AffineTransform {
             matrix: [
                 [
                     std::f32::consts::FRAC_1_SQRT_2,
                     -std::f32::consts::FRAC_1_SQRT_2,
-                    100.0,
+                    0.0, // Reduced translation to keep image in bounds
                 ],
                 [
                     std::f32::consts::FRAC_1_SQRT_2,
@@ -122,6 +127,8 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         active: true,
         filters: ImageFilters::default(),
     }));
+    rect4.strokes = Paints::new([Paint::from(CGColor(0, 0, 255, 255))]);
+    rect4.stroke_width = 2.0;
 
     // Fifth example: Rectangle demonstrating repeating image tiles
     let mut rect5 = nf.create_rectangle_node();
@@ -135,6 +142,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
         opacity: 1.0,
+        alignement: Alignment::CENTER,
         fit: ImagePaintFit::Tile(ImageTile {
             repeat: ImageRepeat::Repeat,
             scale: 0.1,
@@ -156,11 +164,75 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 1, // 90 degrees rotation
         opacity: 1.0,
+        alignement: Alignment::CENTER,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
     }));
+
+    // Seventh example: Rectangle with LEFT alignment
+    let mut rect7 = nf.create_rectangle_node();
+    rect7.name = Some("ImageLeftRect".to_string());
+    rect7.transform = AffineTransform::new(50.0, 550.0, 0.0);
+    rect7.size = Size {
+        width: 200.0,
+        height: 200.0,
+    };
+    rect7.set_fill(Paint::Image(ImagePaint {
+        image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
+        opacity: 1.0,
+        alignement: Alignment::CENTER_LEFT,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
+        blend_mode: BlendMode::Normal,
+        active: true,
+        filters: ImageFilters::default(),
+    }));
+    rect7.strokes = Paints::new([Paint::from(CGColor(0, 255, 0, 255))]);
+    rect7.stroke_width = 2.0;
+
+    // Eighth example: Rectangle with CENTER alignment
+    let mut rect8 = nf.create_rectangle_node();
+    rect8.name = Some("ImageCenterRect".to_string());
+    rect8.transform = AffineTransform::new(300.0, 550.0, 0.0);
+    rect8.size = Size {
+        width: 200.0,
+        height: 200.0,
+    };
+    rect8.set_fill(Paint::Image(ImagePaint {
+        image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
+        opacity: 1.0,
+        alignement: Alignment::CENTER,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
+        blend_mode: BlendMode::Normal,
+        active: true,
+        filters: ImageFilters::default(),
+    }));
+    rect8.strokes = Paints::new([Paint::from(CGColor(255, 165, 0, 255))]);
+    rect8.stroke_width = 2.0;
+
+    // Ninth example: Rectangle with RIGHT alignment
+    let mut rect9 = nf.create_rectangle_node();
+    rect9.name = Some("ImageRightRect".to_string());
+    rect9.transform = AffineTransform::new(550.0, 550.0, 0.0);
+    rect9.size = Size {
+        width: 200.0,
+        height: 200.0,
+    };
+    rect9.set_fill(Paint::Image(ImagePaint {
+        image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
+        opacity: 1.0,
+        alignement: Alignment::CENTER_RIGHT,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
+        blend_mode: BlendMode::Normal,
+        active: true,
+        filters: ImageFilters::default(),
+    }));
+    rect9.strokes = Paints::new([Paint::from(CGColor(128, 0, 128, 255))]);
+    rect9.stroke_width = 2.0;
 
     let mut repository = NodeRepository::new();
 
@@ -170,6 +242,9 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     let rect4_id = rect4.id.clone();
     let rect5_id = rect5.id.clone();
     let rect6_id = rect6.id.clone();
+    let rect7_id = rect7.id.clone();
+    let rect8_id = rect8.id.clone();
+    let rect9_id = rect9.id.clone();
 
     repository.insert(Node::Rectangle(rect1));
     repository.insert(Node::Rectangle(rect2));
@@ -177,8 +252,13 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     repository.insert(Node::Rectangle(rect4));
     repository.insert(Node::Rectangle(rect5));
     repository.insert(Node::Rectangle(rect6));
+    repository.insert(Node::Rectangle(rect7));
+    repository.insert(Node::Rectangle(rect8));
+    repository.insert(Node::Rectangle(rect9));
 
-    root.children = vec![rect1_id, rect2_id, rect3_id, rect4_id, rect5_id, rect6_id];
+    root.children = vec![
+        rect1_id, rect2_id, rect3_id, rect4_id, rect5_id, rect6_id, rect7_id, rect8_id, rect9_id,
+    ];
     let root_id = root.id.clone();
     repository.insert(Node::Container(root));
 

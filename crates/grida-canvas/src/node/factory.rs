@@ -1,7 +1,7 @@
 use std::f32;
 
 use super::schema::*;
-use crate::cg::types::*;
+use crate::cg::{types::*, Alignment};
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use uuid::Uuid;
 
@@ -44,8 +44,9 @@ impl NodeFactory {
             // TODO: use the built in image ref
             image: ResourceRef::RID(String::new()),
             quarter_turns: 0,
-            opacity: 1.0,
+            alignement: Alignment::CENTER,
             fit: ImagePaintFit::Fit(BoxFit::Cover),
+            opacity: 1.0,
             blend_mode: BlendMode::default(),
             filters: ImageFilters::default(),
             active: true,

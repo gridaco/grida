@@ -259,6 +259,7 @@ mod tests {
         BlendMode, CGColor, FillRule, ImagePaint, ImageRepeat, Paint, ResourceRef, SolidPaint,
         StrokeAlign,
     };
+    use crate::cg::Alignment;
     use crate::resources::ByteStore;
     use crate::runtime::image_repository::ImageRepository;
     use crate::vectornetwork::{VectorNetworkLoop, VectorNetworkRegion, VectorNetworkSegment};
@@ -327,6 +328,7 @@ mod tests {
                 fills: Some(Paints::new([Paint::Image(ImagePaint {
                     image: ResourceRef::RID("img".to_string()),
                     quarter_turns: 0,
+                    alignement: Alignment::CENTER,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 1.0,
                     blend_mode: BlendMode::default(),
@@ -386,6 +388,7 @@ mod tests {
             paints: Paints::new([Paint::Image(ImagePaint {
                 image: ResourceRef::RID("stroke_img".to_string()),
                 quarter_turns: 0,
+                alignement: Alignment::CENTER,
                 fit: ImagePaintFit::Fit(BoxFit::Fill),
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),

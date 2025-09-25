@@ -36,14 +36,7 @@
 //! - Efficient handling of opacity and blend modes
 
 use cg::resources::ByteStore;
-use cg::{
-    cg::types::{
-        BlendMode, CGColor, GradientStop, ImageFilters, ImagePaint, ImagePaintFit, ImageRepeat,
-        LinearGradientPaint, Paint, Paints, RadialGradientPaint, ResourceRef, SolidPaint,
-    },
-    painter::paint,
-    runtime::image_repository::ImageRepository,
-};
+use cg::{cg::types::*, cg::*, painter::paint, runtime::image_repository::ImageRepository};
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use skia_safe::{surfaces, Color, Point, Rect};
 use std::{
@@ -230,6 +223,7 @@ fn main() {
                 Paint::Image(ImagePaint {
                     image: checker_image_ref.clone(),
                     quarter_turns: 0,
+                    alignement: Alignment::CENTER,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.6,
                     blend_mode: BlendMode::Normal,
@@ -250,6 +244,7 @@ fn main() {
                 Paint::Image(ImagePaint {
                     image: checker_image_ref.clone(),
                     quarter_turns: 0,
+                    alignement: Alignment::CENTER,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.5,
                     blend_mode: BlendMode::Normal,
@@ -318,6 +313,7 @@ fn main() {
                 Paint::Image(ImagePaint {
                     image: checker_image_ref,
                     quarter_turns: 0,
+                    alignement: Alignment::CENTER,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.5,
                     blend_mode: BlendMode::Overlay,

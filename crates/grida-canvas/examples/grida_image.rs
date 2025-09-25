@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::{types::*, *};
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -37,6 +37,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
         opacity: 1.0,
+        alignement: Alignment::CENTER,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         active: true,
