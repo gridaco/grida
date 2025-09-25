@@ -174,14 +174,14 @@ export default function Toolbar() {
           value={value}
           open={open === "shape"}
           onOpenChange={(o) => setOpen(o ? "shape" : null)}
-            options={[
-              { value: "rectangle", label: "Rectangle", shortcut: "R" },
-              { value: "ellipse", label: "Ellipse", shortcut: "O" },
-              { value: "line", label: "Line", shortcut: "L" },
-              { value: "polygon", label: "Polygon", shortcut: "Y" },
-              { value: "star", label: "Star" },
-              { value: "image", label: "Image" },
-            ]}
+          options={[
+            { value: "rectangle", label: "Rectangle", shortcut: "R" },
+            { value: "ellipse", label: "Ellipse", shortcut: "O" },
+            { value: "line", label: "Line", shortcut: "L" },
+            { value: "polygon", label: "Polygon", shortcut: "Y" },
+            { value: "star", label: "Star" },
+            { value: "image", label: "Image" },
+          ]}
           onValueChange={(v) => {
             editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}

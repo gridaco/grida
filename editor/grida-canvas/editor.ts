@@ -302,6 +302,9 @@ export class Editor
     return this._tid;
   }
 
+  /**
+   * @deprecated
+   */
   public bind(surface: Scene) {
     this.log("bind surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useCurrentEditor } from "../use-editor";
 
-export function useWindowCurrentEditor() {
+export function useWindowGlobalCurrentEditor() {
   const editor = useCurrentEditor();
   useEffect(() => {
     // @ts-expect-error
@@ -13,7 +13,7 @@ export function useWindowCurrentEditor() {
   }, [editor]);
 }
 
-export function WindowCurrentEditorProvider() {
-  useWindowCurrentEditor();
+export function WindowGlobalCurrentEditorProvider() {
+  useWindowGlobalCurrentEditor();
   return null;
 }

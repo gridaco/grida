@@ -118,7 +118,7 @@ import { sitemap } from "@/www/data/sitemap";
 import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
-import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
+import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import { LibraryContent } from "./library";
 import { EditorYSyncPlugin } from "@/grida-canvas/plugins/sync-y";
 import { Editor } from "@/grida-canvas/editor";
@@ -129,6 +129,7 @@ import colors, {
 } from "@/theme/tailwindcolors";
 import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
 import { PathToolbar } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/path-toolbar";
+import { FullscreenLoadingOverlay } from "@/grida-canvas-react-starter-kit/starterkit-loading/loading";
 
 type UILayoutVariant = "full" | "minimal" | "hidden";
 type UILayout = {
@@ -263,6 +264,17 @@ export default function CanvasPlayground({
   const instance = useEditor(document, backend);
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Mock loading timer - completes after random short time (1-3 seconds)
+  useEffect(() => {
+    const randomDelay = Math.random() * 1000 + 1000; // 1-2 seconds
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, randomDelay);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!src) return;
@@ -281,13 +293,14 @@ export default function CanvasPlayground({
 
   return (
     <>
+      <FullscreenLoadingOverlay loading={isLoading} />
       <FontFamilyListProvider fonts={fonts}>
         <SidebarProvider className="w-full h-full">
           <TooltipProvider>
             <main className="w-full h-full select-none">
               <ErrorBoundary>
                 <StandaloneDocumentEditor editor={instance}>
-                  <WindowCurrentEditorProvider />
+                  <WindowGlobalCurrentEditorProvider />
                   <UserCustomTemplatesProvider templates={templates}>
                     <Consumer backend={backend} />
                   </UserCustomTemplatesProvider>

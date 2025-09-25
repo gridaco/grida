@@ -84,8 +84,7 @@ export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
       }}
     >
       <Canvas
-        width={100}
-        height={100}
+        initialSize={{ width: 100, height: 100 }}
         transform={transform}
         data={document}
         debug={debug}
