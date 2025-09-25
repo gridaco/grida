@@ -1808,6 +1808,7 @@ impl Default for ImageRepeat {
 /// ## Key Properties
 ///
 /// - **`image`**: Reference to the image resource to be painted
+/// - **`quarter_turns`**: Clockwise 90° rotations applied before layout/fitting
 /// - **`fit`**: Defines how the image should be fitted within its container
 /// - **`opacity`**: Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)
 /// - **`blend_mode`**: Determines how the image blends with underlying content
@@ -1818,6 +1819,97 @@ pub struct ImagePaint {
     pub active: bool,
     /// Reference to the image resource to be painted
     pub image: ResourceRef,
+    /// Number of **clockwise quarter turns** to apply to the **source image**
+    /// *before* fitting/cropping/layout math.
+    ///
+    /// Values are interpreted modulo 4:
+    /// - `0` → 0° (no rotation)
+    /// - `1` → 90° CW
+    /// - `2` → 180°
+    /// - `3` → 270° CW
+    ///
+    /// This is a **discrete, lossless** orientation control:
+    /// 90° steps map pixels on the integer grid (no resampling/blur). Use it to
+    /// normalize camera photos and to keep `fit/cover/contain` math deterministic.
+    ///
+    /// # Why a discrete quarter-turn?
+    /// - **Image-space property:** Orientation belongs to the pixels themselves,
+    ///   not the layout container. Applying it *pre-fit* ensures intrinsic size and
+    ///   aspect ratio are computed on the oriented image.
+    /// - **Lossless and fast:** 90° rotations are index remaps; they don’t require
+    ///   filtering. (Arbitrary angles would require resampling.)
+    /// - **Interop-friendly:** Maps cleanly to platform concepts:
+    ///   - **EXIF Orientation (TIFF/EXIF):** 1–8 encodes quarter-turns plus optional
+    ///     mirror flips. The rotation component here is exactly this field.
+    ///   - **CSS:** Use `image-orientation` to request 90° step fixes or `from-image`
+    ///     to honor EXIF; browsers treat it as a discrete correction, not a general
+    ///     transform.  [oai_citation:0‡MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation?utm_source=chatgpt.com)
+    ///   - **Flutter:** `RotatedBox(quarterTurns: ...)` performs a layout-time
+    ///     quarter-turn—semantically the same as this field.  [oai_citation:1‡api.flutter.dev](https://api.flutter.dev/flutter/widgets/RotatedBox-class.html?utm_source=chatgpt.com)
+    ///
+    /// # Invariants
+    /// - Always store `quarter_turns % 4`.
+    /// - Treat as **non-animatable** (step changes only). If you need animation,
+    ///   animate a general transform elsewhere.
+    /// - When `quarter_turns` is odd (1 or 3), **swap width/height** when computing
+    ///   intrinsic size for fitting.
+    ///
+    /// # Pipeline placement
+    /// ```text
+    /// decode → (A) apply quarter_turns → (B) object-position → (C) fit/cover/contain → (D) layer transforms → composite
+    /// ```
+    /// Applying this first guarantees layout/fitting sees the oriented intrinsic size.
+    ///
+    /// # EXIF mapping
+    /// If you ingest EXIF orientation (values 1–8), normalize to:
+    /// ```text
+    /// quarter_turns = { 1→0, 6→1, 3→2, 8→3 }   // others add mirror flips
+    /// ```
+    /// If you also support EXIF **mirrors**, model them as orthogonal flags (e.g.
+    /// X/Y flips) in addition to `quarter_turns`. The pair (flips, quarter_turns)
+    /// covers all 8 EXIF states cleanly.
+    ///
+    /// # CSS & web notes
+    /// - `image-orientation: from-image;` honors EXIF; discrete angles are supported
+    ///   in 90° steps. This is **not** the same as `transform: rotate(...)`, which
+    ///   is continuous and layout-space. Use your `quarter_turns` to **bake/normalize
+    ///   image orientation** or when drawing to canvas/SVG patterns.  [oai_citation:2‡MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation?utm_source=chatgpt.com)
+    ///
+    /// # Flutter notes
+    /// - Prefer `RotatedBox(quarterTurns = quarter_turns as int)` for widget trees;
+    ///   it rotates before layout and stays pixel-crisp for 90° steps. For paint-time
+    ///   shaders, use an image shader with a quarter-turn matrix.  [oai_citation:3‡api.flutter.dev](https://api.flutter.dev/flutter/widgets/RotatedBox-class.html?utm_source=chatgpt.com)
+    ///
+    /// # macOS Preview (rotation behavior)
+    /// - Preview’s Rotate Left/Right applies visual 90° turns. For JPEGs, this may
+    ///   **re-encode** (not guaranteed lossless) rather than merely toggling EXIF,
+    ///   depending on workflow; tools like `jpegtran` perform explicit lossless
+    ///   rotations. Don’t rely on external viewers to preserve losslessness—store
+    ///   orientation explicitly and normalize yourself on export.  [oai_citation:4‡Ask Different](https://apple.stackexchange.com/questions/299183/will-the-quality-of-my-jpeg-images-taken-by-my-iphone-deteriorate-if-i-rotate-th?utm_source=chatgpt.com)
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// // Normalize any integer to 0..=3
+    /// let q = quarter_turns % 4;
+    ///
+    /// // Degrees for UI
+    /// let degrees = (q as i32) * 90;
+    ///
+    /// // Swap intrinsic size when odd quarter turn
+    /// let (w1, h1) = if q % 2 == 1 { (h0, w0) } else { (w0, h0) };
+    ///
+    /// // Compose two rotations
+    /// let composed = (q + other_q) % 4;
+    /// ```
+    ///
+    /// # Storage & schema
+    /// - Store as `u8` (0..=3) or `usize` with `% 4` normalization.
+    /// - Serialize as a small integer or as friendly keywords (`"r0"|"r90"|"r180"|"r270"`).
+    ///
+    /// # See also
+    /// - CSS `image-orientation` (discrete image-space correction).  [oai_citation:5‡MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation)
+    /// - Flutter `RotatedBox::quarterTurns`.  [oai_citation:6‡api.flutter.dev](https://api.flutter.dev/flutter/widgets/RotatedBox/quarterTurns.html)
+    pub quarter_turns: u8,
     /// Defines how the image should be fitted within its container
     pub fit: ImagePaintFit,
     /// Determines how the image should repeat within its container

@@ -35,6 +35,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
     let url = format!("res://images/{}", hash_str.clone());
     rect1.set_fill(Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         repeat: ImageRepeat::NoRepeat,

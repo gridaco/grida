@@ -229,6 +229,7 @@ fn main() {
             Paints::new([
                 Paint::Image(ImagePaint {
                     image: checker_image_ref.clone(),
+                    quarter_turns: 0,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     repeat: ImageRepeat::NoRepeat,
                     scale: 1.0,
@@ -250,6 +251,7 @@ fn main() {
             Paints::new([
                 Paint::Image(ImagePaint {
                     image: checker_image_ref.clone(),
+                    quarter_turns: 0,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     repeat: ImageRepeat::NoRepeat,
                     scale: 1.0,
@@ -319,6 +321,7 @@ fn main() {
                 }),
                 Paint::Image(ImagePaint {
                     image: checker_image_ref,
+                    quarter_turns: 0,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     repeat: ImageRepeat::NoRepeat,
                     scale: 1.0,

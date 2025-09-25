@@ -238,6 +238,8 @@ pub enum JSONPaint {
         fit: JSONImagePaintFit,
         #[serde(default)]
         repeat: JSONImageRepeat,
+        #[serde(rename = "quarterTurns", default)]
+        quarter_turns: u8,
         #[serde(default = "default_image_scale")]
         scale: f32,
         #[serde(default = "default_opacity")]
@@ -413,6 +415,7 @@ impl From<Option<JSONPaint>> for Paint {
                 transform,
                 fit,
                 repeat,
+                quarter_turns,
                 scale,
                 opacity,
                 blend_mode,
@@ -422,6 +425,7 @@ impl From<Option<JSONPaint>> for Paint {
                 let url = src.unwrap_or_default();
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(url),
+                    quarter_turns: quarter_turns % 4,
                     fit: json_paint_to_image_paint_fit(fit, transform),
                     repeat: repeat.into(),
                     scale,
@@ -1168,6 +1172,7 @@ impl From<JSONImageNode> for Node {
                 transform: t,
                 fit,
                 repeat,
+                quarter_turns,
                 scale,
                 opacity,
                 blend_mode,
@@ -1177,6 +1182,7 @@ impl From<JSONImageNode> for Node {
                 let resolved = h.unwrap_or_else(|| url.clone());
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(resolved),
+                    quarter_turns: quarter_turns % 4,
                     fit: json_paint_to_image_paint_fit(fit, t),
                     repeat: repeat.into(),
                     scale,
@@ -1190,6 +1196,7 @@ impl From<JSONImageNode> for Node {
             }
             _ => ImagePaint {
                 image: ResourceRef::RID(url.clone()),
+                quarter_turns: 0,
                 fit: node.fit.into(),
                 repeat: ImageRepeat::default(),
                 scale: 1.0,

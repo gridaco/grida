@@ -326,6 +326,7 @@ mod tests {
                 fill_rule: FillRule::NonZero,
                 fills: Some(Paints::new([Paint::Image(ImagePaint {
                     image: ResourceRef::RID("img".to_string()),
+                    quarter_turns: 0,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     repeat: ImageRepeat::default(),
                     scale: 1.0,
@@ -386,6 +387,7 @@ mod tests {
             align: StrokeAlign::Center,
             paints: Paints::new([Paint::Image(ImagePaint {
                 image: ResourceRef::RID("stroke_img".to_string()),
+                quarter_turns: 0,
                 fit: ImagePaintFit::Fit(BoxFit::Fill),
                 repeat: ImageRepeat::default(),
                 scale: 1.0,

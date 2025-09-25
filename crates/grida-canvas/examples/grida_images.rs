@@ -32,6 +32,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     };
     rect1.set_fill(Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         repeat: ImageRepeat::NoRepeat,
@@ -53,6 +54,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     };
     rect2.set_fill(Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         repeat: ImageRepeat::NoRepeat,
@@ -63,6 +65,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     }));
     rect2.strokes = Paints::new([Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         repeat: ImageRepeat::NoRepeat,
@@ -85,6 +88,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     rect3.set_fill(Paint::from(CGColor(240, 240, 240, 255)));
     rect3.strokes = Paints::new([Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         repeat: ImageRepeat::NoRepeat,
@@ -105,6 +109,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     };
     rect4.set_fill(Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
         opacity: 1.0,
         // Rotate the image 45 degrees with BoxFit::None to showcase the paint transform
         fit: ImagePaintFit::Transform(AffineTransform {
@@ -138,10 +143,31 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     };
     rect5.set_fill(Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::None),
         repeat: ImageRepeat::Repeat,
         scale: 0.1,
+        blend_mode: BlendMode::Normal,
+        active: true,
+        filters: ImageFilters::default(),
+    }));
+
+    // Sixth example: Rectangle with rotated image (90 degrees)
+    let mut rect6 = nf.create_rectangle_node();
+    rect6.name = Some("ImageRotatedRect".to_string());
+    rect6.transform = AffineTransform::new(550.0, 300.0, 0.0);
+    rect6.size = Size {
+        width: 200.0,
+        height: 200.0,
+    };
+    rect6.set_fill(Paint::Image(ImagePaint {
+        image: ResourceRef::RID(url.clone()),
+        quarter_turns: 1, // 90 degrees rotation
+        opacity: 1.0,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
+        repeat: ImageRepeat::NoRepeat,
+        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -154,14 +180,16 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     let rect3_id = rect3.id.clone();
     let rect4_id = rect4.id.clone();
     let rect5_id = rect5.id.clone();
+    let rect6_id = rect6.id.clone();
 
     repository.insert(Node::Rectangle(rect1));
     repository.insert(Node::Rectangle(rect2));
     repository.insert(Node::Rectangle(rect3));
     repository.insert(Node::Rectangle(rect4));
     repository.insert(Node::Rectangle(rect5));
+    repository.insert(Node::Rectangle(rect6));
 
-    root.children = vec![rect1_id, rect2_id, rect3_id, rect4_id, rect5_id];
+    root.children = vec![rect1_id, rect2_id, rect3_id, rect4_id, rect5_id, rect6_id];
     let root_id = root.id.clone();
     repository.insert(Node::Container(root));
 

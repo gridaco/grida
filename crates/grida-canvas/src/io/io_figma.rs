@@ -91,6 +91,7 @@ impl From<&FigmaPaint> for Paint {
 
                 Paint::Image(ImagePaint {
                     image: ResourceRef::RID(image.image_ref.clone()),
+                    quarter_turns: 0,
                     fit: ImagePaintFit::Fit(fit),
                     repeat,
                     scale: 1.0,
@@ -353,6 +354,7 @@ impl FigmaConverter {
 
                 Paint::Image(ImagePaint {
                     image: ResourceRef::RID(url),
+                    quarter_turns: 0,
                     fit: ImagePaintFit::Fit(fit),
                     repeat,
                     scale: 1.0,

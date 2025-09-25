@@ -793,6 +793,15 @@ export namespace cg {
      * @default identity
      */
     transform?: AffineTransform;
+    /**
+     * Number of clockwise quarter turns to apply to the decoded image before layout math.
+     * The value is normalized modulo 4 (`0` = 0°, `1` = 90° CW, `2` = 180°, `3` = 270° CW).
+     * This discrete rotation keeps pixels on the integer grid without resampling.
+     *
+     * @default 0
+     */
+    quarterTurns?: number;
+
     filters: ImageFilters;
 
     /**

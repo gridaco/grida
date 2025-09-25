@@ -43,6 +43,7 @@ impl NodeFactory {
         ImagePaint {
             // TODO: use the built in image ref
             image: ResourceRef::RID(String::new()),
+            quarter_turns: 0,
             opacity: 1.0,
             fit: ImagePaintFit::Fit(BoxFit::Cover),
             repeat: ImageRepeat::default(),
