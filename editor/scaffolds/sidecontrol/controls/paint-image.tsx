@@ -8,6 +8,7 @@ import { useFilePicker } from "use-file-picker";
 import { useCurrentEditor, ImageView } from "@/grida-canvas-react";
 import { Transparency } from "@/grida-canvas-react/components/transparency";
 import cg from "@grida/cg";
+import InputPropertyPercentage from "../ui/percentage";
 
 const IMAGE_FILTERS = [
   {
@@ -212,14 +213,12 @@ export function ImagePaintControl({
   const handleRotate = useCallback(() => {
     if (!value.src) return; // Don't update if no image source
 
-    // const transform =
-    const transform = value.transform;
-
+    const quarterTurns = (value.quarterTurns ?? 0) + 1;
     onValueChange?.({
       ...value,
-      transform,
+      quarterTurns,
     });
-  }, [value, onValueChange]);
+  }, [value.quarterTurns, onValueChange]);
 
   const handleFilterChange = useCallback(
     (key: keyof NonNullable<cg.ImagePaint["filters"]>, fvalue: number) => {
@@ -246,15 +245,39 @@ export function ImagePaintControl({
     [value, onValueChange]
   );
 
+  const handleScaleChange = useCallback(
+    (scale: number) => {
+      console.log("scale", scale);
+      onValueChange?.({
+        ...value,
+        scale,
+      });
+    },
+    [value, onValueChange]
+  );
+
   return (
     <div className="w-full space-y-4">
       {/* Header with Box Fit and Rotate */}
       <div className="flex items-center justify-between gap-8">
-        <ImageFitControl
-          value={value.fit}
-          onValueChange={handleImageFitChange}
-          className="w-24"
-        />
+        <div className="flex items-center gap-2">
+          <ImageFitControl
+            value={value.fit}
+            onValueChange={handleImageFitChange}
+            className="w-24"
+          />
+          {value.fit === "tile" && (
+            <>
+              <InputPropertyPercentage
+                mode="fixed"
+                value={value.scale ?? 1}
+                min={0.01}
+                max={10}
+                onValueChange={handleScaleChange}
+              />
+            </>
+          )}
+        </div>
         <Button
           onClick={handleRotate}
           title="Rotate"

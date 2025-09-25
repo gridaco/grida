@@ -786,7 +786,7 @@ export namespace cg {
     /**
      * box fit or custom transform
      */
-    fit: BoxFit | "transform";
+    fit: "contain" | "cover" | "fill" | "none" | "transform" | "tile";
     /**
      * transform will only take effect if fit is "transform"
      *
@@ -801,6 +801,13 @@ export namespace cg {
      * @default 0
      */
     quarterTurns?: number;
+
+    /**
+     * when mode is "tile", scale the image to the given value.
+     *
+     * @default 1
+     */
+    scale?: number;
 
     filters: ImageFilters;
 

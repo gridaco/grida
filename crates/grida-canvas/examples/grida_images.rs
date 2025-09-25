@@ -35,8 +35,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
-        repeat: ImageRepeat::NoRepeat,
-        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -57,8 +55,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
-        repeat: ImageRepeat::NoRepeat,
-        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -68,8 +64,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
-        repeat: ImageRepeat::NoRepeat,
-        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -91,8 +85,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
-        repeat: ImageRepeat::NoRepeat,
-        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -126,8 +118,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
                 ],
             ],
         }),
-        repeat: ImageRepeat::NoRepeat,
-        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -135,7 +125,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Fifth example: Rectangle demonstrating repeating image tiles
     let mut rect5 = nf.create_rectangle_node();
-    rect5.name = Some("ImageRepeatRect".to_string());
+    rect5.name = Some("ImageTileRect".to_string());
     rect5.transform = AffineTransform::new(300.0, 300.0, 0.0);
     rect5.size = Size {
         width: 200.0,
@@ -145,9 +135,10 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
         opacity: 1.0,
-        fit: ImagePaintFit::Fit(BoxFit::None),
-        repeat: ImageRepeat::Repeat,
-        scale: 0.1,
+        fit: ImagePaintFit::Tile(ImageTile {
+            repeat: ImageRepeat::Repeat,
+            scale: 0.1,
+        }),
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),
@@ -166,8 +157,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         quarter_turns: 1, // 90 degrees rotation
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
-        repeat: ImageRepeat::NoRepeat,
-        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),

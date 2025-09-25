@@ -38,8 +38,6 @@ async fn demo_image() -> (Scene, Vec<u8>) {
         quarter_turns: 0,
         opacity: 1.0,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
-        repeat: ImageRepeat::NoRepeat,
-        scale: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
         filters: ImageFilters::default(),

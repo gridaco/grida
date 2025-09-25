@@ -38,6 +38,10 @@ export function ImageFitControl({
           value: "transform",
           label: "Crop",
         },
+        {
+          value: "tile",
+          label: "Tile",
+        },
       ]}
       value={value}
       onValueChange={onValueChange}

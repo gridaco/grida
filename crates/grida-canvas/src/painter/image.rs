@@ -5,7 +5,6 @@ use skia_safe::{self, shaders, Color, SamplingOptions, Shader, TileMode};
 
 fn tile_modes_for_repeat(repeat: ImageRepeat) -> (TileMode, TileMode) {
     match repeat {
-        ImageRepeat::NoRepeat => (TileMode::Decal, TileMode::Decal),
         ImageRepeat::RepeatX => (TileMode::Repeat, TileMode::Decal),
         ImageRepeat::RepeatY => (TileMode::Decal, TileMode::Repeat),
         ImageRepeat::Repeat => (TileMode::Repeat, TileMode::Repeat),
@@ -35,7 +34,15 @@ pub fn image_shader(
         size,
     ));
     let sampling = SamplingOptions::default();
-    let tile_modes = tile_modes_for_repeat(img.repeat);
+
+    // Extract repeat mode based on the fit variant
+    let tile_modes = match &img.fit {
+        ImagePaintFit::Fit(_) | ImagePaintFit::Transform(_) => {
+            // For non-tile modes, use Decal to avoid repetition
+            (TileMode::Decal, TileMode::Decal)
+        }
+        ImagePaintFit::Tile(tile) => tile_modes_for_repeat(tile.repeat),
+    };
     let mut shader = image.to_shader(Some(tile_modes), sampling, Some(&matrix))?;
 
     // Apply image filters if any are specified
@@ -58,7 +65,7 @@ pub fn image_shader(
 
 /// Calculates the transformation matrix for an image paint.
 ///
-/// This function handles both box-fit transformations and custom transforms,
+/// This function handles box-fit transformations, custom transforms, and tile patterns,
 /// ensuring proper scaling and positioning within the container.
 ///
 /// # Arguments
@@ -73,26 +80,27 @@ pub fn image_paint_matrix(
     image_size: (f32, f32),
     container_size: (f32, f32),
 ) -> [[f32; 3]; 2] {
-    let scale = sanitize_scale(paint.scale);
     let quarter_turns = paint.quarter_turns % 4;
     let oriented_image_size = oriented_image_size(quarter_turns, image_size);
 
     let matrix = match &paint.fit {
         ImagePaintFit::Fit(box_fit) => {
+            // For fit mode, use default scale of 1.0 (no scaling)
             let matrix = box_fit
                 .calculate_transform(oriented_image_size, container_size)
                 .matrix;
-            apply_scale_for_fit(matrix, scale, oriented_image_size, container_size)
+            apply_scale_for_fit(matrix, 1.0, oriented_image_size, container_size)
         }
         // For custom transforms, we handle the complete image-to-container mapping
         // directly without composing with BoxFit::Fill, which would create double transformation.
         ImagePaintFit::Transform(transform) => {
-            let mut matrix =
-                calculate_raw_transform(transform, oriented_image_size, container_size);
-            if (scale - 1.0).abs() > f32::EPSILON {
-                apply_scale_about_origin(&mut matrix, scale);
-            }
+            let matrix = calculate_raw_transform(transform, oriented_image_size, container_size);
             matrix
+        }
+        ImagePaintFit::Tile(tile) => {
+            // For tile mode, the scale controls how many tiles fit in the container
+            let scale = sanitize_scale(tile.scale);
+            calculate_tile_transform_with_scale(tile, oriented_image_size, container_size, scale)
         }
     };
 
@@ -184,6 +192,81 @@ pub fn calculate_raw_transform(
     ]
 }
 
+/// Calculates the transform matrix for a tile pattern with scale control.
+///
+/// The scale parameter controls the tile size relative to the original image size:
+/// - scale = 1.0: Tiles are the same size as the original image
+/// - scale = 2.0: Tiles are 2x larger than the original image (fewer tiles)
+/// - scale = 0.5: Tiles are 0.5x smaller than the original image (more tiles)
+///
+/// When the container grows, more tiles are repeated because tiles maintain
+/// their size relative to the image dimensions. The scale is independent of
+/// the container size.
+///
+/// # Arguments
+/// * `_tile` - The tile configuration (not used in current implementation)
+/// * `image_size` - The natural dimensions of the image (width, height)
+/// * `container_size` - The dimensions of the target container (width, height)
+/// * `scale` - The scale factor relative to the original image size
+///
+/// # Returns
+/// The 2x3 transformation matrix in shader space
+pub fn calculate_tile_transform_with_scale(
+    _tile: &ImageTile,
+    image_size: (f32, f32),
+    container_size: (f32, f32),
+    scale: f32,
+) -> [[f32; 3]; 2] {
+    let (image_width, image_height) = image_size;
+    let (container_width, container_height) = container_size;
+
+    // Scale is relative to the original image size, not the container
+    // This means when container grows, more tiles are repeated
+    // scale = 2.0 means tiles are 2x larger (fewer tiles)
+    // scale = 0.5 means tiles are 0.5x smaller (more tiles)
+    let scale_x = scale;
+    let scale_y = scale;
+
+    // Calculate the tile dimensions after scaling
+    let tile_width = image_width * scale_x;
+    let tile_height = image_height * scale_y;
+
+    // Center the first tile within the container
+    let translate_x = (container_width - tile_width) / 2.0;
+    let translate_y = (container_height - tile_height) / 2.0;
+
+    [[scale_x, 0.0, translate_x], [0.0, scale_y, translate_y]]
+}
+
+/// Calculates the transform matrix for a tile pattern.
+///
+/// This function handles the tile composition and layout for pattern tiling.
+/// For now, it behaves like BoxFit::Fill since the ImageTile struct only contains
+/// scale and repeat information.
+///
+/// # Arguments
+/// * `tile` - The tile configuration
+/// * `image_size` - The natural dimensions of the image (width, height)
+/// * `container_size` - The dimensions of the target container (width, height)
+///
+/// # Returns
+/// The 2x3 transformation matrix in shader space
+pub fn calculate_tile_transform(
+    _tile: &ImageTile,
+    image_size: (f32, f32),
+    container_size: (f32, f32),
+) -> [[f32; 3]; 2] {
+    let (image_width, image_height) = image_size;
+    let (container_width, container_height) = container_size;
+
+    // For tile mode, we use BoxFit::Fill behavior by default
+    // This can be extended in the future when more tile configuration options are added
+    let scale_x = container_width / image_width;
+    let scale_y = container_height / image_height;
+
+    [[scale_x, 0.0, 0.0], [0.0, scale_y, 0.0]]
+}
+
 fn oriented_image_size(quarter_turns: u8, image_size: (f32, f32)) -> (f32, f32) {
     if quarter_turns % 2 == 1 {
         (image_size.1, image_size.0)
@@ -230,8 +313,6 @@ mod tests {
             image: ResourceRef::RID(String::new()),
             quarter_turns,
             fit,
-            repeat: ImageRepeat::NoRepeat,
-            scale: 1.0,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             filters: ImageFilters::default(),
@@ -298,27 +379,31 @@ mod tests {
 
     #[test]
     fn test_image_paint_matrix_scale_fit_centers() {
-        let mut paint = base_paint(ImagePaintFit::Fit(BoxFit::Contain), 0);
-        paint.scale = 2.0;
+        // For Fit mode, scale is no longer supported at the paint level
+        // This test now verifies that Fit mode works without scaling
+        let paint = base_paint(ImagePaintFit::Fit(BoxFit::Contain), 0);
 
         let matrix = image_paint_matrix(&paint, (100.0, 100.0), (200.0, 200.0));
 
-        assert!((matrix[0][0] - 4.0).abs() < 1e-6);
-        assert!((matrix[1][1] - 4.0).abs() < 1e-6);
-        let expected_translation = (200.0 - 100.0 * 4.0) / 2.0;
+        // BoxFit::Contain with 100x100 image in 200x200 container should scale by 2.0 and center
+        assert!((matrix[0][0] - 2.0).abs() < 1e-6);
+        assert!((matrix[1][1] - 2.0).abs() < 1e-6);
+        let expected_translation = (200.0 - 100.0 * 2.0) / 2.0; // Should be 0.0 for perfect fit
         assert!((matrix[0][2] - expected_translation).abs() < 1e-6);
         assert!((matrix[1][2] - expected_translation).abs() < 1e-6);
     }
 
     #[test]
     fn test_image_paint_matrix_scale_transform_origin() {
-        let mut paint = base_paint(ImagePaintFit::Transform(AffineTransform::identity()), 0);
-        paint.scale = 0.5;
+        // For Transform mode, scale is no longer supported at the paint level
+        // This test now verifies that Transform mode works without scaling
+        let paint = base_paint(ImagePaintFit::Transform(AffineTransform::identity()), 0);
 
         let matrix = image_paint_matrix(&paint, (100.0, 100.0), (200.0, 200.0));
 
-        assert!((matrix[0][0] - 1.0).abs() < 1e-6);
-        assert!((matrix[1][1] - 1.0).abs() < 1e-6);
+        // Identity transform with 100x100 image in 200x200 container should scale by 2.0
+        assert!((matrix[0][0] - 2.0).abs() < 1e-6);
+        assert!((matrix[1][1] - 2.0).abs() < 1e-6);
         assert!((matrix[0][2]).abs() < 1e-6);
         assert!((matrix[1][2]).abs() < 1e-6);
     }
@@ -337,5 +422,84 @@ mod tests {
         let matrix = image_paint_matrix(&paint, (120.0, 60.0), (180.0, 180.0));
         assert_row_eq(matrix[0], [0.0, 1.5, 45.0]);
         assert_row_eq(matrix[1], [-1.5, 0.0, 180.0]);
+    }
+
+    #[test]
+    fn test_image_paint_matrix_tile_mode() {
+        let tile = ImageTile {
+            scale: 2.0,
+            repeat: ImageRepeat::Repeat,
+        };
+        let paint = base_paint(ImagePaintFit::Tile(tile), 0);
+
+        let matrix = image_paint_matrix(&paint, (100.0, 100.0), (200.0, 200.0));
+
+        // Tile mode with 2.0 scale: tiles are 2x larger than the original image size
+        // Scale is relative to image size, so scale_x = scale_y = 2.0
+        assert!((matrix[0][0] - 2.0).abs() < 1e-6);
+        assert!((matrix[1][1] - 2.0).abs() < 1e-6);
+        let expected_translation = (200.0 - 100.0 * 2.0) / 2.0;
+        assert!((matrix[0][2] - expected_translation).abs() < 1e-6);
+        assert!((matrix[1][2] - expected_translation).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_image_paint_matrix_tile_mode_scale_one() {
+        let tile = ImageTile {
+            scale: 1.0,
+            repeat: ImageRepeat::Repeat,
+        };
+        let paint = base_paint(ImagePaintFit::Tile(tile), 0);
+
+        let matrix = image_paint_matrix(&paint, (100.0, 100.0), (200.0, 200.0));
+
+        // Tile mode with 1.0 scale: tiles are the same size as original image
+        // Scale is relative to image size, so scale_x = scale_y = 1.0
+        assert!((matrix[0][0] - 1.0).abs() < 1e-6);
+        assert!((matrix[1][1] - 1.0).abs() < 1e-6);
+        let expected_translation = (200.0 - 100.0 * 1.0) / 2.0;
+        assert!((matrix[0][2] - expected_translation).abs() < 1e-6);
+        assert!((matrix[1][2] - expected_translation).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_image_paint_matrix_tile_mode_scale_half() {
+        let tile = ImageTile {
+            scale: 0.5,
+            repeat: ImageRepeat::Repeat,
+        };
+        let paint = base_paint(ImagePaintFit::Tile(tile), 0);
+
+        let matrix = image_paint_matrix(&paint, (100.0, 100.0), (200.0, 200.0));
+
+        // Tile mode with 0.5 scale: tiles are 0.5x smaller than the original image size
+        // Scale is relative to image size, so scale_x = scale_y = 0.5
+        assert!((matrix[0][0] - 0.5).abs() < 1e-6);
+        assert!((matrix[1][1] - 0.5).abs() < 1e-6);
+        let expected_translation = (200.0 - 100.0 * 0.5) / 2.0;
+        assert!((matrix[0][2] - expected_translation).abs() < 1e-6);
+        assert!((matrix[1][2] - expected_translation).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_image_paint_matrix_tile_mode_different_aspect_ratio() {
+        let tile = ImageTile {
+            scale: 2.0,
+            repeat: ImageRepeat::Repeat,
+        };
+        let paint = base_paint(ImagePaintFit::Tile(tile), 0);
+
+        // Test with different aspect ratios: 100x50 image in 200x100 container
+        let matrix = image_paint_matrix(&paint, (100.0, 50.0), (200.0, 100.0));
+
+        // Scale is relative to image size, so both axes use the same scale value
+        assert!((matrix[0][0] - 2.0).abs() < 1e-6);
+        assert!((matrix[1][1] - 2.0).abs() < 1e-6);
+
+        // Translation should center the tiles
+        let expected_translation_x = (200.0 - 100.0 * 2.0) / 2.0; // 0.0
+        let expected_translation_y = (100.0 - 50.0 * 2.0) / 2.0; // 0.0
+        assert!((matrix[0][2] - expected_translation_x).abs() < 1e-6);
+        assert!((matrix[1][2] - expected_translation_y).abs() < 1e-6);
     }
 }

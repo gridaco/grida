@@ -1713,65 +1713,114 @@ impl ImageFilters {
 
 /// Defines how an image should be fitted within its container.
 ///
-/// `ImagePaintFit` provides two modes for positioning and scaling images:
-/// - **Fit**: Uses standard fitting modes that match CSS `object-fit` and Flutter `BoxFit` behavior
-/// - **Transform**: Applies custom affine transformations for precise control
+/// There are three mutually exclusive modes:
+/// - [`ImagePaintFit::Fit`]: single placement using standard “object-fit” semantics
+/// - [`ImagePaintFit::Transform`]: single placement with a custom affine transform
+/// - [`ImagePaintFit::Tile`]: pattern tiling, where a **tile** is composed first and then repeated
 ///
-/// Both variants output a definite transform matrix that will be applied to the image.
-/// The key difference is that `Fit` uses predefined algorithms, while `Transform` gives
-/// you 100% customization over how the image will be transformed.
+/// ### Why introduce `Tile` instead of a flat `repeat` flag?
 ///
-/// ## Standard Fitting Modes (Fit)
+/// Legacy APIs (CSS `background-*`, Flutter `DecorationImage`) combine orthogonal knobs
+/// like *fit*, *repeat*, and *scale* on the same object. In practice, many combinations
+/// are ignored or become **semantic no-ops**:
 ///
-/// The `Fit` variant uses predefined fitting modes that are consistent across
-/// web and mobile platforms:
+/// - **`cover + repeat`**: the covered image already spans the box, so extra repeats are clipped
+///   and invisible (no-op).
+/// - **Flutter `scale` with non-repeating fit**: acts as a decode hint rather than a visual
+///   multiplier; the subsequent fit fully determines the mapping, so `scale` has no visible effect.
+/// - **SVG/CSS**: the “fit” of content inside a pattern happens **before** repetition; repetition
+///   never re-fits a post-composited result.
 ///
-/// - **`Contain`**: Scales the image to fit entirely within the container while
-///   preserving aspect ratio. Similar to CSS `object-fit: contain`
-/// - **`Cover`**: Scales the image to fill the entire container while preserving
-///   aspect ratio. Parts of the image may be cropped. Similar to CSS `object-fit: cover`
-/// - **`Fill`**: Scales the image to fill the container exactly, potentially
-///   distorting the aspect ratio. Similar to CSS `object-fit: fill`
-/// - **`None`**: No scaling applied, image is positioned at its natural size.
-///   Similar to CSS `object-fit: none`
+/// These facts suggest that **tiling is a different operation** from single-image fitting and
+/// should be modeled explicitly to avoid dead/ignored parameters.
 ///
-/// ## Custom Transformations (Transform)
-///
-/// The `Transform` variant allows for custom affine transformations, providing
-/// precise control over:
-///
-/// - **Translation**: Move the image by specific x,y offsets
-/// - **Rotation**: Rotate the image by any angle
-/// - **Scaling**: Scale the image by different factors on x and y axes
-/// - **Skewing**: Apply shear transformations
-/// - **Combined operations**: Chain multiple transformations together
-///
-/// This is particularly useful for:
-/// - **Cropping**: Position the image to show specific regions
-/// - **Rotation**: Rotate the image to any angle
-/// - **Displacement**: Move the image within its bounding box
-/// - **Custom scaling**: Apply non-uniform scaling for artistic effects
-///
-/// ## Special Case: Identity Transform
-///
-/// When the `Transform` is identity (no transformation), it behaves identically
-/// to `BoxFit::Fill` - the image will fill the entire container exactly.
-///
-///
-/// ## Platform Compatibility
-///
-/// The `Fit` modes are designed to match the behavior of:
-/// - CSS `object-fit` property
-/// - Flutter `BoxFit` enum
-/// - React Native `resizeMode` prop
-///
-/// This ensures consistent image fitting behavior across web, mobile, and desktop platforms.
+/// ### Design goals
+/// 1. **Facts-first accuracy**: The renderer composes a **tile** (with its own local fit/anchor),
+///    and only then repeats it. This mirrors CSS backgrounds and SVG `<pattern>` semantics and how
+///    GPU image shaders (e.g., Skia) treat tiles — as pre-sized quads replicated over a grid.
+/// 2. **Type-level correctness**: By making tiling its own variant, invalid combinations like
+///    “`cover` + `repeat`” cannot be expressed in the single-fit branch.
+/// 3. **Pragmatic ergonomics**: Tiling is **rare** in design tools compared to single-image fitting;
+///    surfacing it as an explicit mode keeps common cases simple while still giving power-users a
+///    precise, predictable tiling pipeline.
 #[derive(Debug, Clone)]
 pub enum ImagePaintFit {
     /// Use standard fitting modes that match CSS `object-fit` and Flutter `BoxFit`
     Fit(BoxFit),
     /// Apply custom affine transformation for precise control
     Transform(AffineTransform),
+    /// Compose a **tile** first (in tile-local space), then repeat it across the paint box.
+    ///
+    /// This matches the mental model of:
+    /// ```
+    /// decode → quarter_turns → compose tile (fit inside tile) → pattern transform → repeat
+    /// ```
+    ///
+    /// - The image is placed **inside the tile** using `content_fit` and `content_anchor`.
+    /// - The tile has an explicit `tile_size` (px/natural/contain/cover) in box space.
+    /// - Repetition uses per-axis `tile_mode` (repeat/mirror/clamp/decal) and optional `spacing`/`phase`.
+    /// - An optional `pattern_transform` rotates/translates/scales the **tile grid** without
+    ///   affecting the content’s own fit inside the tile.
+    ///
+    /// #### Why this is accurate
+    /// - **Pre-repeat composition** is how CSS backgrounds and SVG patterns actually work:
+    ///   `background-size` (or `<image preserveAspectRatio>` inside `<pattern>`) defines the tile,
+    ///   then `background-repeat` (or the pattern view) replicates it.
+    /// - Prevents **no-op combos**: e.g., “cover + repeat” in box space produces clipped duplicates
+    ///   that are indistinguishable from `no-repeat`; here, you would instead choose a tile size and a
+    ///   `content_fit` that make visual sense per tile.
+    /// - Encourages **declarative clarity**: single placement vs. tiling are different intentions with
+    ///   different parameters, so we encode them as different variants.
+    ///
+    /// See also: [flutter#DecorationImage limitations](https://gist.github.com/softmarshmallow/60dac1c6fea7f9809f9bc48127523bf4)
+    Tile(ImageTile),
+}
+
+/// Specification for pattern tiling.
+///
+/// A **tile** defines how an image should be repeated across a container to create
+/// a pattern. The `scale` parameter controls how many tiles fit in the container,
+/// and `repeat` controls the repetition behavior.
+///
+/// #### Order of operations
+/// ```
+/// 1) Start from the oriented intrinsic image (after `quarter_turns`)
+/// 2) Scale the image so that `scale` number of tiles fit in each dimension
+/// 3) Apply the `repeat` behavior to fill the container
+/// 4) Center the pattern within the container
+/// ```
+///
+/// #### Scale behavior
+/// The `scale` parameter controls how many tiles fit in the container:
+/// - When container grows, more tiles are added (not bigger tiles)
+/// - Higher scale = more tiles = smaller individual tiles
+/// - Formula: `tile_scale = (container_size / image_size) / scale`
+///
+/// This mirrors:
+/// - **CSS**: `background-size` + `background-repeat`
+/// - **SVG**: `<image>` inside `<pattern>` with `preserveAspectRatio`
+/// - **Skia**: image shader with local matrix and `SkTileMode`
+#[derive(Debug, Clone)]
+pub struct ImageTile {
+    /// Extra spacing between tiles in pixels (box space). Can be negative to overlap.
+    // pub spacing: (f32, f32),
+
+    /// Controls the tile size relative to the original image size.
+    ///
+    /// This scale factor determines the size of each tile relative to the original image:
+    /// - `scale = 1.0`: Tiles are the same size as the original image
+    /// - `scale = 2.0`: Tiles are 2x larger than the original image (fewer tiles)
+    /// - `scale = 0.5`: Tiles are 0.5x smaller than the original image (more tiles)
+    ///
+    /// The scale is applied directly to the image dimensions: `tile_size = image_size * scale`
+    ///
+    /// For proper tiling behavior, tiles maintain their size relative to the image
+    /// dimensions. When the container grows, more tiles are repeated because the
+    /// tile size is independent of the container size.
+    pub scale: f32,
+
+    /// How the image should repeat when painted within its container.
+    pub repeat: ImageRepeat,
 }
 
 /// Defines how an image should repeat when painted within its container.
@@ -1784,8 +1833,6 @@ pub enum ImagePaintFit {
 /// - https://api.flutter.dev/flutter/painting/ImageRepeat.html
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageRepeat {
-    /// Do not repeat the image. Areas outside the image bounds remain transparent.
-    NoRepeat,
     /// Repeat the image horizontally (X axis) only.
     RepeatX,
     /// Repeat the image vertically (Y axis) only.
@@ -1796,7 +1843,7 @@ pub enum ImageRepeat {
 
 impl Default for ImageRepeat {
     fn default() -> Self {
-        ImageRepeat::NoRepeat
+        ImageRepeat::Repeat
     }
 }
 
@@ -1912,10 +1959,6 @@ pub struct ImagePaint {
     pub quarter_turns: u8,
     /// Defines how the image should be fitted within its container
     pub fit: ImagePaintFit,
-    /// Determines how the image should repeat within its container
-    pub repeat: ImageRepeat,
-    /// Uniform scale factor applied on top of the fit transform (1.0 = original size)
-    pub scale: f32,
     /// Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)
     pub opacity: f32,
     /// Determines how the image blends with underlying content

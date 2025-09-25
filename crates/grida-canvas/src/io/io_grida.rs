@@ -42,34 +42,9 @@ impl JSONTransform2D {
     }
 }
 
-/// JSON representation of image paint fitting modes.
-///
-/// This enum handles the deserialization of image fitting from JSON,
-/// supporting both standard CSS-like fitting modes and custom transforms.
-#[derive(Debug, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum JSONImagePaintFit {
-    /// Standard fitting modes as simple strings
-    Standard(String),
-    /// Transform mode with explicit transform matrix
-    Transform {
-        #[serde(rename = "fit")]
-        fit: String,
-        #[serde(default)]
-        transform: JSONTransform2D,
-    },
-}
-
-impl Default for JSONImagePaintFit {
-    fn default() -> Self {
-        JSONImagePaintFit::Standard("cover".to_string())
-    }
-}
-
 #[derive(Debug, Deserialize, Clone, Copy)]
 #[serde(rename_all = "kebab-case")]
 pub enum JSONImageRepeat {
-    NoRepeat,
     RepeatX,
     RepeatY,
     Repeat,
@@ -77,14 +52,13 @@ pub enum JSONImageRepeat {
 
 impl Default for JSONImageRepeat {
     fn default() -> Self {
-        JSONImageRepeat::NoRepeat
+        JSONImageRepeat::Repeat
     }
 }
 
 impl From<JSONImageRepeat> for ImageRepeat {
     fn from(repeat: JSONImageRepeat) -> Self {
         match repeat {
-            JSONImageRepeat::NoRepeat => ImageRepeat::NoRepeat,
             JSONImageRepeat::RepeatX => ImageRepeat::RepeatX,
             JSONImageRepeat::RepeatY => ImageRepeat::RepeatY,
             JSONImageRepeat::Repeat => ImageRepeat::Repeat,
@@ -96,46 +70,33 @@ fn default_image_scale() -> f32 {
     1.0
 }
 
-impl From<JSONImagePaintFit> for ImagePaintFit {
-    fn from(json_fit: JSONImagePaintFit) -> Self {
-        match json_fit {
-            JSONImagePaintFit::Standard(fit_str) => match fit_str.as_str() {
-                "contain" => ImagePaintFit::Fit(BoxFit::Contain),
-                "cover" => ImagePaintFit::Fit(BoxFit::Cover),
-                "fill" => ImagePaintFit::Fit(BoxFit::Fill),
-                "none" => ImagePaintFit::Fit(BoxFit::None),
-                _ => ImagePaintFit::Fit(BoxFit::Cover), // Default fallback
-            },
-            JSONImagePaintFit::Transform { transform, .. } => {
-                ImagePaintFit::Transform(transform.into())
-            }
-        }
-    }
-}
-
 /// Helper function to convert JSON paint fields to ImagePaintFit
-/// This handles the logic where transform is only used when fit is "transform"
+/// This handles the logic where transform is used when fit is "transform",
+/// and scale/repeat are used when fit is "tile"
 fn json_paint_to_image_paint_fit(
-    fit: JSONImagePaintFit,
+    fit: Option<String>,
     transform: Option<JSONTransform2D>,
+    scale: Option<f32>,
+    repeat: Option<JSONImageRepeat>,
 ) -> ImagePaintFit {
-    match fit {
-        JSONImagePaintFit::Transform {
-            transform: fit_transform,
-            ..
-        } => {
-            // Use the transform from the fit variant
-            ImagePaintFit::Transform(fit_transform.into())
-        }
-        JSONImagePaintFit::Standard(fit_str) if fit_str == "transform" => {
-            // Handle case where fit is "transform" but we need to use the separate transform field
+    match fit.as_deref() {
+        Some("transform") => {
+            // Use the separate transform field
             let json_transform = transform.unwrap_or_default();
             ImagePaintFit::Transform(json_transform.into())
         }
-        _ => {
-            // For non-transform fits, ignore the transform field and use the fit
-            fit.into()
+        Some("tile") => {
+            // Handle tile mode using the separate scale and repeat fields
+            ImagePaintFit::Tile(ImageTile {
+                scale: scale.unwrap_or(1.0),
+                repeat: repeat.map(|r| r.into()).unwrap_or(ImageRepeat::Repeat),
+            })
         }
+        Some("contain") => ImagePaintFit::Fit(BoxFit::Contain),
+        Some("cover") => ImagePaintFit::Fit(BoxFit::Cover),
+        Some("fill") => ImagePaintFit::Fit(BoxFit::Fill),
+        Some("none") => ImagePaintFit::Fit(BoxFit::None),
+        _ => ImagePaintFit::Fit(BoxFit::Cover), // Default fallback
     }
 }
 
@@ -235,7 +196,7 @@ pub enum JSONPaint {
         #[serde(default)]
         transform: Option<JSONTransform2D>,
         #[serde(default)]
-        fit: JSONImagePaintFit,
+        fit: Option<String>,
         #[serde(default)]
         repeat: JSONImageRepeat,
         #[serde(rename = "quarterTurns", default)]
@@ -426,9 +387,7 @@ impl From<Option<JSONPaint>> for Paint {
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(url),
                     quarter_turns: quarter_turns % 4,
-                    fit: json_paint_to_image_paint_fit(fit, transform),
-                    repeat: repeat.into(),
-                    scale,
+                    fit: json_paint_to_image_paint_fit(fit, transform, Some(scale), Some(repeat)),
                     opacity,
                     blend_mode,
                     filters,
@@ -823,7 +782,7 @@ pub struct JSONImageNode {
     #[serde(rename = "src")]
     pub src: Option<String>,
     #[serde(rename = "fit", default)]
-    pub fit: JSONImagePaintFit,
+    pub fit: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1183,9 +1142,7 @@ impl From<JSONImageNode> for Node {
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(resolved),
                     quarter_turns: quarter_turns % 4,
-                    fit: json_paint_to_image_paint_fit(fit, t),
-                    repeat: repeat.into(),
-                    scale,
+                    fit: json_paint_to_image_paint_fit(fit, t, Some(scale), Some(repeat)),
                     opacity,
                     blend_mode,
                     filters,
@@ -1197,9 +1154,7 @@ impl From<JSONImageNode> for Node {
             _ => ImagePaint {
                 image: ResourceRef::RID(url.clone()),
                 quarter_turns: 0,
-                fit: node.fit.into(),
-                repeat: ImageRepeat::default(),
-                scale: 1.0,
+                fit: json_paint_to_image_paint_fit(node.fit, None, None, None),
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),
                 filters: ImageFilters::default(),
@@ -2381,70 +2336,6 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_json_image_paint_fit_standard_modes() {
-        // Test standard fitting modes as simple strings
-        let json_contain = r#""contain""#;
-        let fit: JSONImagePaintFit =
-            serde_json::from_str(json_contain).expect("Failed to parse contain");
-        assert!(matches!(fit, JSONImagePaintFit::Standard(ref s) if s == "contain"));
-
-        let json_cover = r#""cover""#;
-        let fit: JSONImagePaintFit =
-            serde_json::from_str(json_cover).expect("Failed to parse cover");
-        assert!(matches!(fit, JSONImagePaintFit::Standard(ref s) if s == "cover"));
-
-        let json_fill = r#""fill""#;
-        let fit: JSONImagePaintFit = serde_json::from_str(json_fill).expect("Failed to parse fill");
-        assert!(matches!(fit, JSONImagePaintFit::Standard(ref s) if s == "fill"));
-
-        let json_none = r#""none""#;
-        let fit: JSONImagePaintFit = serde_json::from_str(json_none).expect("Failed to parse none");
-        assert!(matches!(fit, JSONImagePaintFit::Standard(ref s) if s == "none"));
-    }
-
-    #[test]
-    fn deserialize_json_image_paint_fit_transform() {
-        // Test transform mode (flattened structure)
-        let json_transform =
-            r#"{"fit": "transform", "transform": [[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]}"#;
-        let fit: JSONImagePaintFit =
-            serde_json::from_str(json_transform).expect("Failed to parse transform");
-
-        match fit {
-            JSONImagePaintFit::Transform { transform, .. } => {
-                assert_eq!(transform.matrix()[0], [1.0, 0.0, 10.0]);
-                assert_eq!(transform.matrix()[1], [0.0, 1.0, 20.0]);
-            }
-            _ => panic!("Expected Transform variant"),
-        }
-    }
-
-    #[test]
-    fn json_image_paint_fit_into_conversion() {
-        // Test conversion to ImagePaintFit
-        let json_contain = JSONImagePaintFit::Standard("contain".to_string());
-        let image_fit: ImagePaintFit = json_contain.into();
-        assert!(matches!(image_fit, ImagePaintFit::Fit(BoxFit::Contain)));
-
-        let json_cover = JSONImagePaintFit::Standard("cover".to_string());
-        let image_fit: ImagePaintFit = json_cover.into();
-        assert!(matches!(image_fit, ImagePaintFit::Fit(BoxFit::Cover)));
-
-        let json_transform = JSONImagePaintFit::Transform {
-            fit: "transform".to_string(),
-            transform: JSONTransform2D([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]),
-        };
-        let image_fit: ImagePaintFit = json_transform.into();
-        match image_fit {
-            ImagePaintFit::Transform(transform) => {
-                assert_eq!(transform.matrix[0], [2.0, 0.0, 5.0]);
-                assert_eq!(transform.matrix[1], [0.0, 2.0, 10.0]);
-            }
-            _ => panic!("Expected Transform variant"),
-        }
-    }
-
-    #[test]
     fn deserialize_json_transform2d() {
         // Test JSONTransform2D deserialization (flattened structure)
         let json_transform = r#"[[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]"#;
@@ -2479,24 +2370,34 @@ mod tests {
     #[test]
     fn json_paint_to_image_paint_fit_helper() {
         // Test the helper function with standard fits (transform should be ignored)
-        let fit = JSONImagePaintFit::Standard("cover".to_string());
+        let fit = Some("cover".to_string());
         let transform = Some(JSONTransform2D([[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]));
-        let result = json_paint_to_image_paint_fit(fit, transform);
+        let result = json_paint_to_image_paint_fit(fit, transform, None, None);
         assert!(matches!(result, ImagePaintFit::Fit(BoxFit::Cover)));
 
         // Test with transform fit
-        let fit = JSONImagePaintFit::Transform {
-            fit: "transform".to_string(),
-            transform: JSONTransform2D([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]),
-        };
-        let transform = Some(JSONTransform2D([[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]])); // Should be ignored
-        let result = json_paint_to_image_paint_fit(fit, transform);
+        let fit = Some("transform".to_string());
+        let transform = Some(JSONTransform2D([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]));
+        let result = json_paint_to_image_paint_fit(fit, transform, None, None);
         match result {
             ImagePaintFit::Transform(affine) => {
                 assert_eq!(affine.matrix[0], [2.0, 0.0, 5.0]);
                 assert_eq!(affine.matrix[1], [0.0, 2.0, 10.0]);
             }
             _ => panic!("Expected Transform variant"),
+        }
+
+        // Test with tile fit using separate scale and repeat
+        let fit = Some("tile".to_string());
+        let scale = Some(2.0);
+        let repeat = Some(JSONImageRepeat::RepeatX);
+        let result = json_paint_to_image_paint_fit(fit, None, scale, repeat);
+        match result {
+            ImagePaintFit::Tile(tile) => {
+                assert_eq!(tile.scale, 2.0);
+                assert!(matches!(tile.repeat, ImageRepeat::RepeatX));
+            }
+            _ => panic!("Expected Tile variant"),
         }
     }
 }
