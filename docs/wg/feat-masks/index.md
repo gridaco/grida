@@ -24,7 +24,7 @@
 
 **Concept**: Hard, binary shape mask. Resolution‑independent; ignores partial alpha.
 
-**Math**: Clip region \(C \subset \mathbb{R}^2\). Output at (x,y) = Source(x,y) if (x,y) ∈ C, else 0.
+**Math**: Clip region C ⊂ ℝ². Output at (x,y) = Source(x,y) if (x,y) ∈ C, else 0.
 
 **Skia**: Prefer geometric clip (no extra layer): `clipPath`/`clipRect`/`clipRRect` with AA. Use saveLayer only when combined with other effects that require isolation.
 

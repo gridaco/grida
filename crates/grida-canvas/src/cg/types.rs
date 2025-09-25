@@ -1752,7 +1752,7 @@ pub enum ImagePaintFit {
     /// Compose a **tile** first (in tile-local space), then repeat it across the paint box.
     ///
     /// This matches the mental model of:
-    /// ```
+    /// ```txt
     /// decode → quarter_turns → compose tile (fit inside tile) → pattern transform → repeat
     /// ```
     ///
@@ -1783,12 +1783,10 @@ pub enum ImagePaintFit {
 /// and `repeat` controls the repetition behavior.
 ///
 /// #### Order of operations
-/// ```
-/// 1) Start from the oriented intrinsic image (after `quarter_turns`)
-/// 2) Scale the image so that `scale` number of tiles fit in each dimension
-/// 3) Apply the `repeat` behavior to fill the container
-/// 4) Center the pattern within the container
-/// ```
+/// 1. Start from the oriented intrinsic image (after `quarter_turns`)
+/// 2. Scale the image so that `scale` number of tiles fit in each dimension
+/// 3. Apply the `repeat` behavior to fill the container
+/// 4. Center the pattern within the container
 ///
 /// #### Scale behavior
 /// The `scale` parameter controls how many tiles fit in the container:
