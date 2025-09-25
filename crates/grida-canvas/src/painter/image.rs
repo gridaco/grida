@@ -74,24 +74,30 @@ pub fn image_paint_matrix(
     container_size: (f32, f32),
 ) -> [[f32; 3]; 2] {
     let scale = sanitize_scale(paint.scale);
+    let quarter_turns = paint.quarter_turns % 4;
+    let oriented_image_size = oriented_image_size(quarter_turns, image_size);
 
-    match &paint.fit {
+    let matrix = match &paint.fit {
         ImagePaintFit::Fit(box_fit) => {
             let matrix = box_fit
-                .calculate_transform(image_size, container_size)
+                .calculate_transform(oriented_image_size, container_size)
                 .matrix;
-            apply_scale_for_fit(matrix, scale, image_size, container_size)
+            apply_scale_for_fit(matrix, scale, oriented_image_size, container_size)
         }
         // For custom transforms, we handle the complete image-to-container mapping
         // directly without composing with BoxFit::Fill, which would create double transformation.
         ImagePaintFit::Transform(transform) => {
-            let mut matrix = calculate_raw_transform(transform, image_size, container_size);
+            let mut matrix =
+                calculate_raw_transform(transform, oriented_image_size, container_size);
             if (scale - 1.0).abs() > f32::EPSILON {
                 apply_scale_about_origin(&mut matrix, scale);
             }
             matrix
         }
-    }
+    };
+
+    let rotation = quarter_turn_matrix(quarter_turns, image_size);
+    multiply_affine(matrix, rotation)
 }
 
 fn sanitize_scale(scale: f32) -> f32 {
@@ -178,11 +184,71 @@ pub fn calculate_raw_transform(
     ]
 }
 
+fn oriented_image_size(quarter_turns: u8, image_size: (f32, f32)) -> (f32, f32) {
+    if quarter_turns % 2 == 1 {
+        (image_size.1, image_size.0)
+    } else {
+        image_size
+    }
+}
+
+fn quarter_turn_matrix(quarter_turns: u8, image_size: (f32, f32)) -> [[f32; 3]; 2] {
+    let (width, height) = image_size;
+    match quarter_turns % 4 {
+        0 => [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+        1 => [[0.0, -1.0, height], [1.0, 0.0, 0.0]],
+        2 => [[-1.0, 0.0, width], [0.0, -1.0, height]],
+        3 => [[0.0, 1.0, 0.0], [-1.0, 0.0, width]],
+        _ => unreachable!("quarter turns already normalized"),
+    }
+}
+
+fn multiply_affine(a: [[f32; 3]; 2], b: [[f32; 3]; 2]) -> [[f32; 3]; 2] {
+    [
+        [
+            a[0][0] * b[0][0] + a[0][1] * b[1][0],
+            a[0][0] * b[0][1] + a[0][1] * b[1][1],
+            a[0][0] * b[0][2] + a[0][1] * b[1][2] + a[0][2],
+        ],
+        [
+            a[1][0] * b[0][0] + a[1][1] * b[1][0],
+            a[1][0] * b[0][1] + a[1][1] * b[1][1],
+            a[1][0] * b[0][2] + a[1][1] * b[1][2] + a[1][2],
+        ],
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use math2::box_fit::BoxFit;
     use math2::transform::AffineTransform;
+
+    fn base_paint(fit: ImagePaintFit, quarter_turns: u8) -> ImagePaint {
+        ImagePaint {
+            active: true,
+            image: ResourceRef::RID(String::new()),
+            quarter_turns,
+            fit,
+            repeat: ImageRepeat::NoRepeat,
+            scale: 1.0,
+            opacity: 1.0,
+            blend_mode: BlendMode::Normal,
+            filters: ImageFilters::default(),
+        }
+    }
+
+    fn assert_row_eq(actual: [f32; 3], expected: [f32; 3]) {
+        for (idx, (a, e)) in actual.iter().zip(expected.iter()).enumerate() {
+            assert!(
+                (a - e).abs() < 1e-5,
+                "row component {} expected {:?} got {:?}",
+                idx,
+                expected,
+                actual
+            );
+        }
+    }
 
     #[test]
     fn test_calculate_raw_transform_identity() {
@@ -232,17 +298,8 @@ mod tests {
 
     #[test]
     fn test_image_paint_matrix_scale_fit_centers() {
-        let paint = ImagePaint {
-            active: true,
-            image: ResourceRef::RID(String::new()),
-            fit: ImagePaintFit::Fit(BoxFit::Contain),
-            repeat: ImageRepeat::NoRepeat,
-            scale: 2.0,
-            quarter_turns: 0,
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            filters: ImageFilters::default(),
-        };
+        let mut paint = base_paint(ImagePaintFit::Fit(BoxFit::Contain), 0);
+        paint.scale = 2.0;
 
         let matrix = image_paint_matrix(&paint, (100.0, 100.0), (200.0, 200.0));
 
@@ -255,17 +312,8 @@ mod tests {
 
     #[test]
     fn test_image_paint_matrix_scale_transform_origin() {
-        let paint = ImagePaint {
-            active: true,
-            image: ResourceRef::RID(String::new()),
-            fit: ImagePaintFit::Transform(AffineTransform::identity()),
-            repeat: ImageRepeat::NoRepeat,
-            scale: 0.5,
-            quarter_turns: 0,
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            filters: ImageFilters::default(),
-        };
+        let mut paint = base_paint(ImagePaintFit::Transform(AffineTransform::identity()), 0);
+        paint.scale = 0.5;
 
         let matrix = image_paint_matrix(&paint, (100.0, 100.0), (200.0, 200.0));
 
@@ -273,5 +321,21 @@ mod tests {
         assert!((matrix[1][1] - 1.0).abs() < 1e-6);
         assert!((matrix[0][2]).abs() < 1e-6);
         assert!((matrix[1][2]).abs() < 1e-6);
+    }
+
+    #[test]
+    fn image_paint_matrix_applies_quarter_turn_clockwise() {
+        let paint = base_paint(ImagePaintFit::Fit(BoxFit::Contain), 1);
+        let matrix = image_paint_matrix(&paint, (100.0, 50.0), (100.0, 100.0));
+        assert_row_eq(matrix[0], [0.0, -1.0, 75.0]);
+        assert_row_eq(matrix[1], [1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn image_paint_matrix_applies_quarter_turn_counter_clockwise() {
+        let paint = base_paint(ImagePaintFit::Fit(BoxFit::Contain), 3);
+        let matrix = image_paint_matrix(&paint, (120.0, 60.0), (180.0, 180.0));
+        assert_row_eq(matrix[0], [0.0, 1.5, 45.0]);
+        assert_row_eq(matrix[1], [-1.5, 0.0, 180.0]);
     }
 }
