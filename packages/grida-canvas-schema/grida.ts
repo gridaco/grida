@@ -1043,7 +1043,7 @@ export namespace grida.program.nodes {
       export type PropsPaintValue = cg.Paint | SolidPaintToken;
     }
 
-    export interface IOpacity {
+    export interface IBlend {
       /**
        * opacity of the node.
        *
@@ -1054,10 +1054,10 @@ export namespace grida.program.nodes {
        * @default 1
        */
       opacity: number;
-    }
 
-    export interface ILayerBlendMode {
       /**
+       * layer blend mode
+       *
        * @default "pass-through"
        */
       blendMode?: cg.LayerBlendMode;
@@ -1322,8 +1322,7 @@ export namespace grida.program.nodes {
      */
     export interface ICSSStylable
       extends IStylable<css.ExplicitlySupportedCSSProperties>,
-        IOpacity,
-        ILayerBlendMode,
+        IBlend,
         ILayerMaskType,
         IRotation,
         IZIndex,
@@ -1799,7 +1798,7 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.IPositioning,
       i.IFixedDimension,
-      i.IOpacity,
+      i.IBlend,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
@@ -1820,8 +1819,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       // i.ICSSDimension,
       i.IFixedDimension,
-      i.IOpacity,
-      i.ILayerBlendMode,
+      i.IBlend,
       i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
@@ -1854,8 +1852,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IPositioning,
       i.IFixedDimension,
-      i.IOpacity,
-      i.ILayerBlendMode,
+      i.IBlend,
       i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
@@ -1872,8 +1869,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IPositioning,
       i.IFixedDimension,
-      i.IOpacity,
-      i.ILayerBlendMode,
+      i.IBlend,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1890,9 +1886,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IPositioning,
       i.IFixedDimension,
-      i.IOpacity,
-      i.ILayerBlendMode,
-      i.ILayerMaskType,
+      i.IBlend,
       i.IZIndex,
       i.IRotation,
       i.ICornerRadius,
@@ -1935,8 +1929,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       i.IStroke,
       i.IFixedDimension,
-      i.IOpacity,
-      i.ILayerBlendMode,
+      i.IBlend,
       i.ILayerMaskType,
       i.IZIndex,
       i.IRotation {
@@ -1968,8 +1961,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       // i.ICSSDimension,
       i.IFixedDimension,
-      i.IOpacity,
-      i.ILayerBlendMode,
+      i.IBlend,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -2007,8 +1999,7 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IEllipseArcData,
-      i.IOpacity,
-      i.ILayerBlendMode,
+      i.IBlend,
       i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,

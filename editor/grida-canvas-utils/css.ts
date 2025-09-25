@@ -1,6 +1,7 @@
 import cmath from "@grida/cmath";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
+import type csstype from "csstype";
 import colors from "color-name";
 
 export namespace css {
@@ -37,7 +38,7 @@ export namespace css {
     styles: Partial<
       grida.program.nodes.i.IStylable<grida.program.css.ExplicitlySupportedCSSProperties>
     > &
-      Partial<grida.program.nodes.i.IOpacity> &
+      Partial<grida.program.nodes.i.IBlend> &
       Partial<grida.program.nodes.i.IRotation> &
       Partial<grida.program.nodes.i.IZIndex> &
       Partial<grida.program.nodes.i.IPositioning> &
@@ -68,6 +69,7 @@ export namespace css {
       height,
       zIndex,
       opacity,
+      blendMode,
       rotation,
       fill,
       fit,
@@ -117,6 +119,7 @@ export namespace css {
       bottom: bottom,
       zIndex: zIndex,
       opacity: opacity,
+      mixBlendMode: blendMode ? toMixBlendMode(blendMode) : undefined,
       objectFit: fit,
       rotate: rotation ? `${rotation}deg` : undefined,
       //
@@ -386,6 +389,13 @@ export namespace css {
     const { color, offset = [0, 0], blur = 0, spread = 0 } = boxShadow;
 
     return `${inset ? "inset " : ""}${offset[0]}px ${offset[1]}px ${blur}px ${spread}px ${toRGBAString(color)}`;
+  }
+
+  function toMixBlendMode(
+    blendMode: cg.LayerBlendMode
+  ): csstype.DataType.BlendMode {
+    if (blendMode === "pass-through") return "normal";
+    return blendMode;
   }
 
   export function toFillString(paint: cg.Paint): string {
