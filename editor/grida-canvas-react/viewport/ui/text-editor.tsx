@@ -8,7 +8,7 @@ import { useSingleSelection } from "../surface-hooks";
 import { css } from "@/grida-canvas-utils/css";
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
-import ContentEditable from "./contenteditable";
+import ContentEditable from "@/components/primitives/contenteditable";
 
 export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const editor = useCurrentEditor();
