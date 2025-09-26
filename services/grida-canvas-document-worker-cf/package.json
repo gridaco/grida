@@ -1,0 +1,22 @@
+{
+	"name": "grida-canvas-document-worker-cf",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"start": "wrangler dev",
+		"cf-typegen": "wrangler types"
+	},
+	"devDependencies": {
+		"typescript": "^5.5.2",
+		"wrangler": "^4.40.1"
+	},
+	"dependencies": {
+		"hono": "^4.9.8",
+		"lib0": "^0.2.114",
+		"y-protocols": "^1.0.6",
+		"yjs": "^13.6.27"
+	}
+}

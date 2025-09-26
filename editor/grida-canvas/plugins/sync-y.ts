@@ -37,8 +37,10 @@ export class EditorYSyncPlugin {
   ) {
     this.doc = new Y.Doc();
     this.provider = new WebsocketProvider(
-      "wss://live.grida.co/editor",
-      room_id,
+      process.env.NODE_ENV === "development"
+        ? "wss://localhost:8787/editor"
+        : "wss://live.grida.co/editor",
+      this.room_id,
       this.doc
     );
 
