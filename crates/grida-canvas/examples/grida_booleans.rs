@@ -43,7 +43,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        circle.fills = vec![Paint::from(CGColor(200, 200, 200, 255))];
+        circle.fills = Paints::new([Paint::from(CGColor(200, 200, 200, 255))]);
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -51,25 +51,26 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0); // Moved text up slightly
         text.text = "Union (A ∪ B): Combines two shapes into one".to_string();
         text.text_style.font_size = 16.0;
-        text.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        text.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
             id: "bool_union_1".to_string(),
             name: Some("Union Operation".to_string()),
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Union,
             corner_radius: None,
             children: vec![rect.id.clone(), circle.id.clone()],
-            fill: Paint::from(CGColor(100, 100, 200, 255)),
-            stroke: Some(Paint::from(CGColor(0, 0, 0, 255))),
+            fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
+            strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes
@@ -97,7 +98,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        circle1.fills = vec![Paint::from(CGColor(200, 200, 200, 255))];
+        circle1.fills = Paints::new([Paint::from(CGColor(200, 200, 200, 255))]);
 
         let mut circle2 = nf.create_ellipse_node();
         circle2.name = Some("Circle 2".to_string());
@@ -106,7 +107,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        circle2.fills = vec![Paint::from(CGColor(200, 200, 200, 255))];
+        circle2.fills = Paints::new([Paint::from(CGColor(200, 200, 200, 255))]);
 
         // Add description text
         let mut text = nf.create_text_span_node();
@@ -114,25 +115,26 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.text = "Intersection (A ∩ B): Shows only the overlapping area".to_string();
         text.text_style.font_size = 16.0;
-        text.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        text.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
             id: "bool_intersection_1".to_string(),
             name: Some("Intersection Operation".to_string()),
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Intersection,
             children: vec![circle1.id.clone(), circle2.id.clone()],
             corner_radius: None,
-            fill: Paint::from(CGColor(100, 100, 200, 255)),
-            stroke: Some(Paint::from(CGColor(0, 0, 0, 255))),
+            fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
+            strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes
@@ -160,7 +162,7 @@ async fn demo_booleans() -> Scene {
             width: base_size,
             height: base_size,
         };
-        star.fills = vec![Paint::from(CGColor(200, 200, 200, 255))];
+        star.fills = Paints::new([Paint::from(CGColor(200, 200, 200, 255))]);
 
         let mut rect = nf.create_rectangle_node();
         rect.name = Some("Rectangle".to_string());
@@ -177,25 +179,26 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.text = "Difference (A - B): Removes the second shape from the first".to_string();
         text.text_style.font_size = 16.0;
-        text.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        text.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
             id: "bool_difference_1".to_string(),
             name: Some("Difference Operation".to_string()),
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Difference,
             corner_radius: None,
             children: vec![star.id.clone(), rect.id.clone()],
-            fill: Paint::from(CGColor(100, 100, 200, 255)),
-            stroke: Some(Paint::from(CGColor(0, 0, 0, 255))),
+            fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
+            strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes
@@ -240,25 +243,26 @@ async fn demo_booleans() -> Scene {
         text.transform = AffineTransform::new(start_x, y_offset - 40.0, 0.0);
         text.text = "XOR (A ⊕ B): Shows areas that don't overlap".to_string();
         text.text_style.font_size = 16.0;
-        text.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        text.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
             id: "bool_xor_1".to_string(),
             name: Some("XOR Operation".to_string()),
             active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Xor,
             corner_radius: None,
             children: vec![square1.id.clone(), square2.id.clone()],
-            fill: Paint::from(CGColor(100, 100, 200, 255)),
-            stroke: Some(Paint::from(CGColor(0, 0, 0, 255))),
+            fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
+            strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         };
 
         // Collect IDs before moving nodes

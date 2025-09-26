@@ -15,6 +15,7 @@ import {
   VideoIcon,
   GlobeIcon,
   GroupIcon,
+  Half2Icon,
 } from "@radix-ui/react-icons";
 import { SquaresUniteIcon } from "lucide-react";
 
@@ -25,6 +26,10 @@ export function NodeTypeIcon({
   node: grida.program.nodes.Node;
   className?: string;
 }) {
+  if ("mask" in node) {
+    return <Half2Icon className={className} />;
+  }
+
   switch (node.type) {
     case "iframe":
       return <GlobeIcon className={className} />;
@@ -53,6 +58,17 @@ export function NodeTypeIcon({
     case "instance":
       return <ComponentInstanceIcon className={className} />;
     case "rectangle":
+      // Check if rectangle has image fill(s)
+      if (node.fill && node.fill.type === "image") {
+        return <ImageIcon className={className} />;
+      }
+      if (
+        node.fills &&
+        node.fills.length === 1 &&
+        node.fills[0].type === "image"
+      ) {
+        return <ImageIcon className={className} />;
+      }
       return <BoxIcon className={className} />;
     case "ellipse":
       return <CircleIcon className={className} />;

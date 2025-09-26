@@ -17,7 +17,7 @@ async fn scene() -> Scene {
     };
     container.stroke_width = 10.0;
     container.stroke_align = StrokeAlign::Outside;
-    container.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
+    container.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     container.set_fill(Paint::from(CGColor(255, 255, 255, 255)));
     // Center the container in the 800x800 canvas
     container.transform = AffineTransform::new(200.0, 200.0, 0.0);

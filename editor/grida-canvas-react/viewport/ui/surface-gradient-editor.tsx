@@ -12,6 +12,11 @@ import {
   useNodeState,
 } from "@/grida-canvas-react/provider";
 import { editor } from "@/grida-canvas";
+import {
+  resolvePaints,
+  getTargetPaint,
+  updateTargetPaint,
+} from "@/grida-canvas/utils/paint-resolution";
 
 const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
   ["linear_gradient" satisfies cg.Paint["type"]]: "linear",
@@ -22,16 +27,23 @@ const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
 };
 
 export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
-  const { selected_stop } =
-    useContentEditModeState()! as editor.state.FillGradientContentEditMode;
+  const { selected_stop, paint_index, paint_target } =
+    useContentEditModeState()! as editor.state.PaintGradientContentEditMode;
   const data = useSingleSelection(node_id);
-  const { fill } = useNodeState(node_id, (node) => ({
-    fill: node.fill,
-  }));
+  const node = useNodeState(node_id, (node) => node);
 
-  if (!data) return null;
-  if (!fill) return null;
-  if (!cg.isGradientPaint(fill)) return null;
+  if (!data || !node) return null;
+
+  const target = paint_target ?? "fill";
+  const { paints, resolvedIndex: activePaintIndex } = resolvePaints(
+    node,
+    target,
+    paint_index ?? 0
+  );
+  const gradient = paints[activePaintIndex];
+
+  if (!gradient) return null;
+  if (!cg.isGradientPaint(gradient)) return null;
 
   return (
     <div
@@ -52,7 +64,9 @@ export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
           node_id={node_id}
           width={data.boundingSurfaceRect.width}
           height={data.boundingSurfaceRect.height}
-          gradient={fill}
+          gradient={gradient}
+          paint_index={activePaintIndex}
+          paint_target={target}
           selected_stop={selected_stop}
         />
       </div>
@@ -65,15 +79,20 @@ function EditorUser({
   width,
   height,
   gradient,
+  paint_index,
+  paint_target,
   selected_stop,
 }: {
   node_id: string;
   width: number;
   height: number;
   gradient: cg.GradientPaint;
+  paint_index: number;
+  paint_target: "fill" | "stroke";
   selected_stop: number;
 }) {
   const editor = useCurrentEditor();
+  const node = useNodeState(node_id, (node) => node);
 
   const gradientType = gradientTypeMap[gradient.type];
 
@@ -94,9 +113,12 @@ function EditorUser({
 
   const setFocusedStop = useCallback(
     (stop: number | null) => {
-      editor.selectGradientStop(node_id, stop ?? 0);
+      editor.selectGradientStop(node_id, stop ?? 0, {
+        paintIndex: paint_index,
+        paintTarget: paint_target,
+      });
     },
-    [editor, node_id]
+    [editor, node_id, paint_index, paint_target]
   );
 
   // Update state when gradient prop changes
@@ -111,9 +133,29 @@ function EditorUser({
 
   const onValueChange = useCallback(
     (g: cg.GradientPaint) => {
-      editor?.changeNodeFill(node_id, g);
+      if (editor && node) {
+        const { paints } = resolvePaints(node, paint_target, paint_index);
+        const updatedPaints = [...paints];
+
+        if (updatedPaints.length === 0) {
+          updatedPaints.push(g);
+        } else {
+          const { resolvedIndex } = resolvePaints(
+            node,
+            paint_target,
+            paint_index
+          );
+          updatedPaints[resolvedIndex] = g;
+        }
+
+        if (paint_target === "stroke") {
+          editor.changeNodeStrokes(node_id, updatedPaints);
+        } else {
+          editor.changeNodeFills(node_id, updatedPaints);
+        }
+      }
     },
-    [editor, node_id]
+    [editor, node_id, paint_index, paint_target, node]
   );
 
   const handlePointsChange = useCallback(
@@ -136,6 +178,9 @@ function EditorUser({
         type: gradient.type,
         stops,
         transform,
+        blendMode: gradient.blendMode,
+        opacity: gradient.opacity || 1,
+        active: true,
       });
     },
     [gradient.type, gradientType, stops, onValueChange]
@@ -157,6 +202,9 @@ function EditorUser({
         type: gradient.type,
         stops: newStops,
         transform,
+        blendMode: gradient.blendMode,
+        opacity: gradient.opacity || 1,
+        active: true,
       });
     },
     [stops, points, gradient.type, gradientType, onValueChange]
@@ -183,6 +231,9 @@ function EditorUser({
         type: gradient.type,
         stops: newStops,
         transform,
+        blendMode: gradient.blendMode,
+        opacity: gradient.opacity || 1,
+        active: true,
       });
     },
     [stops, points, gradient.type, gradientType, onValueChange]

@@ -47,6 +47,7 @@ async fn demo_gradients() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         }));
         ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -79,6 +80,7 @@ async fn demo_gradients() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         }));
         ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -96,7 +98,7 @@ async fn demo_gradients() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
         let angle = (i as f32) * 45.0;
-        rect.strokes = vec![Paint::LinearGradient(LinearGradientPaint {
+        rect.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(angle),
             stops: vec![
                 GradientStop {
@@ -110,7 +112,8 @@ async fn demo_gradients() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-        })];
+            active: true,
+        })]);
         rect.stroke_width = 8.0;
         ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -128,7 +131,7 @@ async fn demo_gradients() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
         let offset = -0.25 + 0.125 * i as f32;
-        rect.strokes = vec![Paint::RadialGradient(RadialGradientPaint {
+        rect.strokes = Paints::new([Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform {
                 matrix: [[1.0, 0.0, offset], [0.0, 1.0, offset]],
             },
@@ -144,7 +147,8 @@ async fn demo_gradients() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-        })];
+            active: true,
+        })]);
         rect.stroke_width = 8.0;
         ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));

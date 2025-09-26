@@ -54,7 +54,7 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             polygon.point_count = i + 3;
-            polygon.fills = vec![Paint::from(CGColor(255, 255, 255, 255))];
+            polygon.fills = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
             polygon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
                 dx: 4.0,
                 dy: 4.0,
@@ -96,7 +96,7 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             polygon.point_count = i + 3;
-            polygon.fills = vec![Paint::from(CGColor(200, 200, 200, 255))];
+            polygon.fills = Paints::new([Paint::from(CGColor(200, 200, 200, 255))]);
             polygon.effects =
                 LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
                     radius: 4.0 * (i + 1) as f32,
@@ -133,6 +133,7 @@ async fn demo_effects() -> Scene {
         ],
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
+        active: true,
     }));
     let vivid_gradient_rect_id = vivid_gradient_rect.id.clone();
     repository.insert(Node::Rectangle(vivid_gradient_rect));
@@ -165,7 +166,7 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             blur_polygon.point_count = i + 3;
-            blur_polygon.fills = vec![Paint::from(CGColor(255, 255, 255, 128))];
+            blur_polygon.fills = Paints::new([Paint::from(CGColor(255, 255, 255, 128))]);
             blur_polygon.effects =
                 LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeGaussianBlur {
                     radius: 8.0 * (i + 1) as f32,
@@ -207,7 +208,7 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             polygon.point_count = i + 3;
-            polygon.fills = vec![Paint::from(CGColor(240, 240, 240, 255))];
+            polygon.fills = Paints::new([Paint::from(CGColor(240, 240, 240, 255))]);
             polygon.effects = LayerEffects::from_array(vec![FilterEffect::InnerShadow(FeShadow {
                 dx: 2.0,
                 dy: 2.0,
@@ -295,7 +296,7 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             polygon.point_count = i + 3;
-            polygon.fills = vec![Paint::from(CGColor(255, 255, 255, 255))];
+            polygon.fills = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
 
             // Combine multiple effects based on index
             let effects = match i {

@@ -10,7 +10,7 @@ use crate::{
     resources::{self, ByteStore, Resources},
     runtime::{
         camera::Camera2D, config::RuntimeRendererConfig, font_repository::FontRepository,
-        image_repository::ImageRepository,
+        image_repository::ImageRepository, system_images,
     },
 };
 
@@ -21,6 +21,28 @@ use skia_safe::{
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+fn normalize_image_id(id: &str) -> String {
+    if id.starts_with("res://") || id.starts_with("system://") {
+        id.to_string()
+    } else {
+        format!("res://images/{}", id)
+    }
+}
+
+fn detect_image_mime(bytes: &[u8]) -> &'static str {
+    if bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
+        "image/png"
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        "image/jpeg"
+    } else if bytes.len() > 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        "image/webp"
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        "image/gif"
+    } else {
+        "application/octet-stream"
+    }
+}
 
 /// Callback type used to request a redraw from the host window.
 pub type RequestRedrawCallback = Arc<dyn Fn()>;
@@ -191,12 +213,13 @@ impl Renderer {
         store: Arc<Mutex<ByteStore>>,
         options: RendererOptions,
     ) -> Self {
-        let resources = Resources::with_store(store.clone());
+        let mut resources = Resources::with_store(store.clone());
         let mut font_repository = FontRepository::new(store.clone());
         if options.use_embedded_fonts {
             font_repository.register_embedded_fonts();
         }
-        let image_repository = ImageRepository::new(store);
+        let mut image_repository = ImageRepository::new(store);
+        system_images::register(&mut resources, &mut image_repository);
         Self {
             backend,
             scene: None,
@@ -235,13 +258,27 @@ impl Renderer {
         self.fonts.add(hash, family);
     }
 
-    pub fn add_image(&mut self, bytes: &[u8]) -> String {
+    pub fn add_image(&mut self, bytes: &[u8]) -> (String, String, u32, u32, String) {
         let hash = resources::hash_bytes(bytes);
         let hash_str = format!("{:016x}", hash);
         let rid = format!("res://images/{}", hash_str);
         self.resources.insert(&rid, bytes.to_vec());
-        self.images.insert(hash_str.clone(), hash);
-        hash_str
+
+        let (width, height) = self.images.insert(rid.clone(), hash).unwrap_or((0, 0));
+
+        let r#type = detect_image_mime(bytes).to_string();
+
+        (hash_str, rid, width, height, r#type)
+    }
+
+    pub fn get_image_bytes(&self, id: &str) -> Option<Vec<u8>> {
+        let rid = normalize_image_id(id);
+        self.resources.get(&rid)
+    }
+
+    pub fn get_image_size(&self, id: &str) -> Option<(u32, u32)> {
+        let rid = normalize_image_id(id);
+        self.images.get_size(&rid)
     }
 
     /// Enable or disable the image tile cache.
@@ -382,7 +419,7 @@ impl Renderer {
             bounds.x + bounds.width,
             bounds.y + bounds.height,
         );
-        let canvas = recorder.begin_recording(sk_bounds, None);
+        let canvas = recorder.begin_recording(sk_bounds, true);
         let painter =
             Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
         draw(&painter);
@@ -482,7 +519,6 @@ impl Renderer {
         height: f32,
     ) -> DrawResult {
         let __before_paint = Instant::now();
-        let mut cache_picture_used = 0;
 
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
@@ -500,6 +536,9 @@ impl Renderer {
 
         // Apply camera transform
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
+
+        // Always draw via command pipeline. Tiles are drawn first (as a backdrop),
+        // then the full command stream composes the final result.
 
         // draw image cache tiles
         for tk in plan.tiles.iter() {
@@ -532,33 +571,22 @@ impl Renderer {
             }
         }
 
-        // draw picture regions
-        for (region, indices) in &plan.regions {
+        // Prefill picture cache for visible layers so Painter can reuse pictures even with masks
+        for (_region, indices) in &plan.regions {
             for idx in indices {
-                if let Some(layer) = self.scene_cache.layers.layers.get(*idx) {
-                    let layer = layer.clone();
-                    let picture = self.with_recording_cached(&layer.id(), |painter| {
+                if let Some(layer) = self.scene_cache.layers.layers.get(*idx).cloned() {
+                    let id = layer.id().clone();
+                    let _ = self.with_recording_cached(&id, |painter| {
                         painter.draw_layer(&layer);
                     });
-
-                    if let Some(pic) = picture {
-                        // clip to region
-                        canvas.save();
-                        canvas.clip_rect(
-                            Rect::from_xywh(region.x, region.y, region.width, region.height),
-                            None,
-                            false,
-                        );
-                        canvas.draw_picture(pic, None, None);
-                        canvas.restore();
-                        cache_picture_used += 1;
-                    }
-                } else {
-                    // report error
-                    println!("layer not found: {}", idx);
                 }
             }
         }
+
+        let painter =
+            Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
+        painter.draw_layer_list(&self.scene_cache.layers);
+        let cache_picture_used = painter.cache_picture_hits();
 
         let __painter_duration = __before_paint.elapsed();
 
@@ -607,21 +635,10 @@ impl Renderer {
         // Apply camera transform
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // draw picture regions
+        // Always use the command pipeline for export to ensure masks are applied
         let painter =
             Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
-        for (_region, indices) in &plan.regions {
-            for idx in indices {
-                if let Some(layer) = self.scene_cache.layers.layers.get(*idx) {
-                    let layer = layer.clone();
-
-                    painter.draw_layer(&layer);
-                } else {
-                    // report error
-                    println!("layer not found: {}", idx);
-                }
-            }
-        }
+        painter.draw_layer_list(&self.scene_cache.layers);
 
         let __painter_duration = __before_paint.elapsed();
 

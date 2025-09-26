@@ -77,6 +77,13 @@ impl ImageMipmaps {
         Self { levels }
     }
 
+    /// Dimensions of the base (original) image.
+    pub fn dimensions(&self) -> Option<(u32, u32)> {
+        self.levels
+            .first()
+            .map(|(_, img)| (img.width() as u32, img.height() as u32))
+    }
+
     /// Number of mipmap levels.
     pub fn level_count(&self) -> usize {
         self.levels.len()

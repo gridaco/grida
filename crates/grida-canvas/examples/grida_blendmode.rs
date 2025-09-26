@@ -77,6 +77,7 @@ async fn demo_blendmode() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
+            active: true,
         }));
 
         let background_id = background.id.clone();
@@ -91,7 +92,7 @@ async fn demo_blendmode() -> Scene {
             height: base_size,
         };
         sweep_overlay.corner_radius = RectangularCornerRadius::circular(20.0);
-        sweep_overlay.blend_mode = BlendMode::Multiply; // Modulate equivalent
+        sweep_overlay.blend_mode = LayerBlendMode::Blend(BlendMode::Multiply);
 
         // Create a sweep-like effect using a radial gradient with multiple color stops
         sweep_overlay.set_fill(Paint::RadialGradient(RadialGradientPaint {
@@ -132,6 +133,7 @@ async fn demo_blendmode() -> Scene {
             ],
             opacity: 0.3, // Make it subtle
             blend_mode: BlendMode::Normal,
+            active: true,
         }));
 
         let sweep_overlay_id = sweep_overlay.id.clone();
@@ -141,7 +143,7 @@ async fn demo_blendmode() -> Scene {
         let mut circle_group = nf.create_group_node();
         circle_group.name = Some(format!("Circle Group {}", i));
         circle_group.transform = Some(AffineTransform::new(x, y, 0.0));
-        circle_group.blend_mode = *blend_mode;
+        circle_group.blend_mode = LayerBlendMode::Blend(*blend_mode);
 
         let mut circle_ids = Vec::new();
 
@@ -157,7 +159,7 @@ async fn demo_blendmode() -> Scene {
             height: circle_radius * 2.0,
         };
         green_circle.set_fill(Paint::from(CGColor(0, 255, 0, 255)));
-        green_circle.blend_mode = BlendMode::Normal; // Plus equivalent
+        green_circle.blend_mode = LayerBlendMode::default();
         let green_circle_id = green_circle.id.clone();
         repository.insert(Node::Ellipse(green_circle));
         circle_ids.push(green_circle_id);
@@ -171,7 +173,7 @@ async fn demo_blendmode() -> Scene {
             height: circle_radius * 2.0,
         };
         red_circle.set_fill(Paint::from(CGColor(255, 0, 0, 255)));
-        red_circle.blend_mode = BlendMode::Normal; // Plus equivalent
+        red_circle.blend_mode = LayerBlendMode::default();
         let red_circle_id = red_circle.id.clone();
         repository.insert(Node::Ellipse(red_circle));
         circle_ids.push(red_circle_id);
@@ -186,7 +188,7 @@ async fn demo_blendmode() -> Scene {
             height: circle_radius * 2.0,
         };
         blue_circle.set_fill(Paint::from(CGColor(0, 0, 255, 255)));
-        blue_circle.blend_mode = BlendMode::Normal; // Plus equivalent
+        blue_circle.blend_mode = LayerBlendMode::default();
         let blue_circle_id = blue_circle.id.clone();
         repository.insert(Node::Ellipse(blue_circle));
         circle_ids.push(blue_circle_id);
@@ -205,7 +207,7 @@ async fn demo_blendmode() -> Scene {
         label.text_style = TextStyleRec::from_font("Geist", 14.0);
         label.text_align = TextAlign::Left;
         label.text_align_vertical = TextAlignVertical::Top;
-        label.fills = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        label.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         let label_id = label.id.clone();
         repository.insert(Node::TextSpan(label));
 

@@ -109,6 +109,16 @@ pub unsafe extern "C" fn set_main_camera_transform(
 // #region: image management
 // ====================================================================================================
 
+#[derive(Serialize)]
+pub struct CreateImageResourceResult {
+    pub hash: String,
+    pub url: String,
+    pub width: u32,
+    pub height: u32,
+    #[serde(rename = "type")]
+    pub r#type: String,
+}
+
 #[no_mangle]
 /// js::_add_image
 pub unsafe extern "C" fn add_image(
@@ -118,9 +128,56 @@ pub unsafe extern "C" fn add_image(
 ) -> *const u8 {
     if let Some(app) = app.as_mut() {
         let data = std::slice::from_raw_parts(data_ptr, data_len);
-        let hash = app.add_image(data);
-        if let Ok(cstr) = CString::new(hash) {
-            return cstr.into_raw() as *const u8;
+        let (hash, url, width, height, r#type) = app.add_image(data);
+        let result = CreateImageResourceResult {
+            hash,
+            url,
+            width,
+            height,
+            r#type,
+        };
+        if let Ok(json) = serde_json::to_string(&result) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
+/// js::_get_image_bytes
+pub unsafe extern "C" fn get_image_bytes(
+    app: *mut EmscriptenApplication,
+    id_ptr: *const u8,
+    id_len: usize,
+) -> *const u8 {
+    if let (Some(app), Some(id)) = (app.as_mut(), __str_from_ptr_len(id_ptr, id_len)) {
+        if let Some(bytes) = app.get_image_bytes(&id) {
+            let len = bytes.len();
+            let out = allocate(len + 4) as *mut u8;
+            let len_bytes = (len as u32).to_le_bytes();
+            std::ptr::copy_nonoverlapping(len_bytes.as_ptr(), out, 4);
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), out.add(4), len);
+            return out;
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
+/// js::_get_image_size
+pub unsafe extern "C" fn get_image_size(
+    app: *mut EmscriptenApplication,
+    id_ptr: *const u8,
+    id_len: usize,
+) -> *const u32 {
+    if let (Some(app), Some(id)) = (app.as_mut(), __str_from_ptr_len(id_ptr, id_len)) {
+        if let Some((w, h)) = app.get_image_size(&id) {
+            let out = allocate(std::mem::size_of::<u32>() * 2) as *mut u32;
+            std::ptr::write(out, w);
+            std::ptr::write(out.add(1), h);
+            return out;
         }
     }
     std::ptr::null()

@@ -19,7 +19,7 @@ fn test_pdf_export() {
         height: 50.0,
     };
     rect.transform = AffineTransform::new(10.0, 10.0, 0.0);
-    rect.fills = vec![Paint::from(CGColor(255, 0, 0, 255))];
+    rect.fills = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
 
     let rect_id = rect.id.clone();
     repo.insert(Node::Rectangle(rect));

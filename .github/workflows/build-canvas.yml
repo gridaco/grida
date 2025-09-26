@@ -1,0 +1,69 @@
+name: canvas build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - '.github/workflows/*'
+      - 'crates/*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            just
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add wasm32-unknown-emscripten target
+        run: rustup target add wasm32-unknown-emscripten
+
+      - name: Cache cargo build outputs
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm32-unknown-emscripten
+
+      - name: Install workspace dependencies for @grida/canvas-wasm
+        run: pnpm install --filter "@grida/canvas-wasm..." --frozen-lockfile
+
+      - name: Install Emscripten SDK
+        run: python3 bin/activate-emsdk
+
+      - name: Verify Emscripten toolchain  
+        run: |
+          emcc -v  
+          em++ -v
+
+      - name: Fix missing xlocale.h header for Emscripten
+        run: |
+          sudo ln -s /usr/include/locale.h /usr/include/xlocale.h
+
+      - name: Build canvas wasm artifacts
+        run: just build
+        working-directory: crates/grida-canvas-wasm

@@ -3,6 +3,8 @@ use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::Deserialize;
 use std::hash::Hash;
 
+use super::alignment::Alignment;
+
 /// A 2D point with x and y coordinates.
 #[derive(Debug, Clone, Copy)]
 pub struct CGPoint {
@@ -44,18 +46,18 @@ pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
 
 impl CGColor {
     pub const TRANSPARENT: Self = Self(0, 0, 0, 0);
-    pub const BLACK: Self = Self(0, 0, 0, 255);
-    pub const WHITE: Self = Self(255, 255, 255, 255);
-    pub const RED: Self = Self(255, 0, 0, 255);
-    pub const GREEN: Self = Self(0, 255, 0, 255);
-    pub const BLUE: Self = Self(0, 0, 255, 255);
+    pub const BLACK: Self = Self(0, 0, 0, 0xff);
+    pub const WHITE: Self = Self(0xff, 0xff, 0xff, 0xff);
+    pub const RED: Self = Self(0xff, 0, 0, 0xff);
+    pub const GREEN: Self = Self(0, 0xff, 0, 0xff);
+    pub const BLUE: Self = Self(0, 0, 0xff, 0xff);
 
     pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self(r, g, b, a)
     }
 
     pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
-        Self(r, g, b, 255)
+        Self(r, g, b, 0xff)
     }
 
     pub fn r(&self) -> u8 {
@@ -75,10 +77,64 @@ impl CGColor {
 impl From<CGColor> for SolidPaint {
     fn from(color: CGColor) -> Self {
         SolidPaint {
+            active: true,
             color,
-            opacity: 1.0,
             blend_mode: BlendMode::default(),
         }
+    }
+}
+
+/// Defines the type of masking applied to a layer.
+///
+/// This corresponds to the CSS `mask-type` property and is related to `clip-path` functionality.
+/// The mask type determines how the mask is interpreted and applied to the layer content.
+///
+/// # CSS Equivalents
+/// - **None**: No masking is applied
+/// - **Geometry**: Vector-based masking (equivalent to `clip-path` in CSS)
+/// - **Alpha**: Alpha channel masking (equivalent to `mask-type: alpha` in CSS)
+/// - **Luminance**: Luminance-based masking (equivalent to `mask-type: luminance` in CSS)
+///
+/// For more information, see the [MDN documentation on mask-type](https://developer.mozilla.org/en-US/docs/Web/CSS/mask-type).
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub enum LayerMaskType {
+    Image(ImageMaskType),
+
+    /// Vector-based masking (clipPath).
+    ///
+    /// Uses the vector geometry path to define the visible area of the content.
+    /// Unlike alpha or luminance masking, this type does not use opacity or brightness values.
+    /// The mask is purely geometric - content is either fully visible or fully hidden based on whether
+    /// it falls inside or outside the defined vector path. This is equivalent to CSS `clip-path`.
+    #[serde(rename = "geometry")]
+    Geometry,
+}
+
+impl Default for LayerMaskType {
+    fn default() -> Self {
+        LayerMaskType::Image(ImageMaskType::default())
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub enum ImageMaskType {
+    /// Alpha channel masking.
+    ///
+    /// Uses the alpha channel of the mask to determine the opacity of the masked content.
+    /// Areas with higher alpha values in the mask will show the content more opaquely.
+    #[serde(rename = "alpha")]
+    Alpha,
+    /// Luminance-based masking.
+    ///
+    /// Uses the luminance (brightness) of the mask to determine the opacity of the masked content.
+    /// Brighter areas in the mask will show the content more opaquely, while darker areas will be more transparent.
+    #[serde(rename = "luminance")]
+    Luminance,
+}
+
+impl Default for ImageMaskType {
+    fn default() -> Self {
+        ImageMaskType::Alpha
     }
 }
 
@@ -166,10 +222,59 @@ pub enum BooleanPathOperation {
 /// - Flutter `Clip*` wrapping a subtree → (potential future **shape clip**, not implemented)
 pub type ContainerClipFlag = bool;
 
-/// Blend modes for compositing layers, compatible with Skia and SVG/CSS.
+/// Layer-level compositing mode.
+///
+/// - `Blend(BlendMode)`: The layer is **isolated** and composited as a single surface
+///   using the given blend mode (e.g., `Normal/SrcOver`, `Multiply`, etc.).
+/// - `PassThrough`: The layer **does not** create a compositing boundary. Its children
+///   (or its internal paint stack) are drawn directly into the parent and may blend with
+///   content beneath the layer. Group opacity should be applied multiplicatively to
+///   descendants rather than forcing isolation.
+///
+/// This mirrors Figma’s semantics:
+/// - Groups default to **PassThrough** (non-isolated).
+/// - Switching a group to a specific blend mode (e.g., `Normal`) isolates and flattens it.
+///
+/// Closest CSS analogy:
+/// - `PassThrough` ≈ `isolation: auto`
+/// - `Blend(BlendMode::Normal)` ≈ `isolation: isolate` + normal compositing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(untagged)]
+pub enum LayerBlendMode {
+    /// Non-isolated group/layer; children/paints blend directly with the backdrop.
+    #[serde(rename = "pass-through")]
+    PassThrough,
+    /// Isolated layer composited with a specific blend mode.
+    Blend(BlendMode),
+}
+
+impl From<BlendMode> for LayerBlendMode {
+    #[inline]
+    fn from(mode: BlendMode) -> Self {
+        LayerBlendMode::Blend(mode)
+    }
+}
+
+impl Into<BlendMode> for LayerBlendMode {
+    fn into(self) -> BlendMode {
+        match self {
+            LayerBlendMode::PassThrough => BlendMode::Normal,
+            LayerBlendMode::Blend(mode) => mode,
+        }
+    }
+}
+
+impl Default for LayerBlendMode {
+    fn default() -> Self {
+        LayerBlendMode::PassThrough
+    }
+}
+
+/// Blend functions for compositing paints or isolated layers (does **not** include PassThrough).
 ///
 /// - SVG: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/mix-blend-mode
 /// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
+/// - Flutter: https://api.flutter.dev/flutter/dart-ui/BlendMode.html
 /// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 pub enum BlendMode {
@@ -221,11 +326,6 @@ pub enum BlendMode {
     // Skia: kLuminosity
     #[serde(rename = "luminosity")]
     Luminosity,
-
-    /// Like `Normal`, but means no blending at all (pass-through).
-    /// This is Figma-specific, and typically treated the same as `Normal`.
-    #[serde(rename = "pass-through")]
-    PassThrough,
 }
 
 impl Default for BlendMode {
@@ -900,15 +1000,68 @@ pub enum Paint {
 }
 
 impl Paint {
+    pub fn active(&self) -> bool {
+        match self {
+            Paint::Solid(solid) => solid.active,
+            Paint::LinearGradient(gradient) => gradient.active,
+            Paint::RadialGradient(gradient) => gradient.active,
+            Paint::SweepGradient(gradient) => gradient.active,
+            Paint::DiamondGradient(gradient) => gradient.active,
+            Paint::Image(image) => image.active,
+        }
+    }
+
     pub fn opacity(&self) -> f32 {
         match self {
-            Paint::Solid(solid) => solid.opacity,
+            Paint::Solid(solid) => solid.opacity(),
             Paint::LinearGradient(gradient) => gradient.opacity,
             Paint::RadialGradient(gradient) => gradient.opacity,
             Paint::SweepGradient(gradient) => gradient.opacity,
             Paint::DiamondGradient(gradient) => gradient.opacity,
             Paint::Image(image) => image.opacity,
         }
+    }
+
+    /// Returns `true` if the paint is visible, `false` otherwise.
+    ///
+    /// A paint is considered visible when:
+    /// - It is active (`active() == true`)
+    /// - It has non-zero opacity (`opacity() > 0.0`)
+    ///
+    /// This method combines the `active` and `opacity` properties to determine
+    /// whether the paint should be rendered. A paint that is inactive or has
+    /// zero opacity is considered invisible and will not be drawn.
+    ///
+    /// ## Performance Note
+    ///
+    /// Paints with `opacity == 0.0` have no visual effect regardless of blend mode,
+    /// so they can be safely removed from the render list to optimize performance.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let solid_paint = Paint::Solid(SolidPaint {
+    ///     active: true,
+    ///     color: CGColor::RED,
+    ///     blend_mode: BlendMode::Normal,
+    /// });
+    /// assert!(solid_paint.visible()); // active and opaque
+    ///
+    /// let transparent_paint = Paint::Solid(SolidPaint {
+    ///     active: true,
+    ///     color: CGColor::TRANSPARENT,
+    ///     blend_mode: BlendMode::Normal,
+    /// });
+    /// assert!(!transparent_paint.visible()); // active but transparent
+    /// ```
+    pub fn visible(&self) -> bool {
+        if !self.active() {
+            return false;
+        }
+        if self.opacity() == 0.0 {
+            return false;
+        }
+        return true;
     }
 
     pub fn blend_mode(&self) -> BlendMode {
@@ -935,7 +1088,7 @@ impl Paint {
         match self {
             Paint::Solid(solid) => {
                 solid.color.0.hash(hasher);
-                solid.opacity.to_bits().hash(hasher);
+                solid.opacity().to_bits().hash(hasher);
                 solid.blend_mode.hash(hasher);
             }
             Paint::LinearGradient(gradient) => {
@@ -971,12 +1124,190 @@ impl Paint {
                 }
             }
             Paint::Image(image) => {
-                // For image paints, hash the image hash
-                image.hash.hash(hasher);
+                // For image paints, hash the referenced resource identifier
+                match &image.image {
+                    ResourceRef::HASH(h) | ResourceRef::RID(h) => h.hash(hasher),
+                };
                 image.opacity.to_bits().hash(hasher);
                 image.blend_mode.hash(hasher);
             }
         }
+    }
+}
+
+/// Ordered stack of [`Paint`] values that are composited sequentially.
+///
+/// Entries are interpreted in **paint order**: the first item is drawn first,
+/// and every subsequent item is composited on top of the pixels produced by the
+/// previous paints. This matches Figma and other graphics editors where, for
+/// example, `Paints::new([solid, image])` results in the image appearing
+/// above the solid color when rendered. User interfaces may display the list in
+/// reverse order (top-most paint first); `Paints` always stores the canonical
+/// engine order to avoid ambiguity in the renderer and conversion layers.
+///
+/// The [`BlendMode`] assigned to each [`Paint`] applies to that specific entry
+/// while it is composited over the accumulated result. It never retroactively
+/// affects paints that were drawn earlier in the stack.
+#[derive(Debug, Clone, Default)]
+pub struct Paints {
+    paints: Vec<Paint>,
+}
+
+impl Paints {
+    /// Create a new [`Paints`] collection from an ordered list of paints.
+    ///
+    /// Supports both `Vec<Paint>` and array literals:
+    /// - `Paints::new(vec![paint1, paint2])` - traditional approach
+    /// - `Paints::new([paint1, paint2])` - ergonomic array literals
+    pub fn new<T>(paints: T) -> Self
+    where
+        T: IntoPaints,
+    {
+        Self {
+            paints: paints.into_paints(),
+        }
+    }
+
+    /// Returns `true` when there are no paints in the collection.
+    pub fn is_empty(&self) -> bool {
+        self.paints.is_empty()
+    }
+
+    /// Number of paints in the stack.
+    pub fn len(&self) -> usize {
+        self.paints.len()
+    }
+
+    /// Immutable slice access to the ordered paints.
+    pub fn as_slice(&self) -> &[Paint] {
+        &self.paints
+    }
+
+    /// Mutable slice access to the ordered paints.
+    pub fn as_mut_slice(&mut self) -> &mut [Paint] {
+        &mut self.paints
+    }
+
+    /// Consume the collection and return the underlying vector.
+    pub fn into_vec(self) -> Vec<Paint> {
+        self.paints
+    }
+
+    /// Append a new paint to the top of the stack.
+    pub fn push(&mut self, paint: Paint) {
+        self.paints.push(paint);
+    }
+
+    /// Iterate over paints in paint order.
+    pub fn iter(&self) -> std::slice::Iter<'_, Paint> {
+        self.paints.iter()
+    }
+
+    /// Mutable iterator over paints in paint order.
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Paint> {
+        self.paints.iter_mut()
+    }
+}
+
+impl From<Vec<Paint>> for Paints {
+    fn from(value: Vec<Paint>) -> Self {
+        Paints::new(value)
+    }
+}
+
+impl From<Paints> for Vec<Paint> {
+    fn from(value: Paints) -> Self {
+        value.paints
+    }
+}
+
+// Custom trait to support both Vec<Paint> and array literals in Paints::new()
+pub trait IntoPaints {
+    fn into_paints(self) -> Vec<Paint>;
+}
+
+impl IntoPaints for Vec<Paint> {
+    fn into_paints(self) -> Vec<Paint> {
+        self
+    }
+}
+
+impl<const N: usize> IntoPaints for [Paint; N] {
+    fn into_paints(self) -> Vec<Paint> {
+        self.to_vec()
+    }
+}
+
+impl FromIterator<Paint> for Paints {
+    fn from_iter<I: IntoIterator<Item = Paint>>(iter: I) -> Self {
+        Paints::new(iter.into_iter().collect::<Vec<_>>())
+    }
+}
+
+// Support for array literals - much more ergonomic than vec![]
+impl<const N: usize> From<[Paint; N]> for Paints {
+    fn from(value: [Paint; N]) -> Self {
+        // Most efficient: direct construction without intermediate allocations
+        Paints {
+            paints: value.to_vec(),
+        }
+    }
+}
+
+// Support for single Paint conversion
+impl From<Paint> for Paints {
+    fn from(value: Paint) -> Self {
+        // More efficient: avoid the intermediate Vec allocation
+        Paints {
+            paints: vec![value],
+        }
+    }
+}
+
+impl IntoIterator for Paints {
+    type Item = Paint;
+    type IntoIter = std::vec::IntoIter<Paint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.paints.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Paints {
+    type Item = &'a Paint;
+    type IntoIter = std::slice::Iter<'a, Paint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.paints.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Paints {
+    type Item = &'a mut Paint;
+    type IntoIter = std::slice::IterMut<'a, Paint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.paints.iter_mut()
+    }
+}
+
+impl std::ops::Deref for Paints {
+    type Target = [Paint];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl std::ops::DerefMut for Paints {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
+    }
+}
+
+impl Extend<Paint> for Paints {
+    fn extend<I: IntoIterator<Item = Paint>>(&mut self, iter: I) {
+        self.paints.extend(iter);
     }
 }
 
@@ -1001,53 +1332,58 @@ impl GradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct SolidPaint {
+    pub active: bool,
     pub color: CGColor,
-    pub opacity: f32,
     pub blend_mode: BlendMode,
 }
 
 impl SolidPaint {
     pub fn new_color(color: CGColor) -> Self {
         Self {
+            active: true,
             color,
-            opacity: 1.0,
             blend_mode: BlendMode::default(),
         }
     }
 
+    /// Returns the opacity as a value between 0.0 and 1.0, derived from the color's alpha channel.
+    pub fn opacity(&self) -> f32 {
+        self.color.a() as f32 / 255.0
+    }
+
     pub const TRANSPARENT: Self = Self {
+        active: true,
         color: CGColor::TRANSPARENT,
-        opacity: 0.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const BLACK: Self = Self {
+        active: true,
         color: CGColor::BLACK,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const WHITE: Self = Self {
+        active: true,
         color: CGColor::WHITE,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const RED: Self = Self {
+        active: true,
         color: CGColor::RED,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const BLUE: Self = Self {
+        active: true,
         color: CGColor::BLUE,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 
     pub const GREEN: Self = Self {
+        active: true,
         color: CGColor::GREEN,
-        opacity: 1.0,
         blend_mode: BlendMode::Normal,
     };
 }
@@ -1067,6 +1403,7 @@ pub struct GradientStop {
 
 #[derive(Debug, Clone)]
 pub struct LinearGradientPaint {
+    pub active: bool,
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
@@ -1076,6 +1413,7 @@ pub struct LinearGradientPaint {
 impl LinearGradientPaint {
     pub fn from_colors(colors: Vec<CGColor>) -> Self {
         Self {
+            active: true,
             transform: AffineTransform::default(),
             stops: colors
                 .iter()
@@ -1094,6 +1432,7 @@ impl LinearGradientPaint {
 impl Default for LinearGradientPaint {
     fn default() -> Self {
         Self {
+            active: true,
             transform: AffineTransform::default(),
             stops: Vec::new(),
             opacity: 1.0,
@@ -1104,6 +1443,7 @@ impl Default for LinearGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct RadialGradientPaint {
+    pub active: bool,
     /// # Radial Gradient Transform Model
     ///
     /// ## Coordinate Space
@@ -1145,6 +1485,7 @@ pub struct RadialGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct DiamondGradientPaint {
+    pub active: bool,
     /// # Diamond Gradient Transform Model
     ///
     /// Figma's Diamond Gradient is equivalent to a radial gradient evaluated
@@ -1168,6 +1509,7 @@ pub struct DiamondGradientPaint {
 
 #[derive(Debug, Clone)]
 pub struct SweepGradientPaint {
+    pub active: bool,
     /// # Sweep Gradient Transform Model
     ///
     /// ## Coordinate Space
@@ -1207,18 +1549,10 @@ pub struct SweepGradientPaint {
     pub blend_mode: BlendMode,
 }
 
-#[derive(Debug, Clone)]
-pub struct ImagePaint {
-    pub transform: AffineTransform,
-    pub hash: String,
-    pub fit: BoxFit,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-}
-
 impl Default for RadialGradientPaint {
     fn default() -> Self {
         Self {
+            active: true,
             transform: AffineTransform::default(),
             stops: Vec::new(),
             opacity: 1.0,
@@ -1230,6 +1564,7 @@ impl Default for RadialGradientPaint {
 impl Default for DiamondGradientPaint {
     fn default() -> Self {
         Self {
+            active: true,
             transform: AffineTransform::default(),
             stops: Vec::new(),
             opacity: 1.0,
@@ -1241,6 +1576,7 @@ impl Default for DiamondGradientPaint {
 impl Default for SweepGradientPaint {
     fn default() -> Self {
         Self {
+            active: true,
             transform: AffineTransform::default(),
             stops: Vec::new(),
             opacity: 1.0,
@@ -1249,16 +1585,393 @@ impl Default for SweepGradientPaint {
     }
 }
 
-impl Default for ImagePaint {
-    fn default() -> Self {
-        Self {
-            transform: AffineTransform::default(),
-            hash: String::new(),
-            fit: BoxFit::Cover,
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        }
+/// A reference to a resource that can be identified either by a logical Resource ID (RID) or by a hash.
+///
+/// `ResourceRef` is used throughout the Grida Canvas to reference external resources like images,
+/// fonts, or other binary data. It provides two ways to identify resources:
+///
+/// ## Variants
+///
+/// - **`HASH(String)`**: References a resource by its content hash. This is typically used for
+///   resources that are stored in memory with a `mem://` URL format. The hash is computed from
+///   the resource's binary content using a hashing algorithm.
+///
+/// - **`RID(String)`**: References a resource by a logical Resource ID. This is typically used
+///   for resources that have a human-readable identifier like `res://images/logo.png` or
+///   external URLs. RIDs provide a stable way to reference resources that may be loaded
+///   from different sources.
+///
+/// ## Usage
+///
+/// `ResourceRef` is commonly used in:
+/// - [`ImagePaint`] to reference image resources
+/// - Resource management systems to track and resolve resource dependencies
+/// - Import/export operations to maintain resource references across different formats
+///
+/// ## Examples
+///
+/// ```ignore
+/// // Reference by logical ID
+/// let image_ref = ResourceRef::RID("res://images/logo.png".to_string());
+///
+/// // Reference by content hash (for in-memory resources)
+/// let mem_ref = ResourceRef::HASH("a1b2c3d4e5f6".to_string());
+/// ```
+///
+/// ## Resource Resolution
+///
+/// The actual resolution of a `ResourceRef` depends on the context:
+/// - RID references are typically resolved through a resource index that maps logical IDs to
+///   actual resource locations or content hashes
+/// - HASH references are typically resolved directly from a byte store using the hash as a key
+///
+/// Both variants are treated uniformly in most contexts, allowing the resource management
+/// system to handle different resource types transparently.
+#[derive(Debug, Clone)]
+pub enum ResourceRef {
+    /// Reference by content hash, typically used for in-memory resources with `mem://` URLs
+    HASH(String),
+    /// Reference by logical Resource ID, typically used for named resources with `res://` URLs
+    RID(String),
+}
+
+/// Image filter parameters for color adjustments
+///
+/// All values are normalized to the range [-1.0, 1.0] where:
+/// - `-1.0` = maximum negative adjustment
+/// - `0.0` = no change (neutral)
+/// - `1.0` = maximum positive adjustment
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct ImageFilters {
+    /// Exposure adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the overall brightness of the image.
+    /// - `-1.0` = very dark
+    /// - `0.0` = original (no change)
+    /// - `1.0` = very bright
+    pub exposure: f32,
+
+    /// Contrast adjustment (-0.3 to 0.3, default: 0.0)
+    ///
+    /// Controls the difference between light and dark areas.
+    /// - `-0.3` = low contrast (UI cap)
+    /// - `0.0` = original contrast
+    /// - `0.3` = high contrast (UI cap)
+    pub contrast: f32,
+
+    /// Saturation adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the intensity of colors.
+    /// - `-1.0` = grayscale (no color)
+    /// - `0.0` = original saturation
+    /// - `1.0` = highly oversaturated
+    pub saturation: f32,
+
+    /// Temperature adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the warm/cool color balance.
+    /// - `-1.0` = very cool (blue tint)
+    /// - `0.0` = neutral (no change)
+    /// - `1.0` = very warm (orange tint)
+    pub temperature: f32,
+
+    /// Tint adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the green/magenta color balance.
+    /// - `-1.0` = strong magenta tint
+    /// - `0.0` = neutral (no change)
+    /// - `1.0` = strong green tint
+    pub tint: f32,
+
+    /// Highlights adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the brightness of highlight areas.
+    /// - `-1.0` = darken highlights
+    /// - `0.0` = no change
+    /// - `1.0` = brighten highlights
+    pub highlights: f32,
+
+    /// Shadows adjustment (-1.0 to 1.0, default: 0.0)
+    ///
+    /// Controls the brightness of shadow areas.
+    /// - `-1.0` = darken shadows
+    /// - `0.0` = no change
+    /// - `1.0` = brighten shadows
+    pub shadows: f32,
+}
+
+impl ImageFilters {
+    /// Check if any filters are active (non-zero values)
+    pub fn has_filters(&self) -> bool {
+        self.exposure != 0.0
+            || self.contrast != 0.0
+            || self.saturation != 0.0
+            || self.temperature != 0.0
+            || self.tint != 0.0
+            || self.highlights != 0.0
+            || self.shadows != 0.0
     }
+}
+
+/// Defines how an image should be fitted within its container.
+///
+/// There are three mutually exclusive modes:
+/// - [`ImagePaintFit::Fit`]: single placement using standard “object-fit” semantics
+/// - [`ImagePaintFit::Transform`]: single placement with a custom affine transform
+/// - [`ImagePaintFit::Tile`]: pattern tiling, where a **tile** is composed first and then repeated
+///
+/// ### Why introduce `Tile` instead of a flat `repeat` flag?
+///
+/// Legacy APIs (CSS `background-*`, Flutter `DecorationImage`) combine orthogonal knobs
+/// like *fit*, *repeat*, and *scale* on the same object. In practice, many combinations
+/// are ignored or become **semantic no-ops**:
+///
+/// - **`cover + repeat`**: the covered image already spans the box, so extra repeats are clipped
+///   and invisible (no-op).
+/// - **Flutter `scale` with non-repeating fit**: acts as a decode hint rather than a visual
+///   multiplier; the subsequent fit fully determines the mapping, so `scale` has no visible effect.
+/// - **SVG/CSS**: the “fit” of content inside a pattern happens **before** repetition; repetition
+///   never re-fits a post-composited result.
+///
+/// These facts suggest that **tiling is a different operation** from single-image fitting and
+/// should be modeled explicitly to avoid dead/ignored parameters.
+///
+/// ### Design goals
+/// 1. **Facts-first accuracy**: The renderer composes a **tile** (with its own local fit/anchor),
+///    and only then repeats it. This mirrors CSS backgrounds and SVG `<pattern>` semantics and how
+///    GPU image shaders (e.g., Skia) treat tiles — as pre-sized quads replicated over a grid.
+/// 2. **Type-level correctness**: By making tiling its own variant, invalid combinations like
+///    “`cover` + `repeat`” cannot be expressed in the single-fit branch.
+/// 3. **Pragmatic ergonomics**: Tiling is **rare** in design tools compared to single-image fitting;
+///    surfacing it as an explicit mode keeps common cases simple while still giving power-users a
+///    precise, predictable tiling pipeline.
+#[derive(Debug, Clone)]
+pub enum ImagePaintFit {
+    /// Use standard fitting modes that match CSS `object-fit` and Flutter `BoxFit`
+    Fit(BoxFit),
+    /// Apply custom affine transformation for precise control
+    Transform(AffineTransform),
+    /// Compose a **tile** first (in tile-local space), then repeat it across the paint box.
+    ///
+    /// This matches the mental model of:
+    /// ```txt
+    /// decode → quarter_turns → compose tile (fit inside tile) → pattern transform → repeat
+    /// ```
+    ///
+    /// - The image is placed **inside the tile** using `content_fit` and `content_anchor`.
+    /// - The tile has an explicit `tile_size` (px/natural/contain/cover) in box space.
+    /// - Repetition uses per-axis `tile_mode` (repeat/mirror/clamp/decal) and optional `spacing`/`phase`.
+    /// - An optional `pattern_transform` rotates/translates/scales the **tile grid** without
+    ///   affecting the content’s own fit inside the tile.
+    ///
+    /// #### Why this is accurate
+    /// - **Pre-repeat composition** is how CSS backgrounds and SVG patterns actually work:
+    ///   `background-size` (or `<image preserveAspectRatio>` inside `<pattern>`) defines the tile,
+    ///   then `background-repeat` (or the pattern view) replicates it.
+    /// - Prevents **no-op combos**: e.g., “cover + repeat” in box space produces clipped duplicates
+    ///   that are indistinguishable from `no-repeat`; here, you would instead choose a tile size and a
+    ///   `content_fit` that make visual sense per tile.
+    /// - Encourages **declarative clarity**: single placement vs. tiling are different intentions with
+    ///   different parameters, so we encode them as different variants.
+    ///
+    /// See also: [flutter#DecorationImage limitations](https://gist.github.com/softmarshmallow/60dac1c6fea7f9809f9bc48127523bf4)
+    Tile(ImageTile),
+}
+
+/// Specification for pattern tiling.
+///
+/// A **tile** defines how an image should be repeated across a container to create
+/// a pattern. The `scale` parameter controls how many tiles fit in the container,
+/// and `repeat` controls the repetition behavior.
+///
+/// #### Order of operations
+/// 1. Start from the oriented intrinsic image (after `quarter_turns`)
+/// 2. Scale the image so that `scale` number of tiles fit in each dimension
+/// 3. Apply the `repeat` behavior to fill the container
+/// 4. Center the pattern within the container
+///
+/// #### Scale behavior
+/// The `scale` parameter controls how many tiles fit in the container:
+/// - When container grows, more tiles are added (not bigger tiles)
+/// - Higher scale = more tiles = smaller individual tiles
+/// - Formula: `tile_scale = (container_size / image_size) / scale`
+///
+/// This mirrors:
+/// - **CSS**: `background-size` + `background-repeat`
+/// - **SVG**: `<image>` inside `<pattern>` with `preserveAspectRatio`
+/// - **Skia**: image shader with local matrix and `SkTileMode`
+#[derive(Debug, Clone)]
+pub struct ImageTile {
+    /// Extra spacing between tiles in pixels (box space). Can be negative to overlap.
+    // pub spacing: (f32, f32),
+
+    /// Controls the tile size relative to the original image size.
+    ///
+    /// This scale factor determines the size of each tile relative to the original image:
+    /// - `scale = 1.0`: Tiles are the same size as the original image
+    /// - `scale = 2.0`: Tiles are 2x larger than the original image (fewer tiles)
+    /// - `scale = 0.5`: Tiles are 0.5x smaller than the original image (more tiles)
+    ///
+    /// The scale is applied directly to the image dimensions: `tile_size = image_size * scale`
+    ///
+    /// For proper tiling behavior, tiles maintain their size relative to the image
+    /// dimensions. When the container grows, more tiles are repeated because the
+    /// tile size is independent of the container size.
+    pub scale: f32,
+
+    /// How the image should repeat when painted within its container.
+    pub repeat: ImageRepeat,
+}
+
+/// Defines how an image should repeat when painted within its container.
+///
+/// This mirrors the behavior of CSS `background-repeat` values, allowing
+/// images to tile horizontally, vertically, both, or not at all.
+///
+/// See also:
+/// - https://developer.mozilla.org/en-US/docs/Web/CSS/background-repeat
+/// - https://api.flutter.dev/flutter/painting/ImageRepeat.html
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageRepeat {
+    /// Repeat the image horizontally (X axis) only.
+    RepeatX,
+    /// Repeat the image vertically (Y axis) only.
+    RepeatY,
+    /// Repeat the image in both directions.
+    Repeat,
+}
+
+impl Default for ImageRepeat {
+    fn default() -> Self {
+        ImageRepeat::Repeat
+    }
+}
+
+/// Defines how an image should be painted within its container.
+///
+/// `ImagePaint` combines an image resource with fitting behavior, visual properties,
+/// and effects to create a complete image painting specification.
+///
+/// ## Key Properties
+///
+/// - **`image`**: Reference to the image resource to be painted
+/// - **`quarter_turns`**: Clockwise 90° rotations applied before layout/fitting
+/// - **`alignement`**: Positions the fitted image within its container using normalized coordinates
+/// - **`fit`**: Defines how the image should be fitted within its container
+/// - **`opacity`**: Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)
+/// - **`blend_mode`**: Determines how the image blends with underlying content
+/// - **`filters`**: Applies visual effects like brightness, contrast, saturation, etc.
+///
+#[derive(Debug, Clone)]
+pub struct ImagePaint {
+    pub active: bool,
+    /// Reference to the image resource to be painted
+    pub image: ResourceRef,
+    /// Number of **clockwise quarter turns** to apply to the **source image**
+    /// *before* fitting/cropping/layout math.
+    ///
+    /// Values are interpreted modulo 4:
+    /// - `0` → 0° (no rotation)
+    /// - `1` → 90° CW
+    /// - `2` → 180°
+    /// - `3` → 270° CW
+    ///
+    /// This is a **discrete, lossless** orientation control:
+    /// 90° steps map pixels on the integer grid (no resampling/blur). Use it to
+    /// normalize camera photos and to keep `fit/cover/contain` math deterministic.
+    ///
+    /// # Why a discrete quarter-turn?
+    /// - **Image-space property:** Orientation belongs to the pixels themselves,
+    ///   not the layout container. Applying it *pre-fit* ensures intrinsic size and
+    ///   aspect ratio are computed on the oriented image.
+    /// - **Lossless and fast:** 90° rotations are index remaps; they don’t require
+    ///   filtering. (Arbitrary angles would require resampling.)
+    /// - **Interop-friendly:** Maps cleanly to platform concepts:
+    ///   - **EXIF Orientation (TIFF/EXIF):** 1–8 encodes quarter-turns plus optional
+    ///     mirror flips. The rotation component here is exactly this field.
+    ///   - **CSS:** Use `image-orientation` to request 90° step fixes or `from-image`
+    ///     to honor EXIF; browsers treat it as a discrete correction, not a general
+    ///     transform.  [oai_citation:0‡MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation?utm_source=chatgpt.com)
+    ///   - **Flutter:** `RotatedBox(quarterTurns: ...)` performs a layout-time
+    ///     quarter-turn—semantically the same as this field.  [oai_citation:1‡api.flutter.dev](https://api.flutter.dev/flutter/widgets/RotatedBox-class.html?utm_source=chatgpt.com)
+    ///
+    /// # Invariants
+    /// - Always store `quarter_turns % 4`.
+    /// - Treat as **non-animatable** (step changes only). If you need animation,
+    ///   animate a general transform elsewhere.
+    /// - When `quarter_turns` is odd (1 or 3), **swap width/height** when computing
+    ///   intrinsic size for fitting.
+    ///
+    /// # Pipeline placement
+    /// ```text
+    /// decode → (A) apply quarter_turns → (B) object-position → (C) fit/cover/contain → (D) layer transforms → composite
+    /// ```
+    /// Applying this first guarantees layout/fitting sees the oriented intrinsic size.
+    ///
+    /// # EXIF mapping
+    /// If you ingest EXIF orientation (values 1–8), normalize to:
+    /// ```text
+    /// quarter_turns = { 1→0, 6→1, 3→2, 8→3 }   // others add mirror flips
+    /// ```
+    /// If you also support EXIF **mirrors**, model them as orthogonal flags (e.g.
+    /// X/Y flips) in addition to `quarter_turns`. The pair (flips, quarter_turns)
+    /// covers all 8 EXIF states cleanly.
+    ///
+    /// # CSS & web notes
+    /// - `image-orientation: from-image;` honors EXIF; discrete angles are supported
+    ///   in 90° steps. This is **not** the same as `transform: rotate(...)`, which
+    ///   is continuous and layout-space. Use your `quarter_turns` to **bake/normalize
+    ///   image orientation** or when drawing to canvas/SVG patterns.  [oai_citation:2‡MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation?utm_source=chatgpt.com)
+    ///
+    /// # Flutter notes
+    /// - Prefer `RotatedBox(quarterTurns = quarter_turns as int)` for widget trees;
+    ///   it rotates before layout and stays pixel-crisp for 90° steps. For paint-time
+    ///   shaders, use an image shader with a quarter-turn matrix.  [oai_citation:3‡api.flutter.dev](https://api.flutter.dev/flutter/widgets/RotatedBox-class.html?utm_source=chatgpt.com)
+    ///
+    /// # macOS Preview (rotation behavior)
+    /// - Preview’s Rotate Left/Right applies visual 90° turns. For JPEGs, this may
+    ///   **re-encode** (not guaranteed lossless) rather than merely toggling EXIF,
+    ///   depending on workflow; tools like `jpegtran` perform explicit lossless
+    ///   rotations. Don’t rely on external viewers to preserve losslessness—store
+    ///   orientation explicitly and normalize yourself on export.  [oai_citation:4‡Ask Different](https://apple.stackexchange.com/questions/299183/will-the-quality-of-my-jpeg-images-taken-by-my-iphone-deteriorate-if-i-rotate-th?utm_source=chatgpt.com)
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// // Normalize any integer to 0..=3
+    /// let q = quarter_turns % 4;
+    ///
+    /// // Degrees for UI
+    /// let degrees = (q as i32) * 90;
+    ///
+    /// // Swap intrinsic size when odd quarter turn
+    /// let (w1, h1) = if q % 2 == 1 { (h0, w0) } else { (w0, h0) };
+    ///
+    /// // Compose two rotations
+    /// let composed = (q + other_q) % 4;
+    /// ```
+    ///
+    /// # Storage & schema
+    /// - Store as `u8` (0..=3) or `usize` with `% 4` normalization.
+    /// - Serialize as a small integer or as friendly keywords (`"r0"|"r90"|"r180"|"r270"`).
+    ///
+    /// # See also
+    /// - CSS `image-orientation` (discrete image-space correction).  [oai_citation:5‡MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation)
+    /// - Flutter `RotatedBox::quarterTurns`.  [oai_citation:6‡api.flutter.dev](https://api.flutter.dev/flutter/widgets/RotatedBox/quarterTurns.html)
+    pub quarter_turns: u8,
+    /// Positions the fitted image within its container.
+    ///
+    /// Uses normalized coordinates where `(-1.0, -1.0)` represents the top-left corner,
+    /// `(0.0, 0.0)` represents the center, and `(1.0, 1.0)` represents the bottom-right corner.
+    /// This behaves similarly to CSS `object-position`.
+    pub alignement: Alignment,
+    /// Defines how the image should be fitted within its container
+    pub fit: ImagePaintFit,
+    /// Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)
+    pub opacity: f32,
+    /// Determines how the image blends with underlying content
+    pub blend_mode: BlendMode,
+    /// Applies visual effects like brightness, contrast, saturation, etc.
+    pub filters: ImageFilters,
 }
 
 // #endregion

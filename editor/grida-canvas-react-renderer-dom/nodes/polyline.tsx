@@ -13,7 +13,7 @@ interface PolylineNode
     grida.program.nodes.i.IHrefable,
     grida.program.nodes.i.IPositioning,
     grida.program.nodes.i.IFixedDimension,
-    grida.program.nodes.i.IOpacity,
+    grida.program.nodes.i.IBlend,
     grida.program.nodes.i.IZIndex,
     grida.program.nodes.i.IRotation,
     grida.program.nodes.i.IFill<cg.Paint>,

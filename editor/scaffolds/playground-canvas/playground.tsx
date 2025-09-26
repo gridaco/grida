@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
 import { SidebarRoot } from "@/components/sidebar";
 import {
   Selection,
@@ -112,7 +118,7 @@ import { sitemap } from "@/www/data/sitemap";
 import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
-import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
+import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import { LibraryContent } from "./library";
 import { EditorYSyncPlugin } from "@/grida-canvas/plugins/sync-y";
 import { Editor } from "@/grida-canvas/editor";
@@ -123,13 +129,76 @@ import colors, {
 } from "@/theme/tailwindcolors";
 import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
 import { PathToolbar } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/path-toolbar";
+import { FullscreenLoadingOverlay } from "@/grida-canvas-react-starter-kit/starterkit-loading/loading";
 
-type UIConfig = {
-  sidebar: "hidden" | "visible";
-  toolbar: "hidden" | "visible";
+type UILayoutVariant = "full" | "minimal" | "hidden";
+type UILayout = {
+  sidebar_left: boolean;
+  sidebar_right: "hidden" | "visible" | "floating-when-selection";
+  toolbar_bottom: boolean;
+  help_fab: boolean;
 };
 
 const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
+
+const LAYOUT_VARIANTS: Record<UILayoutVariant, UILayout> = {
+  hidden: {
+    sidebar_left: false,
+    sidebar_right: "hidden",
+    toolbar_bottom: false,
+    help_fab: false,
+  },
+  minimal: {
+    sidebar_left: false,
+    sidebar_right: "floating-when-selection",
+    toolbar_bottom: true,
+    help_fab: true,
+  },
+  full: {
+    sidebar_left: true,
+    sidebar_right: "visible",
+    toolbar_bottom: true,
+    help_fab: true,
+  },
+};
+
+// Custom hook for managing UI layout state
+function useUILayout() {
+  const [uiVariant, setUIVariant] = useState<UILayoutVariant>("full");
+  const [lastVisibleVariant, setLastVisibleVariant] = useState<
+    "full" | "minimal"
+  >("full");
+
+  const ui = useMemo(() => LAYOUT_VARIANTS[uiVariant], [uiVariant]);
+
+  const toggleVisibility = useCallback(() => {
+    setUIVariant((current) => {
+      if (current === "hidden") {
+        return lastVisibleVariant; // Return to last visible state
+      }
+      setLastVisibleVariant(current as "full" | "minimal"); // Remember current state
+      return "hidden";
+    });
+  }, [lastVisibleVariant]);
+
+  const toggleMinimal = useCallback(() => {
+    setUIVariant((current) => {
+      if (current === "hidden") {
+        return "full"; // Don't toggle if hidden
+      }
+      const newVariant = current === "full" ? "minimal" : "full";
+      setLastVisibleVariant(newVariant);
+      return newVariant;
+    });
+  }, []);
+
+  return {
+    ui,
+    uiVariant,
+    toggleVisibility,
+    toggleMinimal,
+  };
+}
 
 function snapshotFilename() {
   const now = new Date();
@@ -195,6 +264,17 @@ export default function CanvasPlayground({
   const instance = useEditor(document, backend);
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Mock loading timer - completes after random short time (1-3 seconds)
+  useEffect(() => {
+    const randomDelay = Math.random() * 1000 + 1000; // 1-2 seconds
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, randomDelay);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!src) return;
@@ -213,13 +293,14 @@ export default function CanvasPlayground({
 
   return (
     <>
+      <FullscreenLoadingOverlay loading={isLoading} />
       <FontFamilyListProvider fonts={fonts}>
         <SidebarProvider className="w-full h-full">
           <TooltipProvider>
             <main className="w-full h-full select-none">
               <ErrorBoundary>
                 <StandaloneDocumentEditor editor={instance}>
-                  <WindowCurrentEditorProvider />
+                  <WindowGlobalCurrentEditorProvider />
                   <UserCustomTemplatesProvider templates={templates}>
                     <Consumer backend={backend} />
                   </UserCustomTemplatesProvider>
@@ -234,13 +315,25 @@ export default function CanvasPlayground({
 }
 
 function Consumer({ backend }: { backend: "dom" | "canvas" }) {
-  const [ui, setUI] = useState<UIConfig>({
-    sidebar: "visible",
-    toolbar: "visible",
-  });
+  const { ui, toggleVisibility, toggleMinimal } = useUILayout();
 
   const instance = useCurrentEditor();
   const debug = useEditorState(instance, (state) => state.debug);
+
+  // Check if there are selected nodes for conditional sidebar display
+  const hasSelection = useEditorState(
+    instance,
+    (state) => state.selection.length > 0
+  );
+
+  // Determine if right sidebar should be visible
+  const should_show_sidebar_right =
+    ui.sidebar_right === "visible" ||
+    (ui.sidebar_right === "floating-when-selection" && hasSelection);
+
+  // Determine the variant for the right sidebar
+  const sidebar_right_variant =
+    ui.sidebar_right === "floating-when-selection" ? "floating" : "sidebar";
 
   useDisableSwipeBack();
 
@@ -248,10 +341,14 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
     e.stopPropagation();
     e.stopImmediatePropagation();
     e.preventDefault();
-    setUI((ui) => ({
-      ...ui,
-      sidebar: ui.sidebar === "visible" ? "hidden" : "visible",
-    }));
+    toggleVisibility();
+  });
+
+  useHotkeys("meta+shift+\\, ctrl+shift+\\", (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    toggleMinimal();
   });
 
   useHotkeys("ctrl+`", () => {
@@ -259,13 +356,6 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
     toast("Debug mode " + (debug ? "enabled" : "disabled"), {
       position: "bottom-left",
     });
-  });
-
-  useHotkeys("meta+shift+\\, ctrl+shift+\\", () => {
-    setUI((ui) => ({
-      ...ui,
-      toolbar: ui.toolbar === "visible" ? "hidden" : "visible",
-    }));
   });
 
   useHotkeys(
@@ -287,7 +377,7 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
     <>
       <PreviewProvider>
         <div className="flex w-full h-full">
-          {ui.sidebar === "visible" && <SidebarLeft />}
+          {ui.sidebar_left && <SidebarLeft />}
           <EditorSurfaceClipboardSyncProvider>
             <EditorSurfaceDropzone>
               <EditorSurfaceContextMenu>
@@ -302,7 +392,7 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
                         <StandaloneSceneContent />
                       </AutoInitialFitTransformer>
                     )}
-                    {ui.toolbar === "visible" && (
+                    {ui.toolbar_bottom && (
                       <>
                         <BrushToolbarPosition>
                           <BrushToolbar />
@@ -321,11 +411,13 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
               </EditorSurfaceContextMenu>
             </EditorSurfaceDropzone>
           </EditorSurfaceClipboardSyncProvider>
-          {ui.sidebar === "visible" && <SidebarRight />}
+          {should_show_sidebar_right && (
+            <SidebarRight variant={sidebar_right_variant} />
+          )}
         </div>
       </PreviewProvider>
 
-      {ui.toolbar === "visible" && <HelpFab />}
+      {ui.help_fab && <HelpFab />}
     </>
   );
 }
@@ -442,12 +534,24 @@ function Presense() {
   );
 }
 
-function SidebarRight() {
+function SidebarRight({
+  variant = "sidebar",
+}: {
+  variant?: "sidebar" | "floating";
+}) {
   const should_show_artboards_list = useArtboardListCondition();
 
   return (
-    <aside className="relative">
-      <Sidebar side="right" variant="sidebar" className="hidden sm:block">
+    <aside
+      data-variant={variant}
+      id="sidebar-right"
+      className="relative data-[variant=floating]:absolute"
+    >
+      <Sidebar
+        side="right"
+        variant={variant}
+        className="group-data-[variant=floating]:pt-8 group-data-[variant=floating]:pb-4 group-data-[variant=floating]:pl-0 group-data-[variant=floating]:pr-4"
+      >
         <SidebarHeader className="p-0">
           <header className="flex h-11 px-2 justify-between items-center gap-2">
             <div className="flex-1">

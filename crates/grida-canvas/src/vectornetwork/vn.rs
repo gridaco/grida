@@ -88,7 +88,7 @@ pub struct VectorNetworkRegion {
     /// When `None`, the region will not be filled by the vector-network painter.
     /// This mirrors node-level fill semantics where multiple paints may be
     /// stacked.
-    pub fills: Option<Vec<Paint>>,
+    pub fills: Option<Paints>,
 }
 
 #[derive(Debug, Clone)]

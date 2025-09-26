@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::{types::*, *};
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -32,14 +32,18 @@ async fn demo_image() -> (Scene, Vec<u8>) {
     rect1.name = Some("ImageFillRect".to_string());
     rect1.transform = AffineTransform::identity();
     rect1.size = image8ksize.clone();
+    let url = format!("res://images/{}", hash_str.clone());
     rect1.set_fill(Paint::Image(ImagePaint {
-        hash: hash_str.clone(),
+        image: ResourceRef::RID(url.clone()),
+        quarter_turns: 0,
         opacity: 1.0,
-        transform: AffineTransform::identity(),
-        fit: BoxFit::Cover,
+        alignement: Alignment::CENTER,
+        fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
+        active: true,
+        filters: ImageFilters::default(),
     }));
-    rect1.strokes = vec![Paint::from(CGColor(255, 0, 0, 255))];
+    rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     rect1.stroke_width = 2.0;
 
     let mut repository = NodeRepository::new();

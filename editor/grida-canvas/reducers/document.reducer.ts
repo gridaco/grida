@@ -17,6 +17,11 @@ import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import assert from "assert";
+import {
+  resolvePaints,
+  getTargetPaint,
+  updateTargetPaint,
+} from "../utils/paint-resolution";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import nodeTransformReducer from "./node-transform.reducer";
@@ -121,6 +126,34 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "copy":
     case "cut": {
+      if (state.content_edit_mode?.type === "paint/image") {
+        const { node_id, paint_target, paint_index } = state.content_edit_mode;
+        const node = dq.__getNodeById(state, node_id);
+        assert(node, `node not found with node_id: "${node_id}"`);
+        const { paints, resolvedIndex } = resolvePaints(
+          node as grida.program.nodes.UnknwonNode,
+          paint_target,
+          paint_index
+        );
+        const targetPaint = paints[resolvedIndex];
+        if (!cg.isImagePaint(targetPaint)) {
+          return state;
+        }
+        const serialized = JSON.parse(
+          JSON.stringify(targetPaint)
+        ) as cg.ImagePaint;
+        return produce(state, (draft) => {
+          draft.user_clipboard = {
+            payload_id: v4(),
+            type: "property/fill-image-paint",
+            document_key: draft.document_key,
+            node_id,
+            paint_target,
+            paint_index: resolvedIndex,
+            paint: serialized,
+          };
+        });
+      }
       if (state.content_edit_mode?.type === "vector") {
         const {
           node_id,
@@ -162,6 +195,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         // [copy]
         draft.user_clipboard = {
           payload_id: v4(),
+          type: "prototypes",
           ids: target_node_ids,
           prototypes: target_node_ids.map((id) =>
             grida.program.nodes.factory.createPrototypeFromSnapshot(
@@ -179,6 +213,65 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "paste": {
+      if (state.user_clipboard?.type === "property/fill-image-paint") {
+        const clipboard = state.user_clipboard;
+        if (
+          clipboard.document_key &&
+          state.document_key &&
+          clipboard.document_key !== state.document_key
+        ) {
+          return state;
+        }
+        if (state.selection.length === 0) {
+          return state;
+        }
+        const selectionIds = [...state.selection];
+        return produce(state, (draft) => {
+          const payload = draft.user_clipboard;
+          if (!payload || payload.type !== "property/fill-image-paint") {
+            return;
+          }
+          if (
+            payload.document_key &&
+            draft.document_key &&
+            payload.document_key !== draft.document_key
+          ) {
+            return;
+          }
+          const target = payload.paint_target;
+          const pluralKey = target === "stroke" ? "strokes" : "fills";
+          const singularKey = target === "stroke" ? "stroke" : "fill";
+          let applied = false;
+
+          for (const node_id of selectionIds) {
+            const node = dq.__getNodeById(draft, node_id);
+            if (!node) continue;
+
+            const existing: cg.Paint[] = Array.isArray((node as any)[pluralKey])
+              ? ([...(node as any)[pluralKey]] as cg.Paint[])
+              : (node as any)[singularKey]
+                ? [(node as any)[singularKey] as cg.Paint]
+                : [];
+
+            const clonedPaint = JSON.parse(
+              JSON.stringify(payload.paint)
+            ) as cg.ImagePaint;
+
+            // Simply push the paint to the end without any checks
+            existing.push(clonedPaint);
+
+            (node as any)[pluralKey] = existing;
+            if (existing.length > 0) {
+              (node as any)[singularKey] = existing[0];
+            }
+            applied = true;
+          }
+
+          if (!applied) {
+            return;
+          }
+        });
+      }
       if (action.vector_network) {
         if (state.content_edit_mode?.type === "vector") {
           const net = action.vector_network;
@@ -256,7 +349,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             height: 0,
             rotation: 0,
             zIndex: 0,
-            stroke: { type: "solid", color: black },
+            stroke: { type: "solid", color: black, active: true },
             strokeCap: "butt",
             strokeWidth: 1,
             vectorNetwork: net,
@@ -336,6 +429,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       }
 
       if (!state.user_clipboard) break;
+      if (state.user_clipboard.type !== "prototypes") break;
       const { user_clipboard, selection } = state;
       const { ids, prototypes } = user_clipboard;
 
@@ -448,25 +542,37 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "a11y/delete": {
       const target_node_ids = state.selection;
 
-      if (state.content_edit_mode?.type === "fill/gradient") {
+      if (state.content_edit_mode?.type === "paint/gradient") {
         const { node_id } = state.content_edit_mode;
 
         return produce(state, (draft) => {
           const mode =
-            draft.content_edit_mode as editor.state.FillGradientContentEditMode;
+            draft.content_edit_mode as editor.state.PaintGradientContentEditMode;
           const node = dq.__getNodeById(draft, node_id)!;
-          if (
-            node &&
-            "fill" in node &&
-            cg.isGradientPaint(node.fill as cg.Paint)
-          ) {
-            const fill = node.fill as cg.GradientPaint;
-            if (fill.stops.length > 2) {
-              fill.stops.splice(mode.selected_stop, 1);
+          const paintTarget = mode.paint_target ?? "fill";
+          const { paints, resolvedIndex } = resolvePaints(
+            node as grida.program.nodes.UnknwonNode,
+            paintTarget,
+            mode.paint_index ?? 0
+          );
+          const target = paints[resolvedIndex];
+
+          if (target && cg.isGradientPaint(target)) {
+            const gradient = target as cg.GradientPaint;
+            if (gradient.stops.length > 2) {
+              gradient.stops.splice(mode.selected_stop, 1);
               mode.selected_stop = Math.min(
                 mode.selected_stop,
-                fill.stops.length - 1
+                gradient.stops.length - 1
               );
+            }
+
+            // Update the paint in the array
+            if (paints.length > 0) {
+              paints[resolvedIndex] = gradient;
+              // Update singular property for legacy compatibility
+              const singularKey = paintTarget === "stroke" ? "stroke" : "fill";
+              (node as any)[singularKey] = paints[0];
             }
           }
         });
@@ -686,23 +792,43 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       // handle a11y for content edit mode
       if (state.content_edit_mode) {
         switch (state.content_edit_mode.type) {
-          case "fill/gradient": {
-            const { node_id, selected_stop } = state.content_edit_mode;
+          case "paint/gradient": {
+            const {
+              node_id,
+              selected_stop,
+              paint_index = 0,
+              paint_target = "fill",
+            } = state.content_edit_mode;
             return produce(state, (draft) => {
               const node = dq.__getNodeById(draft, node_id);
-              const fill: cg.GradientPaint | undefined =
-                "fill" in node && cg.isGradientPaint(node?.fill as cg.Paint)
-                  ? (node.fill as cg.GradientPaint)
+              const { paints, resolvedIndex } = resolvePaints(
+                node as grida.program.nodes.UnknwonNode,
+                paint_target,
+                paint_index
+              );
+              const target = paints[resolvedIndex];
+              const gradient: cg.GradientPaint | undefined =
+                target && cg.isGradientPaint(target)
+                  ? (target as cg.GradientPaint)
                   : undefined;
               const mod = shiftKey ? 0.1 : 0.01;
 
-              if (!fill) return;
+              if (!gradient) return;
 
-              const stop = fill.stops[selected_stop];
+              const stop = gradient.stops[selected_stop];
               stop.offset = Math.min(
                 1,
                 Math.max(0, stop.offset + direction_1d * mod)
               );
+
+              // Update the paint in the array
+              if (paints.length > 0) {
+                paints[resolvedIndex] = gradient;
+                // Update singular property for legacy compatibility
+                const singularKey =
+                  paint_target === "stroke" ? "stroke" : "fill";
+                (node as any)[singularKey] = paints[0];
+              }
             });
             break;
           }
@@ -1436,12 +1562,17 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "select-gradient-stop": {
       return produce(state, (draft) => {
         const { target } = <EditorSelectGradientStopAction>action;
-        const { node_id, stop } = target;
+        const { node_id, stop, paint_index, paint_target } = target;
         const node = dq.__getNodeById(draft, node_id);
         assert(node);
-        if (draft.content_edit_mode?.type === "fill/gradient") {
+        if (draft.content_edit_mode?.type === "paint/gradient") {
           draft.content_edit_mode.node_id = node_id;
           draft.content_edit_mode.selected_stop = stop;
+          if (typeof paint_index === "number") {
+            draft.content_edit_mode.paint_index = paint_index;
+          }
+          draft.content_edit_mode.paint_target =
+            paint_target ?? draft.content_edit_mode.paint_target ?? "fill";
         }
       });
     }
@@ -1521,7 +1652,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "surface/guide/delete":
     case "surface/pixel-grid":
     case "surface/content-edit-mode/try-enter":
-    case "surface/content-edit-mode/fill/gradient":
+    case "surface/content-edit-mode/paint/gradient":
+    case "surface/content-edit-mode/paint/image":
     case "surface/content-edit-mode/try-exit":
     case "surface/tool":
     case "surface/brush":

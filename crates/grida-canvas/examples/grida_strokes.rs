@@ -39,7 +39,7 @@ async fn demo_strokes() -> Scene {
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
 
         // Solid color stroke
-        rect.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         rect.stroke_width = 8.0; // Thick stroke to make alignment visible
 
         // Set different alignments
@@ -68,7 +68,7 @@ async fn demo_strokes() -> Scene {
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
 
         // Solid color stroke
-        rect.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         rect.stroke_width = (i + 1) as f32 * 2.0; // Increasing stroke width
         rect.stroke_align = StrokeAlign::Center;
 
@@ -88,7 +88,7 @@ async fn demo_strokes() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
-        rect.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         rect.stroke_width = 4.0;
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -101,8 +101,8 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        ellipse.fills = vec![Paint::from(CGColor(0, 0, 0, 0))];
-        ellipse.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        ellipse.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
+        ellipse.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         ellipse.stroke_width = 4.0;
         all_shape_ids.push(ellipse.id.clone());
         repository.insert(Node::Ellipse(ellipse));
@@ -116,8 +116,8 @@ async fn demo_strokes() -> Scene {
             height: base_size,
         };
         polygon.point_count = 6;
-        polygon.fills = vec![Paint::from(CGColor(0, 0, 0, 0))];
-        polygon.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        polygon.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
+        polygon.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         polygon.stroke_width = 4.0;
         all_shape_ids.push(polygon.id.clone());
         repository.insert(Node::RegularPolygon(polygon));
@@ -132,8 +132,8 @@ async fn demo_strokes() -> Scene {
         };
         star.point_count = 5;
         star.inner_radius = 0.4;
-        star.fills = vec![Paint::from(CGColor(0, 0, 0, 0))];
-        star.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        star.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
+        star.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         star.stroke_width = 4.0;
         all_shape_ids.push(star.id.clone());
         repository.insert(Node::RegularStarPolygon(star));
@@ -154,7 +154,7 @@ async fn demo_strokes() -> Scene {
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
 
         // Solid color stroke
-        rect.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         rect.stroke_width = 4.0;
 
         // Add different effects
@@ -194,7 +194,7 @@ async fn demo_strokes() -> Scene {
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
 
         // Solid color stroke
-        rect.strokes = vec![Paint::from(CGColor(0, 0, 0, 255))];
+        rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         rect.stroke_width = 4.0;
 
         // Add different dash patterns
@@ -222,7 +222,7 @@ async fn demo_strokes() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
-        rect.strokes = vec![Paint::LinearGradient(LinearGradientPaint {
+        rect.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::new(0.0, 0.0, 0.0),
             stops: vec![
                 GradientStop {
@@ -236,7 +236,8 @@ async fn demo_strokes() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-        })];
+            active: true,
+        })]);
         rect.stroke_width = 8.0;
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -251,7 +252,7 @@ async fn demo_strokes() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
-        rect.strokes = vec![Paint::RadialGradient(RadialGradientPaint {
+        rect.strokes = Paints::new([Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::new(base_size / 2.0, base_size / 2.0, 0.0),
             stops: vec![
                 GradientStop {
@@ -265,7 +266,8 @@ async fn demo_strokes() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-        })];
+            active: true,
+        })]);
         rect.stroke_width = 8.0;
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -280,7 +282,7 @@ async fn demo_strokes() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
-        rect.strokes = vec![Paint::RadialGradient(RadialGradientPaint {
+        rect.strokes = Paints::new([Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::new(base_size / 2.0, base_size / 2.0, 0.0),
             stops: vec![
                 GradientStop {
@@ -298,7 +300,8 @@ async fn demo_strokes() -> Scene {
             ],
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-        })];
+            active: true,
+        })]);
         rect.stroke_width = 8.0;
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -313,7 +316,7 @@ async fn demo_strokes() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
-        rect.strokes = vec![Paint::from(CGColor(255, 128, 0, 255))];
+        rect.strokes = Paints::new([Paint::from(CGColor(255, 128, 0, 255))]);
         rect.stroke_width = 8.0;
         rect.stroke_dash_array = Some(vec![20.0, 10.0, 5.0, 10.0]); // Complex dash pattern
         all_shape_ids.push(rect.id.clone());
@@ -332,11 +335,11 @@ async fn demo_strokes() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
-        rect.strokes = vec![
+        rect.strokes = Paints::new([
             Paint::from(CGColor(255, 0, 0, 255)),
             Paint::from(CGColor(0, 255, 0, 255)),
             Paint::from(CGColor(0, 0, 255, 255)),
-        ];
+        ]);
         rect.stroke_width = 12.0; // Thick stroke to show layering
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -351,7 +354,7 @@ async fn demo_strokes() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
-        rect.strokes = vec![
+        rect.strokes = Paints::new([
             Paint::from(CGColor(255, 255, 0, 255)),
             Paint::LinearGradient(LinearGradientPaint {
                 transform: AffineTransform::from_rotatation(45.0),
@@ -367,8 +370,9 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 0.7,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
-        ];
+        ]);
         rect.stroke_width = 10.0;
         all_shape_ids.push(rect.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -381,8 +385,8 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        ellipse.fills = vec![Paint::from(CGColor(0, 0, 0, 0))];
-        ellipse.strokes = vec![
+        ellipse.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
+        ellipse.strokes = Paints::new([
             Paint::RadialGradient(RadialGradientPaint {
                 transform: AffineTransform::identity(),
                 stops: vec![
@@ -397,6 +401,7 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 1.0,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
             Paint::LinearGradient(LinearGradientPaint {
                 transform: AffineTransform::from_rotatation(90.0),
@@ -412,8 +417,9 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 0.8,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
-        ];
+        ]);
         ellipse.stroke_width = 12.0;
         all_shape_ids.push(ellipse.id.clone());
         repository.insert(Node::Ellipse(ellipse));
@@ -427,8 +433,8 @@ async fn demo_strokes() -> Scene {
             height: base_size,
         };
         polygon.point_count = 5; // Pentagon
-        polygon.fills = vec![Paint::from(CGColor(0, 0, 0, 0))];
-        polygon.strokes = vec![
+        polygon.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
+        polygon.strokes = Paints::new([
             Paint::from(CGColor(128, 0, 128, 255)),
             Paint::LinearGradient(LinearGradientPaint {
                 transform: AffineTransform::from_rotatation(30.0),
@@ -444,6 +450,7 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 0.6,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
             Paint::RadialGradient(RadialGradientPaint {
                 transform: AffineTransform {
@@ -461,8 +468,9 @@ async fn demo_strokes() -> Scene {
                 ],
                 opacity: 0.5,
                 blend_mode: BlendMode::Normal,
+                active: true,
             }),
-        ];
+        ]);
         polygon.stroke_width = 15.0; // Very thick to show all layers
         polygon.stroke_dash_array = Some(vec![8.0, 4.0]); // Dashed pattern
         all_shape_ids.push(polygon.id.clone());

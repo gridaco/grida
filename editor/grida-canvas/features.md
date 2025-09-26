@@ -147,4 +147,20 @@ This document lists all implemented features including the ones that are not yet
 
 ### Known Limitations
 
+**dom backend**
+
 - css backend node's `linear-gradient` does not support custom transform matrix
+- css does not support `diamond-gradient`
+
+---
+
+## All Features ever implemented (Implemented, May not persist)
+
+Below list may contain uncatagorized or even duplicate features. It's our history and iterations archive for future reference, for ensuring them as tests.
+
+We keep below list as-is, as new issues discovered, to-do list added, and handled.
+
+They are very specific, details per-scenario descriptions.
+
+- [x] `2025.09` text stroke - outside default
+      when stroke added to text, it should apply default outside

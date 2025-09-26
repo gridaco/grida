@@ -44,13 +44,13 @@ fn main() {
         let stroke_options = StrokeOptions {
             width: 5.0, // Increased stroke width for visibility
             align: cg::cg::types::StrokeAlign::Center,
-            color,
+            paints: Paints::new([Paint::from(color)]),
             width_profile: None,
         };
 
         // Use VNPainter to render the line
         let painter = VNPainter::new(canvas);
-        painter.draw(&line, &[], Some(&stroke_options));
+        painter.draw(&line, &[], Some(&stroke_options), 0.0);
     }
 
     let image = surface.image_snapshot();

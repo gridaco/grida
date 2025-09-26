@@ -1,7 +1,5 @@
 import React, { useMemo } from "react";
 import type cg from "@grida/cg";
-import type { FontFeature } from "@grida/fonts/parse";
-import type Typr from "@grida/fonts/typr";
 import { editor } from "@/grida-canvas";
 
 const PANGRAM_EN = "The Quick Brown Fox Jumps Over The Lazy Dog";

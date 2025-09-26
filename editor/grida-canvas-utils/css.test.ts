@@ -20,6 +20,7 @@ describe("toReactTextStyle", () => {
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
+        active: true,
       },
       fontFeatures: { liga: false, smpl: true },
       fontVariations: { wght: 700, slnt: 12 },
@@ -43,6 +44,7 @@ describe("toReactTextStyle", () => {
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
+        active: true,
       },
       fontOpticalSizing: 12,
       fontVariations: { wght: 500 },
@@ -66,6 +68,7 @@ describe("toReactTextStyle", () => {
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
+        active: true,
       },
       fontFeatures: { kern: true },
     };
@@ -88,6 +91,7 @@ describe("toReactTextStyle", () => {
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
+        active: true,
       },
       fontVariations: { wdth: 120, wght: 500 },
     };
@@ -109,6 +113,7 @@ describe("toReactTextStyle", () => {
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
+        active: true,
       },
       textTransform: "uppercase",
     };
@@ -131,6 +136,7 @@ describe("toReactCSSProperties", () => {
       fill: {
         type: "solid",
         color: { r: 0, g: 0, b: 0, a: 1 },
+        active: true,
       },
       maxLines: 2,
     } as any;

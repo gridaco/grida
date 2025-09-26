@@ -31,13 +31,7 @@ function CanvasContent({
   className?: string;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const rendererRef = useGrida2D(canvasRef);
-
-  useLayoutEffect(() => {
-    if (rendererRef.current) {
-      onMount?.(rendererRef.current);
-    }
-  }, [rendererRef.current]);
+  const rendererRef = useGrida2D(canvasRef, onMount);
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
@@ -125,8 +119,7 @@ function useDPR() {
 }
 
 export default function Canvas({
-  width,
-  height,
+  initialSize,
   data,
   transform,
   debug,
@@ -134,8 +127,7 @@ export default function Canvas({
   onMount,
   className,
 }: {
-  width: number;
-  height: number;
+  initialSize: { width: number; height: number };
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
@@ -146,7 +138,7 @@ export default function Canvas({
   onMount?: (surface: Scene) => void;
   className?: string;
 }) {
-  const size = useSize({ width, height });
+  const size = useSize(initialSize);
   // const dpr = useDPR();
   const dpr = 1;
   return (

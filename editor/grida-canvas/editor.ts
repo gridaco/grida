@@ -18,7 +18,6 @@ import { EditorFollowPlugin } from "./plugins/follow";
 import type { Scene } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
 import * as google from "@grida/fonts/google";
-import type { FvarInstance } from "@grida/fonts/parse";
 
 import { DocumentFontManager } from "./font-manager";
 import {
@@ -82,6 +81,7 @@ export class Editor
     editor.api.IEventTargetActions,
     editor.api.IFollowPluginActions,
     editor.api.IVectorInterfaceActions,
+    editor.api.IDocumentImageInterfaceActions,
     editor.api.IFontLoaderActions,
     editor.api.IExportPluginActions
 {
@@ -302,6 +302,9 @@ export class Editor
     return this._tid;
   }
 
+  /**
+   * @deprecated
+   */
   public bind(surface: Scene) {
     this.log("bind surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");
@@ -488,6 +491,12 @@ export class Editor
         width: this.viewport.size.width,
         height: this.viewport.size.height,
       },
+      backend: this.backend,
+      // TODO: LEGACY_PAINT_MODEL
+      paint_constraints: {
+        fill: this.backend === "dom" ? "fill" : "fills",
+        stroke: this.backend === "dom" ? "stroke" : "strokes",
+      },
     });
     this._tid++;
     this.listeners.forEach((l) => l(this, action));
@@ -503,6 +512,12 @@ export class Editor
           viewport: {
             width: this.viewport.size.width,
             height: this.viewport.size.height,
+          },
+          backend: this.backend,
+          // TODO: LEGACY_PAINT_MODEL
+          paint_constraints: {
+            fill: this.backend === "dom" ? "fill" : "fills",
+            stroke: this.backend === "dom" ? "stroke" : "strokes",
           },
         }),
       this.mstate
@@ -601,35 +616,51 @@ export class Editor
     });
   }
 
+  // ================================================================
+  // #region IDocumentImageInterfaceActions implementation
+  // ================================================================
+
   private readonly images = new Map<string, grida.program.document.ImageRef>();
-  private async _experimental_createImage_for_wasm(
-    src: string
-  ): Promise<Readonly<grida.program.document.ImageRef>> {
+
+  __is_image_registered(ref: string): boolean {
+    return this.images.has(ref);
+  }
+
+  __get_image_ref(ref: string): grida.program.document.ImageRef | null {
+    return this.images.get(ref) || null;
+  }
+
+  __get_image_bytes_for_wasm(ref: string): Uint8Array | null {
     assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
-    const res = await fetch(src);
-    const blob = await res.blob();
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    const type = blob.type;
+    const data = this._m_wasm_canvas_scene.getImageBytes(ref);
+    if (!data) return null;
+    return new Uint8Array(data);
+  }
 
-    const { width, height } = await new Promise<{
-      width: number;
-      height: number;
-    }>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve({ width: img.width, height: img.height });
-      img.onerror = reject;
-      img.src = src;
-    });
+  __get_image_size_for_wasm(
+    ref: string
+  ): { width: number; height: number } | null {
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+    const size = this._m_wasm_canvas_scene.getImageSize(ref);
+    if (!size) return null;
+    return size;
+  }
 
-    const hash = this._m_wasm_canvas_scene.addImage(bytes);
-    const url = `res://images/${hash}`;
+  protected _experimental_createImage_for_wasm(
+    data: Uint8Array
+  ): Readonly<grida.program.document.ImageRef> {
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+
+    const result = this._m_wasm_canvas_scene.addImage(data);
+    if (!result) throw new Error("addImage failed");
+    const { hash, url, width, height, type } = result;
 
     const ref: grida.program.document.ImageRef = {
       url,
       width,
       height,
-      bytes: bytes.byteLength,
-      type: type as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+      bytes: data.byteLength,
+      type: type as grida.program.document.ImageType,
     };
 
     this.images.set(url, ref);
@@ -637,17 +668,36 @@ export class Editor
     return ref;
   }
 
-  async createImage(
+  async createImageAsync(
     src: string
   ): Promise<Readonly<grida.program.document.ImageRef>> {
-    if (this.backend === "canvas" && this._m_wasm_canvas_scene) {
-      return this._experimental_createImage_for_wasm(src);
-    }
-
     const res = await fetch(src);
     const blob = await res.blob();
     const bytes = await blob.arrayBuffer();
     const type = blob.type;
+
+    // TODO: add file validation
+
+    return this.createImage(
+      new Uint8Array(bytes),
+      src,
+      type as grida.program.document.ImageType
+    );
+  }
+
+  async createImage(
+    data: Uint8Array,
+    url?: string,
+    type?: grida.program.document.ImageType | (string | {})
+  ): Promise<Readonly<grida.program.document.ImageRef>> {
+    // TODO: add file validation
+
+    if (this.backend === "canvas" && this._m_wasm_canvas_scene) {
+      return this._experimental_createImage_for_wasm(data);
+    }
+
+    // For DOM backend, we need to get dimensions
+    const imageUrl = url || URL.createObjectURL(new Blob([data]));
 
     const { width, height } = await new Promise<{
       width: number;
@@ -656,24 +706,31 @@ export class Editor
       const img = new Image();
       img.onload = () => resolve({ width: img.width, height: img.height });
       img.onerror = reject;
-      img.src = src;
+      img.src = imageUrl;
     });
 
     const ref: grida.program.document.ImageRef = {
-      url: src,
+      url: url || imageUrl,
       width,
       height,
-      bytes: bytes.byteLength,
-      type: type as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+      bytes: data.byteLength,
+      type: (type as grida.program.document.ImageType) || "image/png",
     };
 
     this.reduce((state) => {
-      state.document.images[src] = ref;
+      state.document.images[ref.url] = ref;
       return state;
     });
 
     return ref;
   }
+
+  getImage(ref: string): ImageProxy | null {
+    if (!this.__is_image_registered(ref)) return null;
+    return new ImageProxy(this, ref);
+  }
+
+  // #endregion
 
   setTool(tool: editor.state.ToolMode, debug_label?: string) {
     if (debug_label) this.log("debug:setTool", tool, debug_label);
@@ -691,7 +748,11 @@ export class Editor
    */
   tryEnterContentEditMode(
     node_id?: string,
-    mode: "auto" | "fill/gradient" = "auto"
+    mode: "auto" | "paint/gradient" | "paint/image" = "auto",
+    options?: {
+      paintIndex?: number;
+      paintTarget?: "fill" | "stroke";
+    }
   ) {
     node_id = node_id ?? this.state.selection[0];
     switch (mode) {
@@ -699,14 +760,29 @@ export class Editor
         return this.dispatch({
           type: "surface/content-edit-mode/try-enter",
         });
-      case "fill/gradient":
+      case "paint/gradient":
         if (node_id) {
+          const paintTarget = options?.paintTarget ?? "fill";
+          const paintIndex = options?.paintIndex ?? 0;
           return this.dispatch({
-            type: "surface/content-edit-mode/fill/gradient",
-            node_id: node_id ?? this.state.selection[0],
+            type: "surface/content-edit-mode/paint/gradient",
+            node_id: node_id,
+            paint_target: paintTarget,
+            paint_index: paintIndex,
           });
         } else {
           // no-op
+        }
+      case "paint/image":
+        if (node_id) {
+          const paintTarget = options?.paintTarget ?? "fill";
+          const paintIndex = options?.paintIndex ?? 0;
+          return this.dispatch({
+            type: "surface/content-edit-mode/paint/image",
+            node_id: node_id,
+            paint_target: paintTarget,
+            paint_index: paintIndex,
+          });
         }
     }
   }
@@ -782,6 +858,10 @@ export class Editor
           if (state.tool.type !== "cursor") {
             steps.push("escape-tool");
           }
+          break;
+        }
+        case "paint/gradient":
+        case "paint/image": {
           break;
         }
       }
@@ -867,6 +947,34 @@ export class Editor
     return true;
   }
 
+  public async writeClipboardSVG(
+    target: "selection" | editor.NodeID
+  ): Promise<boolean> {
+    assert(this.backend === "canvas", "Editor is not using canvas backend");
+    const ids = target === "selection" ? this.mstate.selection : [target];
+    if (ids.length === 0) return false;
+    const id = ids[0];
+    const data = await this.exportNodeAs(id, "SVG");
+    if (typeof data !== "string") {
+      return false;
+    }
+
+    const svgBlob = new Blob([data], { type: "image/svg+xml" });
+    const textBlob = new Blob([data], { type: "text/plain" });
+    const item = new ClipboardItem({
+      "image/svg+xml": svgBlob,
+      "text/plain": textBlob,
+    });
+
+    try {
+      await navigator.clipboard.write([item]);
+    } catch (error) {
+      await navigator.clipboard.writeText(data);
+    }
+
+    return true;
+  }
+
   public async a11yCopyAsImage(format: "png"): Promise<boolean> {
     if (this.mstate.content_edit_mode?.type === "vector") {
       const { selected_vertices, selected_segments, selected_tangents } =
@@ -880,6 +988,22 @@ export class Editor
       if (this.mstate.selection.length === 0) return false;
     }
     return await this.writeClipboardMedia("selection", format);
+  }
+
+  public async a11yCopyAsSVG(): Promise<boolean> {
+    if (this.mstate.content_edit_mode?.type === "vector") {
+      const { selected_vertices, selected_segments, selected_tangents } =
+        this.mstate.content_edit_mode.selection;
+      const hasSelection =
+        selected_vertices.length > 0 ||
+        selected_segments.length > 0 ||
+        selected_tangents.length > 0;
+      if (!hasSelection) return false;
+    } else {
+      if (this.mstate.selection.length === 0) return false;
+    }
+
+    return await this.writeClipboardSVG("selection");
   }
 
   public a11yCopy() {
@@ -959,6 +1083,49 @@ export class Editor
       target: target,
       op: "xor",
     });
+  }
+
+  /**
+   * groups targets as mask, if multiple, if single && is mask, remove mask
+   * @param target
+   */
+  public toggleMask(target: ReadonlyArray<editor.NodeID>) {
+    if (target.length === 0) return;
+    if (target.length === 1) {
+      if (this.isMask(target[0])) {
+        this.removeMask(target[0]);
+        return;
+      }
+    }
+    this.groupMask(target);
+  }
+
+  public groupMask(target: ReadonlyArray<editor.NodeID>) {
+    assert(Array.isArray(target), "target must be an array");
+    this.group(target);
+    this.dispatch({
+      type: "node/change/*",
+      node_id: target[0],
+      mask: "alpha",
+    });
+  }
+
+  public removeMask(target: editor.NodeID) {
+    if (!this.isMask(target)) return;
+    this.dispatch({
+      type: "node/change/*",
+      node_id: target,
+      mask: null,
+    });
+  }
+
+  /**
+   * Checks if a node is being used as a mask
+   * @param target the node to test
+   */
+  public isMask(target: editor.NodeID) {
+    const n = this.getNodeSnapshotById(target);
+    return "mask" in n && n.mask;
   }
 
   public setClipboardColor(color: cg.RGBA8888) {
@@ -1123,12 +1290,23 @@ export class Editor
     });
   }
 
-  public selectGradientStop(node_id: editor.NodeID, stop: number): void {
+  public selectGradientStop(
+    node_id: editor.NodeID,
+    stop: number,
+    options?: {
+      paintIndex?: number;
+      paintTarget?: "fill" | "stroke";
+    }
+  ): void {
+    const paintTarget = options?.paintTarget ?? "fill";
+    const paintIndex = options?.paintIndex ?? 0;
     this.dispatch({
       type: "select-gradient-stop",
       target: {
         node_id,
         stop,
+        paint_index: paintIndex,
+        paint_target: paintTarget,
       },
     });
   }
@@ -1258,6 +1436,7 @@ export class Editor
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
+          active: true,
         },
       },
     });
@@ -1278,6 +1457,7 @@ export class Editor
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
+          active: true,
         },
       },
     });
@@ -1844,11 +2024,21 @@ export class Editor
       }
     });
   }
-  changeNodeBlendMode(node_id: editor.NodeID, blendMode: cg.BlendMode): void {
+  changeNodeBlendMode(
+    node_id: editor.NodeID,
+    blendMode: cg.LayerBlendMode
+  ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       blendMode,
+    });
+  }
+  changeNodeMaskType(node_id: string, mask: cg.LayerMaskType) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      mask,
     });
   }
   changeNodeRotation(node_id: string, rotation: editor.api.NumberChange) {
@@ -1953,31 +2143,81 @@ export class Editor
     });
   }
 
-  changeNodeFill(
-    node_id: string | string[],
-    fill: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-  ) {
+  changeNodeFills(node_id: string | string[], fills: cg.Paint[]) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     this.dispatchAll(
       node_ids.map((node_id) => ({
         type: "node/change/*",
         node_id,
-        fill: fill as cg.Paint,
+        fills,
       }))
     );
   }
 
-  changeNodeStroke(
-    node_id: string | string[],
-    stroke: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-  ) {
+  changeNodeStrokes(node_id: string | string[], strokes: cg.Paint[]) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     this.dispatchAll(
       node_ids.map((node_id) => ({
         type: "node/change/*",
         node_id,
-        stroke: stroke as cg.Paint,
+        strokes,
       }))
+    );
+  }
+
+  addNodeFill(
+    node_id: string | string[],
+    fill: cg.Paint,
+    at: "start" | "end" = "start"
+  ) {
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => {
+        const current = this.getNodeSnapshotById(node_id);
+        const currentFills = Array.isArray((current as any).fills)
+          ? ((current as any).fills as cg.Paint[])
+          : (current as any).fill
+            ? [(current as any).fill as cg.Paint]
+            : [];
+
+        const newFills =
+          at === "start" ? [fill, ...currentFills] : [...currentFills, fill];
+
+        return {
+          type: "node/change/*",
+          node_id,
+          fills: newFills,
+        };
+      })
+    );
+  }
+
+  addNodeStroke(
+    node_id: string | string[],
+    stroke: cg.Paint,
+    at: "start" | "end" = "start"
+  ) {
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    this.dispatchAll(
+      node_ids.map((node_id) => {
+        const current = this.getNodeSnapshotById(node_id);
+        const currentStrokes = Array.isArray((current as any).strokes)
+          ? ((current as any).strokes as cg.Paint[])
+          : (current as any).stroke
+            ? [(current as any).stroke as cg.Paint]
+            : [];
+
+        const newStrokes =
+          at === "start"
+            ? [stroke, ...currentStrokes]
+            : [...currentStrokes, stroke];
+
+        return {
+          type: "node/change/*",
+          node_id,
+          strokes: newStrokes,
+        };
+      })
     );
   }
 
@@ -3274,6 +3514,46 @@ export class Editor
    */
   dispose() {
     this.listeners.clear();
+  }
+}
+
+export class ImageProxy implements editor.api.ImageInstance {
+  public readonly type: grida.program.document.ImageType;
+  private readonly ref_obj: grida.program.document.ImageRef;
+  constructor(
+    private readonly editor: Editor,
+    private readonly ref: string
+  ) {
+    assert(editor.__is_image_registered(ref), "Image is not registered");
+    this.ref_obj = editor.__get_image_ref(ref)!;
+    this.type = this.ref_obj.type;
+  }
+
+  getBytes(): Uint8Array {
+    return this.editor.__get_image_bytes_for_wasm(this.ref)!;
+  }
+
+  async getDataURL(): Promise<string> {
+    const bytes = this.getBytes();
+    const blob = new Blob([bytes], { type: this.type });
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        resolve(reader.result as string);
+      };
+
+      reader.onerror = () => {
+        reject(new Error("Failed to read image file"));
+      };
+
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  getSize() {
+    return this.editor.__get_image_size_for_wasm(this.ref)!;
   }
 }
 
