@@ -13,6 +13,7 @@ import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
 import type { io } from "@grida/io";
+import { applyPatches, type Patch } from "immer";
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -1784,30 +1785,13 @@ export namespace editor.history {
   export type HistoryEntry = {
     actionType: EditorAction["type"];
     timestamp: number;
-    state: editor.state.IDocumentState;
+    patches: Patch[];
+    inversePatches: Patch[];
   };
 
   /**
    * @mutates draft
    */
-  export function apply(
-    draft: editor.state.IEditorState,
-    snapshot: editor.state.IDocumentState
-  ) {
-    //
-    draft.selection = snapshot.selection;
-    draft.scene_id = snapshot.scene_id;
-    draft.document = snapshot.document;
-    draft.document_ctx = snapshot.document_ctx;
-    draft.content_edit_mode = snapshot.content_edit_mode;
-    draft.document_key = snapshot.document_key;
-    //
-
-    // hover state should be cleared to prevent errors
-    draft.hovered_node_id = null;
-    return;
-  }
-
   export function snapshot(
     state: editor.state.IDocumentState
   ): editor.state.IDocumentState {
@@ -1823,35 +1807,75 @@ export namespace editor.history {
 
   export function entry(
     actionType: editor.history.HistoryEntry["actionType"],
-    state: editor.state.IDocumentState
+    patches: Patch[],
+    inversePatches: Patch[]
   ): editor.history.HistoryEntry {
     return {
       actionType,
-      state: snapshot(state),
+      patches,
+      inversePatches,
       timestamp: Date.now(),
     };
   }
 
   export function getMergableEntry(
     snapshots: editor.history.HistoryEntry[],
+    currentTimestamp: number,
     timeout: number = 300
   ): editor.history.HistoryEntry | undefined {
     if (snapshots.length === 0) {
       return;
     }
 
-    const newTimestamp = Date.now();
     const previousEntry = snapshots[snapshots.length - 1];
 
     if (
       // actionType !== previousEntry.actionType ||
-      newTimestamp - previousEntry.timestamp >
+      currentTimestamp - previousEntry.timestamp >
       timeout
     ) {
       return;
     }
 
     return previousEntry;
+  }
+
+  export function filterDocumentPatches(patches: Patch[]): Patch[] {
+    return patches.filter((patch) => {
+      const [key] = patch.path;
+      return (
+        key === "selection" ||
+        key === "scene_id" ||
+        key === "document" ||
+        key === "document_ctx" ||
+        key === "content_edit_mode" ||
+        key === "document_key"
+      );
+    });
+  }
+
+  export function apply(draft: editor.state.IEditorState, patches: Patch[]) {
+    const snapshotState = snapshot(draft);
+    const nextState = applyPatchesToSnapshot(snapshotState, patches);
+    draft.selection = nextState.selection;
+    draft.scene_id = nextState.scene_id;
+    draft.document = nextState.document;
+    draft.document_ctx = nextState.document_ctx;
+    draft.content_edit_mode = nextState.content_edit_mode;
+    draft.document_key = nextState.document_key;
+
+    draft.hovered_node_id = null;
+  }
+
+  function applyPatchesToSnapshot(
+    base: editor.state.IDocumentState,
+    patches: Patch[]
+  ): editor.state.IDocumentState {
+    if (patches.length === 0) {
+      return base;
+    }
+
+    return applyPatches(base, patches);
   }
 }
 
