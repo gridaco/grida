@@ -5,3 +5,4 @@ packages:
   - "crates/*"
   - "packages/*"
   - "packages/lib/*"
+  - "services/*"
