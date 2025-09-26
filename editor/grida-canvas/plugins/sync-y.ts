@@ -8,48 +8,79 @@ import { dq } from "../query";
 import equal from "fast-deep-equal";
 
 type AwarenessPayload = {
-  player: {
-    cursor_id: string;
+  /**
+   * user-window-session unique cursor id
+   *
+   * one user can have multiple cursors (if multiple windows are open)
+   */
+  cursor_id: string;
+  /**
+   * player profile information (rarely changes)
+   */
+  profile: {
+    /**
+     * theme colors for this player within collaboration ui
+     */
     palette: editor.state.MultiplayerCursorColorPalette;
-    transform: cmath.Transform;
-    position: [number, number];
-    marquee_a: [number, number] | null;
-    selection: string[];
-    scene_id: string | undefined;
   };
+  /**
+   * current focus state (changes when switching pages/selecting)
+   */
+  focus: {
+    /**
+     * player's current scene (page)
+     */
+    scene_id: string | undefined;
+    /**
+     * the selection (node ids) of this player
+     */
+    selection: string[];
+  };
+  /**
+   * geometric state (changes frequently with mouse movement)
+   */
+  geo: {
+    /**
+     * current transform (camera)
+     */
+    transform: cmath.Transform;
+    /**
+     * current cursor position
+     */
+    position: [number, number];
+    /**
+     * marquee start point
+     * the full marquee is a rect with marquee_a and position (current cursor position)
+     */
+    marquee_a: [number, number] | null;
+  };
+  /**
+   * cursor chat is a ephemeral message that lives for a short time and disappears after few seconds (as configured)
+   * only the last message is kept
+   */
+  cursor_chat: {
+    txt: string;
+    ts: number;
+  } | null;
 };
 
-export class EditorYSyncPlugin {
-  public readonly doc: Y.Doc;
-  public readonly provider: WebsocketProvider;
-  public readonly awareness: Awareness;
-  private readonly __unsubscribe_player_change: () => void;
-  private readonly __unsubscribe_document_change: () => void;
+// Internal class for managing document synchronization
+class DocumentSyncManager {
+  private __unsubscribe_document_change!: () => void;
   private readonly ymap: Y.Map<any>;
   private throttle_ms: number = 5;
   private _tid: number = 0;
 
   constructor(
     private readonly _editor: Editor,
-    private readonly room_id: string,
-    private readonly cursor: {
-      palette: editor.state.MultiplayerCursorColorPalette;
-      cursor_id: string;
-    }
+    private readonly _doc: Y.Doc
   ) {
-    this.doc = new Y.Doc();
-    this.provider = new WebsocketProvider(
-      process.env.NODE_ENV === "development"
-        ? "wss://localhost:8787/editor"
-        : "wss://live.grida.co/editor",
-      this.room_id,
-      this.doc
-    );
+    this.ymap = _doc.getMap("document");
+    this._setupDocumentSync();
+  }
 
-    this.awareness = this.provider.awareness;
-    this.ymap = this.doc.getMap("document");
-
-    // Sync document state
+  private _setupDocumentSync() {
+    // Sync document state from Y.Doc to Editor
     this.ymap.observe((event) => {
       const changes = event.changes.keys;
       const currentState = this._editor.getSnapshot();
@@ -78,86 +109,7 @@ export class EditorYSyncPlugin {
       }
     });
 
-    const aware = () => {
-      const states = Array.from(this.awareness.getStates().entries())
-        .filter(([id]) => id !== this.awareness.clientID)
-        .filter(([_, state]) => {
-          // Only process states that have a complete player object with palette
-          return state && state.player && state.player.palette;
-        })
-        .map((_: any) => {
-          const [id, state] = _ as [string, AwarenessPayload];
-          const {
-            cursor_id,
-            palette,
-            position = [0, 0],
-            marquee_a,
-            transform,
-            selection,
-            scene_id,
-          } = state.player;
-
-          const marquee = marquee_a ? { a: marquee_a, b: position } : null;
-
-          return {
-            t: Date.now(),
-            id: cursor_id, // Use cursor_id instead of awareness clientID
-            position,
-            palette,
-            marquee: marquee,
-            transform,
-            selection,
-            scene_id,
-          } satisfies editor.state.MultiplayerCursor;
-        });
-
-      // Convert to object format {[cursorId]: cursor} with timestamp-based conflict resolution
-      const cursorsObject = states.reduce(
-        (acc, state) => {
-          const existing = acc[state.id];
-          if (!existing || state.t > existing.t) {
-            acc[state.id] = state;
-          }
-          return acc;
-        },
-        {} as Record<string, (typeof states)[0]>
-      );
-
-      this._editor.__sync_cursors(cursorsObject);
-    };
-
-    this.awareness.on("change", aware);
-    this.awareness.on("remove", aware);
-    aware();
-
-    // Subscribe to cursor changes for awareness updates (pointer, marquee, etc.)
-    this.__unsubscribe_player_change = this._editor.subscribeWithSelector(
-      (state) => ({
-        pointer: state.pointer,
-        marquee: state.marquee,
-        selection: state.selection,
-        transform: state.transform,
-        scene_id: state.scene_id,
-      }),
-      (editor, next) => {
-        if (editor.locked) return;
-        const { pointer, marquee, selection, transform, scene_id } = next;
-
-        // Update awareness for cursor position
-        this.awareness.setLocalStateField("player", {
-          cursor_id: this.cursor.cursor_id,
-          palette: this.cursor.palette, // TODO: palette needs to be synced only once
-          position: pointer.position,
-          marquee_a: marquee?.a ?? null,
-          transform,
-          selection,
-          scene_id,
-        } satisfies AwarenessPayload["player"]);
-      },
-      equal
-    );
-
-    // Subscribe with selector for document sync
+    // Subscribe to editor document changes and sync to Y.Doc
     this.__unsubscribe_document_change = this._editor.subscribeWithSelector(
       (state) => state.document,
       editor.throttle(
@@ -176,11 +128,198 @@ export class EditorYSyncPlugin {
   }
 
   public destroy() {
+    this.__unsubscribe_document_change();
+  }
+}
+
+// Internal class for managing awareness/cursor synchronization
+class AwarenessSyncManager {
+  private __unsubscribe_geo_change!: () => void;
+  private __unsubscribe_focus_change!: () => void;
+
+  private _currentState: Partial<
+    Omit<AwarenessPayload, "cursor_id" | "profile">
+  > = {};
+
+  constructor(
+    private readonly _editor: Editor,
+    private readonly _awareness: Awareness,
+    private readonly _cursor: {
+      palette: editor.state.MultiplayerCursorColorPalette;
+      cursor_id: string;
+    }
+  ) {
+    this._setupAwarenessSync();
+  }
+
+  private _setupAwarenessSync() {
+    const aware = () => {
+      const states = Array.from(this._awareness.getStates().entries())
+        .filter(([id]) => id !== this._awareness.clientID)
+        .filter(([_, state]) => {
+          // Only process states that have a complete player object with palette
+          return state && state.profile?.palette;
+        })
+        .map((_: any) => {
+          const [id, state] = _ as [string, AwarenessPayload];
+          const {
+            cursor_id,
+            profile: { palette },
+            focus: { scene_id, selection },
+            geo: { transform, position = [0, 0], marquee_a },
+            cursor_chat,
+          } = state;
+
+          const marquee = marquee_a ? { a: marquee_a, b: position } : null;
+
+          return {
+            t: Date.now(),
+            id: cursor_id, // Use cursor_id instead of awareness clientID
+            position,
+            palette,
+            marquee: marquee,
+            transform,
+            selection,
+            scene_id,
+            ephemeral_chat: cursor_chat,
+          } satisfies editor.state.MultiplayerCursor;
+        });
+
+      // Convert to object format {[cursorId]: cursor} with timestamp-based conflict resolution
+      const cursorsObject = states.reduce(
+        (acc, state) => {
+          const existing = acc[state.id];
+          if (!existing || state.t > existing.t) {
+            acc[state.id] = state;
+          }
+          return acc;
+        },
+        {} as Record<string, (typeof states)[0]>
+      );
+
+      this._editor.__sync_cursors(cursorsObject);
+    };
+
+    this._awareness.on("change", aware);
+    this._awareness.on("remove", aware);
+    aware();
+
+    this._setupGeoAwarenessSync();
+    this._setupFocusAwarenessSync();
+  }
+
+  private _setupGeoAwarenessSync() {
+    // High-frequency updates for geometric data (mouse movement, camera)
+    this.__unsubscribe_geo_change = this._editor.subscribeWithSelector(
+      (state) => ({
+        pointer: state.pointer,
+        marquee: state.marquee,
+        transform: state.transform,
+      }),
+      (editor, next) => {
+        if (editor.locked) return;
+        const { pointer, marquee, transform } = next;
+
+        this._currentState.geo = {
+          transform,
+          position: pointer.position,
+          marquee_a: marquee?.a ?? null,
+        };
+
+        this._syncAwarenessState();
+      },
+      equal
+    );
+  }
+
+  private _setupFocusAwarenessSync() {
+    // Medium-frequency updates for focus changes (page switches, selections)
+    this.__unsubscribe_focus_change = this._editor.subscribeWithSelector(
+      (state) => ({
+        selection: state.selection,
+        scene_id: state.scene_id,
+      }),
+      (editor, next) => {
+        if (editor.locked) return;
+        const { selection, scene_id } = next;
+
+        this._currentState.focus = {
+          scene_id,
+          selection,
+        };
+
+        this._syncAwarenessState();
+      },
+      equal
+    );
+  }
+
+  private _syncAwarenessState() {
+    this._awareness.setLocalState({
+      cursor_id: this._cursor.cursor_id,
+      profile: { palette: this._cursor.palette },
+      focus: this._currentState.focus || { scene_id: undefined, selection: [] },
+      geo: this._currentState.geo || {
+        transform: [
+          [1, 0, 0],
+          [0, 1, 0],
+        ],
+        position: [0, 0],
+        marquee_a: null,
+      },
+      cursor_chat: null, // Not syncing cursor_chat yet
+    } satisfies AwarenessPayload);
+  }
+
+  public destroy() {
+    this.__unsubscribe_geo_change();
+    this.__unsubscribe_focus_change();
+  }
+}
+
+export class EditorYSyncPlugin {
+  public readonly doc: Y.Doc;
+  public readonly provider: WebsocketProvider;
+  public readonly awareness: Awareness;
+  private readonly _documentSync: DocumentSyncManager;
+  private readonly _awarenessSync: AwarenessSyncManager;
+
+  constructor(
+    private readonly _editor: Editor,
+    private readonly room_id: string,
+    private readonly cursor: {
+      palette: editor.state.MultiplayerCursorColorPalette;
+      cursor_id: string;
+    }
+  ) {
+    this.doc = new Y.Doc();
+    this.provider = new WebsocketProvider(
+      process.env.NODE_ENV === "development"
+        ? "wss://localhost:8787/editor"
+        : "wss://live.grida.co/editor",
+      this.room_id,
+      this.doc
+    );
+
+    this.awareness = this.provider.awareness;
+
+    // Initialize sub-managers
+    this._documentSync = new DocumentSyncManager(this._editor, this.doc);
+    this._awarenessSync = new AwarenessSyncManager(
+      this._editor,
+      this.awareness,
+      this.cursor
+    );
+  }
+
+  public destroy() {
     // Clean up awareness state immediately
     this.awareness.setLocalState(null);
 
-    this.__unsubscribe_player_change();
-    this.__unsubscribe_document_change();
+    // Destroy sub-managers
+    this._documentSync.destroy();
+    this._awarenessSync.destroy();
+
     this.provider.destroy();
     this.doc.destroy();
   }

@@ -812,6 +812,10 @@ export namespace editor.state {
     marquee: editor.state.Marquee | null;
     selection: string[];
     scene_id: string | undefined;
+    ephemeral_chat: {
+      txt: string;
+      ts: number;
+    } | null;
   };
 
   /**
