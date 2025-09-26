@@ -7,7 +7,7 @@ export function Header_001({ logo }: { logo?: string }) {
       // name="Header"
       node_id="header"
       // component={TemplateBuilderWidgets.flex}
-      fill={{ type: "solid", color: { r: 0, g: 0, b: 0, a: 0 } }}
+      fill={{ type: "solid", color: { r: 0, g: 0, b: 0, a: 0 }, active: true }}
       style={
         {
           // right: 0,

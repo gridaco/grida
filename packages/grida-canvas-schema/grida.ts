@@ -1,7 +1,7 @@
 import type { tokens } from "@grida/tokens";
 import type { TokenizableExcept } from "@grida/tokens/utils";
 import type vn from "@grida/vn";
-import type cg from "@grida/cg";
+import cg from "@grida/cg";
 import type cmath from "@grida/cmath";
 import * as CSS from "csstype";
 
@@ -277,11 +277,17 @@ export namespace grida.program.document {
     nodes: Record<nodes.NodeID, nodes.Node>;
   }
 
+  export type ImageType =
+    | "image/png"
+    | "image/jpeg"
+    | "image/webp"
+    | "image/gif";
+
   /**
    * reference to an registered image
    */
   export type ImageRef = {
-    type: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+    type: ImageType;
     url: string;
     width: number;
     height: number;
@@ -1037,7 +1043,7 @@ export namespace grida.program.nodes {
       export type PropsPaintValue = cg.Paint | SolidPaintToken;
     }
 
-    export interface IOpacity {
+    export interface IBlend {
       /**
        * opacity of the node.
        *
@@ -1048,13 +1054,20 @@ export namespace grida.program.nodes {
        * @default 1
        */
       opacity: number;
+
+      /**
+       * layer blend mode
+       *
+       * @default "pass-through"
+       */
+      blendMode?: cg.LayerBlendMode;
     }
 
-    export interface IBlendMode {
+    export interface ILayerMaskType {
       /**
-       * @default "normal"
+       * @default undefined
        */
-      blendMode?: cg.BlendMode;
+      mask?: cg.LayerMaskType | null | undefined;
     }
 
     export interface IZIndex {
@@ -1209,6 +1222,12 @@ export namespace grida.program.nodes {
     export interface IFill<T> {
       // FIXME: make it nullable
       fill?: T | undefined;
+      /**
+       * Multiple paint fills. When defined, the first entry should mirror the
+       * single {@link fill} value for backwards compatibility with DOM
+       * backends that only support a single fill.
+       */
+      fills?: T[] | undefined;
     }
 
     export interface IEffects {
@@ -1247,6 +1266,11 @@ export namespace grida.program.nodes {
      */
     export interface IStroke {
       stroke?: cg.Paint;
+      /**
+       * Multiple stroke paints. Similar to {@link IFill.fills}, the first
+       * stroke is mirrored via {@link stroke} for single-stroke backends.
+       */
+      strokes?: cg.Paint[];
 
       /**
        * stroke width - 0 or greater
@@ -1274,6 +1298,7 @@ export namespace grida.program.nodes {
      */
     export interface ITextStroke {
       stroke?: cg.Paint;
+      strokes?: cg.Paint[];
       /**
        * stroke width - 0 or greater
        */
@@ -1297,7 +1322,8 @@ export namespace grida.program.nodes {
      */
     export interface ICSSStylable
       extends IStylable<css.ExplicitlySupportedCSSProperties>,
-        IOpacity,
+        IBlend,
+        ILayerMaskType,
         IRotation,
         IZIndex,
         IPositioning,
@@ -1772,7 +1798,7 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.IPositioning,
       i.IFixedDimension,
-      i.IOpacity,
+      i.IBlend,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
@@ -1793,8 +1819,8 @@ export namespace grida.program.nodes {
       i.IPositioning,
       // i.ICSSDimension,
       i.IFixedDimension,
-      i.IOpacity,
-      i.IBlendMode,
+      i.IBlend,
+      i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
@@ -1826,8 +1852,8 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IPositioning,
       i.IFixedDimension,
-      i.IOpacity,
-      i.IBlendMode,
+      i.IBlend,
+      i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1843,8 +1869,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IPositioning,
       i.IFixedDimension,
-      i.IOpacity,
-      i.IBlendMode,
+      i.IBlend,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1861,8 +1886,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IPositioning,
       i.IFixedDimension,
-      i.IOpacity,
-      i.IBlendMode,
+      i.IBlend,
       i.IZIndex,
       i.IRotation,
       i.ICornerRadius,
@@ -1905,8 +1929,8 @@ export namespace grida.program.nodes {
       i.IPositioning,
       i.IStroke,
       i.IFixedDimension,
-      i.IOpacity,
-      i.IBlendMode,
+      i.IBlend,
+      i.ILayerMaskType,
       i.IZIndex,
       i.IRotation {
     readonly type: "line";
@@ -1937,8 +1961,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       // i.ICSSDimension,
       i.IFixedDimension,
-      i.IOpacity,
-      i.IBlendMode,
+      i.IBlend,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1976,8 +1999,8 @@ export namespace grida.program.nodes {
       // i.ICSSDimension,
       i.IFixedDimension,
       i.IEllipseArcData,
-      i.IOpacity,
-      i.IBlendMode,
+      i.IBlend,
+      i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -2114,7 +2137,7 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
-            blendMode: "normal",
+            blendMode: cg.def.LAYER_BLENDMODE,
             zIndex: 0,
             rotation: 0,
             width: 0,
@@ -2306,6 +2329,7 @@ export namespace grida.program.nodes {
         rotation: 0,
         zIndex: 0,
         opacity: 1,
+        blendMode: cg.def.LAYER_BLENDMODE,
         position: "absolute",
         layout: "flow",
         direction: "horizontal",

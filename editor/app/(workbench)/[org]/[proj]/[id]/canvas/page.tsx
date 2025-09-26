@@ -18,7 +18,7 @@ import Toolbar, {
   ToolbarPosition,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-preview";
-import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
+import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 
 export default function CanvasPage() {
   const [state] = useEditorState();
@@ -37,7 +37,7 @@ export default function CanvasPage() {
 function GridaCanvas() {
   return (
     <>
-      <WindowCurrentEditorProvider />
+      <WindowGlobalCurrentEditorProvider />
       <div className="flex w-full h-full">
         <PreviewProvider>
           <Hotkeys />

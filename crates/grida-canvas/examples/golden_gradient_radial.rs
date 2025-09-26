@@ -30,9 +30,10 @@ fn main() {
         opacity: 1.0,
         transform: AffineTransform::identity(),
         blend_mode: BlendMode::Normal,
+        active: true,
     };
 
-    let paint = radial_gradient_paint(&gradient, 1.0, (width as f32, height as f32));
+    let paint = radial_gradient_paint(&gradient, (width as f32, height as f32));
 
     canvas.draw_rect(
         Rect::from_xywh(0.0, 0.0, width as f32, height as f32),

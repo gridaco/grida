@@ -18,14 +18,19 @@ import {
 export function OpsControl({
   disabled,
   onOp,
+  className,
 }: {
   disabled?: boolean;
   onOp?: (op: cg.BooleanOperation) => void;
+  className?: string;
 }) {
   return (
     <div
       aria-disabled={disabled}
-      className={cn("group/ops flex items-center justify-center gap-0")}
+      className={cn(
+        "group/ops flex items-center justify-center gap-0",
+        className
+      )}
     >
       <button
         disabled={disabled}
@@ -38,7 +43,7 @@ export function OpsControl({
         <SquaresUniteIcon />
       </button>
       <div className="h-full border-r border-transparent" />
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger disabled={disabled} className="p-0 px-1">
           <CaretDownIcon className="size-3" />
         </DropdownMenuTrigger>

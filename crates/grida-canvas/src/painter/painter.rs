@@ -1,12 +1,10 @@
-use super::cvt;
 use super::geometry::*;
-use super::layer::{LayerList, PainterPictureLayer};
+use super::layer::{Layer, LayerList, PainterMaskGroup, PainterPictureLayer, PainterRenderCommand};
+use super::paint;
 use super::shadow;
 use super::text_stroke;
-use crate::cache::geometry::GeometryCache;
 use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
 use crate::cg::types::*;
-use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use crate::shape::*;
@@ -14,7 +12,8 @@ use crate::sk;
 use crate::vectornetwork::vn_painter::StrokeOptions;
 use math2::transform::AffineTransform;
 use skia_safe::{
-    canvas::SaveLayerRec, path::AddPathMode, textlayout, Paint as SkPaint, Path, Point,
+    canvas::SaveLayerRec, path::AddPathMode, textlayout, Paint as SkPaint, Path, Point, Rect,
+    Shader,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -27,6 +26,7 @@ pub struct Painter<'a> {
     images: &'a ImageRepository,
     path_cache: RefCell<VectorPathCache>,
     scene_cache: Option<&'a SceneCache>,
+    cache_hits: RefCell<usize>,
 }
 
 impl<'a> Painter<'a> {
@@ -43,6 +43,7 @@ impl<'a> Painter<'a> {
             images,
             path_cache: RefCell::new(VectorPathCache::new()),
             scene_cache: Some(scene_cache), // Store reference to scene cache
+            cache_hits: RefCell::new(0),
         }
     }
 
@@ -51,16 +52,11 @@ impl<'a> Painter<'a> {
         &self.path_cache
     }
 
-    /// Create a NodePainter that uses this Painter for its operations
-    pub fn node_painter(&self) -> NodePainter<'_> {
-        NodePainter::new(self)
-    }
-
     // ============================
     // === Helper Methods ========
     // ============================
 
-    fn with_transform_option<F: FnOnce()>(&self, transform: &Option<AffineTransform>, f: F) {
+    pub fn with_transform_option<F: FnOnce()>(&self, transform: &Option<AffineTransform>, f: F) {
         if let Some(transform) = transform {
             self.with_transform(&transform.matrix, f);
         } else {
@@ -68,8 +64,29 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Wrap drawing in an alpha mask using a shader.
+    ///
+    /// Steps:
+    /// 1) save_layer(bounds)
+    /// 2) draw content via closure
+    /// 3) draw a rect with DstIn using the provided shader as the alpha mask
+    pub fn with_alpha_mask<F: FnOnce()>(&self, bounds: Rect, mask_shader: Shader, draw_content: F) {
+        let rec = SaveLayerRec::default().bounds(&bounds);
+        self.canvas.save_layer(&rec);
+
+        draw_content();
+
+        let mut p = SkPaint::default();
+        p.set_anti_alias(true);
+        p.set_blend_mode(skia_safe::BlendMode::DstIn);
+        p.set_shader(mask_shader);
+        self.canvas.draw_rect(bounds, &p);
+
+        self.canvas.restore();
+    }
+
     /// Save/restore transform state and apply a 2×3 matrix
-    fn with_transform<F: FnOnce()>(&self, transform: &[[f32; 3]; 2], f: F) {
+    pub fn with_transform<F: FnOnce()>(&self, transform: &[[f32; 3]; 2], f: F) {
         let canvas = self.canvas;
         canvas.save();
         canvas.concat(&sk::sk_matrix(*transform));
@@ -78,7 +95,7 @@ impl<'a> Painter<'a> {
     }
 
     /// If opacity < 1.0, wrap drawing in a save_layer_alpha; else draw directly.
-    fn with_opacity<F: FnOnce()>(&self, opacity: f32, f: F) {
+    pub fn with_opacity<F: FnOnce()>(&self, opacity: f32, f: F) {
         let canvas = self.canvas;
         if opacity < 1.0 {
             canvas.save_layer_alpha(None, (opacity * 255.0) as u32);
@@ -90,10 +107,18 @@ impl<'a> Painter<'a> {
     }
 
     /// If blend mode is not Normal, wrap drawing in a save_layer with blend mode; else draw directly.
-    fn with_blendmode<F: FnOnce()>(&self, blend_mode: BlendMode, f: F) {
+    pub fn with_blendmode<F: FnOnce()>(&self, layer_blend_mode: LayerBlendMode, f: F) {
         let canvas = self.canvas;
-        if blend_mode != BlendMode::Normal {
+
+        // let mut paint = SkPaint::default();
+        // paint.set_blend_mode(blend_mode.into());
+        // canvas.save_layer(&SaveLayerRec::default().paint(&paint));
+        // f();
+        // canvas.restore();
+
+        if layer_blend_mode != LayerBlendMode::PassThrough {
             let mut paint = SkPaint::default();
+            let blend_mode: BlendMode = layer_blend_mode.into();
             paint.set_blend_mode(blend_mode.into());
             canvas.save_layer(&SaveLayerRec::default().paint(&paint));
             f();
@@ -104,7 +129,7 @@ impl<'a> Painter<'a> {
     }
 
     /// Helper method to apply clipping to a region with optional corner radius
-    fn with_clip<F: FnOnce()>(&self, shape: &PainterShape, f: F) {
+    pub fn with_clip<F: FnOnce()>(&self, shape: &PainterShape, f: F) {
         let canvas = self.canvas;
         canvas.save();
 
@@ -248,7 +273,7 @@ impl<'a> Painter<'a> {
         canvas.restore(); // pop the clip
     }
 
-    fn cached_path(&self, id: &NodeId, data: &str) -> Rc<Path> {
+    pub fn cached_path(&self, id: &NodeId, data: &str) -> Rc<Path> {
         self.path_cache.borrow_mut().get_or_create(id, data)
     }
 
@@ -282,13 +307,12 @@ impl<'a> Painter<'a> {
         )
     }
 
-    fn draw_fills(&self, shape: &PainterShape, fills: &[Paint]) {
+    pub fn draw_fills(&self, shape: &PainterShape, fills: &[Paint]) {
         if fills.is_empty() {
             return;
         }
-        if let Some(paint) = cvt::sk_paint_stack(
+        if let Some(paint) = paint::sk_paint_stack(
             fills,
-            1.0,
             (shape.rect.width(), shape.rect.height()),
             self.images,
         ) {
@@ -296,7 +320,7 @@ impl<'a> Painter<'a> {
         }
     }
 
-    fn draw_strokes(
+    pub fn draw_strokes(
         &self,
         shape: &PainterShape,
         strokes: &[Paint],
@@ -325,9 +349,8 @@ impl<'a> Painter<'a> {
         if strokes.is_empty() {
             return;
         }
-        if let Some(paint) = cvt::sk_paint_stack(
+        if let Some(paint) = paint::sk_paint_stack(
             strokes,
-            1.0,
             (shape.rect.width(), shape.rect.height()),
             self.images,
         ) {
@@ -336,7 +359,7 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw a shape applying all layer effects in the correct order.
-    fn draw_shape_with_effects<F: Fn()>(
+    pub fn draw_shape_with_effects<F: Fn()>(
         &self,
         effects: &LayerEffects,
         shape: &PainterShape,
@@ -369,7 +392,7 @@ impl<'a> Painter<'a> {
         }
     }
 
-    fn draw_text_span(
+    pub fn draw_text_span(
         &self,
         id: &NodeId,
         text: &str,
@@ -426,7 +449,7 @@ impl<'a> Painter<'a> {
         );
     }
 
-    fn draw_text_paragraph(
+    pub fn draw_text_paragraph(
         &self,
         paragraph: &Rc<RefCell<textlayout::Paragraph>>,
         strokes: &[Paint],
@@ -438,45 +461,49 @@ impl<'a> Painter<'a> {
         self.canvas.save();
         self.canvas.translate((0.0, y_offset));
 
-        if stroke_width > 0.0 && matches!(stroke_align, StrokeAlign::Outside) {
-            for stroke_paint_def in strokes {
-                paragraph.borrow_mut().visit(|_, info| {
-                    if let Some(info) = info {
-                        text_stroke::draw_text_stroke_outside_fast_pre(
-                            self.canvas,
-                            info.glyphs(),
-                            info.positions(),
-                            info.origin(),
-                            info.font(),
-                            stroke_paint_def,
-                            stroke_width,
-                            layout_size,
-                        );
-                    }
-                });
-            }
+        if stroke_width > 0.0 && !strokes.is_empty() && matches!(stroke_align, StrokeAlign::Outside)
+        {
+            let images = self.images;
+            paragraph.borrow_mut().visit(|_, info| {
+                if let Some(info) = info {
+                    text_stroke::draw_text_stroke_outside_fast_pre(
+                        self.canvas,
+                        info.glyphs(),
+                        info.positions(),
+                        info.origin(),
+                        info.font(),
+                        strokes,
+                        stroke_width,
+                        layout_size,
+                        images,
+                    );
+                }
+            });
         }
 
         // Now we can simply paint the paragraph - all paint handling is done in paragraph()
         paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
 
-        if stroke_width > 0.0 && !matches!(stroke_align, StrokeAlign::Outside) {
-            for stroke_paint_def in strokes {
-                paragraph.borrow_mut().visit(|_, info| {
-                    if let Some(info) = info {
-                        text_stroke::draw_text_stroke(
-                            self.canvas,
-                            info.glyphs(),
-                            info.positions(),
-                            info.origin(),
-                            info.font(),
-                            stroke_paint_def,
-                            stroke_width,
-                            *stroke_align,
-                        );
-                    }
-                });
-            }
+        if stroke_width > 0.0
+            && !strokes.is_empty()
+            && !matches!(stroke_align, StrokeAlign::Outside)
+        {
+            let images = self.images;
+            paragraph.borrow_mut().visit(|_, info| {
+                if let Some(info) = info {
+                    text_stroke::draw_text_stroke(
+                        self.canvas,
+                        info.glyphs(),
+                        info.positions(),
+                        info.origin(),
+                        info.font(),
+                        strokes,
+                        stroke_width,
+                        *stroke_align,
+                        images,
+                    );
+                }
+            });
         }
 
         self.canvas.restore();
@@ -610,19 +637,17 @@ impl<'a> Painter<'a> {
                             self.with_opacity(vector_layer.base.opacity, || {
                                 // Use VNPainter for vector network rendering
                                 let vn_painter =
-                                    crate::vectornetwork::vn_painter::VNPainter::new(self.canvas);
+                                    crate::vectornetwork::vn_painter::VNPainter::new_with_images(
+                                        self.canvas,
+                                        self.images,
+                                    );
 
                                 // Convert strokes to StrokeOptions for VNPainter
                                 let stroke_options = if !vector_layer.strokes.is_empty() {
-                                    let first_stroke = &vector_layer.strokes[0];
-                                    let stroke_color = match first_stroke {
-                                        Paint::Solid(solid) => solid.color,
-                                        _ => CGColor(0, 0, 0, 255), // Default black
-                                    };
                                     Some(StrokeOptions {
                                         width: vector_layer.stroke_width,
                                         align: vector_layer.stroke_align,
-                                        color: stroke_color,
+                                        paints: vector_layer.strokes.clone(),
                                         width_profile: vector_layer.stroke_width_profile.clone(),
                                     })
                                 } else {
@@ -633,6 +658,7 @@ impl<'a> Painter<'a> {
                                     &vector_layer.vector,
                                     &vector_layer.fills,
                                     stroke_options.as_ref(),
+                                    vector_layer.corner_radius,
                                 );
                             });
                         };
@@ -650,460 +676,95 @@ impl<'a> Painter<'a> {
         }
     }
 
+    fn draw_render_commands(&self, commands: &[PainterRenderCommand]) {
+        for command in commands {
+            match command {
+                PainterRenderCommand::Draw(layer) => {
+                    // Prefer cached picture if available
+                    if let Some(scene_cache) = self.scene_cache {
+                        if let Some(pic) = scene_cache.picture.get_node_picture(layer.id()) {
+                            self.canvas.draw_picture(pic, None, None);
+                            *self.cache_hits.borrow_mut() += 1;
+                            continue;
+                        }
+                    }
+                    self.draw_layer(layer)
+                }
+                PainterRenderCommand::MaskGroup(group) => self.draw_mask_group(group),
+            }
+        }
+    }
+
+    fn draw_mask_group(&self, group: &PainterMaskGroup) {
+        match group.mask_type {
+            LayerMaskType::Geometry => self.draw_geometry_mask_group(group),
+            LayerMaskType::Image(image_mask) => self.draw_image_mask_group(group, image_mask),
+        }
+    }
+
+    fn draw_geometry_mask_group(&self, group: &PainterMaskGroup) {
+        let mut clip_path = Path::new();
+        self.collect_mask_paths_for_masks(&group.mask_commands, &mut clip_path);
+        if clip_path.is_empty() {
+            return;
+        }
+
+        self.canvas.save();
+        self.canvas.clip_path(&clip_path, None, true);
+        self.draw_render_commands(&group.content_commands);
+        self.canvas.restore();
+    }
+
+    fn draw_image_mask_group(&self, group: &PainterMaskGroup, mask_type: ImageMaskType) {
+        self.canvas.save_layer(&SaveLayerRec::default());
+        self.draw_render_commands(&group.content_commands);
+
+        let mut paint = SkPaint::default();
+        paint.set_blend_mode(skia_safe::BlendMode::DstIn);
+
+        if let ImageMaskType::Luminance = mask_type {
+            // Use Skia-safe's built-in luma color filter constructor
+            paint.set_color_filter(skia_safe::luma_color_filter::new());
+        }
+
+        self.canvas
+            .save_layer(&SaveLayerRec::default().paint(&paint));
+        self.draw_render_commands(&group.mask_commands);
+        self.canvas.restore();
+        self.canvas.restore();
+    }
+
+    /// Collect only mask geometry paths (ignoring content of nested groups).
+    fn collect_mask_paths_for_masks(&self, commands: &[PainterRenderCommand], out_path: &mut Path) {
+        for command in commands {
+            match command {
+                PainterRenderCommand::Draw(layer) => {
+                    if let Some(layer_path) = Self::layer_to_path(layer) {
+                        out_path.add_path(&layer_path, (0.0, 0.0), AddPathMode::Append);
+                    }
+                }
+                PainterRenderCommand::MaskGroup(group) => {
+                    // Recurse only into further mask commands
+                    self.collect_mask_paths_for_masks(&group.mask_commands, out_path);
+                }
+            }
+        }
+    }
+
+    fn layer_to_path(layer: &PainterPictureLayer) -> Option<Path> {
+        let shape = layer.shape();
+        let mut path = shape.to_path();
+        let transform = layer.transform().matrix;
+        path.transform(&sk::sk_matrix(transform));
+        Some(path)
+    }
+
     /// Draw all layers in a [`LayerList`].
     pub fn draw_layer_list(&self, list: &LayerList) {
-        for layer in &list.layers {
-            self.draw_layer(layer);
-        }
-    }
-}
-
-/// A painter specifically for drawing nodes, using the main Painter for operations.
-/// This separates node-specific drawing logic from the main Painter while maintaining
-/// the ability to test golden outputs.
-pub struct NodePainter<'a> {
-    painter: &'a Painter<'a>,
-}
-
-impl<'a> NodePainter<'a> {
-    /// Create a new NodePainter that uses the given Painter
-    pub fn new(painter: &'a Painter<'a>) -> Self {
-        Self { painter }
+        self.draw_render_commands(&list.commands);
     }
 
-    /// Draw a RectangleNode, respecting its transform, effect, fill, stroke, blend mode, opacity
-    pub fn draw_rect_node(&self, node: &RectangleNodeRec) {
-        self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Rectangle(node.clone()));
-            self.painter
-                .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter.draw_fills(&shape, &node.fills);
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        });
-                    });
-                });
-        });
-    }
-
-    /// Draw an ImageNode, respecting transform, effect, rounded corners, blend mode, opacity
-    pub fn draw_image_node(&self, node: &ImageNodeRec) -> bool {
-        self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Image(node.clone()));
-
-            self.painter
-                .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            // convert the image itself to a paint
-                            let image_paint = Paint::Image(ImagePaint {
-                                hash: node.hash.clone(),
-                                opacity: node.opacity,
-                                transform: AffineTransform::identity(),
-                                fit: math2::box_fit::BoxFit::Cover,
-                                blend_mode: BlendMode::default(),
-                            });
-
-                            self.painter
-                                .draw_fills(&shape, std::slice::from_ref(&image_paint));
-                            self.painter.draw_strokes(
-                                &shape,
-                                std::slice::from_ref(&node.stroke),
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        });
-                    });
-                });
-        });
-        true
-    }
-
-    /// Draw an EllipseNode
-    pub fn draw_ellipse_node(&self, node: &EllipseNodeRec) {
-        self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Ellipse(node.clone()));
-            self.painter
-                .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter.draw_fills(&shape, &node.fills);
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        });
-                    });
-                });
-        });
-    }
-
-    /// Draw a LineNode
-    pub fn draw_line_node(&self, node: &LineNodeRec) {
-        self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Line(node.clone()));
-
-            self.painter.with_opacity(node.opacity, || {
-                self.painter.with_blendmode(node.blend_mode, || {
-                    self.painter.draw_strokes(
-                        &shape,
-                        &node.strokes,
-                        node.stroke_width,
-                        node.get_stroke_align(),
-                        node.stroke_dash_array.as_ref(),
-                    );
-                });
-            });
-        });
-    }
-
-    pub fn draw_vector_node(&self, node: &VectorNodeRec) {
-        self.painter.with_transform(&node.transform.matrix, || {
-            let path = node.to_path();
-            let stroke_align = node.get_stroke_align();
-            let shape = PainterShape::from_path(path);
-            self.painter
-                .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            if let Some(fill) = &node.fill {
-                                self.painter.draw_fills(&shape, std::slice::from_ref(fill));
-                            }
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                node.stroke_width,
-                                stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        });
-                    });
-                });
-        });
-    }
-
-    /// Draw a PathNode (SVG path data)
-    pub fn draw_path_node(&self, node: &SVGPathNodeRec) {
-        self.painter.with_transform(&node.transform.matrix, || {
-            let path = self.painter.cached_path(&node.id, &node.data);
-            let shape = PainterShape::from_path((*path).clone());
-            self.painter
-                .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter
-                                .draw_fills(&shape, std::slice::from_ref(&node.fill));
-                            if let Some(stroke) = &node.stroke {
-                                self.painter.draw_strokes(
-                                    &shape,
-                                    std::slice::from_ref(stroke),
-                                    node.stroke_width,
-                                    node.stroke_align,
-                                    node.stroke_dash_array.as_ref(),
-                                );
-                            }
-                        });
-                    });
-                });
-        });
-    }
-
-    /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
-    pub fn draw_polygon_node(&self, node: &PolygonNodeRec) {
-        self.painter.with_transform(&node.transform.matrix, || {
-            let path = node.to_path();
-            let shape = PainterShape::from_path(path.clone());
-            self.painter
-                .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter.draw_fills(&shape, &node.fills);
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        });
-                    });
-                });
-        });
-    }
-
-    /// Draw a RegularPolygonNode by converting to a PolygonNode
-    pub fn draw_regular_polygon_node(&self, node: &RegularPolygonNodeRec) {
-        let points = node.to_points();
-
-        let polygon = PolygonNodeRec {
-            id: node.id.clone(),
-            name: node.name.clone(),
-            active: node.active,
-            transform: node.transform,
-            points,
-            corner_radius: node.corner_radius,
-            fills: node.fills.clone(),
-            strokes: node.strokes.clone(),
-            stroke_width: node.stroke_width,
-            stroke_align: node.stroke_align,
-            opacity: node.opacity,
-            blend_mode: node.blend_mode,
-            effects: node.effects.clone(),
-            stroke_dash_array: node.stroke_dash_array.clone(),
-        };
-
-        self.draw_polygon_node(&polygon);
-    }
-
-    /// Draw a RegularStarPolygonNode by converting to a PolygonNode
-    pub fn draw_regular_star_polygon_node(&self, node: &RegularStarPolygonNodeRec) {
-        let points = node.to_points();
-
-        let polygon = PolygonNodeRec {
-            id: node.id.clone(),
-            name: node.name.clone(),
-            active: node.active,
-            transform: node.transform,
-            points,
-            corner_radius: node.corner_radius,
-            fills: node.fills.clone(),
-            strokes: node.strokes.clone(),
-            stroke_width: node.stroke_width,
-            stroke_align: node.stroke_align,
-            opacity: node.opacity,
-            blend_mode: node.blend_mode,
-            effects: node.effects.clone(),
-            stroke_dash_array: node.stroke_dash_array.clone(),
-        };
-
-        self.draw_polygon_node(&polygon);
-    }
-
-    /// Draw a TextSpanNode (simple text block)
-    pub fn draw_text_span_node(&self, node: &TextSpanNodeRec) {
-        if node.fills.is_empty() {
-            return;
-        }
-        self.painter.with_transform(&node.transform.matrix, || {
-            self.painter.with_opacity(node.opacity, || {
-                self.painter.with_blendmode(node.blend_mode, || {
-                    self.painter.draw_text_span(
-                        &node.id,
-                        &node.text,
-                        &node.width,
-                        &node.height,
-                        &node.max_lines,
-                        &node.ellipsis,
-                        &node.fills,
-                        &node.strokes,
-                        node.stroke_width,
-                        &node.stroke_align,
-                        &node.text_align,
-                        &node.text_align_vertical,
-                        &node.text_style,
-                    );
-                });
-            });
-        });
-    }
-
-    /// Draw a ContainerNode (background + stroke + children)
-    pub fn draw_container_node_recursively(
-        &self,
-        node: &ContainerNodeRec,
-        repository: &NodeRepository,
-        cache: &GeometryCache,
-    ) {
-        self.painter.with_transform(&node.transform.matrix, || {
-            self.painter.with_opacity(node.opacity, || {
-                let shape = build_shape(&IntrinsicSizeNode::Container(node.clone()));
-
-                // Draw effects, fills, children (with optional clipping), then strokes last
-                self.painter
-                    .draw_shape_with_effects(&node.effects, &shape, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            // Paint fills first
-                            self.painter.draw_fills(&shape, &node.fills);
-
-                            // Children are drawn next; if `clip` is enabled we push
-                            // a clip region for the container's shape so that
-                            // descendants are clipped but the container's own stroke
-                            // remains unaffected.
-                            if node.clip {
-                                self.painter.with_clip(&shape, || {
-                                    for child_id in &node.children {
-                                        if let Some(child) = repository.get(child_id) {
-                                            self.draw_node_recursively(child, repository, cache);
-                                        }
-                                    }
-                                });
-                            } else {
-                                for child_id in &node.children {
-                                    if let Some(child) = repository.get(child_id) {
-                                        self.draw_node_recursively(child, repository, cache);
-                                    }
-                                }
-                            }
-
-                            // Finally paint the stroke so it is not clipped by the
-                            // container's own clip and always renders above children.
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        });
-                    });
-            });
-        });
-    }
-
-    pub fn draw_error_node(&self, node: &ErrorNodeRec) {
-        self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Error(node.clone()));
-
-            // Create a red fill paint
-            let fill = Paint::Solid(SolidPaint {
-                color: CGColor(255, 0, 0, 51), // Semi-transparent red
-                opacity: 1.0,
-                blend_mode: BlendMode::Normal,
-            });
-            let stroke = Paint::Solid(SolidPaint {
-                color: CGColor(255, 0, 0, 255), // Solid red
-                opacity: 1.0,
-                blend_mode: BlendMode::Normal,
-            });
-
-            self.painter.with_opacity(node.opacity, || {
-                self.painter.draw_fills(&shape, std::slice::from_ref(&fill));
-                self.painter.draw_strokes(
-                    &shape,
-                    std::slice::from_ref(&stroke),
-                    1.0,
-                    StrokeAlign::Inside,
-                    None,
-                );
-            });
-        });
-    }
-
-    /// Draw a GroupNode: no shape of its own, only children, but apply transform + opacity
-    pub fn draw_group_node_recursively(
-        &self,
-        node: &GroupNodeRec,
-        repository: &NodeRepository,
-        cache: &GeometryCache,
-    ) {
-        self.painter.with_transform_option(&node.transform, || {
-            self.painter.with_opacity(node.opacity, || {
-                for child_id in &node.children {
-                    if let Some(child) = repository.get(child_id) {
-                        self.draw_node_recursively(child, repository, cache);
-                    }
-                }
-            });
-        });
-    }
-
-    pub fn draw_boolean_operation_node_recursively(
-        &self,
-        node: &BooleanPathOperationNodeRec,
-        repository: &NodeRepository,
-        cache: &GeometryCache,
-    ) {
-        self.painter.with_transform_option(&node.transform, || {
-            if let Some(shape) = boolean_operation_shape(node, repository, cache) {
-                self.painter
-                    .draw_shape_with_effects(&node.effects, &shape, || {
-                        self.painter.with_opacity(node.opacity, || {
-                            self.painter.with_blendmode(node.blend_mode, || {
-                                self.painter
-                                    .draw_fills(&shape, std::slice::from_ref(&node.fill));
-                                if let Some(stroke) = &node.stroke {
-                                    self.painter.draw_strokes(
-                                        &shape,
-                                        std::slice::from_ref(stroke),
-                                        node.stroke_width,
-                                        node.stroke_align,
-                                        node.stroke_dash_array.as_ref(),
-                                    );
-                                }
-                            });
-                        });
-                    });
-            } else {
-                for child_id in &node.children {
-                    if let Some(child) = repository.get(child_id) {
-                        self.draw_node_recursively(child, repository, cache);
-                    }
-                }
-            }
-        });
-    }
-
-    pub fn draw_node(&self, node: &LeafNode) {
-        if !node.active() {
-            return;
-        }
-        match node {
-            LeafNode::Error(n) => self.draw_error_node(n),
-            LeafNode::Rectangle(n) => self.draw_rect_node(n),
-            LeafNode::Ellipse(n) => self.draw_ellipse_node(n),
-            LeafNode::Polygon(n) => self.draw_polygon_node(n),
-            LeafNode::RegularPolygon(n) => self.draw_regular_polygon_node(n),
-            LeafNode::TextSpan(n) => self.draw_text_span_node(n),
-            LeafNode::Line(n) => self.draw_line_node(n),
-            LeafNode::Image(n) => {
-                self.draw_image_node(n);
-            }
-            LeafNode::Vector(n) => self.draw_vector_node(n),
-            LeafNode::SVGPath(n) => self.draw_path_node(n),
-            LeafNode::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
-        }
-    }
-
-    /// Dispatch to the correct node‐type draw method
-    pub fn draw_node_recursively(
-        &self,
-        node: &Node,
-        repository: &NodeRepository,
-        cache: &GeometryCache,
-    ) {
-        if !node.active() {
-            return;
-        }
-        match node {
-            Node::Error(n) => self.draw_error_node(n),
-            Node::Group(n) => self.draw_group_node_recursively(n, repository, cache),
-            Node::Container(n) => self.draw_container_node_recursively(n, repository, cache),
-            Node::Rectangle(n) => self.draw_rect_node(n),
-            Node::Ellipse(n) => self.draw_ellipse_node(n),
-            Node::Polygon(n) => self.draw_polygon_node(n),
-            Node::RegularPolygon(n) => self.draw_regular_polygon_node(n),
-            Node::TextSpan(n) => self.draw_text_span_node(n),
-            Node::Line(n) => self.draw_line_node(n),
-            Node::Image(n) => {
-                self.draw_image_node(n);
-            }
-            Node::Vector(n) => self.draw_vector_node(n),
-            Node::SVGPath(n) => self.draw_path_node(n),
-            Node::BooleanOperation(n) => {
-                self.draw_boolean_operation_node_recursively(n, repository, cache)
-            }
-            Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
-        }
+    pub fn cache_picture_hits(&self) -> usize {
+        *self.cache_hits.borrow()
     }
 }

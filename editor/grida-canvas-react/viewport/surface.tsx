@@ -47,6 +47,7 @@ import { PointerCursor } from "@/components/multiplayer/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
+import { SurfaceImageEditor } from "./ui/surface-image-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
@@ -379,6 +380,7 @@ export function EditorSurface() {
             )}
           </SurfaceGroup>
 
+          {/* surfaces with performance considerations */}
           <SurfaceGroup
             hidden={
               is_transforming ||
@@ -394,7 +396,7 @@ export function EditorSurface() {
                 node_id={content_edit_mode.node_id}
               />
             )}
-            {content_edit_mode?.type === "fill/gradient" && (
+            {content_edit_mode?.type === "paint/gradient" && (
               <SurfaceGradientEditor
                 key="gradient-editor"
                 node_id={content_edit_mode.node_id}
@@ -402,7 +404,14 @@ export function EditorSurface() {
             )}
           </SurfaceGroup>
 
+          {/* surfaces relatively cheap */}
           <SurfaceGroup hidden={is_window_resizing}>
+            {content_edit_mode?.type === "paint/image" && (
+              <SurfaceImageEditor
+                key="image-editor"
+                node_id={content_edit_mode.node_id}
+              />
+            )}
             {content_edit_mode?.type === "width" && (
               <SurfaceVariableWidthEditor
                 key="varwidth-editor"

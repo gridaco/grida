@@ -12,7 +12,7 @@ impl TiledScene {
         // Create a recorder to capture the scene
         let mut recorder = PictureRecorder::new();
         let bounds = Rect::new(0.0, 0.0, width, height);
-        let canvas = recorder.begin_recording(bounds, None);
+        let canvas = recorder.begin_recording(bounds, true);
 
         // Draw 100 rectangles in a grid
         Self::draw_rectangles(canvas);

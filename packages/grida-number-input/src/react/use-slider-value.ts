@@ -12,7 +12,7 @@ import * as React from "react";
  * @param options - Configuration options for the slider
  * @param options.min - Minimum allowed value
  * @param options.max - Maximum allowed value
- * @param options.step - Step increment (optional). If provided, values will be rounded to nearest step
+ * @param options.step - Step increment (optional). If provided, values will be rounded to nearest step. Works correctly with decimal steps (e.g., 0.01)
  * @param options.marks - Array of mark points for snapping (optional). Values will snap to nearest mark within threshold
  * @param options.defaultValue - Initial/default value (optional). Falls back to min if not provided
  * @param options.value - Controlled value (optional). If provided, overrides defaultValue
@@ -27,6 +27,7 @@ import * as React from "react";
  *
  * @example
  * ```tsx
+ * // Integer step example
  * const sliderProps = useSliderValue({
  *   min: 0,
  *   max: 100,
@@ -35,6 +36,16 @@ import * as React from "react";
  *   defaultValue: 50,
  *   onValueChange: (value) => console.log('Changing:', value),
  *   onValueCommit: (value) => console.log('Committed:', value),
+ * });
+ *
+ * // Decimal step example (e.g., for opacity values)
+ * const opacitySliderProps = useSliderValue({
+ *   min: 0.1,
+ *   max: 0.5,
+ *   step: 0.01,
+ *   defaultValue: 0.3,
+ *   onValueChange: (value) => console.log('Opacity changing:', value),
+ *   onValueCommit: (value) => console.log('Opacity committed:', value),
  * });
  *
  * return (
@@ -87,7 +98,7 @@ export function useSliderValue({
       );
       // Apply step constraint if step is provided
       const steppedValue = step
-        ? Math.round(snappedValue / step) * step
+        ? applyStepConstraint(snappedValue, step, min)
         : snappedValue;
       const clampedValue = Math.max(min, Math.min(max, steppedValue));
 
@@ -111,7 +122,7 @@ export function useSliderValue({
       );
       // Apply step constraint if step is provided
       const steppedValue = step
-        ? Math.round(snappedValue / step) * step
+        ? applyStepConstraint(snappedValue, step, min)
         : snappedValue;
       const clampedValue = Math.max(min, Math.min(max, steppedValue));
 
@@ -134,6 +145,32 @@ export function useSliderValue({
     onValueCommit: handleValueCommit,
     isSnapped: marks?.includes(value) ?? false,
   };
+}
+
+/**
+ * Helper function to apply step constraint to a value, handling decimal steps properly.
+ *
+ * @param value - The value to constrain
+ * @param step - The step size
+ * @param min - The minimum value (used as the base for step calculation)
+ * @returns The value constrained to the nearest step
+ */
+function applyStepConstraint(value: number, step: number, min: number): number {
+  // Calculate the number of steps from the minimum value
+  const stepsFromMin = (value - min) / step;
+
+  // Round to the nearest step
+  const roundedSteps = Math.round(stepsFromMin);
+
+  // Calculate the final value
+  const result = min + roundedSteps * step;
+
+  // Handle floating point precision issues by rounding to a reasonable number of decimal places
+  const decimalPlaces = Math.max(0, -Math.floor(Math.log10(step)));
+  return (
+    Math.round(result * Math.pow(10, decimalPlaces)) /
+    Math.pow(10, decimalPlaces)
+  );
 }
 
 /**

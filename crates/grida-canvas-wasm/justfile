@@ -81,11 +81,11 @@ info:
 # Internal recipe: Build WASM (debug mode)
 _build_wasm32_unknown_emscripten_debug:
     @echo "🔨 Building for wasm32-unknown-emscripten target..."
-    @source ../../third_party/externals/emsdk/emsdk_env.sh && \
+    @bash -c '. ../../third_party/externals/emsdk/emsdk_env.sh && \
         export CC=emcc && \
         export CXX=em++ && \
         export AR=emar && \
-        time cargo build --target wasm32-unknown-emscripten
+        time cargo build --target wasm32-unknown-emscripten'
     @echo "✅ Build completed successfully!"
     @echo "📁 Output file: ../../target/wasm32-unknown-emscripten/debug/grida_canvas_wasm.wasm"
     @echo "🎉 Grida Canvas WASM is ready for use!"
@@ -93,11 +93,11 @@ _build_wasm32_unknown_emscripten_debug:
 # Internal recipe: Build WASM (release mode)
 _build_wasm32_unknown_emscripten_release:
     @echo "🔨 Building for wasm32-unknown-emscripten target (Production Mode)..."
-    @source ../../third_party/externals/emsdk/emsdk_env.sh && \
+    @bash -c '. ../../third_party/externals/emsdk/emsdk_env.sh && \
         export CC=emcc && \
         export CXX=em++ && \
         export AR=emar && \
-        time cargo build --release --target wasm32-unknown-emscripten
+        time cargo build --release --target wasm32-unknown-emscripten'
     @echo "✅ Production build completed successfully!"
     @echo "📁 Output file: ../../target/wasm32-unknown-emscripten/release/grida_canvas_wasm.wasm"
     @echo "⚡ Production optimizations applied:"

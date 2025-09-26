@@ -712,6 +712,9 @@ importers:
       i18next:
         specifier: ^23.7.9
         version: 23.16.8
+      idb:
+        specifier: ^8.0.3
+        version: 8.0.3
       image-size:
         specifier: ^2.0.2
         version: 2.0.2
@@ -1069,6 +1072,9 @@ importers:
       fflate:
         specifier: ^0.8.2
         version: 0.8.2
+      image-size:
+        specifier: ^2.0.2
+        version: 2.0.2
     devDependencies:
       '@grida/cg':
         specifier: workspace:*
@@ -8811,6 +8817,9 @@ packages:
     engines: {node: ^10 || ^12 || >= 14}
     peerDependencies:
       postcss: ^8.1.0
+
+  idb@8.0.3:
+    resolution: {integrity: sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==}
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
@@ -23406,6 +23415,8 @@ snapshots:
   icss-utils@5.1.0(postcss@8.5.4):
     dependencies:
       postcss: 8.5.4
+
+  idb@8.0.3: {}
 
   ieee754@1.2.1: {}
 

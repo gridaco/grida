@@ -6,12 +6,15 @@ import type cg from "@grida/cg";
 export function BoxFitControl({
   value = "none",
   onValueChange,
+  className,
 }: {
   value?: TMixed<cg.BoxFit>;
   onValueChange?: (value: cg.BoxFit) => void;
+  className?: string;
 }) {
   return (
     <PropertyEnum<cg.BoxFit>
+      className={className}
       enum={[
         {
           value: "none",

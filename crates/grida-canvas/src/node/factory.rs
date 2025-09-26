@@ -1,7 +1,7 @@
 use std::f32;
 
 use super::schema::*;
-use crate::cg::types::*;
+use crate::cg::{types::*, Alignment};
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use uuid::Uuid;
 
@@ -34,19 +34,22 @@ impl NodeFactory {
     fn default_solid_paint(color: CGColor) -> Paint {
         Paint::Solid(SolidPaint {
             color,
-            opacity: 1.0,
             blend_mode: BlendMode::default(),
+            active: true,
         })
     }
 
     fn default_image_paint() -> ImagePaint {
         ImagePaint {
-            // TODO: use the built in image hash
-            hash: String::new(),
+            // TODO: use the built in image ref
+            image: ResourceRef::RID(String::new()),
+            quarter_turns: 0,
+            alignement: Alignment::CENTER,
+            fit: ImagePaintFit::Fit(BoxFit::Cover),
             opacity: 1.0,
-            transform: AffineTransform::identity(),
-            fit: BoxFit::Cover,
             blend_mode: BlendMode::default(),
+            filters: ImageFilters::default(),
+            active: true,
         }
     }
 
@@ -56,16 +59,17 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
-            fills: vec![Self::default_solid_paint(Self::DEFAULT_COLOR)],
-            strokes: vec![],
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
+            strokes: Paints::default(),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
             effects: LayerEffects::default(),
         }
     }
@@ -76,19 +80,20 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             inner_radius: None,
             start_angle: 0.0,
             angle: None,
-            fills: vec![Self::default_solid_paint(Self::DEFAULT_COLOR)],
-            strokes: vec![],
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
+            strokes: Paints::default(),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
             corner_radius: None,
         }
     }
@@ -99,18 +104,19 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             size: Size {
                 width: Self::DEFAULT_SIZE.width,
                 height: 0.0,
             },
-            strokes: vec![Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR)],
+            strokes: Paints::new([Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR)]),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             _data_stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         }
     }
 
@@ -120,6 +126,10 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             width: None,
             height: None,
@@ -129,13 +139,10 @@ impl NodeFactory {
             text_style: TextStyleRec::from_font("Geist", 16.0),
             text_align: TextAlign::Left,
             text_align_vertical: TextAlignVertical::Top,
-            fills: vec![Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR)],
-            strokes: vec![],
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR)]),
+            strokes: Paints::default(),
             stroke_width: 0.0,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         }
     }
 
@@ -148,7 +155,8 @@ impl NodeFactory {
             transform: None,
             children: Vec::new(),
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
         }
     }
 
@@ -158,17 +166,18 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
             children: Vec::new(),
-            fills: vec![Self::default_solid_paint(Self::DEFAULT_COLOR)],
-            strokes: vec![],
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
+            strokes: Paints::default(),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
             effects: LayerEffects::default(),
             clip: true,
         }
@@ -180,16 +189,17 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
-            fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             data: String::new(),
-            stroke: None,
+            strokes: Paints::default(),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         }
     }
 
@@ -199,18 +209,19 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             point_count: 3, // Triangle by default
             corner_radius: 0.0,
-            fills: vec![Self::default_solid_paint(Self::DEFAULT_COLOR)],
-            strokes: vec![],
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
+            strokes: Paints::default(),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         }
     }
 
@@ -219,19 +230,20 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             point_count: 5,    // 5-pointed star by default
             inner_radius: 0.4, // Default inner radius
             corner_radius: 0.0,
-            fills: vec![Self::default_solid_paint(Self::DEFAULT_COLOR)],
-            strokes: vec![],
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
+            strokes: Paints::default(),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         }
     }
 
@@ -240,17 +252,18 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             points: Vec::new(),
             corner_radius: 0.0,
-            fills: vec![Self::default_solid_paint(Self::DEFAULT_COLOR)],
-            strokes: vec![],
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
+            strokes: Paints::default(),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
         }
     }
 
@@ -260,18 +273,19 @@ impl NodeFactory {
             id: self.id(),
             name: None,
             active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            effects: LayerEffects::default(),
+            mask: None,
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
             fill: Self::default_image_paint(),
-            stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
+            strokes: Paints::new([Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR)]),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            opacity: Self::DEFAULT_OPACITY,
-            blend_mode: BlendMode::Normal,
-            effects: LayerEffects::default(),
-            hash: String::new(),
+            image: ResourceRef::RID(String::new()),
         }
     }
 }

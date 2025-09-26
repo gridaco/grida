@@ -76,10 +76,15 @@ export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
   });
 
   return (
-    <SizeProvider className="w-full h-full">
+    <SizeProvider
+      className="w-full h-full max-w-full max-h-full"
+      style={{
+        // Force the canvas to respect container boundaries
+        contain: "strict",
+      }}
+    >
       <Canvas
-        width={100}
-        height={100}
+        initialSize={{ width: 100, height: 100 }}
         transform={transform}
         data={document}
         debug={debug}

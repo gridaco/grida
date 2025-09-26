@@ -1,13 +1,27 @@
 import { css } from "@/grida-canvas-utils/css";
-import { TransparencyGridIcon } from "@radix-ui/react-icons";
+import { TransparencyGridIcon, ImageIcon } from "@radix-ui/react-icons";
 import type cg from "@grida/cg";
 import { cn } from "@/components/lib/utils";
+import { ImageView } from "@/grida-canvas-react";
+import { ComponentProps } from "react";
+
+function ChipContainer({ className, ...props }: ComponentProps<"div">) {
+  return (
+    <div
+      className={cn(
+        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
+        className
+      )}
+      {...props}
+    />
+  );
+}
 
 export function PaintChip({
   paint,
   className,
 }: {
-  paint: cg.Paint;
+  paint: cg.Paint | cg.ImagePaint;
   className?: string;
 }) {
   switch (paint.type) {
@@ -21,6 +35,8 @@ export function PaintChip({
       return <SweepGradientPaintChip paint={paint} className={className} />;
     case "diamond_gradient":
       return <DiamondGradientPaintChip paint={paint} className={className} />;
+    case "image":
+      return <ImagePaintChip paint={paint} className={className} />;
   }
 }
 
@@ -32,20 +48,15 @@ export function RGBAChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       <div
-        className="absolute w-full h-full"
+        className="absolute w-full h-full z-10"
         style={{
           backgroundColor: css.toRGBAString(rgba),
         }}
       />
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
+    </ChipContainer>
   );
 }
 
@@ -57,20 +68,15 @@ export function LinearGradientPaintChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       <div
-        className="absolute w-full h-full"
+        className="absolute w-full h-full z-10"
         style={{
           background: css.toLinearGradientString(paint),
         }}
       />
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
+    </ChipContainer>
   );
 }
 
@@ -82,20 +88,15 @@ export function RadialGradientPaintChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       <div
-        className="absolute w-full h-full"
+        className="absolute w-full h-full z-10"
         style={{
           background: css.toRadialGradientString(paint),
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+    </ChipContainer>
   );
 }
 
@@ -107,20 +108,15 @@ export function SweepGradientPaintChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       <div
-        className="absolute w-full h-full"
+        className="absolute w-full h-full z-10"
         style={{
           background: css.toConicGradientString(paint),
         }}
       />
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
+    </ChipContainer>
   );
 }
 
@@ -132,12 +128,7 @@ export function DiamondGradientPaintChip({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
-        className
-      )}
-    >
+    <ChipContainer className={className}>
       {/* Diamond shape using CSS transform */}
       <div
         className="absolute inset-0 transform rotate-45 scale-75"
@@ -168,7 +159,32 @@ export function DiamondGradientPaintChip({
           }),
         }}
       />
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
-    </div>
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
+    </ChipContainer>
+  );
+}
+
+export function ImagePaintChip({
+  paint,
+  className,
+}: {
+  paint: cg.ImagePaint;
+  className?: string;
+}) {
+  return (
+    <ChipContainer className={className}>
+      {paint.src ? (
+        <ImageView
+          src={paint.src}
+          alt="Paint image"
+          className="w-full h-full object-cover z-10"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <ImageIcon className="w-3 h-3 text-muted-foreground/50" />
+        </div>
+      )}
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
+    </ChipContainer>
   );
 }

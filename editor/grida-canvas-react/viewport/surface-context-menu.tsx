@@ -59,6 +59,7 @@ function ContextMenuContent() {
           Copy/Paste as...
         </ContextMenuSubTrigger>
         <ContextMenuSubContent>
+          <ActionItem action={actions.copyAsSVG} />
           <ActionItem action={actions.copyAsPNG} />
         </ContextMenuSubContent>
       </ContextMenuSub>
@@ -67,6 +68,11 @@ function ContextMenuContent() {
       <ActionItem action={actions.sendToBack} />
       <ContextMenuSeparator />
       <ActionItem action={actions.flatten} />
+      {actions.removeMask.disabled ? (
+        <ActionItem action={actions.groupMask} />
+      ) : (
+        <ActionItem action={actions.removeMask} />
+      )}
       <ContextMenuSub>
         <ContextMenuSubTrigger className="text-xs">
           Edit Vector...

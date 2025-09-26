@@ -80,19 +80,21 @@ pub fn stroke_geometry(
             if let Some((dashed, _)) =
                 pe.filter_path(source_path, &stroke_rec, source_path.bounds())
             {
-                path_to_stroke = dashed;
+                path_to_stroke = dashed.snapshot();
             }
         }
     }
 
     // Apply the stroke to create the outline
-    let mut stroked_path = Path::new();
-    if stroke_rec.apply_to_path(&mut stroked_path, &path_to_stroke) {
+    let mut stroked_path_builder = skia_safe::PathBuilder::new();
+    if stroke_rec.apply_to_path(&mut stroked_path_builder, &path_to_stroke) {
+        let stroked_path = stroked_path_builder.snapshot();
+
         match effective_align {
             Center => stroked_path,
             Inside => {
                 // Clip to original path: intersection
-                if let Some(result) = Path::op(&stroked_path, source_path, PathOp::Intersect) {
+                if let Some(result) = skia_safe::op(&stroked_path, source_path, PathOp::Intersect) {
                     result
                 } else {
                     stroked_path
@@ -100,7 +102,8 @@ pub fn stroke_geometry(
             }
             Outside => {
                 // Subtract original path from stroke outline
-                if let Some(result) = Path::op(&stroked_path, source_path, PathOp::Difference) {
+                if let Some(result) = skia_safe::op(&stroked_path, source_path, PathOp::Difference)
+                {
                     result
                 } else {
                     stroked_path

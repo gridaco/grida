@@ -25,7 +25,7 @@ fn draw_rect(
     canvas.translate((x, y));
 
     // Create paint with gradient relative to container (0,0)
-    let paint = radial_gradient_paint(gradient, gradient.opacity, size);
+    let paint = radial_gradient_paint(gradient, size);
 
     // Draw rectangle at origin (0,0) since we translated the canvas
     canvas.draw_rect(Rect::from_xywh(0.0, 0.0, size.0, size.1), &paint);
@@ -63,6 +63,7 @@ fn main() {
         opacity: 1.0,
         transform: AffineTransform::identity(),
         blend_mode: BlendMode::Normal,
+        active: true,
     };
 
     // Draw rectangles with varying widths in a single row
@@ -90,6 +91,7 @@ fn main() {
         opacity: radial_gradient.opacity,
         transform: AffineTransform::new(-0.5, -0.5, 0.0), // Move gradient center to top-left
         blend_mode: BlendMode::Normal,
+        active: true,
     };
 
     let mut current_x = start_x;
@@ -114,6 +116,7 @@ fn main() {
         opacity: radial_gradient.opacity,
         transform: AffineTransform::new(0.0, 0.0, 45.0), // Rotate the gradient by 45 degrees
         blend_mode: BlendMode::Normal,
+        active: true,
     };
 
     let mut current_x = start_x;

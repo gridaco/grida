@@ -575,23 +575,21 @@ export function useEditorHotKeys() {
               sRGBHex: string;
             }) => {
               const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
-              // set fill if selection
+              const solidPaint: cg.SolidPaint = {
+                type: "solid",
+                color: rgba,
+                active: true,
+              };
+
               if (selection.length > 0) {
-                editor.changeNodeFill(selection, {
-                  type: "solid",
-                  color: rgba,
-                } satisfies cg.SolidPaint);
-              }
-              // copy to clipboard if no selection
-              else {
-                // editor clipboard
+                editor.changeNodeFills(selection, [solidPaint]);
+              } else {
                 editor.setClipboardColor(rgba);
-                // os clipboard
                 window.navigator.clipboard
                   .writeText(result.sRGBHex)
                   .then(() => {
                     toast.success(
-                      `Copied hex color to clipboard  ${result.sRGBHex}`
+                      `Copied hex color to clipboard ${result.sRGBHex}`
                     );
                   });
               }

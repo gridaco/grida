@@ -86,14 +86,32 @@ function __self_guide_delete(draft: editor.state.IEditorState, idx: number) {
   scene.guides.splice(idx, 1);
 }
 
-function __self_try_content_edit_mode_fill_gradient(
+function __self_try_content_edit_mode_paint_gradient(
   draft: editor.state.IEditorState,
-  node_id: string
+  node_id: string,
+  paint_target: "fill" | "stroke" = "fill",
+  paint_index: number = 0
 ) {
   draft.content_edit_mode = {
     node_id: node_id,
-    type: "fill/gradient",
+    type: "paint/gradient",
+    paint_target,
     selected_stop: 0,
+    paint_index,
+  };
+}
+
+function __self_try_content_edit_mode_paint_image(
+  draft: editor.state.IEditorState,
+  node_id: string,
+  paint_target: "fill" | "stroke",
+  paint_index: number = 0
+) {
+  draft.content_edit_mode = {
+    node_id,
+    type: "paint/image",
+    paint_target: paint_target,
+    paint_index,
   };
 }
 
@@ -166,6 +184,66 @@ export function __self_try_enter_content_edit_mode_vector(
   }
 }
 
+function __has_image_paint(
+  node: grida.program.nodes.Node,
+  paint_target: "fill" | "stroke"
+): {
+  hasImage: boolean;
+  paintTarget: "fill" | "stroke";
+  paintIndex: number;
+} | null {
+  if (node.type === "text") return null;
+
+  switch (paint_target) {
+    case "fill": {
+      // Check fills
+      const fills = Array.isArray((node as any).fills)
+        ? ((node as any).fills as grida.program.nodes.i.props.PropsPaintValue[])
+        : (node as any).fill
+          ? [(node as any).fill as grida.program.nodes.i.props.PropsPaintValue]
+          : [];
+      const fillImageIndex = fills.findIndex(
+        (paint) => paint?.type === "image"
+      );
+
+      if (fillImageIndex !== -1) {
+        return {
+          hasImage: true,
+          paintTarget: "fill",
+          paintIndex: fillImageIndex,
+        };
+      }
+      break;
+    }
+    case "stroke": {
+      // Check strokes
+      const strokes = Array.isArray((node as any).strokes)
+        ? ((node as any)
+            .strokes as grida.program.nodes.i.props.PropsPaintValue[])
+        : (node as any).stroke
+          ? [
+              (node as any)
+                .stroke as grida.program.nodes.i.props.PropsPaintValue,
+            ]
+          : [];
+      const strokeImageIndex = strokes.findIndex(
+        (paint) => paint?.type === "image"
+      );
+
+      if (strokeImageIndex !== -1) {
+        return {
+          hasImage: true,
+          paintTarget: "stroke",
+          paintIndex: strokeImageIndex,
+        };
+      }
+      break;
+    }
+  }
+
+  return null;
+}
+
 function __self_try_enter_content_edit_mode_auto(
   draft: editor.state.IEditorState,
   node_id: string,
@@ -192,6 +270,17 @@ function __self_try_enter_content_edit_mode_auto(
     case "polygon":
     case "ellipse":
     case "line": {
+      // Check for image paints first
+      const imagePaintInfo = __has_image_paint(node, "fill");
+      if (imagePaintInfo?.hasImage) {
+        return __self_try_content_edit_mode_paint_image(
+          draft,
+          node_id,
+          "fill",
+          imagePaintInfo.paintIndex
+        );
+      }
+
       return __self_try_enter_content_edit_mode_vector(draft, node_id, context);
     }
     case "bitmap": {
@@ -862,9 +951,24 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
         __self_try_enter_content_edit_mode_auto(draft, node_id, context);
         break;
       }
-      case "surface/content-edit-mode/fill/gradient": {
-        const { node_id } = action;
-        __self_try_content_edit_mode_fill_gradient(draft, node_id);
+      case "surface/content-edit-mode/paint/gradient": {
+        const { node_id, paint_target = "fill", paint_index = 0 } = action;
+        __self_try_content_edit_mode_paint_gradient(
+          draft,
+          node_id,
+          paint_target,
+          paint_index ?? 0
+        );
+        break;
+      }
+      case "surface/content-edit-mode/paint/image": {
+        const { node_id, paint_target, paint_index = 0 } = action;
+        __self_try_content_edit_mode_paint_image(
+          draft,
+          node_id,
+          paint_target,
+          paint_index ?? 0
+        );
         break;
       }
       case "surface/content-edit-mode/try-exit": {

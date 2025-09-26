@@ -379,7 +379,7 @@ export function create_new_vector_node(
     height: 0,
     rotation: 0,
     zIndex: 0,
-    stroke: { type: "solid", color: black },
+    stroke: { type: "solid", color: black, active: true },
     strokeCap: "butt",
     strokeWidth: 1,
     vectorNetwork: {
@@ -699,7 +699,7 @@ export function on_draw_pointer_down(
     height: 0,
     rotation: 0,
     zIndex: 0,
-    stroke: { type: "solid", color: black },
+    stroke: { type: "solid", color: black, active: true },
     strokeCap: "butt",
   } as const;
 

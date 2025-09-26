@@ -1,8 +1,10 @@
 import { useCallback, useMemo } from "react";
 import { useCurrentEditor, useEditorState } from "./use-editor";
-import { useBackendState, useDataTransferEventTarget } from "./provider";
+import { useBackendState } from "./provider";
+import { useDataTransferEventTarget } from "./use-data-transfer";
 import { supportsFlatten } from "@/grida-canvas/reducers/methods/flatten";
 import grida from "@grida/schema";
+import assert from "assert";
 
 export interface ContextMenuAction {
   label: string;
@@ -14,6 +16,7 @@ export interface ContextMenuAction {
 type ContextMenuActionType =
   | "copy"
   | "paste"
+  | "copyAsSVG"
   | "copyAsPNG"
   | "bringToFront"
   | "sendToBack"
@@ -23,6 +26,8 @@ type ContextMenuActionType =
   | "autoLayout"
   | "flatten"
   | "planarize"
+  | "groupMask"
+  | "removeMask"
   | "toggleActive"
   | "zoomToFit"
   | "toggleLocked"
@@ -34,6 +39,7 @@ export type ContextMenuActions = Record<
 >;
 
 export function useContextMenuActions(ids: string[]): ContextMenuActions {
+  assert(Array.isArray(ids), "ids must be an array");
   const editor = useCurrentEditor();
   const backend = useBackendState();
   const { insertText } = useDataTransferEventTarget();
@@ -47,7 +53,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
   });
 
   const hasSelection = ids.length > 0;
-
+  const isSingle = ids.length === 1;
   const canGroup = backend === "canvas" && hasSelection;
 
   const canFlatten =
@@ -67,9 +73,13 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
     hasSelection &&
     ids.every((id) => nodes[id].type === "vector");
 
+  const canGroupMask = canGroup;
+  const canRemoveMask = isSingle && editor.isMask(ids[0]);
+
   const targetSingleOrSelection =
     ids.length === 1 ? (ids[0] as string) : "selection";
 
+  // FIXME: use global on paste
   const handlePaste = useCallback(async () => {
     try {
       const clipboardItems = await navigator.clipboard.read();
@@ -103,6 +113,13 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       paste: {
         label: "Paste",
         onSelect: handlePaste,
+      },
+      copyAsSVG: {
+        label: "Copy as SVG",
+        disabled: backend !== "canvas" || !hasSelection,
+        onSelect: () => {
+          void editor.a11yCopyAsSVG();
+        },
       },
       copyAsPNG: {
         label: "Copy as PNG",
@@ -159,6 +176,16 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Planarize",
         disabled: !canPlanarize,
         onSelect: () => editor.planarize(ids),
+      },
+      groupMask: {
+        label: "Use as Mask",
+        disabled: !canGroupMask,
+        onSelect: () => editor.groupMask(ids),
+      },
+      removeMask: {
+        label: "Remove Mask",
+        disabled: !canRemoveMask,
+        onSelect: () => editor.removeMask(ids[0]),
       },
       toggleActive: {
         label: "Set Active/Inactive",

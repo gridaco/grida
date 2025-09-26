@@ -18,8 +18,6 @@ import {
   CornerRadiusControl,
 } from "./controls/corner-radius";
 import { BorderControl } from "./controls/border";
-import { FillControl } from "./controls/fill";
-import { StringValueControl } from "./controls/string-value";
 import { PaddingControl } from "./controls/padding";
 import { GapControl } from "./controls/gap";
 import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
@@ -59,6 +57,7 @@ import {
   LockOpen1Icon,
   MixerVerticalIcon,
   PlusIcon,
+  TrashIcon,
 } from "@radix-ui/react-icons";
 import { supports } from "@/grida-canvas/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
@@ -94,13 +93,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 import { dq } from "@/grida-canvas/query";
-import { StrokeAlignControl } from "./controls/stroke-align";
 import { TextDetails } from "./controls/widgets/text-details";
 import cg from "@grida/cg";
 import { FeControl } from "./controls/fe";
 import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
 import { ModeVectorEditModeProperties } from "./chunks/mode-vector";
+import { SectionFills } from "./chunks/section-fills";
+import { SectionStrokes } from "./chunks/section-strokes";
 import { OpsControl } from "./controls/ext-ops";
 import { MaskControl } from "./controls/ext-mask";
 import {
@@ -114,6 +114,8 @@ import {
   useCurrentFontFamily,
 } from "./controls/context/font";
 import { PropertyLineLabelWithNumberGesture } from "./ui/label-with-number-gesture";
+import { MaskTypeControl } from "./controls/mask-type";
+import { Editor } from "@/grida-canvas/editor";
 
 function FontStyleControlScaffold({ selection }: { selection: string[] }) {
   const editor = useCurrentEditor();
@@ -152,31 +154,36 @@ function Align() {
   );
 }
 
-function BooleanOperations() {
+function Header() {
   const editor = useCurrentEditor();
   const { selection } = useSelectionState();
   const backend = useBackendState();
   const has_selection = selection.length >= 1;
+  const is_single = selection.length === 1;
+  const supports_masking = backend === "canvas";
   const supports_boolean = backend === "canvas";
 
-  return (
-    <SidebarSection className="mt-2 flex justify-center">
-      <OpsControl
-        disabled={!has_selection || !supports_boolean}
-        onOp={(op) => {
-          editor.op(selection, op);
-        }}
-      />
-    </SidebarSection>
-  );
-}
+  // TODO: this won't change immediately since useSelectionState only checks the selection itself, not the mask property for the node.
+  // we'll fix this when reliable, performant selector based query is ready
+  const is_mask = is_single && editor.isMask(selection[0]);
 
-function Header() {
   return (
     <>
-      <div className="w-full flex items-center justify-end gap-1">
-        <MaskControl disabled />
-        <BooleanOperations />
+      <div className="p-2 w-full flex items-center justify-end gap-2">
+        <MaskControl
+          disabled={!has_selection || !supports_masking}
+          active={Boolean(is_mask)}
+          onClick={() => {
+            editor.toggleMask(selection);
+          }}
+        />
+        <OpsControl
+          disabled={!has_selection || !supports_boolean}
+          onOp={(op) => {
+            editor.op(selection, op);
+          }}
+          className="flex justify-center"
+        />
       </div>
       <hr />
     </>
@@ -656,17 +663,9 @@ function ModeMixedNodeProperties({
           <PropertyLine>
             <PropertyLineLabel>Fill</PropertyLineLabel>
             {fill?.mixed || fill?.partial ? (
-              <PaintControl
-                value={undefined}
-                onValueChange={change.fill}
-                removable
-              />
+              <PaintControl value={undefined} onValueChange={change.fill} />
             ) : (
-              <PaintControl
-                value={fill?.value}
-                onValueChange={change.fill}
-                removable
-              />
+              <PaintControl value={fill?.value} onValueChange={change.fill} />
             )}
           </PropertyLine>
         </SidebarMenuSectionContent>
@@ -689,10 +688,6 @@ function ModeMixedNodeProperties({
                       change.strokeWidth({ type: "set", value: 1 });
                     }
                   }}
-                  onValueRemove={() => {
-                    change.stroke(null);
-                  }}
-                  removable
                 />
               ) : (
                 <PaintControl
@@ -704,10 +699,6 @@ function ModeMixedNodeProperties({
                       change.strokeWidth({ type: "set", value: 1 });
                     }
                   }}
-                  onValueRemove={() => {
-                    change.stroke(null);
-                  }}
-                  removable
                 />
               )}
             </PropertyLine>
@@ -951,11 +942,14 @@ function ModeNodeProperties({
         <SectionProps node_id={node_id} />
       )}
 
+      <SectionMask node_id={node_id} editor={instance} />
+
       <SidebarSection hidden={!is_stylable} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
           <SidebarSectionHeaderActions>
             <BlendModeDropdown
+              type="layer"
               value={blendMode}
               onValueChange={actions.blendMode}
             />
@@ -1054,6 +1048,7 @@ function ModeNodeProperties({
           )}
         </SidebarMenuSectionContent>
       </SidebarSection>
+
       {config.text === "on" && is_text && <SectionText node_id={node_id} />}
       <SidebarSection
         hidden={config.image === "off" || !is_image}
@@ -1599,133 +1594,32 @@ function SectionProps({ node_id }: { node_id: string }) {
   );
 }
 
-function SectionFills({ node_id }: { node_id: string }) {
-  const instance = useCurrentEditor();
-  const { content_edit_mode } = useEditorState(instance, (state) => ({
-    content_edit_mode: state.content_edit_mode,
-  }));
-
-  const { fill } = useNodeState(node_id, (node) => ({
-    fill: node.fill,
-  }));
-
-  const selectedGradientStop =
-    content_edit_mode?.type === "fill/gradient"
-      ? content_edit_mode.selected_stop
-      : undefined;
-
+function SectionMask({ node_id, editor }: { node_id: string; editor: Editor }) {
   const actions = useNodeActions(node_id)!;
+  const { mask } = useNodeState(node_id, (node) => ({
+    mask: node.mask,
+  }));
+
+  if (!mask) return null;
 
   return (
     <SidebarSection className="border-b pb-4">
       <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
+        <SidebarSectionHeaderLabel>Mask</SidebarSectionHeaderLabel>
+        <SidebarSectionHeaderActions>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              editor.removeMask(node_id);
+            }}
+          >
+            <TrashIcon className="size-3" />
+          </Button>
+        </SidebarSectionHeaderActions>
       </SidebarSectionHeaderItem>
       <SidebarMenuSectionContent className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Fill</PropertyLineLabel>
-          <FillControl
-            value={fill}
-            onValueChange={actions.fill}
-            removable
-            selectedGradientStop={selectedGradientStop}
-            onSelectedGradientStopChange={(stop) => {
-              instance.selectGradientStop(node_id, stop);
-            }}
-            onOpenChange={(open) => {
-              if (open) {
-                instance.tryEnterContentEditMode(node_id, "fill/gradient");
-              } else {
-                instance.tryExitContentEditMode();
-              }
-              //
-            }}
-          />
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
-  );
-}
-
-function SectionStrokes({
-  node_id,
-  config = {
-    stroke_cap: "on",
-  },
-}: {
-  node_id: string;
-  config?: {
-    stroke_cap: "on" | "off";
-  };
-}) {
-  const { stroke, strokeWidth, strokeAlign, strokeCap, type } = useNodeState(
-    node_id,
-    (node) => ({
-      stroke: node.stroke,
-      strokeWidth: node.strokeWidth,
-      strokeAlign: node.strokeAlign,
-      strokeCap: node.strokeCap,
-      type: node.type,
-    })
-  );
-
-  const is_text_node = type === "text";
-  const has_stroke_paint = stroke !== undefined;
-  const actions = useNodeActions(node_id)!;
-
-  return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Color</PropertyLineLabel>
-          <PaintControl
-            value={stroke}
-            onValueChange={actions.stroke}
-            onValueAdd={(value) => {
-              actions.stroke(value);
-              if (!strokeWidth || strokeWidth === 0) {
-                actions.strokeWidth({ type: "set", value: 1 });
-              }
-
-              // set outside as default for text nodes (if none set)
-              if (is_text_node && !strokeAlign) {
-                actions.strokeAlign("outside");
-              }
-            }}
-            onValueRemove={() => {
-              actions.stroke(null);
-            }}
-            removable
-          />
-        </PropertyLine>
-        {has_stroke_paint && (
-          <>
-            <PropertyLine>
-              <PropertyLineLabel>Width</PropertyLineLabel>
-              <StrokeWidthControl
-                value={strokeWidth}
-                onValueCommit={actions.strokeWidth}
-              />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Align</PropertyLineLabel>
-              <StrokeAlignControl
-                value={strokeAlign}
-                onValueChange={actions.strokeAlign}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={config.stroke_cap === "off"}>
-              <PropertyLineLabel>Cap</PropertyLineLabel>
-              <StrokeCapControl
-                value={strokeCap}
-                onValueChange={actions.strokeCap}
-              />
-            </PropertyLine>
-          </>
-        )}
+        <MaskTypeControl value={mask} onValueChange={actions.maskType} />
       </SidebarMenuSectionContent>
     </SidebarSection>
   );

@@ -48,8 +48,8 @@ use skia_safe::Path;
 /// // Layer definition
 /// let layer = PainterPictureLayer {
 ///     shape: shape,
-///     fills: vec![fill],
-///     strokes: vec![stroke],
+///     fills: Paints::new([fill]),
+///     strokes: Paints::new([stroke]),
 ///     effects: vec![],
 /// };
 ///
@@ -74,6 +74,25 @@ pub enum PainterPictureLayer {
     Shape(PainterPictureShapeLayer),
     Text(PainterPictureTextLayer),
     Vector(PainterPictureVectorLayer),
+}
+
+#[derive(Debug, Clone)]
+pub enum PainterRenderCommand {
+    Draw(PainterPictureLayer),
+    MaskGroup(PainterMaskGroup),
+}
+
+#[derive(Debug, Clone)]
+pub struct PainterMaskGroup {
+    pub mask_type: LayerMaskType,
+    pub mask_commands: Vec<PainterRenderCommand>,
+    pub content_commands: Vec<PainterRenderCommand>,
+}
+
+#[derive(Debug, Default)]
+struct FlattenResult {
+    commands: Vec<PainterRenderCommand>,
+    mask: Option<LayerMaskType>,
 }
 
 pub trait Layer {
@@ -122,7 +141,7 @@ pub struct PainterPictureLayerBase {
     pub id: NodeId,
     pub z_index: usize,
     pub opacity: f32,
-    pub blend_mode: BlendMode,
+    pub blend_mode: LayerBlendMode,
     pub transform: AffineTransform,
     pub clip_path: Option<skia_safe::Path>,
 }
@@ -132,8 +151,8 @@ pub struct PainterPictureShapeLayer {
     pub base: PainterPictureLayerBase,
     pub shape: PainterShape,
     pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
+    pub strokes: Paints,
+    pub fills: Paints,
     pub stroke_path: Option<skia_safe::Path>,
 }
 
@@ -141,8 +160,8 @@ pub struct PainterPictureShapeLayer {
 pub struct PainterPictureTextLayer {
     pub base: PainterPictureLayerBase,
     pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
+    pub strokes: Paints,
+    pub fills: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_path: Option<skia_safe::Path>,
@@ -162,28 +181,47 @@ pub struct PainterPictureTextLayer {
 pub struct PainterPictureVectorLayer {
     pub base: PainterPictureLayerBase,
     pub effects: LayerEffects,
-    pub strokes: Vec<Paint>,
-    pub fills: Vec<Paint>,
+    pub strokes: Paints,
+    pub fills: Paints,
     pub shape: PainterShape,
     pub vector: VectorNetwork,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
+    pub corner_radius: f32,
 }
 
 /// Flat list of [`PainterPictureLayer`] entries.
 #[derive(Debug, Default, Clone)]
 pub struct LayerList {
     pub layers: Vec<PainterPictureLayer>,
+    pub commands: Vec<PainterRenderCommand>,
 }
 
 impl LayerList {
+    /// Filter paints to only include visible ones for performance optimization.
+    ///
+    /// This removes paints that are inactive or have zero opacity, which have no visual effect
+    /// regardless of blend mode and can be safely skipped during rendering.
+    fn filter_visible_paints(paints: &Paints) -> Paints {
+        Paints::new(
+            paints
+                .iter()
+                .filter(|paint| paint.visible())
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
+    }
+
     /// Flatten an entire scene into a layer list using the provided scene cache.
     pub fn from_scene(scene: &Scene, scene_cache: &SceneCache) -> Self {
         let mut list = LayerList::default();
         for id in &scene.children {
-            Self::flatten_node(id, &scene.nodes, scene_cache, 1.0, &mut list.layers);
+            let result = Self::flatten_node(id, &scene.nodes, scene_cache, 1.0, &mut list.layers);
+            list.commands.extend(result.commands);
         }
+        // Build a LUT (id -> index) for picture caching and quick lookup
+        // by ensuring `layers` order and `commands` reference the same layer instances.
         list
     }
 
@@ -195,7 +233,8 @@ impl LayerList {
         opacity: f32,
     ) -> Self {
         let mut list = LayerList::default();
-        Self::flatten_node(id, repo, scene_cache, opacity, &mut list.layers);
+        let result = Self::flatten_node(id, repo, scene_cache, opacity, &mut list.layers);
+        list.commands = result.commands;
         list
     }
 
@@ -209,26 +248,76 @@ impl LayerList {
         scene_cache: &SceneCache,
         parent_opacity: f32,
         out: &mut Vec<PainterPictureLayer>,
-    ) {
-        if let Some(node) = repo.get(id) {
-            if !node.active() {
-                return;
-            }
-            let transform = scene_cache
-                .geometry()
-                .get_world_transform(id)
-                .unwrap_or_else(AffineTransform::identity);
-            match node {
-                Node::Group(n) => {
-                    let opacity = parent_opacity * n.opacity;
-                    for child in &n.children {
-                        Self::flatten_node(child, repo, scene_cache, opacity, out);
-                    }
+    ) -> FlattenResult {
+        let Some(node) = repo.get(id) else {
+            return FlattenResult::default();
+        };
+
+        if !node.active() {
+            return FlattenResult::default();
+        }
+
+        let transform = scene_cache
+            .geometry()
+            .get_world_transform(id)
+            .unwrap_or_else(AffineTransform::identity);
+
+        match node {
+            Node::Group(n) => {
+                let opacity = parent_opacity * n.opacity;
+                FlattenResult {
+                    commands: Self::build_render_commands(
+                        &n.children,
+                        repo,
+                        scene_cache,
+                        opacity,
+                        out,
+                    ),
+                    mask: n.mask,
                 }
-                Node::Container(n) => {
-                    let opacity = parent_opacity * n.opacity;
-                    let shape = build_shape(&IntrinsicSizeNode::Container(n.clone()));
-                    let stroke_path = if n.strokes.len() > 0 && n.stroke_width > 0.0 {
+            }
+            Node::Container(n) => {
+                let opacity = parent_opacity * n.opacity;
+                let shape = build_shape(&IntrinsicSizeNode::Container(n.clone()));
+                let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        n.stroke_width,
+                        n.stroke_align,
+                        n.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                };
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    stroke_path,
+                });
+                out.push(layer.clone());
+                let mut commands = vec![PainterRenderCommand::Draw(layer)];
+                let child_commands =
+                    Self::build_render_commands(&n.children, repo, scene_cache, opacity, out);
+                commands.extend(child_commands);
+                FlattenResult {
+                    commands,
+                    mask: n.mask,
+                }
+            }
+            Node::BooleanOperation(n) => {
+                let opacity = parent_opacity * n.opacity;
+                if let Some(shape) = boolean_operation_shape(n, repo, scene_cache.geometry()) {
+                    let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
                         Some(stroke_geometry(
                             &shape.to_path(),
                             n.stroke_width,
@@ -238,7 +327,7 @@ impl LayerList {
                     } else {
                         None
                     };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
                             id: n.id.clone(),
                             z_index: out.len(),
@@ -249,370 +338,453 @@ impl LayerList {
                         },
                         shape,
                         effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: n.fills.clone(),
+                        strokes: Self::filter_visible_paints(&n.strokes),
+                        fills: Self::filter_visible_paints(&n.fills),
                         stroke_path,
-                    }));
-                    for child in &n.children {
-                        Self::flatten_node(child, repo, scene_cache, opacity, out);
+                    });
+                    out.push(layer.clone());
+                    FlattenResult {
+                        commands: vec![PainterRenderCommand::Draw(layer)],
+                        mask: n.mask,
                     }
-                }
-                Node::BooleanOperation(n) => {
-                    let opacity = parent_opacity * n.opacity;
-                    if let Some(shape) = boolean_operation_shape(n, repo, scene_cache.geometry()) {
-                        let stroke_path = if n.stroke.is_some() && n.stroke_width > 0.0 {
-                            Some(stroke_geometry(
-                                &shape.to_path(),
-                                n.stroke_width,
-                                n.stroke_align,
-                                n.stroke_dash_array.as_ref(),
-                            ))
-                        } else {
-                            None
-                        };
-                        out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                            base: PainterPictureLayerBase {
-                                id: n.id.clone(),
-                                z_index: out.len(),
-                                opacity,
-                                blend_mode: n.blend_mode,
-                                transform,
-                                clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                            },
-                            shape,
-                            effects: n.effects.clone(),
-                            strokes: n.stroke.clone().into_iter().collect(),
-                            fills: vec![n.fill.clone()],
-                            stroke_path,
-                        }));
-                    } else {
-                        for child in &n.children {
-                            Self::flatten_node(child, repo, scene_cache, opacity, out);
-                        }
+                } else {
+                    FlattenResult {
+                        commands: Self::build_render_commands(
+                            &n.children,
+                            repo,
+                            scene_cache,
+                            opacity,
+                            out,
+                        ),
+                        mask: n.mask,
                     }
-                }
-                Node::Rectangle(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::Rectangle(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: n.fills.clone(),
-                        stroke_path,
-                    }))
-                }
-                Node::Ellipse(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::Ellipse(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: n.fills.clone(),
-                        stroke_path,
-                    }))
-                }
-                Node::Polygon(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::Polygon(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: n.fills.clone(),
-                        stroke_path,
-                    }))
-                }
-                Node::RegularPolygon(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: n.fills.clone(),
-                        stroke_path,
-                    }))
-                }
-                Node::RegularStarPolygon(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::RegularStarPolygon(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: n.fills.clone(),
-                        stroke_path,
-                    }))
-                }
-                Node::Line(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::Line(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.get_stroke_align(),
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: vec![],
-                        stroke_path,
-                    }))
-                }
-                Node::TextSpan(n) => {
-                    // Create a rectangle shape for the text bounds
-                    let text_bounds = scene_cache
-                        .geometry()
-                        .get_world_bounds(&n.id)
-                        .unwrap_or_else(|| Rectangle {
-                            x: n.x(),
-                            y: n.y(),
-                            // FIXME: organize pipline, use real values.
-                            width: n.width.unwrap_or(100.0),
-                            height: (n.text_style.font_size
-                                * match n.text_style.line_height {
-                                    // validate: is this the right logic?
-                                    TextLineHeight::Fixed(height) => {
-                                        height / n.text_style.font_size
-                                    }
-                                    TextLineHeight::Factor(factor) => factor,
-                                    TextLineHeight::Normal => 1.2,
-                                }
-                                * 2.0)
-                                .max(0.0),
-                        });
-
-                    let rect_height = n.height.unwrap_or(text_bounds.height);
-                    let shape = PainterShape::from_rect(skia_safe::Rect::from_xywh(
-                        0.0,
-                        0.0,
-                        text_bounds.width,
-                        rect_height,
-                    ));
-
-                    out.push(PainterPictureLayer::Text(PainterPictureTextLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        width: n.width,
-                        height: n.height,
-                        max_lines: n.max_lines,
-                        ellipsis: n.ellipsis.clone(),
-                        effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: n.fills.clone(),
-                        stroke_width: n.stroke_width,
-                        stroke_align: n.stroke_align,
-                        stroke_path: None,
-                        shape,
-                        text: n.text.clone(),
-                        text_style: n.text_style.clone(),
-                        text_align: n.text_align,
-                        text_align_vertical: n.text_align_vertical,
-                        id: n.id.clone(),
-                    }))
-                }
-                Node::SVGPath(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::SVGPath(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: n.effects.clone(),
-                        strokes: n.stroke.clone().into_iter().collect(),
-                        fills: vec![n.fill.clone()],
-                        stroke_path,
-                    }))
-                }
-                Node::Vector(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::Vector(n.clone()));
-                    out.push(PainterPictureLayer::Vector(PainterPictureVectorLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: n.effects.clone(),
-                        strokes: n.strokes.clone(),
-                        fills: n.fill.clone().into_iter().collect(),
-                        vector: n.network.clone(),
-                        stroke_width: n.stroke_width,
-                        stroke_align: n.get_stroke_align(),
-                        stroke_width_profile: n.stroke_width_profile.clone(),
-                    }))
-                }
-                Node::Image(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::Image(n.clone()));
-                    let stroke_path = if n.stroke_width > 0.0 {
-                        Some(stroke_geometry(
-                            &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
-                        ))
-                    } else {
-                        None
-                    };
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: n.blend_mode,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: n.effects.clone(),
-                        strokes: vec![n.stroke.clone()],
-                        fills: vec![Paint::Image(n.fill.clone())],
-                        stroke_path,
-                    }))
-                }
-                Node::Error(n) => {
-                    let shape = build_shape(&IntrinsicSizeNode::Error(n.clone()));
-                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                        base: PainterPictureLayerBase {
-                            id: n.id.clone(),
-                            z_index: out.len(),
-                            opacity: parent_opacity * n.opacity,
-                            blend_mode: BlendMode::Normal,
-                            transform,
-                            clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
-                        },
-                        shape,
-                        effects: LayerEffects::default(),
-                        strokes: vec![],
-                        fills: vec![],
-                        stroke_path: None,
-                    }))
                 }
             }
+            Node::Rectangle(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::Rectangle(n.clone()));
+                let stroke_path = if n.stroke_width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        n.stroke_width,
+                        n.stroke_align,
+                        n.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                };
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    stroke_path,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::Ellipse(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::Ellipse(n.clone()));
+                let stroke_path = if n.stroke_width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        n.stroke_width,
+                        n.stroke_align,
+                        n.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                };
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    stroke_path,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::Polygon(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::Polygon(n.clone()));
+                let stroke_path = if n.stroke_width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        n.stroke_width,
+                        n.stroke_align,
+                        n.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                };
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    stroke_path,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::RegularPolygon(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone()));
+                let stroke_path = if n.stroke_width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        n.stroke_width,
+                        n.stroke_align,
+                        n.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                };
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    stroke_path,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::RegularStarPolygon(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::RegularStarPolygon(n.clone()));
+                let stroke_path = if n.stroke_width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        n.stroke_width,
+                        n.stroke_align,
+                        n.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                };
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    stroke_path,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::Line(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::Line(n.clone()));
+                let stroke_path = if n.stroke_width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        n.stroke_width,
+                        n.get_stroke_align(),
+                        n.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                };
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: n.strokes.clone(),
+                    fills: Paints::default(),
+                    stroke_path,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::TextSpan(n) => {
+                let text_bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(&n.id)
+                    .unwrap_or_else(|| Rectangle {
+                        x: n.x(),
+                        y: n.y(),
+                        width: n.width.unwrap_or(100.0),
+                        height: (n.text_style.font_size
+                            * match n.text_style.line_height {
+                                TextLineHeight::Fixed(height) => height / n.text_style.font_size,
+                                TextLineHeight::Factor(factor) => factor,
+                                TextLineHeight::Normal => 1.2,
+                            }
+                            * 2.0)
+                            .max(0.0),
+                    });
+
+                let rect_height = n.height.unwrap_or(text_bounds.height);
+                let shape = PainterShape::from_rect(skia_safe::Rect::from_xywh(
+                    0.0,
+                    0.0,
+                    text_bounds.width,
+                    rect_height,
+                ));
+
+                let layer = PainterPictureLayer::Text(PainterPictureTextLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    width: n.width,
+                    height: n.height,
+                    max_lines: n.max_lines,
+                    ellipsis: n.ellipsis.clone(),
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    stroke_width: n.stroke_width,
+                    stroke_align: n.stroke_align,
+                    stroke_path: None,
+                    shape,
+                    text: n.text.clone(),
+                    text_style: n.text_style.clone(),
+                    text_align: n.text_align,
+                    text_align_vertical: n.text_align_vertical,
+                    id: n.id.clone(),
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::SVGPath(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::SVGPath(n.clone()));
+                let stroke_path = if n.stroke_width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        n.stroke_width,
+                        n.stroke_align,
+                        n.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                };
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    stroke_path,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::Vector(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::Vector(n.clone()));
+                let layer = PainterPictureLayer::Vector(PainterPictureVectorLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    vector: n.network.clone(),
+                    stroke_width: n.stroke_width,
+                    stroke_align: n.get_stroke_align(),
+                    stroke_width_profile: n.stroke_width_profile.clone(),
+                    corner_radius: n.corner_radius,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::Image(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::Image(n.clone()));
+                let stroke_path = if n.stroke_width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        n.stroke_width,
+                        n.stroke_align,
+                        n.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                };
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: n.effects.clone(),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&Paints::new([Paint::Image(
+                        n.fill.clone(),
+                    )])),
+                    stroke_path,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::Error(n) => {
+                let shape = build_shape(&IntrinsicSizeNode::Error(n.clone()));
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: n.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: LayerBlendMode::PassThrough,
+                        transform,
+                        clip_path: Self::compute_clip_path(&n.id, repo, scene_cache),
+                    },
+                    shape,
+                    effects: LayerEffects::default(),
+                    strokes: Paints::default(),
+                    fills: Paints::default(),
+                    stroke_path: None,
+                });
+                out.push(layer.clone());
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: None,
+                }
+            }
+        }
+    }
+
+    fn build_render_commands(
+        children: &[NodeId],
+        repo: &NodeRepository,
+        scene_cache: &SceneCache,
+        parent_opacity: f32,
+        out: &mut Vec<PainterPictureLayer>,
+    ) -> Vec<PainterRenderCommand> {
+        // Build render commands from child nodes using flat list model.
+        // Iterate children in z-order (bottom→top). Accumulate non-mask commands in `run`.
+        // When a mask node is encountered, emit MaskGroup { mask, items: run } and clear run.
+        let mut out_commands = Vec::new();
+        let mut run: Vec<PainterRenderCommand> = Vec::new();
+        for child_id in children {
+            let result = Self::flatten_node(child_id, repo, scene_cache, parent_opacity, out);
+            if let Some(mask_type) = result.mask {
+                let mask_commands = result.commands;
+                // Emit a scope with the accumulated run as content under this mask
+                out_commands.push(PainterRenderCommand::MaskGroup(PainterMaskGroup {
+                    mask_type,
+                    mask_commands,
+                    content_commands: std::mem::take(&mut run),
+                }));
+            } else {
+                // Not a mask — accumulate into the current run
+                run.extend(result.commands);
+            }
+        }
+        // Flush remaining run (no mask above it)
+        out_commands.extend(run.into_iter());
+        out_commands
+    }
+
+    fn node_mask(node: &Node) -> Option<LayerMaskType> {
+        match node {
+            Node::Group(n) => n.mask,
+            Node::Container(n) => n.mask,
+            Node::Rectangle(n) => n.mask,
+            Node::Ellipse(n) => n.mask,
+            Node::Polygon(n) => n.mask,
+            Node::RegularPolygon(n) => n.mask,
+            Node::RegularStarPolygon(n) => n.mask,
+            Node::Line(n) => n.mask,
+            Node::TextSpan(n) => n.mask,
+            Node::SVGPath(n) => n.mask,
+            Node::Vector(n) => n.mask,
+            Node::BooleanOperation(n) => n.mask,
+            Node::Image(n) => n.mask,
+            Node::Error(_) => None,
         }
     }
 

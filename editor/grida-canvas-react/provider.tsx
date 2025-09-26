@@ -11,21 +11,18 @@ import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import { io } from "@grida/io";
 import type { tokens } from "@grida/tokens";
-import type cg from "@grida/cg";
+import cg from "@grida/cg";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 import {
   DataProvider,
   ProgramDataContextHost,
 } from "@/grida-react-program-context/data-context/context";
-import cmath from "@grida/cmath";
 import type { Action } from "@/grida-canvas/action";
 import equal from "fast-deep-equal";
-import { toast } from "sonner";
 import { is_direct_component_consumer } from "@/grida-canvas/utils/supports";
 import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
-import nid from "../grida-canvas/reducers/tools/id";
 
 type Dispatcher = (action: Action) => void;
 
@@ -157,12 +154,13 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeNodeInnerRadius(node_id, value),
       arcData: (value: grida.program.nodes.i.IEllipseArcData) =>
         instance.changeNodeArcData(node_id, value),
-      fill: (
-        value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-      ) => instance.changeNodeFill(node_id, value),
-      stroke: (
-        value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null
-      ) => instance.changeNodeStroke(node_id, value),
+      fills: (fills: cg.Paint[]) => instance.changeNodeFills(node_id, fills),
+      strokes: (strokes: cg.Paint[]) =>
+        instance.changeNodeStrokes(node_id, strokes),
+      addFill: (fill: cg.Paint, at?: "start" | "end") =>
+        instance.addNodeFill(node_id, fill, at),
+      addStroke: (stroke: cg.Paint, at?: "start" | "end") =>
+        instance.addNodeStroke(node_id, stroke, at),
       strokeWidth: (change: editor.api.NumberChange) =>
         instance.changeNodeStrokeWidth(node_id, change),
       strokeAlign: (value: cg.StrokeAlign) =>
@@ -173,8 +171,10 @@ export function useNodeActions(node_id: string | undefined) {
       // stylable
       opacity: (change: editor.api.NumberChange) =>
         instance.changeNodeOpacity(node_id, change),
-      blendMode: (value: cg.BlendMode) =>
+      blendMode: (value: cg.LayerBlendMode) =>
         instance.changeNodeBlendMode(node_id, value),
+      maskType: (value: cg.LayerMaskType) =>
+        instance.changeNodeMaskType(node_id, value),
       rotation: (change: editor.api.NumberChange) =>
         instance.changeNodeRotation(node_id, change),
       width: (value: grida.program.css.LengthPercentage | "auto") =>
@@ -686,303 +686,6 @@ export function useGestureState(): UseGestureState {
   };
 }
 
-export function useDataTransferEventTarget() {
-  const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    transform: state.transform,
-  }));
-  const current_clipboard = useEditorState(instance, (s) => s.user_clipboard);
-
-  const insertText = useCallback(
-    (
-      text: string,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
-      const [x, y] = instance.clientPointToCanvasPoint(
-        position ? [position.clientX, position.clientY] : [0, 0]
-      );
-
-      const node = instance.createTextNode();
-      node.$.name = text;
-      node.$.text = text;
-      node.$.left = x;
-      node.$.top = y;
-      node.$.fill = {
-        type: "solid",
-        color: { r: 0, g: 0, b: 0, a: 1 },
-      } as cg.Paint;
-    },
-    [instance]
-  );
-
-  const insertImage = useCallback(
-    async (
-      name: string,
-      file: File,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
-      const [x, y] = instance.clientPointToCanvasPoint(
-        position ? [position.clientX, position.clientY] : [0, 0]
-      );
-
-      // TODO: uploader is not implemented. use uploader configured by user.
-      const url = URL.createObjectURL(file);
-      const image = await instance.createImage(url);
-      const node = instance.createImageNode(image);
-      node.$.position = "absolute";
-      node.$.name = name;
-      node.$.left = x;
-      node.$.top = y;
-    },
-    [instance]
-  );
-
-  const insertSVG = useCallback(
-    async (
-      name: string,
-      svg: string,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
-      const node = await instance.createNodeFromSvg(svg);
-
-      const center_dx =
-        typeof node.$.width === "number" && node.$.width > 0
-          ? node.$.width / 2
-          : 0;
-
-      const center_dy =
-        typeof node.$.height === "number" && node.$.height > 0
-          ? node.$.height / 2
-          : 0;
-
-      const [x, y] = instance.clientPointToCanvasPoint(
-        cmath.vector2.sub(
-          position ? [position.clientX, position.clientY] : [0, 0],
-          [center_dx, center_dy]
-        )
-      );
-
-      node.$.name = name;
-      node.$.left = x;
-      node.$.top = y;
-    },
-    [instance]
-  );
-
-  const insertFromFile = useCallback(
-    (
-      type: io.clipboard.ValidFileType,
-      file: File,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
-      if (type === "image/svg+xml") {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const svgContent = e.target?.result as string;
-          const name = file.name.split(".svg")[0];
-          insertSVG(name, svgContent, position);
-        };
-        reader.readAsText(file);
-        return;
-      } else if (
-        type === "image/png" ||
-        type === "image/jpeg" ||
-        type === "image/gif"
-      ) {
-        const name = file.name.split(".")[0];
-        insertImage(name, file, position);
-        return;
-      }
-    },
-    [insertImage, insertSVG]
-  );
-
-  /**
-   * pasting from os clipboard (or fallbacks to local clipboard)
-   *
-   * 1. if the payload contains valid grida payload, insert it (or if identical to local clipboard, paste it)
-   * 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
-   * 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
-   *
-   */
-  const onpaste = useCallback(
-    async (event: ClipboardEvent) => {
-      if (event.defaultPrevented) return;
-      // cancel if on contenteditable / form element
-      if (
-        event.target instanceof HTMLElement &&
-        (event.target as HTMLElement).isContentEditable
-      )
-        return;
-      if (event.target instanceof HTMLInputElement) return;
-      if (event.target instanceof HTMLTextAreaElement) return;
-
-      if (!event.clipboardData) {
-        instance.paste();
-        return;
-      }
-
-      let pasted_from_data_transfer = false;
-
-      // NOTE: the read of the clipboard data should be non-blocking. (in safari, this will fail without any error)
-      const items = (
-        await Promise.all(
-          Array.from(event.clipboardData.items).map(async (item) => {
-            try {
-              const payload = await io.clipboard.decode(item);
-              return payload;
-            } catch {
-              return null;
-            }
-          })
-        )
-      ).filter((item) => item !== null);
-
-      const vector_payload = items.find(
-        (item) => item.type === "text" && item.text.startsWith("grida:vn:")
-      );
-      if (vector_payload) {
-        try {
-          assert(vector_payload.type === "text");
-          const net = JSON.parse(
-            atob(vector_payload.text.slice("grida:vn:".length))
-          );
-          instance.dispatch({ type: "paste", vector_network: net });
-          pasted_from_data_transfer = true;
-        } catch {}
-      }
-
-      if (pasted_from_data_transfer) {
-        event.preventDefault();
-      } else {
-        const grida_payload = items.find((item) => item.type === "clipboard");
-
-        // 1. if there is a grida html clipboard, use it and ignore all others.
-        if (grida_payload) {
-          if (
-            current_clipboard?.payload_id === grida_payload.clipboard.payload_id
-          ) {
-            instance.paste();
-            pasted_from_data_transfer = true;
-          } else {
-            grida_payload.clipboard.prototypes.forEach((p) => {
-              const sub =
-                grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-                  p,
-                  nid
-                );
-              instance.insert({ document: sub });
-            });
-            pasted_from_data_transfer = true;
-          }
-        }
-        // 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
-        else {
-          for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            try {
-              switch (item.type) {
-                case "text": {
-                  const { text } = item;
-                  insertText(text, {
-                    clientX: window.innerWidth / 2,
-                    clientY: window.innerHeight / 2,
-                  });
-                  pasted_from_data_transfer = true;
-                  break;
-                }
-                case "image/gif":
-                case "image/jpeg":
-                case "image/png":
-                case "image/svg+xml": {
-                  const { type, file } = item;
-                  insertFromFile(type, file, {
-                    clientX: window.innerWidth / 2,
-                    clientY: window.innerHeight / 2,
-                  });
-                  pasted_from_data_transfer = true;
-                  break;
-                }
-              }
-            } catch {}
-          }
-        }
-
-        // 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
-        if (!pasted_from_data_transfer) {
-          instance.paste();
-          event.preventDefault();
-        }
-      }
-    },
-    [instance, insertFromFile, insertText, current_clipboard]
-  );
-
-  const ondragover = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-  };
-
-  const ondrop = useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-
-      const knwondata = event.dataTransfer.getData("x-grida-data-transfer");
-      if (knwondata) {
-        const data = JSON.parse(knwondata);
-        switch (data.type) {
-          case "svg":
-            const { name, src } = data;
-            const task = fetch(src, {
-              cache: "no-store",
-            }).then((res) =>
-              res.text().then((text) => {
-                insertSVG(name, text, event);
-              })
-            );
-
-            toast.promise(task, {
-              loading: "Loading...",
-              success: "Inserted",
-              error: "Failed to insert SVG",
-            });
-            break;
-          default:
-            // unknown
-            break;
-        }
-        //
-        return;
-      }
-      const files = event.dataTransfer.files;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const [valid, type] = io.clipboard.filetype(file);
-        if (valid) {
-          insertFromFile(type, file, event);
-        } else {
-          toast.error(`file type '${type}' is not supported`);
-        }
-      }
-    },
-    [insertFromFile]
-  );
-  //
-
-  return { onpaste, ondragover, ondrop, insertText };
-}
-
 export function useClipboardSync() {
   const instance = useCurrentEditor();
   const user_clipboard = useEditorState(
@@ -1001,9 +704,7 @@ export function useClipboardSync() {
         const txt = `grida:vn:${btoa(JSON.stringify(vector_clipboard))}`;
         navigator.clipboard.writeText(txt);
       } else if (user_clipboard) {
-        const items = io.clipboard.encode(
-          user_clipboard as io.clipboard.ClipboardPayload
-        );
+        const items = io.clipboard.encode(user_clipboard);
 
         if (items) {
           const clipboardItem = new ClipboardItem(items);

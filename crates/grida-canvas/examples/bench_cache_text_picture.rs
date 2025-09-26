@@ -19,7 +19,7 @@ fn make_paragraph(fc: &FontCollection, text: &str, width: f32, font_size: f32) -
 
 fn make_picture(fc: &FontCollection, texts: &[(&str, f32)], width: f32, height: f32) -> Picture {
     let mut recorder = PictureRecorder::new();
-    let canvas = recorder.begin_recording(Rect::from_xywh(0.0, 0.0, width, height), None);
+    let canvas = recorder.begin_recording(Rect::from_xywh(0.0, 0.0, width, height), true);
 
     let mut y_offset = 0.0;
     for (text, font_size) in texts {

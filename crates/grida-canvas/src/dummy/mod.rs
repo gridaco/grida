@@ -71,8 +71,8 @@ pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
             };
             rect.set_fill(Paint::Solid(SolidPaint {
                 color: CGColor(((x * 5) % 255) as u8, ((y * 3) % 255) as u8, 128, 255),
-                opacity: 1.0,
                 blend_mode: BlendMode::default(),
+                active: true,
             }));
             let id = rect.id.clone();
             nodes.insert(Node::Rectangle(rect));

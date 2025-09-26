@@ -346,7 +346,7 @@ export namespace iosvg {
           return undefined;
 
         case "currentColor":
-          return { type: "solid", color: context.currentColor };
+          return { type: "solid", color: context.currentColor, active: true };
         default:
           const namedcolor = (
             colors as Record<string, [number, number, number] | undefined>
@@ -360,6 +360,7 @@ export namespace iosvg {
                 b: namedcolor[2],
                 a: 255,
               },
+              active: true,
             };
           }
 
@@ -367,6 +368,7 @@ export namespace iosvg {
             return {
               type: "solid",
               color: cmath.color.hex_to_rgba8888(paint),
+              active: true,
             };
           }
       }

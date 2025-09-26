@@ -35,8 +35,12 @@ function cornerRadius(
 /**
  * Gets the mode value for fill from a collection of nodes.
  */
+// TODO: LEGACY_PAINT_MODEL
 function fill(...nodes: grida.program.nodes.Node[]): any {
   for (const node of nodes) {
+    if (Array.isArray((node as any).fills) && (node as any).fills.length > 0) {
+      return (node as any).fills[0];
+    }
     if ("fill" in node && node.fill !== undefined) {
       return node.fill;
     }
@@ -48,8 +52,15 @@ function fill(...nodes: grida.program.nodes.Node[]): any {
 /**
  * Gets the mode value for stroke from a collection of nodes.
  */
+// TODO: LEGACY_PAINT_MODEL
 function stroke(...nodes: grida.program.nodes.Node[]): any {
   for (const node of nodes) {
+    if (
+      Array.isArray((node as any).strokes) &&
+      (node as any).strokes.length > 0
+    ) {
+      return (node as any).strokes[0];
+    }
     if ("stroke" in node && node.stroke !== undefined) {
       return node.stroke;
     }
