@@ -200,6 +200,29 @@ function useUILayout() {
   };
 }
 
+// Get or create a persistent cursor ID for this browser tab
+const get_or_create_demo_session_cursor_id = (): string => {
+  const storageKey = `grida-canvas-playground-current-session-cursor-id`;
+
+  // Try to get existing cursor ID from session storage
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    const existingId = window.sessionStorage.getItem(storageKey);
+    if (existingId) {
+      return existingId;
+    }
+  }
+
+  // Generate new cursor ID if none exists
+  const newId = `cursor-${v4()}`;
+
+  // Store it in session storage for persistence across refreshes
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    window.sessionStorage.setItem(storageKey, newId);
+  }
+
+  return newId;
+};
+
 function snapshotFilename() {
   const now = new Date();
   const date = now.toISOString().split("T")[0];
@@ -213,8 +236,11 @@ function useSyncMultiplayerCursors(editor: Editor, room_id?: string) {
   useEffect(() => {
     if (!room_id) return;
 
+    const cursorId = get_or_create_demo_session_cursor_id();
+
     if (!pluginRef.current) {
       pluginRef.current = new EditorYSyncPlugin(editor, room_id, {
+        cursor_id: cursorId,
         palette: colors[randomcolorname({ exclude: neutral_colors })],
       });
     }
@@ -504,13 +530,13 @@ function Presense() {
           fill: "",
           text: "",
         }}
-        zIndex={cursors.length + 1}
+        zIndex={Object.keys(cursors).length + 1}
         avatar={{
           src: undefined,
           fallback: "ME",
         }}
       />
-      {cursors.map((cursor, i) => (
+      {Object.values(cursors).map((cursor, i) => (
         <PlayerAvatar
           key={cursor.id}
           type={"remote"}
@@ -519,7 +545,7 @@ function Presense() {
             fill: cursor.palette["600"],
             text: cursor.palette["100"],
           }}
-          zIndex={cursors.length - i}
+          zIndex={Object.keys(cursors).length - i}
           avatar={{
             src: undefined,
             fallback: "?",

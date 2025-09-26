@@ -9,6 +9,7 @@ import equal from "fast-deep-equal";
 
 type AwarenessPayload = {
   player: {
+    cursor_id: string;
     palette: editor.state.MultiplayerCursorColorPalette;
     transform: cmath.Transform;
     position: [number, number];
@@ -33,6 +34,7 @@ export class EditorYSyncPlugin {
     private readonly room_id: string,
     private readonly cursor: {
       palette: editor.state.MultiplayerCursorColorPalette;
+      cursor_id: string;
     }
   ) {
     this.doc = new Y.Doc();
@@ -79,22 +81,27 @@ export class EditorYSyncPlugin {
     const aware = () => {
       const states = Array.from(this.awareness.getStates().entries())
         .filter(([id]) => id !== this.awareness.clientID)
+        .filter(([_, state]) => {
+          // Only process states that have a complete player object with palette
+          return state && state.player && state.player.palette;
+        })
         .map((_: any) => {
           const [id, state] = _ as [string, AwarenessPayload];
           const {
+            cursor_id,
             palette,
             position = [0, 0],
             marquee_a,
             transform,
             selection,
             scene_id,
-          } = state.player ?? {};
+          } = state.player;
 
           const marquee = marquee_a ? { a: marquee_a, b: position } : null;
 
           return {
             t: Date.now(),
-            id,
+            id: cursor_id, // Use cursor_id instead of awareness clientID
             position,
             palette,
             marquee: marquee,
@@ -104,7 +111,19 @@ export class EditorYSyncPlugin {
           } satisfies editor.state.MultiplayerCursor;
         });
 
-      this._editor.__sync_cursors(states);
+      // Convert to object format {[cursorId]: cursor} with timestamp-based conflict resolution
+      const cursorsObject = states.reduce(
+        (acc, state) => {
+          const existing = acc[state.id];
+          if (!existing || state.t > existing.t) {
+            acc[state.id] = state;
+          }
+          return acc;
+        },
+        {} as Record<string, (typeof states)[0]>
+      );
+
+      this._editor.__sync_cursors(cursorsObject);
     };
 
     this.awareness.on("change", aware);
@@ -126,6 +145,7 @@ export class EditorYSyncPlugin {
 
         // Update awareness for cursor position
         this.awareness.setLocalStateField("player", {
+          cursor_id: this.cursor.cursor_id,
           palette: this.cursor.palette, // TODO: palette needs to be synced only once
           position: pointer.position,
           marquee_a: marquee?.a ?? null,
@@ -156,6 +176,9 @@ export class EditorYSyncPlugin {
   }
 
   public destroy() {
+    // Clean up awareness state immediately
+    this.awareness.setLocalState(null);
+
     this.__unsubscribe_player_change();
     this.__unsubscribe_document_change();
     this.provider.destroy();

@@ -819,8 +819,9 @@ export namespace editor.state {
   export interface IEditorMultiplayerCursorState {
     /**
      * multiplayer cursors, does not include local cursor
+     * Object format {[cursorId]: cursor} for efficient lookups and natural deduplication
      */
-    cursors: MultiplayerCursor[];
+    cursors: Record<string, MultiplayerCursor>;
   }
 
   export interface IEditorUserClipboardState {
@@ -1315,7 +1316,7 @@ export namespace editor.state {
         last: cmath.vector2.zero,
         logical: cmath.vector2.zero,
       },
-      cursors: [],
+      cursors: {},
       history: {
         future: [],
         past: [],

@@ -458,9 +458,10 @@ function FollowingFrameOverlay() {
     instance.__pligin_follow
   );
 
-  const cursor = useEditorState(instance, (state) =>
-    state.cursors.find((c) => c.id === cursorId)
-  );
+  const cursor = useEditorState(instance, (state) => {
+    if (!cursorId) return undefined;
+    return state.cursors[cursorId];
+  });
 
   const stop = React.useCallback(
     (e: React.SyntheticEvent) => {
@@ -497,10 +498,11 @@ function RemoteCursorOverlay() {
   const cursors = useMultiplayerCursorState();
   const { transform } = useTransformState();
 
-  if (!cursors.length) return null;
+  const cursorArray = Object.values(cursors);
+  if (!cursorArray.length) return null;
   return (
     <>
-      {cursors.map((c) => {
+      {cursorArray.map((c) => {
         const pos = cmath.vector2.transform(c.position, transform);
         return (
           <React.Fragment key={c.id}>

@@ -6,10 +6,15 @@ export const metadata: Metadata = {
   description: "Grida Canvas Playground",
 };
 
-export default function CanvasPlaygroundPage() {
+export default async function CanvasPlaygroundPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ room: string }>;
+}) {
+  const { room } = await searchParams;
   return (
     <main className="w-screen h-screen overflow-hidden">
-      <Editor />
+      <Editor backend="canvas" room_id={room} />
     </main>
   );
 }
