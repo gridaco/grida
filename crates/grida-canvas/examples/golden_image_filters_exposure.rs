@@ -10,10 +10,12 @@
 //! - k < 1.0: darker (negative exposure)
 //!
 //! ## Layout
-//! Single PNG with 3-column layout showing:
-//! - Original image
-//! - Underexposed (-1 EV, k = 0.5)
-//! - Overexposed (+1 EV, k = 2.0)
+//! Single PNG with 5-column layout showing:
+//! - Underexposed (-1.0 EV)
+//! - Slight underexposed (-0.5 EV)
+//! - Original (0.0 EV)
+//! - Slight overexposed (+0.5 EV)
+//! - Overexposed (+1.0 EV)
 
 use cg::cg::types::ImageFilters;
 use cg::painter::image_filters;

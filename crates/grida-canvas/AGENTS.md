@@ -34,5 +34,6 @@ cargo run --example <example-name>
 ## Package Docs
 
 ```sh
+# skia-safe
 cargo doc --package skia-safe --open --no-deps
 ```

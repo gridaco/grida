@@ -15,10 +15,12 @@
 //!   - k = 0.0: flat gray
 //!
 //! ## Layout
-//! Single PNG with 3-column layout showing:
-//! - Original image
-//! - Low contrast (k = 0.5)
-//! - High contrast (k = 2.0)
+//! Single PNG with 5-column layout showing:
+//! - -1.0
+//! - -0.5
+//! - Original (0.0)
+//! - +0.5
+//! - +1.0
 
 use cg::cg::types::ImageFilters;
 use cg::painter::image_filters;

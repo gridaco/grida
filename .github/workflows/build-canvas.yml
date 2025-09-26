@@ -55,6 +55,11 @@ jobs:
       - name: Install Emscripten SDK
         run: python3 bin/activate-emsdk
 
+      - name: Verify Emscripten toolchain  
+        run: |
+          emcc -v  
+          em++ -v
+
       - name: Fix missing xlocale.h header for Emscripten
         run: |
           sudo ln -s /usr/include/locale.h /usr/include/xlocale.h

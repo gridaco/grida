@@ -15,10 +15,12 @@
 //!   - k = 0.0: grayscale
 //!
 //! ## Layout
-//! Single PNG with 3-column layout showing:
-//! - Original image
-//! - Desaturated (k = 0.0, grayscale)
-//! - Oversaturated (k = 2.0)
+//! Single PNG with 5-column layout showing:
+//! - Desaturated (-1.0)
+//! - Partially desaturated (-0.5)
+//! - Original (0.0)
+//! - Partially oversaturated (+0.5)
+//! - Oversaturated (+1.0)
 
 use cg::cg::types::ImageFilters;
 use cg::painter::image_filters;
