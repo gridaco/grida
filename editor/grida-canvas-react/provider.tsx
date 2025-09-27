@@ -23,6 +23,7 @@ import { is_direct_component_consumer } from "@/grida-canvas/utils/supports";
 import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
+import { cursors } from "./components/cursor";
 
 type Dispatcher = (action: Action) => void;
 
@@ -430,7 +431,7 @@ export function useEventTargetCSSCursor() {
   return useMemo(() => {
     switch (tool.type) {
       case "cursor":
-        return "default";
+        return cursors.default_png.css;
       case "hand":
         return "grab";
       case "zoom":

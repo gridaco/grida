@@ -15,4 +15,18 @@ Naming:
 
 ## Examples
 
-- `default-72-x32y32-000000.png`
+- `default-64-x28y28-000000.png`
+
+## Usage
+
+```css
+cursor:
+  url-set(
+      url("https://grida.co/assets/css-cursors-grida/default-64-x28y28-000000.png")
+        2x,
+      url("https://grida.co/assets/css-cursors-grida/default-64-x28y28-000000.png")
+        1x
+    )
+    /* (28/2) = (14) */ 14 14,
+  default;
+```
