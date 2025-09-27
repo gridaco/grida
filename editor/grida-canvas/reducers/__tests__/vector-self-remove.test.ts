@@ -5,6 +5,7 @@ jest.mock("@/grida-canvas", () => ({
 jest.mock("@grida/cmath", () => ({}), { virtual: true });
 jest.mock("@grida/schema", () => ({}), { virtual: true });
 jest.mock("@grida/vn", () => ({}), { virtual: true });
+jest.mock("svg-pathdata", () => ({}), { virtual: true });
 
 jest.mock("../methods", () => ({
   self_optimizeVectorNetwork: jest.fn(),

@@ -176,7 +176,7 @@ We use turborepo (except few isolated packages).
 To run test, build, and dev, use below commands.
 
 ```sh
-# run tests
+# run tests (all, not recommended. requires crates build)
 turbo test
 
 # run tests for packages
@@ -185,16 +185,19 @@ turbo test --filter='./packages/*'
 # build packages (required for typecheck for its dependants)
 turbo build --filter='./packages/*'
 
+# build packages in watch mode
+pnpm dev:packages --concurrency 100
+
 # run tests except for rust crates
 turbo test --filter='!./crates/*'
 
-# run build
+# run build (all, not recommended)
 turbo build
 
 # run dev
 turbo dev
 
-# run typecheck
+# run typecheck (always run)
 turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
 
 # for crates specific tests
@@ -223,14 +226,15 @@ file. After cloning the repo or installing dependencies, run the following
 steps before executing `pnpm typecheck`:
 
 ```sh
-# install dependencies for shared packages and the editor
-pnpm install --filter "./packages/*"
-pnpm install --filter editor
+pnpm install
 
 # build shared packages and the wasm bundle
 pnpm turbo build --filter="./packages/*"
-pnpm --filter @grida/canvas-wasm build
+pnpm turbo build --filter @grida/canvas-wasm
 
 # finally, run the repository-wide typecheck
 pnpm typecheck
+
+# run test (only packages and editor)
+pnpm turbo test --filter='./packages/*' --filter=editor
 ```

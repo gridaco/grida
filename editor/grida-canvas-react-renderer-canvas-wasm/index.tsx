@@ -43,8 +43,14 @@ function CanvasContent({
     surface: Scene,
     transform: cmath.Transform,
     width: number,
-    height: number
+    height: number,
+    devicePixelRatio: number
   ) => {
+    const safeDpr =
+      Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
+        ? devicePixelRatio
+        : 1;
+
     // the transform is the canvas transform, which needs to be converted to camera transform.
     // input transform = translation + scale of the viewport, top left aligned
     // camera transform = transform of the camera, center aligned
@@ -52,11 +58,18 @@ function CanvasContent({
     // - reverse the transform to match the canvas coordinate system
 
     const toCenter = cmath.transform.translate(cmath.transform.identity, [
-      -width / 2,
-      -height / 2,
+      (-width * safeDpr) / 2,
+      (-height * safeDpr) / 2,
     ]);
 
-    const viewMatrix = cmath.transform.multiply(toCenter, transform);
+    const deviceScale: cmath.Transform = [
+      [safeDpr, 0, 0],
+      [0, safeDpr, 0],
+    ];
+
+    const physicalTransform = cmath.transform.multiply(deviceScale, transform);
+
+    const viewMatrix = cmath.transform.multiply(toCenter, physicalTransform);
 
     surface.setMainCameraTransform(cmath.transform.invert(viewMatrix));
     surface.redraw();
@@ -64,14 +77,14 @@ function CanvasContent({
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
-      syncTransform(rendererRef.current, transform, width, height);
+      syncTransform(rendererRef.current, transform, width, height, dpr);
     }
-  }, [transform, width, height]);
+  }, [transform, width, height, dpr]);
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
       rendererRef.current.resize(width * dpr, height * dpr);
-      syncTransform(rendererRef.current, transform, width, height);
+      syncTransform(rendererRef.current, transform, width, height, dpr);
     }
   }, [width, height, dpr]);
 
@@ -109,12 +122,50 @@ function CanvasContent({
 }
 
 function useDPR() {
-  const [dpr, setDPR] = useState<number | null>(null);
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setDPR(window.devicePixelRatio);
+  const [dpr, setDPR] = useState<number>(() => {
+    if (typeof window === "undefined") {
+      return 1;
     }
-  }, []);
+    const ratio = window.devicePixelRatio;
+    return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const update = () => {
+      const ratio = window.devicePixelRatio;
+      const next = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+      setDPR((prev) => (Math.abs(prev - next) > 1e-3 ? next : prev));
+    };
+
+    update();
+
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+
+    let mediaQuery: MediaQueryList | null = null;
+    let mediaQueryListener: ((event: MediaQueryListEvent) => void) | null =
+      null;
+
+    // Listen for DPR changes (e.g., when moving between displays or browser zoom)
+    if (typeof window.matchMedia === "function") {
+      mediaQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
+      mediaQueryListener = () => update();
+      mediaQuery.addEventListener("change", mediaQueryListener);
+    }
+
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+      if (mediaQuery && mediaQueryListener) {
+        mediaQuery.removeEventListener("change", mediaQueryListener);
+      }
+    };
+  }, [dpr]);
+
   return dpr;
 }
 
@@ -139,13 +190,12 @@ export default function Canvas({
   className?: string;
 }) {
   const size = useSize(initialSize);
-  // const dpr = useDPR();
-  const dpr = 1;
+  const dpr = useDPR();
   return (
     <CanvasContent
       width={size.width}
       height={size.height}
-      dpr={dpr ?? 1}
+      dpr={dpr}
       data={data}
       transform={transform}
       debug={debug}

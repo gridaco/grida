@@ -1,4 +1,5 @@
-import { produce, type Draft } from "immer";
+import { type Draft } from "immer";
+import { produceWithHistory as produce } from "./history/patches";
 
 import type { SurfaceAction, EditorSurface_StartGesture } from "../action";
 import { editor } from "@/grida-canvas";

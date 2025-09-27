@@ -63,6 +63,13 @@ export function DevtoolsPanel() {
               </TabsTrigger>
               <TabsTrigger
                 onClick={onTabClick}
+                value="history"
+                className="text-xs uppercase"
+              >
+                History
+              </TabsTrigger>
+              <TabsTrigger
+                onClick={onTabClick}
                 value="recorder"
                 className="text-xs uppercase"
               >
@@ -131,6 +138,9 @@ export function DevtoolsPanel() {
                 <FontsPanel />
               </TabsContent>
             </Tabs>
+          </TabsContent>
+          <TabsContent value="history" className="h-full">
+            <HistoryPanel />
           </TabsContent>
           <TabsContent value="recorder" className="h-full">
             <RecorderPanel />
@@ -248,6 +258,12 @@ function JSONContent({ value }: { value: unknown }) {
       />
     </div>
   );
+}
+
+function HistoryPanel() {
+  const editor = useCurrentEditor();
+  const history = useEditorState(editor, (state) => state.history);
+  return <JSONContent value={history} />;
 }
 
 function RecorderPanel() {

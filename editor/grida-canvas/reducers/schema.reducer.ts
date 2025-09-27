@@ -1,6 +1,6 @@
 import type { SchemaAction } from "../action";
 import type grida from "@grida/schema";
-import produce from "immer";
+import { produceWithHistory as produce } from "./history/patches";
 
 export class SchemaManager {
   private properties: grida.program.schema.Properties;

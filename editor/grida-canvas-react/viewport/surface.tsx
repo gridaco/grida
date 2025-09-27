@@ -43,7 +43,7 @@ import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import cmath from "@grida/cmath";
 import { cursors } from "../components/cursor";
-import { PointerCursor } from "@/components/multiplayer/cursor";
+import { PointerCursorSVG } from "@/components/multiplayer/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
@@ -458,9 +458,10 @@ function FollowingFrameOverlay() {
     instance.__pligin_follow
   );
 
-  const cursor = useEditorState(instance, (state) =>
-    state.cursors.find((c) => c.id === cursorId)
-  );
+  const cursor = useEditorState(instance, (state) => {
+    if (!cursorId) return undefined;
+    return state.cursors[cursorId];
+  });
 
   const stop = React.useCallback(
     (e: React.SyntheticEvent) => {
@@ -497,19 +498,23 @@ function RemoteCursorOverlay() {
   const cursors = useMultiplayerCursorState();
   const { transform } = useTransformState();
 
-  if (!cursors.length) return null;
+  const cursorArray = Object.values(cursors);
+  if (!cursorArray.length) return null;
   return (
     <>
-      {cursors.map((c) => {
+      {cursorArray.map((c) => {
         const pos = cmath.vector2.transform(c.position, transform);
         return (
           <React.Fragment key={c.id}>
-            <PointerCursor
-              key={c.id}
-              local={false}
-              x={pos[0]}
-              y={pos[1]}
-              color={{ hue: c.palette["100"], fill: c.palette["400"] }}
+            <PointerCursorSVG
+              fill={c.palette["400"]}
+              hue={c.palette["100"]}
+              style={{
+                willChange: "transform",
+                transform: `translateX(${pos[0]}px) translateY(${pos[1]}px)`,
+                zIndex: 999,
+              }}
+              className="absolute top-0 left-0 transform pointer-events-none"
             />
             {c.marquee && (
               <MarqueeArea

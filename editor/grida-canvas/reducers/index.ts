@@ -1,5 +1,5 @@
 import type { Action, InternalAction, EditorAction } from "../action";
-import { produce, type Draft } from "immer";
+import { produce as immerProduce, type Draft } from "immer";
 import {
   self_update_gesture_transform,
   self_updateSurfaceHoverState,
@@ -7,11 +7,14 @@ import {
 } from "./methods";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
-import equal from "fast-deep-equal";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import nid from "./tools/id";
 import { v4 } from "uuid";
+import {
+  produceWithHistory as produce,
+  consumeHistoryPatches,
+} from "./history/patches";
 
 export type ReducerContext = {
   geometry: editor.api.IDocumentGeometryQuery;
@@ -180,13 +183,11 @@ export default function reducer<S extends editor.state.IEditorState>(
         return produce(state, (draft) => {
           const nextPresent = draft.history.past.pop();
           if (nextPresent) {
-            draft.history.future.unshift(
-              editor.history.entry(
-                nextPresent.actionType,
-                editor.history.snapshot(state)
-              )
-            );
-            editor.history.apply(draft, nextPresent.state);
+            draft.history.future.unshift({
+              ...nextPresent,
+              timestamp: Date.now(),
+            });
+            editor.history.apply(draft, nextPresent.inversePatches);
           }
         });
       }
@@ -197,13 +198,11 @@ export default function reducer<S extends editor.state.IEditorState>(
         return produce(state, (draft) => {
           const nextPresent = draft.history.future.shift();
           if (nextPresent) {
-            draft.history.past.push(
-              editor.history.entry(
-                nextPresent.actionType,
-                editor.history.snapshot(state)
-              )
-            );
-            editor.history.apply(draft, nextPresent.state);
+            draft.history.past.push({
+              ...nextPresent,
+              timestamp: Date.now(),
+            });
+            editor.history.apply(draft, nextPresent.patches);
           }
         });
       }
@@ -249,19 +248,35 @@ function historyExtension<S extends editor.state.IEditorState>(
   action: EditorAction,
   next: S
 ): S {
-  //
-  // checks if there is change in the document state, take snapshot
-  //
-  const hasChanged = !equal(prev.document, next.document);
-  if (!hasChanged) return next;
-  return produce(next, (draft) => {
-    const entry = editor.history.entry(action.type, prev);
-    const mergableEntry = editor.history.getMergableEntry(prev.history.past);
+  const patchesEntry = consumeHistoryPatches(next);
+  if (!patchesEntry) {
+    return next;
+  }
+
+  const patches = editor.history.filterDocumentPatches(patchesEntry.patches);
+  const inversePatches = editor.history.filterDocumentPatches(
+    patchesEntry.inversePatches
+  );
+
+  if (patches.length === 0 && inversePatches.length === 0) {
+    return next;
+  }
+
+  return immerProduce(next, (draft) => {
+    const entry = editor.history.entry(action.type, patches, inversePatches);
+    const mergableEntry = editor.history.getMergableEntry(
+      prev.history.past,
+      entry.timestamp
+    );
 
     if (mergableEntry) {
       draft.history.past[draft.history.past.length - 1] = {
-        ...entry,
-        state: mergableEntry.state,
+        actionType: action.type,
+        timestamp: entry.timestamp,
+        patches: mergableEntry.patches.concat(entry.patches),
+        inversePatches: entry.inversePatches.concat(
+          mergableEntry.inversePatches
+        ),
       };
     } else {
       const max_history = 100;

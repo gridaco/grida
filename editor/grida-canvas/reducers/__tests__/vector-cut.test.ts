@@ -90,6 +90,8 @@ jest.mock("@grida/vn", () => {
   };
 });
 
+jest.mock("svg-pathdata", () => ({}), { virtual: true });
+
 jest.mock("../surface.reducer", () => ({
   __esModule: true,
   default: jest.fn(),

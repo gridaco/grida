@@ -9,7 +9,6 @@ import { TooltipProvider } from "@radix-ui/react-tooltip";
 import OriginComp569 from "./comp/comp-569";
 import { PhoneInput } from "@/components/extension/phone-input";
 import { Timeline } from "@/grida-react-timeline-wd";
-import { PointerCursor } from "@/components/multiplayer/cursor";
 
 export default function AllComponentsPage() {
   return (
@@ -28,8 +27,6 @@ export default function AllComponentsPage() {
           <__RichTextEditor />
           <hr />
           <__Timeline />
-          <hr />
-          <__MultiplayerCursor />
           <hr />
           <OriginComp569 />
         </div>
@@ -108,28 +105,6 @@ function __Timeline() {
   return (
     <div className="grid gap-4">
       <Timeline />
-    </div>
-  );
-}
-
-function __MultiplayerCursor() {
-  return (
-    <div className="grid gap-4">
-      <label>Multiplayer Cursor</label>
-      <div className="w-fit h-96 relative">
-        <PointerCursor
-          local={false}
-          color={{ hue: "red", fill: "red" }}
-          x={100}
-          y={100}
-        />
-        <PointerCursor
-          local={false}
-          color={{ hue: "blue", fill: "blue" }}
-          x={200}
-          y={100}
-        />
-      </div>
     </div>
   );
 }

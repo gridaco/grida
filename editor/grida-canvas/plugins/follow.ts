@@ -37,7 +37,7 @@ export class EditorFollowPlugin {
 
   public follow(cursor_id: string): boolean {
     if (this._isFollowing) return false;
-    const cursor = this.editor.state.cursors.find((c) => c.id === cursor_id);
+    const cursor = this.editor.state.cursors[cursor_id];
     if (!cursor) return false;
 
     const initial =
@@ -53,7 +53,7 @@ export class EditorFollowPlugin {
 
     this.editor.setTransform(this.fit(initial), false);
     this.__unsubscribe_cursor = this.editor.subscribeWithSelector(
-      (state) => state.cursors.find((c) => c.id === cursor_id),
+      (state) => state.cursors[cursor_id],
       (editor, cursor) => {
         if (!cursor) return;
         if (cursor.scene_id && cursor.scene_id !== editor.state.scene_id) {

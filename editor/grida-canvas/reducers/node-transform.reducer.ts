@@ -1,4 +1,4 @@
-import { produce } from "immer";
+import { produceWithHistory as produce } from "./history/patches";
 import grida from "@grida/schema";
 import assert from "assert";
 import cmath from "@grida/cmath";

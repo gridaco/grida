@@ -1,4 +1,5 @@
-import { produce, type Draft } from "immer";
+import { type Draft } from "immer";
+import { produceWithHistory as produce } from "./history/patches";
 import type grida from "@grida/schema";
 import type { NodeChangeAction } from "../action";
 import type cg from "@grida/cg";
