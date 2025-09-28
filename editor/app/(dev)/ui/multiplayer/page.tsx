@@ -93,7 +93,6 @@ function MultiplayerDemoContent() {
     <>
       <CursorChat
         open={isChatOpen}
-        autoCloseDelay={3000}
         onValueChange={handleValueChange}
         onValueCommit={handleValueCommit}
         onClose={() => setIsChatOpen(false)}

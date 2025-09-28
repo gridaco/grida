@@ -827,6 +827,23 @@ export namespace editor.state {
      * Object format {[cursorId]: cursor} for efficient lookups and natural deduplication
      */
     cursors: Record<string, MultiplayerCursor>;
+    /**
+     * Local cursor chat state
+     */
+    local_cursor_chat: {
+      /**
+       * Current message being typed
+       */
+      message: string | null;
+      /**
+       * Whether the chat is open
+       */
+      is_open: boolean;
+      /**
+       * Timestamp of when the message was last modified, or null if no message
+       */
+      last_modified: number | null;
+    };
   }
 
   export interface IEditorUserClipboardState {
@@ -1322,6 +1339,11 @@ export namespace editor.state {
         logical: cmath.vector2.zero,
       },
       cursors: {},
+      local_cursor_chat: {
+        message: null,
+        is_open: false,
+        last_modified: null,
+      },
       history: {
         future: [],
         past: [],
@@ -2799,5 +2821,11 @@ export namespace editor.api {
     exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
     exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array>;
     exportNodeAs(node_id: string, format: "SVG"): Promise<string>;
+  }
+
+  export interface ICursorChatActions {
+    openCursorChat(): void;
+    closeCursorChat(): void;
+    setCursorChatMessage(message: string | null): void;
   }
 }

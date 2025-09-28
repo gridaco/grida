@@ -83,7 +83,8 @@ export class Editor
     editor.api.IVectorInterfaceActions,
     editor.api.IDocumentImageInterfaceActions,
     editor.api.IFontLoaderActions,
-    editor.api.IExportPluginActions
+    editor.api.IExportPluginActions,
+    editor.api.ICursorChatActions
 {
   private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
@@ -3508,6 +3509,30 @@ export class Editor
     throw new Error("Not implemented");
   }
   // #endregion IExportPluginActions implementation
+
+  // #region ICursorChatActions implementation
+  openCursorChat(): void {
+    this.reduce((state) => {
+      state.local_cursor_chat.is_open = true;
+      return state;
+    });
+  }
+
+  closeCursorChat(): void {
+    this.reduce((state) => {
+      state.local_cursor_chat.is_open = false;
+      return state;
+    });
+  }
+
+  setCursorChatMessage(message: string | null): void {
+    this.reduce((state) => {
+      state.local_cursor_chat.message = message;
+      state.local_cursor_chat.last_modified = message ? Date.now() : null;
+      return state;
+    });
+  }
+  // #endregion ICursorChatActions implementation
 
   /**
    * Dispose editor instance and cleanup resources

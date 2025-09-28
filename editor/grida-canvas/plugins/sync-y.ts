@@ -141,6 +141,8 @@ class AwarenessSyncManager {
     Omit<AwarenessPayload, "cursor_id" | "profile">
   > = {};
 
+  private __unsubscribe_cursor_chat_change!: () => void;
+
   constructor(
     private readonly _editor: Editor,
     private readonly _awareness: Awareness,
@@ -206,6 +208,7 @@ class AwarenessSyncManager {
 
     this._setupGeoAwarenessSync();
     this._setupFocusAwarenessSync();
+    this._setupCursorChatAwarenessSync();
   }
 
   private _setupGeoAwarenessSync() {
@@ -254,6 +257,24 @@ class AwarenessSyncManager {
     );
   }
 
+  private _setupCursorChatAwarenessSync() {
+    // Sync cursor chat state from editor to awareness
+    this.__unsubscribe_cursor_chat_change = this._editor.subscribeWithSelector(
+      (state) => state.local_cursor_chat,
+      (editor, next) => {
+        if (editor.locked) return;
+        const { message, last_modified } = next;
+
+        this._currentState.cursor_chat = message
+          ? { txt: message, ts: last_modified || Date.now() }
+          : null;
+
+        this._syncAwarenessState();
+      },
+      equal
+    );
+  }
+
   private _syncAwarenessState() {
     this._awareness.setLocalState({
       cursor_id: this._cursor.cursor_id,
@@ -267,13 +288,14 @@ class AwarenessSyncManager {
         position: [0, 0],
         marquee_a: null,
       },
-      cursor_chat: null, // Not syncing cursor_chat yet
+      cursor_chat: this._currentState.cursor_chat || null,
     } satisfies AwarenessPayload);
   }
 
   public destroy() {
     this.__unsubscribe_geo_change();
     this.__unsubscribe_focus_change();
+    this.__unsubscribe_cursor_chat_change();
   }
 }
 

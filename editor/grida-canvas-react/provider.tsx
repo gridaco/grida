@@ -427,8 +427,16 @@ export function useIsTransforming() {
 export function useEventTargetCSSCursor() {
   const editor = useCurrentEditor();
   const tool = useEditorState(editor, (state) => state.tool);
+  const istyping = useEditorState(
+    editor,
+    (state) => state.local_cursor_chat.is_open
+  );
 
   return useMemo(() => {
+    if (istyping) {
+      // when typing, we show a fake cursor (see CursorChatInput)
+      return "none";
+    }
     switch (tool.type) {
       case "cursor":
         return cursors.default_png.css;
@@ -458,7 +466,7 @@ export function useEventTargetCSSCursor() {
       case "lasso":
         return "crosshair";
     }
-  }, [tool]);
+  }, [tool, istyping]);
 }
 
 export function usePointerState(): editor.state.IEditorState["pointer"] {

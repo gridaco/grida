@@ -130,6 +130,7 @@ import colors, {
 import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
 import { PathToolbar } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/path-toolbar";
 import { FullscreenLoadingOverlay } from "@/grida-canvas-react-starter-kit/starterkit-loading/loading";
+import { CursorChat } from "@/components/multiplayer/cursor-chat";
 
 type UILayoutVariant = "full" | "minimal" | "hidden";
 type UILayout = {
@@ -411,6 +412,7 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
                   <ViewportRoot className="relative w-full h-full overflow-hidden">
                     <Hotkyes />
                     <EditorSurface />
+                    <LocalFakeCursorChat />
                     {backend === "canvas" ? (
                       <__WIP_UNSTABLE_WasmContent editor={instance} />
                     ) : (
@@ -445,6 +447,48 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
 
       {ui.help_fab && <HelpFab />}
     </>
+  );
+}
+
+/**
+ * Local Fake Cusror portal
+ *
+ * This is only active when fake cursor is required when typing chat
+ */
+function LocalFakeCursorChat() {
+  const instance = useCurrentEditor();
+
+  // Get cursor chat state from editor
+  const cursorChatState = useEditorState(
+    instance,
+    (state) => state.local_cursor_chat
+  );
+
+  useHotkeys("/", (e) => {
+    e.preventDefault();
+    instance.openCursorChat();
+  });
+
+  const handleValueChange = (value: string) => {
+    instance.setCursorChatMessage(value);
+  };
+
+  const handleValueCommit = (value: string) => {
+    // Clear message after commit
+    instance.setCursorChatMessage(null);
+  };
+
+  const handleClose = () => {
+    instance.closeCursorChat();
+  };
+
+  return (
+    <CursorChat
+      open={cursorChatState.is_open}
+      onValueChange={handleValueChange}
+      onValueCommit={handleValueCommit}
+      onClose={handleClose}
+    />
   );
 }
 
@@ -517,7 +561,7 @@ function useArtboardListCondition() {
   return should_show_artboards_list;
 }
 
-function Presense() {
+function PresenseAvatars() {
   const instance = useCurrentEditor();
   const cursors = useEditorState(instance, (state) => state.cursors);
 
@@ -581,7 +625,7 @@ function SidebarRight({
         <SidebarHeader className="p-0">
           <header className="flex h-11 px-2 justify-between items-center gap-2">
             <div className="flex-1">
-              <Presense />
+              <PresenseAvatars />
             </div>
             <div className="flex items-center">
               <Zoom

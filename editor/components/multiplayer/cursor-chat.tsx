@@ -3,7 +3,9 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { cva } from "class-variance-authority";
 import { cn } from "@/components/lib/utils";
-import ContentEditable from "@/components/primitives/contenteditable";
+import ContentEditable, {
+  type ContentEditableEvent,
+} from "@/components/primitives/contenteditable";
 import { FakeLocalPointerCursorPNG } from "../cursor/cursor-fake";
 
 const floatingChatVariants = cva(
@@ -48,13 +50,11 @@ export interface CursorChatInputProps {
 export interface CursorChatProps {
   /** Whether the chat is open (controlled externally) */
   open: boolean;
-  /** Auto-close delay in milliseconds (debounced by user input) */
-  autoCloseDelay?: number;
   /** Callback when the input value changes (on every keystroke) */
   onValueChange?: (value: string) => void;
   /** Callback when the value is committed (Enter key or blur) */
   onValueCommit?: (value: string) => void;
-  /** Callback when the chat should close (triggered by blur or auto-close) */
+  /** Callback when the chat should close (triggered by blur) */
   onClose?: () => void;
   /** Colors for the chat bubble */
   color?: {
@@ -68,7 +68,6 @@ export interface CursorChatProps {
  */
 export function CursorChat({
   open,
-  autoCloseDelay = 3000,
   onValueChange,
   onValueCommit,
   onClose,
@@ -77,18 +76,8 @@ export function CursorChat({
     hue: "#1d4ed8",
   },
 }: CursorChatProps) {
-  const [isHidden, setIsHidden] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [message, setMessage] = useState("");
   const boundsRef = useRef<HTMLDivElement>(null);
-
-  const hideChat = useCallback(() => {
-    setIsHidden(true);
-  }, []);
-
-  const showChat = useCallback(() => {
-    setIsHidden(false);
-  }, []);
 
   // Window-level pointer tracking for position
   useEffect(() => {
@@ -103,52 +92,17 @@ export function CursorChat({
     };
   }, []);
 
-  // Bounds-level pointer enter/leave tracking
-  useEffect(() => {
-    const boundsElement = boundsRef.current;
-    if (!boundsElement) return;
-
-    const handlePointerEnter = () => {
-      showChat();
-    };
-
-    const handlePointerLeave = () => {
-      hideChat();
-    };
-
-    boundsElement.addEventListener("pointerenter", handlePointerEnter);
-    boundsElement.addEventListener("pointerleave", handlePointerLeave);
-
-    return () => {
-      boundsElement.removeEventListener("pointerenter", handlePointerEnter);
-      boundsElement.removeEventListener("pointerleave", handlePointerLeave);
-    };
-  }, [showChat, hideChat]);
-
-  // Auto-close after delay (debounced by input)
-  useEffect(() => {
-    if (!open || !message) return;
-
-    const timer = setTimeout(() => {
-      onClose?.();
-    }, autoCloseDelay);
-
-    return () => clearTimeout(timer);
-  }, [open, message, autoCloseDelay, onClose]);
-
   return (
-    <div ref={boundsRef} className="fixed inset-0 pointer-events-auto z-50">
+    <div ref={boundsRef} className="fixed inset-0 z-50 pointer-events-none">
       {open && (
         <div
-          className="fixed top-0 left-0 pointer-events-auto transition-none"
+          className="fixed top-0 left-0 transition-none"
           style={{
             transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
             zIndex: 1000,
-            opacity: isHidden ? 0 : 1,
-            visibility: isHidden ? "hidden" : "visible",
           }}
         >
-          <FakeLocalPointerCursorPNG className="absolute pointer-events-auto cursor-none" />
+          <FakeLocalPointerCursorPNG className="absolute" />
           <CursorChatInput
             color={color}
             placeholder="Type your message..."
@@ -245,8 +199,8 @@ export function CursorChatInput({
     }
   };
 
-  const handleChange = (e: any) => {
-    const value = e.target.value;
+  const handleChange = (e: ContentEditableEvent) => {
+    const value = e.target.textContent;
     setMessage(value);
     onValueChange?.(value);
   };

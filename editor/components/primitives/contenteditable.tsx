@@ -114,12 +114,15 @@ export default class ContentEditable extends React.Component<Props> {
     if (!el) return;
 
     const html = el.innerHTML;
+    const textContent = el.textContent || "";
+
     if (this.props.onChange && html !== this.lastHtml) {
       // Clone event with Object.assign to avoid
       // "Cannot assign to read only property 'target' of object"
       const evt = Object.assign({}, originalEvt, {
         target: {
           value: html,
+          textContent: textContent,
         },
       });
       this.props.onChange(evt);
@@ -132,7 +135,7 @@ export type ContentEditableEvent = React.SyntheticEvent<
   HTMLDivElement,
   Event
 > & {
-  target: { value: string };
+  target: { value: string; textContent: string };
 };
 type Modify<T, R> = Pick<T, Exclude<keyof T, keyof R>> & R;
 type DivProps = Modify<
