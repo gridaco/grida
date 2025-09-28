@@ -2,6 +2,11 @@
 import React from "react";
 import { cn } from "@/components/lib/utils";
 
+/**
+ * fake cursor SVG, has same hotspot as the real curor (png) needs to adjest the offset and size.
+ * - DO "-top-3.5 -left-3.5 size-8"
+ * @returns
+ */
 export function PointerCursorSVG({
   fill,
   hue,
@@ -13,20 +18,56 @@ export function PointerCursorSVG({
 }) {
   return (
     <svg
-      width="12"
-      height="16"
-      viewBox="0 0 18 24"
-      fill="none"
-      className={cn("pointer-events-none", className)}
       xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 64 64"
+      width="64"
+      height="64"
+      className={cn("pointer-events-none", className)}
       {...props}
     >
-      <path
-        d="M2.717 2.22918L15.9831 15.8743C16.5994 16.5083 16.1503 17.5714 15.2661 17.5714H9.35976C8.59988 17.5714 7.86831 17.8598 7.3128 18.3783L2.68232 22.7C2.0431 23.2966 1 22.8434 1 21.969V2.92626C1 2.02855 2.09122 1.58553 2.717 2.22918Z"
-        fill={fill}
-        stroke={hue}
-        strokeWidth="2"
-      />
+      <g filter="url(#a)">
+        <path
+          fill={fill}
+          d="M26.366 30.143c-.992-2.38 1.396-4.77 3.777-3.777l18.436 7.681c2.54 1.058 2.303 4.73-.35 5.454l-5.265 1.436a2.889 2.889 0 0 0-2.027 2.027L39.5 48.228c-.724 2.654-4.396 2.89-5.454.351l-7.681-18.436Z"
+        />
+        <path
+          stroke={hue}
+          stroke-width="1.55"
+          d="M27.076 29.847c-.727-1.746 1.025-3.498 2.77-2.77l18.437 7.68c1.861.777 1.688 3.47-.257 4l-5.265 1.437a3.659 3.659 0 0 0-2.567 2.567l-1.437 5.265c-.53 1.945-3.223 2.118-4 .257l-7.68-18.436Z"
+        />
+      </g>
+      <defs>
+        <filter
+          id="a"
+          width="35.777"
+          height="35.777"
+          x="20.357"
+          y="22.283"
+          color-interpolation-filters="sRGB"
+          filterUnits="userSpaceOnUse"
+        >
+          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feColorMatrix
+            in="SourceAlpha"
+            result="hardAlpha"
+            values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+          />
+          <feOffset dy="1.926" />
+          <feGaussianBlur stdDeviation="2.889" />
+          <feComposite in2="hardAlpha" operator="out" />
+          <feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.45 0" />
+          <feBlend
+            in2="BackgroundImageFix"
+            result="effect1_dropShadow_3436_1176"
+          />
+          <feBlend
+            in="SourceGraphic"
+            in2="effect1_dropShadow_3436_1176"
+            result="shape"
+          />
+        </filter>
+      </defs>
     </svg>
   );
 }

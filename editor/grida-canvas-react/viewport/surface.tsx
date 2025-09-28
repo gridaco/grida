@@ -514,7 +514,7 @@ function RemoteCursorOverlay() {
                 transform: `translateX(${pos[0]}px) translateY(${pos[1]}px)`,
                 zIndex: 999,
               }}
-              className="absolute top-0 left-0 transform pointer-events-none"
+              className="absolute -top-3.5 -left-3.5 transform pointer-events-none size-8"
             />
             {c.marquee && (
               <MarqueeArea

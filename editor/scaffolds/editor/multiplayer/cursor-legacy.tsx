@@ -37,7 +37,7 @@ export function PointerCursor({
             transform: `translateX(${x}px) translateY(${y}px)`,
             zIndex: 999,
           }}
-          className="absolute top-0 left-0 transform pointer-events-none"
+          className="absolute -top-3.5 -left-3.5 transform pointer-events-none size-8"
           fill={fill}
           hue={hue}
         />
