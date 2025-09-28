@@ -43,7 +43,7 @@ import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import cmath from "@grida/cmath";
 import { cursors } from "../../components/cursor/cursor-data";
-import { PointerCursorSVG } from "@/components/cursor/cursor-fake";
+import { FakePointerCursorSVG } from "@/components/cursor/cursor-fake";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
@@ -71,6 +71,10 @@ import {
   NodeOverlayCornerRadiusHandle,
   NodeOverlayRectangularCornerRadiusHandles,
 } from "./ui/corner-radius-handle";
+import {
+  FakeCursorPosition,
+  FakeForeignCursor,
+} from "@/components/multiplayer/cursor";
 
 const DRAG_THRESHOLD = 2;
 
@@ -506,16 +510,16 @@ function RemoteCursorOverlay() {
         const pos = cmath.vector2.transform(c.position, transform);
         return (
           <React.Fragment key={c.id}>
-            <PointerCursorSVG
-              fill={c.palette["400"]}
-              hue={c.palette["100"]}
-              style={{
-                willChange: "transform",
-                transform: `translateX(${pos[0]}px) translateY(${pos[1]}px)`,
-                zIndex: 999,
-              }}
-              className="absolute -top-3.5 -left-3.5 transform pointer-events-none size-8"
-            />
+            <FakeCursorPosition x={pos[0]} y={pos[1]}>
+              <FakeForeignCursor
+                color={{
+                  fill: c.palette["400"],
+                  hue: c.palette["100"],
+                }}
+                name={"Anonymous"}
+                message={c.ephemeral_chat?.txt}
+              />
+            </FakeCursorPosition>
             {c.marquee && (
               <MarqueeArea
                 a={cmath.vector2.transform(c.marquee.a, transform)}

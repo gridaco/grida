@@ -1,13 +1,14 @@
 "use client";
 import React from "react";
 import { cn } from "@/components/lib/utils";
+import { cursors } from "./cursor-data";
 
 /**
  * fake cursor SVG, has same hotspot as the real curor (png) needs to adjest the offset and size.
  * - DO "-top-3.5 -left-3.5 size-8"
  * @returns
  */
-export function PointerCursorSVG({
+export function FakePointerCursorSVG({
   fill,
   hue,
   className,
@@ -69,5 +70,26 @@ export function PointerCursorSVG({
         </filter>
       </defs>
     </svg>
+  );
+}
+
+/**
+ * for local cursor only, as its not colored.
+ * this is sized and positioned
+ */
+export function FakeLocalPointerCursorPNG({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div {...props} className={cn("relative z-[99999]", className)}>
+      <img
+        src={cursors.default_png.url}
+        className={cn("pointer-events-none size-8")}
+        style={{
+          transform: "translate(-14px, -14px)",
+        }}
+      />
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { PointerCursorSVG } from "@/components/cursor/cursor-fake";
+import { FakePointerCursorSVG } from "@/components/cursor/cursor-fake";
 
 export function PointerCursor({
   local,
@@ -30,7 +30,7 @@ export function PointerCursor({
   return (
     <>
       {!local && (
-        <PointerCursorSVG
+        <FakePointerCursorSVG
           style={{
             willChange: "transform",
             color: fill,
