@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { PointerCursorSVG } from "@/components/multiplayer/cursor";
+import { PointerCursorSVG } from "@/components/cursor/cursor-fake";
 
 export function PointerCursor({
   local,

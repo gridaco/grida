@@ -23,7 +23,7 @@ import { is_direct_component_consumer } from "@/grida-canvas/utils/supports";
 import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
-import { cursors } from "./components/cursor";
+import { cursors } from "../components/cursor/cursor-data";
 
 type Dispatcher = (action: Action) => void;
 

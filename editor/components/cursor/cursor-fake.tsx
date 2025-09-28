@@ -33,7 +33,7 @@ export function PointerCursorSVG({
         />
         <path
           stroke={hue}
-          stroke-width="1.55"
+          strokeWidth="1.55"
           d="M27.076 29.847c-.727-1.746 1.025-3.498 2.77-2.77l18.437 7.68c1.861.777 1.688 3.47-.257 4l-5.265 1.437a3.659 3.659 0 0 0-2.567 2.567l-1.437 5.265c-.53 1.945-3.223 2.118-4 .257l-7.68-18.436Z"
         />
       </g>
@@ -44,10 +44,10 @@ export function PointerCursorSVG({
           height="35.777"
           x="20.357"
           y="22.283"
-          color-interpolation-filters="sRGB"
+          colorInterpolationFilters="sRGB"
           filterUnits="userSpaceOnUse"
         >
-          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feFlood floodOpacity="0" result="BackgroundImageFix" />
           <feColorMatrix
             in="SourceAlpha"
             result="hardAlpha"
