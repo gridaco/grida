@@ -83,14 +83,14 @@ function useVariableWithEditor() {
 
   const onUDragStart = useCallback(
     (stop: number) => {
-      instance.startTranslateVariableWidthStop(node_id, stop);
+      instance.surface.surfaceStartTranslateVariableWidthStop(node_id, stop);
     },
     [instance, node_id]
   );
 
   const onRDragStart = useCallback(
     (stop: number, side: "left" | "right") => {
-      instance.startResizeVariableWidthStop(node_id, stop, side);
+      instance.surface.surfaceStartResizeVariableWidthStop(node_id, stop, side);
     },
     [instance, node_id]
   );

@@ -130,7 +130,7 @@ export default function Toolbar() {
       <ToggleGroupPrimitive.Root
         data-slot="toggle-group"
         onValueChange={(v) => {
-          editor.surfaceSetTool(
+          editor.surface.surfaceSetTool(
             v
               ? toolbar_value_to_cursormode(v as ToolbarToolType)
               : { type: "cursor" }
@@ -150,7 +150,7 @@ export default function Toolbar() {
             { value: "hand", label: "Hand tool", shortcut: "H" },
           ]}
           onValueChange={(v) => {
-            editor.surfaceSetTool(
+            editor.surface.surfaceSetTool(
               toolbar_value_to_cursormode(v as ToolbarToolType)
             );
           }}
@@ -185,7 +185,7 @@ export default function Toolbar() {
             { value: "image", label: "Image" },
           ]}
           onValueChange={(v) => {
-            editor.surfaceSetTool(
+            editor.surface.surfaceSetTool(
               toolbar_value_to_cursormode(v as ToolbarToolType)
             );
           }}
@@ -196,7 +196,7 @@ export default function Toolbar() {
           onOpenChange={(o) => setOpen(o ? "draw" : null)}
           options={tools}
           onValueChange={(v) => {
-            editor.surfaceSetTool(
+            editor.surface.surfaceSetTool(
               toolbar_value_to_cursormode(v as ToolbarToolType)
             );
           }}

@@ -197,7 +197,7 @@ export function EditorSurface() {
       if (event.defaultPrevented) return;
       // for performance reasons, we don't want to update the overlay when transforming (except for translate)
       if (is_node_transforming && !is_node_translating) return;
-      editor.surfacePointerMove(event);
+      editor.surface.surfacePointerMove(event);
     };
 
     et.addEventListener("pointermove", handlePointerMove, {
@@ -218,7 +218,7 @@ export function EditorSurface() {
         if (event.defaultPrevented) return;
         if (event.button === 1) {
           __hand_tool_triggered_by_aux_button.current = true;
-          editor.surfaceSetTool({ type: "hand" });
+          editor.surface.surfaceSetTool({ type: "hand" });
         }
       },
       onMouseUp: ({ event }) => {
@@ -226,40 +226,40 @@ export function EditorSurface() {
         if (event.button === 1) {
           if (__hand_tool_triggered_by_aux_button.current) {
             __hand_tool_triggered_by_aux_button.current = false;
-            editor.surfaceSetTool({ type: "cursor" });
+            editor.surface.surfaceSetTool({ type: "cursor" });
           }
         }
       },
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.surfacePointerDown(event);
+        editor.surface.surfacePointerDown(event);
       },
       onPointerUp: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.surfacePointerUp(event);
+        editor.surface.surfacePointerUp(event);
       },
       onClick: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.surfaceClick(event);
+        editor.surface.surfaceClick(event);
       },
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
 
         // [order matters] - otherwise, it will always try to enter the content edit mode
-        editor.surfaceTryToggleContentEditMode(); // 1
-        editor.surfaceDoubleClick(event); // 2
+        editor.surface.surfaceTryToggleContentEditMode(); // 1
+        editor.surface.surfaceDoubleClick(event); // 2
       },
       onDragStart: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.surfaceDragStart(event as PointerEvent);
+        editor.surface.surfaceDragStart(event as PointerEvent);
       },
       onDragEnd: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.surfaceDragEnd(event as PointerEvent);
+        editor.surface.surfaceDragEnd(event as PointerEvent);
       },
       onDrag: (e) => {
         if (e.event.defaultPrevented) return;
-        editor.surfaceDrag({
+        editor.surface.surfaceDrag({
           delta: e.delta,
           distance: e.distance,
           movement: e.movement,
@@ -459,7 +459,7 @@ export function EditorSurface() {
 function FollowingFrameOverlay() {
   const instance = useCurrentEditor();
   const { isFollowing, cursor: cursorId } = useFollowPlugin(
-    instance.__pligin_follow
+    instance.surface.__pligin_follow
   );
 
   const cursor = useEditorState(instance, (state) => {
@@ -471,7 +471,7 @@ function FollowingFrameOverlay() {
     (e: React.SyntheticEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      instance.unfollow();
+      instance.surface.unfollow();
     },
     [instance]
   );
@@ -674,10 +674,10 @@ function NodeTitleBar({
       //   editor.hoverEnterNode(node.id);
       // },
       onPointerEnter: () => {
-        editor.surfaceHoverEnterNode(node.id);
+        editor.surface.surfaceHoverEnterNode(node.id);
       },
       onPointerLeave: () => {
-        editor.surfaceHoverLeaveNode(node.id);
+        editor.surface.surfaceHoverLeaveNode(node.id);
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
@@ -910,7 +910,7 @@ function SingleSelectionOverlay({
                 distribution={distribution}
                 style={style}
                 onGapGestureStart={(axis) => {
-                  editor.surfaceStartGapGesture(node_id, axis);
+                  editor.surface.surfaceStartGapGesture(node_id, axis);
                 }}
               />
             </>
@@ -939,7 +939,7 @@ function MultpleSelectionGroupsOverlay({ readonly }: { readonly?: boolean }) {
                 distribution={g.distribution}
                 style={g.style}
                 onGapGestureStart={(axis) => {
-                  editor.surfaceStartGapGesture(g.ids, axis);
+                  editor.surface.surfaceStartGapGesture(g.ids, axis);
                 }}
               />
             )}
@@ -1194,7 +1194,7 @@ function LayerOverlayRotationHandle({
   const bind = useSurfaceGesture({
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.surfaceStartRotateGesture(node_id);
+      editor.surface.surfaceStartRotateGesture(node_id);
     },
   });
 
@@ -1252,7 +1252,7 @@ function LayerOverlayResizeHandle({
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.surfaceStartScaleGesture(selection, anchor);
+      editor.surface.surfaceStartScaleGesture(selection, anchor);
     },
   });
 
@@ -1277,7 +1277,7 @@ function LayerOverlayResizeSide({
       },
       onDragStart: ({ event }) => {
         event.preventDefault();
-        editor.surfaceStartScaleGesture(selection, anchor);
+        editor.surface.surfaceStartScaleGesture(selection, anchor);
       },
       onDoubleClick: ({ event }) => {
         event.preventDefault();
@@ -1426,7 +1426,7 @@ function RedDotSortHandle({
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.surfaceStartSortGesture(selection, node_id);
+      editor.surface.surfaceStartSortGesture(selection, node_id);
     },
   });
 
@@ -1684,14 +1684,14 @@ function RulerGuideOverlay() {
 
   const bindX = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      editor.surfaceStartGuideGesture("y", -1);
+      editor.surface.surfaceStartGuideGesture("y", -1);
       event.preventDefault();
     },
   });
 
   const bindY = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      editor.surfaceStartGuideGesture("x", -1);
+      editor.surface.surfaceStartGuideGesture("x", -1);
       event.preventDefault();
     },
   });
@@ -1838,7 +1838,7 @@ function Guide({
       event.stopPropagation();
     },
     onDragStart: ({ event }) => {
-      editor.surfaceStartGuideGesture(axis, idx);
+      editor.surface.surfaceStartGuideGesture(axis, idx);
       event.preventDefault();
     },
   });

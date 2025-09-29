@@ -104,7 +104,7 @@ export function ZoomControl({ className }: { className?: string }) {
         <DropdownMenuCheckboxItem
           checked={pixelgrid === "on"}
           onSelect={() => {
-            editor.surfaceTogglePixelGrid();
+            editor.surface.surfaceTogglePixelGrid();
           }}
           className="text-xs"
         >
@@ -114,7 +114,7 @@ export function ZoomControl({ className }: { className?: string }) {
         <DropdownMenuCheckboxItem
           checked={ruler === "on"}
           onSelect={() => {
-            editor.surfaceToggleRuler();
+            editor.surface.surfaceToggleRuler();
           }}
           className="text-xs"
         >

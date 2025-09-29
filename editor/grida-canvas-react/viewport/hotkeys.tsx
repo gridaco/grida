@@ -368,15 +368,19 @@ export function useEditorHotKeys() {
   useEffect(() => {
     const cb = (e: FocusEvent) => {
       if (e.defaultPrevented) return;
-      editor.surfaceConfigureSurfaceRaycastTargeting({ target: "auto" });
-      editor.surfaceConfigureMeasurement("off");
-      editor.surfaceConfigureTranslateWithCloneModifier("off");
-      editor.surfaceConfigureTransformWithCenterOriginModifier("off");
-      editor.surfaceConfigureTranslateWithAxisLockModifier("off");
-      editor.surfaceConfigureTransformWithPreserveAspectRatioModifier("off");
-      editor.surfaceConfigureRotateWithQuantizeModifier("off");
+      editor.surface.surfaceConfigureSurfaceRaycastTargeting({
+        target: "auto",
+      });
+      editor.surface.surfaceConfigureMeasurement("off");
+      editor.surface.surfaceConfigureTranslateWithCloneModifier("off");
+      editor.surface.surfaceConfigureTransformWithCenterOriginModifier("off");
+      editor.surface.surfaceConfigureTranslateWithAxisLockModifier("off");
+      editor.surface.surfaceConfigureTransformWithPreserveAspectRatioModifier(
+        "off"
+      );
+      editor.surface.surfaceConfigureRotateWithQuantizeModifier("off");
       setAltKey(false);
-      editor.surfaceSetTool({ type: "cursor" }, "window blur");
+      editor.surface.surfaceSetTool({ type: "cursor" }, "window blur");
     };
     window.addEventListener("blur", cb);
     return () => {
@@ -392,7 +396,7 @@ export function useEditorHotKeys() {
     if (altKey) {
       mode = "none";
     }
-    editor.surfaceConfigureCurveTangentMirroringModifier(mode);
+    editor.surface.surfaceConfigureCurveTangentMirroringModifier(mode);
   }, [tool.type, altKey, editor]);
 
   // always triggering. (alt, meta, ctrl, shift)
@@ -401,24 +405,32 @@ export function useEditorHotKeys() {
     (e) => {
       switch (e.key) {
         case "Meta":
-          editor.surfaceConfigureSurfaceRaycastTargeting({ target: "deepest" });
+          editor.surface.surfaceConfigureSurfaceRaycastTargeting({
+            target: "deepest",
+          });
           break;
         case "Control":
-          editor.surfaceConfigureSurfaceRaycastTargeting({ target: "deepest" });
-          editor.surfaceConfigureTranslateWithForceDisableSnap("on");
+          editor.surface.surfaceConfigureSurfaceRaycastTargeting({
+            target: "deepest",
+          });
+          editor.surface.surfaceConfigureTranslateWithForceDisableSnap("on");
           break;
         case "Alt":
-          editor.surfaceConfigureMeasurement("on");
-          editor.surfaceConfigureTranslateWithCloneModifier("on");
-          editor.surfaceConfigureTransformWithCenterOriginModifier("on");
+          editor.surface.surfaceConfigureMeasurement("on");
+          editor.surface.surfaceConfigureTranslateWithCloneModifier("on");
+          editor.surface.surfaceConfigureTransformWithCenterOriginModifier(
+            "on"
+          );
           setAltKey(true);
           // NOTE: on some systems, the alt key focuses to the browser menu, so we need to prevent that. (e.g. alt key on windows/chrome)
           e.preventDefault();
           break;
         case "Shift":
-          editor.surfaceConfigureTranslateWithAxisLockModifier("on");
-          editor.surfaceConfigureTransformWithPreserveAspectRatioModifier("on");
-          editor.surfaceConfigureRotateWithQuantizeModifier(15);
+          editor.surface.surfaceConfigureTranslateWithAxisLockModifier("on");
+          editor.surface.surfaceConfigureTransformWithPreserveAspectRatioModifier(
+            "on"
+          );
+          editor.surface.surfaceConfigureRotateWithQuantizeModifier(15);
           break;
       }
       //
@@ -434,24 +446,30 @@ export function useEditorHotKeys() {
     (e) => {
       switch (e.key) {
         case "Meta":
-          editor.surfaceConfigureSurfaceRaycastTargeting({ target: "auto" });
+          editor.surface.surfaceConfigureSurfaceRaycastTargeting({
+            target: "auto",
+          });
           break;
         case "Control":
-          editor.surfaceConfigureSurfaceRaycastTargeting({ target: "auto" });
-          editor.surfaceConfigureTranslateWithForceDisableSnap("off");
+          editor.surface.surfaceConfigureSurfaceRaycastTargeting({
+            target: "auto",
+          });
+          editor.surface.surfaceConfigureTranslateWithForceDisableSnap("off");
           break;
         case "Alt":
-          editor.surfaceConfigureMeasurement("off");
-          editor.surfaceConfigureTranslateWithCloneModifier("off");
-          editor.surfaceConfigureTransformWithCenterOriginModifier("off");
+          editor.surface.surfaceConfigureMeasurement("off");
+          editor.surface.surfaceConfigureTranslateWithCloneModifier("off");
+          editor.surface.surfaceConfigureTransformWithCenterOriginModifier(
+            "off"
+          );
           setAltKey(false);
           break;
         case "Shift":
-          editor.surfaceConfigureTranslateWithAxisLockModifier("off");
-          editor.surfaceConfigureTransformWithPreserveAspectRatioModifier(
+          editor.surface.surfaceConfigureTranslateWithAxisLockModifier("off");
+          editor.surface.surfaceConfigureTransformWithPreserveAspectRatioModifier(
             "off"
           );
-          editor.surfaceConfigureRotateWithQuantizeModifier("off");
+          editor.surface.surfaceConfigureRotateWithQuantizeModifier("off");
           break;
       }
       //
@@ -474,11 +492,11 @@ export function useEditorHotKeys() {
       // check if up or down
       switch (e.type) {
         case "keydown":
-          editor.surfaceSetTool({ type: "hand" });
+          editor.surface.surfaceSetTool({ type: "hand" });
           __hand_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          editor.surfaceSetTool({ type: "cursor" }, "hand tool keyup");
+          editor.surface.surfaceSetTool({ type: "cursor" }, "hand tool keyup");
           __hand_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -502,11 +520,11 @@ export function useEditorHotKeys() {
       // check if up or down
       switch (e.type) {
         case "keydown":
-          editor.surfaceSetTool({ type: "zoom" });
+          editor.surface.surfaceSetTool({ type: "zoom" });
           __zoom_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          editor.surfaceSetTool({ type: "cursor" });
+          editor.surface.surfaceSetTool({ type: "cursor" });
           __zoom_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -529,11 +547,11 @@ export function useEditorHotKeys() {
 
       switch (e.type) {
         case "keydown":
-          editor.surfaceSetTool({ type: "bend" });
+          editor.surface.surfaceSetTool({ type: "bend" });
           __bend_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          editor.surfaceSetTool({ type: "cursor" }, "bend tool keyup");
+          editor.surface.surfaceSetTool({ type: "cursor" }, "bend tool keyup");
           __bend_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -586,7 +604,7 @@ export function useEditorHotKeys() {
               if (selection.length > 0) {
                 editor.changeNodePropertyFills(selection, [solidPaint]);
               } else {
-                editor.a11ySetClipboardColor(rgba);
+                editor.surface.a11ySetClipboardColor(rgba);
                 window.navigator.clipboard
                   .writeText(result.sRGBHex)
                   .then(() => {
@@ -615,7 +633,7 @@ export function useEditorHotKeys() {
       const maybe_selected = editor.select(">");
       if (!maybe_selected) {
         // check if select(">") is possible first, then toggle when not possible
-        editor.surfaceTryToggleContentEditMode();
+        editor.surface.surfaceTryToggleContentEditMode();
       }
     },
     {
@@ -662,13 +680,13 @@ export function useEditorHotKeys() {
   );
 
   useHotkeys("escape, clear", () => {
-    editor.a11yEscape();
+    editor.surface.a11yEscape();
   });
 
   useHotkeys(
     "meta+shift+h, ctrl+shift+h",
     () => {
-      editor.a11yToggleActive("selection");
+      editor.surface.a11yToggleActive("selection");
     },
     {
       preventDefault: true,
@@ -676,7 +694,7 @@ export function useEditorHotKeys() {
   );
 
   useHotkeys("meta+shift+l, ctrl+shift+l", () => {
-    editor.a11yToggleLocked("selection");
+    editor.surface.a11yToggleLocked("selection");
   });
   // #endregion
 
@@ -705,28 +723,28 @@ export function useEditorHotKeys() {
   );
 
   useHotkeys("meta+b, ctrl+b", () => {
-    editor.a11yToggleBold("selection");
+    editor.surface.a11yToggleBold("selection");
   });
 
   useHotkeys("meta+i, ctrl+i", () => {
-    editor.a11yToggleItalic("selection");
+    editor.surface.a11yToggleItalic("selection");
   });
 
   useHotkeys("meta+u, ctrl+u", () => {
-    editor.a11yToggleUnderline("selection");
+    editor.surface.a11yToggleUnderline("selection");
   });
 
   useHotkeys("meta+shift+x, ctrl+shift+x", () => {
-    editor.a11yToggleLineThrough("selection");
+    editor.surface.a11yToggleLineThrough("selection");
   });
 
   useHotkeys("shift+r", () => {
-    const v = editor.surfaceToggleRuler();
+    const v = editor.surface.surfaceToggleRuler();
     toast.success(`Ruler ${v === "on" ? "on" : "off"}`);
   });
 
   useHotkeys("shift+\", shift+'", () => {
-    const v = editor.surfaceTogglePixelGrid();
+    const v = editor.surface.surfaceTogglePixelGrid();
     toast.success(`Pixel Grid ${v === "on" ? "on" : "off"}`);
   });
 
@@ -760,13 +778,13 @@ export function useEditorHotKeys() {
     toast.error("[flip vertical] is not implemented yet");
   });
 
-  useHotkeys("cut, meta+x, ctrl+x", () => editor.a11yCut(), {
+  useHotkeys("cut, meta+x, ctrl+x", () => editor.surface.a11yCut(), {
     preventDefault: true,
     enableOnContentEditable: false,
     enableOnFormTags: false,
   });
 
-  useHotkeys("copy, meta+c, ctrl+c", () => editor.a11yCopy(), {
+  useHotkeys("copy, meta+c, ctrl+c", () => editor.surface.a11yCopy(), {
     preventDefault: false,
     enableOnContentEditable: false,
     enableOnFormTags: false,
@@ -776,7 +794,7 @@ export function useEditorHotKeys() {
     "meta+shift+c, ctrl+shift+c",
     () => {
       if (editor.backend === "canvas") {
-        const task = editor.a11yCopyAsImage("png");
+        const task = editor.surface.a11yCopyAsImage("png");
         toast.promise(task, {
           success: "Copied as PNG",
           error: "Failed to copy as PNG",
@@ -797,7 +815,7 @@ export function useEditorHotKeys() {
   //   enableOnFormTags: false,
   // });
 
-  useHotkeys("backspace, delete", () => editor.a11yDelete(), {
+  useHotkeys("backspace, delete", () => editor.surface.a11yDelete(), {
     preventDefault: true,
     enableOnContentEditable: false,
     enableOnFormTags: false,
@@ -833,83 +851,83 @@ export function useEditorHotKeys() {
   //
 
   useHotkeys("ctrl+alt+arrowright", () => {
-    editor.a11yNudgeResize("selection", "x", 1);
+    editor.surface.a11yNudgeResize("selection", "x", 1);
   });
 
   useHotkeys("ctrl+alt+shift+arrowright", () => {
-    editor.a11yNudgeResize("selection", "x", 10);
+    editor.surface.a11yNudgeResize("selection", "x", 10);
   });
 
   useHotkeys("ctrl+alt+arrowleft", () => {
-    editor.a11yNudgeResize("selection", "x", -1);
+    editor.surface.a11yNudgeResize("selection", "x", -1);
   });
 
   useHotkeys("ctrl+alt+shift+arrowleft", () => {
-    editor.a11yNudgeResize("selection", "x", -10);
+    editor.surface.a11yNudgeResize("selection", "x", -10);
   });
 
   useHotkeys("ctrl+alt+arrowup", () => {
-    editor.a11yNudgeResize("selection", "y", -1);
+    editor.surface.a11yNudgeResize("selection", "y", -1);
   });
 
   useHotkeys("ctrl+alt+shift+arrowup", () => {
-    editor.a11yNudgeResize("selection", "y", -10);
+    editor.surface.a11yNudgeResize("selection", "y", -10);
   });
 
   useHotkeys("ctrl+alt+arrowdown", () => {
-    editor.a11yNudgeResize("selection", "y", 1);
+    editor.surface.a11yNudgeResize("selection", "y", 1);
   });
 
   useHotkeys("ctrl+alt+shift+arrowdown", () => {
-    editor.a11yNudgeResize("selection", "y", 10);
+    editor.surface.a11yNudgeResize("selection", "y", 10);
   });
 
   // keyup
 
   useHotkeys("v", () => {
-    editor.surfaceSetTool({ type: "cursor" });
+    editor.surface.surfaceSetTool({ type: "cursor" });
   });
 
   useHotkeys("q", () => {
     if (content_edit_mode?.type === "vector") {
-      editor.surfaceSetTool({ type: "lasso" });
+      editor.surface.surfaceSetTool({ type: "lasso" });
     }
   });
 
   useHotkeys("h", () => {
-    editor.surfaceSetTool({ type: "hand" });
+    editor.surface.surfaceSetTool({ type: "hand" });
   });
 
   useHotkeys("a, f", () => {
-    editor.surfaceSetTool({ type: "insert", node: "container" });
+    editor.surface.surfaceSetTool({ type: "insert", node: "container" });
   });
 
   useHotkeys("r", () => {
-    editor.surfaceSetTool({ type: "insert", node: "rectangle" });
+    editor.surface.surfaceSetTool({ type: "insert", node: "rectangle" });
   });
 
   useHotkeys("o", () => {
-    editor.surfaceSetTool({ type: "insert", node: "ellipse" });
+    editor.surface.surfaceSetTool({ type: "insert", node: "ellipse" });
   });
 
   useHotkeys("y", () => {
-    editor.surfaceSetTool({ type: "insert", node: "polygon" });
+    editor.surface.surfaceSetTool({ type: "insert", node: "polygon" });
   });
 
   useHotkeys("t", () => {
-    editor.surfaceSetTool({ type: "insert", node: "text" });
+    editor.surface.surfaceSetTool({ type: "insert", node: "text" });
   });
 
   useHotkeys("l", () => {
-    editor.surfaceSetTool({ type: "draw", tool: "line" });
+    editor.surface.surfaceSetTool({ type: "draw", tool: "line" });
   });
 
   useHotkeys(
     "p",
     () => {
       // Holding `p` continues a path even when closing on an existing vertex.
-      editor.surfaceConfigurePathKeepProjectingModifier("on");
-      editor.surfaceSetTool({ type: "path" });
+      editor.surface.surfaceConfigurePathKeepProjectingModifier("on");
+      editor.surface.surfaceSetTool({ type: "path" });
     },
     { keydown: true, keyup: false }
   );
@@ -917,32 +935,32 @@ export function useEditorHotKeys() {
   useHotkeys(
     "p",
     () => {
-      editor.surfaceConfigurePathKeepProjectingModifier("off");
+      editor.surface.surfaceConfigurePathKeepProjectingModifier("off");
     },
     { keydown: false, keyup: true }
   );
 
   useHotkeys("shift+p", () => {
-    editor.surfaceSetTool({ type: "draw", tool: "pencil" });
+    editor.surface.surfaceSetTool({ type: "draw", tool: "pencil" });
   });
 
   useHotkeys("b", () => {
-    editor.surfaceSetTool({ type: "brush" });
+    editor.surface.surfaceSetTool({ type: "brush" });
   });
 
   useHotkeys("e", () => {
-    editor.surfaceSetTool({ type: "eraser" });
+    editor.surface.surfaceSetTool({ type: "eraser" });
   });
 
   useHotkeys("g", () => {
     if (content_edit_mode?.type === "bitmap") {
-      editor.surfaceSetTool({ type: "flood-fill" });
+      editor.surface.surfaceSetTool({ type: "flood-fill" });
     }
   });
 
   useHotkeys("shift+w", () => {
     if (content_edit_mode?.type === "vector") {
-      editor.surfaceSetTool({ type: "width" });
+      editor.surface.surfaceSetTool({ type: "width" });
     }
   });
 
@@ -950,14 +968,14 @@ export function useEditorHotKeys() {
     if (selection.length) {
       const i = parseInt(e.key);
       const o = i / 10;
-      editor.a11ySetOpacity("selection", o);
+      editor.surface.a11ySetOpacity("selection", o);
       toast.success(`opacity: ${o}`);
     }
   });
 
   useSingleDoublePressHotkey("0", (type) => {
     const o = type === "single" ? 1 : 0;
-    editor.a11ySetOpacity("selection", o);
+    editor.surface.a11ySetOpacity("selection", o);
     toast.success(`opacity: ${o}`);
   });
 

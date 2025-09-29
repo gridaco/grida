@@ -373,10 +373,10 @@ export function NodeHierarchyList() {
               mask={mask}
               maskIndicatorVariant={maskIndicatorVariant}
               onPointerEnter={() => {
-                editor.surfaceHoverNode(node.id, "enter");
+                editor.surface.surfaceHoverNode(node.id, "enter");
               }}
               onPointerLeave={() => {
-                editor.surfaceHoverNode(node.id, "leave");
+                editor.surface.surfaceHoverNode(node.id, "leave");
               }}
               onRenameCommit={(name) => {
                 editor.changeNodeName(node.id, name);

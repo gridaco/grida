@@ -11,7 +11,12 @@ import cmath from "@grida/cmath";
 import assert from "assert";
 import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
-import { InternalAction, TCanvasEventTargetDragGestureState } from "./action";
+import {
+  EditorConfigAction,
+  InternalAction,
+  SurfaceAction,
+  TCanvasEventTargetDragGestureState,
+} from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
@@ -314,16 +319,12 @@ export class Editor
     editor.api.IDocumentExportPluginActions,
     editor.api.IDocumentSchemaActions_Experimental,
     editor.api.IDocumentBrushToolActions,
-    editor.api.IDocumentVectorInterfaceActions,
-    editor.api.IEditorSurfaceActions,
-    editor.api.IEditorA11yActions,
-    editor.api.ISurfaceMultiplayerFollowPluginActions,
-    editor.api.ISurfaceMultiplayerCursorChatActions
+    editor.api.IDocumentVectorInterfaceActions
 {
-  private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
   readonly camera: Camera;
+  readonly surface: EditorSurface;
 
   readonly backend: editor.EditorContentRenderingBackend;
 
@@ -378,7 +379,6 @@ export class Editor
     contentElement,
     geometry,
     initialState,
-    config = { pointer_move_throttle_ms: 30 },
     plugins = {},
     onCreate,
   }: {
@@ -389,9 +389,6 @@ export class Editor
       | editor.api.IDocumentGeometryInterfaceProvider
       | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider);
     initialState: editor.state.IEditorStateInit;
-    config?: {
-      pointer_move_throttle_ms: number;
-    };
     onCreate?: (editor: Editor) => void;
     plugins?: {
       export_as_image?: WithEditorInstance<editor.api.IDocumentImageExportInterfaceProvider>;
@@ -404,6 +401,7 @@ export class Editor
   }) {
     this.backend = backend;
     this.camera = new Camera(this, new domapi.DOMViewportApi(viewportElement));
+    this.surface = new EditorSurface(this);
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
     this._m_geometry =
@@ -449,7 +447,6 @@ export class Editor
       );
     }
 
-    this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
     this._fontManager = new DocumentFontManager(this);
 
     this._do_legacy_warmup();
@@ -888,75 +885,6 @@ export class Editor
 
   // #endregion
 
-  surfaceSetTool(tool: editor.state.ToolMode, debug_label?: string) {
-    if (debug_label) this.log("debug:setTool", tool, debug_label);
-
-    this.dispatch({
-      type: "surface/tool",
-      tool: tool,
-    });
-  }
-
-  /**
-   * Try to enter content edit mode - only works when the selected node is a text or vector node
-   *
-   * when triggered on such invalid context, it should be a no-op
-   */
-  surfaceTryEnterContentEditMode(
-    node_id?: string,
-    mode: "auto" | "paint/gradient" | "paint/image" = "auto",
-    options?: {
-      paintIndex?: number;
-      paintTarget?: "fill" | "stroke";
-    }
-  ) {
-    node_id = node_id ?? this.state.selection[0];
-    switch (mode) {
-      case "auto":
-        return this.dispatch({
-          type: "surface/content-edit-mode/try-enter",
-        });
-      case "paint/gradient":
-        if (node_id) {
-          const paintTarget = options?.paintTarget ?? "fill";
-          const paintIndex = options?.paintIndex ?? 0;
-          return this.dispatch({
-            type: "surface/content-edit-mode/paint/gradient",
-            node_id: node_id,
-            paint_target: paintTarget,
-            paint_index: paintIndex,
-          });
-        } else {
-          // no-op
-        }
-      case "paint/image":
-        if (node_id) {
-          const paintTarget = options?.paintTarget ?? "fill";
-          const paintIndex = options?.paintIndex ?? 0;
-          return this.dispatch({
-            type: "surface/content-edit-mode/paint/image",
-            node_id: node_id,
-            paint_target: paintTarget,
-            paint_index: paintIndex,
-          });
-        }
-    }
-  }
-
-  surfaceTryExitContentEditMode() {
-    this.dispatch({
-      type: "surface/content-edit-mode/try-exit",
-    });
-  }
-
-  surfaceTryToggleContentEditMode() {
-    if (this.mstate.content_edit_mode) {
-      this.surfaceTryExitContentEditMode();
-    } else {
-      this.surfaceTryEnterContentEditMode();
-    }
-  }
-
   public select(...selectors: grida.program.document.Selector[]) {
     const { document_ctx, selection } = this.mstate;
     const ids = Array.from(
@@ -1019,48 +947,6 @@ export class Editor
     this.dispatch({
       type: "paste",
     });
-  }
-
-  public async writeClipboardMedia(
-    target: "selection" | editor.NodeID,
-    format: "png"
-  ): Promise<boolean> {
-    assert(this.backend === "canvas", "Editor is not using canvas backend");
-    const ids = target === "selection" ? this.mstate.selection : [target];
-    if (ids.length === 0) return false;
-    const id = ids[0];
-    const data = await this.exportNodeAs(id, "PNG");
-    const blob = new Blob([data as BlobPart], { type: "image/png" });
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-    return true;
-  }
-
-  public async writeClipboardSVG(
-    target: "selection" | editor.NodeID
-  ): Promise<boolean> {
-    assert(this.backend === "canvas", "Editor is not using canvas backend");
-    const ids = target === "selection" ? this.mstate.selection : [target];
-    if (ids.length === 0) return false;
-    const id = ids[0];
-    const data = await this.exportNodeAs(id, "SVG");
-    if (typeof data !== "string") {
-      return false;
-    }
-
-    const svgBlob = new Blob([data], { type: "image/svg+xml" });
-    const textBlob = new Blob([data], { type: "text/plain" });
-    const item = new ClipboardItem({
-      "image/svg+xml": svgBlob,
-      "text/plain": textBlob,
-    });
-
-    try {
-      await navigator.clipboard.write([item]);
-    } catch (error) {
-      await navigator.clipboard.writeText(data);
-    }
-
-    return true;
   }
 
   public duplicate(target: "selection" | editor.NodeID) {
@@ -1536,151 +1422,6 @@ export class Editor
     });
   }
   // #endregion IDocumentEditorActions implementation
-
-  // ==============================================================
-  // #region Surface actions
-  // ==============================================================
-
-  public surfaceHoverNode(node_id: string, event: "enter" | "leave") {
-    this.dispatch({
-      type: "hover",
-      target: node_id,
-      event,
-    });
-  }
-
-  public surfaceHoverEnterNode(node_id: string) {
-    this.surfaceHoverNode(node_id, "enter");
-  }
-
-  public surfaceHoverLeaveNode(node_id: string) {
-    this.surfaceHoverNode(node_id, "leave");
-  }
-
-  public surfaceUpdateVectorHoveredControl(
-    hoveredControl: {
-      type: editor.state.VectorContentEditModeHoverableGeometryControlType;
-      index: number;
-    } | null
-  ) {
-    this.dispatch({
-      type: "vector/update-hovered-control",
-      hoveredControl,
-    });
-  }
-
-  public surfaceSelectGradientStop(
-    node_id: editor.NodeID,
-    stop: number,
-    options?: {
-      paintIndex?: number;
-      paintTarget?: "fill" | "stroke";
-    }
-  ): void {
-    const paintTarget = options?.paintTarget ?? "fill";
-    const paintIndex = options?.paintIndex ?? 0;
-    this.dispatch({
-      type: "select-gradient-stop",
-      target: {
-        node_id,
-        stop,
-        paint_index: paintIndex,
-        paint_target: paintTarget,
-      },
-    });
-  }
-
-  public surfaceConfigureSurfaceRaycastTargeting(
-    config: Partial<editor.state.HitTestingConfig>
-  ) {
-    this.dispatch({
-      type: "config/surface/raycast-targeting",
-      config,
-    });
-  }
-
-  public surfaceConfigureMeasurement(measurement: "on" | "off") {
-    this.dispatch({
-      type: "config/surface/measurement",
-      measurement,
-    });
-  }
-
-  public surfaceConfigureTranslateWithCloneModifier(
-    translate_with_clone: "on" | "off"
-  ) {
-    this.dispatch({
-      type: "config/modifiers/translate-with-clone",
-      translate_with_clone,
-    });
-  }
-
-  public surfaceConfigureTranslateWithAxisLockModifier(
-    tarnslate_with_axis_lock: "on" | "off"
-  ) {
-    this.dispatch({
-      type: "config/modifiers/translate-with-axis-lock",
-      tarnslate_with_axis_lock,
-    });
-  }
-
-  public surfaceConfigureTranslateWithForceDisableSnap(
-    translate_with_force_disable_snap: "on" | "off"
-  ) {
-    this.dispatch({
-      type: "config/modifiers/translate-with-force-disable-snap",
-      translate_with_force_disable_snap,
-    });
-  }
-
-  public surfaceConfigureTransformWithCenterOriginModifier(
-    transform_with_center_origin: "on" | "off"
-  ) {
-    this.dispatch({
-      type: "config/modifiers/transform-with-center-origin",
-      transform_with_center_origin,
-    });
-  }
-
-  public surfaceConfigureTransformWithPreserveAspectRatioModifier(
-    transform_with_preserve_aspect_ratio: "on" | "off"
-  ) {
-    this.dispatch({
-      type: "config/modifiers/transform-with-preserve-aspect-ratio",
-      transform_with_preserve_aspect_ratio,
-    });
-  }
-
-  public surfaceConfigureRotateWithQuantizeModifier(
-    rotate_with_quantize: number | "off"
-  ) {
-    this.dispatch({
-      type: "config/modifiers/rotate-with-quantize",
-      rotate_with_quantize,
-    });
-  }
-
-  public surfaceConfigureCurveTangentMirroringModifier(
-    curve_tangent_mirroring: vn.TangentMirroringMode
-  ) {
-    this.dispatch({
-      type: "config/modifiers/curve-tangent-mirroring",
-      curve_tangent_mirroring,
-    });
-  }
-
-  public surfaceConfigurePathKeepProjectingModifier(
-    path_keep_projecting: "on" | "off"
-  ) {
-    this.dispatch({
-      type: "config/modifiers/path-keep-projecting",
-      path_keep_projecting,
-    });
-  }
-
-  // ==============================================================
-  // #endregion Surface actions
-  // ==============================================================
 
   // #region IDocumentGeometryQuery implementation
 
@@ -2944,34 +2685,6 @@ export class Editor
   }
   // #endregion IBrushToolActions implementation
 
-  // #region IPixelGridActions implementation
-  surfaceConfigurePixelGrid(state: "on" | "off") {
-    this.dispatch({
-      type: "surface/pixel-grid",
-      state,
-    });
-  }
-  surfaceTogglePixelGrid(): "on" | "off" {
-    const { pixelgrid } = this.state;
-    const next = pixelgrid === "on" ? "off" : "on";
-    this.surfaceConfigurePixelGrid(next);
-    return next;
-  }
-  // #endregion IPixelGridActions implementation
-
-  // #region IRulerActions implementation
-  surfaceConfigureRuler(state: "on" | "off") {
-    this.dispatch({
-      type: "surface/ruler",
-      state,
-    });
-  }
-  surfaceToggleRuler(): "on" | "off" {
-    const { ruler } = this.state;
-    const next = ruler === "on" ? "off" : "on";
-    this.surfaceConfigureRuler(next);
-    return next;
-  }
   // #endregion IRulerActions implementation
 
   // #region IGuide2DActions implementation
@@ -2986,245 +2699,6 @@ export class Editor
     });
   }
   // #endregion IGuide2DActions implementation
-
-  // #region IEventTargetActions implementation
-
-  private _throttled_pointer_move_with_raycast = editor.throttle(
-    (event: PointerEvent, position: { x: number; y: number }) => {
-      // this is throttled - as it is expensive
-      const ids = this.getNodeIdsFromPointerEvent(event);
-      this.dispatch({
-        type: "event-target/event/on-pointer-move-raycast",
-        node_ids_from_point: ids,
-        position,
-        shiftKey: event.shiftKey,
-      });
-    },
-    this.__pointer_move_throttle_ms
-  );
-
-  surfacePointerDown(event: PointerEvent) {
-    const ids = this.getNodeIdsFromPointerEvent(event);
-
-    this.dispatch({
-      type: "event-target/event/on-pointer-down",
-      node_ids_from_point: ids,
-      shiftKey: event.shiftKey,
-    });
-  }
-
-  surfacePointerUp(event: PointerEvent) {
-    this.dispatch({
-      type: "event-target/event/on-pointer-up",
-    });
-  }
-
-  surfacePointerMove(event: PointerEvent) {
-    const position = this.camera.pointerEventToViewportPoint(event);
-
-    this.dispatch({
-      type: "event-target/event/on-pointer-move",
-      position_canvas: position,
-      position_client: { x: event.clientX, y: event.clientY },
-    });
-
-    this._throttled_pointer_move_with_raycast(event, position);
-  }
-
-  surfaceClick(event: MouseEvent) {
-    const ids = this.getNodeIdsFromPointerEvent(event);
-
-    this.dispatch({
-      type: "event-target/event/on-click",
-      node_ids_from_point: ids,
-      shiftKey: event.shiftKey,
-    });
-  }
-
-  surfaceDoubleClick(event: MouseEvent) {
-    this.dispatch({
-      type: "event-target/event/on-double-click",
-    });
-  }
-
-  surfaceDragStart(event: PointerEvent) {
-    this.dispatch({
-      type: "event-target/event/on-drag-start",
-      shiftKey: event.shiftKey,
-    });
-  }
-
-  surfaceDragEnd(event: PointerEvent) {
-    const { marquee } = this.state;
-    if (marquee) {
-      // test area in canvas space
-      const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
-
-      const contained = this.geometry.getNodeIdsFromEnvelope(area);
-
-      this.dispatch({
-        type: "event-target/event/on-drag-end",
-        node_ids_from_area: contained,
-        shiftKey: event.shiftKey,
-      });
-
-      return;
-    }
-    this.dispatch({
-      type: "event-target/event/on-drag-end",
-      shiftKey: event.shiftKey,
-    });
-  }
-
-  surfaceDrag(event: TCanvasEventTargetDragGestureState) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "event-target/event/on-drag",
-        event,
-      });
-    });
-  }
-
-  //
-
-  surfaceStartGuideGesture(axis: cmath.Axis, idx: number | -1) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        idx: idx,
-        type: "guide",
-        axis,
-      },
-    });
-  }
-
-  surfaceStartScaleGesture(
-    selection: string | string[],
-    direction: cmath.CardinalDirection
-  ) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "scale",
-        selection: Array.isArray(selection) ? selection : [selection],
-        direction,
-      },
-    });
-  }
-
-  surfaceStartSortGesture(selection: string | string[], node_id: string) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "sort",
-        selection: Array.isArray(selection) ? selection : [selection],
-        node_id,
-      },
-    });
-  }
-
-  surfaceStartGapGesture(selection: string | string[], axis: "x" | "y") {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "gap",
-        selection: selection,
-        axis,
-      },
-    });
-  }
-
-  // #region drag resize handle
-  surfaceStartCornerRadiusGesture(
-    selection: string,
-    anchor?: cmath.IntercardinalDirection
-  ) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "corner-radius",
-        node_id: selection,
-        anchor,
-      },
-    });
-  }
-  // #endregion drag resize handle
-
-  surfaceStartRotateGesture(selection: string) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "rotate",
-        selection,
-      },
-    });
-  }
-
-  surfaceStartTranslateVectorNetwork(node_id: string) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "translate-vector-controls",
-        node_id,
-      },
-    });
-  }
-
-  startTranslateVariableWidthStop(node_id: string, stop: number) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "translate-variable-width-stop",
-        node_id,
-        stop,
-      },
-    });
-  }
-
-  startResizeVariableWidthStop(
-    node_id: string,
-    stop: number,
-    side: "left" | "right"
-  ) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "resize-variable-width-stop",
-        node_id,
-        stop,
-        side,
-      },
-    });
-  }
-
-  surfaceStartCurveGesture(
-    node_id: string,
-    segment: number,
-    control: "ta" | "tb"
-  ) {
-    this.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "curve",
-        node_id,
-        control,
-        segment,
-      },
-    });
-  }
-
-  // #endregion IEventTargetActions implementation
-
-  readonly __pligin_follow: EditorFollowPlugin = new EditorFollowPlugin(this);
-  // #region IFollowPluginActions implementation
-  follow(cursor_id: string): void {
-    this.__pligin_follow.follow(cursor_id);
-  }
-
-  unfollow(): void {
-    this.__pligin_follow.unfollow();
-  }
-  // #endregion IFollowPluginActions implementation
 
   // #region IVectorInterfaceActions implementation
   toVectorNetwork(node_id: string): vn.VectorNetwork | null {
@@ -3332,18 +2806,584 @@ export class Editor
   // #endregion IExportPluginActions implementation
   // ==============================================================
 
+  /**
+   * Dispose editor instance and cleanup resources
+   */
+  dispose() {
+    this.listeners.clear();
+  }
+}
+
+export class EditorSurface
+  implements
+    editor.api.IEditorSurfaceActions,
+    editor.api.IEditorA11yActions,
+    editor.api.ISurfaceMultiplayerFollowPluginActions,
+    editor.api.ISurfaceMultiplayerCursorChatActions
+{
+  readonly camera: Camera;
+  readonly __pligin_follow: EditorFollowPlugin;
+  private readonly __pointer_move_throttle_ms: number = 30;
+  private get state(): editor.state.IEditorState {
+    return this._editor.state;
+  }
+
+  constructor(
+    readonly _editor: Editor,
+    config: { pointer_move_throttle_ms: number } = {
+      pointer_move_throttle_ms: 30,
+    }
+  ) {
+    this.camera = _editor.camera;
+    this.__pligin_follow = new EditorFollowPlugin(_editor);
+    this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
+  }
+
+  private dispatch(action: Action) {
+    this._editor.dispatch(action);
+  }
+
+  // ==============================================================
+  // #region Surface actions
+  // ==============================================================
+
+  surfaceSetTool(tool: editor.state.ToolMode, debug_label?: string) {
+    if (debug_label) console.log("debug:setTool", tool, debug_label);
+
+    this.dispatch({
+      type: "surface/tool",
+      tool: tool,
+    });
+  }
+
+  /**
+   * Try to enter content edit mode - only works when the selected node is a text or vector node
+   *
+   * when triggered on such invalid context, it should be a no-op
+   */
+  surfaceTryEnterContentEditMode(
+    node_id?: string,
+    mode: "auto" | "paint/gradient" | "paint/image" = "auto",
+    options?: {
+      paintIndex?: number;
+      paintTarget?: "fill" | "stroke";
+    }
+  ) {
+    node_id = node_id ?? this.state.selection[0];
+    switch (mode) {
+      case "auto":
+        return this.dispatch({
+          type: "surface/content-edit-mode/try-enter",
+        });
+      case "paint/gradient":
+        if (node_id) {
+          const paintTarget = options?.paintTarget ?? "fill";
+          const paintIndex = options?.paintIndex ?? 0;
+          return this.dispatch({
+            type: "surface/content-edit-mode/paint/gradient",
+            node_id: node_id,
+            paint_target: paintTarget,
+            paint_index: paintIndex,
+          });
+        } else {
+          // no-op
+        }
+      case "paint/image":
+        if (node_id) {
+          const paintTarget = options?.paintTarget ?? "fill";
+          const paintIndex = options?.paintIndex ?? 0;
+          return this.dispatch({
+            type: "surface/content-edit-mode/paint/image",
+            node_id: node_id,
+            paint_target: paintTarget,
+            paint_index: paintIndex,
+          });
+        }
+    }
+  }
+
+  surfaceTryExitContentEditMode() {
+    this.dispatch({
+      type: "surface/content-edit-mode/try-exit",
+    });
+  }
+
+  surfaceTryToggleContentEditMode() {
+    if (this._editor.state.content_edit_mode) {
+      this.surfaceTryExitContentEditMode();
+    } else {
+      this.surfaceTryEnterContentEditMode();
+    }
+  }
+
+  public surfaceHoverNode(node_id: string, event: "enter" | "leave") {
+    this.dispatch({
+      type: "hover",
+      target: node_id,
+      event,
+    });
+  }
+
+  public surfaceHoverEnterNode(node_id: string) {
+    this.surfaceHoverNode(node_id, "enter");
+  }
+
+  public surfaceHoverLeaveNode(node_id: string) {
+    this.surfaceHoverNode(node_id, "leave");
+  }
+
+  public surfaceUpdateVectorHoveredControl(
+    hoveredControl: {
+      type: editor.state.VectorContentEditModeHoverableGeometryControlType;
+      index: number;
+    } | null
+  ) {
+    this.dispatch({
+      type: "vector/update-hovered-control",
+      hoveredControl,
+    });
+  }
+
+  public surfaceSelectGradientStop(
+    node_id: editor.NodeID,
+    stop: number,
+    options?: {
+      paintIndex?: number;
+      paintTarget?: "fill" | "stroke";
+    }
+  ): void {
+    const paintTarget = options?.paintTarget ?? "fill";
+    const paintIndex = options?.paintIndex ?? 0;
+    this.dispatch({
+      type: "select-gradient-stop",
+      target: {
+        node_id,
+        stop,
+        paint_index: paintIndex,
+        paint_target: paintTarget,
+      },
+    });
+  }
+
+  public surfaceConfigureSurfaceRaycastTargeting(
+    config: Partial<editor.state.HitTestingConfig>
+  ) {
+    this.dispatch({
+      type: "config/surface/raycast-targeting",
+      config,
+    });
+  }
+
+  public surfaceConfigureMeasurement(measurement: "on" | "off") {
+    this.dispatch({
+      type: "config/surface/measurement",
+      measurement,
+    });
+  }
+
+  public surfaceConfigureTranslateWithCloneModifier(
+    translate_with_clone: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/translate-with-clone",
+      translate_with_clone,
+    });
+  }
+
+  public surfaceConfigureTranslateWithAxisLockModifier(
+    tarnslate_with_axis_lock: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/translate-with-axis-lock",
+      tarnslate_with_axis_lock,
+    });
+  }
+
+  public surfaceConfigureTranslateWithForceDisableSnap(
+    translate_with_force_disable_snap: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/translate-with-force-disable-snap",
+      translate_with_force_disable_snap,
+    });
+  }
+
+  public surfaceConfigureTransformWithCenterOriginModifier(
+    transform_with_center_origin: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/transform-with-center-origin",
+      transform_with_center_origin,
+    });
+  }
+
+  public surfaceConfigureTransformWithPreserveAspectRatioModifier(
+    transform_with_preserve_aspect_ratio: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/transform-with-preserve-aspect-ratio",
+      transform_with_preserve_aspect_ratio,
+    });
+  }
+
+  public surfaceConfigureRotateWithQuantizeModifier(
+    rotate_with_quantize: number | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/rotate-with-quantize",
+      rotate_with_quantize,
+    });
+  }
+
+  public surfaceConfigureCurveTangentMirroringModifier(
+    curve_tangent_mirroring: vn.TangentMirroringMode
+  ) {
+    this.dispatch({
+      type: "config/modifiers/curve-tangent-mirroring",
+      curve_tangent_mirroring,
+    });
+  }
+
+  public surfaceConfigurePathKeepProjectingModifier(
+    path_keep_projecting: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/path-keep-projecting",
+      path_keep_projecting,
+    });
+  }
+
+  // #region IPixelGridActions implementation
+  surfaceConfigurePixelGrid(state: "on" | "off") {
+    this.dispatch({
+      type: "surface/pixel-grid",
+      state,
+    });
+  }
+  surfaceTogglePixelGrid(): "on" | "off" {
+    const { pixelgrid } = this.state;
+    const next = pixelgrid === "on" ? "off" : "on";
+    this.surfaceConfigurePixelGrid(next);
+    return next;
+  }
+  // #endregion IPixelGridActions implementation
+
+  // #region IRulerActions implementation
+  surfaceConfigureRuler(state: "on" | "off") {
+    this.dispatch({
+      type: "surface/ruler",
+      state,
+    });
+  }
+  surfaceToggleRuler(): "on" | "off" {
+    const { ruler } = this._editor.state;
+    const next = ruler === "on" ? "off" : "on";
+    this.surfaceConfigureRuler(next);
+    return next;
+  }
+
+  // ==============================================================
+  // #endregion Surface actions
+  // ==============================================================
+
+  // #region IEventTargetActions implementation
+
+  private _throttled_pointer_move_with_raycast = editor.throttle(
+    (event: PointerEvent, position: { x: number; y: number }) => {
+      // this is throttled - as it is expensive
+      const ids = this._editor.getNodeIdsFromPointerEvent(event);
+      this._editor.dispatch({
+        type: "event-target/event/on-pointer-move-raycast",
+        node_ids_from_point: ids,
+        position,
+        shiftKey: event.shiftKey,
+      });
+    },
+    this.__pointer_move_throttle_ms
+  );
+
+  surfacePointerDown(event: PointerEvent) {
+    const ids = this._editor.getNodeIdsFromPointerEvent(event);
+
+    this._editor.dispatch({
+      type: "event-target/event/on-pointer-down",
+      node_ids_from_point: ids,
+      shiftKey: event.shiftKey,
+    });
+  }
+
+  surfacePointerUp(event: PointerEvent) {
+    this._editor.dispatch({
+      type: "event-target/event/on-pointer-up",
+    });
+  }
+
+  surfacePointerMove(event: PointerEvent) {
+    const position = this.camera.pointerEventToViewportPoint(event);
+
+    this._editor.dispatch({
+      type: "event-target/event/on-pointer-move",
+      position_canvas: position,
+      position_client: { x: event.clientX, y: event.clientY },
+    });
+
+    this._throttled_pointer_move_with_raycast(event, position);
+  }
+
+  surfaceClick(event: MouseEvent) {
+    const ids = this._editor.getNodeIdsFromPointerEvent(event);
+
+    this._editor.dispatch({
+      type: "event-target/event/on-click",
+      node_ids_from_point: ids,
+      shiftKey: event.shiftKey,
+    });
+  }
+
+  surfaceDoubleClick(event: MouseEvent) {
+    this._editor.dispatch({
+      type: "event-target/event/on-double-click",
+    });
+  }
+
+  surfaceDragStart(event: PointerEvent) {
+    this._editor.dispatch({
+      type: "event-target/event/on-drag-start",
+      shiftKey: event.shiftKey,
+    });
+  }
+
+  surfaceDragEnd(event: PointerEvent) {
+    const { marquee } = this._editor.state;
+    if (marquee) {
+      // test area in canvas space
+      const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
+
+      const contained = this._editor.geometry.getNodeIdsFromEnvelope(area);
+
+      this._editor.dispatch({
+        type: "event-target/event/on-drag-end",
+        node_ids_from_area: contained,
+        shiftKey: event.shiftKey,
+      });
+
+      return;
+    }
+    this._editor.dispatch({
+      type: "event-target/event/on-drag-end",
+      shiftKey: event.shiftKey,
+    });
+  }
+
+  surfaceDrag(event: TCanvasEventTargetDragGestureState) {
+    requestAnimationFrame(() => {
+      this._editor.dispatch({
+        type: "event-target/event/on-drag",
+        event,
+      });
+    });
+  }
+
+  //
+
+  surfaceStartGuideGesture(axis: cmath.Axis, idx: number | -1) {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        idx: idx,
+        type: "guide",
+        axis,
+      },
+    });
+  }
+
+  surfaceStartScaleGesture(
+    selection: string | string[],
+    direction: cmath.CardinalDirection
+  ) {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "scale",
+        selection: Array.isArray(selection) ? selection : [selection],
+        direction,
+      },
+    });
+  }
+
+  surfaceStartSortGesture(selection: string | string[], node_id: string) {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "sort",
+        selection: Array.isArray(selection) ? selection : [selection],
+        node_id,
+      },
+    });
+  }
+
+  surfaceStartGapGesture(selection: string | string[], axis: "x" | "y") {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "gap",
+        selection: selection,
+        axis,
+      },
+    });
+  }
+
+  // #region drag resize handle
+  surfaceStartCornerRadiusGesture(
+    selection: string,
+    anchor?: cmath.IntercardinalDirection
+  ) {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "corner-radius",
+        node_id: selection,
+        anchor,
+      },
+    });
+  }
+  // #endregion drag resize handle
+
+  surfaceStartRotateGesture(selection: string) {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "rotate",
+        selection,
+      },
+    });
+  }
+
+  surfaceStartTranslateVectorNetwork(node_id: string) {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "translate-vector-controls",
+        node_id,
+      },
+    });
+  }
+
+  surfaceStartTranslateVariableWidthStop(node_id: string, stop: number) {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "translate-variable-width-stop",
+        node_id,
+        stop,
+      },
+    });
+  }
+
+  surfaceStartResizeVariableWidthStop(
+    node_id: string,
+    stop: number,
+    side: "left" | "right"
+  ) {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "resize-variable-width-stop",
+        node_id,
+        stop,
+        side,
+      },
+    });
+  }
+
+  surfaceStartCurveGesture(
+    node_id: string,
+    segment: number,
+    control: "ta" | "tb"
+  ) {
+    this._editor.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "curve",
+        node_id,
+        control,
+        segment,
+      },
+    });
+  }
+
+  // #endregion IEventTargetActions implementation
+
+  // #region IFollowPluginActions implementation
+  follow(cursor_id: string): void {
+    this.__pligin_follow.follow(cursor_id);
+  }
+
+  unfollow(): void {
+    this.__pligin_follow.unfollow();
+  }
+  // #endregion IFollowPluginActions implementation
+
+  public async writeClipboardMedia(
+    target: "selection" | editor.NodeID,
+    format: "png"
+  ): Promise<boolean> {
+    assert(
+      this._editor.backend === "canvas",
+      "Editor is not using canvas backend"
+    );
+    const ids = target === "selection" ? this.state.selection : [target];
+    if (ids.length === 0) return false;
+    const id = ids[0];
+    const data = await this._editor.exportNodeAs(id, "PNG");
+    const blob = new Blob([data as BlobPart], { type: "image/png" });
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    return true;
+  }
+
+  public async writeClipboardSVG(
+    target: "selection" | editor.NodeID
+  ): Promise<boolean> {
+    assert(
+      this._editor.backend === "canvas",
+      "Editor is not using canvas backend"
+    );
+    const ids = target === "selection" ? this.state.selection : [target];
+    if (ids.length === 0) return false;
+    const id = ids[0];
+    const data = await this._editor.exportNodeAs(id, "SVG");
+    if (typeof data !== "string") {
+      return false;
+    }
+
+    const svgBlob = new Blob([data], { type: "image/svg+xml" });
+    const textBlob = new Blob([data], { type: "text/plain" });
+    const item = new ClipboardItem({
+      "image/svg+xml": svgBlob,
+      "text/plain": textBlob,
+    });
+
+    try {
+      await navigator.clipboard.write([item]);
+    } catch (error) {
+      await navigator.clipboard.writeText(data);
+    }
+
+    return true;
+  }
+
   // ==============================================================
   // #region ICursorChatActions implementation
   // ==============================================================
   openCursorChat(): void {
-    this.reduce((state) => {
+    this._editor.reduce((state) => {
       state.local_cursor_chat.is_open = true;
       return state;
     });
   }
 
   closeCursorChat(): void {
-    this.reduce((state) => {
+    this._editor.reduce((state) => {
       state.local_cursor_chat.is_open = false;
       state.local_cursor_chat.message = null;
       state.local_cursor_chat.last_modified = null;
@@ -3352,7 +3392,7 @@ export class Editor
   }
 
   updateCursorChatMessage(message: string | null): void {
-    this.reduce((state) => {
+    this._editor.reduce((state) => {
       state.local_cursor_chat.message = message;
       state.local_cursor_chat.last_modified = message ? Date.now() : null;
       return state;
@@ -3362,7 +3402,7 @@ export class Editor
   public __sync_cursors(
     cursors: editor.state.IEditorMultiplayerCursorState["cursors"]
   ) {
-    this.reduce((state) => {
+    this._editor.reduce((state) => {
       state.cursors = cursors;
       return state;
     });
@@ -3377,7 +3417,7 @@ export class Editor
   // ==============================================================
 
   public a11yEscape() {
-    const step = this._stackEscapeSteps(this.mstate)[0];
+    const step = this._stackEscapeSteps(this.state)[0];
 
     switch (step) {
       case "escape-tool": {
@@ -3385,7 +3425,7 @@ export class Editor
         break;
       }
       case "escape-selection": {
-        this.blur("a11yEscape");
+        this._editor.blur("a11yEscape");
         break;
       }
       case "escape-content-edit-mode":
@@ -3445,55 +3485,55 @@ export class Editor
   }
 
   public async a11yCopyAsImage(format: "png"): Promise<boolean> {
-    if (this.mstate.content_edit_mode?.type === "vector") {
+    if (this.state.content_edit_mode?.type === "vector") {
       const { selected_vertices, selected_segments, selected_tangents } =
-        this.mstate.content_edit_mode.selection;
+        this.state.content_edit_mode.selection;
       const hasSelection =
         selected_vertices.length > 0 ||
         selected_segments.length > 0 ||
         selected_tangents.length > 0;
       if (!hasSelection) return false;
     } else {
-      if (this.mstate.selection.length === 0) return false;
+      if (this.state.selection.length === 0) return false;
     }
     return await this.writeClipboardMedia("selection", format);
   }
 
   public async a11yCopyAsSVG(): Promise<boolean> {
-    if (this.mstate.content_edit_mode?.type === "vector") {
+    if (this.state.content_edit_mode?.type === "vector") {
       const { selected_vertices, selected_segments, selected_tangents } =
-        this.mstate.content_edit_mode.selection;
+        this.state.content_edit_mode.selection;
       const hasSelection =
         selected_vertices.length > 0 ||
         selected_segments.length > 0 ||
         selected_tangents.length > 0;
       if (!hasSelection) return false;
     } else {
-      if (this.mstate.selection.length === 0) return false;
+      if (this.state.selection.length === 0) return false;
     }
 
     return await this.writeClipboardSVG("selection");
   }
 
   public a11yCopy() {
-    if (this.mstate.content_edit_mode?.type === "vector") {
+    if (this.state.content_edit_mode?.type === "vector") {
       const { selected_vertices, selected_segments, selected_tangents } =
-        this.mstate.content_edit_mode.selection;
+        this.state.content_edit_mode.selection;
       const hasSelection =
         selected_vertices.length > 0 ||
         selected_segments.length > 0 ||
         selected_tangents.length > 0;
       if (!hasSelection) return;
     }
-    this.copy("selection");
+    this._editor.copy("selection");
   }
 
   public a11yCut() {
-    this.cut("selection");
+    this._editor.cut("selection");
   }
 
   public a11yPaste() {
-    this.paste();
+    this._editor.paste();
   }
 
   public a11yDelete() {
@@ -3521,43 +3561,38 @@ export class Editor
   }
 
   public a11yToggleActive(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
+    const target_ids = target === "selection" ? this.state.selection : [target];
 
     for (const node_id of target_ids) {
-      this.toggleNodeActive(node_id);
+      this._editor.toggleNodeActive(node_id);
     }
   }
 
   public a11yToggleLocked(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
+    const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
-      this.toggleNodeLocked(node_id);
+      this._editor.toggleNodeLocked(node_id);
     }
   }
 
   public a11yToggleBold(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
+    const target_ids = target === "selection" ? this.state.selection : [target];
     target_ids.forEach((node_id) => {
-      this.toggleTextNodeBold(node_id);
+      this._editor.toggleTextNodeBold(node_id);
     });
   }
 
   public a11yToggleItalic(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
+    const target_ids = target === "selection" ? this.state.selection : [target];
     target_ids.forEach((node_id) => {
-      this.toggleTextNodeItalic(node_id);
+      this._editor.toggleTextNodeItalic(node_id);
     });
   }
 
   public a11yToggleUnderline(
     target: "selection" | editor.NodeID = "selection"
   ) {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
+    const target_ids = target === "selection" ? this.state.selection : [target];
     target_ids.forEach((node_id) => {
       this.dispatch({
         type: "node/toggle/underline",
@@ -3569,8 +3604,7 @@ export class Editor
   public a11yToggleLineThrough(
     target: "selection" | editor.NodeID = "selection"
   ) {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
+    const target_ids = target === "selection" ? this.state.selection : [target];
     target_ids.forEach((node_id) => {
       this.dispatch({
         type: "node/toggle/line-through",
@@ -3583,23 +3617,18 @@ export class Editor
     target: "selection" | editor.NodeID = "selection",
     opacity: number
   ) {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
+    const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
-      this.changeNodePropertyOpacity(node_id, { type: "set", value: opacity });
+      this._editor.changeNodePropertyOpacity(node_id, {
+        type: "set",
+        value: opacity,
+      });
     }
   }
 
   // ==============================================================
   // #endregion a11y actions
   // ==============================================================
-
-  /**
-   * Dispose editor instance and cleanup resources
-   */
-  dispose() {
-    this.listeners.clear();
-  }
 }
 
 export class ImageProxy implements editor.api.ImageInstance {

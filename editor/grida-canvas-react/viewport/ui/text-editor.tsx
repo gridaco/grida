@@ -77,7 +77,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
               }
               stopPropagation(e);
             }}
-            onBlur={() => editor.surfaceTryExitContentEditMode()}
+            onBlur={() => editor.surface.surfaceTryExitContentEditMode()}
             html={node.text as string}
             onChange={(e) => {
               const txt = e.currentTarget.textContent;

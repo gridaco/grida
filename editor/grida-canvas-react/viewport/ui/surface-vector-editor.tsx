@@ -605,7 +605,11 @@ function VertexPoint({
           );
           if (segment !== -1) {
             const control = ve.segments[segment].a === index ? "ta" : "tb";
-            instance.surfaceStartCurveGesture(ve.node_id, segment, control);
+            instance.surface.surfaceStartCurveGesture(
+              ve.node_id,
+              segment,
+              control
+            );
           }
         } else {
           ve.onDragStart();

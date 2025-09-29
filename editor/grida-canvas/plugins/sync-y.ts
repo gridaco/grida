@@ -199,7 +199,7 @@ class AwarenessSyncManager {
         {} as Record<string, (typeof states)[0]>
       );
 
-      this._editor.__sync_cursors(cursorsObject);
+      this._editor.surface.__sync_cursors(cursorsObject);
     };
 
     this._awareness.on("change", aware);

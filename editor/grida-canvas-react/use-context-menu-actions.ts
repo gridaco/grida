@@ -118,14 +118,14 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Copy as SVG",
         disabled: backend !== "canvas" || !hasSelection,
         onSelect: () => {
-          void editor.a11yCopyAsSVG();
+          void editor.surface.a11yCopyAsSVG();
         },
       },
       copyAsPNG: {
         label: "Copy as PNG",
         shortcut: "⇧⌘C",
         disabled: backend !== "canvas" || !hasSelection,
-        onSelect: () => editor.a11yCopyAsImage("png"),
+        onSelect: () => editor.surface.a11yCopyAsImage("png"),
       },
       bringToFront: {
         label: "Bring to front",

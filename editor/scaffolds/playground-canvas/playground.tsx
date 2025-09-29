@@ -466,20 +466,20 @@ function LocalFakeCursorChat() {
 
   useHotkeys("/", (e) => {
     e.preventDefault();
-    instance.openCursorChat();
+    instance.surface.openCursorChat();
   });
 
   const handleValueChange = (value: string) => {
-    instance.updateCursorChatMessage(value);
+    instance.surface.updateCursorChatMessage(value);
   };
 
   const handleValueCommit = (value: string) => {
     // Clear message after commit
-    instance.updateCursorChatMessage(null);
+    instance.surface.updateCursorChatMessage(null);
   };
 
   const handleClose = () => {
-    instance.closeCursorChat();
+    instance.surface.closeCursorChat();
   };
 
   return (
@@ -596,7 +596,7 @@ function PresenseAvatars() {
           }}
           tooltip="Click to follow"
           onClick={() => {
-            instance.follow(cursor.id);
+            instance.surface.follow(cursor.id);
           }}
         />
       ))}

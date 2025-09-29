@@ -113,7 +113,7 @@ function EditorUser({
 
   const setFocusedStop = useCallback(
     (stop: number | null) => {
-      editor.surfaceSelectGradientStop(node_id, stop ?? 0, {
+      editor.surface.surfaceSelectGradientStop(node_id, stop ?? 0, {
         paintIndex: paint_index,
         paintTarget: paint_target,
       });

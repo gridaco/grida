@@ -168,7 +168,7 @@ export function PlaygroundToolbar() {
         <ToggleGroupPrimitive.Root
           data-slot="toggle-group"
           onValueChange={(v) => {
-            editor.surfaceSetTool(
+            editor.surface.surfaceSetTool(
               toolbar_value_to_cursormode(v as ToolbarToolType)
             );
           }}
@@ -186,7 +186,7 @@ export function PlaygroundToolbar() {
               { value: "hand", label: "Hand tool", shortcut: "H" },
             ]}
             onValueChange={(v) => {
-              editor.surfaceSetTool(
+              editor.surface.surfaceSetTool(
                 toolbar_value_to_cursormode(v as ToolbarToolType)
               );
             }}
@@ -219,7 +219,7 @@ export function PlaygroundToolbar() {
               { value: "image", label: "Image" },
             ]}
             onValueChange={(v) => {
-              editor.surfaceSetTool(
+              editor.surface.surfaceSetTool(
                 toolbar_value_to_cursormode(v as ToolbarToolType)
               );
             }}
@@ -235,7 +235,7 @@ export function PlaygroundToolbar() {
               { value: "eraser", label: "Eraser tool", shortcut: "E" },
             ]}
             onValueChange={(v) => {
-              editor.surfaceSetTool(
+              editor.surface.surfaceSetTool(
                 toolbar_value_to_cursormode(v as ToolbarToolType)
               );
             }}
@@ -281,7 +281,7 @@ function BitmapEditModeAuxiliaryToolbar() {
               pressed={tool.type === "flood-fill"}
               onPressedChange={(pressed) => {
                 if (pressed) {
-                  editor.surfaceSetTool({ type: "flood-fill" });
+                  editor.surface.surfaceSetTool({ type: "flood-fill" });
                 }
               }}
             >
@@ -298,7 +298,7 @@ function BitmapEditModeAuxiliaryToolbar() {
             variant="ghost"
             size="icon"
             className="p-0.5"
-            onClick={editor.surfaceTryExitContentEditMode}
+            onClick={editor.surface.surfaceTryExitContentEditMode.bind(editor)}
           >
             <Cross2Icon className="w-3.5 h-3.5" />
           </Button>
@@ -368,7 +368,7 @@ function ClipboardColor() {
       >
         <ColorPicker
           color={color}
-          onColorChange={editor.a11ySetClipboardColor.bind(editor)}
+          onColorChange={editor.surface.a11ySetClipboardColor.bind(editor)}
           options={options}
         />
       </PopoverContent>

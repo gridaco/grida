@@ -20,7 +20,7 @@ export function NodeOverlayCornerRadiusHandle({
   const bind = useGesture({
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.surfaceStartCornerRadiusGesture(node_id, anchor);
+      editor.surface.surfaceStartCornerRadiusGesture(node_id, anchor);
     },
   });
 
