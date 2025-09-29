@@ -1,10 +1,48 @@
 "use client";
-import React, { useEffect, useLayoutEffect, useState } from "react";
-import { Scene } from "@grida/canvas-wasm";
+import React, { useLayoutEffect, useRef } from "react";
 import { useSize } from "@/grida-canvas-react/viewport/size";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
-import { useGrida2D } from "./use-grida2d";
+import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
+
+import init, { type Scene } from "@grida/canvas-wasm";
+import locateFile from "./locate-file";
+
+export function useGrida2D(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  onMount?: (surface: Scene) => void
+) {
+  const rendererRef = useRef<Scene | null>(null);
+  const isInitializedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (canvasRef.current && !isInitializedRef.current) {
+      const canvasel = canvasRef.current;
+      isInitializedRef.current = true;
+
+      init({
+        locateFile: locateFile,
+      }).then((factory) => {
+        const grida = factory.createWebGLCanvasSurface(canvasel);
+        grida.runtime_renderer_set_cache_tile(false);
+        // grida.setDebug(true);
+        // grida.setVerbose(true);
+
+        rendererRef.current = grida;
+        onMount?.(grida);
+        console.log("grida wasm initialized");
+
+        if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
+          // grida.setVerbose(true);
+          // grida.setDebug(true);
+          console.log("wasm::factory", factory.module);
+        }
+      });
+    }
+  }, [canvasRef]);
+
+  return rendererRef;
+}
 
 function CanvasContent({
   width,
@@ -119,54 +157,6 @@ function CanvasContent({
       className={className}
     />
   );
-}
-
-function useDPR() {
-  const [dpr, setDPR] = useState<number>(() => {
-    if (typeof window === "undefined") {
-      return 1;
-    }
-    const ratio = window.devicePixelRatio;
-    return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
-  });
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const update = () => {
-      const ratio = window.devicePixelRatio;
-      const next = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
-      setDPR((prev) => (Math.abs(prev - next) > 1e-3 ? next : prev));
-    };
-
-    update();
-
-    window.addEventListener("resize", update);
-    window.addEventListener("orientationchange", update);
-
-    let mediaQuery: MediaQueryList | null = null;
-    let mediaQueryListener: ((event: MediaQueryListEvent) => void) | null =
-      null;
-
-    // Listen for DPR changes (e.g., when moving between displays or browser zoom)
-    if (typeof window.matchMedia === "function") {
-      mediaQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
-      mediaQueryListener = () => update();
-      mediaQuery.addEventListener("change", mediaQueryListener);
-    }
-
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("orientationchange", update);
-      if (mediaQuery && mediaQueryListener) {
-        mediaQuery.removeEventListener("change", mediaQueryListener);
-      }
-    };
-  }, [dpr]);
-
-  return dpr;
 }
 
 export default function Canvas({
