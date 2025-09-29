@@ -236,32 +236,102 @@ export default function CanvasPlayground({
   const instance = useEditor(document, backend);
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
-  const [ready, setIsReady] = useState(false);
+  const [documentReady, setDocumentReady] = useState(() => !src);
+  const [canvasReady, setCanvasReady] = useState(() => backend !== "canvas");
+  const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(
+    null
+  );
+  const handleCanvasRef = useCallback((node: HTMLCanvasElement | null) => {
+    setCanvasElement(node);
+  }, []);
 
   useEffect(() => {
-    if (ready) return;
-    if (src) {
-      fetch(src)
-        .then((res) => {
-          res.json().then((file) => {
-            instance.reset(
-              editor.state.init({
-                editable: true,
-                document: file.document,
-              }),
-              src
-            );
-          });
-        })
-        .finally(() => {
-          setIsReady(true);
-        });
-    } else {
-      if (document) {
-        setIsReady(true);
-      }
+    if (backend !== "canvas") {
+      setCanvasReady(true);
+      return;
     }
-  }, [src]);
+
+    if (!canvasElement) {
+      setCanvasReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCanvasReady(false);
+
+    instance
+      .mount(canvasElement)
+      .then(() => {
+        if (!cancelled) {
+          setCanvasReady(true);
+        }
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        toast.error("Failed to mount canvas surface");
+        console.error("Failed to mount canvas surface", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [backend, canvasElement, instance]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!src) {
+      setDocumentReady(!!document);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const controller = new AbortController();
+    setDocumentReady(false);
+
+    const load = async () => {
+      try {
+        const res = await fetch(src, { signal: controller.signal });
+        if (!res.ok) {
+          throw new Error(
+            `Failed to fetch document: ${res.status} ${res.statusText}`
+          );
+        }
+        const file = await res.json();
+        if (cancelled) {
+          return;
+        }
+        instance.reset(
+          editor.state.init({
+            editable: true,
+            document: file.document,
+          }),
+          src
+        );
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error("Failed to load playground document", error);
+      } finally {
+        if (!cancelled) {
+          setDocumentReady(true);
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [document, instance, src]);
+
+  const ready = documentReady && canvasReady;
 
   return (
     <>
@@ -274,7 +344,7 @@ export default function CanvasPlayground({
                 <StandaloneDocumentEditor editor={instance}>
                   <WindowGlobalCurrentEditorProvider />
                   <UserCustomTemplatesProvider templates={templates}>
-                    <Consumer backend={backend} />
+                    <Consumer backend={backend} canvasRef={handleCanvasRef} />
                   </UserCustomTemplatesProvider>
                 </StandaloneDocumentEditor>
               </FontFamilyListProvider>
@@ -286,9 +356,14 @@ export default function CanvasPlayground({
   );
 }
 
-function Consumer({ backend }: { backend: "dom" | "canvas" }) {
+function Consumer({
+  backend,
+  canvasRef,
+}: {
+  backend: "dom" | "canvas";
+  canvasRef?: (canvas: HTMLCanvasElement | null) => void;
+}) {
   const { ui, toggleVisibility, toggleMinimal } = useUILayout();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const instance = useCurrentEditor();
   const debug = useEditorState(instance, (state) => state.debug);
 
@@ -337,12 +412,6 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
       preventDefault: true,
     }
   );
-
-  useEffect(() => {
-    if (canvasRef.current) {
-      instance.mount(canvasRef.current);
-    }
-  }, [canvasRef.current]);
 
   const onExport = () => {
     const blob = instance.archive();
