@@ -291,7 +291,7 @@ export function ChunkPaints({
 
   const handleSelectGradientStop = React.useCallback(
     (paintIndex: number, stop: number) => {
-      instance.selectGradientStop(node_id, stop, {
+      instance.surfaceSelectGradientStop(node_id, stop, {
         paintTarget,
         paintIndex,
       });
@@ -313,14 +313,14 @@ export function ChunkPaints({
           case "radial_gradient":
           case "sweep_gradient":
           case "diamond_gradient": {
-            instance.tryEnterContentEditMode(node_id, "paint/gradient", {
+            instance.surfaceTryEnterContentEditMode(node_id, "paint/gradient", {
               paintTarget,
               paintIndex,
             });
             break;
           }
           case "image": {
-            instance.tryEnterContentEditMode(node_id, "paint/image", {
+            instance.surfaceTryEnterContentEditMode(node_id, "paint/image", {
               paintTarget,
               paintIndex,
             });
@@ -330,7 +330,7 @@ export function ChunkPaints({
       } else {
         // User closed the paint
         setOpenPaintIndex(null);
-        instance.tryExitContentEditMode();
+        instance.surfaceTryExitContentEditMode();
       }
     },
     [instance, node_id, paintTarget, paintList]

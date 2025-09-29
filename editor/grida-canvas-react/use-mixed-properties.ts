@@ -75,19 +75,19 @@ export function useMixedProperties(ids: string[]) {
   const rotation = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.rotation?.ids.forEach((id) => {
-        instance.changeNodeRotation(id, change);
+        instance.changeNodePropertyRotation(id, change);
       });
     },
-    [mixedProperties.rotation?.ids, instance.changeNodeRotation]
+    [mixedProperties.rotation?.ids, instance.changeNodePropertyRotation]
   );
 
   const opacity = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.opacity?.ids.forEach((id) => {
-        instance.changeNodeOpacity(id, change);
+        instance.changeNodePropertyOpacity(id, change);
       });
     },
-    [mixedProperties.opacity?.ids, instance.changeNodeOpacity]
+    [mixedProperties.opacity?.ids, instance.changeNodePropertyOpacity]
   );
 
   const width = useCallback(
@@ -111,10 +111,10 @@ export function useMixedProperties(ids: string[]) {
   const positioningMode = useCallback(
     (position: grida.program.nodes.i.IPositioning["position"]) => {
       mixedProperties.position?.ids.forEach((id) => {
-        instance.changeNodePositioningMode(id, position);
+        instance.changeNodePropertyPositioningMode(id, position);
       });
     },
-    [mixedProperties.position?.ids, instance.changeNodePositioningMode]
+    [mixedProperties.position?.ids, instance.changeNodePropertyPositioningMode]
   );
 
   const fontFamily = useCallback(
@@ -247,16 +247,16 @@ export function useMixedProperties(ids: string[]) {
   const fit = useCallback(
     (value: cg.BoxFit) => {
       mixedProperties.fit?.ids.forEach((id) => {
-        instance.changeNodeFit(id, value);
+        instance.changeNodePropertyFit(id, value);
       });
     },
-    [mixedProperties.fit?.ids, instance.changeNodeFit]
+    [mixedProperties.fit?.ids, instance.changeNodePropertyFit]
   );
 
   const fill = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
       const paints = value === null ? [] : [value as cg.Paint];
-      instance.changeNodeFills(ids, paints);
+      instance.changeNodePropertyFills(ids, paints);
     },
     [ids, instance]
   );
@@ -264,7 +264,7 @@ export function useMixedProperties(ids: string[]) {
   const stroke = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
       const paints = value === null ? [] : [value as cg.Paint];
-      instance.changeNodeStrokes(ids, paints);
+      instance.changeNodePropertyStrokes(ids, paints);
     },
     [ids, instance]
   );
@@ -272,19 +272,19 @@ export function useMixedProperties(ids: string[]) {
   const strokeWidth = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.strokeWidth?.ids.forEach((id) => {
-        instance.changeNodeStrokeWidth(id, change);
+        instance.changeNodePropertyStrokeWidth(id, change);
       });
     },
-    [mixedProperties.strokeWidth?.ids, instance.changeNodeStrokeWidth]
+    [mixedProperties.strokeWidth?.ids, instance.changeNodePropertyStrokeWidth]
   );
 
   const strokeCap = useCallback(
     (value: cg.StrokeCap) => {
       mixedProperties.strokeCap?.ids.forEach((id) => {
-        instance.changeNodeStrokeCap(id, value);
+        instance.changeNodePropertyStrokeCap(id, value);
       });
     },
-    [mixedProperties.strokeCap?.ids, instance.changeNodeStrokeCap]
+    [mixedProperties.strokeCap?.ids, instance.changeNodePropertyStrokeCap]
   );
 
   const layout = useCallback(
@@ -332,19 +332,19 @@ export function useMixedProperties(ids: string[]) {
   const cornerRadius = useCallback(
     (value: cg.CornerRadius) => {
       mixedProperties.cornerRadius?.ids.forEach((id) => {
-        instance.changeNodeCornerRadius(id, value);
+        instance.changeNodePropertyCornerRadius(id, value);
       });
     },
-    [mixedProperties.cornerRadius?.ids, instance.changeNodeCornerRadius]
+    [mixedProperties.cornerRadius?.ids, instance.changeNodePropertyCornerRadius]
   );
 
   const cursor = useCallback(
     (value: cg.SystemMouseCursor) => {
       mixedProperties.cursor?.ids.forEach((id) => {
-        instance.changeNodeMouseCursor(id, value);
+        instance.changeNodePropertyMouseCursor(id, value);
       });
     },
-    [mixedProperties.cursor?.ids, instance.changeNodeMouseCursor]
+    [mixedProperties.cursor?.ids, instance.changeNodePropertyMouseCursor]
   );
 
   const actions = useMemo(
@@ -489,7 +489,7 @@ export function useMixedPaints() {
     ) => {
       const group = paints[index];
       const paintsArray = value === null ? [] : [value as cg.Paint];
-      instance.changeNodeFills(group.ids, paintsArray);
+      instance.changeNodePropertyFills(group.ids, paintsArray);
     },
     [paints, instance]
   );

@@ -60,7 +60,7 @@ export function useDataTransferEventTarget() {
         clientY: number;
       }
     ) => {
-      const [x, y] = instance.clientPointToCanvasPoint(
+      const [x, y] = instance.camera.clientPointToCanvasPoint(
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
@@ -86,7 +86,7 @@ export function useDataTransferEventTarget() {
         clientY: number;
       }
     ) => {
-      const [x, y] = instance.clientPointToCanvasPoint(
+      const [x, y] = instance.camera.clientPointToCanvasPoint(
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
@@ -138,7 +138,7 @@ export function useDataTransferEventTarget() {
           ? node.$.height / 2
           : 0;
 
-      const [x, y] = instance.clientPointToCanvasPoint(
+      const [x, y] = instance.camera.clientPointToCanvasPoint(
         cmath.vector2.sub(
           position ? [position.clientX, position.clientY] : [0, 0],
           [center_dx, center_dy]

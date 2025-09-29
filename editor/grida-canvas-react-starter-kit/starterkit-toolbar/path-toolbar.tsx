@@ -24,7 +24,7 @@ export function PathToolbar() {
         size="sm"
         value={tool.type}
         onValueChange={(v) => {
-          editor.setTool({ type: v as "cursor" | "lasso" | "bend" });
+          editor.surfaceSetTool({ type: v as "cursor" | "lasso" | "bend" });
         }}
         className="gap-2"
       >
@@ -89,7 +89,7 @@ export function PathToolbar() {
             variant="ghost"
             size="sm"
             onClick={() => {
-              editor.tryExitContentEditMode();
+              editor.surfaceTryExitContentEditMode();
             }}
           >
             <Cross2Icon className="size-4" />

@@ -145,7 +145,7 @@ function CanvasConsumer() {
       prompt: value.text,
     })
       .then((image) => {
-        editor.changeNodeSrc(id, image.src);
+        editor.changeNodePropertySrc(id, image.src);
       })
       .finally(() => {
         credits.refresh();

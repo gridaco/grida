@@ -185,7 +185,7 @@ function FormStartPageControl() {
             properties={properties!}
             props={shallowProps}
             onValueChange={(k, v) => {
-              editor.changeNodeProps("page", k, v);
+              editor.changeNodePropertyProps("page", k, v);
             }}
           />
         </SidebarMenuSectionContent>

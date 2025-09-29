@@ -113,71 +113,72 @@ export function useNodeActions(node_id: string | undefined) {
     return {
       toggleLocked: () => instance.toggleNodeLocked(node_id),
       toggleActive: () => instance.toggleNodeActive(node_id),
-      toggleBold: () => instance.toggleNodeBold(node_id),
-      toggleItalic: () => instance.toggleNodeItalic(node_id),
-      toggleUnderline: () => instance.toggleNodeUnderline(node_id),
-      toggleLineThrough: () => instance.toggleNodeLineThrough(node_id),
+      toggleBold: () => instance.toggleTextNodeBold(node_id),
+      toggleItalic: () => instance.toggleTextNodeItalic(node_id),
+      toggleUnderline: () => instance.toggleTextNodeUnderline(node_id),
+      toggleLineThrough: () => instance.toggleTextNodeLineThrough(node_id),
       component: (component_id: string) =>
-        instance.changeNodeComponent(node_id, component_id),
+        instance.changeNodePropertyComponent(node_id, component_id),
       text: (text: tokens.StringValueExpression | null) =>
-        instance.changeNodeText(node_id, text),
+        instance.changeNodePropertyText(node_id, text),
       style: (
         key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
         value: any
-      ) => instance.changeNodeStyle(node_id, key, value),
+      ) => instance.changeNodePropertyStyle(node_id, key, value),
       value: (key: string, value: any) =>
-        instance.changeNodeProps(node_id, key, value),
+        instance.changeNodePropertyProps(node_id, key, value),
       // attributes
       userdata: (value: any) => instance.changeNodeUserData(node_id, value),
       name: (name: string) => instance.changeNodeName(node_id, name),
       active: (active: boolean) => instance.changeNodeActive(node_id, active),
       locked: (locked: boolean) => instance.changeNodeLocked(node_id, locked),
       src: (src?: tokens.StringValueExpression) =>
-        instance.changeNodeSrc(node_id, src),
+        instance.changeNodePropertySrc(node_id, src),
       href: (href?: grida.program.nodes.i.IHrefable["href"]) =>
-        instance.changeNodeHref(node_id, href),
+        instance.changeNodePropertyHref(node_id, href),
       target: (target?: grida.program.nodes.i.IHrefable["target"]) =>
-        instance.changeNodeTarget(node_id, target),
+        instance.changeNodePropertyTarget(node_id, target),
 
       positioning: (value: grida.program.nodes.i.IPositioning) =>
-        instance.changeNodePositioning(node_id, value),
+        instance.changeNodePropertyPositioning(node_id, value),
       positioningMode: (value: "absolute" | "relative") =>
-        instance.changeNodePositioningMode(node_id, value),
+        instance.changeNodePropertyPositioningMode(node_id, value),
 
       //
       cornerRadius: (value: cg.CornerRadius) =>
-        instance.changeNodeCornerRadius(node_id, value),
+        instance.changeNodePropertyCornerRadius(node_id, value),
       cornerRadiusDelta: (delta: number) =>
-        instance.changeNodeCornerRadiusWithDelta(node_id, delta),
+        instance.changeNodePropertyCornerRadiusWithDelta(node_id, delta),
       pointCount: (value: number) =>
-        instance.changeNodePointCount(node_id, value),
+        instance.changeNodePropertyPointCount(node_id, value),
       innerRadius: (value: number) =>
-        instance.changeNodeInnerRadius(node_id, value),
+        instance.changeNodePropertyInnerRadius(node_id, value),
       arcData: (value: grida.program.nodes.i.IEllipseArcData) =>
-        instance.changeNodeArcData(node_id, value),
-      fills: (fills: cg.Paint[]) => instance.changeNodeFills(node_id, fills),
+        instance.changeNodePropertyArcData(node_id, value),
+      fills: (fills: cg.Paint[]) =>
+        instance.changeNodePropertyFills(node_id, fills),
       strokes: (strokes: cg.Paint[]) =>
-        instance.changeNodeStrokes(node_id, strokes),
+        instance.changeNodePropertyStrokes(node_id, strokes),
       addFill: (fill: cg.Paint, at?: "start" | "end") =>
         instance.addNodeFill(node_id, fill, at),
       addStroke: (stroke: cg.Paint, at?: "start" | "end") =>
         instance.addNodeStroke(node_id, stroke, at),
       strokeWidth: (change: editor.api.NumberChange) =>
-        instance.changeNodeStrokeWidth(node_id, change),
+        instance.changeNodePropertyStrokeWidth(node_id, change),
       strokeAlign: (value: cg.StrokeAlign) =>
-        instance.changeNodeStrokeAlign(node_id, value),
+        instance.changeNodePropertyStrokeAlign(node_id, value),
       strokeCap: (value: cg.StrokeCap) =>
-        instance.changeNodeStrokeCap(node_id, value),
-      fit: (value: cg.BoxFit) => instance.changeNodeFit(node_id, value),
+        instance.changeNodePropertyStrokeCap(node_id, value),
+      fit: (value: cg.BoxFit) => instance.changeNodePropertyFit(node_id, value),
       // stylable
       opacity: (change: editor.api.NumberChange) =>
-        instance.changeNodeOpacity(node_id, change),
+        instance.changeNodePropertyOpacity(node_id, change),
       blendMode: (value: cg.LayerBlendMode) =>
-        instance.changeNodeBlendMode(node_id, value),
+        instance.changeNodePropertyBlendMode(node_id, value),
       maskType: (value: cg.LayerMaskType) =>
         instance.changeNodeMaskType(node_id, value),
       rotation: (change: editor.api.NumberChange) =>
-        instance.changeNodeRotation(node_id, change),
+        instance.changeNodePropertyRotation(node_id, change),
       width: (value: grida.program.css.LengthPercentage | "auto") =>
         instance.changeNodeSize(node_id, "width", value),
       height: (value: grida.program.css.LengthPercentage | "auto") =>
@@ -237,7 +238,7 @@ export function useNodeActions(node_id: string | undefined) {
 
       // border
       border: (value: grida.program.css.Border | undefined) =>
-        instance.changeNodeBorder(node_id, value),
+        instance.changeNodePropertyBorder(node_id, value),
 
       padding: (value: grida.program.nodes.i.IPadding["padding"]) =>
         instance.changeContainerNodePadding(node_id, value),
@@ -265,9 +266,9 @@ export function useNodeActions(node_id: string | undefined) {
 
       // css style
       aspectRatio: (value?: number) =>
-        instance.changeNodeStyle(node_id, "aspectRatio", value),
+        instance.changeNodePropertyStyle(node_id, "aspectRatio", value),
       cursor: (value: cg.SystemMouseCursor) =>
-        instance.changeNodeMouseCursor(node_id, value),
+        instance.changeNodePropertyMouseCursor(node_id, value),
     };
   }, [node_id, instance]);
 }
@@ -746,7 +747,7 @@ export function useRootTemplateInstanceNode(root_id: string) {
 
   const changeRootProps = useCallback(
     (key: string, value: any) => {
-      editor.changeNodeProps(root_id, key, value);
+      editor.changeNodePropertyProps(root_id, key, value);
     },
     [editor, root_id]
   );

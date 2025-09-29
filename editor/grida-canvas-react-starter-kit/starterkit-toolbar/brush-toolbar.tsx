@@ -301,7 +301,7 @@ function EyedropButton() {
       open()?.then((result) => {
         const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
         // editor clipboard
-        editor.setClipboardColor(rgba);
+        editor.a11ySetClipboardColor(rgba);
       });
     } else {
       toast.error("This feature is not supported in your browser.");

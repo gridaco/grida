@@ -18,7 +18,7 @@ import {
 
 export type ReducerContext = {
   geometry: editor.api.IDocumentGeometryQuery;
-  vector?: editor.api.IVectorInterfaceActions;
+  vector?: editor.api.IDocumentVectorInterfaceActions;
   viewport: {
     width: number;
     height: number;

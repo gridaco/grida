@@ -77,11 +77,11 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
               }
               stopPropagation(e);
             }}
-            onBlur={() => editor.tryExitContentEditMode()}
+            onBlur={() => editor.surfaceTryExitContentEditMode()}
             html={node.text as string}
             onChange={(e) => {
               const txt = e.currentTarget.textContent;
-              editor.changeNodeText(node_id, txt);
+              editor.changeNodePropertyText(node_id, txt);
             }}
             style={{
               width: "100%",

@@ -470,12 +470,12 @@ function LocalFakeCursorChat() {
   });
 
   const handleValueChange = (value: string) => {
-    instance.setCursorChatMessage(value);
+    instance.updateCursorChatMessage(value);
   };
 
   const handleValueCommit = (value: string) => {
     // Clear message after commit
-    instance.setCursorChatMessage(null);
+    instance.updateCursorChatMessage(null);
   };
 
   const handleClose = () => {

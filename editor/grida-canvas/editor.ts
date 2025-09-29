@@ -1,8 +1,8 @@
 import produce from "immer";
 import { Action, editor } from ".";
 import reducer, { _internal_reducer } from "./reducers";
-import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
+import grida from "@grida/schema";
 import cg from "@grida/cg";
 import nid from "./reducers/tools/id";
 import type { tokens } from "@grida/tokens";
@@ -17,8 +17,7 @@ import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
 import type { Scene } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
-import * as google from "@grida/fonts/google";
-
+import * as googlefonts from "@grida/fonts/google";
 import { DocumentFontManager } from "./font-manager";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
@@ -67,32 +66,266 @@ function resolveWithEditorInstance<T>(
   return isWithEditorFunction(value) ? value(instance) : value;
 }
 
+export class Camera implements editor.api.ICameraActions {
+  constructor(
+    readonly editor: Editor,
+    readonly viewport: domapi.DOMViewportApi
+  ) {}
+
+  get transform() {
+    return this.editor.state.transform;
+  }
+
+  set transform(transform: cmath.Transform) {
+    this.editor.dispatch({
+      type: "transform",
+      transform,
+      sync: true,
+    });
+  }
+
+  // #region ICameraActions implementation
+  transformWithSync(transform: cmath.Transform, sync: boolean = true) {
+    this.editor.dispatch({
+      type: "transform",
+      transform,
+      sync,
+    });
+  }
+
+  zoom(delta: number, origin: cmath.Vector2) {
+    const _scale = this.transform[0][0];
+    // the origin point of the zooming point in x, y (surface space)
+    const [ox, oy] = origin;
+
+    // Apply proportional zooming
+    const scale = _scale + _scale * delta;
+
+    const newscale = cmath.clamp(
+      scale,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
+    );
+    const [tx, ty] = cmath.transform.getTranslate(this.transform);
+
+    // calculate the offset that should be applied with scale with css transform.
+    const [newx, newy] = [
+      ox - (ox - tx) * (newscale / _scale),
+      oy - (oy - ty) * (newscale / _scale),
+    ];
+
+    const next: cmath.Transform = [
+      [newscale, this.transform[0][1], newx],
+      [this.transform[1][0], newscale, newy],
+    ];
+
+    this.transform = next;
+  }
+
+  pan(delta: [dx: number, dy: number]) {
+    this.transform = cmath.transform.translate(
+      this.editor.state.transform,
+      delta
+    );
+  }
+
+  scale(
+    factor: number | cmath.Vector2,
+    origin: cmath.Vector2 | "center" = "center"
+  ) {
+    const { transform } = this.editor.state;
+    const [fx, fy] = typeof factor === "number" ? [factor, factor] : factor;
+    const _scale = transform[0][0];
+    let ox, oy: number;
+    if (origin === "center") {
+      // Canvas size (you need to know or pass this)
+      const { width, height } = this.viewport.size;
+
+      // Calculate the absolute transform origin
+      ox = width / 2;
+      oy = height / 2;
+    } else {
+      [ox, oy] = origin;
+    }
+
+    const sx = cmath.clamp(
+      fx,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
+    );
+
+    const sy = cmath.clamp(
+      fy,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
+    );
+
+    const [tx, ty] = cmath.transform.getTranslate(transform);
+
+    // calculate the offset that should be applied with scale with css transform.
+    const [newx, newy] = [
+      ox - (ox - tx) * (sx / _scale),
+      oy - (oy - ty) * (sy / _scale),
+    ];
+
+    const next: cmath.Transform = [
+      [sx, transform[0][1], newx],
+      [transform[1][0], sy, newy],
+    ];
+
+    this.transform = next;
+  }
+
+  /**
+   * Transform to fit
+   */
+  fit(
+    selector: grida.program.document.Selector,
+    options: {
+      margin?: number | [number, number, number, number];
+      animate?: boolean;
+    } = {
+      margin: 64,
+      animate: false,
+    }
+  ) {
+    const { document_ctx, selection, transform } = this.editor.state;
+    const ids = dq.querySelector(document_ctx, selection, selector);
+
+    const rects = ids
+      .map((id) => this.editor.geometry.getNodeAbsoluteBoundingRect(id))
+      .filter((r) => r) as cmath.Rectangle[];
+
+    if (rects.length === 0) {
+      return;
+    }
+
+    const area = cmath.rect.union(rects);
+
+    const { width, height } = this.viewport.size;
+    const view = { x: 0, y: 0, width, height };
+
+    const next_transform = cmath.ext.viewport.transformToFit(
+      view,
+      area,
+      options.margin
+    );
+
+    if (options.animate) {
+      animateTransformTo(transform, next_transform, (t) => {
+        this.transform = t;
+      });
+    } else {
+      this.transform = next_transform;
+    }
+  }
+
+  zoomIn() {
+    const { transform } = this.editor.state;
+    const prevscale = transform[0][0];
+    const nextscale = cmath.quantize(prevscale * 2, 0.01);
+
+    this.scale(nextscale);
+  }
+
+  zoomOut() {
+    const prevscale = this.transform[0][0];
+    const nextscale = cmath.quantize(prevscale / 2, 0.01);
+
+    this.scale(nextscale);
+  }
+  // #endregion ICameraActions implementation
+
+  /**
+   * Convert a point in client (window) to viewport relative (offset applied) point.
+   * @param pointer_event
+   * @returns viewport relative point
+   */
+  public pointerEventToViewportPoint = (
+    pointer_event: PointerEvent | MouseEvent
+  ) => {
+    const { clientX, clientY } = pointer_event;
+
+    const [x, y] = this.viewport.offset;
+    const position = {
+      x: clientX - x,
+      y: clientY - y,
+    };
+
+    return position;
+  };
+
+  /**
+   * Convert a point in client (window) space to canvas space.
+   * @param point
+   * @returns canvas space point
+   *
+   * @example
+   * ```ts
+   * const canvasPoint = editor.clientPointToCanvasPoint([event.clientX, event.clientY]);
+   * ```
+   */
+  public clientPointToCanvasPoint(point: cmath.Vector2): cmath.Vector2 {
+    const [clientX, clientY] = point;
+    const [offsetX, offsetY] = this.viewport.offset;
+
+    // Convert from client coordinates to viewport coordinates
+    const viewportX = clientX - offsetX;
+    const viewportY = clientY - offsetY;
+
+    // Apply inverse transform to convert from viewport space to canvas space
+    const inverseTransform = cmath.transform.invert(this.transform);
+    const canvasPoint = cmath.vector2.transform(
+      [viewportX, viewportY],
+      inverseTransform
+    );
+
+    return canvasPoint;
+  }
+
+  /**
+   * Convert a point in canvas space to client (window) space.
+   * @param point
+   * @returns client space point
+   *
+   * @example
+   * ```ts
+   * const clientPoint = editor.canvasPointToClientPoint([500, 500]);
+   * ```
+   */
+  public canvasPointToClientPoint(point: cmath.Vector2): cmath.Vector2 {
+    // Apply transform to convert from canvas space to viewport space
+    const viewportPoint = cmath.vector2.transform(point, this.transform);
+
+    // Convert from viewport coordinates to client coordinates
+    const [offsetX, offsetY] = this.viewport.offset;
+    const clientX = viewportPoint[0] + offsetX;
+    const clientY = viewportPoint[1] + offsetY;
+
+    return [clientX, clientY];
+  }
+}
+
 export class Editor
   implements
-    editor.api.IDocumentEditorActions,
+    editor.api.IDocumentActions,
+    editor.api.IDocumentNodeChangeActions,
     editor.api.IDocumentGeometryQuery,
-    editor.api.ISchemaActions,
-    editor.api.INodeChangeActions,
-    editor.api.IBrushToolActions,
-    editor.api.IPixelGridActions,
-    editor.api.IRulerActions,
-    editor.api.IGuide2DActions,
-    editor.api.ICameraActions,
-    editor.api.IEventTargetActions,
-    editor.api.IFollowPluginActions,
-    editor.api.IVectorInterfaceActions,
-    editor.api.IDocumentImageInterfaceActions,
-    editor.api.IFontLoaderActions,
-    editor.api.IExportPluginActions,
-    editor.api.ICursorChatActions
+    editor.api.IDocumentExportPluginActions,
+    editor.api.IDocumentSchemaActions_Experimental,
+    editor.api.IDocumentBrushToolActions,
+    editor.api.IDocumentVectorInterfaceActions,
+    editor.api.IEditorSurfaceActions,
+    editor.api.IEditorA11yActions,
+    editor.api.ISurfaceMultiplayerFollowPluginActions,
+    editor.api.ISurfaceMultiplayerCursorChatActions
 {
   private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
+  readonly camera: Camera;
 
   readonly backend: editor.EditorContentRenderingBackend;
-
-  readonly viewport: domapi.DOMViewportApi;
 
   private _m_wasm_canvas_scene: Scene | null = null;
 
@@ -170,9 +403,9 @@ export class Editor
     };
   }) {
     this.backend = backend;
+    this.camera = new Camera(this, new domapi.DOMViewportApi(viewportElement));
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
-    this.viewport = new domapi.DOMViewportApi(viewportElement);
     this._m_geometry =
       typeof geometry === "function" ? geometry(this) : geometry;
     //
@@ -231,7 +464,7 @@ export class Editor
    */
   private _do_legacy_warmup() {
     // warm up
-    google.fetchWebfontList().then((webfontlist) => {
+    googlefonts.fetchWebfontList().then((webfontlist) => {
       this.__internal_dispatch({
         type: "__internal/webfonts#webfontList",
         webfontlist,
@@ -352,80 +585,11 @@ export class Editor
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
-    const blob = new Blob([io.archive.pack(documentData)], {
+    const blob = new Blob([io.archive.pack(documentData) as BlobPart], {
       type: "application/zip",
     });
 
     return blob;
-  }
-
-  /**
-   * Convert a point in client (window) to viewport relative (offset applied) point.
-   * @param pointer_event
-   * @returns viewport relative point
-   */
-  private pointerEventToViewportPoint = (
-    pointer_event: PointerEvent | MouseEvent
-  ) => {
-    const { clientX, clientY } = pointer_event;
-
-    const [x, y] = this.viewport.offset;
-    const position = {
-      x: clientX - x,
-      y: clientY - y,
-    };
-
-    return position;
-  };
-
-  /**
-   * Convert a point in client (window) space to canvas space.
-   * @param point
-   * @returns canvas space point
-   *
-   * @example
-   * ```ts
-   * const canvasPoint = editor.clientPointToCanvasPoint([event.clientX, event.clientY]);
-   * ```
-   */
-  public clientPointToCanvasPoint(point: cmath.Vector2): cmath.Vector2 {
-    const [clientX, clientY] = point;
-    const [offsetX, offsetY] = this.viewport.offset;
-
-    // Convert from client coordinates to viewport coordinates
-    const viewportX = clientX - offsetX;
-    const viewportY = clientY - offsetY;
-
-    // Apply inverse transform to convert from viewport space to canvas space
-    const inverseTransform = cmath.transform.invert(this.mstate.transform);
-    const canvasPoint = cmath.vector2.transform(
-      [viewportX, viewportY],
-      inverseTransform
-    );
-
-    return canvasPoint;
-  }
-
-  /**
-   * Convert a point in canvas space to client (window) space.
-   * @param point
-   * @returns client space point
-   *
-   * @example
-   * ```ts
-   * const clientPoint = editor.canvasPointToClientPoint([500, 500]);
-   * ```
-   */
-  public canvasPointToClientPoint(point: cmath.Vector2): cmath.Vector2 {
-    // Apply transform to convert from canvas space to viewport space
-    const viewportPoint = cmath.vector2.transform(point, this.mstate.transform);
-
-    // Convert from viewport coordinates to client coordinates
-    const [offsetX, offsetY] = this.viewport.offset;
-    const clientX = viewportPoint[0] + offsetX;
-    const clientY = viewportPoint[1] + offsetY;
-
-    return [clientX, clientY];
   }
 
   private __createNodeId(): editor.NodeID {
@@ -456,15 +620,6 @@ export class Editor
     return dq.getSiblings(this.mstate.document_ctx, node_id);
   }
 
-  public __sync_cursors(
-    cursors: editor.state.IEditorMultiplayerCursorState["cursors"]
-  ) {
-    this.reduce((state) => {
-      state.cursors = cursors;
-      return state;
-    });
-  }
-
   public reduce(
     reducer: (
       state: editor.state.IEditorState
@@ -489,8 +644,8 @@ export class Editor
       geometry: this,
       vector: this,
       viewport: {
-        width: this.viewport.size.width,
-        height: this.viewport.size.height,
+        width: this.camera.viewport.size.width,
+        height: this.camera.viewport.size.height,
       },
       backend: this.backend,
       // TODO: LEGACY_PAINT_MODEL
@@ -511,8 +666,8 @@ export class Editor
           geometry: this,
           vector: this,
           viewport: {
-            width: this.viewport.size.width,
-            height: this.viewport.size.height,
+            width: this.camera.viewport.size.width,
+            height: this.camera.viewport.size.height,
           },
           backend: this.backend,
           // TODO: LEGACY_PAINT_MODEL
@@ -698,7 +853,7 @@ export class Editor
     }
 
     // For DOM backend, we need to get dimensions
-    const imageUrl = url || URL.createObjectURL(new Blob([data]));
+    const imageUrl = url || URL.createObjectURL(new Blob([data as BlobPart]));
 
     const { width, height } = await new Promise<{
       width: number;
@@ -733,7 +888,7 @@ export class Editor
 
   // #endregion
 
-  setTool(tool: editor.state.ToolMode, debug_label?: string) {
+  surfaceSetTool(tool: editor.state.ToolMode, debug_label?: string) {
     if (debug_label) this.log("debug:setTool", tool, debug_label);
 
     this.dispatch({
@@ -747,7 +902,7 @@ export class Editor
    *
    * when triggered on such invalid context, it should be a no-op
    */
-  tryEnterContentEditMode(
+  surfaceTryEnterContentEditMode(
     node_id?: string,
     mode: "auto" | "paint/gradient" | "paint/image" = "auto",
     options?: {
@@ -788,17 +943,17 @@ export class Editor
     }
   }
 
-  tryExitContentEditMode() {
+  surfaceTryExitContentEditMode() {
     this.dispatch({
       type: "surface/content-edit-mode/try-exit",
     });
   }
 
-  tryToggleContentEditMode() {
+  surfaceTryToggleContentEditMode() {
     if (this.mstate.content_edit_mode) {
-      this.tryExitContentEditMode();
+      this.surfaceTryExitContentEditMode();
     } else {
-      this.tryEnterContentEditMode();
+      this.surfaceTryEnterContentEditMode();
     }
   }
 
@@ -824,74 +979,6 @@ export class Editor
     }
 
     return ids;
-  }
-
-  private _stackEscapeSteps(
-    state: editor.state.IEditorState
-  ): editor.a11y.EscapeStep[] {
-    const steps: editor.a11y.EscapeStep[] = [];
-
-    if (!state.content_edit_mode) {
-      // p1. if the tool is selected, escape the tool
-      if (state.tool.type !== "cursor") {
-        steps.push("escape-tool");
-      }
-      // p2. if the selection is not empty, escape the selection
-      if (state.selection.length > 0) {
-        steps.push("escape-selection");
-      }
-    } else {
-      switch (state.content_edit_mode.type) {
-        case "vector": {
-          const { selected_vertices, selected_segments, selected_tangents } =
-            state.content_edit_mode.selection;
-          const hasSelection =
-            selected_vertices.length > 0 ||
-            selected_segments.length > 0 ||
-            selected_tangents.length > 0;
-
-          // p1. if the selection is not empty, escape the selection
-          if (hasSelection) {
-            steps.push("escape-selection");
-          }
-
-          // p2. if the tool is selected, escape the tool
-          if (state.tool.type !== "cursor") {
-            steps.push("escape-tool");
-          }
-          break;
-        }
-        case "paint/gradient":
-        case "paint/image": {
-          break;
-        }
-      }
-
-      // p3. if the content edit mode is active, escape the content edit mode
-      steps.push("escape-content-edit-mode");
-    }
-
-    return steps;
-  }
-
-  public a11yEscape() {
-    const step = this._stackEscapeSteps(this.mstate)[0];
-
-    switch (step) {
-      case "escape-tool": {
-        this.setTool({ type: "cursor" }, "a11yEscape");
-        break;
-      }
-      case "escape-selection": {
-        this.blur("a11yEscape");
-        break;
-      }
-      case "escape-content-edit-mode":
-      default: {
-        this.tryExitContentEditMode();
-        break;
-      }
-    }
   }
 
   public blur(debug_label?: string) {
@@ -943,7 +1030,7 @@ export class Editor
     if (ids.length === 0) return false;
     const id = ids[0];
     const data = await this.exportNodeAs(id, "PNG");
-    const blob = new Blob([data], { type: "image/png" });
+    const blob = new Blob([data as BlobPart], { type: "image/png" });
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
     return true;
   }
@@ -974,62 +1061,6 @@ export class Editor
     }
 
     return true;
-  }
-
-  public async a11yCopyAsImage(format: "png"): Promise<boolean> {
-    if (this.mstate.content_edit_mode?.type === "vector") {
-      const { selected_vertices, selected_segments, selected_tangents } =
-        this.mstate.content_edit_mode.selection;
-      const hasSelection =
-        selected_vertices.length > 0 ||
-        selected_segments.length > 0 ||
-        selected_tangents.length > 0;
-      if (!hasSelection) return false;
-    } else {
-      if (this.mstate.selection.length === 0) return false;
-    }
-    return await this.writeClipboardMedia("selection", format);
-  }
-
-  public async a11yCopyAsSVG(): Promise<boolean> {
-    if (this.mstate.content_edit_mode?.type === "vector") {
-      const { selected_vertices, selected_segments, selected_tangents } =
-        this.mstate.content_edit_mode.selection;
-      const hasSelection =
-        selected_vertices.length > 0 ||
-        selected_segments.length > 0 ||
-        selected_tangents.length > 0;
-      if (!hasSelection) return false;
-    } else {
-      if (this.mstate.selection.length === 0) return false;
-    }
-
-    return await this.writeClipboardSVG("selection");
-  }
-
-  public a11yCopy() {
-    if (this.mstate.content_edit_mode?.type === "vector") {
-      const { selected_vertices, selected_segments, selected_tangents } =
-        this.mstate.content_edit_mode.selection;
-      const hasSelection =
-        selected_vertices.length > 0 ||
-        selected_segments.length > 0 ||
-        selected_tangents.length > 0;
-      if (!hasSelection) return;
-    }
-    this.copy("selection");
-  }
-
-  public a11yCut() {
-    this.cut("selection");
-  }
-
-  public a11yPaste() {
-    this.paste();
-  }
-
-  public a11yDelete() {
-    this.dispatch({ type: "a11y/delete" });
   }
 
   public duplicate(target: "selection" | editor.NodeID) {
@@ -1127,13 +1158,6 @@ export class Editor
   public isMask(target: editor.NodeID) {
     const n = this.getNodeSnapshotById(target);
     return "mask" in n && n.mask;
-  }
-
-  public setClipboardColor(color: cg.RGBA8888) {
-    this.dispatch({
-      type: "clip/color",
-      color,
-    });
   }
 
   //
@@ -1266,18 +1290,6 @@ export class Editor
     });
   }
 
-  public updateVectorHoveredControl(
-    hoveredControl: {
-      type: editor.state.VectorContentEditModeHoverableGeometryControlType;
-      index: number;
-    } | null
-  ) {
-    this.dispatch({
-      type: "vector/update-hovered-control",
-      hoveredControl,
-    });
-  }
-
   public bendOrClearCorner(
     node_id: editor.NodeID,
     vertex: number,
@@ -1288,27 +1300,6 @@ export class Editor
       type: "bend-or-clear-corner",
       target: { node_id, vertex, ref },
       tangent,
-    });
-  }
-
-  public selectGradientStop(
-    node_id: editor.NodeID,
-    stop: number,
-    options?: {
-      paintIndex?: number;
-      paintTarget?: "fill" | "stroke";
-    }
-  ): void {
-    const paintTarget = options?.paintTarget ?? "fill";
-    const paintIndex = options?.paintIndex ?? 0;
-    this.dispatch({
-      type: "select-gradient-stop",
-      target: {
-        node_id,
-        stop,
-        paint_index: paintIndex,
-        paint_target: paintTarget,
-      },
     });
   }
 
@@ -1466,19 +1457,6 @@ export class Editor
     return this.getNodeById(id);
   }
 
-  public nudgeResize(
-    target: "selection" | editor.NodeID = "selection",
-    axis: "x" | "y",
-    delta: number = 1
-  ) {
-    this.dispatch({
-      type: "nudge-resize",
-      delta,
-      axis,
-      target,
-    });
-  }
-
   public align(
     target: "selection" | editor.NodeID,
     alignment: {
@@ -1557,8 +1535,62 @@ export class Editor
       target,
     });
   }
+  // #endregion IDocumentEditorActions implementation
 
-  public configureSurfaceRaycastTargeting(
+  // ==============================================================
+  // #region Surface actions
+  // ==============================================================
+
+  public surfaceHoverNode(node_id: string, event: "enter" | "leave") {
+    this.dispatch({
+      type: "hover",
+      target: node_id,
+      event,
+    });
+  }
+
+  public surfaceHoverEnterNode(node_id: string) {
+    this.surfaceHoverNode(node_id, "enter");
+  }
+
+  public surfaceHoverLeaveNode(node_id: string) {
+    this.surfaceHoverNode(node_id, "leave");
+  }
+
+  public surfaceUpdateVectorHoveredControl(
+    hoveredControl: {
+      type: editor.state.VectorContentEditModeHoverableGeometryControlType;
+      index: number;
+    } | null
+  ) {
+    this.dispatch({
+      type: "vector/update-hovered-control",
+      hoveredControl,
+    });
+  }
+
+  public surfaceSelectGradientStop(
+    node_id: editor.NodeID,
+    stop: number,
+    options?: {
+      paintIndex?: number;
+      paintTarget?: "fill" | "stroke";
+    }
+  ): void {
+    const paintTarget = options?.paintTarget ?? "fill";
+    const paintIndex = options?.paintIndex ?? 0;
+    this.dispatch({
+      type: "select-gradient-stop",
+      target: {
+        node_id,
+        stop,
+        paint_index: paintIndex,
+        paint_target: paintTarget,
+      },
+    });
+  }
+
+  public surfaceConfigureSurfaceRaycastTargeting(
     config: Partial<editor.state.HitTestingConfig>
   ) {
     this.dispatch({
@@ -1567,14 +1599,14 @@ export class Editor
     });
   }
 
-  public configureMeasurement(measurement: "on" | "off") {
+  public surfaceConfigureMeasurement(measurement: "on" | "off") {
     this.dispatch({
       type: "config/surface/measurement",
       measurement,
     });
   }
 
-  public configureTranslateWithCloneModifier(
+  public surfaceConfigureTranslateWithCloneModifier(
     translate_with_clone: "on" | "off"
   ) {
     this.dispatch({
@@ -1583,7 +1615,7 @@ export class Editor
     });
   }
 
-  public configureTranslateWithAxisLockModifier(
+  public surfaceConfigureTranslateWithAxisLockModifier(
     tarnslate_with_axis_lock: "on" | "off"
   ) {
     this.dispatch({
@@ -1592,7 +1624,7 @@ export class Editor
     });
   }
 
-  public configureTranslateWithForceDisableSnap(
+  public surfaceConfigureTranslateWithForceDisableSnap(
     translate_with_force_disable_snap: "on" | "off"
   ) {
     this.dispatch({
@@ -1601,7 +1633,7 @@ export class Editor
     });
   }
 
-  public configureTransformWithCenterOriginModifier(
+  public surfaceConfigureTransformWithCenterOriginModifier(
     transform_with_center_origin: "on" | "off"
   ) {
     this.dispatch({
@@ -1610,7 +1642,7 @@ export class Editor
     });
   }
 
-  public configureTransformWithPreserveAspectRatioModifier(
+  public surfaceConfigureTransformWithPreserveAspectRatioModifier(
     transform_with_preserve_aspect_ratio: "on" | "off"
   ) {
     this.dispatch({
@@ -1619,7 +1651,7 @@ export class Editor
     });
   }
 
-  public configureRotateWithQuantizeModifier(
+  public surfaceConfigureRotateWithQuantizeModifier(
     rotate_with_quantize: number | "off"
   ) {
     this.dispatch({
@@ -1628,7 +1660,7 @@ export class Editor
     });
   }
 
-  public configureCurveTangentMirroringModifier(
+  public surfaceConfigureCurveTangentMirroringModifier(
     curve_tangent_mirroring: vn.TangentMirroringMode
   ) {
     this.dispatch({
@@ -1637,15 +1669,7 @@ export class Editor
     });
   }
 
-  /**
-   * Toggles whether the path tool should keep projecting after connecting
-   * to an existing vertex.
-   *
-   * When set to `"on"`, drawing a path and closing it on an existing
-   * vertex will continue extending the path from that vertex. When set to
-   * `"off"`, the path gesture concludes on close.
-   */
-  public configurePathKeepProjectingModifier(
+  public surfaceConfigurePathKeepProjectingModifier(
     path_keep_projecting: "on" | "off"
   ) {
     this.dispatch({
@@ -1654,73 +1678,9 @@ export class Editor
     });
   }
 
-  public toggleActive(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
-
-    for (const node_id of target_ids) {
-      this.toggleNodeActive(node_id);
-    }
-  }
-
-  public toggleLocked(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
-    for (const node_id of target_ids) {
-      this.toggleNodeLocked(node_id);
-    }
-  }
-
-  public toggleBold(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
-    target_ids.forEach((node_id) => {
-      this.toggleNodeBold(node_id);
-    });
-  }
-
-  public toggleItalic(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
-    target_ids.forEach((node_id) => {
-      this.toggleNodeItalic(node_id);
-    });
-  }
-
-  public toggleUnderline(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
-    target_ids.forEach((node_id) => {
-      this.dispatch({
-        type: "node/toggle/underline",
-        node_id,
-      });
-    });
-  }
-
-  public toggleLineThrough(target: "selection" | editor.NodeID = "selection") {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
-    target_ids.forEach((node_id) => {
-      this.dispatch({
-        type: "node/toggle/line-through",
-        node_id,
-      });
-    });
-  }
-
-  public setOpacity(
-    target: "selection" | editor.NodeID = "selection",
-    opacity: number
-  ) {
-    const target_ids =
-      target === "selection" ? this.mstate.selection : [target];
-    for (const node_id of target_ids) {
-      this.changeNodeOpacity(node_id, { type: "set", value: opacity });
-    }
-  }
-
-  // #endregion IDocumentEditorActions implementation
+  // ==============================================================
+  // #endregion Surface actions
+  // ==============================================================
 
   // #region IDocumentGeometryQuery implementation
 
@@ -1832,7 +1792,7 @@ export class Editor
     this.changeNodeLocked(node_id, next);
     return next;
   }
-  toggleNodeBold(node_id: string) {
+  toggleTextNodeBold(node_id: string) {
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextNode;
@@ -1862,7 +1822,7 @@ export class Editor
     this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
     return match.key.fontWeight as cg.NFontWeight;
   }
-  toggleNodeItalic(node_id: string) {
+  toggleTextNodeItalic(node_id: string) {
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextNode;
@@ -1891,19 +1851,19 @@ export class Editor
     this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
     return true;
   }
-  toggleNodeUnderline(node_id: string) {
+  toggleTextNodeUnderline(node_id: string) {
     this.dispatch({
       type: "node/toggle/underline",
       node_id: node_id,
     });
   }
-  toggleNodeLineThrough(node_id: string) {
+  toggleTextNodeLineThrough(node_id: string) {
     this.dispatch({
       type: "node/toggle/line-through",
       node_id: node_id,
     });
   }
-  changeNodeProps(
+  changeNodePropertyProps(
     node_id: string,
     key: string,
     value?: tokens.StringValueExpression
@@ -1916,14 +1876,17 @@ export class Editor
       },
     });
   }
-  changeNodeComponent(node_id: string, component_id: string) {
+  changeNodePropertyComponent(node_id: string, component_id: string) {
     this.dispatch({
       type: "node/change/component",
       node_id: node_id,
       component_id: component_id,
     });
   }
-  changeNodeText(node_id: string, text: tokens.StringValueExpression | null) {
+  changeNodePropertyText(
+    node_id: string,
+    text: tokens.StringValueExpression | null
+  ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
@@ -1958,7 +1921,7 @@ export class Editor
       locked: locked,
     });
   }
-  changeNodePositioning(
+  changeNodePropertyPositioning(
     node_id: string,
     positioning: Partial<grida.program.nodes.i.IPositioning>
   ) {
@@ -1968,7 +1931,7 @@ export class Editor
       ...positioning,
     });
   }
-  changeNodePositioningMode(
+  changeNodePropertyPositioningMode(
     node_id: string,
     position: grida.program.nodes.i.IPositioning["position"]
   ) {
@@ -1978,14 +1941,14 @@ export class Editor
       position,
     });
   }
-  changeNodeSrc(node_id: string, src?: tokens.StringValueExpression) {
+  changeNodePropertySrc(node_id: string, src?: tokens.StringValueExpression) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       src,
     });
   }
-  changeNodeHref(
+  changeNodePropertyHref(
     node_id: string,
     href?: grida.program.nodes.i.IHrefable["href"]
   ) {
@@ -1995,7 +1958,7 @@ export class Editor
       href,
     });
   }
-  changeNodeTarget(
+  changeNodePropertyTarget(
     node_id: string,
     target?: grida.program.nodes.i.IHrefable["target"]
   ) {
@@ -2005,7 +1968,7 @@ export class Editor
       target,
     });
   }
-  changeNodeOpacity(node_id: string, opacity: editor.api.NumberChange) {
+  changeNodePropertyOpacity(node_id: string, opacity: editor.api.NumberChange) {
     requestAnimationFrame(() => {
       try {
         const value = resolveNumberChangeValue(
@@ -2025,7 +1988,7 @@ export class Editor
       }
     });
   }
-  changeNodeBlendMode(
+  changeNodePropertyBlendMode(
     node_id: editor.NodeID,
     blendMode: cg.LayerBlendMode
   ): void {
@@ -2042,7 +2005,10 @@ export class Editor
       mask,
     });
   }
-  changeNodeRotation(node_id: string, rotation: editor.api.NumberChange) {
+  changeNodePropertyRotation(
+    node_id: string,
+    rotation: editor.api.NumberChange
+  ) {
     requestAnimationFrame(() => {
       try {
         const value = resolveNumberChangeValue(
@@ -2119,7 +2085,7 @@ export class Editor
             default:
               return;
           }
-          this.changeNodePositioning(node_id, {
+          this.changeNodePropertyPositioning(node_id, {
             left: cmath.quantize(left, 1),
           });
         } else {
@@ -2136,7 +2102,7 @@ export class Editor
             default:
               return;
           }
-          this.changeNodePositioning(node_id, {
+          this.changeNodePropertyPositioning(node_id, {
             top: cmath.quantize(top, 1),
           });
         }
@@ -2144,7 +2110,7 @@ export class Editor
     });
   }
 
-  changeNodeFills(node_id: string | string[], fills: cg.Paint[]) {
+  changeNodePropertyFills(node_id: string | string[], fills: cg.Paint[]) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     this.dispatchAll(
       node_ids.map((node_id) => ({
@@ -2155,7 +2121,7 @@ export class Editor
     );
   }
 
-  changeNodeStrokes(node_id: string | string[], strokes: cg.Paint[]) {
+  changeNodePropertyStrokes(node_id: string | string[], strokes: cg.Paint[]) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     this.dispatchAll(
       node_ids.map((node_id) => ({
@@ -2222,7 +2188,10 @@ export class Editor
     );
   }
 
-  changeNodeStrokeWidth(node_id: string, strokeWidth: editor.api.NumberChange) {
+  changeNodePropertyStrokeWidth(
+    node_id: string,
+    strokeWidth: editor.api.NumberChange
+  ) {
     try {
       const value = resolveNumberChangeValue(
         this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
@@ -2241,7 +2210,7 @@ export class Editor
     }
   }
 
-  changeNodeStrokeAlign(node_id: string, strokeAlign: cg.StrokeAlign) {
+  changeNodePropertyStrokeAlign(node_id: string, strokeAlign: cg.StrokeAlign) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
@@ -2249,14 +2218,14 @@ export class Editor
     });
   }
 
-  changeNodeStrokeCap(node_id: string, strokeCap: cg.StrokeCap) {
+  changeNodePropertyStrokeCap(node_id: string, strokeCap: cg.StrokeCap) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       strokeCap,
     });
   }
-  changeNodeFit(node_id: string, fit: cg.BoxFit) {
+  changeNodePropertyFit(node_id: string, fit: cg.BoxFit) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
@@ -2264,7 +2233,10 @@ export class Editor
     });
   }
 
-  changeNodeCornerRadius(node_id: string, cornerRadius: cg.CornerRadius) {
+  changeNodePropertyCornerRadius(
+    node_id: string,
+    cornerRadius: cg.CornerRadius
+  ) {
     if (typeof cornerRadius === "number") {
       // When a uniform corner radius is applied after using individual corner
       // values, the individual corner properties may still remain on the node
@@ -2292,7 +2264,10 @@ export class Editor
       });
     }
   }
-  changeNodeCornerRadiusWithDelta(node_id: string, delta: number): void {
+  changeNodePropertyCornerRadiusWithDelta(
+    node_id: string,
+    delta: number
+  ): void {
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.UnknwonNode;
@@ -2330,21 +2305,27 @@ export class Editor
     });
   }
 
-  changeNodePointCount(node_id: editor.NodeID, pointCount: number): void {
+  changeNodePropertyPointCount(
+    node_id: editor.NodeID,
+    pointCount: number
+  ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       pointCount,
     });
   }
-  changeNodeInnerRadius(node_id: editor.NodeID, innerRadius: number): void {
+  changeNodePropertyInnerRadius(
+    node_id: editor.NodeID,
+    innerRadius: number
+  ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       innerRadius,
     });
   }
-  changeNodeArcData(
+  changeNodePropertyArcData(
     node_id: editor.NodeID,
     arcData: grida.program.nodes.i.IEllipseArcData
   ): void {
@@ -2789,7 +2770,7 @@ export class Editor
   }
 
   //
-  changeNodeBorder(
+  changeNodePropertyBorder(
     node_id: string,
     border: grida.program.css.Border | undefined
   ) {
@@ -2918,14 +2899,14 @@ export class Editor
     });
   }
   //
-  changeNodeMouseCursor(node_id: string, cursor: cg.SystemMouseCursor) {
+  changeNodePropertyMouseCursor(node_id: string, cursor: cg.SystemMouseCursor) {
     this.dispatch({
       type: "node/change/*",
       node_id,
       cursor,
     });
   }
-  changeNodeStyle(
+  changeNodePropertyStyle(
     node_id: string,
     key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
     value: any
@@ -2964,31 +2945,31 @@ export class Editor
   // #endregion IBrushToolActions implementation
 
   // #region IPixelGridActions implementation
-  configurePixelGrid(state: "on" | "off") {
+  surfaceConfigurePixelGrid(state: "on" | "off") {
     this.dispatch({
       type: "surface/pixel-grid",
       state,
     });
   }
-  togglePixelGrid(): "on" | "off" {
+  surfaceTogglePixelGrid(): "on" | "off" {
     const { pixelgrid } = this.state;
     const next = pixelgrid === "on" ? "off" : "on";
-    this.configurePixelGrid(next);
+    this.surfaceConfigurePixelGrid(next);
     return next;
   }
   // #endregion IPixelGridActions implementation
 
   // #region IRulerActions implementation
-  configureRuler(state: "on" | "off") {
+  surfaceConfigureRuler(state: "on" | "off") {
     this.dispatch({
       type: "surface/ruler",
       state,
     });
   }
-  toggleRuler(): "on" | "off" {
+  surfaceToggleRuler(): "on" | "off" {
     const { ruler } = this.state;
     const next = ruler === "on" ? "off" : "on";
-    this.configureRuler(next);
+    this.surfaceConfigureRuler(next);
     return next;
   }
   // #endregion IRulerActions implementation
@@ -3006,177 +2987,7 @@ export class Editor
   }
   // #endregion IGuide2DActions implementation
 
-  // #region ICameraActions implementation
-  setTransform(transform: cmath.Transform, sync: boolean = true) {
-    this.dispatch({
-      type: "transform",
-      transform,
-      sync,
-    });
-  }
-
-  zoom(delta: number, origin: cmath.Vector2) {
-    const { transform } = this.state;
-    const _scale = transform[0][0];
-    // the origin point of the zooming point in x, y (surface space)
-    const [ox, oy] = origin;
-
-    // Apply proportional zooming
-    const scale = _scale + _scale * delta;
-
-    const newscale = cmath.clamp(
-      scale,
-      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
-      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
-    );
-    const [tx, ty] = cmath.transform.getTranslate(transform);
-
-    // calculate the offset that should be applied with scale with css transform.
-    const [newx, newy] = [
-      ox - (ox - tx) * (newscale / _scale),
-      oy - (oy - ty) * (newscale / _scale),
-    ];
-
-    const next: cmath.Transform = [
-      [newscale, transform[0][1], newx],
-      [transform[1][0], newscale, newy],
-    ];
-
-    this.setTransform(next, true);
-  }
-
-  pan(delta: [dx: number, dy: number]) {
-    this.setTransform(
-      cmath.transform.translate(this.state.transform, delta),
-      true
-    );
-  }
-
-  scale(
-    factor: number | cmath.Vector2,
-    origin: cmath.Vector2 | "center" = "center"
-  ) {
-    const { transform } = this.state;
-    const [fx, fy] = typeof factor === "number" ? [factor, factor] : factor;
-    const _scale = transform[0][0];
-    let ox, oy: number;
-    if (origin === "center") {
-      // Canvas size (you need to know or pass this)
-      const { width, height } = this.viewport.size;
-
-      // Calculate the absolute transform origin
-      ox = width / 2;
-      oy = height / 2;
-    } else {
-      [ox, oy] = origin;
-    }
-
-    const sx = cmath.clamp(
-      fx,
-      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
-      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
-    );
-
-    const sy = cmath.clamp(
-      fy,
-      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
-      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
-    );
-
-    const [tx, ty] = cmath.transform.getTranslate(transform);
-
-    // calculate the offset that should be applied with scale with css transform.
-    const [newx, newy] = [
-      ox - (ox - tx) * (sx / _scale),
-      oy - (oy - ty) * (sy / _scale),
-    ];
-
-    const next: cmath.Transform = [
-      [sx, transform[0][1], newx],
-      [transform[1][0], sy, newy],
-    ];
-
-    this.setTransform(next);
-  }
-
-  /**
-   * Transform to fit
-   */
-  fit(
-    selector: grida.program.document.Selector,
-    options: {
-      margin?: number | [number, number, number, number];
-      animate?: boolean;
-    } = {
-      margin: 64,
-      animate: false,
-    }
-  ) {
-    const { document_ctx, selection, transform } = this.state;
-    const ids = dq.querySelector(document_ctx, selection, selector);
-
-    const rects = ids
-      .map((id) => this.geometry.getNodeAbsoluteBoundingRect(id))
-      .filter((r) => r) as cmath.Rectangle[];
-
-    if (rects.length === 0) {
-      return;
-    }
-
-    const area = cmath.rect.union(rects);
-
-    const { width, height } = this.viewport.size;
-    const view = { x: 0, y: 0, width, height };
-
-    const next_transform = cmath.ext.viewport.transformToFit(
-      view,
-      area,
-      options.margin
-    );
-
-    if (options.animate) {
-      animateTransformTo(transform, next_transform, (t) => {
-        this.setTransform(t);
-      });
-    } else {
-      this.setTransform(next_transform);
-    }
-  }
-
-  zoomIn() {
-    const { transform } = this.state;
-    const prevscale = transform[0][0];
-    const nextscale = cmath.quantize(prevscale * 2, 0.01);
-
-    this.scale(nextscale);
-  }
-
-  zoomOut() {
-    const { transform } = this.state;
-    const prevscale = transform[0][0];
-    const nextscale = cmath.quantize(prevscale / 2, 0.01);
-
-    this.scale(nextscale);
-  }
-  // #endregion ICameraActions implementation
-
   // #region IEventTargetActions implementation
-
-  pointerDown(event: PointerEvent) {
-    const ids = this.getNodeIdsFromPointerEvent(event);
-
-    this.dispatch({
-      type: "event-target/event/on-pointer-down",
-      node_ids_from_point: ids,
-      shiftKey: event.shiftKey,
-    });
-  }
-
-  pointerUp(event: PointerEvent) {
-    this.dispatch({
-      type: "event-target/event/on-pointer-up",
-    });
-  }
 
   private _throttled_pointer_move_with_raycast = editor.throttle(
     (event: PointerEvent, position: { x: number; y: number }) => {
@@ -3192,8 +3003,24 @@ export class Editor
     this.__pointer_move_throttle_ms
   );
 
-  pointerMove(event: PointerEvent) {
-    const position = this.pointerEventToViewportPoint(event);
+  surfacePointerDown(event: PointerEvent) {
+    const ids = this.getNodeIdsFromPointerEvent(event);
+
+    this.dispatch({
+      type: "event-target/event/on-pointer-down",
+      node_ids_from_point: ids,
+      shiftKey: event.shiftKey,
+    });
+  }
+
+  surfacePointerUp(event: PointerEvent) {
+    this.dispatch({
+      type: "event-target/event/on-pointer-up",
+    });
+  }
+
+  surfacePointerMove(event: PointerEvent) {
+    const position = this.camera.pointerEventToViewportPoint(event);
 
     this.dispatch({
       type: "event-target/event/on-pointer-move",
@@ -3204,7 +3031,7 @@ export class Editor
     this._throttled_pointer_move_with_raycast(event, position);
   }
 
-  click(event: MouseEvent) {
+  surfaceClick(event: MouseEvent) {
     const ids = this.getNodeIdsFromPointerEvent(event);
 
     this.dispatch({
@@ -3214,20 +3041,20 @@ export class Editor
     });
   }
 
-  doubleClick(event: MouseEvent) {
+  surfaceDoubleClick(event: MouseEvent) {
     this.dispatch({
       type: "event-target/event/on-double-click",
     });
   }
 
-  dragStart(event: PointerEvent) {
+  surfaceDragStart(event: PointerEvent) {
     this.dispatch({
       type: "event-target/event/on-drag-start",
       shiftKey: event.shiftKey,
     });
   }
 
-  dragEnd(event: PointerEvent) {
+  surfaceDragEnd(event: PointerEvent) {
     const { marquee } = this.state;
     if (marquee) {
       // test area in canvas space
@@ -3249,7 +3076,7 @@ export class Editor
     });
   }
 
-  drag(event: TCanvasEventTargetDragGestureState) {
+  surfaceDrag(event: TCanvasEventTargetDragGestureState) {
     requestAnimationFrame(() => {
       this.dispatch({
         type: "event-target/event/on-drag",
@@ -3260,23 +3087,7 @@ export class Editor
 
   //
 
-  public hoverNode(node_id: string, event: "enter" | "leave") {
-    this.dispatch({
-      type: "hover",
-      target: node_id,
-      event,
-    });
-  }
-
-  public hoverEnterNode(node_id: string) {
-    this.hoverNode(node_id, "enter");
-  }
-
-  public hoverLeaveNode(node_id: string) {
-    this.hoverNode(node_id, "leave");
-  }
-
-  startGuideGesture(axis: cmath.Axis, idx: number | -1) {
+  surfaceStartGuideGesture(axis: cmath.Axis, idx: number | -1) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
@@ -3287,7 +3098,7 @@ export class Editor
     });
   }
 
-  startScaleGesture(
+  surfaceStartScaleGesture(
     selection: string | string[],
     direction: cmath.CardinalDirection
   ) {
@@ -3301,7 +3112,7 @@ export class Editor
     });
   }
 
-  startSortGesture(selection: string | string[], node_id: string) {
+  surfaceStartSortGesture(selection: string | string[], node_id: string) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
@@ -3312,7 +3123,7 @@ export class Editor
     });
   }
 
-  startGapGesture(selection: string | string[], axis: "x" | "y") {
+  surfaceStartGapGesture(selection: string | string[], axis: "x" | "y") {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
@@ -3324,7 +3135,7 @@ export class Editor
   }
 
   // #region drag resize handle
-  startCornerRadiusGesture(
+  surfaceStartCornerRadiusGesture(
     selection: string,
     anchor?: cmath.IntercardinalDirection
   ) {
@@ -3339,7 +3150,7 @@ export class Editor
   }
   // #endregion drag resize handle
 
-  startRotateGesture(selection: string) {
+  surfaceStartRotateGesture(selection: string) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
@@ -3349,7 +3160,7 @@ export class Editor
     });
   }
 
-  startTranslateVectorNetwork(node_id: string) {
+  surfaceStartTranslateVectorNetwork(node_id: string) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
@@ -3386,7 +3197,11 @@ export class Editor
     });
   }
 
-  startCurveGesture(node_id: string, segment: number, control: "ta" | "tb") {
+  surfaceStartCurveGesture(
+    node_id: string,
+    segment: number,
+    control: "ta" | "tb"
+  ) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
@@ -3420,8 +3235,9 @@ export class Editor
   }
   // #endregion IVectorInterfaceActions implementation
 
+  // ==============================================================
   // #region IFontLoaderActions implementation
-
+  // ==============================================================
   async loadFontSync(font: { family: string }): Promise<void> {
     if (!this.fontCollection) return;
     await this.fontCollection.loadFont(font);
@@ -3444,8 +3260,8 @@ export class Editor
     }
   }
 
-  getFontItem(fontFamily: string): google.GoogleWebFontListItem | null {
-    const item: google.GoogleWebFontListItem | undefined =
+  getFontItem(fontFamily: string): googlefonts.GoogleWebFontListItem | null {
+    const item: googlefonts.GoogleWebFontListItem | undefined =
       this.mstate.webfontlist.items.find((f) => f.family === fontFamily);
     if (!item) return null;
     return item;
@@ -3471,9 +3287,13 @@ export class Editor
     return this._fontManager.selectFontStyle(description);
   }
 
+  // ==============================================================
   // #endregion IFontLoaderActions implementation
+  // ==============================================================
 
+  // ==============================================================
   // #region IExportPluginActions implementation
+  // ==============================================================
   exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
   exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array>;
   exportNodeAs(node_id: string, format: "SVG"): Promise<string>;
@@ -3508,9 +3328,13 @@ export class Editor
 
     throw new Error("Not implemented");
   }
+  // ==============================================================
   // #endregion IExportPluginActions implementation
+  // ==============================================================
 
+  // ==============================================================
   // #region ICursorChatActions implementation
+  // ==============================================================
   openCursorChat(): void {
     this.reduce((state) => {
       state.local_cursor_chat.is_open = true;
@@ -3527,14 +3351,248 @@ export class Editor
     });
   }
 
-  setCursorChatMessage(message: string | null): void {
+  updateCursorChatMessage(message: string | null): void {
     this.reduce((state) => {
       state.local_cursor_chat.message = message;
       state.local_cursor_chat.last_modified = message ? Date.now() : null;
       return state;
     });
   }
+
+  public __sync_cursors(
+    cursors: editor.state.IEditorMultiplayerCursorState["cursors"]
+  ) {
+    this.reduce((state) => {
+      state.cursors = cursors;
+      return state;
+    });
+  }
+
+  // ==============================================================
   // #endregion ICursorChatActions implementation
+  // ==============================================================
+
+  // ==============================================================
+  // #region a11y actions
+  // ==============================================================
+
+  public a11yEscape() {
+    const step = this._stackEscapeSteps(this.mstate)[0];
+
+    switch (step) {
+      case "escape-tool": {
+        this.surfaceSetTool({ type: "cursor" }, "a11yEscape");
+        break;
+      }
+      case "escape-selection": {
+        this.blur("a11yEscape");
+        break;
+      }
+      case "escape-content-edit-mode":
+      default: {
+        this.surfaceTryExitContentEditMode();
+        break;
+      }
+    }
+  }
+
+  private _stackEscapeSteps(
+    state: editor.state.IEditorState
+  ): editor.a11y.EscapeStep[] {
+    const steps: editor.a11y.EscapeStep[] = [];
+
+    if (!state.content_edit_mode) {
+      // p1. if the tool is selected, escape the tool
+      if (state.tool.type !== "cursor") {
+        steps.push("escape-tool");
+      }
+      // p2. if the selection is not empty, escape the selection
+      if (state.selection.length > 0) {
+        steps.push("escape-selection");
+      }
+    } else {
+      switch (state.content_edit_mode.type) {
+        case "vector": {
+          const { selected_vertices, selected_segments, selected_tangents } =
+            state.content_edit_mode.selection;
+          const hasSelection =
+            selected_vertices.length > 0 ||
+            selected_segments.length > 0 ||
+            selected_tangents.length > 0;
+
+          // p1. if the selection is not empty, escape the selection
+          if (hasSelection) {
+            steps.push("escape-selection");
+          }
+
+          // p2. if the tool is selected, escape the tool
+          if (state.tool.type !== "cursor") {
+            steps.push("escape-tool");
+          }
+          break;
+        }
+        case "paint/gradient":
+        case "paint/image": {
+          break;
+        }
+      }
+
+      // p3. if the content edit mode is active, escape the content edit mode
+      steps.push("escape-content-edit-mode");
+    }
+
+    return steps;
+  }
+
+  public async a11yCopyAsImage(format: "png"): Promise<boolean> {
+    if (this.mstate.content_edit_mode?.type === "vector") {
+      const { selected_vertices, selected_segments, selected_tangents } =
+        this.mstate.content_edit_mode.selection;
+      const hasSelection =
+        selected_vertices.length > 0 ||
+        selected_segments.length > 0 ||
+        selected_tangents.length > 0;
+      if (!hasSelection) return false;
+    } else {
+      if (this.mstate.selection.length === 0) return false;
+    }
+    return await this.writeClipboardMedia("selection", format);
+  }
+
+  public async a11yCopyAsSVG(): Promise<boolean> {
+    if (this.mstate.content_edit_mode?.type === "vector") {
+      const { selected_vertices, selected_segments, selected_tangents } =
+        this.mstate.content_edit_mode.selection;
+      const hasSelection =
+        selected_vertices.length > 0 ||
+        selected_segments.length > 0 ||
+        selected_tangents.length > 0;
+      if (!hasSelection) return false;
+    } else {
+      if (this.mstate.selection.length === 0) return false;
+    }
+
+    return await this.writeClipboardSVG("selection");
+  }
+
+  public a11yCopy() {
+    if (this.mstate.content_edit_mode?.type === "vector") {
+      const { selected_vertices, selected_segments, selected_tangents } =
+        this.mstate.content_edit_mode.selection;
+      const hasSelection =
+        selected_vertices.length > 0 ||
+        selected_segments.length > 0 ||
+        selected_tangents.length > 0;
+      if (!hasSelection) return;
+    }
+    this.copy("selection");
+  }
+
+  public a11yCut() {
+    this.cut("selection");
+  }
+
+  public a11yPaste() {
+    this.paste();
+  }
+
+  public a11yDelete() {
+    this.dispatch({ type: "a11y/delete" });
+  }
+
+  public a11ySetClipboardColor(color: cg.RGBA8888) {
+    this.dispatch({
+      type: "clip/color",
+      color,
+    });
+  }
+
+  public a11yNudgeResize(
+    target: "selection" | editor.NodeID = "selection",
+    axis: "x" | "y",
+    delta: number = 1
+  ) {
+    this.dispatch({
+      type: "nudge-resize",
+      delta,
+      axis,
+      target,
+    });
+  }
+
+  public a11yToggleActive(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+
+    for (const node_id of target_ids) {
+      this.toggleNodeActive(node_id);
+    }
+  }
+
+  public a11yToggleLocked(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    for (const node_id of target_ids) {
+      this.toggleNodeLocked(node_id);
+    }
+  }
+
+  public a11yToggleBold(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.toggleTextNodeBold(node_id);
+    });
+  }
+
+  public a11yToggleItalic(target: "selection" | editor.NodeID = "selection") {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.toggleTextNodeItalic(node_id);
+    });
+  }
+
+  public a11yToggleUnderline(
+    target: "selection" | editor.NodeID = "selection"
+  ) {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.dispatch({
+        type: "node/toggle/underline",
+        node_id,
+      });
+    });
+  }
+
+  public a11yToggleLineThrough(
+    target: "selection" | editor.NodeID = "selection"
+  ) {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    target_ids.forEach((node_id) => {
+      this.dispatch({
+        type: "node/toggle/line-through",
+        node_id,
+      });
+    });
+  }
+
+  public a11ySetOpacity(
+    target: "selection" | editor.NodeID = "selection",
+    opacity: number
+  ) {
+    const target_ids =
+      target === "selection" ? this.mstate.selection : [target];
+    for (const node_id of target_ids) {
+      this.changeNodePropertyOpacity(node_id, { type: "set", value: opacity });
+    }
+  }
+
+  // ==============================================================
+  // #endregion a11y actions
+  // ==============================================================
 
   /**
    * Dispose editor instance and cleanup resources
@@ -3562,7 +3620,7 @@ export class ImageProxy implements editor.api.ImageInstance {
 
   async getDataURL(): Promise<string> {
     const bytes = this.getBytes();
-    const blob = new Blob([bytes], { type: this.type });
+    const blob = new Blob([bytes as BlobPart], { type: this.type });
 
     return new Promise((resolve, reject) => {
       const reader = new FileReader();

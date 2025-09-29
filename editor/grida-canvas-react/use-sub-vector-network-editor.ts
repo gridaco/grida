@@ -141,16 +141,16 @@ export default function useVectorContentEditMode(): VectorContentEditor {
   const onCurveControlPointDragStart = useCallback(
     (segment: number, control: "ta" | "tb") => {
       if (multi) {
-        instance.startTranslateVectorNetwork(node_id);
+        instance.surfaceStartTranslateVectorNetwork(node_id);
       } else {
-        instance.startCurveGesture(node_id, segment, control);
+        instance.surfaceStartCurveGesture(node_id, segment, control);
       }
     },
     [multi, instance, node_id]
   );
 
   const onDragStart = useCallback(() => {
-    instance.startTranslateVectorNetwork(node_id);
+    instance.surfaceStartTranslateVectorNetwork(node_id);
   }, [instance, node_id]);
 
   const selectSegment = useCallback(
@@ -181,7 +181,7 @@ export default function useVectorContentEditMode(): VectorContentEditor {
   const onSplitSegmentT05 = useCallback(
     (segment: number) => {
       instance.splitSegment(node_id, { segment, t: 0.5 });
-      instance.startTranslateVectorNetwork(node_id);
+      instance.surfaceStartTranslateVectorNetwork(node_id);
     },
     [instance, node_id, vertices.length]
   );
@@ -205,7 +205,7 @@ export default function useVectorContentEditMode(): VectorContentEditor {
 
   const updateHoveredControl = useCallback(
     (hoveredControl: { type: "vertex" | "segment"; index: number } | null) => {
-      instance.updateVectorHoveredControl(hoveredControl);
+      instance.surfaceUpdateVectorHoveredControl(hoveredControl);
     },
     [instance]
   );

@@ -197,7 +197,7 @@ export function EditorSurface() {
       if (event.defaultPrevented) return;
       // for performance reasons, we don't want to update the overlay when transforming (except for translate)
       if (is_node_transforming && !is_node_translating) return;
-      editor.pointerMove(event);
+      editor.surfacePointerMove(event);
     };
 
     et.addEventListener("pointermove", handlePointerMove, {
@@ -218,7 +218,7 @@ export function EditorSurface() {
         if (event.defaultPrevented) return;
         if (event.button === 1) {
           __hand_tool_triggered_by_aux_button.current = true;
-          editor.setTool({ type: "hand" });
+          editor.surfaceSetTool({ type: "hand" });
         }
       },
       onMouseUp: ({ event }) => {
@@ -226,40 +226,40 @@ export function EditorSurface() {
         if (event.button === 1) {
           if (__hand_tool_triggered_by_aux_button.current) {
             __hand_tool_triggered_by_aux_button.current = false;
-            editor.setTool({ type: "cursor" });
+            editor.surfaceSetTool({ type: "cursor" });
           }
         }
       },
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.pointerDown(event);
+        editor.surfacePointerDown(event);
       },
       onPointerUp: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.pointerUp(event);
+        editor.surfacePointerUp(event);
       },
       onClick: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.click(event);
+        editor.surfaceClick(event);
       },
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
 
         // [order matters] - otherwise, it will always try to enter the content edit mode
-        editor.tryToggleContentEditMode(); // 1
-        editor.doubleClick(event); // 2
+        editor.surfaceTryToggleContentEditMode(); // 1
+        editor.surfaceDoubleClick(event); // 2
       },
       onDragStart: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.dragStart(event as PointerEvent);
+        editor.surfaceDragStart(event as PointerEvent);
       },
       onDragEnd: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.dragEnd(event as PointerEvent);
+        editor.surfaceDragEnd(event as PointerEvent);
       },
       onDrag: (e) => {
         if (e.event.defaultPrevented) return;
-        editor.drag({
+        editor.surfaceDrag({
           delta: e.delta,
           distance: e.distance,
           movement: e.movement,
@@ -298,10 +298,10 @@ export function EditorSurface() {
           const d = delta[1];
           const sensitivity = 0.01;
           const zoom_delta = -d * sensitivity;
-          editor.zoom(zoom_delta, origin);
+          editor.camera.zoom(zoom_delta, origin);
         } else {
           const sensitivity = 2;
-          editor.pan(
+          editor.camera.pan(
             cmath.vector2.invert(
               cmath.vector2.multiply(delta, [sensitivity, sensitivity])
             )
@@ -674,10 +674,10 @@ function NodeTitleBar({
       //   editor.hoverEnterNode(node.id);
       // },
       onPointerEnter: () => {
-        editor.hoverEnterNode(node.id);
+        editor.surfaceHoverEnterNode(node.id);
       },
       onPointerLeave: () => {
-        editor.hoverLeaveNode(node.id);
+        editor.surfaceHoverLeaveNode(node.id);
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
@@ -910,7 +910,7 @@ function SingleSelectionOverlay({
                 distribution={distribution}
                 style={style}
                 onGapGestureStart={(axis) => {
-                  editor.startGapGesture(node_id, axis);
+                  editor.surfaceStartGapGesture(node_id, axis);
                 }}
               />
             </>
@@ -939,7 +939,7 @@ function MultpleSelectionGroupsOverlay({ readonly }: { readonly?: boolean }) {
                 distribution={g.distribution}
                 style={g.style}
                 onGapGestureStart={(axis) => {
-                  editor.startGapGesture(g.ids, axis);
+                  editor.surfaceStartGapGesture(g.ids, axis);
                 }}
               />
             )}
@@ -1194,7 +1194,7 @@ function LayerOverlayRotationHandle({
   const bind = useSurfaceGesture({
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.startRotateGesture(node_id);
+      editor.surfaceStartRotateGesture(node_id);
     },
   });
 
@@ -1252,7 +1252,7 @@ function LayerOverlayResizeHandle({
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.startScaleGesture(selection, anchor);
+      editor.surfaceStartScaleGesture(selection, anchor);
     },
   });
 
@@ -1277,7 +1277,7 @@ function LayerOverlayResizeSide({
       },
       onDragStart: ({ event }) => {
         event.preventDefault();
-        editor.startScaleGesture(selection, anchor);
+        editor.surfaceStartScaleGesture(selection, anchor);
       },
       onDoubleClick: ({ event }) => {
         event.preventDefault();
@@ -1426,7 +1426,7 @@ function RedDotSortHandle({
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.startSortGesture(selection, node_id);
+      editor.surfaceStartSortGesture(selection, node_id);
     },
   });
 
@@ -1684,14 +1684,14 @@ function RulerGuideOverlay() {
 
   const bindX = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      editor.startGuideGesture("y", -1);
+      editor.surfaceStartGuideGesture("y", -1);
       event.preventDefault();
     },
   });
 
   const bindY = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      editor.startGuideGesture("x", -1);
+      editor.surfaceStartGuideGesture("x", -1);
       event.preventDefault();
     },
   });
@@ -1838,7 +1838,7 @@ function Guide({
       event.stopPropagation();
     },
     onDragStart: ({ event }) => {
-      editor.startGuideGesture(axis, idx);
+      editor.surfaceStartGuideGesture(axis, idx);
       event.preventDefault();
     },
   });

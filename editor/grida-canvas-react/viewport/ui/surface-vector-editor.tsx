@@ -7,7 +7,6 @@ import {
 import cmath from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/components/lib/utils";
-import { svg } from "@/grida-canvas-utils/svg";
 import { Point } from "./point";
 import assert from "assert";
 import useVectorContentEditMode, {
@@ -320,7 +319,7 @@ function Segment({
         event.preventDefault();
         draggedRef.current = true;
         if (tool.type === "bend") {
-          const canvasPoint = instance.clientPointToCanvasPoint([
+          const canvasPoint = instance.camera.clientPointToCanvasPoint([
             (event as MouseEvent).clientX,
             (event as MouseEvent).clientY,
           ]);
@@ -345,7 +344,7 @@ function Segment({
           frozenRef.current
         ) {
           event.preventDefault();
-          const canvasPoint = instance.clientPointToCanvasPoint([
+          const canvasPoint = instance.camera.clientPointToCanvasPoint([
             (event as MouseEvent).clientX,
             (event as MouseEvent).clientY,
           ]);
@@ -606,7 +605,7 @@ function VertexPoint({
           );
           if (segment !== -1) {
             const control = ve.segments[segment].a === index ? "ta" : "tb";
-            instance.startCurveGesture(ve.node_id, segment, control);
+            instance.surfaceStartCurveGesture(ve.node_id, segment, control);
           }
         } else {
           ve.onDragStart();

@@ -30,7 +30,7 @@ export class CanvasWasmGeometryQueryInterfaceProvider
     clientX: number;
     clientY: number;
   }): string[] {
-    const p = this.editor.clientPointToCanvasPoint([
+    const p = this.editor.camera.clientPointToCanvasPoint([
       event.clientX,
       event.clientY,
     ]);

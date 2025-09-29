@@ -198,7 +198,7 @@ function useFitInitiallyEffect() {
   const sceneId = useEditorState(editor, (state) => state.scene_id);
 
   useEffect(() => {
-    editor.fit("*");
+    editor.camera.fit("*");
   }, [documentKey, sceneId]);
 }
 

@@ -130,7 +130,7 @@ export default function Toolbar() {
       <ToggleGroupPrimitive.Root
         data-slot="toggle-group"
         onValueChange={(v) => {
-          editor.setTool(
+          editor.surfaceSetTool(
             v
               ? toolbar_value_to_cursormode(v as ToolbarToolType)
               : { type: "cursor" }
@@ -150,7 +150,9 @@ export default function Toolbar() {
             { value: "hand", label: "Hand tool", shortcut: "H" },
           ]}
           onValueChange={(v) => {
-            editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+            editor.surfaceSetTool(
+              toolbar_value_to_cursormode(v as ToolbarToolType)
+            );
           }}
         />
         <VerticalDivider />
@@ -183,7 +185,9 @@ export default function Toolbar() {
             { value: "image", label: "Image" },
           ]}
           onValueChange={(v) => {
-            editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+            editor.surfaceSetTool(
+              toolbar_value_to_cursormode(v as ToolbarToolType)
+            );
           }}
         />
         <ToolsGroup
@@ -192,7 +196,9 @@ export default function Toolbar() {
           onOpenChange={(o) => setOpen(o ? "draw" : null)}
           options={tools}
           onValueChange={(v) => {
-            editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+            editor.surfaceSetTool(
+              toolbar_value_to_cursormode(v as ToolbarToolType)
+            );
           }}
         />
       </ToggleGroupPrimitive.Root>

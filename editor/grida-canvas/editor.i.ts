@@ -2039,260 +2039,25 @@ export namespace editor.api {
     delay: number;
   };
 
-  export interface INodeChangeActions {
-    toggleNodeActive(node_id: NodeID): void;
-    toggleNodeLocked(node_id: NodeID): void;
-
-    /**
-     * @param node_id text node id
-     * @returns the font weight if the node is toggled, false otherwise
-     *
-     * @remarks
-     * not all fonts can be toggled bold, the font should actually have 400 / 700 weight defined.
-     */
-    toggleNodeBold(node_id: NodeID): false | cg.NFontWeight;
-
-    /**
-     * @param node_id text node id
-     * @returns true if the node is toggled, false otherwise
-     *
-     * note: the boolean does not return if its italic, it returns the result of successful toggle
-     * not all fonts can be toggled italic, the font should actually have italic style defined.
-     */
-    toggleNodeItalic(node_id: NodeID): boolean;
-
-    toggleNodeUnderline(node_id: NodeID): void;
-    toggleNodeLineThrough(node_id: NodeID): void;
-    changeNodeActive(node_id: NodeID, active: boolean): void;
-    changeNodeLocked(node_id: NodeID, locked: boolean): void;
-    changeNodeName(node_id: NodeID, name: string): void;
-    changeNodeUserData(node_id: NodeID, userdata: unknown): void;
-    changeNodeSize(
-      node_id: NodeID,
-      axis: "width" | "height",
-      value: grida.program.css.LengthPercentage | "auto"
-    ): void;
-    autoSizeTextNode(node_id: NodeID, axis: "width" | "height"): void;
-    changeNodeBorder(
-      node_id: NodeID,
-      border: grida.program.css.Border | undefined
-    ): void;
-    changeNodeProps(
-      node_id: string,
-      key: string,
-      value?: tokens.StringValueExpression
-    ): void;
-    changeNodeComponent(node_id: NodeID, component: string): void;
-    changeNodeText(node_id: NodeID, text: tokens.StringValueExpression): void;
-    changeNodeStyle(
-      node_id: NodeID,
-      key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
-      value: any
-    ): void;
-    changeNodeMouseCursor(
-      node_id: NodeID,
-      mouseCursor: cg.SystemMouseCursor
-    ): void;
-    changeNodeSrc(node_id: NodeID, src?: tokens.StringValueExpression): void;
-    changeNodeHref(
-      node_id: NodeID,
-      href?: grida.program.nodes.i.IHrefable["href"]
-    ): void;
-    changeNodeTarget(
-      node_id: NodeID,
-      target?: grida.program.nodes.i.IHrefable["target"]
-    ): void;
-    changeNodePositioning(
-      node_id: NodeID,
-      positioning: grida.program.nodes.i.IPositioning
-    ): void;
-    changeNodePositioningMode(
-      node_id: NodeID,
-      positioningMode: "absolute" | "relative"
-    ): void;
-    changeNodeCornerRadius(
-      node_id: NodeID,
-      cornerRadius: cg.CornerRadius
-    ): void;
-    changeNodeCornerRadiusWithDelta(node_id: NodeID, delta: number): void;
-    changeNodePointCount(node_id: NodeID, pointCount: number): void;
-    changeNodeInnerRadius(node_id: NodeID, innerRadius: number): void;
-    changeNodeArcData(
-      node_id: NodeID,
-      arcData: grida.program.nodes.i.IEllipseArcData
-    ): void;
-    changeNodeFills(node_id: NodeID, fills: cg.Paint[]): void;
-    changeNodeFills(node_id: NodeID[], fills: cg.Paint[]): void;
-    changeNodeStrokes(node_id: NodeID, strokes: cg.Paint[]): void;
-    changeNodeStrokes(node_id: NodeID[], strokes: cg.Paint[]): void;
-    addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
-    addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;
-    addNodeStroke(
-      node_id: NodeID,
-      stroke: cg.Paint,
-      at?: "start" | "end"
-    ): void;
-    addNodeStroke(
-      node_id: NodeID[],
-      stroke: cg.Paint,
-      at?: "start" | "end"
-    ): void;
-    changeNodeStrokeWidth(
-      node_id: NodeID,
-      strokeWidth: editor.api.NumberChange
-    ): void;
-    changeNodeStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
-    changeNodeStrokeAlign(node_id: NodeID, strokeAlign: cg.StrokeAlign): void;
-    changeNodeFit(node_id: NodeID, fit: cg.BoxFit): void;
-    changeNodeOpacity(node_id: NodeID, opacity: editor.api.NumberChange): void;
-    changeNodeBlendMode(node_id: NodeID, blendMode: cg.LayerBlendMode): void;
-    changeNodeRotation(
-      node_id: NodeID,
-      rotation: editor.api.NumberChange
-    ): void;
-    changeTextNodeFontFamilySync(
-      node_id: NodeID,
-      fontFamily: string,
-      force?: boolean
-    ): Promise<boolean>;
-    changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
-    changeTextNodeFontKerning(node_id: NodeID, fontKerning: boolean): void;
-    changeTextNodeFontWidth(node_id: NodeID, fontWidth: number): void;
-
-    /**
-     * use when font style change or family change
-     *
-     * | property              | operation        | notes |
-     * |-----------------------|------------------|-------|
-     * | `fontFamily`          | validate & set   | validate if the requested family / postscript is registered and ready to use, else reject |
-     * | `fontPostscriptName`  | set              | |
-     * | `fontStyleItalic`     | set              | |
-     * | `fontWeight`          | set              | |
-     * | `fontWidth`           | set              | |
-     * | `fontOpticalSizing`   | set              | |
-     * | `fontVariations`      | update / clean   | if instance change, remove not-defined variations |
-     * | `fontFeatures`        | clean            | if instance change, remove not-def features |
-     */
-    changeTextNodeFontStyle(
-      node_id: NodeID,
-      fontStyleDescription: editor.api.FontStyleChangeDescription
-    ): void;
-    changeTextNodeFontFeature(
-      node_id: NodeID,
-      feature: cg.OpenTypeFeature,
-      value: boolean
-    ): void;
-    changeTextNodeFontVariation(
-      node_id: NodeID,
-      key: string,
-      value: number
-    ): void;
-    changeTextNodeFontOpticalSizing(
-      node_id: NodeID,
-      fontOpticalSizing: cg.OpticalSizing
-    ): void;
-    changeTextNodeFontSize(
-      node_id: NodeID,
-      fontSize: editor.api.NumberChange
-    ): void;
-    changeTextNodeTextAlign(node_id: NodeID, textAlign: cg.TextAlign): void;
-    changeTextNodeTextAlignVertical(
-      node_id: NodeID,
-      textAlignVertical: cg.TextAlignVertical
-    ): void;
-    changeTextNodeTextTransform(
-      node_id: NodeID,
-      transform: cg.TextTransform
-    ): void;
-    changeTextNodeTextDecorationLine(
-      node_id: NodeID,
-      textDecorationLine: cg.TextDecorationLine
-    ): void;
-    changeTextNodeTextDecorationStyle(
-      node_id: NodeID,
-      textDecorationStyle: cg.TextDecorationStyle
-    ): void;
-    changeTextNodeTextDecorationThickness(
-      node_id: NodeID,
-      textDecorationThickness: cg.TextDecorationThicknessPercentage
-    ): void;
-    changeTextNodeTextDecorationColor(
-      node_id: NodeID,
-      textDecorationColor: cg.TextDecorationColor
-    ): void;
-    changeTextNodeTextDecorationSkipInk(
-      node_id: NodeID,
-      textDecorationSkipInk: cg.TextDecorationSkipInkFlag
-    ): void;
-    changeTextNodeLineHeight(
-      node_id: NodeID,
-      lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
-    ): void;
-    changeTextNodeLetterSpacing(
-      node_id: NodeID,
-      letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
-    ): void;
-    changeTextNodeWordSpacing(
-      node_id: NodeID,
-      wordSpacing: TChange<grida.program.nodes.TextNode["wordSpacing"]>
-    ): void;
-    changeTextNodeMaxlength(
-      node_id: NodeID,
-      maxlength: number | undefined
-    ): void;
-    changeTextNodeMaxLines(node_id: NodeID, maxLines: number | null): void;
-    changeContainerNodePadding(
-      node_id: NodeID,
-      padding: grida.program.nodes.i.IPadding["padding"]
-    ): void;
-    changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
-    changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;
-    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeBlur): void;
-    changeNodeFeBackdropBlur(
-      node_id: NodeID,
-      effect?: cg.IFeGaussianBlur
-    ): void;
-    changeContainerNodeLayout(
-      node_id: NodeID,
-      layout: grida.program.nodes.i.IFlexContainer["layout"]
-    ): void;
-    changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis): void;
-    changeFlexContainerNodeMainAxisAlignment(
-      node_id: string,
-      mainAxisAlignment: cg.MainAxisAlignment
-    ): void;
-    changeFlexContainerNodeCrossAxisAlignment(
-      node_id: string,
-      crossAxisAlignment: cg.CrossAxisAlignment
-    ): void;
-    changeFlexContainerNodeGap(
-      node_id: string,
-      gap: number | { mainAxisGap: number; crossAxisGap: number }
-    ): void;
-  }
-
-  export interface IBrushToolActions {
+  export interface IDocumentBrushToolActions {
     changeBrush(brush: BitmapEditorBrush): void;
     changeBrushSize(size: editor.api.NumberChange): void;
     changeBrushOpacity(opacity: editor.api.NumberChange): void;
   }
 
-  export interface IPixelGridActions {
-    configurePixelGrid(state: "on" | "off"): void;
-    togglePixelGrid(): "on" | "off";
-  }
-
-  export interface IRulerActions {
-    configureRuler(state: "on" | "off"): void;
-    toggleRuler(): "on" | "off";
-  }
-
-  export interface IGuide2DActions {
-    deleteGuide(idx: number): void;
-  }
-
   export interface ICameraActions {
-    setTransform(transform: cmath.Transform): void;
+    /**
+     * @get the transform of the camera
+     * @set set the transform of the camera
+     */
+    transform: cmath.Transform;
+
+    /**
+     * set the transform of the camera
+     * @param transform the transform to set
+     * @param sync if true, the transform will also re-calculate the cursor position.
+     */
+    transformWithSync(transform: cmath.Transform, sync: boolean): void;
 
     /**
      * zoom the camera by the given delta
@@ -2321,42 +2086,6 @@ export namespace editor.api {
     zoomOut(): void;
   }
 
-  export interface IEventTargetActions {
-    hoverNode(node_id: string, event: "enter" | "leave"): void;
-    hoverEnterNode(node_id: string): void;
-    hoverLeaveNode(node_id: string): void;
-
-    startGuideGesture(axis: cmath.Axis, idx: number | -1): void;
-    startScaleGesture(
-      selection: string | string[],
-      direction: cmath.CardinalDirection
-    ): void;
-    startSortGesture(selection: string | string[], node_id: string): void;
-    startGapGesture(selection: string | string[], axis: "x" | "y"): void;
-    startCornerRadiusGesture(
-      selection: string,
-      anchor?: cmath.IntercardinalDirection
-    ): void;
-    startRotateGesture(selection: string): void;
-    startTranslateVectorNetwork(node_id: string): void;
-    startCurveGesture(
-      node_id: string,
-      segment: number,
-      control: "ta" | "tb"
-    ): void;
-
-    pointerDown(event: PointerEvent): void;
-    pointerUp(event: PointerEvent): void;
-    pointerMove(event: PointerEvent): void;
-
-    click(event: MouseEvent): void;
-    doubleClick(event: MouseEvent): void;
-
-    dragStart(event: PointerEvent): void;
-    dragEnd(event: PointerEvent): void;
-    drag(event: TCanvasEventTargetDragGestureState): void;
-  }
-
   export interface IDocumentGeometryInterfaceProvider {
     /**
      * returns a list of node ids that are intersecting with the pointer event
@@ -2364,18 +2093,21 @@ export namespace editor.api {
      * @returns
      */
     getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
+
     /**
      * returns a list of node ids that are intersecting with the point in canvas space
      * @param point canvas space point
      * @returns
      */
     getNodeIdsFromPoint(point: cmath.Vector2): string[];
+
     /**
      * returns a list of node ids that are intersecting with the envelope in canvas space
      * @param envelope
      * @returns
      */
     getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
+
     /**
      * returns a bounding rect of the node in canvas space
      * @param node_id
@@ -2477,6 +2209,8 @@ export namespace editor.api {
     toVectorNetwork(node_id: string): vn.VectorNetwork | null;
   }
 
+  //
+
   export interface IDocumentGeometryQuery {
     /**
      * returns a list of node ids that are intersecting with the point in canvas space
@@ -2510,7 +2244,11 @@ export namespace editor.api {
     getNodeAbsoluteRotation(node_id: NodeID): number;
   }
 
-  export interface IDocumentEditorActions {
+  export interface IDocumentVectorInterfaceActions {
+    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+  }
+
+  export interface IDocumentActions {
     loadScene(scene_id: string): void;
     createScene(scene?: grida.program.document.SceneInit): void;
     deleteScene(scene_id: string): void;
@@ -2521,21 +2259,6 @@ export namespace editor.api {
       backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
     ): void;
 
-    //
-    setTool(tool: editor.state.ToolMode): void;
-    tryExitContentEditMode(): void;
-    tryToggleContentEditMode(): void;
-    tryEnterContentEditMode(): void;
-    tryEnterContentEditMode(
-      node_id?: string,
-      mode?: "auto" | "paint/gradient" | "paint/image",
-      options?: {
-        paintIndex?: number;
-        paintTarget?: "fill" | "stroke";
-      }
-    ): void;
-    //
-
     /**
      * select the nodes by the given selectors.
      *
@@ -2543,6 +2266,436 @@ export namespace editor.api {
      * @returns the selected node ids. or `false` if ignored.
      */
     select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
+
+    blur(): void;
+    undo(): void;
+    redo(): void;
+    cut(target: "selection" | NodeID): void;
+    copy(target: "selection" | NodeID): void;
+    paste(): void;
+    duplicate(target: "selection" | NodeID): void;
+    flatten(target: "selection" | NodeID): void;
+    op(target: ReadonlyArray<NodeID>, op: cg.BooleanOperation): void;
+    union(target: ReadonlyArray<NodeID>): void;
+    subtract(target: ReadonlyArray<NodeID>): void;
+    intersect(target: ReadonlyArray<NodeID>): void;
+    exclude(target: ReadonlyArray<NodeID>): void;
+    groupMask(target: ReadonlyArray<NodeID>): void;
+
+    // vector editor
+    selectVertex(node_id: NodeID, vertex: number): void;
+    deleteVertex(node_id: NodeID, vertex: number): void;
+    selectSegment(node_id: NodeID, segment: number): void;
+    deleteSegment(node_id: NodeID, segment: number): void;
+    splitSegment(node_id: NodeID, point: vn.PointOnSegment): void;
+    translateVertex(
+      node_id: NodeID,
+      vertex: number,
+      delta: cmath.Vector2
+    ): void;
+    translateSegment(
+      node_id: NodeID,
+      segment: number,
+      delta: cmath.Vector2
+    ): void;
+    bendSegment(
+      node_id: NodeID,
+      segment: number,
+      ca: number,
+      cb: cmath.Vector2,
+      frozen: {
+        a: cmath.Vector2;
+        b: cmath.Vector2;
+        ta: cmath.Vector2;
+        tb: cmath.Vector2;
+      }
+    ): void;
+    planarize(node_id: NodeID): void;
+
+    //
+    getNodeSnapshotById(node_id: NodeID): Readonly<grida.program.nodes.Node>;
+    getNodeById(node_id: NodeID): NodeProxy<grida.program.nodes.Node>;
+    getNodeDepth(node_id: NodeID): number;
+    //
+
+    //
+    insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;
+    deleteNode(target: "selection" | NodeID): void;
+    //
+
+    createNodeFromSvg(
+      svg: string
+    ): Promise<NodeProxy<grida.program.nodes.ContainerNode>>;
+    createImageNode(
+      image: grida.program.document.ImageRef
+    ): NodeProxy<grida.program.nodes.ImageNode>;
+    createTextNode(text: string): NodeProxy<grida.program.nodes.TextNode>;
+    createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
+
+    order(target: "selection" | NodeID, order: "back" | "front" | number): void;
+    mv(source: NodeID[], target: NodeID, index?: number): void;
+
+    align(
+      target: "selection" | NodeID,
+      alignment: {
+        horizontal?: "none" | "min" | "max" | "center";
+        vertical?: "none" | "min" | "max" | "center";
+      }
+    ): void;
+
+    //
+    distributeEvenly(target: "selection" | NodeID[], axis: "x" | "y"): void;
+    autoLayout(target: "selection" | NodeID[]): void;
+    contain(target: "selection" | NodeID[]): void;
+
+    /**
+     * group the nodes
+     * @param target - the nodes to group
+     */
+    group(target: "selection" | NodeID[]): void;
+
+    /**
+     * ungroup the nodes (from group or boolean)
+     * @param target - the nodes to ungroup
+     */
+    ungroup(target: "selection" | NodeID[]): void;
+
+    /**
+     * delete the guide at the given index
+     * @param idx
+     */
+    deleteGuide(idx: number): void;
+
+    // #region fonts
+
+    /**
+     * Loads the font so that the backend can render it
+     */
+    loadFontSync(font: { family: string }): Promise<void>;
+
+    /**
+     * Lists fonts currently loaded and available to the renderer.
+     */
+    listLoadedFonts(): string[];
+
+    /**
+     * Loads platform default fonts and configures renderer fallback order.
+     */
+    loadPlatformDefaultFonts(): Promise<void>;
+
+    /**
+     * Retrieves font metadata, variation axes and features.
+     */
+    getFontFamilyDetailsSync(
+      fontFamily: string
+    ): Promise<editor.font_spec.UIFontFamily | null>;
+
+    // #endregion fonts
+
+    // #region image
+
+    /**
+     * creates an image (data) from the given data, registers it to the document
+     * @param data
+     */
+    createImage(
+      data: Uint8Array | File
+    ): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * creates an image (data) from the given src, registers it to the document
+     * @param src
+     */
+    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * gets the image instance from the given ref
+     * @param ref
+     */
+    getImage(ref: string): ImageInstance | null;
+
+    // #endregion image
+  }
+
+  export interface IDocumentNodeChangeActions {
+    toggleNodeActive(node_id: NodeID): void;
+    toggleNodeLocked(node_id: NodeID): void;
+
+    changeNodeActive(node_id: NodeID, active: boolean): void;
+    changeNodeLocked(node_id: NodeID, locked: boolean): void;
+    changeNodeName(node_id: NodeID, name: string): void;
+    changeNodeUserData(node_id: NodeID, userdata: unknown): void;
+    changeNodeSize(
+      node_id: NodeID,
+      axis: "width" | "height",
+      value: grida.program.css.LengthPercentage | "auto"
+    ): void;
+
+    changeNodePropertyBorder(
+      node_id: NodeID,
+      border: grida.program.css.Border | undefined
+    ): void;
+    changeNodePropertyProps(
+      node_id: string,
+      key: string,
+      value?: tokens.StringValueExpression
+    ): void;
+    changeNodePropertyComponent(node_id: NodeID, component: string): void;
+    changeNodePropertyText(
+      node_id: NodeID,
+      text: tokens.StringValueExpression
+    ): void;
+    changeNodePropertyStyle(
+      node_id: NodeID,
+      key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
+      value: any
+    ): void;
+    changeNodePropertyMouseCursor(
+      node_id: NodeID,
+      mouseCursor: cg.SystemMouseCursor
+    ): void;
+    changeNodePropertySrc(
+      node_id: NodeID,
+      src?: tokens.StringValueExpression
+    ): void;
+    changeNodePropertyHref(
+      node_id: NodeID,
+      href?: grida.program.nodes.i.IHrefable["href"]
+    ): void;
+    changeNodePropertyTarget(
+      node_id: NodeID,
+      target?: grida.program.nodes.i.IHrefable["target"]
+    ): void;
+    changeNodePropertyPositioning(
+      node_id: NodeID,
+      positioning: grida.program.nodes.i.IPositioning
+    ): void;
+    changeNodePropertyPositioningMode(
+      node_id: NodeID,
+      positioningMode: "absolute" | "relative"
+    ): void;
+    changeNodePropertyCornerRadius(
+      node_id: NodeID,
+      cornerRadius: cg.CornerRadius
+    ): void;
+    changeNodePropertyCornerRadiusWithDelta(
+      node_id: NodeID,
+      delta: number
+    ): void;
+    changeNodePropertyPointCount(node_id: NodeID, pointCount: number): void;
+    changeNodePropertyInnerRadius(node_id: NodeID, innerRadius: number): void;
+    changeNodePropertyArcData(
+      node_id: NodeID,
+      arcData: grida.program.nodes.i.IEllipseArcData
+    ): void;
+    changeNodePropertyFills(node_id: NodeID, fills: cg.Paint[]): void;
+    changeNodePropertyFills(node_id: NodeID[], fills: cg.Paint[]): void;
+    changeNodePropertyStrokes(node_id: NodeID, strokes: cg.Paint[]): void;
+    changeNodePropertyStrokes(node_id: NodeID[], strokes: cg.Paint[]): void;
+
+    changeNodePropertyStrokeWidth(
+      node_id: NodeID,
+      strokeWidth: editor.api.NumberChange
+    ): void;
+    changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodePropertyStrokeAlign(
+      node_id: NodeID,
+      strokeAlign: cg.StrokeAlign
+    ): void;
+    changeNodePropertyFit(node_id: NodeID, fit: cg.BoxFit): void;
+    changeNodePropertyOpacity(
+      node_id: NodeID,
+      opacity: editor.api.NumberChange
+    ): void;
+    changeNodePropertyBlendMode(
+      node_id: NodeID,
+      blendMode: cg.LayerBlendMode
+    ): void;
+    changeNodePropertyRotation(
+      node_id: NodeID,
+      rotation: editor.api.NumberChange
+    ): void;
+
+    addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
+    addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;
+
+    addNodeStroke(
+      node_id: NodeID,
+      stroke: cg.Paint,
+      at?: "start" | "end"
+    ): void;
+    addNodeStroke(
+      node_id: NodeID[],
+      stroke: cg.Paint,
+      at?: "start" | "end"
+    ): void;
+
+    changeContainerNodePadding(
+      node_id: NodeID,
+      padding: grida.program.nodes.i.IPadding["padding"]
+    ): void;
+    changeContainerNodeLayout(
+      node_id: NodeID,
+      layout: grida.program.nodes.i.IFlexContainer["layout"]
+    ): void;
+    changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis): void;
+    changeFlexContainerNodeMainAxisAlignment(
+      node_id: string,
+      mainAxisAlignment: cg.MainAxisAlignment
+    ): void;
+    changeFlexContainerNodeCrossAxisAlignment(
+      node_id: string,
+      crossAxisAlignment: cg.CrossAxisAlignment
+    ): void;
+    changeFlexContainerNodeGap(
+      node_id: string,
+      gap: number | { mainAxisGap: number; crossAxisGap: number }
+    ): void;
+
+    changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
+    changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;
+    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeBlur): void;
+    changeNodeFeBackdropBlur(
+      node_id: NodeID,
+      effect?: cg.IFeGaussianBlur
+    ): void;
+
+    // ==============================================================
+    // TextNode
+    // ==============================================================
+
+    changeTextNodeFontFamilySync(
+      node_id: NodeID,
+      fontFamily: string,
+      force?: boolean
+    ): Promise<boolean>;
+    changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
+    changeTextNodeFontKerning(node_id: NodeID, fontKerning: boolean): void;
+    changeTextNodeFontWidth(node_id: NodeID, fontWidth: number): void;
+
+    /**
+     * use when font style change or family change
+     *
+     * | property              | operation        | notes |
+     * |-----------------------|------------------|-------|
+     * | `fontFamily`          | validate & set   | validate if the requested family / postscript is registered and ready to use, else reject |
+     * | `fontPostscriptName`  | set              | |
+     * | `fontStyleItalic`     | set              | |
+     * | `fontWeight`          | set              | |
+     * | `fontWidth`           | set              | |
+     * | `fontOpticalSizing`   | set              | |
+     * | `fontVariations`      | update / clean   | if instance change, remove not-defined variations |
+     * | `fontFeatures`        | clean            | if instance change, remove not-def features |
+     */
+    changeTextNodeFontStyle(
+      node_id: NodeID,
+      fontStyleDescription: editor.api.FontStyleChangeDescription
+    ): void;
+    changeTextNodeFontFeature(
+      node_id: NodeID,
+      feature: cg.OpenTypeFeature,
+      value: boolean
+    ): void;
+    changeTextNodeFontVariation(
+      node_id: NodeID,
+      key: string,
+      value: number
+    ): void;
+    changeTextNodeFontOpticalSizing(
+      node_id: NodeID,
+      fontOpticalSizing: cg.OpticalSizing
+    ): void;
+    changeTextNodeFontSize(
+      node_id: NodeID,
+      fontSize: editor.api.NumberChange
+    ): void;
+    changeTextNodeTextAlign(node_id: NodeID, textAlign: cg.TextAlign): void;
+    changeTextNodeTextAlignVertical(
+      node_id: NodeID,
+      textAlignVertical: cg.TextAlignVertical
+    ): void;
+    changeTextNodeTextTransform(
+      node_id: NodeID,
+      transform: cg.TextTransform
+    ): void;
+    changeTextNodeTextDecorationLine(
+      node_id: NodeID,
+      textDecorationLine: cg.TextDecorationLine
+    ): void;
+    changeTextNodeTextDecorationStyle(
+      node_id: NodeID,
+      textDecorationStyle: cg.TextDecorationStyle
+    ): void;
+    changeTextNodeTextDecorationThickness(
+      node_id: NodeID,
+      textDecorationThickness: cg.TextDecorationThicknessPercentage
+    ): void;
+    changeTextNodeTextDecorationColor(
+      node_id: NodeID,
+      textDecorationColor: cg.TextDecorationColor
+    ): void;
+    changeTextNodeTextDecorationSkipInk(
+      node_id: NodeID,
+      textDecorationSkipInk: cg.TextDecorationSkipInkFlag
+    ): void;
+    changeTextNodeLineHeight(
+      node_id: NodeID,
+      lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
+    ): void;
+    changeTextNodeLetterSpacing(
+      node_id: NodeID,
+      letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
+    ): void;
+    changeTextNodeWordSpacing(
+      node_id: NodeID,
+      wordSpacing: TChange<grida.program.nodes.TextNode["wordSpacing"]>
+    ): void;
+    changeTextNodeMaxlength(
+      node_id: NodeID,
+      maxlength: number | undefined
+    ): void;
+    changeTextNodeMaxLines(node_id: NodeID, maxLines: number | null): void;
+
+    /**
+     * @param node_id text node id
+     * @returns the font weight if the node is toggled, false otherwise
+     *
+     * @remarks
+     * not all fonts can be toggled bold, the font should actually have 400 / 700 weight defined.
+     */
+    toggleTextNodeBold(node_id: NodeID): false | cg.NFontWeight;
+
+    /**
+     * @param node_id text node id
+     * @returns true if the node is toggled, false otherwise
+     *
+     * note: the boolean does not return if its italic, it returns the result of successful toggle
+     * not all fonts can be toggled italic, the font should actually have italic style defined.
+     */
+    toggleTextNodeItalic(node_id: NodeID): boolean;
+
+    toggleTextNodeUnderline(node_id: NodeID): void;
+    toggleTextNodeLineThrough(node_id: NodeID): void;
+
+    /**
+     * removes explicit width or height value from the text node, making them sized "auto", based on the content.
+     */
+    autoSizeTextNode(node_id: NodeID, axis: "width" | "height"): void;
+
+    // ==============================================================
+  }
+
+  /**
+   * ## A11y actions
+   */
+  export interface IEditorA11yActions {
+    //
+    a11ySetClipboardColor(color: cg.RGBA8888): void;
+    a11yNudgeResize(
+      target: "selection" | NodeID,
+      axis: "x" | "y",
+      delta: number
+    ): void;
 
     /**
      * ux a11y escape command.
@@ -2578,68 +2731,92 @@ export namespace editor.api {
      */
     a11yPaste(): void;
     a11yDelete(): void;
-    blur(): void;
-    undo(): void;
-    redo(): void;
-    cut(target: "selection" | NodeID): void;
-    copy(target: "selection" | NodeID): void;
-    paste(): void;
-    duplicate(target: "selection" | NodeID): void;
-    flatten(target: "selection" | NodeID): void;
-    op(target: ReadonlyArray<NodeID>, op: cg.BooleanOperation): void;
-    union(target: ReadonlyArray<NodeID>): void;
-    subtract(target: ReadonlyArray<NodeID>): void;
-    intersect(target: ReadonlyArray<NodeID>): void;
-    exclude(target: ReadonlyArray<NodeID>): void;
-    groupMask(target: ReadonlyArray<NodeID>): void;
+    //
+    // //
+    a11yToggleActive(target: "selection" | NodeID): void;
+    a11yToggleLocked(target: "selection" | NodeID): void;
+    a11yToggleBold(target: "selection" | NodeID): void;
+    a11yToggleItalic(target: "selection" | NodeID): void;
+    a11yToggleUnderline(target: "selection" | NodeID): void;
+    a11yToggleLineThrough(target: "selection" | NodeID): void;
+    // //
+    a11ySetOpacity(target: "selection" | NodeID, opacity: number): void;
+  }
 
-    setClipboardColor(color: cg.RGBA8888): void;
+  /**
+   * ## Surface actions
+   *
+   * Surface actions are grida-distro specific opinionated surface api, which they won't be exposed to public api nor plugin api.
+   * They only make sense to be used within grida-distro.
+   *
+   * Difference between ally* and surface* actions:
+   * - a11y actions are "intended" to be used by users, specific to key binded actions, but make sense to be exposed as api as well.
+   * - surface actions are "NOT intended" to be used by developers, but rather directly called to UI-specific actions.
+   *
+   * a11y actions are generic, surface actions are specific.
+   */
+  export interface IEditorSurfaceActions {
+    surfaceHoverNode(node_id: string, event: "enter" | "leave"): void;
+    surfaceHoverEnterNode(node_id: string): void;
+    surfaceHoverLeaveNode(node_id: string): void;
 
-    // vector editor
-    selectVertex(node_id: NodeID, vertex: number): void;
-    deleteVertex(node_id: NodeID, vertex: number): void;
-    selectSegment(node_id: NodeID, segment: number): void;
-    deleteSegment(node_id: NodeID, segment: number): void;
-    splitSegment(node_id: NodeID, point: vn.PointOnSegment): void;
-    translateVertex(
-      node_id: NodeID,
-      vertex: number,
-      delta: cmath.Vector2
+    surfaceStartGuideGesture(axis: cmath.Axis, idx: number | -1): void;
+    surfaceStartScaleGesture(
+      selection: string | string[],
+      direction: cmath.CardinalDirection
     ): void;
-    translateSegment(
-      node_id: NodeID,
-      segment: number,
-      delta: cmath.Vector2
+    surfaceStartSortGesture(
+      selection: string | string[],
+      node_id: string
     ): void;
-    bendSegment(
-      node_id: NodeID,
+    surfaceStartGapGesture(selection: string | string[], axis: "x" | "y"): void;
+    surfaceStartCornerRadiusGesture(
+      selection: string,
+      anchor?: cmath.IntercardinalDirection
+    ): void;
+    surfaceStartRotateGesture(selection: string): void;
+    surfaceStartTranslateVectorNetwork(node_id: string): void;
+    surfaceStartCurveGesture(
+      node_id: string,
       segment: number,
-      ca: number,
-      cb: cmath.Vector2,
-      frozen: {
-        a: cmath.Vector2;
-        b: cmath.Vector2;
-        ta: cmath.Vector2;
-        tb: cmath.Vector2;
+      control: "ta" | "tb"
+    ): void;
+
+    surfacePointerDown(event: PointerEvent): void;
+    surfacePointerUp(event: PointerEvent): void;
+    surfacePointerMove(event: PointerEvent): void;
+
+    surfaceClick(event: MouseEvent): void;
+    surfaceDoubleClick(event: MouseEvent): void;
+
+    surfaceDragStart(event: PointerEvent): void;
+    surfaceDragEnd(event: PointerEvent): void;
+    surfaceDrag(event: TCanvasEventTargetDragGestureState): void;
+
+    // pixel grid
+    surfaceConfigurePixelGrid(state: "on" | "off"): void;
+    surfaceTogglePixelGrid(): "on" | "off";
+    //
+    // ruler
+    surfaceConfigureRuler(state: "on" | "off"): void;
+    surfaceToggleRuler(): "on" | "off";
+    //
+
+    //
+    surfaceSetTool(tool: editor.state.ToolMode): void;
+    surfaceTryExitContentEditMode(): void;
+    surfaceTryToggleContentEditMode(): void;
+    surfaceTryEnterContentEditMode(): void;
+    surfaceTryEnterContentEditMode(
+      node_id?: string,
+      mode?: "auto" | "paint/gradient" | "paint/image",
+      options?: {
+        paintIndex?: number;
+        paintTarget?: "fill" | "stroke";
       }
     ): void;
-    planarize(node_id: NodeID): void;
-
-    /**
-     * Updates the hovered control in vector content edit mode.
-     *
-     * @param hoveredControl - The hovered control with type and index, or null if no control is hovered
-     */
-    updateVectorHoveredControl(
-      hoveredControl: {
-        type: editor.state.VectorContentEditModeHoverableGeometryControlType;
-        index: number;
-      } | null
-    ): void;
-
     //
 
-    //
     /**
      * select the gradient stop by the given index
      *
@@ -2648,7 +2825,7 @@ export namespace editor.api {
      * @param node_id node id
      * @param stop index of the stop
      */
-    selectGradientStop(
+    surfaceSelectGradientStop(
       node_id: NodeID,
       stop: number,
       options?: {
@@ -2658,94 +2835,60 @@ export namespace editor.api {
     ): void;
     //
 
-    //
-    getNodeSnapshotById(node_id: NodeID): Readonly<grida.program.nodes.Node>;
-    getNodeById(node_id: NodeID): NodeProxy<grida.program.nodes.Node>;
-    getNodeDepth(node_id: NodeID): number;
-    //
-
-    //
-    insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;
-    deleteNode(target: "selection" | NodeID): void;
-    //
-
-    createNodeFromSvg(
-      svg: string
-    ): Promise<NodeProxy<grida.program.nodes.ContainerNode>>;
-    createImageNode(
-      image: grida.program.document.ImageRef
-    ): NodeProxy<grida.program.nodes.ImageNode>;
-    createTextNode(text: string): NodeProxy<grida.program.nodes.TextNode>;
-    createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
-
-    //
-    nudgeResize(
-      target: "selection" | NodeID,
-      axis: "x" | "y",
-      delta: number
-    ): void;
-    align(
-      target: "selection" | NodeID,
-      alignment: {
-        horizontal?: "none" | "min" | "max" | "center";
-        vertical?: "none" | "min" | "max" | "center";
-      }
-    ): void;
-    order(target: "selection" | NodeID, order: "back" | "front" | number): void;
-    mv(source: NodeID[], target: NodeID, index?: number): void;
-    //
-    distributeEvenly(target: "selection" | NodeID[], axis: "x" | "y"): void;
-    autoLayout(target: "selection" | NodeID[]): void;
-    contain(target: "selection" | NodeID[]): void;
-
     /**
-     * group the nodes
-     * @param target - the nodes to group
+     * Updates the hovered control in vector content edit mode.
+     *
+     * @param hoveredControl - The hovered control with type and index, or null if no control is hovered
      */
-    group(target: "selection" | NodeID[]): void;
+    surfaceUpdateVectorHoveredControl(
+      hoveredControl: {
+        type: editor.state.VectorContentEditModeHoverableGeometryControlType;
+        index: number;
+      } | null
+    ): void;
 
-    /**
-     * ungroup the nodes (from group or boolean)
-     * @param target - the nodes to ungroup
-     */
-    ungroup(target: "selection" | NodeID[]): void;
-    configureSurfaceRaycastTargeting(
+    //
+    surfaceConfigureSurfaceRaycastTargeting(
       config: Partial<state.HitTestingConfig>
     ): void;
-    configureMeasurement(measurement: "on" | "off"): void;
-    configureTranslateWithCloneModifier(
+    surfaceConfigureMeasurement(measurement: "on" | "off"): void;
+    surfaceConfigureTranslateWithCloneModifier(
       translate_with_clone: "on" | "off"
     ): void;
-    configureTranslateWithAxisLockModifier(
+    surfaceConfigureTranslateWithAxisLockModifier(
       tarnslate_with_axis_lock: "on" | "off"
     ): void;
-    configureTranslateWithForceDisableSnap(
+    surfaceConfigureTranslateWithForceDisableSnap(
       translate_with_force_disable_snap: "on" | "off"
     ): void;
-    configureTransformWithCenterOriginModifier(
+    surfaceConfigureTransformWithCenterOriginModifier(
       transform_with_center_origin: "on" | "off"
     ): void;
-    configureTransformWithPreserveAspectRatioModifier(
+    surfaceConfigureTransformWithPreserveAspectRatioModifier(
       transform_with_preserve_aspect_ratio: "on" | "off"
     ): void;
-    configureRotateWithQuantizeModifier(
+    surfaceConfigureRotateWithQuantizeModifier(
       rotate_with_quantize: number | "off"
     ): void;
-    configureCurveTangentMirroringModifier(
+    surfaceConfigureCurveTangentMirroringModifier(
       curve_tangent_mirroring: vn.TangentMirroringMode
     ): void;
-    // //
-    toggleActive(target: "selection" | NodeID): void;
-    toggleLocked(target: "selection" | NodeID): void;
-    toggleBold(target: "selection" | NodeID): void;
-    toggleItalic(target: "selection" | NodeID): void;
-    toggleUnderline(target: "selection" | NodeID): void;
-    toggleLineThrough(target: "selection" | NodeID): void;
-    // //
-    setOpacity(target: "selection" | NodeID, opacity: number): void;
+
+    /**
+     * Toggles whether the path tool should keep projecting after connecting
+     * to an existing vertex.
+     *
+     * When set to `"on"`, drawing a path and closing it on an existing
+     * vertex will continue extending the path from that vertex. When set to
+     * `"off"`, the path gesture concludes on close.
+     */
+    surfaceConfigurePathKeepProjectingModifier(
+      path_keep_projecting: "on" | "off"
+    ): void;
+    //
   }
 
-  export interface ISchemaActions {
+  export interface IDocumentSchemaActions_Experimental {
     // //
     schemaDefineProperty(
       key?: string,
@@ -2760,72 +2903,20 @@ export namespace editor.api {
     schemaDeleteProperty(key: string): void;
   }
 
-  export interface IFollowPluginActions {
-    follow(cursor_id: string): void;
-    unfollow(): void;
-  }
-
-  export interface IVectorInterfaceActions {
-    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
-  }
-
-  export interface IDocumentImageInterfaceActions {
-    //
-
-    /**
-     * creates an image (data) from the given data, registers it to the document
-     * @param data
-     */
-    createImage(
-      data: Uint8Array | File
-    ): Promise<grida.program.document.ImageRef>;
-
-    /**
-     * creates an image (data) from the given src, registers it to the document
-     * @param src
-     */
-    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
-
-    /**
-     * gets the image instance from the given ref
-     * @param ref
-     */
-    getImage(ref: string): ImageInstance | null;
-  }
-
-  export interface IFontLoaderActions {
-    /**
-     * Loads the font so that the backend can render it
-     */
-    loadFontSync(font: { family: string }): Promise<void>;
-
-    /**
-     * Lists fonts currently loaded and available to the renderer.
-     */
-    listLoadedFonts(): string[];
-
-    /**
-     * Loads platform default fonts and configures renderer fallback order.
-     */
-    loadPlatformDefaultFonts(): Promise<void>;
-
-    /**
-     * Retrieves font metadata, variation axes and features.
-     */
-    getFontFamilyDetailsSync(
-      fontFamily: string
-    ): Promise<editor.font_spec.UIFontFamily | null>;
-  }
-
-  export interface IExportPluginActions {
+  export interface IDocumentExportPluginActions {
     exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
     exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array>;
     exportNodeAs(node_id: string, format: "SVG"): Promise<string>;
   }
 
-  export interface ICursorChatActions {
+  export interface ISurfaceMultiplayerFollowPluginActions {
+    follow(cursor_id: string): void;
+    unfollow(): void;
+  }
+
+  export interface ISurfaceMultiplayerCursorChatActions {
     openCursorChat(): void;
     closeCursorChat(): void;
-    setCursorChatMessage(message: string | null): void;
+    updateCursorChatMessage(message: string | null): void;
   }
 }

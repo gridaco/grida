@@ -37,7 +37,7 @@ export default function useTangentMirroring(
   const setValue = useCallback(
     (mode: vn.StrictTangentMirroringMode) => {
       if (mode === "none") {
-        instance.configureCurveTangentMirroringModifier("none");
+        instance.surfaceConfigureCurveTangentMirroringModifier("none");
       } else {
         const verts = new Set<number>();
         for (const [v] of selected_tangents) verts.add(v);
@@ -52,7 +52,7 @@ export default function useTangentMirroring(
             }
           }
         });
-        instance.configureCurveTangentMirroringModifier(mode);
+        instance.surfaceConfigureCurveTangentMirroringModifier(mode);
       }
     },
     [instance, selected_tangents, selected_vertices, segments]

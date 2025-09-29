@@ -199,7 +199,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Zoom to fit",
         shortcut: "⇧1",
         disabled: !hasSelection,
-        onSelect: () => editor.fit(ids, { margin: 64, animate: true }),
+        onSelect: () => editor.camera.fit(ids, { margin: 64, animate: true }),
       },
       toggleLocked: {
         label: "Lock/Unlock",

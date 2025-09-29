@@ -135,7 +135,7 @@ ${userprompt}
           const { changes } = d as any;
           changes?.forEach((change: { id: string; text: string }) => {
             if (!(change.id && change.text)) return;
-            editor.changeNodeText(change.id, change.text);
+            editor.changeNodePropertyText(change.id, change.text);
           });
         },
         () => {
@@ -168,7 +168,9 @@ export function PlaygroundToolbar() {
         <ToggleGroupPrimitive.Root
           data-slot="toggle-group"
           onValueChange={(v) => {
-            editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+            editor.surfaceSetTool(
+              toolbar_value_to_cursormode(v as ToolbarToolType)
+            );
           }}
           value={value}
           defaultValue="cursor"
@@ -184,7 +186,9 @@ export function PlaygroundToolbar() {
               { value: "hand", label: "Hand tool", shortcut: "H" },
             ]}
             onValueChange={(v) => {
-              editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+              editor.surfaceSetTool(
+                toolbar_value_to_cursormode(v as ToolbarToolType)
+              );
             }}
           />
           <VerticalDivider />
@@ -215,7 +219,9 @@ export function PlaygroundToolbar() {
               { value: "image", label: "Image" },
             ]}
             onValueChange={(v) => {
-              editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+              editor.surfaceSetTool(
+                toolbar_value_to_cursormode(v as ToolbarToolType)
+              );
             }}
           />
           <ToolsGroup
@@ -229,7 +235,9 @@ export function PlaygroundToolbar() {
               { value: "eraser", label: "Eraser tool", shortcut: "E" },
             ]}
             onValueChange={(v) => {
-              editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+              editor.surfaceSetTool(
+                toolbar_value_to_cursormode(v as ToolbarToolType)
+              );
             }}
           />
           <VerticalDivider />
@@ -273,7 +281,7 @@ function BitmapEditModeAuxiliaryToolbar() {
               pressed={tool.type === "flood-fill"}
               onPressedChange={(pressed) => {
                 if (pressed) {
-                  editor.setTool({ type: "flood-fill" });
+                  editor.surfaceSetTool({ type: "flood-fill" });
                 }
               }}
             >
@@ -290,7 +298,7 @@ function BitmapEditModeAuxiliaryToolbar() {
             variant="ghost"
             size="icon"
             className="p-0.5"
-            onClick={editor.tryExitContentEditMode}
+            onClick={editor.surfaceTryExitContentEditMode}
           >
             <Cross2Icon className="w-3.5 h-3.5" />
           </Button>
@@ -360,7 +368,7 @@ function ClipboardColor() {
       >
         <ColorPicker
           color={color}
-          onColorChange={editor.setClipboardColor.bind(editor)}
+          onColorChange={editor.a11ySetClipboardColor.bind(editor)}
           options={options}
         />
       </PopoverContent>

@@ -281,7 +281,7 @@ function EditorUXServer({ focus }: { focus: { node?: string } }) {
     () => {
       if (focus.node) {
         editor.select([focus.node]);
-        editor.fit([focus.node], { margin: 64, animate: true });
+        editor.camera.fit([focus.node], { margin: 64, animate: true });
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
