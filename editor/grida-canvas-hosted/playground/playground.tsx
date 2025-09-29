@@ -127,11 +127,11 @@ import colors, {
   neutral_colors,
   randomcolorname,
 } from "@/theme/tailwindcolors";
-import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
 import { PathToolbar } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/path-toolbar";
 import { FullscreenLoadingOverlay } from "@/grida-canvas-react-starter-kit/starterkit-loading/loading";
 import { CursorChat } from "@/components/multiplayer/cursor-chat";
 import { distro } from "../distro";
+import { WithSize } from "@/grida-canvas-react/viewport/size";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -232,62 +232,63 @@ export default function CanvasPlayground({
   src,
   room_id,
 }: CanvasPlaygroundProps) {
+  useDisableSwipeBack();
   const instance = useEditor(document, backend);
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Mock loading timer - completes after random short time (1-3 seconds)
-  useEffect(() => {
-    const randomDelay = Math.random() * 1000 + 1000; // 1-2 seconds
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, randomDelay);
-
-    return () => clearTimeout(timer);
-  }, []);
+  const [ready, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (!src) return;
-    fetch(src).then((res) => {
-      res.json().then((file) => {
-        instance.reset(
-          editor.state.init({
-            editable: true,
-            document: file.document,
-          }),
-          src
-        );
-      });
-    });
+    if (ready) return;
+    if (src) {
+      fetch(src)
+        .then((res) => {
+          res.json().then((file) => {
+            instance.reset(
+              editor.state.init({
+                editable: true,
+                document: file.document,
+              }),
+              src
+            );
+          });
+        })
+        .finally(() => {
+          setIsReady(true);
+        });
+    } else {
+      if (document) {
+        setIsReady(true);
+      }
+    }
   }, [src]);
 
   return (
     <>
-      <FullscreenLoadingOverlay loading={isLoading} />
-      <FontFamilyListProvider fonts={fonts}>
+      <ErrorBoundary>
         <SidebarProvider className="w-full h-full">
           <TooltipProvider>
+            <FullscreenLoadingOverlay loading={!ready} />
             <main className="w-full h-full select-none">
-              <ErrorBoundary>
+              <FontFamilyListProvider fonts={fonts}>
                 <StandaloneDocumentEditor editor={instance}>
                   <WindowGlobalCurrentEditorProvider />
                   <UserCustomTemplatesProvider templates={templates}>
                     <Consumer backend={backend} />
                   </UserCustomTemplatesProvider>
                 </StandaloneDocumentEditor>
-              </ErrorBoundary>
+              </FontFamilyListProvider>
             </main>
           </TooltipProvider>
         </SidebarProvider>
-      </FontFamilyListProvider>
+      </ErrorBoundary>
     </>
   );
 }
 
 function Consumer({ backend }: { backend: "dom" | "canvas" }) {
   const { ui, toggleVisibility, toggleMinimal } = useUILayout();
-
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const instance = useCurrentEditor();
   const debug = useEditorState(instance, (state) => state.debug);
 
@@ -305,8 +306,6 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
   // Determine the variant for the right sidebar
   const sidebar_right_variant =
     ui.sidebar_right === "floating-when-selection" ? "floating" : "sidebar";
-
-  useDisableSwipeBack();
 
   useHotkeys("meta+\\, ctrl+\\", (e) => {
     e.stopPropagation();
@@ -339,6 +338,12 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
     }
   );
 
+  useEffect(() => {
+    if (canvasRef.current) {
+      instance.mount(canvasRef.current);
+    }
+  }, [canvasRef.current]);
+
   const onExport = () => {
     const blob = instance.archive();
     saveAs(blob, distro.snapshot_file_name());
@@ -349,40 +354,62 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
       <PreviewProvider>
         <div className="flex w-full h-full">
           {ui.sidebar_left && <SidebarLeft />}
-          <EditorSurfaceClipboardSyncProvider>
-            <EditorSurfaceDropzone>
-              <EditorSurfaceContextMenu>
-                <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
-                  <ViewportRoot className="relative w-full h-full overflow-hidden">
-                    <Hotkyes />
-                    <EditorSurface />
-                    <LocalFakeCursorChat />
-                    {backend === "canvas" ? (
-                      <__WIP_UNSTABLE_WasmContent editor={instance} />
-                    ) : (
-                      <AutoInitialFitTransformer>
-                        <StandaloneSceneContent />
-                      </AutoInitialFitTransformer>
-                    )}
-                    {ui.toolbar_bottom && (
-                      <>
-                        <BrushToolbarPosition>
-                          <BrushToolbar />
-                        </BrushToolbarPosition>
-                        <PathToolbarPosition>
-                          <PathToolbar />
-                        </PathToolbarPosition>
-                        <ToolbarPosition>
-                          <PlaygroundToolbar />
-                        </ToolbarPosition>
-                      </>
-                    )}
-                  </ViewportRoot>
-                  {debug && <DevtoolsPanel />}
-                </StandaloneSceneBackground>
-              </EditorSurfaceContextMenu>
-            </EditorSurfaceDropzone>
-          </EditorSurfaceClipboardSyncProvider>
+          <EditorSurfaceClipboardSyncProvider />
+          <EditorSurfaceDropzone>
+            <EditorSurfaceContextMenu>
+              <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
+                <ViewportRoot className="relative w-full h-full overflow-hidden">
+                  <Hotkyes />
+                  <EditorSurface />
+                  <LocalFakeCursorChat />
+                  {/* {backend === "canvas" && (
+                    <__WIP_UNSTABLE_WasmContent editor={instance} />
+                  )} */}
+                  {backend === "canvas" && (
+                    <WithSize
+                      className="w-full h-full max-w-full max-h-full"
+                      style={{
+                        // Force the canvas to respect container boundaries
+                        contain: "strict",
+                      }}
+                    >
+                      {({ width, height }) => (
+                        <canvas
+                          id="canvas"
+                          ref={canvasRef}
+                          width={width}
+                          height={height}
+                          style={{
+                            width: width,
+                            height: height,
+                          }}
+                        />
+                      )}
+                    </WithSize>
+                  )}
+                  {backend === "dom" && (
+                    <AutoInitialFitTransformer>
+                      <StandaloneSceneContent />
+                    </AutoInitialFitTransformer>
+                  )}
+                  {ui.toolbar_bottom && (
+                    <>
+                      <BrushToolbarPosition>
+                        <BrushToolbar />
+                      </BrushToolbarPosition>
+                      <PathToolbarPosition>
+                        <PathToolbar />
+                      </PathToolbarPosition>
+                      <ToolbarPosition>
+                        <PlaygroundToolbar />
+                      </ToolbarPosition>
+                    </>
+                  )}
+                </ViewportRoot>
+                {debug && <DevtoolsPanel />}
+              </StandaloneSceneBackground>
+            </EditorSurfaceContextMenu>
+          </EditorSurfaceDropzone>
           {should_show_sidebar_right && (
             <SidebarRight variant={sidebar_right_variant} />
           )}
@@ -682,7 +709,7 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
               <hr />
               <Label className="flex items-center justify-between">
                 Rendering Backend
-                <Link href="/canvas" target="_blank">
+                <Link href="/canvas/experimental/dom" target="_blank">
                   <Button size="sm" variant="outline">
                     DOM
                     <OpenInNewWindowIcon />
@@ -691,7 +718,7 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
               </Label>
               <Label className="flex items-center justify-between">
                 Rendering Backend
-                <Link href="/canvas/experimental/wasm" target="_blank">
+                <Link href="/canvas" target="_blank">
                   <Button size="sm" variant="outline">
                     CANVAS WASM
                     <OpenInNewWindowIcon />

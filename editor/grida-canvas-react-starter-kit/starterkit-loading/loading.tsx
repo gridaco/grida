@@ -199,7 +199,7 @@ function UXProgress({
 export function FullscreenLoadingOverlay({
   loading,
   expectedDuration = 3000,
-  minDuration = 0,
+  minDuration = 1000,
   steps,
   step,
   maxFakedProgress = 0.9,

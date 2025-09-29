@@ -41,6 +41,9 @@ const Context = React.createContext<{
   setMode: (mode: "framed" | "fullscreen") => void;
 } | null>(null);
 
+/**
+ * @deprecated needs re-design
+ */
 export function PreviewProvider({
   children,
 }: React.PropsWithChildren<StandaloneDocumentContentProps>) {

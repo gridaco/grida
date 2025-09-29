@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function CanvasPlaygroundPage() {
   return (
     <main className="w-screen h-screen overflow-hidden">
-      <Editor />
+      <Editor backend="dom" />
     </main>
   );
 }

@@ -36,7 +36,7 @@ export default async function FileExamplePage({
 
   return (
     <main className="w-screen h-screen overflow-hidden">
-      <Editor src={example?.url} />
+      <Editor backend="canvas" src={example?.url} />
     </main>
   );
 }

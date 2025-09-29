@@ -20,7 +20,6 @@ import {
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
-import type { Scene } from "@grida/canvas-wasm";
 import vn from "@grida/vn";
 import * as googlefonts from "@grida/fonts/google";
 import { DocumentFontManager } from "./font-manager";
@@ -33,6 +32,8 @@ import {
   CanvasWasmFontManagerAgentInterfaceProvider,
   CanvasWasmFontParserInterfaceProvider,
 } from "./backends/wasm";
+import init, { type Scene } from "@grida/canvas-wasm";
+import locateFile from "./backends/wasm-locate-file";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -75,7 +76,17 @@ export class Camera implements editor.api.ICameraActions {
   constructor(
     readonly editor: Editor,
     readonly viewport: domapi.DOMViewportApi
-  ) {}
+  ) {
+    //
+  }
+
+  get dpr(): number {
+    if (typeof window === "undefined") {
+      return 1;
+    }
+    const ratio = window.devicePixelRatio;
+    return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  }
 
   get transform() {
     return this.editor.state.transform;
@@ -321,6 +332,7 @@ export class Editor
     editor.api.IDocumentBrushToolActions,
     editor.api.IDocumentVectorInterfaceActions
 {
+  private readonly logger: (...args: any[]) => void;
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
   readonly camera: Camera;
@@ -373,6 +385,8 @@ export class Editor
     return this.mstate;
   }
 
+  readonly onMount: ((surface: Scene) => void) | null = null;
+
   constructor({
     logger = console.log,
     backend,
@@ -381,6 +395,7 @@ export class Editor
     initialState,
     interfaces = {},
     onCreate,
+    onMount,
   }: {
     logger?: (...args: any[]) => void;
     backend: editor.EditorContentRenderingBackend;
@@ -390,6 +405,7 @@ export class Editor
       | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider);
     initialState: editor.state.IEditorStateInit;
     onCreate?: (editor: Editor) => void;
+    onMount?: (surface: Scene) => void;
     interfaces?: {
       export_as_image?: WithEditorInstance<editor.api.IDocumentImageExportInterfaceProvider>;
       export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
@@ -399,6 +415,7 @@ export class Editor
       font_parser?: WithEditorInstance<editor.api.IDocumentFontParserInterfaceProvider>;
     };
   }) {
+    this.logger = logger;
     this.backend = backend;
     this.camera = new Camera(this, new domapi.DOMViewportApi(viewportElement));
     this.surface = new EditorSurface(this);
@@ -513,7 +530,7 @@ export class Editor
 
   private log(...args: any[]) {
     if (this.debug || process.env.NODE_ENV === "development") {
-      console.log(...args);
+      this.logger?.(...args);
     }
   }
 
@@ -533,12 +550,7 @@ export class Editor
     return this._tid;
   }
 
-  /**
-   * @deprecated
-   */
-  public bind(surface: Scene) {
-    this.log("bind surface");
-    assert(this.backend === "canvas", "Editor is not using canvas backend");
+  private __bind_wasm_surface(surface: Scene) {
     this._m_wasm_canvas_scene = surface;
     //
     this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
@@ -574,6 +586,154 @@ export class Editor
     );
 
     this._do_legacy_warmup();
+  }
+
+  public async mount(el: HTMLCanvasElement) {
+    this.log("mount surface");
+    assert(this.backend === "canvas", "Editor is not using canvas backend");
+
+    await init({
+      locateFile: locateFile,
+    }).then((factory) => {
+      const surface = factory.createWebGLCanvasSurface(el);
+      surface.runtime_renderer_set_cache_tile(false);
+      // surface.setDebug(this.debug);
+      // surface.setVerbose(this.debug);
+      this.__bind_wasm_surface(surface);
+      this.onMount?.(surface);
+
+      this.log("grida wasm initialized");
+
+      let width = el.width;
+      let height = el.height;
+      el.addEventListener("resize", () => {
+        width = el.width;
+        height = el.height;
+        this._m_wasm_canvas_scene?.resize(width, height);
+        this._m_wasm_canvas_scene?.redraw();
+      });
+
+      if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
+        this.log("wasm::factory", factory.module);
+      }
+
+      const syncTransform = (
+        surface: Scene,
+        transform: cmath.Transform,
+        width: number,
+        height: number,
+        dpr: number
+      ) => {
+        const safeDpr = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+
+        // the transform is the canvas transform, which needs to be converted to camera transform.
+        // input transform = translation + scale of the viewport, top left aligned
+        // camera transform = transform of the camera, center aligned
+        // - translate the transform to the center of the canvas
+        // - reverse the transform to match the canvas coordinate system
+
+        const toCenter = cmath.transform.translate(cmath.transform.identity, [
+          (-width * safeDpr) / 2,
+          (-height * safeDpr) / 2,
+        ]);
+
+        const deviceScale: cmath.Transform = [
+          [safeDpr, 0, 0],
+          [0, safeDpr, 0],
+        ];
+
+        const physicalTransform = cmath.transform.multiply(
+          deviceScale,
+          transform
+        );
+
+        const viewMatrix = cmath.transform.multiply(
+          toCenter,
+          physicalTransform
+        );
+
+        surface.setMainCameraTransform(cmath.transform.invert(viewMatrix));
+        surface.redraw();
+      };
+
+      const syncDocument = (
+        surface: Scene,
+        document: grida.program.document.Document
+      ) => {
+        const p = JSON.stringify({
+          version: "0.0.1-beta.1+20250728",
+          document,
+        });
+        surface.loadScene(p);
+        surface.redraw();
+      };
+
+      // setup hooks
+      // - state.document
+      // - state.debug
+      // - state.transform
+      // - [state.hovered_node_id, state.selection]
+
+      // once
+      syncDocument(this._m_wasm_canvas_scene!, this.state.document);
+      syncTransform(
+        this._m_wasm_canvas_scene!,
+        this.state.transform,
+        el.width,
+        el.height,
+        // this.camera.dpr
+        1
+      );
+
+      // subscribe
+      this.subscribeWithSelector(
+        (state) => state.document,
+        (_, v) => {
+          syncDocument(this._m_wasm_canvas_scene!, v);
+        }
+      );
+
+      this.subscribeWithSelector(
+        (state) => state.debug,
+        (_, v) => {
+          this._m_wasm_canvas_scene?.setDebug(v);
+          this._m_wasm_canvas_scene?.redraw();
+        }
+      );
+
+      this.subscribeWithSelector(
+        (state) => {
+          const hovered = state.hovered_node_id;
+          const selected = state.selection;
+          return [...selected, ...(hovered ? [hovered] : [])];
+        },
+        (_, v) => {
+          this._m_wasm_canvas_scene?.highlightStrokes({
+            nodes: v,
+            style: {
+              strokeWidth: 1,
+              // --color-workbench-accent-sky
+              stroke: "#00a6f4",
+            },
+          });
+          this._m_wasm_canvas_scene?.redraw();
+        }
+      );
+
+      this.subscribeWithSelector(
+        (state) => state.transform,
+        (_, v) => {
+          syncTransform(
+            this._m_wasm_canvas_scene!,
+            v,
+            el.width,
+            el.height,
+            // this.camera.dpr
+            1
+          );
+        }
+      );
+    });
   }
 
   public archive(): Blob {

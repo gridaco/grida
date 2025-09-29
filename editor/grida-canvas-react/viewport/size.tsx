@@ -90,3 +90,38 @@ export function useSize(defaultSize: { width: number; height: number }) {
     return defaultSize;
   }
 }
+
+/**
+ * A render prop component that measures its own dimensions and provides them to children.
+ * This component uses the render prop pattern to give child components access
+ * to the measured width and height of its own container.
+ *
+ * @example
+ * ```tsx
+ * <WithSize>
+ *   {(size) => <div style={{ width: size.width, height: size.height }} />}
+ * </WithSize>
+ * ```
+ *
+ * @param props - Component props
+ * @param props.children - Render function that receives the measured dimensions
+ * @param props.className - CSS classes for the container div
+ * @param props.style - Inline styles for the container div
+ * @param props.id - HTML id attribute for the container div
+ * @returns A div element that measures itself and renders children with dimensions
+ */
+export function WithSize({
+  children,
+  ...props
+}: {
+  children: (size: { width: number; height: number }) => React.ReactNode;
+} & Omit<React.HTMLAttributes<HTMLDivElement>, "children">) {
+  const [ref, { width, height }] = useMeasure();
+  const __measured = width !== null && height !== null;
+
+  return (
+    <div ref={ref} {...props}>
+      {__measured ? children({ width, height }) : null}
+    </div>
+  );
+}
