@@ -2,7 +2,7 @@ use crate::cache::scene::SceneCache;
 use crate::devtools::text_overlay;
 
 use crate::node::schema::NodeId;
-use crate::painter::layer::Layer;
+use crate::painter::layer::{Layer, PainterPictureLayer};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::font_repository::FontRepository;
 use crate::sk;
@@ -53,16 +53,21 @@ impl StrokeOverlay {
         for id in nodes {
             if let Some(layer) = cache.layers.layers.iter().find(|l| l.id() == id) {
                 if cache.geometry.get_render_bounds(id).is_some() {
-                    let shape = layer.shape();
                     let transform = layer.transform();
 
                     let mut path = if let Some(entry) = cache.path.borrow().get(id) {
                         (*entry.path).clone()
                     } else {
                         match layer {
-                            crate::painter::layer::PainterPictureLayer::Text(t) => {
+                            PainterPictureLayer::Vector(vector_layer) => {
+                                // for overlay, we don't intentionally apply corner radius (for better performance)
+                                vector_layer.vector.to_appended_path()
+                            }
+                            PainterPictureLayer::Text(text_layer) => {
                                 if let Some(text_path) =
-                                    text_overlay::TextOverlay::text_layer_baseline(cache, t)
+                                    text_overlay::TextOverlay::text_layer_baseline(
+                                        cache, text_layer,
+                                    )
                                 {
                                     text_path
                                 } else {
@@ -70,7 +75,7 @@ impl StrokeOverlay {
                                     continue;
                                 }
                             }
-                            _ => shape.to_path(),
+                            _ => layer.shape().to_path(),
                         }
                     };
                     path.transform(&sk::sk_matrix(transform.matrix));
