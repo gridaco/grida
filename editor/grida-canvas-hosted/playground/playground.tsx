@@ -131,46 +131,16 @@ import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
 import { PathToolbar } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/path-toolbar";
 import { FullscreenLoadingOverlay } from "@/grida-canvas-react-starter-kit/starterkit-loading/loading";
 import { CursorChat } from "@/components/multiplayer/cursor-chat";
-
-type UILayoutVariant = "full" | "minimal" | "hidden";
-type UILayout = {
-  sidebar_left: boolean;
-  sidebar_right: "hidden" | "visible" | "floating-when-selection";
-  toolbar_bottom: boolean;
-  help_fab: boolean;
-};
-
-const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
-
-const LAYOUT_VARIANTS: Record<UILayoutVariant, UILayout> = {
-  hidden: {
-    sidebar_left: false,
-    sidebar_right: "hidden",
-    toolbar_bottom: false,
-    help_fab: false,
-  },
-  minimal: {
-    sidebar_left: false,
-    sidebar_right: "floating-when-selection",
-    toolbar_bottom: true,
-    help_fab: true,
-  },
-  full: {
-    sidebar_left: true,
-    sidebar_right: "visible",
-    toolbar_bottom: true,
-    help_fab: true,
-  },
-};
+import { distro } from "../distro";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
-  const [uiVariant, setUIVariant] = useState<UILayoutVariant>("full");
+  const [uiVariant, setUIVariant] = useState<distro.ui.UILayoutVariant>("full");
   const [lastVisibleVariant, setLastVisibleVariant] = useState<
     "full" | "minimal"
   >("full");
 
-  const ui = useMemo(() => LAYOUT_VARIANTS[uiVariant], [uiVariant]);
+  const ui = useMemo(() => distro.ui.LAYOUT_VARIANTS[uiVariant], [uiVariant]);
 
   const toggleVisibility = useCallback(() => {
     setUIVariant((current) => {
@@ -224,13 +194,6 @@ const get_or_create_demo_session_cursor_id = (): string => {
   return newId;
 };
 
-function snapshotFilename() {
-  const now = new Date();
-  const date = now.toISOString().split("T")[0];
-  const time = now.toLocaleTimeString().replace(/:/g, ".");
-  return `Snapshot ${date} at ${time}.grida`;
-}
-
 function useSyncMultiplayerCursors(editor: Editor, room_id?: string) {
   const pluginRef = useRef<EditorYSyncPlugin | null>(null);
 
@@ -263,26 +226,7 @@ export type CanvasPlaygroundProps = {
 } & Partial<UserCustomTemplatesProps>;
 
 export default function CanvasPlayground({
-  document = {
-    editable: true,
-    debug: false,
-    document: {
-      nodes: {},
-      scenes: {
-        main: {
-          type: "scene",
-          id: "main",
-          name: "main",
-          children: [],
-          guides: [],
-          constraints: {
-            children: "multiple",
-          },
-          backgroundColor: CANVAS_BG_COLOR,
-        },
-      },
-    },
-  },
+  document = distro.playground.EMPTY_DOCUMENT,
   backend = "dom",
   templates,
   src,
@@ -397,7 +341,7 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
 
   const onExport = () => {
     const blob = instance.archive();
-    saveAs(blob, snapshotFilename());
+    saveAs(blob, distro.snapshot_file_name());
   };
 
   return (
@@ -838,7 +782,7 @@ function PlaygroundMenuContent() {
 
   const onExport = () => {
     const blob = instance.archive();
-    saveAs(blob, snapshotFilename());
+    saveAs(blob, distro.snapshot_file_name());
   };
 
   return (

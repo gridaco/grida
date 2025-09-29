@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { canvas_examples } from "@/scaffolds/playground-canvas/examples";
+import { canvas_examples } from "@/grida-canvas-hosted/playground/examples";
 import { notFound } from "next/navigation";
 import Editor from "../../editor";
 

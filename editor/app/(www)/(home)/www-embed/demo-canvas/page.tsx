@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import PlaygroundCanvas from "@/scaffolds/playground-canvas/playground-nossr";
+import PlaygroundCanvas from "@/grida-canvas-hosted/playground/playground-nossr";
 
 export const metadata: Metadata = {
   title: "Canvas Playground",

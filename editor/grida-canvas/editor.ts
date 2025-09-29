@@ -374,23 +374,23 @@ export class Editor
   }
 
   constructor({
+    logger = console.log,
     backend,
     viewportElement,
-    contentElement,
     geometry,
     initialState,
-    plugins = {},
+    interfaces = {},
     onCreate,
   }: {
+    logger?: (...args: any[]) => void;
     backend: editor.EditorContentRenderingBackend;
     viewportElement: string | HTMLElement;
-    contentElement: string | HTMLElement | Scene;
     geometry:
       | editor.api.IDocumentGeometryInterfaceProvider
       | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider);
     initialState: editor.state.IEditorStateInit;
     onCreate?: (editor: Editor) => void;
-    plugins?: {
+    interfaces?: {
       export_as_image?: WithEditorInstance<editor.api.IDocumentImageExportInterfaceProvider>;
       export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
       export_as_svg?: WithEditorInstance<editor.api.IDocumentSVGExportInterfaceProvider>;
@@ -408,42 +408,42 @@ export class Editor
       typeof geometry === "function" ? geometry(this) : geometry;
     //
 
-    if (plugins?.export_as_image) {
+    if (interfaces?.export_as_image) {
       this._m_exporter_image = resolveWithEditorInstance(
         this,
-        plugins.export_as_image
+        interfaces.export_as_image
       );
     }
 
-    if (plugins?.export_as_pdf) {
+    if (interfaces?.export_as_pdf) {
       this._m_exporter_pdf = resolveWithEditorInstance(
         this,
-        plugins.export_as_pdf
+        interfaces.export_as_pdf
       );
     }
 
-    if (plugins?.export_as_svg) {
+    if (interfaces?.export_as_svg) {
       this._m_exporter_svg = resolveWithEditorInstance(
         this,
-        plugins.export_as_svg
+        interfaces.export_as_svg
       );
     }
 
-    if (plugins?.vector) {
-      this._m_vector = resolveWithEditorInstance(this, plugins.vector);
+    if (interfaces?.vector) {
+      this._m_vector = resolveWithEditorInstance(this, interfaces.vector);
     }
 
-    if (plugins?.font_collection) {
+    if (interfaces?.font_collection) {
       this._m_font_collection = resolveWithEditorInstance(
         this,
-        plugins.font_collection
+        interfaces.font_collection
       );
     }
 
-    if (plugins?.font_parser) {
+    if (interfaces?.font_parser) {
       this._m_font_parser = resolveWithEditorInstance(
         this,
-        plugins.font_parser
+        interfaces.font_parser
       );
     }
 

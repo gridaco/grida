@@ -2,7 +2,7 @@
 import dynamic from "next/dynamic";
 
 const PlaygroundCanvas = dynamic(
-  () => import("@/scaffolds/playground-canvas/playground"),
+  () => import("@/grida-canvas-hosted/playground/playground"),
   {
     ssr: false,
   }

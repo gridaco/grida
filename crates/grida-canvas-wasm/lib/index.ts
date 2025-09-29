@@ -138,3 +138,5 @@ class ApplicationFactory {
     return this.createWebGLCanvasSurface(canvas);
   }
 }
+
+export type { ApplicationFactory };

@@ -5,7 +5,7 @@ import { DesktopDragArea } from "@/host/desktop";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 const PlaygroundCanvas = dynamic(
-  () => import("@/scaffolds/playground-canvas/playground"),
+  () => import("@/grida-canvas-hosted/playground/playground"),
   {
     ssr: false,
   }

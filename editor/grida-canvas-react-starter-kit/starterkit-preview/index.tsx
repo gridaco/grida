@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import Resizable from "./resizable";
-import ErrorBoundary from "@/scaffolds/playground-canvas/error-boundary";
+import ErrorBoundary from "@/grida-canvas-hosted/playground/error-boundary";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";

@@ -42,10 +42,9 @@ export function useEditor(
         return new Editor({
           backend: backend,
           viewportElement: domapi.k.VIEWPORT_ELEMENT_ID,
-          contentElement: domapi.k.EDITOR_CONTENT_ELEMENT_ID,
           geometry: (_) => new DOMGeometryQueryInterfaceProvider(_),
           initialState: init ?? __DEFAULT_STATE,
-          plugins: {
+          interfaces: {
             export_as_image: (_) => new DOMImageExportInterfaceProvider(_),
             font_collection: (_) => new DOMFontManagerAgentInterfaceProvider(_),
             font_parser: (_) => new DOMFontParserInterfaceProvider(_),
@@ -56,7 +55,6 @@ export function useEditor(
         return new Editor({
           backend: backend,
           viewportElement: domapi.k.VIEWPORT_ELEMENT_ID,
-          contentElement: domapi.k.EDITOR_CONTENT_ELEMENT_ID,
           geometry: (_) => new NoopGeometryQueryInterfaceProvider(),
           initialState: init ?? __DEFAULT_STATE,
         });
