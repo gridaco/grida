@@ -8,8 +8,8 @@ let i = 0;
  * @returns
  */
 export default function nid() {
-  if (process.env.NODE_ENV === "development") {
-    return "dev-" + i++;
-  }
+  // if (process.env.NODE_ENV === "development") {
+  //   return "dev-" + i++;
+  // }
   return v4();
 }

@@ -3521,6 +3521,8 @@ export class Editor
   closeCursorChat(): void {
     this.reduce((state) => {
       state.local_cursor_chat.is_open = false;
+      state.local_cursor_chat.message = null;
+      state.local_cursor_chat.last_modified = null;
       return state;
     });
   }
