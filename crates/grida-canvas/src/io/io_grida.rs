@@ -469,6 +469,66 @@ pub struct JSONScene {
     pub constraints: Option<HashMap<String, String>>,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum JSONCornerRadius {
+    Uniform(f32),
+    PerCorner(Vec<f32>),
+}
+
+impl JSONCornerRadius {
+    fn into_rectangular(self) -> RectangularCornerRadius {
+        match self {
+            JSONCornerRadius::Uniform(radius) => RectangularCornerRadius::circular(radius),
+            JSONCornerRadius::PerCorner(values) => {
+                // Interpret values following CSS border-radius shorthand semantics.
+                // https://developer.mozilla.org/en-US/docs/Web/CSS/border-radius
+                match values.len() {
+                    0 => RectangularCornerRadius::default(),
+                    1 => RectangularCornerRadius::circular(values[0]),
+                    2 => RectangularCornerRadius {
+                        tl: Radius::circular(values[0]),
+                        tr: Radius::circular(values[1]),
+                        br: Radius::circular(values[0]),
+                        bl: Radius::circular(values[1]),
+                    },
+                    _ => {
+                        let mut iter = values.into_iter();
+                        let tl = iter.next().unwrap_or_default();
+                        let tr = iter.next().unwrap_or(tl);
+                        let br = iter.next().unwrap_or(tr);
+                        let bl = iter.next().unwrap_or(br);
+                        RectangularCornerRadius {
+                            tl: Radius::circular(tl),
+                            tr: Radius::circular(tr),
+                            br: Radius::circular(br),
+                            bl: Radius::circular(bl),
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn into_uniform(self) -> Option<f32> {
+        match self {
+            JSONCornerRadius::Uniform(radius) => Some(radius),
+            JSONCornerRadius::PerCorner(values) => {
+                if values.is_empty() {
+                    None
+                } else if values
+                    .iter()
+                    .all(|&value| (value - values[0]).abs() < f32::EPSILON)
+                {
+                    Some(values[0])
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct JSONUnknownNodeProperties {
     pub id: String,
@@ -519,7 +579,7 @@ pub struct JSONUnknownNodeProperties {
     pub height: CSSDimension,
 
     #[serde(rename = "cornerRadius", default)]
-    pub corner_radius: Option<f32>,
+    pub corner_radius: Option<JSONCornerRadius>,
     #[serde(
         rename = "cornerRadiusTopLeft",
         default,
@@ -1066,7 +1126,10 @@ impl From<JSONEllipseNode> for Node {
             inner_radius: node.inner_radius,
             start_angle: node.angle_offset.unwrap_or(0.0),
             angle: node.angle,
-            corner_radius: node.base.corner_radius,
+            corner_radius: node
+                .base
+                .corner_radius
+                .and_then(JSONCornerRadius::into_uniform),
         })
     }
 }
@@ -1226,7 +1289,11 @@ impl From<JSONRegularPolygonNode> for Node {
                 width: node.base.width.length(0.0),
                 height: node.base.height.length(0.0),
             },
-            corner_radius: node.base.corner_radius.unwrap_or(0.0),
+            corner_radius: node
+                .base
+                .corner_radius
+                .and_then(JSONCornerRadius::into_uniform)
+                .unwrap_or(0.0),
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
@@ -1264,7 +1331,11 @@ impl From<JSONRegularStarPolygonNode> for Node {
                 width: node.base.width.length(0.0),
                 height: node.base.height.length(0.0),
             },
-            corner_radius: node.base.corner_radius.unwrap_or(0.0),
+            corner_radius: node
+                .base
+                .corner_radius
+                .and_then(JSONCornerRadius::into_uniform)
+                .unwrap_or(0.0),
             inner_radius: node.inner_radius,
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
@@ -1381,7 +1452,11 @@ impl From<JSONVectorNode> for Node {
             ),
             transform,
             network,
-            corner_radius: node.base.corner_radius.unwrap_or(0.0),
+            corner_radius: node
+                .base
+                .corner_radius
+                .and_then(JSONCornerRadius::into_uniform)
+                .unwrap_or(0.0),
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
@@ -1417,7 +1492,10 @@ impl From<JSONBooleanOperationNode> for Node {
             ),
             transform: Some(transform),
             op: node.op,
-            corner_radius: node.base.corner_radius,
+            corner_radius: node
+                .base
+                .corner_radius
+                .and_then(JSONCornerRadius::into_uniform),
             children: node.children,
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
@@ -1466,6 +1544,12 @@ where
     let value: Option<Value> = Deserialize::deserialize(deserializer)?;
     match value {
         Some(Value::Number(n)) => Ok(Some(Radius::circular(n.as_f64().unwrap_or(0.0) as f32))),
+        Some(Value::Array(values)) => {
+            let mut iter = values.into_iter().filter_map(|value| value.as_f64());
+            let rx = iter.next().unwrap_or(0.0) as f32;
+            let ry = iter.next().unwrap_or(rx as f64) as f32;
+            Ok(Some(Radius::elliptical(rx, ry)))
+        }
         _ => Ok(None),
     }
 }
@@ -1506,13 +1590,15 @@ where
 }
 
 fn merge_corner_radius(
-    corner_radius: Option<f32>,
+    corner_radius: Option<JSONCornerRadius>,
     corner_radius_top_left: Option<Radius>,
     corner_radius_top_right: Option<Radius>,
     corner_radius_bottom_right: Option<Radius>,
     corner_radius_bottom_left: Option<Radius>,
 ) -> RectangularCornerRadius {
-    let mut r = RectangularCornerRadius::circular(corner_radius.unwrap_or(0.0));
+    let mut r = corner_radius
+        .map(JSONCornerRadius::into_rectangular)
+        .unwrap_or_default();
     if let Some(corner_radius_top_left) = corner_radius_top_left {
         r.tl = corner_radius_top_left;
     }
@@ -1526,6 +1612,46 @@ fn merge_corner_radius(
         r.bl = corner_radius_bottom_left;
     }
     r
+}
+
+#[cfg(test)]
+mod corner_radius_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn corner_radius_array_deserializes_into_rectangular_radius() {
+        let json_props = json!({
+            "id": "node-1",
+            "name": "Cornered",
+            "active": true,
+            "locked": false,
+            "opacity": 1.0,
+            "blendMode": "normal",
+            "zIndex": 0,
+            "position": "absolute",
+            "left": 0,
+            "top": 0,
+            "rotation": 0,
+            "width": 100,
+            "height": 50,
+            "cornerRadius": [12, 8, 4, 2]
+        });
+
+        let props: JSONUnknownNodeProperties = serde_json::from_value(json_props).unwrap();
+        let radius = merge_corner_radius(
+            props.corner_radius,
+            props.corner_radius_top_left,
+            props.corner_radius_top_right,
+            props.corner_radius_bottom_right,
+            props.corner_radius_bottom_left,
+        );
+
+        assert_eq!(radius.tl.rx, 12.0);
+        assert_eq!(radius.tr.rx, 8.0);
+        assert_eq!(radius.br.rx, 4.0);
+        assert_eq!(radius.bl.rx, 2.0);
+    }
 }
 
 fn merge_effects(
