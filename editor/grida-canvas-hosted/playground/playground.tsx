@@ -132,6 +132,7 @@ import { FullscreenLoadingOverlay } from "@/grida-canvas-react-starter-kit/start
 import { CursorChat } from "@/components/multiplayer/cursor-chat";
 import { distro } from "../distro";
 import { WithSize } from "@/grida-canvas-react/viewport/size";
+import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -434,28 +435,7 @@ function Consumer({
                   {/* {backend === "canvas" && (
                     <__WIP_UNSTABLE_WasmContent editor={instance} />
                   )} */}
-                  {backend === "canvas" && (
-                    <WithSize
-                      className="w-full h-full max-w-full max-h-full"
-                      style={{
-                        // Force the canvas to respect container boundaries
-                        contain: "strict",
-                      }}
-                    >
-                      {({ width, height }) => (
-                        <canvas
-                          id="canvas"
-                          ref={canvasRef}
-                          width={width}
-                          height={height}
-                          style={{
-                            width: width,
-                            height: height,
-                          }}
-                        />
-                      )}
-                    </WithSize>
-                  )}
+                  {backend === "canvas" && <Canvas ref={canvasRef} />}
                   {backend === "dom" && (
                     <AutoInitialFitTransformer>
                       <StandaloneSceneContent />
@@ -487,6 +467,33 @@ function Consumer({
 
       {ui.help_fab && <HelpFab />}
     </>
+  );
+}
+
+function Canvas({ ref }: { ref?: (canvas: HTMLCanvasElement | null) => void }) {
+  const dpr = useDPR();
+
+  return (
+    <WithSize
+      className="w-full h-full max-w-full max-h-full"
+      style={{
+        // Force the canvas to respect container boundaries
+        contain: "strict",
+      }}
+    >
+      {({ width, height }) => (
+        <canvas
+          id="canvas"
+          ref={ref}
+          width={width * dpr}
+          height={height * dpr}
+          style={{
+            width: width,
+            height: height,
+          }}
+        />
+      )}
+    </WithSize>
   );
 }
 

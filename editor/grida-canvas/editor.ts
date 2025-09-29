@@ -385,7 +385,7 @@ export class Editor
     return this.mstate;
   }
 
-  readonly onMount: ((surface: Scene) => void) | null = null;
+  readonly onMount?: (surface: Scene) => void;
 
   constructor({
     logger = console.log,
@@ -416,6 +416,7 @@ export class Editor
     };
   }) {
     this.logger = logger;
+    this.onMount = onMount;
     this.backend = backend;
     this.camera = new Camera(this, new domapi.DOMViewportApi(viewportElement));
     this.surface = new EditorSurface(this);
@@ -588,6 +589,11 @@ export class Editor
     this._do_legacy_warmup();
   }
 
+  /**
+   * mount the canvas surface
+   * this does not YET manage the width / height / dpr. It assumes the canvas sets its own physical width / height.
+   * @param el canvas element
+   */
   public async mount(el: HTMLCanvasElement) {
     this.log("mount surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");
@@ -604,28 +610,14 @@ export class Editor
 
       this.log("grida wasm initialized");
 
-      let width = el.width;
-      let height = el.height;
-      el.addEventListener("resize", () => {
-        width = el.width;
-        height = el.height;
-        this._m_wasm_canvas_scene?.resize(width, height);
-        this._m_wasm_canvas_scene?.redraw();
-      });
-
-      if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
-        this.log("wasm::factory", factory.module);
-      }
-
       const syncTransform = (
         surface: Scene,
         transform: cmath.Transform,
+        // physical width
         width: number,
-        height: number,
-        dpr: number
+        // physical height
+        height: number
       ) => {
-        const safeDpr = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
-
         // the transform is the canvas transform, which needs to be converted to camera transform.
         // input transform = translation + scale of the viewport, top left aligned
         // camera transform = transform of the camera, center aligned
@@ -633,13 +625,15 @@ export class Editor
         // - reverse the transform to match the canvas coordinate system
 
         const toCenter = cmath.transform.translate(cmath.transform.identity, [
-          (-width * safeDpr) / 2,
-          (-height * safeDpr) / 2,
+          -width / 2,
+          -height / 2,
         ]);
 
+        const dpr = window.devicePixelRatio || 1;
+
         const deviceScale: cmath.Transform = [
-          [safeDpr, 0, 0],
-          [0, safeDpr, 0],
+          [dpr, 0, 0],
+          [0, dpr, 0],
         ];
 
         const physicalTransform = cmath.transform.multiply(
@@ -655,6 +649,27 @@ export class Editor
         surface.setMainCameraTransform(cmath.transform.invert(viewMatrix));
         surface.redraw();
       };
+
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.target == el) {
+            this._m_wasm_canvas_scene?.resize(el.width, el.height);
+            syncTransform(
+              this._m_wasm_canvas_scene!,
+              this.state.transform,
+              el.width,
+              el.height
+            );
+          }
+        }
+      });
+
+      // TODO: cleanup not handled
+      ro.observe(el, { box: "device-pixel-content-box" });
+
+      if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
+        this.log("wasm::factory", factory.module);
+      }
 
       const syncDocument = (
         surface: Scene,
@@ -680,9 +695,7 @@ export class Editor
         this._m_wasm_canvas_scene!,
         this.state.transform,
         el.width,
-        el.height,
-        // this.camera.dpr
-        1
+        el.height
       );
 
       // subscribe
@@ -723,14 +736,7 @@ export class Editor
       this.subscribeWithSelector(
         (state) => state.transform,
         (_, v) => {
-          syncTransform(
-            this._m_wasm_canvas_scene!,
-            v,
-            el.width,
-            el.height,
-            // this.camera.dpr
-            1
-          );
+          syncTransform(this._m_wasm_canvas_scene!, v, el.width, el.height);
         }
       );
     });
