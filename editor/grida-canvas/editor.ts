@@ -74,14 +74,6 @@ export class Camera implements editor.api.ICameraActions {
     //
   }
 
-  get dpr(): number {
-    if (typeof window === "undefined") {
-      return 1;
-    }
-    const ratio = window.devicePixelRatio;
-    return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
-  }
-
   get transform() {
     return this.editor.state.transform;
   }
