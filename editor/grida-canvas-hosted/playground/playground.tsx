@@ -305,7 +305,7 @@ export default function CanvasPlayground({
         if (cancelled) {
           return;
         }
-        instance.reset(
+        instance.commands.reset(
           editor.state.init({
             editable: true,
             document: file.document,
@@ -894,7 +894,7 @@ function PlaygroundMenuContent() {
         key={importFromJson.refreshkey}
         {...importFromJson.props}
         onImport={(file) => {
-          instance.reset(
+          instance.commands.reset(
             editor.state.init({
               editable: true,
               document: file.document,

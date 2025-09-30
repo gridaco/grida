@@ -11,7 +11,7 @@ import useVectorContentEditMode from "@/grida-canvas-react/use-sub-vector-networ
 import useTangentMirroring from "./use-tangent-mirroring";
 import vn from "@grida/vn";
 import type { editor } from "@/grida-canvas";
-import { useA11yActions } from "@/grida-canvas-react/provider";
+import { useA11yArrow } from "@/grida-canvas-react/provider";
 import { encodeTranslateVectorCommand } from "@/grida-canvas/reducers/methods";
 import {
   MirroringAll,
@@ -50,7 +50,7 @@ function SectionGeometry({ node_id }: { node_id: string }) {
     selected_vertices
   );
 
-  const { a11yarrow } = useA11yActions();
+  const { a11yarrow } = useA11yArrow();
 
   const points = React.useMemo(() => {
     const { vertices, tangents } = encodeTranslateVectorCommand(vectorNetwork, {

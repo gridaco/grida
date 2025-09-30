@@ -47,12 +47,12 @@ export class EditorFollowPlugin {
         [0, 1, cursor.position[1]],
       ] as cmath.Transform);
 
-    if (cursor.scene_id) this.editor.loadScene(cursor.scene_id);
+    if (cursor.scene_id) this.editor.commands.loadScene(cursor.scene_id);
 
     this.__cursor_id = cursor_id;
 
     this.editor.camera.transformWithSync(this.fit(initial), false);
-    this.__unsubscribe_cursor = this.editor.subscribeWithSelector(
+    this.__unsubscribe_cursor = this.editor.doc.subscribeWithSelector(
       (state) => state.cursors[cursor_id],
       (editor, cursor) => {
         if (!cursor) return;
@@ -60,7 +60,10 @@ export class EditorFollowPlugin {
           editor.loadScene(cursor.scene_id);
         }
         if (cursor.transform) {
-          editor.camera.transformWithSync(this.fit(cursor.transform), false);
+          this.editor.camera.transformWithSync(
+            this.fit(cursor.transform),
+            false
+          );
         }
       },
       equal

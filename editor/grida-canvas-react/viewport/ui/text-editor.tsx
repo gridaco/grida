@@ -81,7 +81,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
             html={node.text as string}
             onChange={(e) => {
               const txt = e.currentTarget.textContent;
-              editor.changeNodePropertyText(node_id, txt);
+              editor.commands.changeNodePropertyText(node_id, txt ?? "");
             }}
             style={{
               width: "100%",

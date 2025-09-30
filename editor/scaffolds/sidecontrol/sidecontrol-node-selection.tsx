@@ -144,10 +144,10 @@ function Align() {
     <_AlignControl
       disabled={!has_selection}
       onAlign={(alignment) => {
-        editor.align("selection", alignment);
+        editor.commands.align("selection", alignment);
       }}
       onDistributeEvenly={(axis) => {
-        editor.distributeEvenly("selection", axis);
+        editor.commands.distributeEvenly("selection", axis);
       }}
       className="justify-between"
     />
@@ -180,7 +180,7 @@ function Header() {
         <OpsControl
           disabled={!has_selection || !supports_boolean}
           onOp={(op) => {
-            editor.op(selection, op);
+            editor.commands.op(selection, op);
           }}
           className="flex justify-center"
         />
@@ -1660,7 +1660,7 @@ function SectionEffects({ node_id }: { node_id: string }) {
   }, [feShadows, feBlur, feBackdropBlur]);
 
   const onAddEffect = useCallback(() => {
-    instance.changeNodeFilterEffects(node_id, [
+    instance.commands.changeNodeFilterEffects(node_id, [
       ...effects,
       {
         type: "shadow",
@@ -1692,14 +1692,14 @@ function SectionEffects({ node_id }: { node_id: string }) {
               <FeControl
                 value={effect}
                 onValueChange={(value) => {
-                  instance.changeNodeFilterEffects(node_id, [
+                  instance.commands.changeNodeFilterEffects(node_id, [
                     ...effects.slice(0, index),
                     value,
                     ...effects.slice(index + 1),
                   ]);
                 }}
                 onRemove={() => {
-                  instance.changeNodeFilterEffects(node_id, [
+                  instance.commands.changeNodeFilterEffects(node_id, [
                     ...effects.slice(0, index),
                     ...effects.slice(index + 1),
                   ]);
@@ -1747,7 +1747,7 @@ function SelectionColors() {
                 size="xs"
                 className="opacity-0 group-hover:opacity-100"
                 onClick={() => {
-                  editor.select(ids);
+                  editor.commands.select(ids);
                 }}
               >
                 <Crosshair2Icon className="size-3" />

@@ -13,7 +13,7 @@ export class DocumentFontManager {
 
   constructor(private editor: Editor) {
     // watch for font registry changes
-    this.editor.subscribeWithSelector(
+    this.editor.doc.subscribeWithSelector(
       (state) => state.fontfaces,
       (_, v) => {
         this.sync(v);

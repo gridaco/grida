@@ -200,7 +200,7 @@ function HostedGridaCanvasDocumentProvider({
   const debouncedSave = useDebounceCallback(save, 1000);
 
   useEffect(() => {
-    editor.subscribeWithSelector(
+    editor.doc.subscribeWithSelector(
       (state) => state.document,
       () => {
         // save to server (with debounce)

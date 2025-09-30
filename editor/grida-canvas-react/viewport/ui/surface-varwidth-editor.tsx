@@ -69,14 +69,14 @@ function useVariableWithEditor() {
 
   const selectStop = useCallback(
     (stop: number) => {
-      instance.selectVariableWidthStop(node_id, stop);
+      instance.commands.selectVariableWidthStop(node_id, stop);
     },
     [instance, node_id]
   );
 
   const deleteStop = useCallback(
     (stop: number) => {
-      instance.deleteVariableWidthStop(node_id, stop);
+      instance.commands.deleteVariableWidthStop(node_id, stop);
     },
     [instance, node_id]
   );

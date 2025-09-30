@@ -91,8 +91,8 @@ export class EditorRecorder {
     if (!this.initial || !this.buffer || this.buffer.length === 0) return;
 
     this.status = "playing";
-    this.editor.locked = true;
-    this.editor.reset(this.initial, undefined, true);
+    this.editor.doc.locked = true;
+    this.editor.doc.reset(this.initial, undefined, true);
 
     for (let i = 0; i < this.buffer.length; i++) {
       const current = this.buffer[i];
@@ -102,7 +102,7 @@ export class EditorRecorder {
       await new Promise((resolve) => setTimeout(resolve, delay));
 
       requestAnimationFrame(() => {
-        this.editor.dispatch(current.a, true);
+        this.editor.doc.dispatch(current.a, true);
       });
     }
 
@@ -111,8 +111,8 @@ export class EditorRecorder {
 
   exit() {
     this.status = "idle";
-    this.editor.locked = false;
-    this.editor.reset(this.final!);
+    this.editor.doc.locked = false;
+    this.editor.doc.reset(this.final!);
   }
 
   /**

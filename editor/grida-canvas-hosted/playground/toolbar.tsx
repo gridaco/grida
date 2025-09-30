@@ -135,7 +135,7 @@ ${userprompt}
           const { changes } = d as any;
           changes?.forEach((change: { id: string; text: string }) => {
             if (!(change.id && change.text)) return;
-            editor.changeNodePropertyText(change.id, change.text);
+            editor.commands.changeNodePropertyText(change.id, change.text);
           });
         },
         () => {

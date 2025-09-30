@@ -280,7 +280,7 @@ function EditorUXServer({ focus }: { focus: { node?: string } }) {
   useEffect(
     () => {
       if (focus.node) {
-        editor.select([focus.node]);
+        editor.commands.select([focus.node]);
         editor.camera.fit([focus.node], { margin: 64, animate: true });
       }
     },

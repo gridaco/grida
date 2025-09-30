@@ -1,7 +1,7 @@
 import { useHotkeys } from "react-hotkeys-hook";
 import {
   useToolState,
-  useA11yActions,
+  useA11yArrow,
   useContentEditModeMinimalState,
   useCurrentSelectionIds,
 } from "../provider";
@@ -360,7 +360,7 @@ export function useEditorHotKeys() {
   const editor = useCurrentEditor();
   const tool = useToolState();
   const content_edit_mode = useContentEditModeMinimalState();
-  const { a11yarrow, a11yalign } = useA11yActions();
+  const { a11yarrow } = useA11yArrow();
 
   const selection = useCurrentSelectionIds();
   const [altKey, setAltKey] = useState(false);
@@ -568,7 +568,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "meta+a, ctrl+a",
     () => {
-      editor.select("selection", "~");
+      editor.commands.select("selection", "~");
     },
     {
       preventDefault: true,
@@ -602,7 +602,9 @@ export function useEditorHotKeys() {
               };
 
               if (selection.length > 0) {
-                editor.changeNodePropertyFills(selection, [solidPaint]);
+                editor.commands.changeNodePropertyFills(selection, [
+                  solidPaint,
+                ]);
               } else {
                 editor.surface.a11ySetClipboardColor(rgba);
                 window.navigator.clipboard
@@ -630,7 +632,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "enter",
     () => {
-      const maybe_selected = editor.select(">");
+      const maybe_selected = editor.commands.select(">");
       if (!maybe_selected) {
         // check if select(">") is possible first, then toggle when not possible
         editor.surface.surfaceTryToggleContentEditMode();
@@ -646,7 +648,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "shift+enter, \\",
     () => {
-      editor.select("..");
+      editor.commands.select("..");
     },
     {
       preventDefault: true,
@@ -658,7 +660,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "tab",
     () => {
-      editor.select("~+");
+      editor.commands.select("~+");
     },
     {
       preventDefault: true,
@@ -670,7 +672,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "shift+tab",
     () => {
-      editor.select("~-");
+      editor.commands.select("~-");
     },
     {
       preventDefault: true,
@@ -701,7 +703,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "undo, meta+z, ctrl+z",
     () => {
-      editor.undo();
+      editor.commands.undo();
     },
     {
       preventDefault: true,
@@ -713,7 +715,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "redo, meta+shift+z, ctrl+shift+z",
     () => {
-      editor.redo();
+      editor.commands.redo();
     },
     {
       preventDefault: true,
@@ -751,7 +753,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "meta+d, ctrl+d",
     () => {
-      editor.duplicate("selection");
+      editor.commands.duplicate("selection");
     },
     {
       preventDefault: true,
@@ -761,7 +763,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "meta+e, ctrl+e, alt+shift+f",
     () => {
-      editor.flatten("selection");
+      editor.commands.flatten("selection");
     },
     {
       preventDefault: true,
@@ -1012,61 +1014,60 @@ export function useEditorHotKeys() {
 
   useHotkeys("]", (e) => {
     if (tool.type === "brush") {
-      editor.changeBrushSize({ type: "delta", value: 1 });
+      editor.commands.changeBrushSize({ type: "delta", value: 1 });
     } else {
-      editor.order("selection", "front");
+      editor.commands.order("selection", "front");
     }
   });
 
   useHotkeys("[", (e) => {
     if (tool.type === "brush") {
-      editor.changeBrushSize({ type: "delta", value: -1 });
+      editor.commands.changeBrushSize({ type: "delta", value: -1 });
     } else {
-      editor.order("selection", "back");
+      editor.commands.order("selection", "back");
     }
   });
 
   useHotkeys("alt+a", () => {
-    a11yalign({ horizontal: "min" });
+    editor.surface.a11yAlign({ horizontal: "min" });
   });
   useHotkeys(
     "alt+d",
     () => {
-      a11yalign({ horizontal: "max" });
+      editor.surface.a11yAlign({ horizontal: "max" });
     },
     { preventDefault: true }
   );
   useHotkeys("alt+w", () => {
-    a11yalign({ vertical: "min" });
+    editor.surface.a11yAlign({ vertical: "min" });
   });
   useHotkeys("alt+s", () => {
-    a11yalign({ vertical: "max" });
+    editor.surface.a11yAlign({ vertical: "max" });
   });
-
   useHotkeys("alt+v", () => {
-    a11yalign({ vertical: "center" });
+    editor.surface.a11yAlign({ vertical: "center" });
   });
   useHotkeys("alt+h", () => {
-    a11yalign({ horizontal: "center" });
+    editor.surface.a11yAlign({ horizontal: "center" });
   });
 
   useHotkeys("alt+ctrl+v", (e) => {
-    editor.distributeEvenly("selection", "x");
+    editor.commands.distributeEvenly("selection", "x");
   });
 
   useHotkeys("alt+ctrl+h", (e) => {
-    editor.distributeEvenly("selection", "y");
+    editor.commands.distributeEvenly("selection", "y");
   });
 
   useHotkeys("shift+a", (e) => {
-    editor.autoLayout("selection");
+    editor.commands.autoLayout("selection");
   });
 
   useHotkeys(
     "ctrl+g, meta+g",
     () => {
       try {
-        editor.group("selection");
+        editor.commands.group("selection");
       } catch (e) {
         console.error(e);
         toast.error("use ⌥⌘G for grouping");
@@ -1081,7 +1082,7 @@ export function useEditorHotKeys() {
     "ctrl+shift+g, meta+shift+g",
     () => {
       try {
-        editor.ungroup("selection");
+        editor.commands.ungroup("selection");
       } catch {}
     },
     {
@@ -1090,7 +1091,7 @@ export function useEditorHotKeys() {
   );
 
   useHotkeys("ctrl+alt+g, meta+alt+g", () => {
-    editor.contain("selection");
+    editor.commands.contain("selection");
   });
 
   useHotkeys("alt+meta+k, alt+ctrl+k", (e) => {

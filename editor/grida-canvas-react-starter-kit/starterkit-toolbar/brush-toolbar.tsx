@@ -74,7 +74,10 @@ export default function BrushToolbar() {
               }}
               onValueChange={(values) => {
                 sizepop.onValueChange();
-                editor.changeBrushSize({ type: "set", value: values[0] });
+                editor.commands.changeBrushSize({
+                  type: "set",
+                  value: values[0],
+                });
               }}
             />
           </div>
@@ -104,7 +107,7 @@ export default function BrushToolbar() {
               onValueChange={(values) => {
                 opacitypop.onValueChange();
                 const v = values[0] / 100;
-                editor.changeBrushOpacity({ type: "set", value: v });
+                editor.commands.changeBrushOpacity({ type: "set", value: v });
               }}
             />
           </div>
@@ -151,7 +154,7 @@ export default function BrushToolbar() {
                   thumbnail={item.thumbnail}
                   selected={selected}
                   onClick={() => {
-                    editor.changeBrush(item.brush);
+                    editor.commands.changeBrush(item.brush);
                     if (selected) {
                       setDetailOpen(true);
                     }

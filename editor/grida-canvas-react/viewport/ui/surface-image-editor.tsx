@@ -222,9 +222,12 @@ function _ImagePaintEditor({
       const updatedPaints = [...paints];
       updatedPaints[paintIndex] = updatedPaint;
       if (paintTarget === "stroke") {
-        editorInstance.changeNodePropertyStrokes(node_id, updatedPaints);
+        editorInstance.commands.changeNodePropertyStrokes(
+          node_id,
+          updatedPaints
+        );
       } else {
-        editorInstance.changeNodePropertyFills(node_id, updatedPaints);
+        editorInstance.commands.changeNodePropertyFills(node_id, updatedPaints);
       }
     };
 

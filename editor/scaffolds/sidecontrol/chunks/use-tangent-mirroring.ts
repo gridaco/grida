@@ -48,7 +48,7 @@ export default function useTangentMirroring(
             const tA = segs[0].a === v ? segs[0].ta : segs[0].tb;
             const tB = segs[1].a === v ? segs[1].ta : segs[1].tb;
             if (cmath.vector2.isZero(tA) && cmath.vector2.isZero(tB)) {
-              instance.bendOrClearCorner(node_id, v);
+              instance.commands.bendOrClearCorner(node_id, v);
             }
           }
         });

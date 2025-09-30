@@ -1,7 +1,7 @@
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import type { Awareness } from "y-protocols/awareness";
-import type { Editor } from "../editor";
+import type { Editor, EditorDocumentStore } from "../editor";
 import { type Action, editor } from "..";
 import type cmath from "@grida/cmath";
 import { dq } from "../query";
@@ -94,7 +94,7 @@ class DocumentSyncManager {
       );
 
       if (Object.keys(updates).length > 0) {
-        this._tid = this._editor.reset(
+        this._tid = this._editor.doc.reset(
           {
             ...currentState,
             document: { ...currentState.document, ...updates },
@@ -110,10 +110,10 @@ class DocumentSyncManager {
     });
 
     // Subscribe to editor document changes and sync to Y.Doc
-    this.__unsubscribe_document_change = this._editor.subscribeWithSelector(
+    this.__unsubscribe_document_change = this._editor.doc.subscribeWithSelector(
       (state) => state.document,
       editor.throttle(
-        (editor: Editor, next, __, action?: Action) => {
+        (editor: EditorDocumentStore, next, __, action?: Action) => {
           if (editor.locked) return;
           // prevent loop mirroring
           if (editor.tid === this._tid) return;
@@ -213,7 +213,7 @@ class AwarenessSyncManager {
 
   private _setupGeoAwarenessSync() {
     // High-frequency updates for geometric data (mouse movement, camera)
-    this.__unsubscribe_geo_change = this._editor.subscribeWithSelector(
+    this.__unsubscribe_geo_change = this._editor.doc.subscribeWithSelector(
       (state) => ({
         pointer: state.pointer,
         marquee: state.marquee,
@@ -237,7 +237,7 @@ class AwarenessSyncManager {
 
   private _setupFocusAwarenessSync() {
     // Medium-frequency updates for focus changes (page switches, selections)
-    this.__unsubscribe_focus_change = this._editor.subscribeWithSelector(
+    this.__unsubscribe_focus_change = this._editor.doc.subscribeWithSelector(
       (state) => ({
         selection: state.selection,
         scene_id: state.scene_id,
@@ -259,20 +259,21 @@ class AwarenessSyncManager {
 
   private _setupCursorChatAwarenessSync() {
     // Sync cursor chat state from editor to awareness
-    this.__unsubscribe_cursor_chat_change = this._editor.subscribeWithSelector(
-      (state) => state.local_cursor_chat,
-      (editor, next) => {
-        if (editor.locked) return;
-        const { message, last_modified } = next;
+    this.__unsubscribe_cursor_chat_change =
+      this._editor.doc.subscribeWithSelector(
+        (state) => state.local_cursor_chat,
+        (editor, next) => {
+          if (editor.locked) return;
+          const { message, last_modified } = next;
 
-        this._currentState.cursor_chat = message
-          ? { txt: message, ts: last_modified || Date.now() }
-          : null;
+          this._currentState.cursor_chat = message
+            ? { txt: message, ts: last_modified || Date.now() }
+            : null;
 
-        this._syncAwarenessState();
-      },
-      equal
-    );
+          this._syncAwarenessState();
+        },
+        equal
+      );
   }
 
   private _syncAwarenessState() {

@@ -248,7 +248,7 @@ export function NodeHierarchyList() {
       expandedItems: allExpandedItems,
     },
     setSelectedItems: (items) => {
-      editor.select(items as string[]);
+      editor.commands.select(items as string[]);
     },
     setExpandedItems: (items) => {
       // Track user's manual expansion/collapse actions
@@ -278,7 +278,7 @@ export function NodeHierarchyList() {
         },
         inversed: true,
       });
-      editor.mv(ids, target_id, index);
+      editor.commands.mv(ids, target_id, index);
     },
     indent: 6,
     dataLoader: {
@@ -379,14 +379,14 @@ export function NodeHierarchyList() {
                 editor.surface.surfaceHoverNode(node.id, "leave");
               }}
               onRenameCommit={(name) => {
-                editor.changeNodeName(node.id, name);
+                editor.commands.changeNodeName(node.id, name);
                 tree.abortRenaming();
               }}
               onToggleLocked={() => {
-                editor.toggleNodeLocked(node.id);
+                editor.commands.toggleNodeLocked(node.id);
               }}
               onToggleActive={() => {
-                editor.toggleNodeActive(node.id);
+                editor.commands.toggleNodeActive(node.id);
               }}
             />
           </NodeHierarchyItemContextMenuWrapper>

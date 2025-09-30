@@ -64,7 +64,7 @@ export function useDataTransferEventTarget() {
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
-      const node = instance.createTextNode();
+      const node = instance.commands.createTextNode(text);
       node.$.name = text;
       node.$.text = text;
       node.$.left = x;
@@ -94,7 +94,7 @@ export function useDataTransferEventTarget() {
       const image = await instance.createImage(new Uint8Array(bytes));
 
       // Create rectangle node with image paint instead of image node
-      const node = instance.createRectangleNode();
+      const node = instance.commands.createRectangleNode();
       node.$.position = "absolute";
       node.$.name = name;
       node.$.left = x;
@@ -126,7 +126,7 @@ export function useDataTransferEventTarget() {
         clientY: number;
       }
     ) => {
-      const node = await instance.createNodeFromSvg(svg);
+      const node = await instance.commands.createNodeFromSvg(svg);
 
       const center_dx =
         typeof node.$.width === "number" && node.$.width > 0
@@ -204,7 +204,7 @@ export function useDataTransferEventTarget() {
       if (event.target instanceof HTMLTextAreaElement) return;
 
       if (!event.clipboardData) {
-        instance.paste();
+        instance.commands.paste();
         return;
       }
 
@@ -233,7 +233,7 @@ export function useDataTransferEventTarget() {
           const net = JSON.parse(
             atob(vector_payload.text.slice("grida:vn:".length))
           );
-          instance.dispatch({ type: "paste", vector_network: net });
+          instance.commands.pasteVector(net);
           pasted_from_data_transfer = true;
         } catch {}
       }
@@ -248,7 +248,7 @@ export function useDataTransferEventTarget() {
           if (
             current_clipboard?.payload_id === grida_payload.clipboard.payload_id
           ) {
-            instance.paste();
+            instance.commands.paste();
             pasted_from_data_transfer = true;
           } else if (grida_payload.clipboard.type === "prototypes") {
             grida_payload.clipboard.prototypes.forEach((p) => {
@@ -261,7 +261,7 @@ export function useDataTransferEventTarget() {
             });
             pasted_from_data_transfer = true;
           } else {
-            instance.paste();
+            instance.commands.paste();
             pasted_from_data_transfer = true;
           }
         }
@@ -299,7 +299,7 @@ export function useDataTransferEventTarget() {
 
         // 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
         if (!pasted_from_data_transfer) {
-          instance.paste();
+          instance.commands.paste();
           event.preventDefault();
         }
       }

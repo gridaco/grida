@@ -126,16 +126,16 @@ export default function useVectorContentEditMode(): VectorContentEditor {
       if (tool.type === "path") {
         return;
       }
-      instance.selectVertex(node_id, vertex, { additive });
+      instance.commands.selectVertex(node_id, vertex, { additive });
     },
-    [tool.type, instance.selectVertex, node_id]
+    [tool.type, instance.commands, node_id]
   );
 
   const deleteVertex = useCallback(
     (vertex: number) => {
-      instance.deleteVertex(node_id, vertex);
+      instance.commands.deleteVertex(node_id, vertex);
     },
-    [node_id, instance.deleteVertex]
+    [node_id, instance.commands]
   );
 
   const onCurveControlPointDragStart = useCallback(
@@ -155,7 +155,7 @@ export default function useVectorContentEditMode(): VectorContentEditor {
 
   const selectSegment = useCallback(
     (segment: number, additive?: boolean) => {
-      instance.selectSegment(node_id, segment, { additive });
+      instance.commands.selectSegment(node_id, segment, { additive });
     },
     [instance, node_id]
   );
@@ -164,23 +164,28 @@ export default function useVectorContentEditMode(): VectorContentEditor {
     (segment: number, control: "ta" | "tb", additive?: boolean) => {
       const vertex =
         control === "ta" ? segments[segment].a : segments[segment].b;
-      instance.selectTangent(node_id, vertex, control === "ta" ? 0 : 1, {
-        additive,
-      });
+      instance.commands.selectTangent(
+        node_id,
+        vertex,
+        control === "ta" ? 0 : 1,
+        {
+          additive,
+        }
+      );
     },
     [instance, node_id, segments]
   );
 
   const deleteSegment = useCallback(
     (segment: number) => {
-      instance.deleteSegment(node_id, segment);
+      instance.commands.deleteSegment(node_id, segment);
     },
     [instance, node_id]
   );
 
   const onSplitSegmentT05 = useCallback(
     (segment: number) => {
-      instance.splitSegment(node_id, { segment, t: 0.5 });
+      instance.commands.splitSegment(node_id, { segment, t: 0.5 });
       instance.surface.surfaceStartTranslateVectorNetwork(node_id);
     },
     [instance, node_id, vertices.length]
@@ -198,7 +203,7 @@ export default function useVectorContentEditMode(): VectorContentEditor {
         tb: cmath.Vector2;
       }
     ) => {
-      instance.bendSegment(node_id, segment, ca, cb, frozen);
+      instance.commands.bendSegment(node_id, segment, ca, cb, frozen);
     },
     [instance, node_id]
   );
@@ -220,9 +225,9 @@ export default function useVectorContentEditMode(): VectorContentEditor {
   const selectLoop = useCallback(
     (loop: vn.Loop) => {
       if (loop.length === 0) return;
-      instance.selectSegment(node_id, loop[0], { additive: false });
+      instance.commands.selectSegment(node_id, loop[0], { additive: false });
       for (let i = 1; i < loop.length; i++) {
-        instance.selectSegment(node_id, loop[i], { additive: true });
+        instance.commands.selectSegment(node_id, loop[i], { additive: true });
       }
     },
     [instance, node_id]

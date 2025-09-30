@@ -44,77 +44,77 @@ export function useMixedProperties(ids: string[]) {
   const name = useCallback(
     (value: string) => {
       ids.forEach((id) => {
-        instance.changeNodeName(id, value);
+        instance.commands.changeNodeName(id, value);
       });
     },
-    [ids, instance.changeNodeName]
+    [ids, instance.commands]
   );
 
   const copy = useCallback(() => {
-    instance.copy("selection");
+    instance.commands.copy("selection");
   }, [instance]);
 
   const active = useCallback(
     (value: boolean) => {
       ids.forEach((id) => {
-        instance.changeNodeActive(id, value);
+        instance.commands.changeNodeActive(id, value);
       });
     },
-    [ids, instance.changeNodeActive]
+    [ids, instance.commands]
   );
 
   const locked = useCallback(
     (value: boolean) => {
       ids.forEach((id) => {
-        instance.changeNodeLocked(id, value);
+        instance.commands.changeNodeLocked(id, value);
       });
     },
-    [ids, instance.changeNodeLocked]
+    [ids, instance.commands]
   );
 
   const rotation = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.rotation?.ids.forEach((id) => {
-        instance.changeNodePropertyRotation(id, change);
+        instance.commands.changeNodePropertyRotation(id, change);
       });
     },
-    [mixedProperties.rotation?.ids, instance.changeNodePropertyRotation]
+    [mixedProperties.rotation?.ids, instance.commands]
   );
 
   const opacity = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.opacity?.ids.forEach((id) => {
-        instance.changeNodePropertyOpacity(id, change);
+        instance.commands.changeNodePropertyOpacity(id, change);
       });
     },
-    [mixedProperties.opacity?.ids, instance.changeNodePropertyOpacity]
+    [mixedProperties.opacity?.ids, instance.commands]
   );
 
   const width = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
       mixedProperties.width?.ids.forEach((id) => {
-        instance.changeNodeSize(id, "width", value);
+        instance.commands.changeNodeSize(id, "width", value);
       });
     },
-    [mixedProperties.width?.ids, instance.changeNodeSize]
+    [mixedProperties.width?.ids, instance.commands]
   );
 
   const height = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
       mixedProperties.height?.ids.forEach((id) => {
-        instance.changeNodeSize(id, "height", value);
+        instance.commands.changeNodeSize(id, "height", value);
       });
     },
-    [mixedProperties.height?.ids, instance.changeNodeSize]
+    [mixedProperties.height?.ids, instance.commands]
   );
 
   const positioningMode = useCallback(
     (position: grida.program.nodes.i.IPositioning["position"]) => {
       mixedProperties.position?.ids.forEach((id) => {
-        instance.changeNodePropertyPositioningMode(id, position);
+        instance.commands.changeNodePropertyPositioningMode(id, position);
       });
     },
-    [mixedProperties.position?.ids, instance.changeNodePropertyPositioningMode]
+    [mixedProperties.position?.ids, instance.commands]
   );
 
   const fontFamily = useCallback(
@@ -129,28 +129,28 @@ export function useMixedProperties(ids: string[]) {
   const fontWeight = useCallback(
     (value: cg.NFontWeight) => {
       mixedProperties.fontWeight?.ids.forEach((id) => {
-        instance.changeTextNodeFontWeight(id, value);
+        instance.commands.changeTextNodeFontWeight(id, value);
       });
     },
-    [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontWeight]
+    [mixedProperties.fontWeight?.ids, instance.commands]
   );
 
   const fontKerning = useCallback(
     (value: boolean) => {
       mixedProperties.fontKerning?.ids.forEach((id) => {
-        instance.changeTextNodeFontKerning(id, value);
+        instance.commands.changeTextNodeFontKerning(id, value);
       });
     },
-    [mixedProperties.fontKerning?.ids, instance.changeTextNodeFontKerning]
+    [mixedProperties.fontKerning?.ids, instance.commands]
   );
 
   const fontWidth = useCallback(
     (value: number) => {
       mixedProperties.fontWidth?.ids.forEach((id) => {
-        instance.changeTextNodeFontWidth(id, value);
+        instance.commands.changeTextNodeFontWidth(id, value);
       });
     },
-    [mixedProperties.fontWidth?.ids, instance.changeTextNodeFontWidth]
+    [mixedProperties.fontWidth?.ids, instance.commands]
   );
 
   const fontStyle = useCallback(
@@ -165,40 +165,37 @@ export function useMixedProperties(ids: string[]) {
   const fontOpticalSizing = useCallback(
     (value: cg.OpticalSizing) => {
       mixedProperties.fontOpticalSizing?.ids.forEach((id) => {
-        instance.changeTextNodeFontOpticalSizing(id, value);
+        instance.commands.changeTextNodeFontOpticalSizing(id, value);
       });
     },
-    [
-      mixedProperties.fontOpticalSizing?.ids,
-      instance.changeTextNodeFontOpticalSizing,
-    ]
+    [mixedProperties.fontOpticalSizing?.ids, instance.commands]
   );
 
   const fontVariation = useCallback(
     (key: string, value: number) => {
       mixedProperties.fontWeight?.ids.forEach((id) => {
-        instance.changeTextNodeFontVariation(id, key, value);
+        instance.commands.changeTextNodeFontVariation(id, key, value);
       });
     },
-    [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontVariation]
+    [mixedProperties.fontWeight?.ids, instance.commands]
   );
 
   const fontSize = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.fontSize?.ids.forEach((id) => {
-        instance.changeTextNodeFontSize(id, change);
+        instance.commands.changeTextNodeFontSize(id, change);
       });
     },
-    [mixedProperties.fontSize?.ids, instance.changeTextNodeFontSize]
+    [mixedProperties.fontSize?.ids, instance.commands]
   );
 
   const lineHeight = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.lineHeight?.ids.forEach((id) => {
-        instance.changeTextNodeLineHeight(id, change);
+        instance.commands.changeTextNodeLineHeight(id, change);
       });
     },
-    [mixedProperties.lineHeight?.ids, instance.changeTextNodeLineHeight]
+    [mixedProperties.lineHeight?.ids, instance.commands]
   );
 
   const letterSpacing = useCallback(
@@ -206,10 +203,10 @@ export function useMixedProperties(ids: string[]) {
       change: editor.api.TChange<grida.program.nodes.TextNode["letterSpacing"]>
     ) => {
       mixedProperties.letterSpacing?.ids.forEach((id) => {
-        instance.changeTextNodeLetterSpacing(id, change);
+        instance.commands.changeTextNodeLetterSpacing(id, change);
       });
     },
-    [mixedProperties.letterSpacing?.ids, instance.changeTextNodeLetterSpacing]
+    [mixedProperties.letterSpacing?.ids, instance.commands]
   );
 
   const wordSpacing = useCallback(
@@ -217,134 +214,125 @@ export function useMixedProperties(ids: string[]) {
       change: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
     ) => {
       mixedProperties.wordSpacing?.ids.forEach((id) => {
-        instance.changeTextNodeWordSpacing(id, change);
+        instance.commands.changeTextNodeWordSpacing(id, change);
       });
     },
-    [mixedProperties.wordSpacing?.ids, instance.changeTextNodeWordSpacing]
+    [mixedProperties.wordSpacing?.ids, instance.commands]
   );
 
   const textAlign = useCallback(
     (value: cg.TextAlign) => {
       mixedProperties.textAlign?.ids.forEach((id) => {
-        instance.changeTextNodeTextAlign(id, value);
+        instance.commands.changeTextNodeTextAlign(id, value);
       });
     },
-    [mixedProperties.textAlign?.ids, instance.changeTextNodeTextAlign]
+    [mixedProperties.textAlign?.ids, instance.commands]
   );
 
   const textAlignVertical = useCallback(
     (value: cg.TextAlignVertical) => {
       mixedProperties.textAlignVertical?.ids.forEach((id) => {
-        instance.changeTextNodeTextAlignVertical(id, value);
+        instance.commands.changeTextNodeTextAlignVertical(id, value);
       });
     },
-    [
-      mixedProperties.textAlignVertical?.ids,
-      instance.changeTextNodeTextAlignVertical,
-    ]
+    [mixedProperties.textAlignVertical?.ids, instance.commands]
   );
 
   const fit = useCallback(
     (value: cg.BoxFit) => {
       mixedProperties.fit?.ids.forEach((id) => {
-        instance.changeNodePropertyFit(id, value);
+        instance.commands.changeNodePropertyFit(id, value);
       });
     },
-    [mixedProperties.fit?.ids, instance.changeNodePropertyFit]
+    [mixedProperties.fit?.ids, instance.commands]
   );
 
   const fill = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
       const paints = value === null ? [] : [value as cg.Paint];
-      instance.changeNodePropertyFills(ids, paints);
+      instance.commands.changeNodePropertyFills(ids, paints);
     },
-    [ids, instance]
+    [ids, instance.commands]
   );
 
   const stroke = useCallback(
     (value: grida.program.nodes.i.props.SolidPaintToken | cg.Paint | null) => {
       const paints = value === null ? [] : [value as cg.Paint];
-      instance.changeNodePropertyStrokes(ids, paints);
+      instance.commands.changeNodePropertyStrokes(ids, paints);
     },
-    [ids, instance]
+    [ids, instance.commands]
   );
 
   const strokeWidth = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.strokeWidth?.ids.forEach((id) => {
-        instance.changeNodePropertyStrokeWidth(id, change);
+        instance.commands.changeNodePropertyStrokeWidth(id, change);
       });
     },
-    [mixedProperties.strokeWidth?.ids, instance.changeNodePropertyStrokeWidth]
+    [mixedProperties.strokeWidth?.ids, instance.commands]
   );
 
   const strokeCap = useCallback(
     (value: cg.StrokeCap) => {
       mixedProperties.strokeCap?.ids.forEach((id) => {
-        instance.changeNodePropertyStrokeCap(id, value);
+        instance.commands.changeNodePropertyStrokeCap(id, value);
       });
     },
-    [mixedProperties.strokeCap?.ids, instance.changeNodePropertyStrokeCap]
+    [mixedProperties.strokeCap?.ids, instance.commands]
   );
 
   const layout = useCallback(
     (value: grida.program.nodes.i.IFlexContainer["layout"]) => {
       mixedProperties.layout?.ids.forEach((id) => {
-        instance.changeContainerNodeLayout(id, value);
+        instance.commands.changeContainerNodeLayout(id, value);
       });
     },
-    [mixedProperties.layout?.ids, instance.changeContainerNodeLayout]
+    [mixedProperties.layout?.ids, instance.commands]
   );
 
   const direction = useCallback(
     (value: cg.Axis) => {
       mixedProperties.direction?.ids.forEach((id) => {
-        instance.changeFlexContainerNodeDirection(id, value);
+        instance.commands.changeFlexContainerNodeDirection(id, value);
       });
     },
-    [mixedProperties.direction?.ids, instance.changeFlexContainerNodeDirection]
+    [mixedProperties.direction?.ids, instance.commands]
   );
 
   const mainAxisAlignment = useCallback(
     (value: cg.MainAxisAlignment) => {
       mixedProperties.mainAxisAlignment?.ids.forEach((id) => {
-        instance.changeFlexContainerNodeMainAxisAlignment(id, value);
+        instance.commands.changeFlexContainerNodeMainAxisAlignment(id, value);
       });
     },
-    [
-      mixedProperties.mainAxisAlignment?.ids,
-      instance.changeFlexContainerNodeMainAxisAlignment,
-    ]
+    [mixedProperties.mainAxisAlignment?.ids, instance.commands]
   );
 
   const crossAxisAlignment = useCallback(
     (value: cg.CrossAxisAlignment) => {
       mixedProperties.crossAxisAlignment?.ids.forEach((id) => {
-        instance.changeFlexContainerNodeCrossAxisAlignment(id, value);
+        instance.commands.changeFlexContainerNodeCrossAxisAlignment(id, value);
       });
     },
-    [
-      mixedProperties.crossAxisAlignment?.ids,
-      instance.changeFlexContainerNodeCrossAxisAlignment,
-    ]
+    [mixedProperties.crossAxisAlignment?.ids, instance.commands]
   );
 
   const cornerRadius = useCallback(
     (value: cg.CornerRadius) => {
       mixedProperties.cornerRadius?.ids.forEach((id) => {
-        instance.changeNodePropertyCornerRadius(id, value);
+        instance.commands.changeNodePropertyCornerRadius(id, value);
       });
     },
-    [mixedProperties.cornerRadius?.ids, instance.changeNodePropertyCornerRadius]
+    [mixedProperties.cornerRadius?.ids, instance.commands]
   );
 
   const cursor = useCallback(
     (value: cg.SystemMouseCursor) => {
       mixedProperties.cursor?.ids.forEach((id) => {
-        instance.changeNodePropertyMouseCursor(id, value);
+        instance.commands.changeNodePropertyMouseCursor(id, value);
       });
     },
-    [mixedProperties.cursor?.ids, instance.changeNodePropertyMouseCursor]
+    [mixedProperties.cursor?.ids, instance.commands]
   );
 
   const actions = useMemo(
@@ -489,9 +477,9 @@ export function useMixedPaints() {
     ) => {
       const group = paints[index];
       const paintsArray = value === null ? [] : [value as cg.Paint];
-      instance.changeNodePropertyFills(group.ids, paintsArray);
+      instance.commands.changeNodePropertyFills(group.ids, paintsArray);
     },
-    [paints, instance]
+    [paints, instance.commands]
   );
 
   return useMemo(() => {

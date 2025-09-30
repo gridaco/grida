@@ -75,200 +75,187 @@ export function StandaloneDocumentEditor({
   );
 }
 
-function __useGestureNudgeState(dispatch: Dispatcher) {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const __gesture_nudge_debounced = useCallback(
-    (state: "on" | "off", delay: number) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        dispatch({
-          type: "gesture/nudge",
-          state: "off",
-        });
-      }, delay);
-    },
-    [dispatch]
-  );
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  return __gesture_nudge_debounced;
-}
-
 export function useNodeActions(node_id: string | undefined) {
   const instance = useCurrentEditor();
 
   return useMemo(() => {
     if (!node_id) return;
     return {
-      toggleLocked: () => instance.toggleNodeLocked(node_id),
-      toggleActive: () => instance.toggleNodeActive(node_id),
+      toggleLocked: () => instance.commands.toggleNodeLocked(node_id),
+      toggleActive: () => instance.commands.toggleNodeActive(node_id),
       toggleBold: () => instance.toggleTextNodeBold(node_id),
       toggleItalic: () => instance.toggleTextNodeItalic(node_id),
-      toggleUnderline: () => instance.toggleTextNodeUnderline(node_id),
-      toggleLineThrough: () => instance.toggleTextNodeLineThrough(node_id),
+      toggleUnderline: () => instance.commands.toggleTextNodeUnderline(node_id),
+      toggleLineThrough: () =>
+        instance.commands.toggleTextNodeLineThrough(node_id),
       component: (component_id: string) =>
-        instance.changeNodePropertyComponent(node_id, component_id),
+        instance.commands.changeNodePropertyComponent(node_id, component_id),
       text: (text: tokens.StringValueExpression | null) =>
-        instance.changeNodePropertyText(node_id, text),
+        instance.commands.changeNodePropertyText(node_id, text),
       style: (
         key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
         value: any
-      ) => instance.changeNodePropertyStyle(node_id, key, value),
+      ) => instance.commands.changeNodePropertyStyle(node_id, key, value),
       value: (key: string, value: any) =>
-        instance.changeNodePropertyProps(node_id, key, value),
+        instance.commands.changeNodePropertyProps(node_id, key, value),
       // attributes
-      userdata: (value: any) => instance.changeNodeUserData(node_id, value),
-      name: (name: string) => instance.changeNodeName(node_id, name),
-      active: (active: boolean) => instance.changeNodeActive(node_id, active),
-      locked: (locked: boolean) => instance.changeNodeLocked(node_id, locked),
+      userdata: (value: any) =>
+        instance.commands.changeNodeUserData(node_id, value),
+      name: (name: string) => instance.commands.changeNodeName(node_id, name),
+      active: (active: boolean) =>
+        instance.commands.changeNodeActive(node_id, active),
+      locked: (locked: boolean) =>
+        instance.commands.changeNodeLocked(node_id, locked),
       src: (src?: tokens.StringValueExpression) =>
-        instance.changeNodePropertySrc(node_id, src),
+        instance.commands.changeNodePropertySrc(node_id, src),
       href: (href?: grida.program.nodes.i.IHrefable["href"]) =>
-        instance.changeNodePropertyHref(node_id, href),
+        instance.commands.changeNodePropertyHref(node_id, href),
       target: (target?: grida.program.nodes.i.IHrefable["target"]) =>
-        instance.changeNodePropertyTarget(node_id, target),
+        instance.commands.changeNodePropertyTarget(node_id, target),
 
       positioning: (value: grida.program.nodes.i.IPositioning) =>
-        instance.changeNodePropertyPositioning(node_id, value),
+        instance.commands.changeNodePropertyPositioning(node_id, value),
       positioningMode: (value: "absolute" | "relative") =>
-        instance.changeNodePropertyPositioningMode(node_id, value),
+        instance.commands.changeNodePropertyPositioningMode(node_id, value),
 
       //
       cornerRadius: (value: cg.CornerRadius) =>
-        instance.changeNodePropertyCornerRadius(node_id, value),
+        instance.commands.changeNodePropertyCornerRadius(node_id, value),
       cornerRadiusDelta: (delta: number) =>
-        instance.changeNodePropertyCornerRadiusWithDelta(node_id, delta),
+        instance.commands.changeNodePropertyCornerRadiusWithDelta(
+          node_id,
+          delta
+        ),
       pointCount: (value: number) =>
-        instance.changeNodePropertyPointCount(node_id, value),
+        instance.commands.changeNodePropertyPointCount(node_id, value),
       innerRadius: (value: number) =>
-        instance.changeNodePropertyInnerRadius(node_id, value),
+        instance.commands.changeNodePropertyInnerRadius(node_id, value),
       arcData: (value: grida.program.nodes.i.IEllipseArcData) =>
-        instance.changeNodePropertyArcData(node_id, value),
+        instance.commands.changeNodePropertyArcData(node_id, value),
       fills: (fills: cg.Paint[]) =>
-        instance.changeNodePropertyFills(node_id, fills),
+        instance.commands.changeNodePropertyFills(node_id, fills),
       strokes: (strokes: cg.Paint[]) =>
-        instance.changeNodePropertyStrokes(node_id, strokes),
+        instance.commands.changeNodePropertyStrokes(node_id, strokes),
       addFill: (fill: cg.Paint, at?: "start" | "end") =>
-        instance.addNodeFill(node_id, fill, at),
+        instance.commands.addNodeFill(node_id, fill, at),
       addStroke: (stroke: cg.Paint, at?: "start" | "end") =>
-        instance.addNodeStroke(node_id, stroke, at),
+        instance.commands.addNodeStroke(node_id, stroke, at),
       strokeWidth: (change: editor.api.NumberChange) =>
-        instance.changeNodePropertyStrokeWidth(node_id, change),
+        instance.commands.changeNodePropertyStrokeWidth(node_id, change),
       strokeAlign: (value: cg.StrokeAlign) =>
-        instance.changeNodePropertyStrokeAlign(node_id, value),
+        instance.commands.changeNodePropertyStrokeAlign(node_id, value),
       strokeCap: (value: cg.StrokeCap) =>
-        instance.changeNodePropertyStrokeCap(node_id, value),
-      fit: (value: cg.BoxFit) => instance.changeNodePropertyFit(node_id, value),
+        instance.commands.changeNodePropertyStrokeCap(node_id, value),
+      fit: (value: cg.BoxFit) =>
+        instance.commands.changeNodePropertyFit(node_id, value),
       // stylable
       opacity: (change: editor.api.NumberChange) =>
-        instance.changeNodePropertyOpacity(node_id, change),
+        instance.commands.changeNodePropertyOpacity(node_id, change),
       blendMode: (value: cg.LayerBlendMode) =>
-        instance.changeNodePropertyBlendMode(node_id, value),
+        instance.commands.changeNodePropertyBlendMode(node_id, value),
       maskType: (value: cg.LayerMaskType) =>
-        instance.changeNodeMaskType(node_id, value),
+        instance.commands.changeNodePropertyMaskType(node_id, value),
       rotation: (change: editor.api.NumberChange) =>
-        instance.changeNodePropertyRotation(node_id, change),
+        instance.commands.changeNodePropertyRotation(node_id, change),
       width: (value: grida.program.css.LengthPercentage | "auto") =>
-        instance.changeNodeSize(node_id, "width", value),
+        instance.commands.changeNodeSize(node_id, "width", value),
       height: (value: grida.program.css.LengthPercentage | "auto") =>
-        instance.changeNodeSize(node_id, "height", value),
+        instance.commands.changeNodeSize(node_id, "height", value),
 
       // text style
       fontFamily: (value: string, force?: boolean) =>
         instance.changeTextNodeFontFamilySync(node_id, value, force),
       fontWeight: (value: cg.NFontWeight) =>
-        instance.changeTextNodeFontWeight(node_id, value),
+        instance.commands.changeTextNodeFontWeight(node_id, value),
       fontKerning: (value: boolean) =>
-        instance.changeTextNodeFontKerning(node_id, value),
+        instance.commands.changeTextNodeFontKerning(node_id, value),
       fontWidth: (value: number) =>
-        instance.changeTextNodeFontWidth(node_id, value),
+        instance.commands.changeTextNodeFontWidth(node_id, value),
       fontFeature: (key: cg.OpenTypeFeature, value: boolean) =>
-        instance.changeTextNodeFontFeature(node_id, key, value),
+        instance.commands.changeTextNodeFontFeature(node_id, key, value),
       fontVariation: (key: string, value: number) =>
-        instance.changeTextNodeFontVariation(node_id, key, value),
+        instance.commands.changeTextNodeFontVariation(node_id, key, value),
       fontOpticalSizing: (value: cg.OpticalSizing) =>
-        instance.changeTextNodeFontOpticalSizing(node_id, value),
-      fontVariationInstance: (coordinates: Record<string, number>) =>
-        instance.changeTextNodeFontVariationInstance(node_id, coordinates),
+        instance.commands.changeTextNodeFontOpticalSizing(node_id, value),
       fontStyle: (change: editor.api.FontStyleChangeDescription) =>
         instance.changeTextNodeFontStyle(node_id, change),
       fontSize: (change: editor.api.NumberChange) =>
-        instance.changeTextNodeFontSize(node_id, change),
+        instance.commands.changeTextNodeFontSize(node_id, change),
       textAlign: (value: cg.TextAlign) =>
-        instance.changeTextNodeTextAlign(node_id, value),
+        instance.commands.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: cg.TextAlignVertical) =>
-        instance.changeTextNodeTextAlignVertical(node_id, value),
+        instance.commands.changeTextNodeTextAlignVertical(node_id, value),
       textTransform: (value: cg.TextTransform) =>
-        instance.changeTextNodeTextTransform(node_id, value),
+        instance.commands.changeTextNodeTextTransform(node_id, value),
       textDecorationLine: (value: cg.TextDecorationLine) =>
-        instance.changeTextNodeTextDecorationLine(node_id, value),
+        instance.commands.changeTextNodeTextDecorationLine(node_id, value),
       textDecorationStyle: (value: cg.TextDecorationStyle) =>
-        instance.changeTextNodeTextDecorationStyle(node_id, value),
+        instance.commands.changeTextNodeTextDecorationStyle(node_id, value),
       textDecorationThickness: (value: cg.TextDecorationThicknessPercentage) =>
-        instance.changeTextNodeTextDecorationThickness(node_id, value),
+        instance.commands.changeTextNodeTextDecorationThickness(node_id, value),
       textDecorationColor: (value: cg.TextDecorationColor) =>
-        instance.changeTextNodeTextDecorationColor(node_id, value),
+        instance.commands.changeTextNodeTextDecorationColor(node_id, value),
       textDecorationSkipInk: (value: cg.TextDecorationSkipInkFlag) =>
-        instance.changeTextNodeTextDecorationSkipInk(node_id, value),
+        instance.commands.changeTextNodeTextDecorationSkipInk(node_id, value),
       lineHeight: (change: editor.api.NumberChange) =>
-        instance.changeTextNodeLineHeight(node_id, change),
+        instance.commands.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (
         change: editor.api.TChange<
           grida.program.nodes.TextNode["letterSpacing"]
         >
-      ) => instance.changeTextNodeLetterSpacing(node_id, change),
+      ) => instance.commands.changeTextNodeLetterSpacing(node_id, change),
       wordSpacing: (
         change: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
-      ) => instance.changeTextNodeWordSpacing(node_id, change),
+      ) => instance.commands.changeTextNodeWordSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
-        instance.changeTextNodeMaxlength(node_id, value),
+        instance.commands.changeTextNodeMaxlength(node_id, value),
       maxLines: (value: number | null) =>
-        instance.changeTextNodeMaxLines(node_id, value),
+        instance.commands.changeTextNodeMaxLines(node_id, value),
 
       // border
       border: (value: grida.program.css.Border | undefined) =>
-        instance.changeNodePropertyBorder(node_id, value),
+        instance.commands.changeNodePropertyBorder(node_id, value),
 
       padding: (value: grida.program.nodes.i.IPadding["padding"]) =>
-        instance.changeContainerNodePadding(node_id, value),
+        instance.commands.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
       //   changeNodeStyle(node_id, "margin", value),
       feShadows: (value?: cg.FeShadow[]) =>
-        instance.changeNodeFeShadows(node_id, value),
-      feBlur: (value?: cg.FeBlur) => instance.changeNodeFeBlur(node_id, value),
+        instance.commands.changeNodeFeShadows(node_id, value),
+      feBlur: (value?: cg.FeBlur) =>
+        instance.commands.changeNodeFeBlur(node_id, value),
       feBackdropBlur: (value?: cg.FeBlur) =>
-        instance.changeNodeFeBackdropBlur(node_id, value),
+        instance.commands.changeNodeFeBackdropBlur(node_id, value),
 
       // layout
       layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
-        instance.changeContainerNodeLayout(node_id, value),
+        instance.commands.changeContainerNodeLayout(node_id, value),
       direction: (value: cg.Axis) =>
-        instance.changeFlexContainerNodeDirection(node_id, value),
+        instance.commands.changeFlexContainerNodeDirection(node_id, value),
       // flexWrap: (value?: string) =>
       //   changeNodeStyle(node_id, "flexWrap", value),
       mainAxisAlignment: (value: cg.MainAxisAlignment) =>
-        instance.changeFlexContainerNodeMainAxisAlignment(node_id, value),
+        instance.commands.changeFlexContainerNodeMainAxisAlignment(
+          node_id,
+          value
+        ),
       crossAxisAlignment: (value: cg.CrossAxisAlignment) =>
-        instance.changeFlexContainerNodeCrossAxisAlignment(node_id, value),
+        instance.commands.changeFlexContainerNodeCrossAxisAlignment(
+          node_id,
+          value
+        ),
       gap: (value: number | { mainAxisGap: number; crossAxisGap: number }) =>
-        instance.changeFlexContainerNodeGap(node_id, value),
+        instance.commands.changeFlexContainerNodeGap(node_id, value),
 
       // css style
       aspectRatio: (value?: number) =>
-        instance.changeNodePropertyStyle(node_id, "aspectRatio", value),
+        instance.commands.changeNodePropertyStyle(
+          node_id,
+          "aspectRatio",
+          value
+        ),
       cursor: (value: cg.SystemMouseCursor) =>
-        instance.changeNodePropertyMouseCursor(node_id, value),
+        instance.commands.changeNodePropertyMouseCursor(node_id, value),
     };
   }, [node_id, instance]);
 }
@@ -515,112 +502,50 @@ export function useBrushState() {
   return useEditorState(editor, (state) => state.brush);
 }
 
-interface UseMultipleSelectionOverlayClick {
-  multipleSelectionOverlayClick: (
-    selection: string[],
-    event: MouseEvent
-  ) => void;
-}
-
-export function useMultipleSelectionOverlayClick(): UseMultipleSelectionOverlayClick {
-  const instance = useCurrentEditor();
-  const dispatch = useCallback(
-    (action: Action) => {
-      instance.dispatch(action);
-    },
-    [instance]
-  );
-
-  const multipleSelectionOverlayClick = useCallback(
-    (selection: string[], event: MouseEvent) => {
-      const ids = instance.getNodeIdsFromPointerEvent(event);
-
-      dispatch({
-        type: "event-target/event/multiple-selection-overlay/on-click",
-        selection: selection,
-        node_ids_from_point: ids,
-        shiftKey: event.shiftKey,
-      });
-    },
-    [dispatch]
-  );
-
-  return useMemo(() => {
-    return {
-      multipleSelectionOverlayClick,
-    };
-  }, [multipleSelectionOverlayClick]);
-}
-
-interface UseA11yActions {
+interface UseA11yArrow {
   a11yarrow: (
     target: "selection" | editor.NodeID,
     direction: "up" | "down" | "left" | "right",
     shiftKey: boolean,
     config?: editor.api.NudgeUXConfig
   ) => void;
-  a11yalign: (alignment: {
-    horizontal?: "min" | "max" | "center";
-    vertical?: "min" | "max" | "center";
-  }) => void;
-  nudge: (
-    target: "selection" | editor.NodeID,
-    axis: "x" | "y",
-    delta: number,
-    config?: editor.api.NudgeUXConfig
-  ) => void;
 }
-export function useA11yActions(): UseA11yActions {
+
+function __use_off_gesture_nudge_state(onOff: () => void) {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const __gesture_nudge_debounced = useCallback(
+    (delay: number) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        onOff();
+      }, delay);
+    },
+    [onOff]
+  );
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return __gesture_nudge_debounced;
+}
+
+export function useA11yArrow(): UseA11yArrow {
   const instance = useCurrentEditor();
-  const dispatch = useCallback(
-    (action: Action) => {
-      instance.dispatch(action);
-    },
-    [instance]
-  );
 
-  // Keep React-specific functions
-  const __gesture_nudge = useCallback(
-    (state: "on" | "off") => {
-      dispatch({
-        type: "gesture/nudge",
-        state,
-      });
-    },
-    [dispatch]
-  );
+  const off = useCallback(() => {
+    instance.surface.surfaceLockNudgeGesture("off");
+  }, [instance]);
 
-  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
-
-  const nudge = useCallback(
-    (
-      target: "selection" | editor.NodeID = "selection",
-      axis: "x" | "y",
-      delta: number = 1,
-      config: editor.api.NudgeUXConfig = {
-        delay: 500,
-        gesture: true,
-      }
-    ) => {
-      const { gesture = true, delay = 500 } = config;
-
-      if (gesture) {
-        // Trigger gesture
-        __gesture_nudge("on");
-
-        // Debounce to turn off gesture
-        __gesture_nudge_debounced("off", delay);
-      }
-
-      dispatch({
-        type: "nudge",
-        delta,
-        axis,
-        target,
-      });
-    },
-    [dispatch]
-  );
+  const __gesture_nudge_debounced = __use_off_gesture_nudge_state(off);
 
   const a11yarrow = useCallback(
     (
@@ -636,35 +561,19 @@ export function useA11yActions(): UseA11yActions {
 
       if (gesture) {
         // Trigger gesture
-        __gesture_nudge("on");
+        instance.surface.surfaceLockNudgeGesture("on");
 
         // Debounce to turn off gesture
-        __gesture_nudge_debounced("off", delay);
+        __gesture_nudge_debounced(delay);
       }
 
-      dispatch({
-        type: `a11y/${direction}`,
-        target,
-        shiftKey,
-      });
+      instance.surface.a11yArrow(direction, shiftKey);
     },
-    [dispatch]
-  );
-
-  const a11yalign = useCallback(
-    (alignment: {
-      horizontal?: "min" | "max" | "center";
-      vertical?: "min" | "max" | "center";
-    }) => {
-      dispatch({ type: "a11y/align", alignment });
-    },
-    [dispatch]
+    [instance]
   );
 
   return {
-    nudge,
     a11yarrow,
-    a11yalign,
   };
 }
 
@@ -747,7 +656,7 @@ export function useRootTemplateInstanceNode(root_id: string) {
 
   const changeRootProps = useCallback(
     (key: string, value: any) => {
-      editor.changeNodePropertyProps(root_id, key, value);
+      editor.commands.changeNodePropertyProps(root_id, key, value);
     },
     [editor, root_id]
   );

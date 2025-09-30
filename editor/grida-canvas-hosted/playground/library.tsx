@@ -59,7 +59,7 @@ export function LibraryContent() {
     }
 
     // insert widget tree
-    editor.insertNode(pre);
+    editor.commands.insertNode(pre);
   };
 
   const onInsertSvgSrc = (name: string, src: string) => {
@@ -68,7 +68,7 @@ export function LibraryContent() {
     }).then((res) => {
       // svg content
       res.text().then((svg) => {
-        editor.createNodeFromSvg(svg).then((node) => {
+        editor.commands.createNodeFromSvg(svg).then((node) => {
           node.$.name = name.split(".svg")[0];
         });
       });

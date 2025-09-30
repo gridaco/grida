@@ -2331,6 +2331,7 @@ export namespace editor.api {
      * inserts the payload with assertions and constraints
      */
     insert(payload: InsertPayload): void;
+    autoSizeTextNode(node_id: string, axis: "width" | "height"): void;
   }
 
   /**
@@ -2346,6 +2347,11 @@ export namespace editor.api {
       };
 
   export interface IDocumentStoreActions {
+    reset(
+      state: editor.state.IEditorState,
+      key?: string,
+      force?: boolean
+    ): void;
     insert(payload: InsertPayload): void;
     loadScene(scene_id: string): void;
     createScene(scene?: grida.program.document.SceneInit): void;
@@ -2371,6 +2377,7 @@ export namespace editor.api {
     cut(target: "selection" | NodeID): void;
     copy(target: "selection" | NodeID): void;
     paste(): void;
+    pasteVector(network: vn.VectorNetwork): void;
     duplicate(target: "selection" | NodeID): void;
     flatten(target: "selection" | NodeID): void;
     op(target: ReadonlyArray<NodeID>, op: cg.BooleanOperation): void;
@@ -2381,11 +2388,25 @@ export namespace editor.api {
     groupMask(target: ReadonlyArray<NodeID>): void;
 
     // vector editor
-    selectVertex(node_id: NodeID, vertex: number): void;
+    selectVertex(
+      node_id: NodeID,
+      vertex: number,
+      options: { additive?: boolean }
+    ): void;
     deleteVertex(node_id: NodeID, vertex: number): void;
-    selectSegment(node_id: NodeID, segment: number): void;
+    selectSegment(
+      node_id: NodeID,
+      segment: number,
+      options: { additive?: boolean }
+    ): void;
     deleteSegment(node_id: NodeID, segment: number): void;
     splitSegment(node_id: NodeID, point: vn.PointOnSegment): void;
+    selectTangent(
+      node_id: editor.NodeID,
+      vertex: number,
+      tangent: 0 | 1,
+      options: { additive?: boolean }
+    ): void;
     translateVertex(
       node_id: NodeID,
       vertex: number,
@@ -2414,7 +2435,11 @@ export namespace editor.api {
       tangent?: cmath.Vector2 | 0,
       ref?: "ta" | "tb"
     ): void;
-    planarize(node_id: NodeID): void;
+    planarize(ids: editor.NodeID | editor.NodeID[]): void;
+
+    selectVariableWidthStop(node_id: NodeID, stop: number): void;
+    deleteVariableWidthStop(node_id: NodeID, stop: number): void;
+    addVariableWidthStop(node_id: editor.NodeID, u: number, r: number): void;
 
     //
     getNodeSnapshotById(node_id: NodeID): Readonly<grida.program.nodes.Node>;
@@ -2545,7 +2570,7 @@ export namespace editor.api {
     changeNodePropertyComponent(node_id: NodeID, component: string): void;
     changeNodePropertyText(
       node_id: NodeID,
-      text: tokens.StringValueExpression
+      text: tokens.StringValueExpression | null
     ): void;
     changeNodePropertyStyle(
       node_id: NodeID,
@@ -2612,6 +2637,10 @@ export namespace editor.api {
     changeNodePropertyBlendMode(
       node_id: NodeID,
       blendMode: cg.LayerBlendMode
+    ): void;
+    changeNodePropertyMaskType(
+      node_id: NodeID,
+      maskType: cg.LayerMaskType
     ): void;
     changeNodePropertyRotation(
       node_id: NodeID,
@@ -2758,6 +2787,16 @@ export namespace editor.api {
       delta: number
     ): void;
 
+    a11yArrow(
+      direction: "up" | "down" | "left" | "right",
+      shiftKey: boolean
+    ): void;
+
+    a11yAlign(alignment: {
+      horizontal?: "min" | "max" | "center";
+      vertical?: "min" | "max" | "center";
+    }): void;
+
     /**
      * ux a11y escape command.
      *
@@ -2821,6 +2860,16 @@ export namespace editor.api {
     surfaceHoverEnterNode(node_id: string): void;
     surfaceHoverLeaveNode(node_id: string): void;
 
+    /**
+     * [gesture/nudge] - used with `nudge` {@link EditorNudgeAction} or `nudge-resize` {@link EditorNudgeResizeAction}
+     *
+     * By default, nudge is not a gesture, but a command. Unlike dragging, nudge does not has a "duration", as it's snap guides cannot be displayed.
+     * To mimic the nudge as a gesture (mostly when needed to display snap guides), use this action.
+     *
+     * @example when `nudge`, also call `gesture/nudge` to display snap guides. after certain duration, call `gesture/nudge` with `state: "off"`
+     */
+    surfaceLockNudgeGesture(state: "on" | "off"): void;
+
     surfaceStartGuideGesture(axis: cmath.Axis, idx: number | -1): void;
     surfaceStartScaleGesture(
       selection: string | string[],
@@ -2849,6 +2898,10 @@ export namespace editor.api {
 
     surfaceClick(event: MouseEvent): void;
     surfaceDoubleClick(event: MouseEvent): void;
+    surfaceMultipleSelectionOverlayClick(
+      group: string[],
+      event: MouseEvent
+    ): void;
 
     surfaceDragStart(event: PointerEvent): void;
     surfaceDragEnd(event: PointerEvent): void;

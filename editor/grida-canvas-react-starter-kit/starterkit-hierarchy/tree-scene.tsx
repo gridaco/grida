@@ -49,7 +49,7 @@ function SceneItemContextMenuWrapper({
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() => {
-            editor.duplicateScene(scene_id);
+            editor.commands.duplicateScene(scene_id);
           }}
           className="text-xs"
         >
@@ -58,7 +58,7 @@ function SceneItemContextMenuWrapper({
         <ContextMenuSeparator />
         <ContextMenuItem
           onSelect={() => {
-            editor.deleteScene(scene_id);
+            editor.commands.deleteScene(scene_id);
           }}
           className="text-xs"
         >
@@ -90,7 +90,7 @@ export function ScenesList() {
       selectedItems: scene_id ? [scene_id] : [],
     },
     setSelectedItems: (items) => {
-      editor.loadScene((items as string[])[0]);
+      editor.commands.loadScene((items as string[])[0]);
     },
     getItemName: (item) => {
       if (item.getId() === "<document>") return "<document>";
@@ -175,7 +175,7 @@ export function ScenesList() {
                   isRenaming={isRenaming}
                   initialValue={scene.name}
                   onValueCommit={(name) => {
-                    editor.renameScene(scene.id, name);
+                    editor.commands.renameScene(scene.id, name);
                     tree.abortRenaming();
                   }}
                   className="font-normal h-8 text-xs! px-2! py-1.5!"

@@ -149,9 +149,9 @@ function EditorUser({
         }
 
         if (paint_target === "stroke") {
-          editor.changeNodePropertyStrokes(node_id, updatedPaints);
+          editor.commands.changeNodePropertyStrokes(node_id, updatedPaints);
         } else {
-          editor.changeNodePropertyFills(node_id, updatedPaints);
+          editor.commands.changeNodePropertyFills(node_id, updatedPaints);
         }
       }
     },

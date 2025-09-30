@@ -96,7 +96,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
           }
         }
       }
-      editor.paste();
+      editor.commands.paste();
     } catch (e) {}
   }, [editor, insertText]);
 
@@ -106,7 +106,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Copy",
         disabled: !hasSelection,
         onSelect: () =>
-          editor.copy(
+          editor.commands.copy(
             hasSelection && ids.length === 1 ? (ids[0] as string) : "selection"
           ),
       },
@@ -131,56 +131,56 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Bring to front",
         shortcut: "]",
         disabled: !hasSelection,
-        onSelect: () => editor.order(targetSingleOrSelection, "front"),
+        onSelect: () => editor.commands.order(targetSingleOrSelection, "front"),
       },
       sendToBack: {
         label: "Send to back",
         shortcut: "[",
         disabled: !hasSelection,
-        onSelect: () => editor.order(targetSingleOrSelection, "back"),
+        onSelect: () => editor.commands.order(targetSingleOrSelection, "back"),
       },
       groupWithContainer: {
         label: "Group with Container",
         shortcut: "⌥⌘G",
         disabled: !hasSelection,
-        onSelect: () => editor.contain(ids),
+        onSelect: () => editor.commands.contain(ids),
       },
       group: {
         label: "Group",
         shortcut: "⌘G",
         disabled: !canGroup,
-        onSelect: () => editor.group(ids),
+        onSelect: () => editor.commands.group(ids),
       },
       ungroup: {
         label: "Ungroup",
         shortcut: "⌘⇧G",
         disabled: !canUngroup,
-        onSelect: () => editor.ungroup(ids),
+        onSelect: () => editor.commands.ungroup(ids),
       },
       autoLayout: {
         label: "Auto-Layout",
         shortcut: "⇧A",
         disabled: !hasSelection,
-        onSelect: () => editor.autoLayout(ids),
+        onSelect: () => editor.commands.autoLayout(ids),
       },
       flatten: {
         label: "Flatten",
         shortcut: "⌘E",
         disabled: !canFlatten,
         onSelect: () =>
-          editor.flatten(
+          editor.commands.flatten(
             hasSelection && ids.length === 1 ? (ids[0] as string) : "selection"
           ),
       },
       planarize: {
         label: "Planarize",
         disabled: !canPlanarize,
-        onSelect: () => editor.planarize(ids),
+        onSelect: () => editor.commands.planarize(ids),
       },
       groupMask: {
         label: "Use as Mask",
         disabled: !canGroupMask,
-        onSelect: () => editor.groupMask(ids),
+        onSelect: () => editor.commands.groupMask(ids),
       },
       removeMask: {
         label: "Remove Mask",
@@ -192,7 +192,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         shortcut: "⌘⇧H",
         disabled: !hasSelection,
         onSelect: () => {
-          ids.forEach((id) => editor.toggleNodeActive(id));
+          ids.forEach((id) => editor.commands.toggleNodeActive(id));
         },
       },
       zoomToFit: {
@@ -206,7 +206,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         shortcut: "⌘⇧L",
         disabled: !hasSelection,
         onSelect: () => {
-          ids.forEach((id) => editor.toggleNodeLocked(id));
+          ids.forEach((id) => editor.commands.toggleNodeLocked(id));
         },
       },
       delete: {
@@ -214,7 +214,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         shortcut: "⌫",
         disabled: !hasSelection,
         onSelect: () =>
-          editor.deleteNode(
+          editor.commands.deleteNode(
             hasSelection && ids.length === 1 ? (ids[0] as string) : "selection"
           ),
       },

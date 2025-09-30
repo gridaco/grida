@@ -599,7 +599,7 @@ function VertexPoint({
         event.preventDefault();
         draggedRef.current = true;
         if (tool.type === "bend") {
-          instance.bendOrClearCorner(ve.node_id, index, 0);
+          instance.commands.bendOrClearCorner(ve.node_id, index, 0);
           const segment = ve.segments.findIndex(
             (s) => s.a === index || s.b === index
           );
@@ -619,7 +619,7 @@ function VertexPoint({
         if (tool.type === "path") return;
         if (tool.type === "bend") {
           if (!draggedRef.current) {
-            instance.bendOrClearCorner(ve.node_id, index);
+            instance.commands.bendOrClearCorner(ve.node_id, index);
           }
           return;
         }

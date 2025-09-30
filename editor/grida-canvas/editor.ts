@@ -698,6 +698,10 @@ class EditorDocumentStore
     });
   }
 
+  public pasteVector(vector_network: vn.VectorNetwork): void {
+    this.dispatch({ type: "paste", vector_network });
+  }
+
   public duplicate(target: "selection" | editor.NodeID) {
     this.dispatch({
       type: "duplicate",
@@ -1268,7 +1272,7 @@ class EditorDocumentStore
     });
   }
 
-  changeNodeMaskType(node_id: string, mask: cg.LayerMaskType) {
+  changeNodePropertyMaskType(node_id: string, mask: cg.LayerMaskType) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
@@ -1995,6 +1999,8 @@ class EditorDocumentStore
   }
 }
 
+export type { EditorDocumentStore };
+
 export class Editor
   implements
     editor.IStoreSubscriptionTrait<editor.state.IEditorState>,
@@ -2049,6 +2055,10 @@ export class Editor
 
   get state() {
     return this.doc.state;
+  }
+
+  get transform() {
+    return this.doc.state.transform;
   }
 
   get debug() {
@@ -2351,17 +2361,13 @@ export class Editor
   }
 
   public subscribe(fn: (editor: this, action?: Action) => void) {
-    // TODO: subscribe to the document store
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
+    // TODO: we can have a single subscription to the document and use that.
+    // Subscribe to the document store changes
+    return this.doc.subscribe((doc, action) => {
+      // Forward the document store changes to our listeners
+      fn(this, action);
+    });
   }
-
-  // public subscribeWithSelector<T>(
-  //   selector: (state: editor.state.IEditorState) => T,
-  //   listener: (editor: this, selected: T, previous: T, action?: Action) => void,
-  //   isEqual: (a: T, b: T) => boolean = Object.is
-  // ): () => void {
-  // }
 
   public archive(): Blob {
     const documentData = {
@@ -3090,6 +3096,13 @@ export class EditorSurface
     this.surfaceHoverNode(node_id, "leave");
   }
 
+  public surfaceLockNudgeGesture(state: "on" | "off") {
+    this.dispatch({
+      type: "gesture/nudge",
+      state,
+    });
+  }
+
   public surfaceUpdateVectorHoveredControl(
     hoveredControl: {
       type: editor.state.VectorContentEditModeHoverableGeometryControlType;
@@ -3301,6 +3314,16 @@ export class EditorSurface
   surfaceDoubleClick(event: MouseEvent) {
     this._editor.doc.dispatch({
       type: "event-target/event/on-double-click",
+    });
+  }
+
+  surfaceMultipleSelectionOverlayClick(group: string[], event: MouseEvent) {
+    const ids = this._editor.getNodeIdsFromPointerEvent(event);
+    this._editor.doc.dispatch({
+      type: "event-target/event/multiple-selection-overlay/on-click",
+      selection: group,
+      node_ids_from_point: ids,
+      shiftKey: event.shiftKey,
     });
   }
 
@@ -3718,6 +3741,27 @@ export class EditorSurface
       delta,
       axis,
       target,
+    });
+  }
+
+  public a11yArrow(
+    direction: "up" | "down" | "left" | "right",
+    shiftKey: boolean
+  ) {
+    this.dispatch({
+      type: `a11y/${direction}`,
+      target: "selection",
+      shiftKey,
+    });
+  }
+
+  public a11yAlign(alignment: {
+    horizontal?: "min" | "max" | "center";
+    vertical?: "min" | "max" | "center";
+  }) {
+    this.dispatch({
+      type: "a11y/align",
+      alignment,
     });
   }
 

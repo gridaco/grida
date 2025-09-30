@@ -13,7 +13,6 @@ import {
   useGestureState,
   useIsTransforming,
   useMultiplayerCursorState,
-  useMultipleSelectionOverlayClick,
   usePointerState,
   useSelectionState,
   useToolState,
@@ -682,9 +681,9 @@ function NodeTitleBar({
       onPointerDown: ({ event }) => {
         event.preventDefault();
         if (event.shiftKey) {
-          editor.select("selection", [node.id]);
+          editor.commands.select("selection", [node.id]);
         } else {
-          editor.select([node.id]);
+          editor.commands.select([node.id]);
         }
       },
     },
@@ -734,7 +733,7 @@ function NodeTitleBarTitle({
   const commit = () => {
     const name = value.trim();
     if (name && name !== node.name) {
-      editor.changeNodeName(node.id, name);
+      editor.commands.changeNodeName(node.id, name);
     }
     setEditing(false);
   };
@@ -962,7 +961,6 @@ function SelectionGroupOverlay({
 }) {
   const editor = useCurrentEditor();
   const tool = useToolState();
-  const { multipleSelectionOverlayClick } = useMultipleSelectionOverlayClick();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
@@ -979,7 +977,7 @@ function SelectionGroupOverlay({
         }
       },
       onClick: (e) => {
-        multipleSelectionOverlayClick(ids, e.event);
+        editor.surface.surfaceMultipleSelectionOverlayClick(ids, e.event);
         e.event.stopPropagation();
       },
     },
@@ -1021,7 +1019,7 @@ function SelectionGroupOverlay({
         <DistributeButton
           axis={preferredDistributeEvenlyActionAxis}
           onClick={(axis) => {
-            editor.distributeEvenly("selection", axis);
+            editor.commands.distributeEvenly("selection", axis);
           }}
         />
         {boundingSurfaceRect && (
@@ -1286,7 +1284,7 @@ function LayerOverlayResizeSide({
         // feat: text-node-auto-size
         if (
           typeof selection === "string" &&
-          editor.getNodeSnapshotById(selection)?.type === "text"
+          editor.commands.getNodeSnapshotById(selection)?.type === "text"
         ) {
           const axis = anchor === "e" || anchor === "w" ? "width" : "height";
           editor.autoSizeTextNode(selection, axis);
@@ -1363,7 +1361,7 @@ function Edge({
         return cmath.vector2.transform([p.x, p.y], transform);
       case "anchor":
         try {
-          const n = editor.getNodeSnapshotById(p.target);
+          const n = editor.commands.getNodeSnapshotById(p.target);
           const cx = (n as any).left + (n as any).width / 2;
           const cy = (n as any).top + (n as any).height / 2;
           return cmath.vector2.transform([cx, cy], transform);
@@ -1830,7 +1828,7 @@ function Guide({
     },
     onKeyDown: ({ event }) => {
       if (event.key === "Delete" || event.key === "Backspace") {
-        editor.deleteGuide(idx);
+        editor.commands.deleteGuide(idx);
       }
       if (event.key === "Escape") {
         (event.currentTarget as HTMLElement)?.blur();

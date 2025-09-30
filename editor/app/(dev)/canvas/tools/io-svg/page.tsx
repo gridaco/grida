@@ -93,7 +93,7 @@ export default function IOSVGPage() {
               )
             );
 
-          instance.reset(
+          instance.commands.reset(
             editor.state.init({
               editable: true,
               document: doc,

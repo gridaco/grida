@@ -129,7 +129,7 @@ function CanvasConsumer() {
   const { generate, key, loading, image, start, end } = useGenerateImage();
 
   const onCommit = (value: { text: string }) => {
-    const id = editor.insertNode({
+    const id = editor.commands.insertNode({
       type: "image",
       name: value.text,
       width: model.width,
@@ -145,7 +145,7 @@ function CanvasConsumer() {
       prompt: value.text,
     })
       .then((image) => {
-        editor.changeNodePropertySrc(id, image.src);
+        editor.commands.changeNodePropertySrc(id, image.src);
       })
       .finally(() => {
         credits.refresh();

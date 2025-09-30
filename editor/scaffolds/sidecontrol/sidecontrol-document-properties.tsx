@@ -42,7 +42,7 @@ function SceneBackgroundPropertyLine() {
       <RGBAColorControl
         value={backgroundColor ? backgroundColor : undefined}
         onValueChange={(color) => {
-          editor.changeSceneBackground(scene_id, color);
+          editor.commands.changeSceneBackground(scene_id, color);
         }}
       />
     </PropertyLine>
@@ -56,7 +56,7 @@ export function DocumentProperties({ className }: { className?: string }) {
   const keys = Object.keys(document.properties ?? {});
 
   const addProperty = () => {
-    editor.schemaDefineProperty();
+    editor.commands.schemaDefineProperty();
   };
 
   return (
@@ -93,13 +93,13 @@ export function DocumentProperties({ className }: { className?: string }) {
                 definition={property}
                 name={key}
                 onNameChange={(newName) => {
-                  editor.schemaRenameProperty(key, newName);
+                  editor.commands.schemaRenameProperty(key, newName);
                 }}
                 onDefinitionChange={(value) => {
-                  editor.schemaUpdateProperty(key, value);
+                  editor.commands.schemaUpdateProperty(key, value);
                 }}
                 onRemove={() => {
-                  editor.schemaDeleteProperty(key);
+                  editor.commands.schemaDeleteProperty(key);
                 }}
               />
             );
