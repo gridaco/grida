@@ -2,6 +2,7 @@ import { toPng, toSvg, toJpeg } from "html-to-image";
 import type { Options } from "html-to-image/lib/types";
 import type { editor } from "..";
 import type { Editor } from "../editor";
+import assert from "assert";
 
 export async function exportAsImage(
   node_id: string,
@@ -92,5 +93,48 @@ export class DOMSVGExportInterfaceProvider
     }
     const text = await fetch(result.url).then((res) => res.text());
     return text;
+  }
+}
+
+export class DOMDefaultExportInterfaceProvider
+  implements editor.api.IDocumentExporterInterfaceProvider
+{
+  readonly formats = ["PNG", "JPEG", "PDF", "SVG"];
+
+  readonly image_export: DOMImageExportInterfaceProvider;
+  readonly svg_export: DOMSVGExportInterfaceProvider;
+
+  constructor(readonly editor: Editor) {
+    this.image_export = new DOMImageExportInterfaceProvider(editor);
+    this.svg_export = new DOMSVGExportInterfaceProvider(editor);
+  }
+
+  canExportNodeAs(
+    _node_id: string,
+    format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+  ): boolean {
+    return this.formats.includes(format);
+  }
+
+  async exportNodeAs(
+    node_id: string,
+    format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+  ): Promise<Uint8Array | string> {
+    assert(this.formats.includes(format), "non supported format");
+
+    switch (format) {
+      case "PNG":
+      case "JPEG": {
+        return this.image_export.exportNodeAsImage(
+          node_id,
+          format as "PNG" | "JPEG"
+        );
+      }
+      case "SVG": {
+        return this.svg_export.exportNodeAsSVG(node_id);
+      }
+    }
+
+    throw new Error("Non supported format");
   }
 }

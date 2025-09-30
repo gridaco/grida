@@ -7,10 +7,10 @@ import deepEqual from "fast-deep-equal/es6/react.js";
 import {
   domapi,
   DOMGeometryQueryInterfaceProvider,
-  DOMImageExportInterfaceProvider,
   DOMFontManagerAgentInterfaceProvider,
   NoopGeometryQueryInterfaceProvider,
   DOMFontParserInterfaceProvider,
+  DOMDefaultExportInterfaceProvider,
 } from "@/grida-canvas/backends";
 
 const __DEFAULT_STATE: editor.state.IEditorStateInit = {
@@ -45,7 +45,7 @@ export function useEditor(
           geometry: (_) => new DOMGeometryQueryInterfaceProvider(_),
           initialState: init ?? __DEFAULT_STATE,
           interfaces: {
-            export_as_image: (_) => new DOMImageExportInterfaceProvider(_),
+            exporter: (_) => new DOMDefaultExportInterfaceProvider(_),
             font_collection: (_) => new DOMFontManagerAgentInterfaceProvider(_),
             font_parser: (_) => new DOMFontParserInterfaceProvider(_),
           },

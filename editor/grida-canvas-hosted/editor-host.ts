@@ -2,12 +2,10 @@ import locateFile from "@/grida-canvas/backends/wasm-locate-file";
 import { Editor } from "@/grida-canvas/editor";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
-  CanvasWasmImageExportInterfaceProvider,
-  CanvasWasmPDFExportInterfaceProvider,
-  CanvasWasmSVGExportInterfaceProvider,
   CanvasWasmVectorInterfaceProvider,
   CanvasWasmFontManagerAgentInterfaceProvider,
   CanvasWasmFontParserInterfaceProvider,
+  CanvasWasmDefaultExportInterfaceProvider,
 } from "../grida-canvas/backends/wasm";
 import init, { type ApplicationFactory, Scene } from "@grida/canvas-wasm";
 import assert from "assert";
@@ -93,12 +91,8 @@ export class GridaCanvasEditorSelfHostedWindowHost {
       geometry: (editor: Editor) =>
         new CanvasWasmGeometryQueryInterfaceProvider(editor, this._scene!),
       interfaces: {
-        export_as_image: (editor: Editor) =>
-          new CanvasWasmImageExportInterfaceProvider(editor, this._scene!),
-        export_as_pdf: (editor: Editor) =>
-          new CanvasWasmPDFExportInterfaceProvider(editor, this._scene!),
-        export_as_svg: (editor: Editor) =>
-          new CanvasWasmSVGExportInterfaceProvider(editor, this._scene!),
+        exporter: (editor: Editor) =>
+          new CanvasWasmDefaultExportInterfaceProvider(editor, this._scene!),
         vector: (editor: Editor) =>
           new CanvasWasmVectorInterfaceProvider(editor, this._scene!),
         font_collection: (editor: Editor) =>

@@ -42,13 +42,22 @@ export class CanvasWasmGeometryQueryInterfaceProvider
   }
 }
 
-export class CanvasWasmImageExportInterfaceProvider
-  implements editor.api.IDocumentImageExportInterfaceProvider
+export class CanvasWasmDefaultExportInterfaceProvider
+  implements editor.api.IDocumentExporterInterfaceProvider
 {
+  readonly formats = ["PNG", "JPEG", "PDF", "SVG"];
+
   constructor(
     readonly editor: Editor,
     readonly surface: Scene
   ) {}
+
+  canExportNodeAs(
+    node_id: string,
+    format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+  ): boolean {
+    return this.formats.includes(format);
+  }
 
   async exportNodeAsImage(
     node_id: string,
@@ -63,15 +72,6 @@ export class CanvasWasmImageExportInterfaceProvider
     });
     return data.data;
   }
-}
-
-export class CanvasWasmPDFExportInterfaceProvider
-  implements editor.api.IDocumentPDFExportInterfaceProvider
-{
-  constructor(
-    readonly editor: Editor,
-    readonly surface: Scene
-  ) {}
 
   async exportNodeAsPDF(node_id: string): Promise<Uint8Array> {
     const data = await this.surface.exportNodeAs(node_id, {
@@ -79,15 +79,6 @@ export class CanvasWasmPDFExportInterfaceProvider
     });
     return data.data;
   }
-}
-
-export class CanvasWasmSVGExportInterfaceProvider
-  implements editor.api.IDocumentSVGExportInterfaceProvider
-{
-  constructor(
-    readonly editor: Editor,
-    readonly surface: Scene
-  ) {}
 
   async exportNodeAsSVG(node_id: string): Promise<string> {
     const data = await this.surface.exportNodeAs(node_id, {
@@ -95,6 +86,27 @@ export class CanvasWasmSVGExportInterfaceProvider
     });
     const str = new TextDecoder("utf-8").decode(data.data);
     return str;
+  }
+
+  exportNodeAs(
+    node_id: string,
+    format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+  ): Promise<Uint8Array | string> {
+    switch (format) {
+      case "PNG":
+      case "JPEG": {
+        return this.exportNodeAsImage(node_id, format as "PNG" | "JPEG");
+      }
+      case "PDF": {
+        return this.exportNodeAsPDF(node_id);
+      }
+      case "SVG": {
+        return this.exportNodeAsSVG(node_id);
+      }
+      default: {
+        throw new Error("Non supported format");
+      }
+    }
   }
 }
 

@@ -2129,6 +2129,38 @@ export namespace editor.api {
     ): Promise<Uint8Array>;
   }
 
+  export interface IDocumentSVGExportInterfaceProvider {
+    /**
+     * exports the node as an svg
+     * @param node_id
+     * @returns
+     */
+    exportNodeAsSVG(node_id: string): Promise<string>;
+  }
+
+  export interface IDocumentPDFExportInterfaceProvider {
+    /**
+     * exports the node as an pdf
+     * @param node_id
+     * @returns
+     */
+    exportNodeAsPDF(node_id: string): Promise<Uint8Array>;
+  }
+
+  export interface IDocumentExporterInterfaceProvider {
+    readonly formats: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})[];
+
+    canExportNodeAs(
+      node_id: string,
+      format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+    ): boolean;
+
+    exportNodeAs(
+      node_id: string,
+      format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+    ): Promise<Uint8Array | string>;
+  }
+
   /**
    * interface for font parser
    *
@@ -2180,24 +2212,6 @@ export namespace editor.api {
      * @param fonts
      */
     setFallbackFonts(fonts: string[]): void;
-  }
-
-  export interface IDocumentSVGExportInterfaceProvider {
-    /**
-     * exports the node as an svg
-     * @param node_id
-     * @returns
-     */
-    exportNodeAsSVG(node_id: string): Promise<string>;
-  }
-
-  export interface IDocumentPDFExportInterfaceProvider {
-    /**
-     * exports the node as an pdf
-     * @param node_id
-     * @returns
-     */
-    exportNodeAsPDF(node_id: string): Promise<Uint8Array>;
   }
 
   export interface IDocumentVectorInterfaceProvider {
@@ -2904,9 +2918,12 @@ export namespace editor.api {
   }
 
   export interface IDocumentExportPluginActions {
-    exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
-    exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array>;
-    exportNodeAs(node_id: string, format: "SVG"): Promise<string>;
+    exportNodeAs(
+      node_id: string,
+      format: "PNG" | "JPEG"
+    ): Promise<Uint8Array | false>;
+    exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array | false>;
+    exportNodeAs(node_id: string, format: "SVG"): Promise<string | false>;
   }
 
   export interface ISurfaceMultiplayerFollowPluginActions {

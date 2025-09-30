@@ -11,29 +11,23 @@ import cmath from "@grida/cmath";
 import assert from "assert";
 import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
-import {
-  EditorConfigAction,
-  InternalAction,
-  SurfaceAction,
-  TCanvasEventTargetDragGestureState,
-} from "./action";
+import { InternalAction, TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
 import vn from "@grida/vn";
 import * as googlefonts from "@grida/fonts/google";
 import { DocumentFontManager } from "./font-manager";
+import init, { type Scene } from "@grida/canvas-wasm";
+import locateFile from "./backends/wasm-locate-file";
 import {
+  NoopDefaultExportInterfaceProvider,
   CanvasWasmGeometryQueryInterfaceProvider,
-  CanvasWasmImageExportInterfaceProvider,
-  CanvasWasmPDFExportInterfaceProvider,
-  CanvasWasmSVGExportInterfaceProvider,
   CanvasWasmVectorInterfaceProvider,
   CanvasWasmFontManagerAgentInterfaceProvider,
   CanvasWasmFontParserInterfaceProvider,
-} from "./backends/wasm";
-import init, { type Scene } from "@grida/canvas-wasm";
-import locateFile from "./backends/wasm-locate-file";
+  CanvasWasmDefaultExportInterfaceProvider,
+} from "./backends";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -341,26 +335,16 @@ export class Editor
   readonly backend: editor.EditorContentRenderingBackend;
 
   private _m_wasm_canvas_scene: Scene | null = null;
+  private _m_exporter: editor.api.IDocumentExporterInterfaceProvider =
+    new NoopDefaultExportInterfaceProvider();
+
+  public get exporter() {
+    return this._m_exporter;
+  }
 
   _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
   get geometry() {
     return this._m_geometry;
-  }
-
-  _m_exporter_image: editor.api.IDocumentImageExportInterfaceProvider | null =
-    null;
-  private get exporterImage() {
-    return this._m_exporter_image;
-  }
-
-  _m_exporter_pdf: editor.api.IDocumentPDFExportInterfaceProvider | null = null;
-  private get exporterPdf() {
-    return this._m_exporter_pdf;
-  }
-
-  _m_exporter_svg: editor.api.IDocumentSVGExportInterfaceProvider | null = null;
-  private get exporterSvg() {
-    return this._m_exporter_svg;
   }
 
   _m_vector: editor.api.IDocumentVectorInterfaceProvider | null = null;
@@ -407,9 +391,7 @@ export class Editor
     onCreate?: (editor: Editor) => void;
     onMount?: (surface: Scene) => void;
     interfaces?: {
-      export_as_image?: WithEditorInstance<editor.api.IDocumentImageExportInterfaceProvider>;
-      export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
-      export_as_svg?: WithEditorInstance<editor.api.IDocumentSVGExportInterfaceProvider>;
+      exporter?: WithEditorInstance<editor.api.IDocumentExporterInterfaceProvider>;
       vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
       font_collection?: WithEditorInstance<editor.api.IDocumentFontCollectionInterfaceProvider>;
       font_parser?: WithEditorInstance<editor.api.IDocumentFontParserInterfaceProvider>;
@@ -426,25 +408,8 @@ export class Editor
       typeof geometry === "function" ? geometry(this) : geometry;
     //
 
-    if (interfaces?.export_as_image) {
-      this._m_exporter_image = resolveWithEditorInstance(
-        this,
-        interfaces.export_as_image
-      );
-    }
-
-    if (interfaces?.export_as_pdf) {
-      this._m_exporter_pdf = resolveWithEditorInstance(
-        this,
-        interfaces.export_as_pdf
-      );
-    }
-
-    if (interfaces?.export_as_svg) {
-      this._m_exporter_svg = resolveWithEditorInstance(
-        this,
-        interfaces.export_as_svg
-      );
+    if (interfaces?.exporter) {
+      this._m_exporter = resolveWithEditorInstance(this, interfaces.exporter);
     }
 
     if (interfaces?.vector) {
@@ -559,17 +524,7 @@ export class Editor
       surface
     );
 
-    this._m_exporter_image = new CanvasWasmImageExportInterfaceProvider(
-      this,
-      surface
-    );
-
-    this._m_exporter_pdf = new CanvasWasmPDFExportInterfaceProvider(
-      this,
-      surface
-    );
-
-    this._m_exporter_svg = new CanvasWasmSVGExportInterfaceProvider(
+    this._m_exporter = new CanvasWasmDefaultExportInterfaceProvider(
       this,
       surface
     );
@@ -2934,39 +2889,23 @@ export class Editor
   // ==============================================================
   // #region IExportPluginActions implementation
   // ==============================================================
-  exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
-  exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array>;
-  exportNodeAs(node_id: string, format: "SVG"): Promise<string>;
+  exportNodeAs(
+    node_id: string,
+    format: "PNG" | "JPEG"
+  ): Promise<Uint8Array | false>;
+  exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array | false>;
+  exportNodeAs(node_id: string, format: "SVG"): Promise<string | false>;
   async exportNodeAs(
     node_id: string,
     format: "PNG" | "JPEG" | "PDF" | "SVG"
-  ): Promise<Uint8Array | string> {
-    switch (format) {
-      case "PNG":
-      case "JPEG": {
-        if (!this.exporterImage) {
-          throw new Error("Exporter is not bound");
-        }
+  ): Promise<Uint8Array | string | false> {
+    const supported_by_exporter = this.exporter.formats.includes(format);
+    if (!supported_by_exporter) return false;
 
-        return this.exporterImage.exportNodeAsImage(node_id, format);
-      }
-      case "PDF": {
-        if (!this.exporterPdf) {
-          throw new Error("Exporter is not bound");
-        }
+    const can_export_request = this.exporter.canExportNodeAs(node_id, format);
+    if (!can_export_request) return false;
 
-        return this.exporterPdf.exportNodeAsPDF(node_id);
-      }
-      case "SVG": {
-        if (!this.exporterSvg) {
-          throw new Error("Exporter is not bound");
-        }
-
-        return this.exporterSvg.exportNodeAsSVG(node_id);
-      }
-    }
-
-    throw new Error("Not implemented");
+    return this.exporter.exportNodeAs(node_id, format);
   }
   // ==============================================================
   // #endregion IExportPluginActions implementation

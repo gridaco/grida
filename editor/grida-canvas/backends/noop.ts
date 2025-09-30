@@ -20,3 +20,23 @@ export class NoopGeometryQueryInterfaceProvider
     return [];
   }
 }
+
+export class NoopDefaultExportInterfaceProvider
+  implements editor.api.IDocumentExporterInterfaceProvider
+{
+  readonly formats = [];
+
+  canExportNodeAs(
+    _node_id: string,
+    _format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+  ): boolean {
+    return false;
+  }
+
+  exportNodeAs(
+    _node_id: string,
+    _format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+  ): Promise<Uint8Array | string> {
+    throw new Error("Not implemented");
+  }
+}
