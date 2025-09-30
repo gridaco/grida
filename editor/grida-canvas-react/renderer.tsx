@@ -162,6 +162,10 @@ function useFitInitiallyEffect() {
   }, [documentKey, sceneId]);
 }
 
+/**
+ * @deprecated
+ * TODO: this should work in plugin-wise, without any react dependencies - like how canvas backend does on mount
+ */
 export function AutoInitialFitTransformer({
   children,
 }: React.PropsWithChildren<{}>) {

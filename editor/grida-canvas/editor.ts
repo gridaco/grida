@@ -653,6 +653,9 @@ export class Editor
         el.height
       );
 
+      // fit the camera
+      this.camera.fit("*");
+
       // subscribe
       this.subscribeWithSelector(
         (state) => state.document,
