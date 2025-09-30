@@ -79,7 +79,7 @@ export class Camera implements editor.api.ICameraActions {
   }
 
   set transform(transform: cmath.Transform) {
-    this.editor.dispatch({
+    this.editor.doc.dispatch({
       type: "transform",
       transform,
       sync: true,
@@ -88,7 +88,7 @@ export class Camera implements editor.api.ICameraActions {
 
   // #region ICameraActions implementation
   transformWithSync(transform: cmath.Transform, sync: boolean = true) {
-    this.editor.dispatch({
+    this.editor.doc.dispatch({
       type: "transform",
       transform,
       sync,
@@ -195,7 +195,7 @@ export class Camera implements editor.api.ICameraActions {
     const ids = dq.querySelector(document_ctx, selection, selector);
 
     const rects = ids
-      .map((id) => this.editor.geometry.getNodeAbsoluteBoundingRect(id))
+      .map((id) => this.editor.geometryProvider.getNodeAbsoluteBoundingRect(id))
       .filter((r) => r) as cmath.Rectangle[];
 
     if (rects.length === 0) {
@@ -308,144 +308,43 @@ export class Camera implements editor.api.ICameraActions {
   }
 }
 
-export class Editor
+class EditorDocumentStore
   implements
-    editor.api.IDocumentActions,
+    editor.api.IDocumentStoreActions,
     editor.api.IDocumentNodeChangeActions,
-    editor.api.IDocumentGeometryQuery,
-    editor.api.IDocumentExportPluginActions,
-    editor.api.IDocumentSchemaActions_Experimental,
     editor.api.IDocumentBrushToolActions,
-    editor.api.IDocumentVectorInterfaceActions
+    editor.api.IDocumentSchemaActions_Experimental
 {
-  private readonly logger: (...args: any[]) => void;
-  private listeners: Set<(editor: this, action?: Action) => void>;
+  private readonly listeners: Set<(editor: this, action?: Action) => void> =
+    new Set();
+
   private mstate: editor.state.IEditorState;
-  readonly camera: Camera;
-  readonly surface: EditorSurface;
-
-  readonly backend: editor.EditorContentRenderingBackend;
-
-  private _m_wasm_canvas_scene: Scene | null = null;
-  private _m_exporter: editor.api.IDocumentExporterInterfaceProvider =
-    new NoopDefaultExportInterfaceProvider();
-
-  public get exporter() {
-    return this._m_exporter;
-  }
-
-  _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
-  get geometry() {
-    return this._m_geometry;
-  }
-
-  _m_vector: editor.api.IDocumentVectorInterfaceProvider | null = null;
-  private get vectorProvider() {
-    return this._m_vector;
-  }
-
-  _m_font_collection: editor.api.IDocumentFontCollectionInterfaceProvider | null =
-    null;
-  public get fontCollection() {
-    return this._m_font_collection;
-  }
-
-  _m_font_parser: editor.api.IDocumentFontParserInterfaceProvider | null = null;
-  public get fontParser() {
-    return this._m_font_parser;
-  }
-
-  private readonly _fontManager: DocumentFontManager;
-
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
 
-  readonly onMount?: (surface: Scene) => void;
-
-  constructor({
-    logger = console.log,
-    backend,
-    viewportElement,
-    geometry,
-    initialState,
-    interfaces = {},
-    onCreate,
-    onMount,
-  }: {
-    logger?: (...args: any[]) => void;
-    backend: editor.EditorContentRenderingBackend;
-    viewportElement: string | HTMLElement;
-    geometry:
-      | editor.api.IDocumentGeometryInterfaceProvider
-      | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider);
-    initialState: editor.state.IEditorStateInit;
-    onCreate?: (editor: Editor) => void;
-    onMount?: (surface: Scene) => void;
-    interfaces?: {
-      exporter?: WithEditorInstance<editor.api.IDocumentExporterInterfaceProvider>;
-      vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
-      font_collection?: WithEditorInstance<editor.api.IDocumentFontCollectionInterfaceProvider>;
-      font_parser?: WithEditorInstance<editor.api.IDocumentFontParserInterfaceProvider>;
-    };
-  }) {
-    this.logger = logger;
-    this.onMount = onMount;
-    this.backend = backend;
-    this.camera = new Camera(this, new domapi.DOMViewportApi(viewportElement));
-    this.surface = new EditorSurface(this);
-    this.mstate = editor.state.init(initialState);
-    this.listeners = new Set();
-    this._m_geometry =
-      typeof geometry === "function" ? geometry(this) : geometry;
-    //
-
-    if (interfaces?.exporter) {
-      this._m_exporter = resolveWithEditorInstance(this, interfaces.exporter);
-    }
-
-    if (interfaces?.vector) {
-      this._m_vector = resolveWithEditorInstance(this, interfaces.vector);
-    }
-
-    if (interfaces?.font_collection) {
-      this._m_font_collection = resolveWithEditorInstance(
-        this,
-        interfaces.font_collection
-      );
-    }
-
-    if (interfaces?.font_parser) {
-      this._m_font_parser = resolveWithEditorInstance(
-        this,
-        interfaces.font_parser
-      );
-    }
-
-    this._fontManager = new DocumentFontManager(this);
-
-    this._do_legacy_warmup();
-    onCreate?.(this);
-
-    this.log("editor instantiated");
-  }
+  private _locked: boolean = false;
 
   /**
-   * legacy warmup - ideally, this should be called externally, or once internallu,
-   * but as we allow dynamic surface binding, this proccess shall be duplicated once surface binded as well.
+   * @deprecated this is event target dependency - will be removed
    */
-  private _do_legacy_warmup() {
-    // warm up
-    googlefonts.fetchWebfontList().then((webfontlist) => {
-      this.__internal_dispatch({
-        type: "__internal/webfonts#webfontList",
-        webfontlist,
-      });
-      void this.loadPlatformDefaultFonts();
-    });
+  get viewportSize() {
+    return this.getViewportSize();
   }
 
-  private _locked: boolean = false;
+  constructor(
+    initialState: editor.state.IEditorStateInit,
+    private readonly backend: editor.EditorContentRenderingBackend,
+    private readonly geometry: editor.api.IDocumentGeometryQuery,
+    private readonly vector: editor.api.IDocumentVectorInterfaceActions | null,
+    /**
+     * @deprecated this is event target dependency - will be removed
+     */
+    private readonly getViewportSize: () => { width: number; height: number },
+    private readonly logger?: (...args: any[]) => void
+  ) {
+    this.mstate = editor.state.init(initialState);
+  }
 
   /**
    * @internal Transaction ID - does not clear on reset.
@@ -466,30 +365,8 @@ export class Editor
     this._locked = value;
   }
 
-  get debug() {
-    return this.mstate.debug;
-  }
-
   get transform() {
     return this.mstate.transform;
-  }
-
-  set debug(value: boolean) {
-    this.reduce((state) => {
-      state.debug = value;
-      return state;
-    });
-  }
-
-  public toggleDebug() {
-    this.debug = !this.debug;
-    return this.debug;
-  }
-
-  private log(...args: any[]) {
-    if (this.debug || process.env.NODE_ENV === "development") {
-      this.logger?.(...args);
-    }
   }
 
   public reset(
@@ -508,204 +385,11 @@ export class Editor
     return this._tid;
   }
 
-  private __bind_wasm_surface(surface: Scene) {
-    this._m_wasm_canvas_scene = surface;
-    //
-    this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
-      this,
-      surface
-    );
-
-    this._m_exporter = new CanvasWasmDefaultExportInterfaceProvider(
-      this,
-      surface
-    );
-
-    this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
-
-    this._m_font_collection = new CanvasWasmFontManagerAgentInterfaceProvider(
-      this,
-      surface
-    );
-
-    this._m_font_parser = new CanvasWasmFontParserInterfaceProvider(
-      this,
-      surface
-    );
-
-    this._do_legacy_warmup();
+  private log(...args: any[]) {
+    this.logger?.(...args);
   }
 
-  /**
-   * mount the canvas surface
-   * this does not YET manage the width / height / dpr. It assumes the canvas sets its own physical width / height.
-   * @param el canvas element
-   */
-  public async mount(el: HTMLCanvasElement) {
-    this.log("mount surface");
-    assert(this.backend === "canvas", "Editor is not using canvas backend");
-
-    await init({
-      locateFile: locateFile,
-    }).then((factory) => {
-      const surface = factory.createWebGLCanvasSurface(el);
-      surface.runtime_renderer_set_cache_tile(false);
-      // surface.setDebug(this.debug);
-      // surface.setVerbose(this.debug);
-      this.__bind_wasm_surface(surface);
-      this.onMount?.(surface);
-
-      this.log("grida wasm initialized");
-
-      const syncTransform = (
-        surface: Scene,
-        transform: cmath.Transform,
-        // physical width
-        width: number,
-        // physical height
-        height: number
-      ) => {
-        // the transform is the canvas transform, which needs to be converted to camera transform.
-        // input transform = translation + scale of the viewport, top left aligned
-        // camera transform = transform of the camera, center aligned
-        // - translate the transform to the center of the canvas
-        // - reverse the transform to match the canvas coordinate system
-
-        const toCenter = cmath.transform.translate(cmath.transform.identity, [
-          -width / 2,
-          -height / 2,
-        ]);
-
-        const dpr = window.devicePixelRatio || 1;
-
-        const deviceScale: cmath.Transform = [
-          [dpr, 0, 0],
-          [0, dpr, 0],
-        ];
-
-        const physicalTransform = cmath.transform.multiply(
-          deviceScale,
-          transform
-        );
-
-        const viewMatrix = cmath.transform.multiply(
-          toCenter,
-          physicalTransform
-        );
-
-        surface.setMainCameraTransform(cmath.transform.invert(viewMatrix));
-        surface.redraw();
-      };
-
-      const ro = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          if (entry.target == el) {
-            this._m_wasm_canvas_scene?.resize(el.width, el.height);
-            syncTransform(
-              this._m_wasm_canvas_scene!,
-              this.state.transform,
-              el.width,
-              el.height
-            );
-          }
-        }
-      });
-
-      // TODO: cleanup not handled
-      ro.observe(el, { box: "device-pixel-content-box" });
-
-      if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
-        this.log("wasm::factory", factory.module);
-      }
-
-      const syncDocument = (
-        surface: Scene,
-        document: grida.program.document.Document
-      ) => {
-        const p = JSON.stringify({
-          version: "0.0.1-beta.1+20250728",
-          document,
-        });
-        surface.loadScene(p);
-        surface.redraw();
-      };
-
-      // setup hooks
-      // - state.document
-      // - state.debug
-      // - state.transform
-      // - [state.hovered_node_id, state.selection]
-
-      // once
-      syncDocument(this._m_wasm_canvas_scene!, this.state.document);
-      syncTransform(
-        this._m_wasm_canvas_scene!,
-        this.state.transform,
-        el.width,
-        el.height
-      );
-
-      // fit the camera
-      this.camera.fit("*");
-
-      // subscribe
-      this.subscribeWithSelector(
-        (state) => state.document,
-        (_, v) => {
-          syncDocument(this._m_wasm_canvas_scene!, v);
-        }
-      );
-
-      this.subscribeWithSelector(
-        (state) => state.debug,
-        (_, v) => {
-          this._m_wasm_canvas_scene?.setDebug(v);
-          this._m_wasm_canvas_scene?.redraw();
-        }
-      );
-
-      this.subscribeWithSelector(
-        (state) => {
-          const hovered = state.hovered_node_id;
-          const selected = state.selection;
-          return [...selected, ...(hovered ? [hovered] : [])];
-        },
-        (_, v) => {
-          this._m_wasm_canvas_scene?.highlightStrokes({
-            nodes: v,
-            style: {
-              strokeWidth: 1,
-              // --color-workbench-accent-sky
-              stroke: "#00a6f4",
-            },
-          });
-          this._m_wasm_canvas_scene?.redraw();
-        }
-      );
-
-      this.subscribeWithSelector(
-        (state) => state.transform,
-        (_, v) => {
-          syncTransform(this._m_wasm_canvas_scene!, v, el.width, el.height);
-        }
-      );
-    });
-  }
-
-  public archive(): Blob {
-    const documentData = {
-      version: "0.0.1-beta.1+20250728",
-      document: this.getSnapshot().document,
-    } satisfies io.JSONDocumentFileModel;
-
-    const blob = new Blob([io.archive.pack(documentData) as BlobPart], {
-      type: "application/zip",
-    });
-
-    return blob;
-  }
-
-  private __createNodeId(): editor.NodeID {
+  __createNodeId(): editor.NodeID {
     // TODO: use a instance-wise generator
     return nid();
   }
@@ -724,9 +408,6 @@ export class Editor
       type: "insert",
       ...payload,
     });
-    for (const font of this.mstate.fontfaces) {
-      this.loadFontSync(font);
-    }
   }
 
   public __get_node_siblings(node_id: string): string[] {
@@ -743,7 +424,7 @@ export class Editor
     this.listeners.forEach((l) => l?.(this));
   }
 
-  private __internal_dispatch(action: InternalAction, force: boolean = false) {
+  public __internal_dispatch(action: InternalAction, force: boolean = false) {
     if (this._locked && !force) return;
     this.mstate = _internal_reducer(this.mstate, action);
 
@@ -754,12 +435,9 @@ export class Editor
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
     this.mstate = reducer(this.mstate, action, {
-      geometry: this,
-      vector: this,
-      viewport: {
-        width: this.camera.viewport.size.width,
-        height: this.camera.viewport.size.height,
-      },
+      geometry: this.geometry,
+      vector: this.vector,
+      viewport: this.viewportSize,
       backend: this.backend,
       // TODO: LEGACY_PAINT_MODEL
       paint_constraints: {
@@ -776,12 +454,9 @@ export class Editor
     this.mstate = actions.reduce(
       (state, action) =>
         reducer(state, action, {
-          geometry: this,
-          vector: this,
-          viewport: {
-            width: this.camera.viewport.size.width,
-            height: this.camera.viewport.size.height,
-          },
+          geometry: this.geometry,
+          vector: this.vector,
+          viewport: this.viewportSize,
           backend: this.backend,
           // TODO: LEGACY_PAINT_MODEL
           paint_constraints: {
@@ -823,18 +498,6 @@ export class Editor
 
     this.listeners.add(wrapped);
     return () => this.listeners.delete(wrapped);
-  }
-
-  public getSnapshot(): Readonly<editor.state.IEditorState> {
-    return this.mstate;
-  }
-
-  public getJson(): unknown {
-    return JSON.parse(JSON.stringify(this.mstate));
-  }
-
-  public getDocumentJson(): unknown {
-    return JSON.parse(JSON.stringify(this.mstate.document));
   }
 
   // #region IDocumentEditorActions implementation
@@ -885,121 +548,91 @@ export class Editor
     });
   }
 
-  // ================================================================
-  // #region IDocumentImageInterfaceActions implementation
-  // ================================================================
+  public async createNodeFromSvg(
+    svg: string
+  ): Promise<NodeProxy<grida.program.nodes.ContainerNode>> {
+    const id = this.__createNodeId();
+    const optimized = iosvg.v0.optimize(svg).data;
+    let result = await iosvg.v0.convert(optimized, {
+      name: "svg",
+      currentColor: { r: 0, g: 0, b: 0, a: 1 },
+    });
+    if (result) {
+      result = result as grida.program.nodes.i.IPositioning &
+        grida.program.nodes.i.IFixedDimension;
 
-  private readonly images = new Map<string, grida.program.document.ImageRef>();
+      this.insert({
+        id: id,
+        prototype: result,
+      });
 
-  __is_image_registered(ref: string): boolean {
-    return this.images.has(ref);
-  }
-
-  __get_image_ref(ref: string): grida.program.document.ImageRef | null {
-    return this.images.get(ref) || null;
-  }
-
-  __get_image_bytes_for_wasm(ref: string): Uint8Array | null {
-    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
-    const data = this._m_wasm_canvas_scene.getImageBytes(ref);
-    if (!data) return null;
-    return new Uint8Array(data);
-  }
-
-  __get_image_size_for_wasm(
-    ref: string
-  ): { width: number; height: number } | null {
-    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
-    const size = this._m_wasm_canvas_scene.getImageSize(ref);
-    if (!size) return null;
-    return size;
-  }
-
-  protected _experimental_createImage_for_wasm(
-    data: Uint8Array
-  ): Readonly<grida.program.document.ImageRef> {
-    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
-
-    const result = this._m_wasm_canvas_scene.addImage(data);
-    if (!result) throw new Error("addImage failed");
-    const { hash, url, width, height, type } = result;
-
-    const ref: grida.program.document.ImageRef = {
-      url,
-      width,
-      height,
-      bytes: data.byteLength,
-      type: type as grida.program.document.ImageType,
-    };
-
-    this.images.set(url, ref);
-
-    return ref;
-  }
-
-  async createImageAsync(
-    src: string
-  ): Promise<Readonly<grida.program.document.ImageRef>> {
-    const res = await fetch(src);
-    const blob = await res.blob();
-    const bytes = await blob.arrayBuffer();
-    const type = blob.type;
-
-    // TODO: add file validation
-
-    return this.createImage(
-      new Uint8Array(bytes),
-      src,
-      type as grida.program.document.ImageType
-    );
-  }
-
-  async createImage(
-    data: Uint8Array,
-    url?: string,
-    type?: grida.program.document.ImageType | (string | {})
-  ): Promise<Readonly<grida.program.document.ImageRef>> {
-    // TODO: add file validation
-
-    if (this.backend === "canvas" && this._m_wasm_canvas_scene) {
-      return this._experimental_createImage_for_wasm(data);
+      return this.getNodeById<grida.program.nodes.ContainerNode>(id);
+    } else {
+      throw new Error("Failed to convert SVG");
     }
-
-    // For DOM backend, we need to get dimensions
-    const imageUrl = url || URL.createObjectURL(new Blob([data as BlobPart]));
-
-    const { width, height } = await new Promise<{
-      width: number;
-      height: number;
-    }>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve({ width: img.width, height: img.height });
-      img.onerror = reject;
-      img.src = imageUrl;
-    });
-
-    const ref: grida.program.document.ImageRef = {
-      url: url || imageUrl,
-      width,
-      height,
-      bytes: data.byteLength,
-      type: (type as grida.program.document.ImageType) || "image/png",
-    };
-
-    this.reduce((state) => {
-      state.document.images[ref.url] = ref;
-      return state;
-    });
-
-    return ref;
   }
 
-  getImage(ref: string): ImageProxy | null {
-    if (!this.__is_image_registered(ref)) return null;
-    return new ImageProxy(this, ref);
+  public createImageNode(
+    image: grida.program.document.ImageRef
+  ): NodeProxy<grida.program.nodes.ImageNode> {
+    const id = this.__createNodeId();
+    this.dispatch({
+      type: "insert",
+      id: id,
+      prototype: {
+        type: "image",
+        _$id: id,
+        src: image.url,
+        width: image.width,
+        height: image.height,
+      },
+    });
+
+    return this.getNodeById(id);
   }
 
-  // #endregion
+  public createTextNode(): NodeProxy<grida.program.nodes.TextNode> {
+    const id = this.__createNodeId();
+    this.dispatch({
+      type: "insert",
+      id: id,
+      prototype: {
+        type: "text",
+        _$id: id,
+        text: "",
+        width: "auto",
+        height: "auto",
+        fill: {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+          active: true,
+        },
+      },
+    });
+
+    return this.getNodeById(id);
+  }
+
+  public createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode> {
+    const id = this.__createNodeId();
+    this.dispatch({
+      type: "insert",
+      id: id,
+      prototype: {
+        type: "rectangle",
+        _$id: id,
+        width: 100,
+        height: 100,
+        fill: {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+          active: true,
+        },
+      },
+    });
+
+    return this.getNodeById(id);
+  }
 
   public select(...selectors: grida.program.document.Selector[]) {
     const { document_ctx, selection } = this.mstate;
@@ -1119,21 +752,6 @@ export class Editor
     });
   }
 
-  /**
-   * groups targets as mask, if multiple, if single && is mask, remove mask
-   * @param target
-   */
-  public toggleMask(target: ReadonlyArray<editor.NodeID>) {
-    if (target.length === 0) return;
-    if (target.length === 1) {
-      if (this.isMask(target[0])) {
-        this.removeMask(target[0]);
-        return;
-      }
-    }
-    this.groupMask(target);
-  }
-
   public groupMask(target: ReadonlyArray<editor.NodeID>) {
     assert(Array.isArray(target), "target must be an array");
     this.group(target);
@@ -1142,24 +760,6 @@ export class Editor
       node_id: target[0],
       mask: "alpha",
     });
-  }
-
-  public removeMask(target: editor.NodeID) {
-    if (!this.isMask(target)) return;
-    this.dispatch({
-      type: "node/change/*",
-      node_id: target,
-      mask: null,
-    });
-  }
-
-  /**
-   * Checks if a node is being used as a mask
-   * @param target the node to test
-   */
-  public isMask(target: editor.NodeID) {
-    const n = this.getNodeSnapshotById(target);
-    return "mask" in n && n.mask;
   }
 
   //
@@ -1373,92 +973,6 @@ export class Editor
     });
   }
 
-  public async createNodeFromSvg(
-    svg: string
-  ): Promise<NodeProxy<grida.program.nodes.ContainerNode>> {
-    const id = this.__createNodeId();
-    const optimized = iosvg.v0.optimize(svg).data;
-    let result = await iosvg.v0.convert(optimized, {
-      name: "svg",
-      currentColor: { r: 0, g: 0, b: 0, a: 1 },
-    });
-    if (result) {
-      result = result as grida.program.nodes.i.IPositioning &
-        grida.program.nodes.i.IFixedDimension;
-
-      this.insert({
-        id: id,
-        prototype: result,
-      });
-
-      return this.getNodeById<grida.program.nodes.ContainerNode>(id);
-    } else {
-      throw new Error("Failed to convert SVG");
-    }
-  }
-
-  public createImageNode(
-    image: grida.program.document.ImageRef
-  ): NodeProxy<grida.program.nodes.ImageNode> {
-    const id = this.__createNodeId();
-    this.dispatch({
-      type: "insert",
-      id: id,
-      prototype: {
-        type: "image",
-        _$id: id,
-        src: image.url,
-        width: image.width,
-        height: image.height,
-      },
-    });
-
-    return this.getNodeById(id);
-  }
-
-  public createTextNode(): NodeProxy<grida.program.nodes.TextNode> {
-    const id = this.__createNodeId();
-    this.dispatch({
-      type: "insert",
-      id: id,
-      prototype: {
-        type: "text",
-        _$id: id,
-        text: "",
-        width: "auto",
-        height: "auto",
-        fill: {
-          type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
-          active: true,
-        },
-      },
-    });
-
-    return this.getNodeById(id);
-  }
-
-  public createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode> {
-    const id = this.__createNodeId();
-    this.dispatch({
-      type: "insert",
-      id: id,
-      prototype: {
-        type: "rectangle",
-        _$id: id,
-        width: 100,
-        height: 100,
-        fill: {
-          type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
-          active: true,
-        },
-      },
-    });
-
-    return this.getNodeById(id);
-  }
-
   public align(
     target: "selection" | editor.NodeID,
     alignment: {
@@ -1519,9 +1033,6 @@ export class Editor
   }
 
   public group(target: "selection" | editor.NodeID[]) {
-    if (this.backend === "dom") {
-      throw new Error("Grouping is not supported in DOM backend");
-    }
     this.dispatch({
       type: "group",
       target,
@@ -1529,66 +1040,11 @@ export class Editor
   }
 
   public ungroup(target: "selection" | editor.NodeID[]) {
-    if (this.backend === "dom") {
-      throw new Error("Grouping is not supported in DOM backend");
-    }
     this.dispatch({
       type: "ungroup",
       target,
     });
   }
-  // #endregion IDocumentEditorActions implementation
-
-  // #region IDocumentGeometryQuery implementation
-
-  public getNodeIdsFromPointerEvent(
-    event: PointerEvent | MouseEvent
-  ): string[] {
-    return this.geometry.getNodeIdsFromPointerEvent(event);
-  }
-
-  public getNodeIdsFromPoint(point: cmath.Vector2): string[] {
-    return this.geometry.getNodeIdsFromPoint(point);
-  }
-
-  public getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[] {
-    return this.geometry.getNodeIdsFromEnvelope(envelope);
-  }
-
-  public getNodeAbsoluteBoundingRect(
-    node_id: editor.NodeID
-  ): cmath.Rectangle | null {
-    return this.geometry.getNodeAbsoluteBoundingRect(node_id);
-  }
-
-  public getNodeAbsoluteRotation(node_id: editor.NodeID): number {
-    const parent_ids = dq.getAncestors(this.state.document_ctx, node_id);
-
-    let rotation = 0;
-    // Calculate the absolute rotation
-    try {
-      for (const parent_id of parent_ids) {
-        const parent_node = this.getNodeSnapshotById(parent_id);
-        assert(parent_node, `parent node not found: ${parent_id}`);
-        if ("rotation" in parent_node) {
-          rotation += parent_node.rotation ?? 0;
-        }
-      }
-
-      // finally, add the node's own rotation
-      const node = this.getNodeSnapshotById(node_id);
-      assert(node, `node not found: ${node_id}`);
-      if ("rotation" in node) {
-        rotation += node.rotation ?? 0;
-      }
-    } catch (e) {
-      reportError(e);
-    }
-
-    return rotation;
-  }
-
-  // #endregion IDocumentGeometryQuery implementation
 
   // #region ISchemaActions implementation
   public schemaDefineProperty(
@@ -1644,82 +1100,27 @@ export class Editor
     this.changeNodeActive(node_id, next);
     return next;
   }
+
   toggleNodeLocked(node_id: string) {
     const next = !this.getNodeSnapshotById(node_id).locked;
     this.changeNodeLocked(node_id, next);
     return next;
   }
-  toggleTextNodeBold(node_id: string) {
-    const node = this.getNodeSnapshotById(
-      node_id
-    ) as grida.program.nodes.TextNode;
-    if (node.type !== "text") return false;
 
-    const isBold = node.fontWeight === 700;
-    const next_weight = isBold ? 400 : 700;
-    const fontFamily = node.fontFamily;
-    if (!fontFamily) return false;
-
-    const match = this.selectFontStyle({
-      fontFamily: fontFamily,
-      fontWeight: next_weight,
-      fontStyleItalic: node.fontStyleItalic,
-    });
-
-    if (!match) {
-      this.log(
-        "toggleNodeBold: matching font face not found",
-        fontFamily,
-        next_weight,
-        node.fontStyleItalic
-      );
-      return false;
-    }
-
-    this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
-    return match.key.fontWeight as cg.NFontWeight;
-  }
-  toggleTextNodeItalic(node_id: string) {
-    const node = this.getNodeSnapshotById(
-      node_id
-    ) as grida.program.nodes.TextNode;
-    if (node.type !== "text") return false;
-
-    const next_italic = !node.fontStyleItalic;
-    const fontFamily = node.fontFamily;
-    if (!fontFamily) return false;
-
-    const match = this.selectFontStyle({
-      fontFamily: fontFamily,
-      fontWeight: node.fontWeight,
-      fontStyleItalic: next_italic,
-    });
-
-    if (!match) {
-      this.log(
-        "toggleNodeItalic: matching font face not found",
-        fontFamily,
-        next_italic,
-        node.fontWeight
-      );
-      return false;
-    }
-
-    this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
-    return true;
-  }
   toggleTextNodeUnderline(node_id: string) {
     this.dispatch({
       type: "node/toggle/underline",
       node_id: node_id,
     });
   }
+
   toggleTextNodeLineThrough(node_id: string) {
     this.dispatch({
       type: "node/toggle/line-through",
       node_id: node_id,
     });
   }
+
   changeNodePropertyProps(
     node_id: string,
     key: string,
@@ -1733,6 +1134,7 @@ export class Editor
       },
     });
   }
+
   changeNodePropertyComponent(node_id: string, component_id: string) {
     this.dispatch({
       type: "node/change/component",
@@ -1740,6 +1142,7 @@ export class Editor
       component_id: component_id,
     });
   }
+
   changeNodePropertyText(
     node_id: string,
     text: tokens.StringValueExpression | null
@@ -1750,6 +1153,7 @@ export class Editor
       text,
     });
   }
+
   changeNodeName(node_id: string, name: string) {
     this.dispatch({
       type: "node/change/*",
@@ -1757,6 +1161,7 @@ export class Editor
       name: name ?? "",
     });
   }
+
   changeNodeUserData(node_id: string, userdata: unknown) {
     this.dispatch({
       type: "node/change/*",
@@ -1764,6 +1169,7 @@ export class Editor
       userdata: userdata as any,
     });
   }
+
   changeNodeActive(node_id: string, active: boolean) {
     this.dispatch({
       type: "node/change/*",
@@ -1771,6 +1177,7 @@ export class Editor
       active: active,
     });
   }
+
   changeNodeLocked(node_id: string, locked: boolean) {
     this.dispatch({
       type: "node/change/*",
@@ -1778,6 +1185,7 @@ export class Editor
       locked: locked,
     });
   }
+
   changeNodePropertyPositioning(
     node_id: string,
     positioning: Partial<grida.program.nodes.i.IPositioning>
@@ -1788,6 +1196,7 @@ export class Editor
       ...positioning,
     });
   }
+
   changeNodePropertyPositioningMode(
     node_id: string,
     position: grida.program.nodes.i.IPositioning["position"]
@@ -1798,6 +1207,7 @@ export class Editor
       position,
     });
   }
+
   changeNodePropertySrc(node_id: string, src?: tokens.StringValueExpression) {
     this.dispatch({
       type: "node/change/*",
@@ -1805,6 +1215,7 @@ export class Editor
       src,
     });
   }
+
   changeNodePropertyHref(
     node_id: string,
     href?: grida.program.nodes.i.IHrefable["href"]
@@ -1815,6 +1226,7 @@ export class Editor
       href,
     });
   }
+
   changeNodePropertyTarget(
     node_id: string,
     target?: grida.program.nodes.i.IHrefable["target"]
@@ -1825,26 +1237,26 @@ export class Editor
       target,
     });
   }
-  changeNodePropertyOpacity(node_id: string, opacity: editor.api.NumberChange) {
-    requestAnimationFrame(() => {
-      try {
-        const value = resolveNumberChangeValue(
-          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-          "opacity",
-          opacity
-        );
 
-        this.dispatch({
-          type: "node/change/*",
-          node_id: node_id,
-          opacity: value,
-        });
-      } catch (e) {
-        reportError(e);
-        return;
-      }
-    });
+  changeNodePropertyOpacity(node_id: string, opacity: editor.api.NumberChange) {
+    try {
+      const value = resolveNumberChangeValue(
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+        "opacity",
+        opacity
+      );
+
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        opacity: value,
+      });
+    } catch (e) {
+      reportError(e);
+      return;
+    }
   }
+
   changeNodePropertyBlendMode(
     node_id: editor.NodeID,
     blendMode: cg.LayerBlendMode
@@ -1855,6 +1267,7 @@ export class Editor
       blendMode,
     });
   }
+
   changeNodeMaskType(node_id: string, mask: cg.LayerMaskType) {
     this.dispatch({
       type: "node/change/*",
@@ -1862,108 +1275,37 @@ export class Editor
       mask,
     });
   }
+
   changeNodePropertyRotation(
     node_id: string,
     rotation: editor.api.NumberChange
   ) {
-    requestAnimationFrame(() => {
-      try {
-        const value = resolveNumberChangeValue(
-          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-          "rotation",
-          rotation
-        );
+    try {
+      const value = resolveNumberChangeValue(
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+        "rotation",
+        rotation
+      );
 
-        this.dispatch({
-          type: "node/change/*",
-          node_id: node_id,
-          rotation: value,
-        });
-      } catch (e) {
-        reportError(e);
-        return;
-      }
-    });
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        rotation: value,
+      });
+    } catch (e) {
+      reportError(e);
+      return;
+    }
   }
   changeNodeSize(
     node_id: string,
     axis: "width" | "height",
     value: grida.program.css.LengthPercentage | "auto"
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        [axis]: value,
-      });
-    });
-  }
-
-  autoSizeTextNode(node_id: string, axis: "width" | "height") {
-    const node = this.getNodeSnapshotById(
-      node_id
-    ) as grida.program.nodes.UnknwonNode;
-    if (node.type !== "text") return;
-
-    const prev = this.geometry.getNodeAbsoluteBoundingRect(node_id);
-    if (!prev) return;
-
-    const h_align = node.textAlign;
-    const v_align = node.textAlignVertical;
-
-    // FIXME: nested raf.
-    // why this is needed?
-    // currently, the api does not expose a way or contains value for textlayout size, not the box size.
-    // since we can't pre-calculate the delta, this is the dirty hack to first resize, then get the next size, shift delta.
-    // => need api/data that holds actual textlayout size (non box size)
-
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        [axis]: "auto",
-      });
-
-      requestAnimationFrame(() => {
-        const next = this.geometry.getNodeAbsoluteBoundingRect(node_id);
-        if (!next) return;
-
-        if (axis === "width") {
-          const diff = prev.width - next.width;
-          if (diff === 0) return;
-          let left = prev.x;
-          switch (h_align) {
-            case "right":
-              left = prev.x + diff;
-              break;
-            case "center":
-              left = prev.x + diff / 2;
-              break;
-            default:
-              return;
-          }
-          this.changeNodePropertyPositioning(node_id, {
-            left: cmath.quantize(left, 1),
-          });
-        } else {
-          const diff = prev.height - next.height;
-          if (diff === 0) return;
-          let top = prev.y;
-          switch (v_align) {
-            case "bottom":
-              top = prev.y + diff;
-              break;
-            case "center":
-              top = prev.y + diff / 2;
-              break;
-            default:
-              return;
-          }
-          this.changeNodePropertyPositioning(node_id, {
-            top: cmath.quantize(top, 1),
-          });
-        }
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      [axis]: value,
     });
   }
 
@@ -2082,6 +1424,7 @@ export class Editor
       strokeCap,
     });
   }
+
   changeNodePropertyFit(node_id: string, fit: cg.BoxFit) {
     this.dispatch({
       type: "node/change/*",
@@ -2121,6 +1464,7 @@ export class Editor
       });
     }
   }
+
   changeNodePropertyCornerRadiusWithDelta(
     node_id: string,
     delta: number
@@ -2172,6 +1516,7 @@ export class Editor
       pointCount,
     });
   }
+
   changeNodePropertyInnerRadius(
     node_id: editor.NodeID,
     innerRadius: number
@@ -2182,6 +1527,7 @@ export class Editor
       innerRadius,
     });
   }
+
   changeNodePropertyArcData(
     node_id: editor.NodeID,
     arcData: grida.program.nodes.i.IEllipseArcData
@@ -2194,53 +1540,7 @@ export class Editor
       angleOffset: arcData.angleOffset,
     });
   }
-  // text style
-  async changeTextNodeFontFamilySync(
-    node_id: string,
-    fontFamily: string,
-    force = true
-  ) {
-    const node = this.getNodeSnapshotById(
-      node_id
-    ) as grida.program.nodes.TextNode;
-    assert(node, "node is not found");
-    assert(node.type === "text", "node is not a text node");
 
-    // load the font family & prepare
-    await this.loadFontSync({ family: fontFamily });
-    const ready = await this.getFontFamilyDetailsSync(fontFamily);
-
-    if (!ready) {
-      this.log(
-        "tried to change font family, but the font could not be parsed correctly",
-        fontFamily
-      );
-      return false;
-    }
-
-    const description: editor.api.FontStyleSelectDescription = { fontFamily };
-
-    if (!force) {
-      // when not force, try to keep the previous (current) font style
-      description.fontWeight = node.fontWeight;
-      description.fontStyleItalic = node.fontStyleItalic;
-      description.fontVariations = node.fontVariations;
-    }
-
-    const match = this.selectFontStyle(description);
-
-    if (match) {
-      this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
-      return true;
-    } else {
-      this.log(
-        "tried to change font family, but matching font face not found",
-        fontFamily,
-        description
-      );
-      return false;
-    }
-  }
   changeTextNodeFontWeight(node_id: string, fontWeight: cg.NFontWeight) {
     this.dispatch({
       type: "node/change/*",
@@ -2262,104 +1562,6 @@ export class Editor
       type: "node/change/*",
       node_id: node_id,
       fontWidth,
-    });
-  }
-
-  changeTextNodeFontStyle(
-    node_id: string,
-    fontStyleDescription: editor.api.FontStyleChangeDescription
-  ) {
-    const { fontStyleKey } = fontStyleDescription;
-    const next_family = fontStyleKey.fontFamily;
-
-    const node = this.getNodeSnapshotById(
-      node_id
-    ) as grida.program.nodes.TextNode;
-
-    const prev: grida.program.nodes.i.IFontStyle = {
-      fontPostscriptName: node.fontPostscriptName,
-      fontWeight: node.fontWeight,
-      fontWidth: node.fontWidth,
-      fontKerning: node.fontKerning,
-      fontSize: node.fontSize,
-      fontVariations: node.fontVariations,
-      fontFeatures: node.fontFeatures,
-      fontOpticalSizing: node.fontOpticalSizing,
-      fontStyleItalic: node.fontStyleItalic,
-    };
-
-    const description = Object.assign(
-      {},
-      {
-        fontFamily: next_family,
-        fontInstancePostscriptName: fontStyleKey.fontPostscriptName,
-        fontStyleItalic: fontStyleKey.fontStyleItalic,
-        fontWeight: fontStyleKey.fontWeight,
-      } satisfies Partial<editor.api.FontStyleSelectDescription>,
-      Object.fromEntries(
-        Object.entries(fontStyleKey).filter(([_, v]) => v !== undefined)
-      )
-    ) as editor.api.FontStyleSelectDescription;
-
-    const match = this.selectFontStyle(description);
-
-    // reject
-    if (!match) {
-      this.log(
-        "matching font face not found",
-        fontStyleKey.fontFamily,
-        description
-      );
-      return;
-    }
-
-    const {
-      fontFamily: _fontFamily,
-      ...next
-    }: grida.program.nodes.i.IFontStyle = {
-      ...prev,
-      fontPostscriptName:
-        match.instance?.postscriptName || match.face.postscriptName,
-      // ----
-      // [high level variables]
-      fontWeight: match.instance?.coordinates?.wght ?? prev.fontWeight,
-      fontWidth: match.instance?.coordinates?.wdth ?? prev.fontWidth,
-      // TODO: should prevent optical sizing auto => fixed
-      // (if the next value === auto's expected value && prev value is auto, keep auto) => the change style does not change the size, so the logic can be even simpler.
-      fontOpticalSizing:
-        match.instance?.coordinates?.opsz ?? prev.fontOpticalSizing,
-      // ----
-      // Clear variable axes for non-variable fonts
-      fontVariations: match.isVariable
-        ? match.instance?.coordinates
-        : undefined,
-      // TODO: clean the invalid features by face change.
-      // fontFeatures: match.features,
-      fontStyleItalic: match.face.italic,
-    } as const;
-
-    this.log(
-      "changeTextNodeFontStyle",
-      "next",
-      next,
-      "match",
-      match,
-      "fontStyleKey",
-      fontStyleKey,
-      "description",
-      description
-    );
-
-    this.dispatch({
-      type: "node/change/fontFamily",
-      node_id: node_id,
-      fontFamily: next_family,
-    });
-
-    this.dispatch({
-      type: "node/change/*",
-      node_id: node_id,
-      ...next,
     });
   }
 
@@ -2409,24 +1611,6 @@ export class Editor
     });
   }
 
-  // FIXME: remove me
-  changeTextNodeFontVariationInstance(
-    node_id: editor.NodeID,
-    coordinates: Record<string, number>
-  ): void {
-    const { wght, ...rest } = coordinates;
-
-    this.dispatch({
-      type: "node/change/*",
-      node_id: node_id,
-      fontWeight:
-        typeof wght === "number" ? (wght as cg.NFontWeight) : undefined,
-      fontVariations:
-        Object.keys(rest).length > 0
-          ? (rest as Record<string, number>)
-          : undefined,
-    });
-  }
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
     try {
       const value = resolveNumberChangeValue(
@@ -2631,12 +1815,10 @@ export class Editor
     node_id: string,
     border: grida.program.css.Border | undefined
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        border: border,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      border: border,
     });
   }
   //
@@ -2644,12 +1826,10 @@ export class Editor
     node_id: string,
     padding: grida.program.nodes.i.IPadding["padding"]
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        padding,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      padding,
     });
   }
 
@@ -2746,13 +1926,11 @@ export class Editor
     node_id: string,
     gap: number | { mainAxisGap: number; crossAxisGap: number }
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        mainAxisGap: typeof gap === "number" ? gap : gap.mainAxisGap,
-        crossAxisGap: typeof gap === "number" ? gap : gap.crossAxisGap,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      mainAxisGap: typeof gap === "number" ? gap : gap.mainAxisGap,
+      crossAxisGap: typeof gap === "number" ? gap : gap.crossAxisGap,
     });
   }
   //
@@ -2768,14 +1946,12 @@ export class Editor
     key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
     value: any
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/style",
-        node_id: node_id,
-        style: {
-          [key]: value,
-        },
-      });
+    this.dispatch({
+      type: "node/change/style",
+      node_id: node_id,
+      style: {
+        [key]: value,
+      },
     });
   }
   // #endregion INodeChangeActions
@@ -2801,8 +1977,6 @@ export class Editor
   }
   // #endregion IBrushToolActions implementation
 
-  // #endregion IRulerActions implementation
-
   // #region IGuide2DActions implementation
 
   /**
@@ -2815,6 +1989,890 @@ export class Editor
     });
   }
   // #endregion IGuide2DActions implementation
+
+  dispose() {
+    this.listeners.clear();
+  }
+}
+
+export class Editor
+  implements
+    editor.IStoreSubscriptionTrait<editor.state.IEditorState>,
+    editor.api.IEditorDocumentStoreConsumerWithConstraintsActions,
+    editor.api.IDocumentFontActions,
+    editor.api.IDocumentImageActions,
+    editor.api.IDocumentGeometryQuery,
+    editor.api.IDocumentNodeTextNodeFontActions,
+    editor.api.IDocumentExportPluginActions,
+    editor.api.IDocumentVectorInterfaceActions
+{
+  private readonly listeners: Set<(editor: this, action?: Action) => void> =
+    new Set();
+  private readonly logger: (...args: any[]) => void;
+  readonly camera: Camera;
+  readonly surface: EditorSurface;
+  readonly backend: editor.EditorContentRenderingBackend;
+  readonly doc: EditorDocumentStore;
+
+  private _m_wasm_canvas_scene: Scene | null = null;
+  private _m_exporter: editor.api.IDocumentExporterInterfaceProvider =
+    new NoopDefaultExportInterfaceProvider();
+
+  public get exporter() {
+    return this._m_exporter;
+  }
+
+  _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
+  get geometryProvider() {
+    return this._m_geometry;
+  }
+
+  _m_vector: editor.api.IDocumentVectorInterfaceProvider | null = null;
+  private get vectorProvider() {
+    return this._m_vector;
+  }
+
+  _m_font_collection: editor.api.IDocumentFontCollectionInterfaceProvider | null =
+    null;
+  public get fontCollection() {
+    return this._m_font_collection;
+  }
+
+  _m_font_parser: editor.api.IDocumentFontParserInterfaceProvider | null = null;
+  public get fontParser() {
+    return this._m_font_parser;
+  }
+
+  private readonly _fontManager: DocumentFontManager;
+
+  readonly onMount?: (surface: Scene) => void;
+
+  get state() {
+    return this.doc.state;
+  }
+
+  get debug() {
+    return this.doc.state.debug;
+  }
+
+  set debug(value: boolean) {
+    this.doc.reduce((state) => {
+      state.debug = value;
+      return state;
+    });
+  }
+
+  public toggleDebug() {
+    this.debug = !this.debug;
+    return this.debug;
+  }
+
+  readonly commands: editor.api.EditorCommands;
+
+  constructor({
+    logger = console.log,
+    backend,
+    viewportElement,
+    geometry,
+    initialState,
+    interfaces = {},
+    onCreate,
+    onMount,
+  }: {
+    logger?: (...args: any[]) => void;
+    backend: editor.EditorContentRenderingBackend;
+    viewportElement: string | HTMLElement;
+    geometry:
+      | editor.api.IDocumentGeometryInterfaceProvider
+      | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider);
+    initialState: editor.state.IEditorStateInit;
+    onCreate?: (editor: Editor) => void;
+    onMount?: (surface: Scene) => void;
+    interfaces?: {
+      exporter?: WithEditorInstance<editor.api.IDocumentExporterInterfaceProvider>;
+      vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
+      font_collection?: WithEditorInstance<editor.api.IDocumentFontCollectionInterfaceProvider>;
+      font_parser?: WithEditorInstance<editor.api.IDocumentFontParserInterfaceProvider>;
+    };
+  }) {
+    this.logger = logger;
+    this.onMount = onMount;
+    this.backend = backend;
+    this.camera = new Camera(this, new domapi.DOMViewportApi(viewportElement));
+    this.doc = new EditorDocumentStore(
+      initialState,
+      backend,
+      this,
+      this,
+      () => this.camera.viewport.size,
+      logger
+    );
+    this.surface = new EditorSurface(this);
+
+    this._m_geometry =
+      typeof geometry === "function" ? geometry(this) : geometry;
+    //
+
+    if (interfaces?.exporter) {
+      this._m_exporter = resolveWithEditorInstance(this, interfaces.exporter);
+    }
+
+    if (interfaces?.vector) {
+      this._m_vector = resolveWithEditorInstance(this, interfaces.vector);
+    }
+
+    if (interfaces?.font_collection) {
+      this._m_font_collection = resolveWithEditorInstance(
+        this,
+        interfaces.font_collection
+      );
+    }
+
+    if (interfaces?.font_parser) {
+      this._m_font_parser = resolveWithEditorInstance(
+        this,
+        interfaces.font_parser
+      );
+    }
+
+    this._fontManager = new DocumentFontManager(this);
+
+    this._do_legacy_warmup();
+    this.commands = this.doc;
+    onCreate?.(this);
+
+    this.log("editor instantiated");
+  }
+
+  /**
+   * legacy warmup - ideally, this should be called externally, or once internallu,
+   * but as we allow dynamic surface binding, this proccess shall be duplicated once surface binded as well.
+   */
+  private _do_legacy_warmup() {
+    // warm up
+    // TODO: remove this from core document state.
+    googlefonts.fetchWebfontList().then((webfontlist) => {
+      this.doc.__internal_dispatch({
+        type: "__internal/webfonts#webfontList",
+        webfontlist,
+      });
+      void this.loadPlatformDefaultFonts();
+    });
+  }
+
+  private log(...args: any[]) {
+    if (this.debug || process.env.NODE_ENV === "development") {
+      this.logger?.(...args);
+    }
+  }
+
+  private __bind_wasm_surface(surface: Scene) {
+    this._m_wasm_canvas_scene = surface;
+    //
+    this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._m_exporter = new CanvasWasmDefaultExportInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
+
+    this._m_font_collection = new CanvasWasmFontManagerAgentInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._m_font_parser = new CanvasWasmFontParserInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._do_legacy_warmup();
+  }
+
+  /**
+   * mount the canvas surface
+   * this does not YET manage the width / height / dpr. It assumes the canvas sets its own physical width / height.
+   * @param el canvas element
+   */
+  public async mount(el: HTMLCanvasElement) {
+    this.log("mount surface");
+    assert(this.backend === "canvas", "Editor is not using canvas backend");
+
+    await init({
+      locateFile: locateFile,
+    }).then((factory) => {
+      const surface = factory.createWebGLCanvasSurface(el);
+      surface.runtime_renderer_set_cache_tile(false);
+      // surface.setDebug(this.debug);
+      // surface.setVerbose(this.debug);
+      this.__bind_wasm_surface(surface);
+      this.onMount?.(surface);
+
+      this.log("grida wasm initialized");
+
+      const syncTransform = (
+        surface: Scene,
+        transform: cmath.Transform,
+        // physical width
+        width: number,
+        // physical height
+        height: number
+      ) => {
+        // the transform is the canvas transform, which needs to be converted to camera transform.
+        // input transform = translation + scale of the viewport, top left aligned
+        // camera transform = transform of the camera, center aligned
+        // - translate the transform to the center of the canvas
+        // - reverse the transform to match the canvas coordinate system
+
+        const toCenter = cmath.transform.translate(cmath.transform.identity, [
+          -width / 2,
+          -height / 2,
+        ]);
+
+        const dpr = window.devicePixelRatio || 1;
+
+        const deviceScale: cmath.Transform = [
+          [dpr, 0, 0],
+          [0, dpr, 0],
+        ];
+
+        const physicalTransform = cmath.transform.multiply(
+          deviceScale,
+          transform
+        );
+
+        const viewMatrix = cmath.transform.multiply(
+          toCenter,
+          physicalTransform
+        );
+
+        surface.setMainCameraTransform(cmath.transform.invert(viewMatrix));
+        surface.redraw();
+      };
+
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.target == el) {
+            this._m_wasm_canvas_scene?.resize(el.width, el.height);
+            syncTransform(
+              this._m_wasm_canvas_scene!,
+              this.state.transform,
+              el.width,
+              el.height
+            );
+          }
+        }
+      });
+
+      // TODO: cleanup not handled
+      ro.observe(el, { box: "device-pixel-content-box" });
+
+      if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
+        this.log("wasm::factory", factory.module);
+      }
+
+      const syncDocument = (
+        surface: Scene,
+        document: grida.program.document.Document
+      ) => {
+        const p = JSON.stringify({
+          version: "0.0.1-beta.1+20250728",
+          document,
+        });
+        surface.loadScene(p);
+        surface.redraw();
+      };
+
+      // setup hooks
+      // - state.document
+      // - state.debug
+      // - state.transform
+      // - [state.hovered_node_id, state.selection]
+
+      // once
+      syncDocument(this._m_wasm_canvas_scene!, this.doc.state.document);
+      syncTransform(
+        this._m_wasm_canvas_scene!,
+        this.doc.state.transform,
+        el.width,
+        el.height
+      );
+
+      // fit the camera
+      this.camera.fit("*");
+
+      // subscribe
+      this.doc.subscribeWithSelector(
+        (state) => state.document,
+        (_, v) => {
+          syncDocument(this._m_wasm_canvas_scene!, v);
+        }
+      );
+
+      this.doc.subscribeWithSelector(
+        (state) => state.debug,
+        (_, v) => {
+          this._m_wasm_canvas_scene?.setDebug(v);
+          this._m_wasm_canvas_scene?.redraw();
+        }
+      );
+
+      this.doc.subscribeWithSelector(
+        (state) => {
+          const hovered = state.hovered_node_id;
+          const selected = state.selection;
+          return [...selected, ...(hovered ? [hovered] : [])];
+        },
+        (_, v) => {
+          this._m_wasm_canvas_scene?.highlightStrokes({
+            nodes: v,
+            style: {
+              strokeWidth: 1,
+              // --color-workbench-accent-sky
+              stroke: "#00a6f4",
+            },
+          });
+          this._m_wasm_canvas_scene?.redraw();
+        }
+      );
+
+      this.doc.subscribeWithSelector(
+        (state) => state.transform,
+        (_, v) => {
+          syncTransform(this._m_wasm_canvas_scene!, v, el.width, el.height);
+        }
+      );
+    });
+  }
+
+  public subscribe(fn: (editor: this, action?: Action) => void) {
+    // TODO: subscribe to the document store
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  // public subscribeWithSelector<T>(
+  //   selector: (state: editor.state.IEditorState) => T,
+  //   listener: (editor: this, selected: T, previous: T, action?: Action) => void,
+  //   isEqual: (a: T, b: T) => boolean = Object.is
+  // ): () => void {
+  // }
+
+  public archive(): Blob {
+    const documentData = {
+      version: "0.0.1-beta.1+20250728",
+      document: this.getSnapshot().document,
+    } satisfies io.JSONDocumentFileModel;
+
+    const blob = new Blob([io.archive.pack(documentData) as BlobPart], {
+      type: "application/zip",
+    });
+
+    return blob;
+  }
+
+  public getSnapshot(): Readonly<editor.state.IEditorState> {
+    return this.doc.state;
+  }
+
+  public getJson(): unknown {
+    return JSON.parse(JSON.stringify(this.doc.state));
+  }
+
+  public getDocumentJson(): unknown {
+    return JSON.parse(JSON.stringify(this.doc.state.document));
+  }
+
+  // ================================================================
+  // #region IDocumentImageInterfaceActions implementation
+  // ================================================================
+
+  private readonly images = new Map<string, grida.program.document.ImageRef>();
+
+  __is_image_registered(ref: string): boolean {
+    return this.images.has(ref);
+  }
+
+  __get_image_ref(ref: string): grida.program.document.ImageRef | null {
+    return this.images.get(ref) || null;
+  }
+
+  __get_image_bytes_for_wasm(ref: string): Uint8Array | null {
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+    const data = this._m_wasm_canvas_scene.getImageBytes(ref);
+    if (!data) return null;
+    return new Uint8Array(data);
+  }
+
+  __get_image_size_for_wasm(
+    ref: string
+  ): { width: number; height: number } | null {
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+    const size = this._m_wasm_canvas_scene.getImageSize(ref);
+    if (!size) return null;
+    return size;
+  }
+
+  protected _experimental_createImage_for_wasm(
+    data: Uint8Array
+  ): Readonly<grida.program.document.ImageRef> {
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+
+    const result = this._m_wasm_canvas_scene.addImage(data);
+    if (!result) throw new Error("addImage failed");
+    const { hash, url, width, height, type } = result;
+
+    const ref: grida.program.document.ImageRef = {
+      url,
+      width,
+      height,
+      bytes: data.byteLength,
+      type: type as grida.program.document.ImageType,
+    };
+
+    this.images.set(url, ref);
+
+    return ref;
+  }
+
+  public insert(
+    payload:
+      | {
+          id?: string;
+          prototype: grida.program.nodes.NodePrototype;
+        }
+      | {
+          document: grida.program.document.IPackedSceneDocument;
+        }
+  ): void {
+    this.doc.insert(payload);
+    for (const font of this.doc.state.fontfaces) {
+      this.loadFontSync(font);
+    }
+  }
+
+  async createImageAsync(
+    src: string
+  ): Promise<Readonly<grida.program.document.ImageRef>> {
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const bytes = await blob.arrayBuffer();
+    const type = blob.type;
+
+    // TODO: add file validation
+
+    return this.createImage(
+      new Uint8Array(bytes),
+      src,
+      type as grida.program.document.ImageType
+    );
+  }
+
+  async createImage(
+    data: Uint8Array,
+    url?: string,
+    type?: grida.program.document.ImageType | (string | {})
+  ): Promise<Readonly<grida.program.document.ImageRef>> {
+    // TODO: add file validation
+
+    if (this.backend === "canvas" && this._m_wasm_canvas_scene) {
+      return this._experimental_createImage_for_wasm(data);
+    }
+
+    // For DOM backend, we need to get dimensions
+    const imageUrl = url || URL.createObjectURL(new Blob([data as BlobPart]));
+
+    const { width, height } = await new Promise<{
+      width: number;
+      height: number;
+    }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = reject;
+      img.src = imageUrl;
+    });
+
+    const ref: grida.program.document.ImageRef = {
+      url: url || imageUrl,
+      width,
+      height,
+      bytes: data.byteLength,
+      type: (type as grida.program.document.ImageType) || "image/png",
+    };
+
+    this.doc.reduce((state) => {
+      state.document.images[ref.url] = ref;
+      return state;
+    });
+
+    return ref;
+  }
+
+  getImage(ref: string): ImageProxy | null {
+    if (!this.__is_image_registered(ref)) return null;
+    return new ImageProxy(this, ref);
+  }
+
+  // #endregion
+
+  /**
+   * Checks if a node is being used as a mask
+   * @param target the node to test
+   */
+  public isMask(target: editor.NodeID) {
+    const n = this.doc.getNodeSnapshotById(target);
+    return "mask" in n && n.mask;
+  }
+
+  /**
+   * groups targets as mask, if multiple, if single && is mask, remove mask
+   * @param target
+   */
+  public toggleMask(target: ReadonlyArray<editor.NodeID>) {
+    if (target.length === 0) return;
+    if (target.length === 1) {
+      if (this.isMask(target[0])) {
+        this.removeMask(target[0]);
+        return;
+      }
+    }
+    this.doc.groupMask(target);
+  }
+
+  public removeMask(target: editor.NodeID) {
+    if (!this.isMask(target)) return;
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: target,
+      mask: null,
+    });
+  }
+
+  // #endregion IDocumentEditorActions implementation
+
+  // #region IDocumentGeometryQuery implementation
+
+  public getNodeIdsFromPointerEvent(
+    event: PointerEvent | MouseEvent
+  ): string[] {
+    return this.geometryProvider.getNodeIdsFromPointerEvent(event);
+  }
+
+  public getNodeIdsFromPoint(point: cmath.Vector2): string[] {
+    return this.geometryProvider.getNodeIdsFromPoint(point);
+  }
+
+  public getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[] {
+    return this.geometryProvider.getNodeIdsFromEnvelope(envelope);
+  }
+
+  public getNodeAbsoluteBoundingRect(
+    node_id: editor.NodeID
+  ): cmath.Rectangle | null {
+    return this.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
+  }
+
+  public getNodeAbsoluteRotation(node_id: editor.NodeID): number {
+    const parent_ids = dq.getAncestors(this.doc.state.document_ctx, node_id);
+
+    let rotation = 0;
+    // Calculate the absolute rotation
+    try {
+      for (const parent_id of parent_ids) {
+        const parent_node = this.doc.getNodeSnapshotById(parent_id);
+        assert(parent_node, `parent node not found: ${parent_id}`);
+        if ("rotation" in parent_node) {
+          rotation += parent_node.rotation ?? 0;
+        }
+      }
+
+      // finally, add the node's own rotation
+      const node = this.doc.getNodeSnapshotById(node_id);
+      assert(node, `node not found: ${node_id}`);
+      if ("rotation" in node) {
+        rotation += node.rotation ?? 0;
+      }
+    } catch (e) {
+      reportError(e);
+    }
+
+    return rotation;
+  }
+
+  // #endregion IDocumentGeometryQuery implementation
+
+  toggleTextNodeBold(node_id: string) {
+    const node = this.doc.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    if (node.type !== "text") return false;
+
+    const isBold = node.fontWeight === 700;
+    const next_weight = isBold ? 400 : 700;
+    const fontFamily = node.fontFamily;
+    if (!fontFamily) return false;
+
+    const match = this.selectFontStyle({
+      fontFamily: fontFamily,
+      fontWeight: next_weight,
+      fontStyleItalic: node.fontStyleItalic,
+    });
+
+    if (!match) {
+      this.log(
+        "toggleNodeBold: matching font face not found",
+        fontFamily,
+        next_weight,
+        node.fontStyleItalic
+      );
+      return false;
+    }
+
+    this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
+    return match.key.fontWeight as cg.NFontWeight;
+  }
+
+  toggleTextNodeItalic(node_id: string) {
+    const node = this.doc.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    if (node.type !== "text") return false;
+
+    const next_italic = !node.fontStyleItalic;
+    const fontFamily = node.fontFamily;
+    if (!fontFamily) return false;
+
+    const match = this.selectFontStyle({
+      fontFamily: fontFamily,
+      fontWeight: node.fontWeight,
+      fontStyleItalic: next_italic,
+    });
+
+    if (!match) {
+      this.log(
+        "toggleNodeItalic: matching font face not found",
+        fontFamily,
+        next_italic,
+        node.fontWeight
+      );
+      return false;
+    }
+
+    this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
+    return true;
+  }
+
+  changeTextNodeFontStyle(
+    node_id: string,
+    fontStyleDescription: editor.api.FontStyleChangeDescription
+  ) {
+    const { fontStyleKey } = fontStyleDescription;
+    const next_family = fontStyleKey.fontFamily;
+
+    const node = this.doc.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+
+    const prev: grida.program.nodes.i.IFontStyle = {
+      fontPostscriptName: node.fontPostscriptName,
+      fontWeight: node.fontWeight,
+      fontWidth: node.fontWidth,
+      fontKerning: node.fontKerning,
+      fontSize: node.fontSize,
+      fontVariations: node.fontVariations,
+      fontFeatures: node.fontFeatures,
+      fontOpticalSizing: node.fontOpticalSizing,
+      fontStyleItalic: node.fontStyleItalic,
+    };
+
+    const description = Object.assign(
+      {},
+      {
+        fontFamily: next_family,
+        fontInstancePostscriptName: fontStyleKey.fontPostscriptName,
+        fontStyleItalic: fontStyleKey.fontStyleItalic,
+        fontWeight: fontStyleKey.fontWeight,
+      } satisfies Partial<editor.api.FontStyleSelectDescription>,
+      Object.fromEntries(
+        Object.entries(fontStyleKey).filter(([_, v]) => v !== undefined)
+      )
+    ) as editor.api.FontStyleSelectDescription;
+
+    const match = this.selectFontStyle(description);
+
+    // reject
+    if (!match) {
+      this.log(
+        "matching font face not found",
+        fontStyleKey.fontFamily,
+        description
+      );
+      return;
+    }
+
+    const {
+      fontFamily: _fontFamily,
+      ...next
+    }: grida.program.nodes.i.IFontStyle = {
+      ...prev,
+      fontPostscriptName:
+        match.instance?.postscriptName || match.face.postscriptName,
+      // ----
+      // [high level variables]
+      fontWeight: match.instance?.coordinates?.wght ?? prev.fontWeight,
+      fontWidth: match.instance?.coordinates?.wdth ?? prev.fontWidth,
+      // TODO: should prevent optical sizing auto => fixed
+      // (if the next value === auto's expected value && prev value is auto, keep auto) => the change style does not change the size, so the logic can be even simpler.
+      fontOpticalSizing:
+        match.instance?.coordinates?.opsz ?? prev.fontOpticalSizing,
+      // ----
+      // Clear variable axes for non-variable fonts
+      fontVariations: match.isVariable
+        ? match.instance?.coordinates
+        : undefined,
+      // TODO: clean the invalid features by face change.
+      // fontFeatures: match.features,
+      fontStyleItalic: match.face.italic,
+    } as const;
+
+    this.doc.dispatch({
+      type: "node/change/fontFamily",
+      node_id: node_id,
+      fontFamily: next_family,
+    });
+
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      ...next,
+    });
+  }
+
+  // text style
+  async changeTextNodeFontFamilySync(
+    node_id: string,
+    fontFamily: string,
+    force = true
+  ) {
+    const node = this.doc.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.TextNode;
+    assert(node, "node is not found");
+    assert(node.type === "text", "node is not a text node");
+
+    // load the font family & prepare
+    await this.loadFontSync({ family: fontFamily });
+    const ready = await this.getFontFamilyDetailsSync(fontFamily);
+
+    if (!ready) {
+      this.log(
+        "tried to change font family, but the font could not be parsed correctly",
+        fontFamily
+      );
+      return false;
+    }
+
+    const description: editor.api.FontStyleSelectDescription = { fontFamily };
+
+    if (!force) {
+      // when not force, try to keep the previous (current) font style
+      description.fontWeight = node.fontWeight;
+      description.fontStyleItalic = node.fontStyleItalic;
+      description.fontVariations = node.fontVariations;
+    }
+
+    const match = this.selectFontStyle(description);
+
+    if (match) {
+      this.changeTextNodeFontStyle(node_id, { fontStyleKey: match.key });
+      return true;
+    } else {
+      this.log(
+        "tried to change font family, but matching font face not found",
+        fontFamily,
+        description
+      );
+      return false;
+    }
+  }
+
+  /**
+   * removes explicit width or height value from the text node, making them sized "auto", based on the content.
+   */
+  autoSizeTextNode(node_id: string, axis: "width" | "height") {
+    const node = this.doc.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.UnknwonNode;
+    if (node.type !== "text") return;
+
+    const prev = this.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
+    if (!prev) return;
+
+    const h_align = node.textAlign;
+    const v_align = node.textAlignVertical;
+
+    // FIXME: nested raf.
+    // why this is needed?
+    // currently, the api does not expose a way or contains value for textlayout size, not the box size.
+    // since we can't pre-calculate the delta, this is the dirty hack to first resize, then get the next size, shift delta.
+    // => need api/data that holds actual textlayout size (non box size)
+
+    requestAnimationFrame(() => {
+      this.doc.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        [axis]: "auto",
+      });
+
+      requestAnimationFrame(() => {
+        const next = this.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
+        if (!next) return;
+
+        if (axis === "width") {
+          const diff = prev.width - next.width;
+          if (diff === 0) return;
+          let left = prev.x;
+          switch (h_align) {
+            case "right":
+              left = prev.x + diff;
+              break;
+            case "center":
+              left = prev.x + diff / 2;
+              break;
+            default:
+              return;
+          }
+          this.doc.changeNodePropertyPositioning(node_id, {
+            left: cmath.quantize(left, 1),
+          });
+        } else {
+          const diff = prev.height - next.height;
+          if (diff === 0) return;
+          let top = prev.y;
+          switch (v_align) {
+            case "bottom":
+              top = prev.y + diff;
+              break;
+            case "center":
+              top = prev.y + diff / 2;
+              break;
+            default:
+              return;
+          }
+          this.doc.changeNodePropertyPositioning(node_id, {
+            top: cmath.quantize(top, 1),
+          });
+        }
+      });
+    });
+  }
+
+  // #endregion IRulerActions implementation
 
   // #region IVectorInterfaceActions implementation
   toVectorNetwork(node_id: string): vn.VectorNetwork | null {
@@ -2852,7 +2910,7 @@ export class Editor
 
   getFontItem(fontFamily: string): googlefonts.GoogleWebFontListItem | null {
     const item: googlefonts.GoogleWebFontListItem | undefined =
-      this.mstate.webfontlist.items.find((f) => f.family === fontFamily);
+      this.doc.state.webfontlist.items.find((f) => f.family === fontFamily);
     if (!item) return null;
     return item;
   }
@@ -2910,7 +2968,7 @@ export class Editor
    * Dispose editor instance and cleanup resources
    */
   dispose() {
-    this.listeners.clear();
+    this.doc.dispose();
   }
 }
 
@@ -2925,7 +2983,7 @@ export class EditorSurface
   readonly __pligin_follow: EditorFollowPlugin;
   private readonly __pointer_move_throttle_ms: number = 30;
   private get state(): editor.state.IEditorState {
-    return this._editor.state;
+    return this._editor.doc.state;
   }
 
   constructor(
@@ -2940,7 +2998,7 @@ export class EditorSurface
   }
 
   private dispatch(action: Action) {
-    this._editor.dispatch(action);
+    this._editor.doc.dispatch(action);
   }
 
   // ==============================================================
@@ -3009,7 +3067,7 @@ export class EditorSurface
   }
 
   surfaceTryToggleContentEditMode() {
-    if (this._editor.state.content_edit_mode) {
+    if (this._editor.doc.state.content_edit_mode) {
       this.surfaceTryExitContentEditMode();
     } else {
       this.surfaceTryEnterContentEditMode();
@@ -3192,7 +3250,7 @@ export class EditorSurface
     (event: PointerEvent, position: { x: number; y: number }) => {
       // this is throttled - as it is expensive
       const ids = this._editor.getNodeIdsFromPointerEvent(event);
-      this._editor.dispatch({
+      this._editor.doc.dispatch({
         type: "event-target/event/on-pointer-move-raycast",
         node_ids_from_point: ids,
         position,
@@ -3205,7 +3263,7 @@ export class EditorSurface
   surfacePointerDown(event: PointerEvent) {
     const ids = this._editor.getNodeIdsFromPointerEvent(event);
 
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "event-target/event/on-pointer-down",
       node_ids_from_point: ids,
       shiftKey: event.shiftKey,
@@ -3213,7 +3271,7 @@ export class EditorSurface
   }
 
   surfacePointerUp(event: PointerEvent) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "event-target/event/on-pointer-up",
     });
   }
@@ -3221,7 +3279,7 @@ export class EditorSurface
   surfacePointerMove(event: PointerEvent) {
     const position = this.camera.pointerEventToViewportPoint(event);
 
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "event-target/event/on-pointer-move",
       position_canvas: position,
       position_client: { x: event.clientX, y: event.clientY },
@@ -3233,7 +3291,7 @@ export class EditorSurface
   surfaceClick(event: MouseEvent) {
     const ids = this._editor.getNodeIdsFromPointerEvent(event);
 
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "event-target/event/on-click",
       node_ids_from_point: ids,
       shiftKey: event.shiftKey,
@@ -3241,27 +3299,28 @@ export class EditorSurface
   }
 
   surfaceDoubleClick(event: MouseEvent) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "event-target/event/on-double-click",
     });
   }
 
   surfaceDragStart(event: PointerEvent) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "event-target/event/on-drag-start",
       shiftKey: event.shiftKey,
     });
   }
 
   surfaceDragEnd(event: PointerEvent) {
-    const { marquee } = this._editor.state;
+    const { marquee } = this._editor.doc.state;
     if (marquee) {
       // test area in canvas space
       const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
 
-      const contained = this._editor.geometry.getNodeIdsFromEnvelope(area);
+      const contained =
+        this._editor.geometryProvider.getNodeIdsFromEnvelope(area);
 
-      this._editor.dispatch({
+      this._editor.doc.dispatch({
         type: "event-target/event/on-drag-end",
         node_ids_from_area: contained,
         shiftKey: event.shiftKey,
@@ -3269,7 +3328,7 @@ export class EditorSurface
 
       return;
     }
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "event-target/event/on-drag-end",
       shiftKey: event.shiftKey,
     });
@@ -3277,7 +3336,7 @@ export class EditorSurface
 
   surfaceDrag(event: TCanvasEventTargetDragGestureState) {
     requestAnimationFrame(() => {
-      this._editor.dispatch({
+      this._editor.doc.dispatch({
         type: "event-target/event/on-drag",
         event,
       });
@@ -3286,8 +3345,10 @@ export class EditorSurface
 
   //
 
+  //
+
   surfaceStartGuideGesture(axis: cmath.Axis, idx: number | -1) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         idx: idx,
@@ -3301,7 +3362,7 @@ export class EditorSurface
     selection: string | string[],
     direction: cmath.CardinalDirection
   ) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "scale",
@@ -3312,7 +3373,7 @@ export class EditorSurface
   }
 
   surfaceStartSortGesture(selection: string | string[], node_id: string) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "sort",
@@ -3323,7 +3384,7 @@ export class EditorSurface
   }
 
   surfaceStartGapGesture(selection: string | string[], axis: "x" | "y") {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "gap",
@@ -3338,7 +3399,7 @@ export class EditorSurface
     selection: string,
     anchor?: cmath.IntercardinalDirection
   ) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "corner-radius",
@@ -3350,7 +3411,7 @@ export class EditorSurface
   // #endregion drag resize handle
 
   surfaceStartRotateGesture(selection: string) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "rotate",
@@ -3360,7 +3421,7 @@ export class EditorSurface
   }
 
   surfaceStartTranslateVectorNetwork(node_id: string) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "translate-vector-controls",
@@ -3370,7 +3431,7 @@ export class EditorSurface
   }
 
   surfaceStartTranslateVariableWidthStop(node_id: string, stop: number) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "translate-variable-width-stop",
@@ -3385,7 +3446,7 @@ export class EditorSurface
     stop: number,
     side: "left" | "right"
   ) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "resize-variable-width-stop",
@@ -3401,7 +3462,7 @@ export class EditorSurface
     segment: number,
     control: "ta" | "tb"
   ) {
-    this._editor.dispatch({
+    this._editor.doc.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "curve",
@@ -3476,14 +3537,14 @@ export class EditorSurface
   // #region ICursorChatActions implementation
   // ==============================================================
   openCursorChat(): void {
-    this._editor.reduce((state) => {
+    this._editor.doc.reduce((state) => {
       state.local_cursor_chat.is_open = true;
       return state;
     });
   }
 
   closeCursorChat(): void {
-    this._editor.reduce((state) => {
+    this._editor.doc.reduce((state) => {
       state.local_cursor_chat.is_open = false;
       state.local_cursor_chat.message = null;
       state.local_cursor_chat.last_modified = null;
@@ -3492,7 +3553,7 @@ export class EditorSurface
   }
 
   updateCursorChatMessage(message: string | null): void {
-    this._editor.reduce((state) => {
+    this._editor.doc.reduce((state) => {
       state.local_cursor_chat.message = message;
       state.local_cursor_chat.last_modified = message ? Date.now() : null;
       return state;
@@ -3502,7 +3563,7 @@ export class EditorSurface
   public __sync_cursors(
     cursors: editor.state.IEditorMultiplayerCursorState["cursors"]
   ) {
-    this._editor.reduce((state) => {
+    this._editor.doc.reduce((state) => {
       state.cursors = cursors;
       return state;
     });
@@ -3525,7 +3586,7 @@ export class EditorSurface
         break;
       }
       case "escape-selection": {
-        this._editor.blur("a11yEscape");
+        this._editor.doc.blur("a11yEscape");
         break;
       }
       case "escape-content-edit-mode":
@@ -3625,15 +3686,15 @@ export class EditorSurface
         selected_tangents.length > 0;
       if (!hasSelection) return;
     }
-    this._editor.copy("selection");
+    this._editor.doc.copy("selection");
   }
 
   public a11yCut() {
-    this._editor.cut("selection");
+    this._editor.doc.cut("selection");
   }
 
   public a11yPaste() {
-    this._editor.paste();
+    this._editor.doc.paste();
   }
 
   public a11yDelete() {
@@ -3664,14 +3725,14 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
 
     for (const node_id of target_ids) {
-      this._editor.toggleNodeActive(node_id);
+      this._editor.doc.toggleNodeActive(node_id);
     }
   }
 
   public a11yToggleLocked(target: "selection" | editor.NodeID = "selection") {
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
-      this._editor.toggleNodeLocked(node_id);
+      this._editor.doc.toggleNodeLocked(node_id);
     }
   }
 
@@ -3719,7 +3780,7 @@ export class EditorSurface
   ) {
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
-      this._editor.changeNodePropertyOpacity(node_id, {
+      this._editor.doc.changeNodePropertyOpacity(node_id, {
         type: "set",
         value: opacity,
       });
@@ -3773,7 +3834,7 @@ export class ImageProxy implements editor.api.ImageInstance {
 
 export class NodeProxy<T extends grida.program.nodes.Node> {
   constructor(
-    private readonly editor: Editor,
+    private readonly doc: EditorDocumentStore,
     private readonly node_id: string
   ) {}
 
@@ -3781,13 +3842,13 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
     // @ts-expect-error - this is a workaround to allow the proxy to be used as a node
     return new Proxy(this, {
       get: (target, prop: string) => {
-        return (target.editor.getNodeSnapshotById(target.node_id) as T)[
+        return (target.doc.getNodeSnapshotById(target.node_id) as T)[
           prop as keyof T
         ];
       },
       set: (target, prop: string, value) => {
         try {
-          target.editor.dispatch({
+          target.doc.dispatch({
             type: "node/change/*",
             node_id: target.node_id,
             [prop]: value,

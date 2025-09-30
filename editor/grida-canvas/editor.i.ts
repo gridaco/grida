@@ -76,6 +76,16 @@ export namespace editor {
   export const __global_editors = {
     bitmap: null as BitmapLayerEditor | null,
   };
+
+  /**
+   * generic store subscription trait.
+   *
+   * this is commonly used for binding to a ui-store consumer, e.g. with react useSyncExternalStore
+   */
+  export interface IStoreSubscriptionTrait<Snapshot> {
+    subscribe: (onStoreChange: () => void) => () => void;
+    getSnapshot: () => Snapshot;
+  }
 }
 
 export namespace editor.config {
@@ -2262,7 +2272,81 @@ export namespace editor.api {
     toVectorNetwork(node_id: string): vn.VectorNetwork | null;
   }
 
-  export interface IDocumentActions {
+  export interface IDocumentFontActions {
+    // #region fonts
+
+    /**
+     * Loads the font so that the backend can render it
+     */
+    loadFontSync(font: { family: string }): Promise<void>;
+
+    /**
+     * Lists fonts currently loaded and available to the renderer.
+     */
+    listLoadedFonts(): string[];
+
+    /**
+     * Loads platform default fonts and configures renderer fallback order.
+     */
+    loadPlatformDefaultFonts(): Promise<void>;
+
+    /**
+     * Retrieves font metadata, variation axes and features.
+     */
+    getFontFamilyDetailsSync(
+      fontFamily: string
+    ): Promise<editor.font_spec.UIFontFamily | null>;
+
+    // #endregion fonts
+  }
+
+  export interface IDocumentImageActions {
+    // #region image
+
+    /**
+     * creates an image (data) from the given data, registers it to the document
+     * @param data
+     */
+    createImage(
+      data: Uint8Array | File
+    ): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * creates an image (data) from the given src, registers it to the document
+     * @param src
+     */
+    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * gets the image instance from the given ref
+     * @param ref
+     */
+    getImage(ref: string): ImageInstance | null;
+
+    // #endregion image
+  }
+
+  export interface IEditorDocumentStoreConsumerWithConstraintsActions {
+    /**
+     * inserts the payload with assertions and constraints
+     */
+    insert(payload: InsertPayload): void;
+  }
+
+  /**
+   * Payload signature for inserting node or subdocument
+   */
+  export type InsertPayload =
+    | {
+        id?: string;
+        prototype: grida.program.nodes.NodePrototype;
+      }
+    | {
+        document: grida.program.document.IPackedSceneDocument;
+      };
+
+  export interface IDocumentStoreActions {
+    insert(payload: InsertPayload): void;
     loadScene(scene_id: string): void;
     createScene(scene?: grida.program.document.SceneInit): void;
     deleteScene(scene_id: string): void;
@@ -2324,6 +2408,12 @@ export namespace editor.api {
         tb: cmath.Vector2;
       }
     ): void;
+    bendOrClearCorner(
+      node_id: editor.NodeID,
+      vertex: number,
+      tangent?: cmath.Vector2 | 0,
+      ref?: "ta" | "tb"
+    ): void;
     planarize(node_id: NodeID): void;
 
     //
@@ -2379,56 +2469,54 @@ export namespace editor.api {
      * @param idx
      */
     deleteGuide(idx: number): void;
+  }
 
-    // #region fonts
-
-    /**
-     * Loads the font so that the backend can render it
-     */
-    loadFontSync(font: { family: string }): Promise<void>;
-
-    /**
-     * Lists fonts currently loaded and available to the renderer.
-     */
-    listLoadedFonts(): string[];
-
-    /**
-     * Loads platform default fonts and configures renderer fallback order.
-     */
-    loadPlatformDefaultFonts(): Promise<void>;
+  /**
+   * node reducer actions that requires font management & font parsing dependencies
+   */
+  export interface IDocumentNodeTextNodeFontActions {
+    changeTextNodeFontFamilySync(
+      node_id: NodeID,
+      fontFamily: string,
+      force?: boolean
+    ): Promise<boolean>;
 
     /**
-     * Retrieves font metadata, variation axes and features.
+     * use when font style change or family change
+     *
+     * | property              | operation        | notes |
+     * |-----------------------|------------------|-------|
+     * | `fontFamily`          | validate & set   | validate if the requested family / postscript is registered and ready to use, else reject |
+     * | `fontPostscriptName`  | set              | |
+     * | `fontStyleItalic`     | set              | |
+     * | `fontWeight`          | set              | |
+     * | `fontWidth`           | set              | |
+     * | `fontOpticalSizing`   | set              | |
+     * | `fontVariations`      | update / clean   | if instance change, remove not-defined variations |
+     * | `fontFeatures`        | clean            | if instance change, remove not-def features |
      */
-    getFontFamilyDetailsSync(
-      fontFamily: string
-    ): Promise<editor.font_spec.UIFontFamily | null>;
-
-    // #endregion fonts
-
-    // #region image
+    changeTextNodeFontStyle(
+      node_id: NodeID,
+      fontStyleDescription: editor.api.FontStyleChangeDescription
+    ): void;
 
     /**
-     * creates an image (data) from the given data, registers it to the document
-     * @param data
+     * @param node_id text node id
+     * @returns the font weight if the node is toggled, false otherwise
+     *
+     * @remarks
+     * not all fonts can be toggled bold, the font should actually have 400 / 700 weight defined.
      */
-    createImage(
-      data: Uint8Array | File
-    ): Promise<grida.program.document.ImageRef>;
+    toggleTextNodeBold(node_id: NodeID): false | cg.NFontWeight;
 
     /**
-     * creates an image (data) from the given src, registers it to the document
-     * @param src
+     * @param node_id text node id
+     * @returns true if the node is toggled, false otherwise
+     *
+     * note: the boolean does not return if its italic, it returns the result of successful toggle
+     * not all fonts can be toggled italic, the font should actually have italic style defined.
      */
-    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
-
-    /**
-     * gets the image instance from the given ref
-     * @param ref
-     */
-    getImage(ref: string): ImageInstance | null;
-
-    // #endregion image
+    toggleTextNodeItalic(node_id: NodeID): boolean;
   }
 
   export interface IDocumentNodeChangeActions {
@@ -2578,33 +2666,10 @@ export namespace editor.api {
     // TextNode
     // ==============================================================
 
-    changeTextNodeFontFamilySync(
-      node_id: NodeID,
-      fontFamily: string,
-      force?: boolean
-    ): Promise<boolean>;
     changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
     changeTextNodeFontKerning(node_id: NodeID, fontKerning: boolean): void;
     changeTextNodeFontWidth(node_id: NodeID, fontWidth: number): void;
 
-    /**
-     * use when font style change or family change
-     *
-     * | property              | operation        | notes |
-     * |-----------------------|------------------|-------|
-     * | `fontFamily`          | validate & set   | validate if the requested family / postscript is registered and ready to use, else reject |
-     * | `fontPostscriptName`  | set              | |
-     * | `fontStyleItalic`     | set              | |
-     * | `fontWeight`          | set              | |
-     * | `fontWidth`           | set              | |
-     * | `fontOpticalSizing`   | set              | |
-     * | `fontVariations`      | update / clean   | if instance change, remove not-defined variations |
-     * | `fontFeatures`        | clean            | if instance change, remove not-def features |
-     */
-    changeTextNodeFontStyle(
-      node_id: NodeID,
-      fontStyleDescription: editor.api.FontStyleChangeDescription
-    ): void;
     changeTextNodeFontFeature(
       node_id: NodeID,
       feature: cg.OpenTypeFeature,
@@ -2670,34 +2735,16 @@ export namespace editor.api {
     ): void;
     changeTextNodeMaxLines(node_id: NodeID, maxLines: number | null): void;
 
-    /**
-     * @param node_id text node id
-     * @returns the font weight if the node is toggled, false otherwise
-     *
-     * @remarks
-     * not all fonts can be toggled bold, the font should actually have 400 / 700 weight defined.
-     */
-    toggleTextNodeBold(node_id: NodeID): false | cg.NFontWeight;
-
-    /**
-     * @param node_id text node id
-     * @returns true if the node is toggled, false otherwise
-     *
-     * note: the boolean does not return if its italic, it returns the result of successful toggle
-     * not all fonts can be toggled italic, the font should actually have italic style defined.
-     */
-    toggleTextNodeItalic(node_id: NodeID): boolean;
-
     toggleTextNodeUnderline(node_id: NodeID): void;
     toggleTextNodeLineThrough(node_id: NodeID): void;
 
-    /**
-     * removes explicit width or height value from the text node, making them sized "auto", based on the content.
-     */
-    autoSizeTextNode(node_id: NodeID, axis: "width" | "height"): void;
-
     // ==============================================================
   }
+
+  export type EditorCommands = editor.api.IDocumentStoreActions &
+    editor.api.IDocumentNodeChangeActions &
+    editor.api.IDocumentBrushToolActions &
+    editor.api.IDocumentSchemaActions_Experimental;
 
   /**
    * ## A11y actions

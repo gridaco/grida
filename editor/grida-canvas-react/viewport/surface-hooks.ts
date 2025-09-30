@@ -315,7 +315,7 @@ export function useSingleSelection(
     const scale = cmath.transform.getScale(transform);
 
     // Collect bounding rectangle
-    const br = instance.geometry.getNodeAbsoluteBoundingRect(node_id);
+    const br = instance.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
     if (!br) {
       setData(undefined);
       return;
@@ -373,7 +373,7 @@ export function useSingleSelection(
       const axis = direction === "horizontal" ? "x" : "y";
       const children = dq.getChildren(document_ctx, node_id);
       const children_rects = children
-        .map((id) => instance.geometry.getNodeAbsoluteBoundingRect(id))
+        .map((id) => instance.geometryProvider.getNodeAbsoluteBoundingRect(id))
         .filter((it): it is cmath.Rectangle => !!it);
 
       distribution.rects = children_rects;
