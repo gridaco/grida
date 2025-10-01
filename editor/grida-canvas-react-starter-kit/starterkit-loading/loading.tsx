@@ -166,6 +166,10 @@ interface FullscreenLoadingOverlayProps {
    * @default 0
    */
   exitDelay?: number;
+  /**
+   * Error message to display in the loading overlay.
+   */
+  errmsg?: string | null;
 }
 
 interface UXProgressProps {
@@ -205,6 +209,7 @@ export function FullscreenLoadingOverlay({
   maxFakedProgress = 0.9,
   onExitComplete,
   exitDelay = 200,
+  errmsg,
 }: FullscreenLoadingOverlayProps) {
   const [showOverlay, setShowOverlay] = useState(true);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -265,6 +270,16 @@ export function FullscreenLoadingOverlay({
               maxFakedProgress={maxFakedProgress}
               className="w-52"
             />
+            {errmsg ? (
+              <motion.p
+                className="text-xs text-destructive"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.3 }}
+              >
+                {errmsg}
+              </motion.p>
+            ) : null}
             {/* <motion.p
               className="text-sm text-muted-foreground"
               initial={{ opacity: 0, y: 10 }}

@@ -242,6 +242,7 @@ export default function CanvasPlayground({
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(
     null
   );
+  const [errmsg, setErrmsg] = useState<string | null>(null);
   const handleCanvasRef = useCallback((node: HTMLCanvasElement | null) => {
     setCanvasElement(node);
   }, []);
@@ -271,7 +272,7 @@ export default function CanvasPlayground({
         if (cancelled) {
           return;
         }
-        toast.error("Failed to mount canvas surface");
+        setErrmsg("Failed to mount canvas surface");
         console.error("Failed to mount canvas surface", error);
       });
 
@@ -339,7 +340,7 @@ export default function CanvasPlayground({
       <ErrorBoundary>
         <SidebarProvider className="w-full h-full">
           <TooltipProvider>
-            <FullscreenLoadingOverlay loading={!ready} />
+            <FullscreenLoadingOverlay loading={!ready} errmsg={errmsg} />
             <main className="w-full h-full select-none">
               <FontFamilyListProvider fonts={fonts}>
                 <StandaloneDocumentEditor editor={instance}>
