@@ -23,13 +23,14 @@ This document proposes a lightweight, stable, and portable identity scheme for *
 
 ## Options `i32 / i64 / i128`
 
-| Type | Bit Budget | JS Safety | DB Alignment         | Overhead           | actor budget  | object budget              | notes                  | collision (per document)   |
-| ---- | ---------- | --------- | -------------------- | ------------------ | ------------- | -------------------------- | ---------------------- | -------------------------- |
-| i32  | 32 bits    | Safe      | INT                  | Low (4 bytes)      | 2^8 (256)     | 2^24 (16,777,216)          | reasonable             | 4,294,967,296              |
-| i64  | 64 bits    | Unsafe\*  | BIGINT               | Moderate (8 bytes) | 2^16 (65,536) | 2^64 (281,474,976,710,656) | maximum                | 18,446,744,073,709,551,616 |
-| i128 | 128 bits   | Unsafe\*  | Not widely supported | High (16 bytes)    | -             | -                          | use uuid at this point | ♾️                         |
+| Type | Bit Budget | JS Safety | DB Alignment         | Overhead           | actor budget      | object budget              | notes                  | collision (per document)   |
+| ---- | ---------- | --------- | -------------------- | ------------------ | ----------------- | -------------------------- | ---------------------- | -------------------------- |
+| i32  | 32 bits    | Safe      | INT                  | Low (4 bytes)      | 2^8-1 (255)\*     | 2^24 (16,777,216)          | reasonable             | 4,294,967,296              |
+| i64  | 64 bits    | Unsafe\*  | BIGINT               | Moderate (8 bytes) | 2^16-1 (65,535)\* | 2^64 (281,474,976,710,656) | maximum                | 18,446,744,073,709,551,616 |
+| i128 | 128 bits   | Unsafe\*  | Not widely supported | High (16 bytes)    | -                 | -                          | use uuid at this point | ♾️                         |
 
 \*JS does not safely represent all 64-bit integers without precision loss.
+\*\*Actor ID 0 is reserved for offline-local work, reducing online actor capacity by 1.
 
 ## Why i32 ?
 
@@ -39,20 +40,36 @@ This document proposes a lightweight, stable, and portable identity scheme for *
 
 The 32-bit ID is packed as follows:
 
-- `actor:8` bits — identifies the actor (up to 256 unique actors per document)
+- `actor:8` bits — identifies the actor (up to 255 online actors per document, actor 0 is reserved for offline-local)
 - `node:24` bits — a counter unique per actor (up to ~16.8 million nodes per actor)
 
 This ID is unique per document and can be exposed as a string in the format `actor:node` when needed for readability or interoperability.
 
 ## Limitations & Future Migration Strategy
 
-- The actor ID is capped at 256, and the node counter is capped at approximately 16 million per actor.
+- The online actor ID is capped at 255 (actor 0 is reserved for offline-local), and the node counter is capped at approximately 16 million per actor.
 - If application needs exceed these limits, migration to a 64-bit (`i64`) ID is possible with negligible performance impact.
 - The primary reason for preferring `i32` currently is to avoid JSON and JavaScript friction caused by larger integer types and to maintain compatibility and simplicity.
 
 ## Current Implementation (Not fully offline compatible)
 
 Currently, actor IDs are assigned per session by the server, forcing actors to connect to obtain their actor ID. However, the long-term design aims to support offline-generated actor IDs with local persistence and server-issued aliases to provide compact forms and maintain consistency across sessions.
+
+### Actor ID Assignment Strategy
+
+When the server assigns an actor ID, it should select the **least-used actor ID** rather than simply incrementing based on the current room count. A naive incremental approach (e.g., `actors_in_room + 1`) could lead to actor ID 1 being consistently reused as actors join and leave, gradually exhausting its 16M node budget while higher actor IDs remain unused. By tracking usage per actor ID and assigning the least-used one, the server ensures balanced distribution across the 255 online actor slots (1-255) and maximizes the effective capacity of the document.
+
+### Offline-First, Sync-Later Strategy
+
+For offline scenarios, a simplified approach allows clients to create and edit documents without prior server coordination:
+
+1. **Offline Creation**: When working offline, the client uses actor ID `0` (reserved for offline-local work)
+2. **Local ID Generation**: All nodes created offline use actor 0 combined with a local counter
+3. **Connect & Reassign**: Upon connecting, the server assigns a real actor ID (1-255) based on the least-used strategy
+4. **ID Rewriting**: The client rewrites all locally-created IDs by replacing actor 0 with the server-assigned actor ID
+5. **Sync**: The rewritten IDs are then synced to the server
+
+This approach trades the need for deterministic offline actor IDs for simplicity, at the cost of requiring a local rewrite phase before the first sync. The rewrite is O(n) in the number of locally-created nodes but avoids the complexity of coordinating persistent offline actor identities across devices. Actor ID 0 serves as a clear marker for "not yet synced" content.
 
 ## Resource IDs (Out of Scope)
 
