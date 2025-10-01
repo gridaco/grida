@@ -66,6 +66,71 @@ export namespace editor {
     } as T;
   }
 
+  /**
+   * Mutual exclusion (reentrancy guard) for JavaScript.
+   *
+   * Ensures that only one callback is executed at a time within the same call stack.
+   * If the mutex is already active, the main callback is skipped and the optional
+   * `elseCb` will be executed instead.
+   *
+   * This is synchronous-only:
+   * - Do not `await` inside the critical section — the lock will be released before
+   *   the awaited code runs.
+   * - Use this to prevent feedback loops when binding two reactive sources
+   *   (e.g. Monaco editor <-> Yjs).
+   *
+   * @example
+   * ```ts
+   * const mutex = createMutex()
+   *
+   * mutex(() => {
+   *   console.log("outer")
+   *   mutex(() => {
+   *     // This will be skipped, because the mutex is locked.
+   *     console.log("inner")
+   *   }, () => {
+   *     console.log("else branch called instead")
+   *   })
+   * })
+   *
+   * mutex(() => {
+   *   console.log("second outer") // will run after lock is released
+   * })
+   * ```
+   */
+  export type Mutex = (
+    /**
+     * Function executed only if the mutex is currently free.
+     */
+    cb: () => void,
+    /**
+     * Optional function executed if the mutex is already locked
+     * (i.e. the call is reentrant).
+     */
+    elseCb?: () => void
+  ) => void;
+
+  /**
+   * Create a new mutex function.
+   *
+   * @returns {Mutex} A function that enforces mutual exclusion.
+   */
+  export function createMutex(): Mutex {
+    let token = true;
+    return (cb: () => void, elseCb?: () => void): void => {
+      if (token) {
+        token = false;
+        try {
+          cb();
+        } finally {
+          token = true;
+        }
+      } else if (elseCb) {
+        elseCb();
+      }
+    };
+  }
+
   export type NodeID = string & {};
 
   /**

@@ -389,6 +389,33 @@ class EditorDocumentStore
     this.logger?.(...args);
   }
 
+  /**
+   * Edit the model without adding the edits to the undo stack or triggering history.
+   * This can have dire consequences on the undo stack!
+   *
+   * @remarks
+   * This is intended for external sync plugins (like Y.js) to apply remote changes
+   * without polluting the local undo/redo history.
+   *
+   * TODO: refactor to use patches - applyPatches / onPatch
+   */
+  public applyEdits(updates: {
+    nodes?: Record<editor.NodeID, grida.program.nodes.Node>;
+    scenes?: Record<string, grida.program.document.Scene>;
+  }) {
+    this.apply((draft) => {
+      for (const [node_id, next] of Object.entries(updates.nodes ?? {})) {
+        draft.document.nodes[node_id] = next;
+      }
+
+      for (const [scene_id, next] of Object.entries(updates.scenes ?? {})) {
+        draft.document.scenes[scene_id] = next;
+      }
+
+      draft.document_ctx = dq.Context.from(draft.document);
+    });
+  }
+
   __createNodeId(): editor.NodeID {
     // TODO: use a instance-wise generator
     return nid();
@@ -414,11 +441,15 @@ class EditorDocumentStore
     return dq.getSiblings(this.mstate.document_ctx, node_id);
   }
 
-  public reduce(
-    reducer: (
-      state: editor.state.IEditorState
-    ) => Readonly<editor.state.IEditorState>
-  ) {
+  /**
+   * apply changes without incrementing the transaction id
+   */
+  private apply(reducer: (draft: editor.state.IEditorState) => void) {
+    this.mstate = produce(this.mstate, reducer);
+    this.listeners.forEach((l) => l?.(this));
+  }
+
+  public reduce(reducer: (draft: editor.state.IEditorState) => void) {
     this.mstate = produce(this.mstate, reducer);
     this._tid++;
     this.listeners.forEach((l) => l?.(this));

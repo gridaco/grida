@@ -6,6 +6,7 @@ import { type Action, editor } from "..";
 import type cmath from "@grida/cmath";
 import { dq } from "../query";
 import equal from "fast-deep-equal";
+import type grida from "@grida/schema";
 
 type AwarenessPayload = {
   /**
@@ -67,64 +68,127 @@ type AwarenessPayload = {
 // Internal class for managing document synchronization
 class DocumentSyncManager {
   private __unsubscribe_document_change!: () => void;
-  private readonly ymap: Y.Map<any>;
+  private readonly ymap_nodes: Y.Map<grida.program.nodes.Node>;
+  private readonly ymap_scenes: Y.Map<grida.program.document.Scene>;
   private throttle_ms: number = 5;
-  private _tid: number = 0;
 
+  /**
+   * Unique origin identifier for this client's transactions
+   * This is used by YJS to track which transactions originated from this client
+   */
+  private readonly origin: string = `client-${Math.random().toString(36).slice(2)}`;
+
+  /**
+   * Mutex to prevent feedback loops between editor changes and Y.js changes
+   */
+  private readonly mutex = editor.createMutex();
+  private rc: number = 0;
   constructor(
     private readonly _editor: Editor,
     private readonly _doc: Y.Doc
   ) {
-    this.ymap = _doc.getMap("document");
+    this.ymap_nodes = _doc.getMap("nodes");
+    this.ymap_scenes = _doc.getMap("scenes");
+
     this._setupDocumentSync();
   }
 
   private _setupDocumentSync() {
-    // Sync document state from Y.Doc to Editor
-    this.ymap.observe((event) => {
-      const changes = event.changes.keys;
-      const currentState = this._editor.getSnapshot();
-      const updates = Object.fromEntries(
-        Array.from(changes.entries())
-          .filter(
-            ([_, change]) =>
-              change.action === "add" || change.action === "update"
-          )
-          .map(([key]) => [key, this.ymap.get(key)])
-      );
-
-      if (Object.keys(updates).length > 0) {
-        this._tid = this._editor.doc.reset(
-          {
-            ...currentState,
-            document: { ...currentState.document, ...updates },
-            document_ctx: dq.Context.from({
-              ...currentState.document,
-              ...updates,
-            }),
-          },
-          undefined,
-          true
-        );
-      }
-    });
-
     // Subscribe to editor document changes and sync to Y.Doc
     this.__unsubscribe_document_change = this._editor.doc.subscribeWithSelector(
       (state) => state.document,
       editor.throttle(
-        (editor: EditorDocumentStore, next, __, action?: Action) => {
-          if (editor.locked) return;
-          // prevent loop mirroring
-          if (editor.tid === this._tid) return;
-          this.ymap.set("nodes", next.nodes);
-          this.ymap.set("scenes", next.scenes);
-          this.ymap.set("properties", next.properties);
+        (
+          editorStore: EditorDocumentStore,
+          next: grida.program.document.Document,
+          prev: grida.program.document.Document
+        ) => {
+          if (editorStore.locked) return;
+          if (this.rc === editorStore.tid) return;
+          this.rc = editorStore.tid;
+
+          // Use mutex to prevent feedback loops
+          this.mutex(() => {
+            this._doc.transact(() => {
+              Object.entries(next.nodes).forEach(([key, node]) => {
+                this.ymap_nodes.set(key, node);
+              });
+
+              Object.entries(next.scenes).forEach(([key, scene]) => {
+                this.ymap_scenes.set(key, scene);
+              });
+              // this.ymap.set("properties", next.properties);
+
+              // console.log("sync:up (local)");
+            }, this.origin); // Use this client's origin identifier
+          });
         },
         this.throttle_ms,
         { trailing: true }
       )
     );
+
+    // Sync document state from Y.Doc to Editor
+    this.ymap_nodes.observe((event) => {
+      // Filter out local transactions and transactions that originated from this client
+      if (event.transaction.local) return;
+      if (event.transaction.origin === this.origin) return;
+
+      // console.log("sync:down", event.transaction.local);
+      const changes = event.changes.keys;
+      const updates: Record<string, grida.program.nodes.Node> =
+        Object.fromEntries(
+          Array.from(changes.entries())
+            .filter(
+              ([_, change]) =>
+                change.action === "add" || change.action === "update"
+            )
+            .map(([key]) => [key, this.ymap_nodes.get(key)!])
+        );
+
+      if (Object.keys(updates).length > 0) {
+        // Use mutex to prevent feedback loops - the applyEdits will trigger
+        // our subscription, but the mutex will prevent it from syncing back to Y.js
+        this.mutex(
+          () => {
+            this._editor.doc.applyEdits({ nodes: updates });
+          },
+          () => {
+            console.log("sync:down skipped (mutex locked)");
+          }
+        );
+      }
+    });
+
+    // Also observe scenes changes
+    this.ymap_scenes.observe((event) => {
+      // Filter out local transactions and transactions that originated from this client
+      if (event.transaction.local) return;
+      if (event.transaction.origin === this.origin) return;
+
+      const changes = event.changes.keys;
+      const updates: Record<string, grida.program.document.Scene> =
+        Object.fromEntries(
+          Array.from(changes.entries())
+            .filter(
+              ([_, change]) =>
+                change.action === "add" || change.action === "update"
+            )
+            .map(([key]) => [key, this.ymap_scenes.get(key)!])
+        );
+
+      if (Object.keys(updates).length > 0) {
+        // Use mutex to prevent feedback loops
+        this.mutex(
+          () => {
+            this._editor.doc.applyEdits({ scenes: updates });
+          },
+          () => {
+            console.log("sync:down skipped (mutex locked)");
+          }
+        );
+      }
+    });
   }
 
   public destroy() {
