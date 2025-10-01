@@ -71,6 +71,43 @@ For offline scenarios, a simplified approach allows clients to create and edit d
 
 This approach trades the need for deterministic offline actor IDs for simplicity, at the cost of requiring a local rewrite phase before the first sync. The rewrite is O(n) in the number of locally-created nodes but avoids the complexity of coordinating persistent offline actor identities across devices. Actor ID 0 serves as a clear marker for "not yet synced" content.
 
+### Strict ID Allocation Rules (Avoid Minting)
+
+These rules formalize **when an ID may be minted**. They minimize counter consumption without compromising CRDT safety.
+
+**A. Allocate only at commit points**
+- Mint an object ID **only when the action is committed** (e.g., pointer-up for shape creation, Enter/blur for text, confirmed paste/import).
+- Do **not** mint during transient states (pointer-down, drag preview, rubber-band, hover, marquee, lasso, ghost handles, or scrubbers).
+
+**B. No-mint zones (transient UI)**
+- Selections, transforms-in-progress, outline/guide overlays, resize handles, and measurement tools must use **ephemeral runtime handles** (not object IDs).
+- Undoable previews within a single gesture (e.g., dragging to decide size) reuse the same transient instance and only mint on commit.
+
+**C. Reuse ephemeral scaffolding**
+- For tools that show a provisional object (e.g., a rectangle while dragging), reuse a **single ephemeral object** without an ID.
+- On commit, **materialize** it as a real object and mint the ID exactly once.
+
+**D. Batch creation & import preflight**
+- Before a mass paste/import, compute the prospective count `N`. If `remaining(node_counter) < N`, request/rotate to a **new least-used actor id** *before* minting.
+- Batch-mint IDs in memory and write them atomically with the content to avoid partially minted states.
+
+**E. Guardrails & rotation**
+- Define a soft threshold: when `node_counter >= 2^24 - MARGIN` (e.g., `MARGIN = 1_000_000`), automatically rotate to a fresh least-used actor id for future creations.
+- Emit telemetry/alert when threshold is crossed (per document, per actor).
+
+**F. No recycling, ever**
+- Deleted/GC’d objects **do not free** `(actor,node)` pairs. Gaps are expected and harmless.
+- Never attempt to fill holes. Recycling risks collisions with late/replayed ops.
+
+**G. Local collision detection & retry**
+- If a rare conflict on `(actor,node)` is detected on insert (e.g., due to offline merges), **retry with `node+1`** under the same actor (or rotate if near threshold). This maintains monotonic semantics without freelists.
+
+**H. Presentation-only ordinals**
+- If dense numbering is needed for UI, compute **presentation ordinals** (1..k) over a stable sort (e.g., created time). Do not persist or sync these; keep the real ID as the only persistent identity.
+
+**I. Observability**
+- Track per-actor counters, per-actor mint rates, and rewrite counts (offline→online) to validate that consumption is balanced and within expected bounds.
+
 ## Resource IDs (Out of Scope)
 
 This ID model applies to **canvas objects and nodes only**. Resource identity (images, fonts, and other binary blobs) is handled separately through a content-addressable hash-based mechanism documented in [feat-hash-nch](../feat-hash-nch/index.md). Resource IDs are derived from content hashing and do not require actor-specific allocation, making them inherently collision-free and suitable for offline-first workflows without coordination.
