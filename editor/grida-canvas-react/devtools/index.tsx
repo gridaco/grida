@@ -192,7 +192,6 @@ function EditorPanel() {
   const {
     document,
     document_ctx,
-    history,
     fontfaces: googlefonts,
     user_clipboard,
     ...state_without_document
@@ -262,7 +261,7 @@ function JSONContent({ value }: { value: unknown }) {
 
 function HistoryPanel() {
   const editor = useCurrentEditor();
-  const history = useEditorState(editor, (state) => state.history);
+  const history = editor.doc.historySnapshot;
   return <JSONContent value={history} />;
 }
 

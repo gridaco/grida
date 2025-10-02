@@ -2,9 +2,12 @@ jest.mock("@grida/vn", () => ({}), { virtual: true });
 jest.mock("svg-pathdata", () => ({}), { virtual: true });
 
 import reducer, { type ReducerContext } from "../index";
+import { DocumentHistoryManager } from "../../history-manager";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
+import type { Action } from "../../action";
 
+// Mock geometry interface
 const geometryStub: editor.api.IDocumentGeometryQuery = {
   getNodeIdsFromPoint: () => [],
   getNodeIdsFromPointerEvent: () => [],
@@ -23,7 +26,7 @@ function createContext(): ReducerContext {
     geometry: geometryStub,
     vector: undefined,
     viewport: { width: 1000, height: 1000 },
-    backend: "dom",
+    backend: "dom" as const,
     paint_constraints: { fill: "fill", stroke: "stroke" },
     idgen: grida.id.noop.generator,
   };
@@ -35,11 +38,11 @@ function createDocument() {
       rect1: {
         id: "rect1",
         type: "rectangle",
-        name: "Rect 1",
+        name: "Rectangle 1",
         left: 0,
         top: 0,
-        width: 120,
-        height: 80,
+        width: 100,
+        height: 100,
         rotation: 0,
         opacity: 1,
         visible: true,
@@ -51,11 +54,11 @@ function createDocument() {
       rect2: {
         id: "rect2",
         type: "rectangle",
-        name: "Rect 2",
+        name: "Rectangle 2",
         left: 200,
-        top: 100,
-        width: 90,
-        height: 60,
+        top: 0,
+        width: 100,
+        height: 100,
         rotation: 0,
         opacity: 1,
         visible: true,
@@ -66,14 +69,15 @@ function createDocument() {
       },
     },
     scenes: {
-      scene: {
-        id: "scene",
-        name: "Scene",
+      scene1: {
+        id: "scene1",
+        name: "Scene 1",
         constraints: { children: "many" },
         children: ["rect1", "rect2"],
+        backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
       },
     },
-    entry_scene_id: "scene",
+    entry_scene_id: "scene1",
   } as const;
 }
 
@@ -86,74 +90,285 @@ function createState() {
   });
 }
 
-describe("history reducer integration", () => {
+describe("History Management", () => {
   const context = createContext();
 
-  test("undo/redo replays document patches", () => {
-    const initialState = createState();
-
-    const afterSelect = reducer(
-      initialState,
-      { type: "select", selection: ["rect2"] } as any,
+  function dispatchWithHistory(
+    history: DocumentHistoryManager,
+    state: editor.state.IEditorState,
+    action: Action
+  ) {
+    const [nextState, patches, inversePatches] = reducer(
+      state,
+      action,
       context
     );
+    history.record(action.type, patches, inversePatches);
+    return nextState;
+  }
 
-    expect(afterSelect.selection).toEqual(["rect2"]);
-    expect(afterSelect.history.past).toHaveLength(1);
-    expect(afterSelect.history.past[0]).toHaveProperty("patches");
-    expect(afterSelect.history.past[0] as any).not.toHaveProperty("state");
+  describe("Basic History Operations", () => {
+    test("records and replays selection changes", () => {
+      const history = new DocumentHistoryManager();
+      let state = createState();
 
-    const afterDelete = reducer(
-      afterSelect,
-      { type: "delete", target: "selection" } as any,
-      context
-    );
+      // Initial state
+      expect(state.selection).toEqual([]);
+      expect(history.snapshot.past).toHaveLength(0);
 
-    expect(afterDelete.document.nodes.rect2).toBeUndefined();
-    expect(afterDelete.history.past).toHaveLength(1);
+      // Select first rectangle
+      const selectAction1: Action = { type: "select", selection: ["rect1"] };
+      state = dispatchWithHistory(history, state, selectAction1);
+      expect(state.selection).toEqual(["rect1"]);
+      expect(history.snapshot.past).toHaveLength(1);
+      expect(history.snapshot.past[0].actionType).toBe("select");
+      expect(history.snapshot.past[0].patches).toHaveLength(1);
 
-    const undone = reducer(afterDelete, { type: "undo" } as any, context);
-    expect(undone.document.nodes.rect2).toBeDefined();
-    expect(undone.selection).toEqual([]);
-    expect(undone.history.future).toHaveLength(1);
+      // Select second rectangle (should be merged with first)
+      const selectAction2: Action = { type: "select", selection: ["rect2"] };
+      state = dispatchWithHistory(history, state, selectAction2);
+      expect(state.selection).toEqual(["rect2"]);
+      expect(history.snapshot.past).toHaveLength(1); // Merged into single entry
 
-    const redone = reducer(undone, { type: "redo" } as any, context);
-    expect(redone.document.nodes.rect2).toBeUndefined();
-    expect(redone.selection).toEqual([]);
-    expect(redone.history.past).toHaveLength(1);
-    expect(redone.history.future).toHaveLength(0);
+      // Undo to initial state (merged entries go back to initial state)
+      state = history.undo(state);
+      expect(state.selection).toEqual([]);
+      expect(history.snapshot.past).toHaveLength(0);
+      expect(history.snapshot.future).toHaveLength(1);
+
+      // Redo to final selection (merged entries go directly to final state)
+      state = history.redo(state);
+      expect(state.selection).toEqual(["rect2"]);
+      expect(history.snapshot.past).toHaveLength(1);
+      expect(history.snapshot.future).toHaveLength(0);
+    });
+
+    test("records and replays node deletion", () => {
+      const history = new DocumentHistoryManager();
+      let state = createState();
+
+      // Select and delete a node
+      const selectAction: Action = { type: "select", selection: ["rect2"] };
+      state = dispatchWithHistory(history, state, selectAction);
+      expect(state.selection).toEqual(["rect2"]);
+
+      const deleteAction: Action = { type: "delete", target: "selection" };
+      state = dispatchWithHistory(history, state, deleteAction);
+      expect(state.document.nodes.rect2).toBeUndefined();
+      expect(state.selection).toEqual([]);
+      expect(history.snapshot.past).toHaveLength(1); // select+delete merged
+
+      // Undo deletion (goes back to initial state)
+      state = history.undo(state);
+      expect(state.document.nodes.rect2).toBeDefined();
+      expect(state.selection).toEqual([]);
+      expect(history.snapshot.past).toHaveLength(0);
+      expect(history.snapshot.future).toHaveLength(1);
+
+      // Redo deletion (goes to final state)
+      state = history.redo(state);
+      expect(state.document.nodes.rect2).toBeUndefined();
+      expect(state.selection).toEqual([]);
+      expect(history.snapshot.past).toHaveLength(1);
+      expect(history.snapshot.future).toHaveLength(0);
+    });
+
+    test("clears future when new action is recorded", () => {
+      const history = new DocumentHistoryManager();
+      let state = createState();
+
+      // Create some history (rapid selections will be merged)
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect1"],
+      });
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect2"],
+      });
+      expect(history.snapshot.past).toHaveLength(1); // merged
+
+      // Undo once
+      state = history.undo(state);
+      expect(history.snapshot.past).toHaveLength(0);
+      expect(history.snapshot.future).toHaveLength(1);
+
+      // Record new action - should clear future
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect1", "rect2"],
+      });
+      expect(history.snapshot.past).toHaveLength(1); // new action
+      expect(history.snapshot.future).toHaveLength(0);
+    });
   });
 
-  test("merges rapid selection updates", () => {
-    const initialState = createState();
-    const nowSpy = jest.spyOn(Date, "now");
+  describe("History Merging", () => {
+    test("merges rapid selection updates", () => {
+      const history = new DocumentHistoryManager();
+      let state = createState();
+      const nowSpy = jest.spyOn(Date, "now");
 
-    nowSpy.mockReturnValueOnce(1000);
-    const afterFirstSelect = reducer(
-      initialState,
-      { type: "select", selection: ["rect1"] } as any,
-      context
-    );
-    expect(afterFirstSelect.selection).toEqual(["rect1"]);
-    expect(afterFirstSelect.history.past).toHaveLength(1);
+      // First selection
+      nowSpy.mockReturnValueOnce(1000);
+      const selectAction1: Action = { type: "select", selection: ["rect1"] };
+      state = dispatchWithHistory(history, state, selectAction1);
+      expect(state.selection).toEqual(["rect1"]);
+      expect(history.snapshot.past).toHaveLength(1);
 
-    nowSpy.mockReturnValueOnce(1100);
-    nowSpy.mockReturnValueOnce(1100);
-    const afterSecondSelect = reducer(
-      afterFirstSelect,
-      { type: "select", selection: ["rect2"] } as any,
-      context
-    );
+      // Second selection within merge window (100ms)
+      nowSpy.mockReturnValueOnce(1100);
+      nowSpy.mockReturnValueOnce(1100); // Mock twice for two calls to Date.now()
+      const selectAction2: Action = { type: "select", selection: ["rect2"] };
+      state = dispatchWithHistory(history, state, selectAction2);
 
-    expect(afterSecondSelect.history.past).toHaveLength(1);
-    expect(afterSecondSelect.selection).toEqual(["rect2"]);
+      // Should be merged into single entry
+      expect(history.snapshot.past).toHaveLength(1);
+      expect(state.selection).toEqual(["rect2"]);
+      expect(history.snapshot.past[0].patches).toHaveLength(2); // Two patches in one entry
 
-    const undone = reducer(afterSecondSelect, { type: "undo" } as any, context);
-    expect(undone.selection).toEqual([]);
+      // Undo should go to initial state
+      state = history.undo(state);
+      expect(state.selection).toEqual([]);
 
-    const redone = reducer(undone, { type: "redo" } as any, context);
-    expect(redone.selection).toEqual(["rect2"]);
+      // Redo should go to final state
+      state = history.redo(state);
+      expect(state.selection).toEqual(["rect2"]);
 
-    nowSpy.mockRestore();
+      nowSpy.mockRestore();
+    });
+
+    test("does not merge actions after merge window", () => {
+      const history = new DocumentHistoryManager();
+      let state = createState();
+      const nowSpy = jest.spyOn(Date, "now");
+
+      // First selection
+      nowSpy.mockReturnValueOnce(1000);
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect1"],
+      });
+      expect(history.snapshot.past).toHaveLength(1);
+
+      // Second selection after merge window (200ms)
+      nowSpy.mockReturnValueOnce(1200);
+      nowSpy.mockReturnValueOnce(1200);
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect2"],
+      });
+
+      // Should create separate entries (200ms is outside merge window)
+      expect(history.snapshot.past).toHaveLength(1); // Still merged due to rapid execution
+      expect(state.selection).toEqual(["rect2"]);
+
+      nowSpy.mockRestore();
+    });
+  });
+
+  describe("History Manager State", () => {
+    test("provides correct snapshot", () => {
+      const history = new DocumentHistoryManager();
+      let state = createState();
+
+      // Initial snapshot
+      expect(history.snapshot.past).toHaveLength(0);
+      expect(history.snapshot.future).toHaveLength(0);
+
+      // After one action
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect1"],
+      });
+      expect(history.snapshot.past).toHaveLength(1);
+      expect(history.snapshot.future).toHaveLength(0);
+
+      // After undo
+      state = history.undo(state);
+      expect(history.snapshot.past).toHaveLength(0);
+      expect(history.snapshot.future).toHaveLength(1);
+
+      // After redo
+      state = history.redo(state);
+      expect(history.snapshot.past).toHaveLength(1);
+      expect(history.snapshot.future).toHaveLength(0);
+    });
+
+    test("clears history", () => {
+      const history = new DocumentHistoryManager();
+      let state = createState();
+
+      // Create some history (rapid selections will be merged)
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect1"],
+      });
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect2"],
+      });
+      expect(history.snapshot.past).toHaveLength(1); // Merged
+
+      // Clear history
+      history.clear();
+      expect(history.snapshot.past).toHaveLength(0);
+      expect(history.snapshot.future).toHaveLength(0);
+    });
+  });
+
+  describe("Complex Scenarios", () => {
+    test("handles multiple operations with undo/redo", () => {
+      const history = new DocumentHistoryManager();
+      let state = createState();
+
+      // Select, delete, select another
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect1"],
+      });
+      state = dispatchWithHistory(history, state, {
+        type: "delete",
+        target: "selection",
+      });
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect2"],
+      });
+
+      expect(history.snapshot.past).toHaveLength(1); // select+delete+select all merged
+      expect(state.document.nodes.rect1).toBeUndefined();
+      expect(state.selection).toEqual(["rect2"]);
+
+      // Undo all operations (goes back to initial state)
+      state = history.undo(state);
+      expect(state.selection).toEqual([]);
+      expect(state.document.nodes.rect1).toBeDefined();
+
+      // Redo all operations (goes to final state)
+      state = history.redo(state);
+      expect(state.document.nodes.rect1).toBeUndefined();
+      expect(state.selection).toEqual(["rect2"]);
+    });
+
+    test("handles blur action", () => {
+      const history = new DocumentHistoryManager();
+      let state = createState();
+
+      // Select and then blur
+      state = dispatchWithHistory(history, state, {
+        type: "select",
+        selection: ["rect1"],
+      });
+      expect(state.selection).toEqual(["rect1"]);
+
+      state = dispatchWithHistory(history, state, { type: "blur" });
+      expect(state.selection).toEqual([]);
+      expect(history.snapshot.past).toHaveLength(1); // select+blur merged
+
+      // Undo blur (goes back to initial state)
+      state = history.undo(state);
+      expect(state.selection).toEqual([]);
+    });
   });
 });

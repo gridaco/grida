@@ -19,19 +19,19 @@ describe("Original Direction Scaling Challenge", () => {
   // decompose/compose operations.
 
   it("should acknowledge the mathematical complexity", () => {
-    console.log("=== ORIGINAL DIRECTION SCALING CHALLENGE ===");
-    console.log(
-      "REQUIREMENT: Scale sides in original X/Y directions regardless of rotation"
-    );
-    console.log(
-      "CHALLENGE: This requires advanced matrix manipulation beyond decompose/compose"
-    );
-    console.log(
-      "CURRENT: Geometry-based scaling that follows the current shape orientation"
-    );
-    console.log(
-      "FUTURE: Could be implemented with specialized matrix operations"
-    );
+    // console.log("=== ORIGINAL DIRECTION SCALING CHALLENGE ===");
+    // console.log(
+    //   "REQUIREMENT: Scale sides in original X/Y directions regardless of rotation"
+    // );
+    // console.log(
+    //   "CHALLENGE: This requires advanced matrix manipulation beyond decompose/compose"
+    // );
+    // console.log(
+    //   "CURRENT: Geometry-based scaling that follows the current shape orientation"
+    // );
+    // console.log(
+    //   "FUTURE: Could be implemented with specialized matrix operations"
+    // );
 
     expect(true).toBe(true); // Acknowledge the limitation
   });

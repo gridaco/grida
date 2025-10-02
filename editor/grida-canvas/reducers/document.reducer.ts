@@ -1,5 +1,5 @@
 import { type Draft } from "immer";
-import { produceWithHistory as produce } from "./history/patches";
+import { updateState } from "./utils/immer";
 import type {
   DocumentAction,
   EditorSelectAction,
@@ -112,7 +112,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         return state;
       }
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         // 0. add the new scene
         draft.document.scenes[new_scene.id] = new_scene;
         // 1. change the scene_id
@@ -123,7 +123,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "scenes/delete": {
       const { scene } = action;
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         // 0. remove the scene
         delete draft.document.scenes[scene];
         // 1. change the scene_id
@@ -152,7 +152,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         children: [],
       });
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         // 0. add the new scene
         draft.document.scenes[next.id] = next;
         // 1. change the scene_id to the new scene
@@ -178,24 +178,24 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "scenes/change/name": {
       const { scene, name } = action;
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         draft.document.scenes[scene].name = name;
       });
     }
     case "scenes/change/background-color": {
       const { scene } = action;
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         draft.document.scenes[scene].backgroundColor = action.backgroundColor;
       });
     }
     case "select": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { selection } = <EditorSelectAction>action;
         self_selectNode(draft, "reset", ...selection);
       });
     }
     case "blur": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         self_clearSelection(draft);
       });
     }
@@ -203,12 +203,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { event, target } = action;
       switch (event) {
         case "enter": {
-          return produce(state, (draft) => {
+          return updateState(state, (draft) => {
             draft.hovered_node_id = target;
           });
         }
         case "leave": {
-          return produce(state, (draft) => {
+          return updateState(state, (draft) => {
             if (draft.hovered_node_id === target) {
               draft.hovered_node_id = null;
             }
@@ -235,7 +235,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const serialized = JSON.parse(
           JSON.stringify(targetPaint)
         ) as cg.ImagePaint;
-        return produce(state, (draft) => {
+        return updateState(state, (draft) => {
           draft.user_clipboard = {
             payload_id: v4(),
             type: "property/fill-image-paint",
@@ -268,7 +268,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           vertices,
           segments: selected_segments,
         });
-        return produce(state, (draft) => {
+        return updateState(state, (draft) => {
           const mode =
             draft.content_edit_mode as editor.state.VectorContentEditMode;
           mode.clipboard = copied;
@@ -284,7 +284,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const target_node_ids =
         target === "selection" ? state.selection : [target];
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         // [copy]
         draft.user_clipboard = {
           payload_id: v4(),
@@ -319,7 +319,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           return state;
         }
         const selectionIds = [...state.selection];
-        return produce(state, (draft) => {
+        return updateState(state, (draft) => {
           const payload = draft.user_clipboard;
           if (!payload || payload.type !== "property/fill-image-paint") {
             return;
@@ -368,7 +368,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       if (action.vector_network) {
         if (state.content_edit_mode?.type === "vector") {
           const net = action.vector_network;
-          return produce(state, (draft) => {
+          return updateState(state, (draft) => {
             const mode =
               draft.content_edit_mode as editor.state.VectorContentEditMode;
             const node = dq.__getNodeById(
@@ -424,7 +424,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           });
         }
 
-        return produce(state, (draft) => {
+        return updateState(state, (draft) => {
           const net = action.vector_network!;
           const id = context.idgen.next();
           const black = { r: 0, g: 0, b: 0, a: 1 };
@@ -467,7 +467,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       if (state.content_edit_mode?.type === "vector") {
         const net = state.content_edit_mode.clipboard;
         if (!net) break;
-        return produce(state, (draft) => {
+        return updateState(state, (draft) => {
           const mode =
             draft.content_edit_mode as editor.state.VectorContentEditMode;
           const node = dq.__getNodeById(
@@ -526,7 +526,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { user_clipboard, selection } = state;
       const { ids, prototypes } = user_clipboard;
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const new_top_ids: string[] = [];
 
         const valid_target_selection =
@@ -595,7 +595,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "duplicate": {
       const { target } = action;
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const target_node_ids =
           target === "selection" ? state.selection : [target];
         self_duplicateNode(draft, new Set(target_node_ids), context);
@@ -618,7 +618,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       }
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const flattened = flatten_with_union(draft, flattenable, context);
         draft.selection = [...flattened, ...ignored];
       });
@@ -628,7 +628,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const target_node_ids =
         target === "selection" ? state.selection : [target];
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_delete_nodes(draft, target_node_ids);
       });
     }
@@ -638,7 +638,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       if (state.content_edit_mode?.type === "paint/gradient") {
         const { node_id } = state.content_edit_mode;
 
-        return produce(state, (draft) => {
+        return updateState(state, (draft) => {
           const mode =
             draft.content_edit_mode as editor.state.PaintGradientContentEditMode;
           const node = dq.__getNodeById(draft, node_id)!;
@@ -697,7 +697,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       }
 
       if (state.content_edit_mode?.type === "vector") {
-        return produce(state, (draft) => {
+        return updateState(state, (draft) => {
           __self_delete_vector_network_selection(
             draft,
             draft.content_edit_mode as editor.state.VectorContentEditMode
@@ -705,7 +705,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         });
       }
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_delete_nodes(draft, target_node_ids);
       });
     }
@@ -806,7 +806,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         );
       }
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const new_top_ids = self_insertSubDocument(draft, parent, sub);
 
         self_select_tool(draft, { type: "cursor" }, context);
@@ -818,7 +818,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const target_node_ids =
         target === "selection" ? state.selection : [target];
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         for (const node_id of target_node_ids) {
           __self_order(draft, node_id, order);
         }
@@ -827,7 +827,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "mv": {
       const { source, target, index } = action;
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         for (const node_id of source) {
           self_moveNode(draft, node_id, target, index);
         }
@@ -842,7 +842,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const dy = axis === "y" ? delta : 0;
 
       if (target_node_ids.length === 0) return state;
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         self_nudge_transform(draft, target_node_ids, dx, dy, context);
       });
     }
@@ -853,7 +853,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const dx = axis === "x" ? delta : 0;
       const dy = axis === "y" ? delta : 0;
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         for (const node_id of target_node_ids) {
           const node = dq.__getNodeById(draft, node_id);
 
@@ -893,7 +893,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               paint_index = 0,
               paint_target = "fill",
             } = state.content_edit_mode;
-            return produce(state, (draft) => {
+            return updateState(state, (draft) => {
               const node = dq.__getNodeById(draft, node_id);
               const { paints, resolvedIndex } = resolvePaints(
                 node as grida.program.nodes.UnknwonNode,
@@ -931,7 +931,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0],
               nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1],
             ];
-            return produce(state, (draft) => {
+            return updateState(state, (draft) => {
               const { node_id, selection } =
                 draft.content_edit_mode as editor.state.VectorContentEditMode;
 
@@ -1020,7 +1020,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           })
           .map((node) => node.id);
 
-        return produce(state, (draft) => {
+        return updateState(state, (draft) => {
           for (const node_id of in_flow_node_ids) {
             __self_order(
               draft,
@@ -1041,7 +1041,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       }
       // delta transform the camera (pan)
       else {
-        return produce(state, (draft) => {
+        return updateState(state, (draft) => {
           const [scaleX, scaleY] = cmath.transform.getScale(draft.transform);
           const delta: cmath.Vector2 = [
             -nudge_mod *
@@ -1103,7 +1103,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           const dx = aligned.x - rect.x;
           const dy = aligned.y - rect.y;
 
-          return produce(state, (draft) => {
+          return updateState(state, (draft) => {
             const node = dq.__getNodeById(state, node_id);
             const moved = nodeTransformReducer(node, {
               type: "translate",
@@ -1130,7 +1130,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         return { dx, dy };
       });
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         let i = 0;
         for (const node_id of target_node_ids) {
           const node = dq.__getNodeById(state, node_id);
@@ -1168,7 +1168,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         return { dx, dy };
       });
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         let i = 0;
         for (const node_id of target_node_ids) {
           const node = dq.__getNodeById(state, node_id);
@@ -1225,7 +1225,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         };
       });
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const insertions: grida.program.nodes.NodeID[] = [];
         layouts.forEach(({ parent, layout, children }) => {
           const container_prototype: grida.program.nodes.NodePrototype = {
@@ -1290,7 +1290,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const insertions = self_wrapNodes(
           draft,
           target_node_ids,
@@ -1305,7 +1305,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const insertions = self_wrapNodes(
           draft,
           target_node_ids,
@@ -1320,7 +1320,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         self_ungroup(draft, target_node_ids, context.geometry);
       });
       break;
@@ -1334,7 +1334,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const node = dq.__getNodeById(state, target_node_ids[0]);
         if (node && node.type === "boolean") {
           // Simply change the op value of the existing boolean operation node
-          return produce(state, (draft) => {
+          return updateState(state, (draft) => {
             const booleanNode = dq.__getNodeById(
               draft,
               target_node_ids[0]
@@ -1356,7 +1356,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       }
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const insertions = self_wrapNodesAsBooleanOperation(
           draft,
           flattenable,
@@ -1378,7 +1378,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "delete-tangent":
     case "translate-vertex":
     case "split-segment": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { node_id } = action.target;
         const node = dq.__getNodeById(draft, node_id);
 
@@ -1591,7 +1591,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             ? target
             : [target];
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         for (const node_id of target_node_ids) {
           const node = dq.__getNodeById(draft, node_id);
 
@@ -1604,7 +1604,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "vector/update-hovered-control": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         if (draft.content_edit_mode?.type === "vector") {
           draft.content_edit_mode.hovered_control = action.hoveredControl;
         }
@@ -1614,7 +1614,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "bend-or-clear-corner": {
       const { target, tangent } = <EditorVectorBendOrClearCornerAction>action;
       const { node_id, vertex, ref } = target;
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const node = dq.__getNodeById(
           draft,
           node_id
@@ -1654,7 +1654,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     //
     case "select-gradient-stop": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { target } = <EditorSelectGradientStopAction>action;
         const { node_id, stop, paint_index, paint_target } = target;
         const node = dq.__getNodeById(draft, node_id);
@@ -1672,7 +1672,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     //
     case "variable-width/select-stop": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { target } = <EditorVariableWidthSelectStopAction>action;
         const { node_id, stop } = target;
         const node = dq.__getNodeById(draft, node_id);
@@ -1683,7 +1683,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "variable-width/delete-stop": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { target } = <EditorVariableWidthDeleteStopAction>action;
         const { node_id, stop } = target;
         const node = dq.__getNodeById(draft, node_id);
@@ -1712,7 +1712,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "variable-width/add-stop": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { target } = <EditorVariableWidthAddStopAction>action;
         const { node_id, u, r } = target;
         const node = dq.__getNodeById(draft, node_id);
@@ -1759,7 +1759,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "document/template/set/props": {
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const root_template_instance = dq.__getNodeById(
           draft,
           // FIXME: update api interface
@@ -1774,7 +1774,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     //     action
     //   );
 
-    //   return produce(state, (draft) => {
+    //   return updateState(state, (draft) => {
     //     draft.template.props = {
     //       ...(draft.template.props || {}),
     //       ...partialProps,
@@ -1790,7 +1790,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "node/change/style":
     case "node/change/fontFamily": {
       const { node_id } = <NodeChangeAction>action;
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const node = dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         draft.document.nodes[node_id] = nodeReducer(node, action);
@@ -1809,7 +1809,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     //
     case "node/toggle/underline": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { node_id } = <NodeToggleUnderlineAction>action;
         const node = dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
@@ -1821,7 +1821,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       //
     }
     case "node/toggle/line-through": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { node_id } = <NodeToggleLineThroughAction>action;
         const node = dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
@@ -1838,7 +1838,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         TemplateNodeOverrideChangeAction
       >action;
 
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { node_id } = __action;
         const template_instance_node = dq.__getNodeById(
           draft,
@@ -1865,7 +1865,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "document/properties/update":
     case "document/properties/put":
     case "document/properties/delete": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         // TODO:
         // const root_node = document.__getNodeById(draft, draft.document.root_id);
         // assert(root_node.type === "component");

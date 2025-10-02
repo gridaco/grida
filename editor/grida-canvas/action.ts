@@ -10,8 +10,6 @@ export type Action =
   | InternalAction
   | EditorCameraAction
   | EditorAction
-  | EditorUndoAction
-  | EditorRedoAction
   | EditorClipAction;
 
 export type InternalAction = __InternalWebfontListLoadAction;
@@ -230,13 +228,6 @@ export interface EditorBlurAction {
   type: "blur";
 }
 
-export type EditorUndoAction = {
-  type: "undo";
-};
-
-export type EditorRedoAction = {
-  type: "redo";
-};
 
 /**
  * set to editor clipbard

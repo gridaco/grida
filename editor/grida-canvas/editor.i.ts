@@ -1,5 +1,5 @@
 import type {
-  EditorAction,
+  Action,
   TCanvasEventTargetDragGestureState,
 } from "@/grida-canvas/action";
 import type { BitmapEditorBrush, BitmapLayerEditor } from "@grida/bitmap";
@@ -13,7 +13,6 @@ import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
 import type { io } from "@grida/io";
-import { applyPatches, type Patch } from "immer";
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -1270,13 +1269,6 @@ export namespace editor.state {
     content_edit_mode?: editor.state.ContentEditModeState;
   }
 
-  export interface IEditorHistoryExtensionState {
-    history: {
-      past: history.HistoryEntry[];
-      future: history.HistoryEntry[];
-    };
-  }
-
   /**
    * @deprecated remove when possible
    */
@@ -1320,7 +1312,6 @@ export namespace editor.state {
       editor.state.ISceneSurfaceState,
       editor.state.IEditorRuntimePreservedState,
       //
-      editor.state.IEditorHistoryExtensionState,
       editor.state.IDocumentState,
       grida.program.document.IDocumentTemplatesRepository {
     rotation_quantize_step: number;
@@ -1418,10 +1409,6 @@ export namespace editor.state {
         message: null,
         is_open: false,
         last_modified: null,
-      },
-      history: {
-        future: [],
-        past: [],
       },
       gesture_modifiers: editor.config.DEFAULT_GESTURE_MODIFIERS,
       ruler: "off",
@@ -1883,101 +1870,27 @@ export namespace editor.gesture {
 }
 
 export namespace editor.history {
+  export interface Patch {
+    op: "replace" | "remove" | "add";
+    path: (string | number)[];
+    value?: any;
+  }
+
   export type HistoryEntry = {
-    actionType: EditorAction["type"];
-    timestamp: number;
+    actionType: Action["type"];
+    /**
+     * timestamp
+     */
+    ts: number;
+    /**
+     * patches
+     */
     patches: Patch[];
+    /**
+     * inverse patches
+     */
     inversePatches: Patch[];
   };
-
-  /**
-   * @mutates draft
-   */
-  export function snapshot(
-    state: editor.state.IDocumentState
-  ): editor.state.IDocumentState {
-    return {
-      selection: state.selection,
-      scene_id: state.scene_id,
-      document: state.document,
-      document_ctx: state.document_ctx,
-      content_edit_mode: state.content_edit_mode,
-      document_key: state.document_key,
-    };
-  }
-
-  export function entry(
-    actionType: editor.history.HistoryEntry["actionType"],
-    patches: Patch[],
-    inversePatches: Patch[]
-  ): editor.history.HistoryEntry {
-    return {
-      actionType,
-      patches,
-      inversePatches,
-      timestamp: Date.now(),
-    };
-  }
-
-  export function getMergableEntry(
-    snapshots: editor.history.HistoryEntry[],
-    currentTimestamp: number,
-    timeout: number = 300
-  ): editor.history.HistoryEntry | undefined {
-    if (snapshots.length === 0) {
-      return;
-    }
-
-    const previousEntry = snapshots[snapshots.length - 1];
-
-    if (
-      // actionType !== previousEntry.actionType ||
-      currentTimestamp - previousEntry.timestamp >
-      timeout
-    ) {
-      return;
-    }
-
-    return previousEntry;
-  }
-
-  export function filterDocumentPatches(patches: Patch[]): Patch[] {
-    return patches.filter((patch) => {
-      const [key] = patch.path;
-      return (
-        key === "selection" ||
-        key === "scene_id" ||
-        key === "document" ||
-        key === "document_ctx" ||
-        key === "content_edit_mode" ||
-        key === "document_key"
-      );
-    });
-  }
-
-  export function apply(draft: editor.state.IEditorState, patches: Patch[]) {
-    const snapshotState = snapshot(draft);
-    const nextState = applyPatchesToSnapshot(snapshotState, patches);
-    draft.selection = nextState.selection;
-    draft.scene_id = nextState.scene_id;
-    draft.document = nextState.document;
-    draft.document_ctx = nextState.document_ctx;
-    draft.content_edit_mode = nextState.content_edit_mode;
-    draft.document_key = nextState.document_key;
-
-    draft.hovered_node_id = null;
-  }
-
-  function applyPatchesToSnapshot(
-    base: editor.state.IDocumentState,
-    patches: Patch[]
-  ): editor.state.IDocumentState {
-    if (patches.length === 0) {
-      return base;
-    }
-
-    return applyPatches(base, patches);
-  }
 }
 
 export namespace editor.a11y {

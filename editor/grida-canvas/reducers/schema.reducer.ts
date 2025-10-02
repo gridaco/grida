@@ -1,6 +1,6 @@
 import type { SchemaAction } from "../action";
 import type grida from "@grida/schema";
-import { produceWithHistory as produce } from "./history/patches";
+import { updateState } from "./utils/immer";
 
 export class SchemaManager {
   private properties: grida.program.schema.Properties;
@@ -98,13 +98,13 @@ export default function schemaReducer(
 
   switch (action.type) {
     case "document/properties/define": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         manager.defineProperty(action.key, action.definition);
         forceAssign(draft, manager.snapshot());
       });
     }
     case "document/properties/rename": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const { key: name, newKey: newName } = action;
         const success = manager.renameProperty(name, newName);
         if (success) {
@@ -113,7 +113,7 @@ export default function schemaReducer(
       });
     }
     case "document/properties/update": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         const success = manager.updateProperty(action.key, action.definition);
         if (success) {
           forceAssign(draft, manager.snapshot());
@@ -121,13 +121,13 @@ export default function schemaReducer(
       });
     }
     case "document/properties/put": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         manager.putProperty(action.key, action.definition);
         forceAssign(draft, manager.snapshot());
       });
     }
     case "document/properties/delete": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         manager.deleteProperty(action.key);
         forceAssign(draft, manager.snapshot());
       });

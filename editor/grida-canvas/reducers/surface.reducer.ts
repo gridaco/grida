@@ -1,5 +1,5 @@
 import { type Draft } from "immer";
-import { produceWithHistory as produce } from "./history/patches";
+import { updateState } from "./utils/immer";
 
 import type { SurfaceAction, EditorSurface_StartGesture } from "../action";
 import { editor } from "@/grida-canvas";
@@ -929,7 +929,7 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
   action: SurfaceAction,
   context: ReducerContext
 ): S {
-  return produce(state, (draft) => {
+  return updateState(state, (draft) => {
     switch (action.type) {
       case "surface/ruler": {
         const { state: rulerstate } = action;

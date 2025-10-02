@@ -1,5 +1,5 @@
 import { type Draft } from "immer";
-import { produceWithHistory as produce } from "./history/patches";
+import { updateState } from "./utils/immer";
 
 import type {
   EventTargetAction,
@@ -992,54 +992,54 @@ export default function eventTargetReducer<S extends editor.state.IEditorState>(
   switch (action.type) {
     // #region [html backend] canvas event target
     case "event-target/event/on-pointer-move": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_pointer_move(draft, action, context);
       });
     }
     case "event-target/event/on-pointer-move-raycast": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_pointer_move_raycast(draft, action);
       });
     }
     case "event-target/event/on-click": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_click(draft, action, context);
       });
     }
     case "event-target/event/on-double-click": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_double_click(draft);
       });
     }
     case "event-target/event/on-pointer-down": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_pointer_down(draft, action, context);
       });
     }
     case "event-target/event/on-pointer-up": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_pointer_up(draft);
       });
     }
     // #region drag event
     case "event-target/event/on-drag-start": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_drag_start(draft, action, context);
       });
     }
     case "event-target/event/on-drag-end": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_drag_end(draft, action, context);
       });
     }
     case "event-target/event/on-drag": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_drag(draft, action, context);
       });
     }
     //
     case "event-target/event/multiple-selection-overlay/on-click": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_multiple_selection_overlay_click(draft, action);
       });
     }

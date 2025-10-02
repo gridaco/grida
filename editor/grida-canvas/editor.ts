@@ -1,22 +1,13 @@
-import produce, { Patch } from "immer";
-import { Action, editor } from ".";
+import produce from "immer";
+import { editor, type Action } from ".";
 import reducer, { type ReducerContext } from "./reducers";
-import { dq } from "@/grida-canvas/query";
-import grida from "@grida/schema";
-import cg from "@grida/cg";
 import type { tokens } from "@grida/tokens";
 import type { BitmapEditorBrush } from "@grida/bitmap";
-import cmath from "@grida/cmath";
-import assert from "assert";
-import { domapi } from "./backends/dom";
+import type { TCanvasEventTargetDragGestureState } from "./action";
 import { animateTransformTo } from "./animation";
-import { InternalAction, TCanvasEventTargetDragGestureState } from "./action";
-import iosvg from "@grida/io-svg";
-import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
-import vn from "@grida/vn";
-import * as googlefonts from "@grida/fonts/google";
 import { DocumentFontManager } from "./font-manager";
+import { DocumentHistoryManager } from "./history-manager";
 import init, { type Scene } from "@grida/canvas-wasm";
 import locateFile from "./backends/wasm-locate-file";
 import {
@@ -27,6 +18,16 @@ import {
   CanvasWasmFontParserInterfaceProvider,
   CanvasWasmDefaultExportInterfaceProvider,
 } from "./backends";
+import { domapi } from "./backends/dom";
+import { dq } from "@/grida-canvas/query";
+import { io } from "@grida/io";
+import * as googlefonts from "@grida/fonts/google";
+import grida from "@grida/schema";
+import vn from "@grida/vn";
+import cg from "@grida/cg";
+import iosvg from "@grida/io-svg";
+import cmath from "@grida/cmath";
+import assert from "assert";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -322,6 +323,11 @@ class EditorDocumentStore
     return this.mstate;
   }
 
+  private readonly historyManager = new DocumentHistoryManager();
+  get historySnapshot() {
+    return this.historyManager.snapshot;
+  }
+
   /**
    * If the editor is locked, no actions will be dispatched. (unless forced)
    */
@@ -448,22 +454,28 @@ class EditorDocumentStore
       logger: this.log,
     };
 
-    if (Array.isArray(action)) {
-      this.mstate = action.reduce(
-        (state, action) => reducer(state, action, context),
-        this.mstate
+    const actions = Array.isArray(action) ? action : [action];
+
+    if (actions.length === 0) {
+      return;
+    }
+
+    let lastAction: Action;
+
+    for (const action of actions) {
+      const [nextState, patches, inversePatches] = reducer(
+        this.mstate,
+        action,
+        context
       );
-    } else {
-      this.mstate = reducer(this.mstate, action, context);
+      this.mstate = nextState;
+      this.historyManager.record(action.type, patches, inversePatches);
+      lastAction = action;
     }
 
     this._tid++;
 
-    if (Array.isArray(action)) {
-      this.listeners.forEach((l) => l(this, action[action.length - 1]));
-    } else {
-      this.listeners.forEach((l) => l(this, action));
-    }
+    this.listeners.forEach((l) => l(this, lastAction));
   }
 
   /**
@@ -513,6 +525,7 @@ class EditorDocumentStore
       // preserve the transform state
       draft.transform = __prev_transform;
     });
+    this.historyManager.clear();
     this._tid = 0;
     this.listeners.forEach((l) => l?.(this));
     return this._tid;
@@ -704,15 +717,29 @@ class EditorDocumentStore
   }
 
   public undo() {
-    this.dispatch({
-      type: "undo",
-    });
+    if (this._locked) return;
+
+    const nextState = this.historyManager.undo(this.mstate);
+    if (nextState === this.mstate) {
+      return;
+    }
+
+    this.mstate = nextState;
+    this._tid++;
+    this.listeners.forEach((l) => l?.(this));
   }
 
   public redo() {
-    this.dispatch({
-      type: "redo",
-    });
+    if (this._locked) return;
+
+    const nextState = this.historyManager.redo(this.mstate);
+    if (nextState === this.mstate) {
+      return;
+    }
+
+    this.mstate = nextState;
+    this._tid++;
+    this.listeners.forEach((l) => l?.(this));
   }
 
   public cut(target: "selection" | editor.NodeID) {
