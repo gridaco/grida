@@ -1,6 +1,7 @@
 import produce from "immer";
 import { editor, type Action } from ".";
 import reducer, { type ReducerContext } from "./reducers";
+
 import type { tokens } from "@grida/tokens";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { TCanvasEventTargetDragGestureState } from "./action";
@@ -315,7 +316,7 @@ class EditorDocumentStore
     editor.api.IDocumentBrushToolActions,
     editor.api.IDocumentSchemaActions_Experimental
 {
-  private readonly listeners: Set<(editor: this, action?: Action) => void> =
+  private readonly listeners: Set<editor.api.SubscriptionCallbackFn<this>> =
     new Set();
 
   private mstate: editor.state.IEditorState;
@@ -461,6 +462,7 @@ class EditorDocumentStore
     }
 
     let lastAction: Action;
+    let lastPatches: editor.history.Patch[] = [];
 
     for (const action of actions) {
       const [nextState, patches, inversePatches] = reducer(
@@ -469,32 +471,41 @@ class EditorDocumentStore
         context
       );
       this.mstate = nextState;
-      this.historyManager.record(action.type, patches, inversePatches);
+      this.historyManager.record({
+        actionType: action.type,
+        patches,
+        inversePatches,
+      });
       lastAction = action;
+      lastPatches = patches;
     }
 
     this._tid++;
 
-    this.listeners.forEach((l) => l(this, lastAction));
+    this.listeners.forEach((l) => l(this, lastAction, lastPatches));
   }
 
   /**
    * subscribe to the document state changes
    * @returns unsubscribe function
    */
-  public subscribe(fn: (editor: this, action?: Action) => void) {
+  public subscribe(fn: editor.api.SubscriptionCallbackFn<this>) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   }
 
   public subscribeWithSelector<T>(
     selector: (state: editor.state.IEditorState) => T,
-    fn: (editor: this, selected: T, previous: T, action?: Action) => void,
+    fn: editor.api.SubscriptionWithSelectorCallbackFn<T, this>,
     isEqual: (a: T, b: T) => boolean = Object.is
   ): () => void {
     let previous = selector(this.mstate);
 
-    const wrapped = (_: this, action?: Action) => {
+    const wrapped = (
+      _: this,
+      action?: Action,
+      patches?: editor.history.Patch[]
+    ) => {
       const next = selector(this.mstate);
       if (!isEqual(previous, next)) {
         const prev = previous;
@@ -502,7 +513,7 @@ class EditorDocumentStore
         // [1]
         previous = next;
         // [2]
-        fn(this, next, prev, action);
+        fn(this, next, prev, action, patches);
       }
     };
 
@@ -2167,12 +2178,12 @@ export class Editor
     }
   }
 
-  public subscribe(fn: (editor: this, action?: Action) => void) {
+  public subscribe(fn: editor.api.SubscriptionCallbackFn<this>) {
     // TODO: we can have a single subscription to the document and use that.
     // Subscribe to the document store changes
-    return this.doc.subscribe((doc, action) => {
+    return this.doc.subscribe((doc, action, patches) => {
       // Forward the document store changes to our listeners
-      fn(this, action);
+      fn(this, action, patches);
     });
   }
 

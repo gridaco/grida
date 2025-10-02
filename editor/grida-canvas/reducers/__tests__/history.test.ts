@@ -103,7 +103,7 @@ describe("History Management", () => {
       action,
       context
     );
-    history.record(action.type, patches, inversePatches);
+    history.record({ actionType: action.type, patches, inversePatches });
     return nextState;
   }
 

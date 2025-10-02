@@ -63,11 +63,15 @@ export class DocumentHistoryManager {
     this.future = [];
   }
 
-  record(
-    actionType: Action["type"],
-    patches: editor.history.Patch[],
-    inversePatches: editor.history.Patch[]
-  ) {
+  record({
+    actionType,
+    patches,
+    inversePatches,
+  }: {
+    actionType: Action["type"];
+    patches: editor.history.Patch[];
+    inversePatches: editor.history.Patch[];
+  }) {
     const filteredPatches = filterDocumentPatches(patches);
     const filteredInverse = filterDocumentPatches(inversePatches);
 

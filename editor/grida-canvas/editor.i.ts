@@ -1915,6 +1915,20 @@ export namespace editor.a11y {
 }
 
 export namespace editor.api {
+  export type SubscriptionCallbackFn<T = any> = (
+    editor: T,
+    action?: Action,
+    patches?: editor.history.Patch[]
+  ) => void;
+
+  export type SubscriptionWithSelectorCallbackFn<T, E = any> = (
+    editor: E,
+    selected: T,
+    previous: T,
+    action?: Action,
+    patches?: editor.history.Patch[]
+  ) => void;
+
   export class EditorConsumerVerboseError extends Error {
     context: any;
     constructor(message: string, context: any) {
