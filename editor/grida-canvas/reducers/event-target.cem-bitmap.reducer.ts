@@ -1,15 +1,10 @@
 import { type Draft } from "immer";
 
-import type {
-  EditorEventTarget_PointerDown,
-  EditorEventTarget_Drag,
-} from "../action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import assert from "assert";
 import { BitmapLayerEditor } from "@grida/bitmap";
-import nid from "./tools/id";
 import cmath from "@grida/cmath";
 import cg from "@grida/cg";
 import { self_try_insert_node, self_clearSelection } from "./methods";
@@ -26,8 +21,8 @@ export function prepare_bitmap_node(
   context: ReducerContext
 ): Draft<grida.program.nodes.BitmapNode> {
   if (!node_id) {
-    const new_node_id = nid();
-    const new_bitmap_ref_id = nid(); // TODO: use other id generator
+    const new_node_id = context.idgen.next();
+    const new_bitmap_ref_id = context.idgen.next(); // FIXME: use other id generator
 
     const parent = __get_insertion_target(draft);
     if (!parent) throw new Error("document level insertion not supported"); // FIXME: support document level insertion

@@ -3,6 +3,7 @@ jest.mock("svg-pathdata", () => ({}), { virtual: true });
 
 import reducer, { type ReducerContext } from "../index";
 import { editor } from "@/grida-canvas";
+import grida from "@grida/schema";
 
 const geometryStub: editor.api.IDocumentGeometryQuery = {
   getNodeIdsFromPoint: () => [],
@@ -24,6 +25,7 @@ function createContext(): ReducerContext {
     viewport: { width: 1000, height: 1000 },
     backend: "dom",
     paint_constraints: { fill: "fill", stroke: "stroke" },
+    idgen: grida.id.noop.generator,
   };
 }
 

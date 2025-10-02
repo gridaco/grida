@@ -3,7 +3,6 @@ import { editor } from "@/grida-canvas";
 import { self_insertSubDocument } from "./insert";
 import { self_selectNode } from "./selection";
 import assert from "assert";
-import nid from "../tools/id";
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 import { dq } from "@/grida-canvas/query";
@@ -37,7 +36,7 @@ export function self_duplicateNode<S extends editor.state.IEditorState>(
     const sub =
       grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
-        nid
+        () => context.idgen.next()
       );
 
     const parent_id = dq.getParentId(draft.document_ctx, origin_id);

@@ -70,7 +70,7 @@ class DocumentSyncManager {
   private __unsubscribe_document_change!: () => void;
   private readonly ymap_nodes: Y.Map<grida.program.nodes.Node>;
   private readonly ymap_scenes: Y.Map<grida.program.document.Scene>;
-  private throttle_ms: number = 5;
+  private throttle_ms: number = 30;
 
   /**
    * Unique origin identifier for this client's transactions

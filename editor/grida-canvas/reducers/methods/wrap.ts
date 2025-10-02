@@ -1,11 +1,11 @@
 import type { Draft } from "immer";
+import type { ReducerContext } from "..";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import cmath from "@grida/cmath";
 import { self_moveNode } from "./move";
 import { self_insertSubDocument } from "./insert";
-import nid from "../tools/id";
 import { self_selectNode } from "./selection";
 import * as modeProperties from "@/grida-canvas/utils/properties";
 import cg from "@grida/cg";
@@ -79,7 +79,7 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   nodeIds: string[],
   kind: "container" | "group",
-  geometry: editor.api.IDocumentGeometryQuery
+  context: ReducerContext
 ): grida.program.nodes.NodeID[] {
   const scene = draft.document.scenes[draft.scene_id!];
 
@@ -107,12 +107,13 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
     if (isRoot) {
       delta = [0, 0];
     } else {
-      const parentRect = geometry.getNodeAbsoluteBoundingRect(parentId)!;
+      const parentRect =
+        context.geometry.getNodeAbsoluteBoundingRect(parentId)!;
       delta = [-parentRect.x, -parentRect.y];
     }
 
     const rects = g
-      .map((nodeId) => geometry.getNodeAbsoluteBoundingRect(nodeId)!)
+      .map((nodeId) => context.geometry.getNodeAbsoluteBoundingRect(nodeId)!)
       .map((rect) => cmath.rect.translate(rect, delta))
       .map((rect) => cmath.rect.quantize(rect, 1));
 
@@ -136,7 +137,7 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
       isRoot ? null : (parentId as string),
       grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
-        nid
+        () => context.idgen.next()
       )
     )[0];
 
@@ -287,7 +288,7 @@ export function self_wrapNodesAsBooleanOperation<
   draft: Draft<S>,
   nodeIds: string[],
   op: cg.BooleanOperation,
-  geometry: editor.api.IDocumentGeometryQuery
+  context: ReducerContext
 ): grida.program.nodes.NodeID[] {
   const scene = draft.document.scenes[draft.scene_id!];
 
@@ -315,12 +316,13 @@ export function self_wrapNodesAsBooleanOperation<
     if (isRoot) {
       delta = [0, 0];
     } else {
-      const parentRect = geometry.getNodeAbsoluteBoundingRect(parentId)!;
+      const parentRect =
+        context.geometry.getNodeAbsoluteBoundingRect(parentId)!;
       delta = [-parentRect.x, -parentRect.y];
     }
 
     const rects = g
-      .map((nodeId) => geometry.getNodeAbsoluteBoundingRect(nodeId)!)
+      .map((nodeId) => context.geometry.getNodeAbsoluteBoundingRect(nodeId)!)
       .map((rect) => cmath.rect.translate(rect, delta))
       .map((rect) => cmath.rect.quantize(rect, 1));
 
@@ -347,7 +349,7 @@ export function self_wrapNodesAsBooleanOperation<
       isRoot ? null : (parentId as string),
       grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
-        nid
+        () => context.idgen.next()
       )
     )[0];
 

@@ -131,7 +131,7 @@ export namespace editor {
     };
   }
 
-  export type NodeID = string & {};
+  export type NodeID = grida.program.nodes.NodeID;
 
   /**
    * a global class based editor instances

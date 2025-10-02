@@ -22,6 +22,341 @@ interface CSSProperties extends CSS.Properties<string | number> {
 export namespace grida {
   export const mixed: unique symbol = Symbol();
 
+  export namespace id {
+    export type NodeIdentifier = string;
+
+    export interface INodeIdGenerator<T extends string | number> {
+      // peek(): T;
+      next(): T;
+    }
+
+    export namespace noop {
+      export const generator: INodeIdGenerator<string> = {
+        next: () => Math.random().toString(36).substring(2, 15),
+      };
+    }
+
+    /**
+     * Grida node identifier utilities.
+     *
+     * The identifier is a 32-bit unsigned integer composed of two fields:
+     * - 8 bits: actor identifier (1-255 for online actors, 0 reserved for offline)
+     * - 24 bits: per-actor node counter (0-16,777,215)
+     *
+     * While the packed representation is numeric, most of the JavaScript/TypeScript
+     * code continues to work with string identifiers. The helpers in this namespace
+     * provide safe packing, unpacking, formatting and generation utilities so that
+     * the rest of the system can transition to the CRDT-friendly layout without
+     * relying on random UUIDs.
+     *
+     * @see https://grida.co/docs/wg/feat-crdt/id
+     */
+    export namespace i32 {
+      //
+
+      export namespace k {
+        export const ACTOR_ID_BITS = 8;
+        export const NODE_COUNTER_BITS = 24;
+        /**
+         * 255
+         */
+        export const ACTOR_ID_MAX = (1 << ACTOR_ID_BITS) - 1;
+        /**
+         * 16,777,215
+         */
+        export const NODE_COUNTER_MAX = (1 << NODE_COUNTER_BITS) - 1;
+
+        /**
+         * 16,777,216
+         */
+        export const NODE_COUNTER_MODULO = NODE_COUNTER_MAX + 1;
+        /**
+         * 4,294,967,295
+         */
+        export const PACKED_MAX =
+          ACTOR_ID_MAX * NODE_COUNTER_MODULO + NODE_COUNTER_MAX;
+
+        /**
+         * e.g. "255-16777215" or "1-42"
+         */
+        export const NODE_ID_SEPARATOR = "-" as const;
+
+        /**
+         * 0 is reserved for offline-local (or non collaborative) work
+         */
+        export const OFFLINE_ACTOR_ID: ActorId = 0;
+      }
+
+      export type ActorId = number;
+      export type NodeCounter = number;
+      export type PackedNodeId = number;
+
+      export interface NodeIdComponents {
+        actor: ActorId;
+        counter: NodeCounter;
+      }
+
+      export type NodeIdGeneratorState = NodeIdComponents;
+
+      /**
+       * Packs the actor and node counter into a 32-bit unsigned integer.
+       */
+      export function pack(actor: ActorId, counter: NodeCounter): PackedNodeId {
+        assertActor(actor);
+        assertCounter(counter);
+        return actor * k.NODE_COUNTER_MODULO + counter;
+      }
+
+      /**
+       * Unpacks a packed node identifier into its actor and counter components.
+       */
+      export function unpack(packed: PackedNodeId): NodeIdComponents {
+        assertPacked(packed);
+        const actor = Math.floor(packed / k.NODE_COUNTER_MODULO);
+        const counter = packed % k.NODE_COUNTER_MODULO;
+        return { actor, counter };
+      }
+
+      /**
+       * Creates the canonical string representation of a node identifier.
+       */
+      export function format(
+        actor: ActorId,
+        counter: NodeCounter
+      ): NodeIdentifier {
+        assertActor(actor);
+        assertCounter(counter);
+        return `${actor}${k.NODE_ID_SEPARATOR}${counter}`;
+      }
+
+      /**
+       * Formats the provided components as a node identifier string.
+       */
+      export function fromComponents(
+        components: NodeIdComponents
+      ): NodeIdentifier {
+        return format(components.actor, components.counter);
+      }
+
+      /**
+       * Converts a packed node identifier into the canonical string representation.
+       */
+      export function fromPacked(packed: PackedNodeId): NodeIdentifier {
+        return fromComponents(unpack(packed));
+      }
+
+      /**
+       * Parses a node identifier expressed either as a string (e.g. "1:42") or as a
+       * packed numeric value.
+       */
+      export function parse(
+        input: NodeIdentifier | PackedNodeId
+      ): NodeIdComponents {
+        if (typeof input === "number") {
+          assertPacked(input);
+          return unpack(input);
+        }
+
+        const trimmed = input.trim();
+        if (trimmed.length === 0) {
+          throw new RangeError("Node identifier cannot be empty");
+        }
+
+        if (trimmed.includes(k.NODE_ID_SEPARATOR)) {
+          const [actorPart, counterPart, ...rest] = trimmed.split(
+            k.NODE_ID_SEPARATOR
+          );
+          if (rest.length > 0) {
+            throw new RangeError(`Invalid node identifier format: "${input}"`);
+          }
+
+          const actor = Number(actorPart);
+          const counter = Number(counterPart);
+
+          if (!Number.isFinite(actor) || !Number.isFinite(counter)) {
+            throw new RangeError(`Invalid node identifier: "${input}"`);
+          }
+
+          assertActor(actor);
+          assertCounter(counter);
+          return { actor, counter };
+        }
+
+        const numeric = Number(trimmed);
+        if (!Number.isFinite(numeric)) {
+          throw new RangeError(`Invalid node identifier: "${input}"`);
+        }
+
+        assertPacked(numeric);
+        return unpack(numeric);
+      }
+
+      /**
+       * Converts a node identifier (string or packed) into its numeric packed form.
+       */
+      export function toPacked(
+        input: NodeIdentifier | PackedNodeId
+      ): PackedNodeId {
+        if (typeof input === "number") {
+          assertPacked(input);
+          return input;
+        }
+
+        const { actor, counter } = parse(input);
+        return pack(actor, counter);
+      }
+
+      /**
+       * Returns true when the provided value is a valid packed node identifier.
+       */
+      export function isPackedNodeId(value: unknown): value is PackedNodeId {
+        return (
+          typeof value === "number" &&
+          Number.isInteger(value) &&
+          value >= 0 &&
+          value <= k.PACKED_MAX
+        );
+      }
+
+      function assertActor(value: number): asserts value is ActorId {
+        if (!Number.isInteger(value) || value < 0 || value > k.ACTOR_ID_MAX) {
+          throw new RangeError(
+            `Actor id must be an integer between 0 and ${k.ACTOR_ID_MAX} (received ${value})`
+          );
+        }
+      }
+
+      function assertCounter(value: number): asserts value is NodeCounter {
+        if (
+          !Number.isInteger(value) ||
+          value < 0 ||
+          value > k.NODE_COUNTER_MAX
+        ) {
+          throw new RangeError(
+            `Node counter must be an integer between 0 and ${k.NODE_COUNTER_MAX} (received ${value})`
+          );
+        }
+      }
+
+      function assertPacked(value: number): asserts value is PackedNodeId {
+        if (!Number.isInteger(value) || value < 0 || value > k.PACKED_MAX) {
+          throw new RangeError(
+            `Packed node id must be an integer between 0 and ${k.PACKED_MAX} (received ${value})`
+          );
+        }
+      }
+
+      const COUNTER_EXHAUSTED_ERROR =
+        "Node counter exhausted for the current actor. Rotate to a new actor id before minting more nodes.";
+
+      /**
+       * Stateful node identifier generator.
+       */
+      export class NodeIdGenerator {
+        private _actor: ActorId;
+        private _counter: NodeCounter;
+
+        constructor(initial: Partial<NodeIdGeneratorState> = {}) {
+          const actor = initial.actor ?? k.OFFLINE_ACTOR_ID;
+          const counter = initial.counter ?? 0;
+
+          assertActor(actor);
+          assertCounter(counter);
+
+          this._actor = actor;
+          this._counter = counter;
+        }
+
+        get actor(): ActorId {
+          return this._actor;
+        }
+
+        get counter(): NodeCounter {
+          return this._counter;
+        }
+
+        /**
+         * Sets the active actor identifier for subsequent allocations.
+         */
+        setActor(actor: ActorId): void {
+          assertActor(actor);
+          this._actor = actor;
+        }
+
+        /**
+         * Sets the next node counter value.
+         */
+        setCounter(counter: NodeCounter): void {
+          assertCounter(counter);
+          this._counter = counter;
+        }
+
+        /**
+         * Returns true when the generator has exhausted the counter range.
+         */
+        get exhausted(): boolean {
+          return this._counter > k.NODE_COUNTER_MAX;
+        }
+
+        /**
+         * Returns the next node identifier string and advances the counter.
+         */
+        next(): NodeIdentifier {
+          this.ensureCapacity();
+          const id = format(this._actor, this._counter);
+          this.advance();
+          return id;
+        }
+
+        /**
+         * Returns the next packed node identifier and advances the counter.
+         */
+        nextPacked(): PackedNodeId {
+          this.ensureCapacity();
+          const packed = pack(this._actor, this._counter);
+          this.advance();
+          return packed;
+        }
+
+        /**
+         * Returns the next identifier components without allocating.
+         */
+        peek(): NodeIdComponents {
+          this.ensureCapacity();
+          return { actor: this._actor, counter: this._counter };
+        }
+
+        /**
+         * Serialises the generator state so it can be restored later.
+         */
+        snapshot(): NodeIdGeneratorState {
+          this.ensureCapacity();
+          return { actor: this._actor, counter: this._counter };
+        }
+
+        /**
+         * Restores the generator state from a snapshot.
+         */
+        restore(state: NodeIdGeneratorState): void {
+          assertActor(state.actor);
+          assertCounter(state.counter);
+          this._actor = state.actor;
+          this._counter = state.counter;
+        }
+
+        private ensureCapacity(): void {
+          if (this._counter > k.NODE_COUNTER_MAX) {
+            throw new RangeError(COUNTER_EXHAUSTED_ERROR);
+          }
+        }
+
+        private advance(): void {
+          this._counter += 1;
+        }
+      }
+    }
+  }
+
   export namespace program {
     export namespace schema {
       /**
@@ -761,7 +1096,7 @@ export namespace grida.program.css {
 }
 
 export namespace grida.program.nodes {
-  export type NodeID = string;
+  export type NodeID = id.NodeIdentifier;
   export type NodeType = Node["type"];
 
   export type Node =

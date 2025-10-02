@@ -4,7 +4,6 @@ import reducer, { _internal_reducer } from "./reducers";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import cg from "@grida/cg";
-import nid from "./reducers/tools/id";
 import type { tokens } from "@grida/tokens";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import cmath from "@grida/cmath";
@@ -333,6 +332,7 @@ class EditorDocumentStore
   }
 
   constructor(
+    private readonly idgen: grida.id.INodeIdGenerator<string>,
     initialState: editor.state.IEditorStateInit,
     private readonly backend: editor.EditorContentRenderingBackend,
     private readonly geometry: editor.api.IDocumentGeometryQuery,
@@ -344,6 +344,24 @@ class EditorDocumentStore
     private readonly logger?: (...args: any[]) => void
   ) {
     this.mstate = editor.state.init(initialState);
+  }
+
+  // TODO: implement this
+  // /**
+  //  * only peek is allowed for external use
+  //  */
+  // public peekNextNodeId() {}
+
+  /**
+   *
+   * TODO: need a batch-peeker-flush system.
+   * TODO: remove this, do not never expose `.next()`
+   * this is temporary to use the legacy factory pattern where it directly needs a id generator.
+   * @deprecated this will be removed
+   * @returns minted id
+   */
+  public useNextNodeId() {
+    return this.idgen.next();
   }
 
   /**
@@ -416,11 +434,6 @@ class EditorDocumentStore
     });
   }
 
-  __createNodeId(): editor.NodeID {
-    // TODO: use a instance-wise generator
-    return nid();
-  }
-
   public insert(
     payload:
       | {
@@ -475,6 +488,7 @@ class EditorDocumentStore
         fill: this.backend === "dom" ? "fill" : "fills",
         stroke: this.backend === "dom" ? "stroke" : "strokes",
       },
+      idgen: this.idgen,
     });
     this._tid++;
     this.listeners.forEach((l) => l(this, action));
@@ -494,6 +508,7 @@ class EditorDocumentStore
             fill: this.backend === "dom" ? "fill" : "fills",
             stroke: this.backend === "dom" ? "stroke" : "strokes",
           },
+          idgen: this.idgen,
         }),
       this.mstate
     );
@@ -582,7 +597,7 @@ class EditorDocumentStore
   public async createNodeFromSvg(
     svg: string
   ): Promise<NodeProxy<grida.program.nodes.ContainerNode>> {
-    const id = this.__createNodeId();
+    const id = this.idgen.next();
     const optimized = iosvg.v0.optimize(svg).data;
     let result = await iosvg.v0.convert(optimized, {
       name: "svg",
@@ -606,7 +621,7 @@ class EditorDocumentStore
   public createImageNode(
     image: grida.program.document.ImageRef
   ): NodeProxy<grida.program.nodes.ImageNode> {
-    const id = this.__createNodeId();
+    const id = this.idgen.next();
     this.dispatch({
       type: "insert",
       id: id,
@@ -623,7 +638,7 @@ class EditorDocumentStore
   }
 
   public createTextNode(): NodeProxy<grida.program.nodes.TextNode> {
-    const id = this.__createNodeId();
+    const id = this.idgen.next();
     this.dispatch({
       type: "insert",
       id: id,
@@ -645,7 +660,7 @@ class EditorDocumentStore
   }
 
   public createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode> {
-    const id = this.__createNodeId();
+    const id = this.idgen.next();
     this.dispatch({
       type: "insert",
       id: id,
@@ -992,7 +1007,7 @@ class EditorDocumentStore
   }
 
   public insertNode(prototype: grida.program.nodes.NodePrototype) {
-    const id = this.__createNodeId();
+    const id = this.idgen.next();
     this.dispatch({
       type: "insert",
       id,
@@ -2141,6 +2156,11 @@ export class Editor
     this.backend = backend;
     this.camera = new Camera(this, new domapi.DOMViewportApi(viewportElement));
     this.doc = new EditorDocumentStore(
+      grida.id.noop.generator, // test only
+      // // TODO: resolve from server
+      // new grida.id.i32.NodeIdGenerator({
+      //   actor: grida.id.i32.k.OFFLINE_ACTOR_ID,
+      // }),
       initialState,
       backend,
       this,

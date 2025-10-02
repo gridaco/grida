@@ -15,7 +15,6 @@ import nodeReducer from "../node.reducer";
 import assert from "assert";
 import grida from "@grida/schema";
 import vn from "@grida/vn";
-import nid from "../tools/id";
 import type { ReducerContext } from "..";
 
 /**
@@ -169,7 +168,7 @@ function __self_update_gesture_transform_translate(
               if (depth === 0) return initial_clone_ids[i];
 
               // else, default.
-              return nid();
+              return context.idgen.next();
             }
           );
 

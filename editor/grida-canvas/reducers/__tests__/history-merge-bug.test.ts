@@ -1,6 +1,7 @@
 jest.mock("@grida/vn", () => ({}), { virtual: true });
 jest.mock("svg-pathdata", () => ({}), { virtual: true });
 
+import grida from "@grida/schema";
 import reducer, { type ReducerContext } from "../index";
 import { editor } from "@/grida-canvas";
 
@@ -24,6 +25,7 @@ function createContext(): ReducerContext {
     viewport: { width: 1000, height: 1000 },
     backend: "dom",
     paint_constraints: { fill: "fill", stroke: "stroke" },
+    idgen: grida.id.noop.generator,
   };
 }
 

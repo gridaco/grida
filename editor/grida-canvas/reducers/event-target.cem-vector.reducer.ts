@@ -1,18 +1,14 @@
 import { type Draft } from "immer";
 
 import type {
-  EditorEventTarget_PointerMove,
   EditorEventTarget_PointerDown,
-  EditorEventTarget_Drag,
   EditorEventTarget_DragStart,
-  EditorEventTarget_DragEnd,
 } from "../action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import assert from "assert";
 import {
-  self_updateVectorAreaSelection,
   getUXNeighbouringVertices,
   self_updateVectorSnappedSegmentP,
 } from "./methods/vector";
@@ -25,7 +21,6 @@ import {
 import { getInitialCurveGesture } from "./tools/gesture";
 import { threshold, snapMovement } from "./tools/snap";
 import { snapToCanvasGeometry } from "@grida/cmath/_snap";
-import nid from "./tools/id";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import type { ReducerContext } from ".";
@@ -363,7 +358,7 @@ export function create_new_vector_node(
   draft: editor.state.IEditorState,
   context: ReducerContext
 ) {
-  const new_node_id = nid();
+  const new_node_id = context.idgen.next();
 
   const vector = {
     type: "vector",
@@ -686,7 +681,7 @@ export function on_draw_pointer_down(
 
   let vector: grida.program.nodes.VectorNode;
 
-  const new_node_id = nid();
+  const new_node_id = context.idgen.next();
   const __base = {
     id: new_node_id,
     active: true,

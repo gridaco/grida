@@ -1,6 +1,5 @@
 import grida from "@grida/schema";
 import cg from "@grida/cg";
-import nid from "./id";
 import { editor } from "@/grida-canvas/editor.i";
 
 export const gray: cg.Paint = {
@@ -57,13 +56,14 @@ export default function initialNode(
     | "polygon"
     | "star"
     | "line",
+  idfac: () => string,
   seed: Partial<Omit<grida.program.nodes.UnknwonNode, "type">> = {},
   constraints: {
     fill?: "fill" | "fills";
     stroke?: "stroke" | "strokes";
   } = {}
 ): grida.program.nodes.Node {
-  const id = nid();
+  const id = idfac();
   const base: grida.program.nodes.i.IBaseNode &
     grida.program.nodes.i.ISceneNode = {
     id: id,

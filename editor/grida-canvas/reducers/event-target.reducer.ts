@@ -37,7 +37,6 @@ import * as cem_vector from "./event-target.cem-vector.reducer";
 import * as cem_bitmap from "./event-target.cem-bitmap.reducer";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import { snapGuideTranslation, threshold } from "./tools/snap";
-import nid from "./tools/id";
 import cmath from "@grida/cmath";
 import type { ReducerContext } from ".";
 
@@ -114,7 +113,12 @@ function __self_evt_on_click(
     case "insert":
       const parent = __get_insertion_target(draft);
 
-      const nnode = initialNode(draft.tool.node, {}, context.paint_constraints);
+      const nnode = initialNode(
+        draft.tool.node,
+        () => context.idgen.next(),
+        {},
+        context.paint_constraints
+      );
 
       let relpos: cmath.Vector2;
       if (parent) {
@@ -365,6 +369,7 @@ function __self_evt_on_drag_start(
       //
       const nnode = initialNode(
         draft.tool.node,
+        () => context.idgen.next(),
         {
           left: initial_rect.x,
           top: initial_rect.y,
@@ -817,7 +822,7 @@ function __self_start_gesture_translate(
   draft.gesture = {
     type: "translate",
     selection: selection,
-    initial_clone_ids: selection.map(() => nid()),
+    initial_clone_ids: selection.map(() => context.idgen.next()),
     initial_selection: selection,
     initial_rects: rects,
     initial_snapshot: editor.state.snapshot(draft),

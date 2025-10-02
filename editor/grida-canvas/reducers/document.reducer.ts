@@ -57,7 +57,6 @@ import {
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
 import { snapMovement } from "./tools/snap";
-import nid from "./tools/id";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
 import { v4 } from "uuid";
@@ -334,7 +333,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
         return produce(state, (draft) => {
           const net = action.vector_network!;
-          const id = nid();
+          const id = context.idgen.next();
           const black = { r: 0, g: 0, b: 0, a: 1 };
           const node: grida.program.nodes.VectorNode = {
             type: "vector",
@@ -465,7 +464,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             const sub =
               grida.program.nodes.factory.create_packed_scene_document_from_prototype(
                 prototype,
-                nid
+                () => context.idgen.next()
               );
 
             const box = getPackedSubtreeBoundingRect(sub);
@@ -624,7 +623,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         sub =
           grida.program.nodes.factory.create_packed_scene_document_from_prototype(
             prototype,
-            (_, depth) => (depth === 0 ? (id ?? nid()) : nid())
+            (_, depth) =>
+              depth === 0 ? (id ?? context.idgen.next()) : context.idgen.next()
           );
       } else if ("document" in action) {
         sub = action.document;
@@ -1160,7 +1160,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             parent,
             grida.program.nodes.factory.create_packed_scene_document_from_prototype(
               container_prototype,
-              nid
+              () => context.idgen.next()
             )
           )[0];
 
@@ -1202,7 +1202,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           draft,
           target_node_ids,
           "container",
-          context.geometry
+          context
         );
         self_selectNode(draft, "reset", ...insertions);
       });
@@ -1217,7 +1217,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           draft,
           target_node_ids,
           "group",
-          context.geometry
+          context
         );
         self_selectNode(draft, "reset", ...insertions);
       });
@@ -1268,7 +1268,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           draft,
           flattenable,
           op,
-          context.geometry
+          context
         );
         self_selectNode(draft, "reset", ...insertions);
       });
@@ -1871,7 +1871,7 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
     draft,
     group[0]
   ) as grida.program.nodes.VectorNode;
-  const id = nid();
+  const id = context.idgen.next();
   const node: grida.program.nodes.VectorNode = {
     ...base,
     id,

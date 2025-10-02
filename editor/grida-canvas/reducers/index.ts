@@ -9,7 +9,6 @@ import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
-import nid from "./tools/id";
 import { v4 } from "uuid";
 import {
   produceWithHistory as produce,
@@ -17,6 +16,7 @@ import {
 } from "./history/patches";
 
 export type ReducerContext = {
+  idgen: grida.id.INodeIdGenerator<string>;
   geometry: editor.api.IDocumentGeometryQuery;
   vector?: editor.api.IDocumentVectorInterfaceActions | null;
   viewport: {
@@ -119,7 +119,7 @@ export default function reducer<S extends editor.state.IEditorState>(
 
       const next = grida.program.document.init_scene({
         ...origin,
-        id: nid(),
+        id: context.idgen.next(),
         name: origin.name + " copy",
         order: origin.order ? origin.order + 1 : undefined,
         children: [],
@@ -143,7 +143,7 @@ export default function reducer<S extends editor.state.IEditorState>(
           const sub =
             grida.program.nodes.factory.create_packed_scene_document_from_prototype(
               prototype,
-              nid
+              () => context.idgen.next()
             );
           self_insertSubDocument(draft, null, sub);
         }

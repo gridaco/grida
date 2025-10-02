@@ -8,7 +8,6 @@ import { useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
 import cmath from "@grida/cmath";
 import { toast } from "sonner";
-import nid from "../grida-canvas/reducers/tools/id";
 
 /**
  * Hook that provides data transfer event handlers for the Grida canvas editor.
@@ -255,7 +254,7 @@ export function useDataTransferEventTarget() {
               const sub =
                 grida.program.nodes.factory.create_packed_scene_document_from_prototype(
                   p,
-                  nid
+                  instance.doc.useNextNodeId
                 );
               instance.insert({ document: sub });
             });
