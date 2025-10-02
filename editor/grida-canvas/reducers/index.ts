@@ -1,19 +1,14 @@
-import type { Action, InternalAction, EditorAction } from "../action";
-import { produce as immerProduce, type Draft, type Patch } from "immer";
+import type { Action, EditorAction } from "../action";
+import { produce, produceWithPatches, type Draft, type Patch } from "immer";
 import {
   self_update_gesture_transform,
   self_updateSurfaceHoverState,
-  self_insertSubDocument,
 } from "./methods";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
-import { v4 } from "uuid";
-import {
-  produceWithHistory as produce,
-  consumeHistoryPatches,
-} from "./history/patches";
+import { produceWithHistory, consumeHistoryPatches } from "./history/patches";
 
 export type ReducerContext = {
   idgen: grida.id.INodeIdGenerator<string>;
@@ -125,7 +120,8 @@ export default function reducer(
     }
 
     default:
-      return historyExtension(state, action, _reducer(state, action, context));
+      const next = _reducer(state, action, context);
+      return historyExtension(state, action, next);
   }
 }
 
@@ -148,7 +144,7 @@ function historyExtension<S extends editor.state.IEditorState>(
     return next;
   }
 
-  return immerProduce(next, (draft) => {
+  return produce(next, (draft) => {
     const entry = editor.history.entry(action.type, patches, inversePatches);
     const mergableEntry = editor.history.getMergableEntry(
       prev.history.past,
@@ -184,7 +180,7 @@ function _reducer<S extends editor.state.IEditorState>(
   switch (action.type) {
     case "config/surface/raycast-targeting": {
       const { config } = action;
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         if (config.target)
           draft.pointer_hit_testing_config.target = config.target;
         if (config.ignores_locked)
@@ -198,7 +194,7 @@ function _reducer<S extends editor.state.IEditorState>(
     }
     case "config/surface/measurement": {
       const { measurement } = action;
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         switch (measurement) {
           case "on": {
             draft.surface_measurement_targeting = "on";
@@ -216,61 +212,61 @@ function _reducer<S extends editor.state.IEditorState>(
       break;
     }
     case "config/modifiers/translate-with-clone": {
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.translate_with_clone =
           action.translate_with_clone;
         self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/translate-with-axis-lock": {
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.tarnslate_with_axis_lock =
           action.tarnslate_with_axis_lock;
         self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/translate-with-force-disable-snap": {
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.translate_with_force_disable_snap =
           action.translate_with_force_disable_snap;
         self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/transform-with-center-origin": {
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.transform_with_center_origin =
           action.transform_with_center_origin;
         self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/transform-with-preserve-aspect-ratio": {
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.transform_with_preserve_aspect_ratio =
           action.transform_with_preserve_aspect_ratio;
         self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/rotate-with-quantize": {
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.rotate_with_quantize =
           action.rotate_with_quantize;
         self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/curve-tangent-mirroring": {
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.curve_tangent_mirroring =
           action.curve_tangent_mirroring;
       });
     }
     case "config/modifiers/path-keep-projecting": {
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.path_keep_projecting =
           action.path_keep_projecting;
       });
     }
     case "gesture/nudge": {
-      return produce(state, (draft: Draft<S>) => {
+      return produceWithHistory(state, (draft: Draft<S>) => {
         const { state } = action;
         switch (state) {
           case "on": {
