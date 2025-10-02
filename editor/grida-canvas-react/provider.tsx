@@ -102,11 +102,15 @@ export function useNodeActions(node_id: string | undefined) {
       // attributes
       userdata: (value: any) =>
         instance.commands.changeNodeUserData(node_id, value),
-      name: (name: string) => instance.commands.changeNodeName(node_id, name),
-      active: (active: boolean) =>
-        instance.commands.changeNodeActive(node_id, active),
-      locked: (locked: boolean) =>
-        instance.commands.changeNodeLocked(node_id, locked),
+      name: (name: string) => {
+        node.name = name;
+      },
+      active: (active: boolean) => {
+        node.active = active;
+      },
+      locked: (locked: boolean) => {
+        node.locked = locked;
+      },
       src: (src?: tokens.StringValueExpression) =>
         instance.commands.changeNodePropertySrc(node_id, src),
       href: (href?: grida.program.nodes.i.IHrefable["href"]) =>

@@ -2613,9 +2613,6 @@ export namespace editor.api {
     toggleNodeActive(node_id: NodeID): void;
     toggleNodeLocked(node_id: NodeID): void;
 
-    changeNodeActive(node_id: NodeID, active: boolean): void;
-    changeNodeLocked(node_id: NodeID, locked: boolean): void;
-    changeNodeName(node_id: NodeID, name: string): void;
     changeNodeUserData(node_id: NodeID, userdata: unknown): void;
     changeNodeSize(
       node_id: NodeID,

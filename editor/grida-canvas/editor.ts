@@ -1147,13 +1147,13 @@ class EditorDocumentStore
 
   toggleNodeActive(node_id: string) {
     const next = !this.getNodeSnapshotById(node_id).active;
-    this.changeNodeActive(node_id, next);
+    this.getNodeById(node_id).active = next;
     return next;
   }
 
   toggleNodeLocked(node_id: string) {
     const next = !this.getNodeSnapshotById(node_id).locked;
-    this.changeNodeLocked(node_id, next);
+    this.getNodeById(node_id).locked = next;
     return next;
   }
 
@@ -1204,35 +1204,11 @@ class EditorDocumentStore
     });
   }
 
-  changeNodeName(node_id: string, name: string) {
-    this.dispatch({
-      type: "node/change/*",
-      node_id: node_id,
-      name: name ?? "",
-    });
-  }
-
   changeNodeUserData(node_id: string, userdata: unknown) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       userdata: userdata as any,
-    });
-  }
-
-  changeNodeActive(node_id: string, active: boolean) {
-    this.dispatch({
-      type: "node/change/*",
-      node_id: node_id,
-      active: active,
-    });
-  }
-
-  changeNodeLocked(node_id: string, locked: boolean) {
-    this.dispatch({
-      type: "node/change/*",
-      node_id: node_id,
-      locked: locked,
     });
   }
 
@@ -3893,6 +3869,60 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
         }
       },
     }) as T;
+  }
+
+  /**
+   * {@link grida.program.nodes.UnknwonNode#name}
+   */
+  set name(name: string) {
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: this.node_id,
+      name,
+    });
+  }
+
+  /**
+   * {@link grida.program.nodes.UnknwonNode#name}
+   */
+  get name() {
+    return this.$.name;
+  }
+
+  /**
+   * {@link grida.program.nodes.UnknwonNode#active}
+   */
+  set active(active: boolean) {
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: this.node_id,
+      active: active,
+    });
+  }
+
+  /**
+   * {@link grida.program.nodes.UnknwonNode#active}
+   */
+  get active() {
+    return this.$.active;
+  }
+
+  /**
+   * {@link grida.program.nodes.UnknwonNode#locked}
+   */
+  set locked(locked: boolean) {
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: this.node_id,
+      locked,
+    });
+  }
+
+  /**
+   * {@link grida.program.nodes.UnknwonNode#locked}
+   */
+  get locked() {
+    return this.$.locked;
   }
 
   /**

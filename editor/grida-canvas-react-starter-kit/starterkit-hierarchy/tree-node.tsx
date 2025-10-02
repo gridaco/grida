@@ -379,7 +379,7 @@ export function NodeHierarchyList() {
                 editor.surface.surfaceHoverNode(node.id, "leave");
               }}
               onRenameCommit={(name) => {
-                editor.commands.changeNodeName(node.id, name);
+                editor.doc.getNodeById(node.id).name = name;
                 tree.abortRenaming();
               }}
               onToggleLocked={() => {

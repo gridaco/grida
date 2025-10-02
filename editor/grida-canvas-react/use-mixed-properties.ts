@@ -44,10 +44,10 @@ export function useMixedProperties(ids: string[]) {
   const name = useCallback(
     (value: string) => {
       ids.forEach((id) => {
-        instance.commands.changeNodeName(id, value);
+        instance.doc.getNodeById(id).name = value;
       });
     },
-    [ids, instance.commands]
+    [ids, instance]
   );
 
   const copy = useCallback(() => {
@@ -57,19 +57,19 @@ export function useMixedProperties(ids: string[]) {
   const active = useCallback(
     (value: boolean) => {
       ids.forEach((id) => {
-        instance.commands.changeNodeActive(id, value);
+        instance.doc.getNodeById(id).active = value;
       });
     },
-    [ids, instance.commands]
+    [ids, instance]
   );
 
   const locked = useCallback(
     (value: boolean) => {
       ids.forEach((id) => {
-        instance.commands.changeNodeLocked(id, value);
+        instance.doc.getNodeById(id).locked = value;
       });
     },
-    [ids, instance.commands]
+    [ids, instance]
   );
 
   const rotation = useCallback(

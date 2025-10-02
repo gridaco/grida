@@ -1949,6 +1949,7 @@ export namespace grida.program.nodes {
   export interface GroupNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.IBlend,
       i.IChildrenReference,
       i.IExpandable,
       i.IPositioning {
@@ -1964,6 +1965,7 @@ export namespace grida.program.nodes {
   export interface BooleanPathOperationNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.IBlend,
       i.IChildrenReference,
       i.IExpandable,
       i.IRotation,
@@ -2374,6 +2376,7 @@ export namespace grida.program.nodes {
   export interface InstanceNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.IBlend,
       i.IPositioning,
       // i.ICSSStylable,
       i.IHrefable,
@@ -2400,9 +2403,9 @@ export namespace grida.program.nodes {
    */
   export interface TemplateInstanceNode
     extends i.IBaseNode,
+      i.ISceneNode,
       i.IHrefable,
       i.IMouseCursor,
-      i.ISceneNode,
       i.IPositioning,
       i.ICSSDimension,
       i.IProperties,

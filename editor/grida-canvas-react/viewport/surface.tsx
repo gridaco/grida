@@ -733,7 +733,7 @@ function NodeTitleBarTitle({
   const commit = () => {
     const name = value.trim();
     if (name && name !== node.name) {
-      editor.commands.changeNodeName(node.id, name);
+      editor.doc.getNodeById(node.id).name = name;
     }
     setEditing(false);
   };
