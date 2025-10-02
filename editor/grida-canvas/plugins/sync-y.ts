@@ -1,12 +1,13 @@
 import * as Y from "yjs";
+import { editor } from "..";
 import { WebsocketProvider } from "y-websocket";
 import type { Awareness } from "y-protocols/awareness";
 import type { Editor, EditorDocumentStore } from "../editor";
-import { type Action, editor } from "..";
 import type cmath from "@grida/cmath";
-import { dq } from "../query";
-import equal from "fast-deep-equal";
 import type grida from "@grida/schema";
+import type { Patch } from "immer";
+import { YPatchBinder } from "./sync-y-patches";
+import equal from "fast-deep-equal";
 
 type AwarenessPayload = {
   /**
@@ -71,6 +72,8 @@ class DocumentSyncManager {
   private readonly ymap_nodes: Y.Map<grida.program.nodes.Node>;
   private readonly ymap_scenes: Y.Map<grida.program.document.Scene>;
   private throttle_ms: number = 30;
+  private readonly nodesBinder: YPatchBinder<Record<string, any>>;
+  private readonly scenesBinder: YPatchBinder<Record<string, any>>;
 
   /**
    * Unique origin identifier for this client's transactions
@@ -85,11 +88,29 @@ class DocumentSyncManager {
   private rc: number = 0;
   constructor(
     private readonly _editor: Editor,
-    private readonly _doc: Y.Doc
+    doc: Y.Doc
   ) {
-    this.ymap_nodes = _doc.getMap("nodes");
-    this.ymap_scenes = _doc.getMap("scenes");
+    this.ymap_nodes = doc.getMap("nodes");
+    this.ymap_scenes = doc.getMap("scenes");
 
+    const initialNodes = this.ymap_nodes.toJSON() as Record<string, any>;
+    const initialScenes = this.ymap_scenes.toJSON() as Record<string, any>;
+
+    this.nodesBinder = new YPatchBinder(
+      this.ymap_nodes,
+      initialNodes,
+      this.origin,
+      (patches) => this._handleRemoteNodePatches(patches)
+    );
+
+    this.scenesBinder = new YPatchBinder(
+      this.ymap_scenes,
+      initialScenes,
+      this.origin,
+      (patches) => this._handleRemoteScenePatches(patches)
+    );
+
+    this._initializeStateFromSources();
     this._setupDocumentSync();
   }
 
@@ -101,99 +122,177 @@ class DocumentSyncManager {
         (
           editorStore: EditorDocumentStore,
           next: grida.program.document.Document,
-          prev: grida.program.document.Document
+          prev: grida.program.document.Document,
+          _action,
+          patches = []
         ) => {
           if (editorStore.locked) return;
           if (this.rc === editorStore.tid) return;
           this.rc = editorStore.tid;
 
-          // Use mutex to prevent feedback loops
+          const { nodes, scenes } = extractDocumentPatches(patches);
+
+          if (nodes.length === 0 && scenes.length === 0) {
+            return;
+          }
+
           this.mutex(() => {
-            this._doc.transact(() => {
-              Object.entries(next.nodes).forEach(([key, node]) => {
-                this.ymap_nodes.set(key, node);
-              });
-
-              Object.entries(next.scenes).forEach(([key, scene]) => {
-                this.ymap_scenes.set(key, scene);
-              });
-              // this.ymap.set("properties", next.properties);
-
-              // console.log("sync:up (local)");
-            }, this.origin); // Use this client's origin identifier
+            if (nodes.length) {
+              this.nodesBinder.applyLocalPatches(nodes);
+            }
+            if (scenes.length) {
+              this.scenesBinder.applyLocalPatches(scenes);
+            }
           });
         },
         this.throttle_ms,
         { trailing: true }
       )
     );
-
-    // Sync document state from Y.Doc to Editor
-    this.ymap_nodes.observe((event) => {
-      // Filter out local transactions and transactions that originated from this client
-      if (event.transaction.local) return;
-      if (event.transaction.origin === this.origin) return;
-
-      // console.log("sync:down", event.transaction.local);
-      const changes = event.changes.keys;
-      const updates: Record<string, grida.program.nodes.Node> =
-        Object.fromEntries(
-          Array.from(changes.entries())
-            .filter(
-              ([_, change]) =>
-                change.action === "add" || change.action === "update"
-            )
-            .map(([key]) => [key, this.ymap_nodes.get(key)!])
-        );
-
-      if (Object.keys(updates).length > 0) {
-        // Use mutex to prevent feedback loops - the applyEdits will trigger
-        // our subscription, but the mutex will prevent it from syncing back to Y.js
-        this.mutex(
-          () => {
-            this._editor.doc.applyEdits({ nodes: updates });
-          },
-          () => {
-            console.log("sync:down skipped (mutex locked)");
-          }
-        );
-      }
-    });
-
-    // Also observe scenes changes
-    this.ymap_scenes.observe((event) => {
-      // Filter out local transactions and transactions that originated from this client
-      if (event.transaction.local) return;
-      if (event.transaction.origin === this.origin) return;
-
-      const changes = event.changes.keys;
-      const updates: Record<string, grida.program.document.Scene> =
-        Object.fromEntries(
-          Array.from(changes.entries())
-            .filter(
-              ([_, change]) =>
-                change.action === "add" || change.action === "update"
-            )
-            .map(([key]) => [key, this.ymap_scenes.get(key)!])
-        );
-
-      if (Object.keys(updates).length > 0) {
-        // Use mutex to prevent feedback loops
-        this.mutex(
-          () => {
-            this._editor.doc.applyEdits({ scenes: updates });
-          },
-          () => {
-            console.log("sync:down skipped (mutex locked)");
-          }
-        );
-      }
-    });
   }
 
   public destroy() {
+    this.nodesBinder.destroy();
+    this.scenesBinder.destroy();
     this.__unsubscribe_document_change();
   }
+
+  private _initializeStateFromSources() {
+    const localDocument = this._editor.doc.state.document;
+    const remoteNodes = this.nodesBinder.getSnapshot();
+    const remoteScenes = this.scenesBinder.getSnapshot();
+
+    const hasRemoteNodes = Object.keys(remoteNodes ?? {}).length > 0;
+    const hasRemoteScenes = Object.keys(remoteScenes ?? {}).length > 0;
+
+    if (this.ymap_nodes.size === 0 && Object.keys(localDocument.nodes).length) {
+      this.nodesBinder.applyLocalPatches([
+        {
+          op: "replace",
+          path: [],
+          value: localDocument.nodes,
+        },
+      ]);
+    } else if (hasRemoteNodes) {
+      this.mutex(() => {
+        this._editor.doc.applyDocumentPatches([
+          {
+            op: "replace",
+            path: ["document", "nodes"],
+            value: remoteNodes,
+          },
+        ]);
+      });
+    }
+
+    if (
+      this.ymap_scenes.size === 0 &&
+      Object.keys(localDocument.scenes).length
+    ) {
+      this.scenesBinder.applyLocalPatches([
+        {
+          op: "replace",
+          path: [],
+          value: localDocument.scenes,
+        },
+      ]);
+    } else if (hasRemoteScenes) {
+      this.mutex(() => {
+        this._editor.doc.applyDocumentPatches([
+          {
+            op: "replace",
+            path: ["document", "scenes"],
+            value: remoteScenes,
+          },
+        ]);
+      });
+    }
+  }
+
+  private _handleRemoteNodePatches(patches: Patch[]) {
+    if (!patches.length) {
+      return;
+    }
+
+    const prefixed = patches.map((patch) => ({
+      ...patch,
+      path: ["document", "nodes", ...patch.path],
+    }));
+
+    this.mutex(
+      () => {
+        this._editor.doc.applyDocumentPatches(prefixed);
+      },
+      () => {
+        console.log("sync:down skipped (mutex locked)");
+      }
+    );
+  }
+
+  private _handleRemoteScenePatches(patches: Patch[]) {
+    if (!patches.length) {
+      return;
+    }
+
+    const prefixed = patches.map((patch) => ({
+      ...patch,
+      path: ["document", "scenes", ...patch.path],
+    }));
+
+    this.mutex(
+      () => {
+        this._editor.doc.applyDocumentPatches(prefixed);
+      },
+      () => {
+        console.log("sync:down skipped (mutex locked)");
+      }
+    );
+  }
+}
+
+export function extractDocumentPatches(patches: Patch[]) {
+  const nodes: Patch[] = [];
+  const scenes: Patch[] = [];
+
+  for (const patch of patches) {
+    if (patch.path[0] !== "document") {
+      continue;
+    }
+
+    if (patch.path.length === 1) {
+      const value = patch.value as grida.program.document.Document | undefined;
+      if (value?.nodes) {
+        nodes.push({
+          ...patch,
+          path: [],
+          value: value.nodes,
+        });
+      }
+      if (value?.scenes) {
+        scenes.push({
+          ...patch,
+          path: [],
+          value: value.scenes,
+        });
+      }
+      continue;
+    }
+
+    const [, key, ...rest] = patch.path;
+    if (key === "nodes") {
+      nodes.push({
+        ...patch,
+        path: rest,
+      });
+    } else if (key === "scenes") {
+      scenes.push({
+        ...patch,
+        path: rest,
+      });
+    }
+  }
+
+  return { nodes, scenes };
 }
 
 // Internal class for managing awareness/cursor synchronization

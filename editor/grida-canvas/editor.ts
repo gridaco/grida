@@ -1,4 +1,4 @@
-import produce from "immer";
+import { produce, applyPatches } from "immer";
 import { editor, type Action } from ".";
 import reducer, { type ReducerContext } from "./reducers";
 
@@ -397,30 +397,21 @@ class EditorDocumentStore
     return this.mstate.transform;
   }
 
-  /**
-   * Edit the model without adding the edits to the undo stack or triggering history.
-   * This can have dire consequences on the undo stack!
-   *
-   * @remarks
-   * This is intended for external sync plugins (like Y.js) to apply remote changes
-   * without polluting the local undo/redo history.
-   *
-   * TODO: refactor to use patches - applyPatches / onPatch
-   */
-  public applyEdits(updates: {
-    nodes?: Record<editor.NodeID, grida.program.nodes.Node>;
-    scenes?: Record<string, grida.program.document.Scene>;
-  }) {
+  public applyDocumentPatches(patches: editor.history.Patch[]) {
+    if (!patches.length) {
+      return;
+    }
+
+    const shouldRecomputeDocumentCtx = patches.some(
+      (patch) => patch.path[0] === "document"
+    );
+
     this.apply((draft) => {
-      for (const [node_id, next] of Object.entries(updates.nodes ?? {})) {
-        draft.document.nodes[node_id] = next;
-      }
+      applyPatches(draft, patches);
 
-      for (const [scene_id, next] of Object.entries(updates.scenes ?? {})) {
-        draft.document.scenes[scene_id] = next;
+      if (shouldRecomputeDocumentCtx) {
+        draft.document_ctx = dq.Context.from(draft.document);
       }
-
-      draft.document_ctx = dq.Context.from(draft.document);
     });
   }
 
