@@ -14,9 +14,7 @@ export type Action =
   | EditorRedoAction
   | EditorClipAction;
 
-export type InternalAction =
-  | __InternalResetAction
-  | __InternalWebfontListLoadAction;
+export type InternalAction = __InternalWebfontListLoadAction;
 
 export type EditorAction =
   | EditorConfigAction
@@ -169,12 +167,6 @@ export type TCanvasEventTargetDragGestureState = {
 
 interface ISelection {
   selection: NodeID[];
-}
-
-export interface __InternalResetAction {
-  type: "__internal/reset";
-  key?: string;
-  state: editor.state.IEditorState;
 }
 
 /**

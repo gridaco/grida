@@ -44,7 +44,6 @@ export default function reducer<S extends editor.state.IEditorState>(
   }
 
   switch (action.type) {
-    case "__internal/reset":
     case "__internal/webfonts#webfontList": {
       return _internal_reducer(state, action);
     }
@@ -225,15 +224,6 @@ export function _internal_reducer<S extends editor.state.IEditorState>(
   action: InternalAction
 ): S {
   switch (action.type) {
-    case "__internal/reset": {
-      const { state: _new_state, key } = action;
-      const prev_state = state;
-      return produce(_new_state, (draft) => {
-        if (key) draft.document_key = key;
-        // preserve the transform state
-        draft.transform = prev_state.transform;
-      }) as S;
-    }
     case "__internal/webfonts#webfontList": {
       const { webfontlist } = action;
       return produce(state, (draft: Draft<S>) => {

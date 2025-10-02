@@ -387,26 +387,6 @@ class EditorDocumentStore
     return this.mstate.transform;
   }
 
-  public reset(
-    state: editor.state.IEditorState,
-    key: string | undefined = undefined,
-    force: boolean = false
-  ): number {
-    this.__internal_dispatch(
-      {
-        type: "__internal/reset",
-        key,
-        state,
-      },
-      force
-    );
-    return this._tid;
-  }
-
-  private log(...args: any[]) {
-    this.logger?.(...args);
-  }
-
   /**
    * Edit the model without adding the edits to the undo stack or triggering history.
    * This can have dire consequences on the undo stack!
@@ -432,26 +412,6 @@ class EditorDocumentStore
 
       draft.document_ctx = dq.Context.from(draft.document);
     });
-  }
-
-  public insert(
-    payload:
-      | {
-          id?: string;
-          prototype: grida.program.nodes.NodePrototype;
-        }
-      | {
-          document: grida.program.document.IPackedSceneDocument;
-        }
-  ) {
-    this.dispatch({
-      type: "insert",
-      ...payload,
-    });
-  }
-
-  public __get_node_siblings(node_id: string): string[] {
-    return dq.getSiblings(this.mstate.document_ctx, node_id);
   }
 
   /**
@@ -547,6 +507,45 @@ class EditorDocumentStore
   }
 
   // #region IDocumentEditorActions implementation
+  public reset(
+    state: editor.state.IEditorState,
+    key: string | undefined = undefined,
+    force: boolean = false
+  ): number {
+    if (this._locked && !force) return this._tid;
+
+    const __prev_state = this.mstate;
+    const __prev_transform = __prev_state.transform;
+    this.mstate = produce(state, (draft) => {
+      if (key) draft.document_key = key;
+      // preserve the transform state
+      draft.transform = __prev_transform;
+    });
+    this._tid = 0;
+    this.listeners.forEach((l) => l?.(this));
+    return this._tid;
+  }
+
+  private log(...args: any[]) {
+    this.logger?.(...args);
+  }
+
+  public insert(
+    payload:
+      | {
+          id?: string;
+          prototype: grida.program.nodes.NodePrototype;
+        }
+      | {
+          document: grida.program.document.IPackedSceneDocument;
+        }
+  ) {
+    this.dispatch({
+      type: "insert",
+      ...payload,
+    });
+  }
+
   public loadScene(scene_id: string) {
     this.dispatch({
       type: "load",
@@ -1978,6 +1977,11 @@ export class Editor
   private readonly listeners: Set<(editor: this, action?: Action) => void> =
     new Set();
   private readonly logger: (...args: any[]) => void;
+
+  /**
+   * [main camera]
+   * grida currently implements single camera system.
+   */
   readonly camera: Camera;
   readonly surface: EditorSurface;
   readonly backend: editor.EditorContentRenderingBackend;
@@ -2142,6 +2146,40 @@ export class Editor
     if (this.debug || process.env.NODE_ENV === "development") {
       this.logger?.(...args);
     }
+  }
+
+  public subscribe(fn: (editor: this, action?: Action) => void) {
+    // TODO: we can have a single subscription to the document and use that.
+    // Subscribe to the document store changes
+    return this.doc.subscribe((doc, action) => {
+      // Forward the document store changes to our listeners
+      fn(this, action);
+    });
+  }
+
+  public archive(): Blob {
+    const documentData = {
+      version: "0.0.1-beta.1+20250728",
+      document: this.getSnapshot().document,
+    } satisfies io.JSONDocumentFileModel;
+
+    const blob = new Blob([io.archive.pack(documentData) as BlobPart], {
+      type: "application/zip",
+    });
+
+    return blob;
+  }
+
+  public getSnapshot(): Readonly<editor.state.IEditorState> {
+    return this.doc.state;
+  }
+
+  public getJson(): unknown {
+    return JSON.parse(JSON.stringify(this.doc.state));
+  }
+
+  public getDocumentJson(): unknown {
+    return JSON.parse(JSON.stringify(this.doc.state.document));
   }
 
   private __bind_wasm_surface(surface: Scene) {
@@ -2326,40 +2364,6 @@ export class Editor
         }
       );
     });
-  }
-
-  public subscribe(fn: (editor: this, action?: Action) => void) {
-    // TODO: we can have a single subscription to the document and use that.
-    // Subscribe to the document store changes
-    return this.doc.subscribe((doc, action) => {
-      // Forward the document store changes to our listeners
-      fn(this, action);
-    });
-  }
-
-  public archive(): Blob {
-    const documentData = {
-      version: "0.0.1-beta.1+20250728",
-      document: this.getSnapshot().document,
-    } satisfies io.JSONDocumentFileModel;
-
-    const blob = new Blob([io.archive.pack(documentData) as BlobPart], {
-      type: "application/zip",
-    });
-
-    return blob;
-  }
-
-  public getSnapshot(): Readonly<editor.state.IEditorState> {
-    return this.doc.state;
-  }
-
-  public getJson(): unknown {
-    return JSON.parse(JSON.stringify(this.doc.state));
-  }
-
-  public getDocumentJson(): unknown {
-    return JSON.parse(JSON.stringify(this.doc.state.document));
   }
 
   // ================================================================
