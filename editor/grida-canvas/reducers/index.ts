@@ -72,99 +72,6 @@ export default function reducer(
         Object.assign(draft, editor.state.__RESET_SCENE_STATE);
       });
     }
-    case "scenes/new": {
-      const { scene } = action;
-      const new_scene = grida.program.document.init_scene(
-        scene ?? {
-          id: v4(),
-          name: `Scene ${Object.keys(state.document.scenes).length + 1}`,
-          order: Object.keys(state.document.scenes).length,
-        }
-      );
-
-      const scene_id = new_scene.id;
-      // check if the scene id does not conflict
-      if (state.document.scenes[scene_id]) {
-        console.error(`Scene id ${scene_id} already exists`);
-        return state;
-      }
-
-      return produce(state, (draft) => {
-        // 0. add the new scene
-        draft.document.scenes[new_scene.id] = new_scene;
-        // 1. change the scene_id
-        draft.scene_id = new_scene.id;
-        // 2. clear scene-specific state
-        Object.assign(draft, editor.state.__RESET_SCENE_STATE);
-      });
-    }
-    case "scenes/delete": {
-      const { scene } = action;
-      return produce(state, (draft) => {
-        // 0. remove the scene
-        delete draft.document.scenes[scene];
-        // 1. change the scene_id
-        if (draft.scene_id === scene) {
-          draft.scene_id = Object.keys(draft.document.scenes)[0];
-        }
-        if (draft.document.entry_scene_id === scene) {
-          draft.document.entry_scene_id = draft.scene_id;
-        }
-        // 2. clear scene-specific state
-        Object.assign(draft, editor.state.__RESET_SCENE_STATE);
-      });
-    }
-    case "scenes/duplicate": {
-      const { scene: scene_id } = action;
-
-      // check if the scene exists
-      const origin = state.document.scenes[scene_id];
-      if (!origin) return state;
-
-      const next = grida.program.document.init_scene({
-        ...origin,
-        id: context.idgen.next(),
-        name: origin.name + " copy",
-        order: origin.order ? origin.order + 1 : undefined,
-        children: [],
-      });
-
-      return produce(state, (draft) => {
-        // 0. add the new scene
-        draft.document.scenes[next.id] = next;
-        // 1. change the scene_id to the new scene
-        draft.scene_id = next.id;
-        // 2. clear scene-specific state
-        Object.assign(draft, editor.state.__RESET_SCENE_STATE);
-
-        // 3. clone nodes recursively
-        for (const child_id of origin.children) {
-          const prototype =
-            grida.program.nodes.factory.createPrototypeFromSnapshot(
-              state.document,
-              child_id
-            );
-          const sub =
-            grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-              prototype,
-              () => context.idgen.next()
-            );
-          self_insertSubDocument(draft, null, sub);
-        }
-      });
-    }
-    case "scenes/change/name": {
-      const { scene, name } = action;
-      return produce(state, (draft) => {
-        draft.document.scenes[scene].name = name;
-      });
-    }
-    case "scenes/change/background-color": {
-      const { scene } = action;
-      return produce(state, (draft) => {
-        draft.document.scenes[scene].backgroundColor = action.backgroundColor;
-      });
-    }
     case "transform": {
       const { transform, sync } = action;
       return produce(state, (draft) => {
@@ -216,6 +123,7 @@ export default function reducer(
         draft.brush_color = action.color;
       });
     }
+
     default:
       return historyExtension(state, action, _reducer(state, action, context));
   }
