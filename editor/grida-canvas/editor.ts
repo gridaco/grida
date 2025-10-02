@@ -1288,17 +1288,6 @@ class EditorDocumentStore
     });
   }
 
-  changeNodePropertyBlendMode(
-    node_id: editor.NodeID,
-    blendMode: cg.LayerBlendMode
-  ): void {
-    this.dispatch({
-      type: "node/change/*",
-      node_id: node_id,
-      blendMode,
-    });
-  }
-
   changeNodePropertyMaskType(node_id: string, mask: cg.LayerMaskType) {
     this.dispatch({
       type: "node/change/*",
@@ -3964,6 +3953,17 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
       type: "node/change/*",
       node_id: this.node_id,
       opacity: value,
+    });
+  }
+
+  /**
+   * {@link grida.program.nodes.UnknwonNode#blendMode}
+   */
+  set blendMode(blendMode: cg.LayerBlendMode) {
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: this.node_id,
+      blendMode,
     });
   }
 }

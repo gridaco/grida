@@ -151,8 +151,9 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyFit(node_id, value),
       // stylable
       opacity: (change: editor.api.NumberChange) => node.changeOpacity(change),
-      blendMode: (value: cg.LayerBlendMode) =>
-        instance.commands.changeNodePropertyBlendMode(node_id, value),
+      blendMode: (value: cg.LayerBlendMode) => {
+        node.blendMode = value;
+      },
       maskType: (value: cg.LayerMaskType) =>
         instance.commands.changeNodePropertyMaskType(node_id, value),
       rotation: node.changeRotation,

@@ -2695,10 +2695,6 @@ export namespace editor.api {
       strokeAlign: cg.StrokeAlign
     ): void;
     changeNodePropertyFit(node_id: NodeID, fit: cg.BoxFit): void;
-    changeNodePropertyBlendMode(
-      node_id: NodeID,
-      blendMode: cg.LayerBlendMode
-    ): void;
     changeNodePropertyMaskType(
       node_id: NodeID,
       maskType: cg.LayerMaskType
