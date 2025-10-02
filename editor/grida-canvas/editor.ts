@@ -445,6 +445,7 @@ class EditorDocumentStore
         stroke: this.backend === "dom" ? "stroke" : "strokes",
       },
       idgen: this.idgen,
+      logger: this.log,
     };
 
     if (Array.isArray(action)) {

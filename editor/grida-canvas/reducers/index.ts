@@ -19,6 +19,7 @@ export type ReducerContext = {
   idgen: grida.id.INodeIdGenerator<string>;
   geometry: editor.api.IDocumentGeometryQuery;
   vector?: editor.api.IDocumentVectorInterfaceActions | null;
+  logger?: (...args: any[]) => void;
   viewport: {
     width: number;
     height: number;
@@ -41,7 +42,7 @@ export default function reducer(
       action.type === "event-target/event/on-drag"
     )
   ) {
-    console.debug("debug:action", action.type, action);
+    context.logger?.("debug:action", action.type, action);
   }
 
   switch (action.type) {
