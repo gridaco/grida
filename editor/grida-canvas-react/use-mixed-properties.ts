@@ -75,7 +75,7 @@ export function useMixedProperties(ids: string[]) {
   const rotation = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.rotation?.ids.forEach((id) => {
-        instance.commands.changeNodePropertyRotation(id, change);
+        instance.doc.getNodeById(id)?.changeRotation(change);
       });
     },
     [mixedProperties.rotation?.ids, instance.commands]

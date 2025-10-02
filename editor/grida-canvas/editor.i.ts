@@ -2707,10 +2707,6 @@ export namespace editor.api {
       node_id: NodeID,
       maskType: cg.LayerMaskType
     ): void;
-    changeNodePropertyRotation(
-      node_id: NodeID,
-      rotation: editor.api.NumberChange
-    ): void;
 
     addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
     addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;

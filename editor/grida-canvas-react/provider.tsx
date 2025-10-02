@@ -80,6 +80,7 @@ export function useNodeActions(node_id: string | undefined) {
 
   return useMemo(() => {
     if (!node_id) return;
+    const node = instance.doc.getNodeById(node_id);
     return {
       toggleLocked: () => instance.commands.toggleNodeLocked(node_id),
       toggleActive: () => instance.commands.toggleNodeActive(node_id),
@@ -155,8 +156,7 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyBlendMode(node_id, value),
       maskType: (value: cg.LayerMaskType) =>
         instance.commands.changeNodePropertyMaskType(node_id, value),
-      rotation: (change: editor.api.NumberChange) =>
-        instance.commands.changeNodePropertyRotation(node_id, change),
+      rotation: node.changeRotation,
       width: (value: grida.program.css.LengthPercentage | "auto") =>
         instance.commands.changeNodeSize(node_id, "width", value),
       height: (value: grida.program.css.LengthPercentage | "auto") =>

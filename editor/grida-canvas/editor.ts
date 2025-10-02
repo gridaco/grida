@@ -1326,27 +1326,6 @@ class EditorDocumentStore
     });
   }
 
-  changeNodePropertyRotation(
-    node_id: string,
-    rotation: editor.api.NumberChange
-  ) {
-    try {
-      const value = resolveNumberChangeValue(
-        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-        "rotation",
-        rotation
-      );
-
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        rotation: value,
-      });
-    } catch (e) {
-      reportError(e);
-      return;
-    }
-  }
   changeNodeSize(
     node_id: string,
     axis: "width" | "height",
@@ -3954,5 +3933,28 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
         }
       },
     }) as T;
+  }
+
+  set rotation(rotation: number) {
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: this.node_id,
+      rotation,
+    });
+  }
+
+  public changeRotation(change: editor.api.NumberChange) {
+    const value = resolveNumberChangeValue(
+      this.doc.getNodeSnapshotById(
+        this.node_id
+      ) as grida.program.nodes.UnknwonNode,
+      "rotation",
+      change
+    );
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: this.node_id,
+      rotation: value,
+    });
   }
 }
