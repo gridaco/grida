@@ -1,4 +1,4 @@
-import { produce as immerProduce, enablePatches, type Patch } from "immer";
+import { produce, enablePatches, type Patch } from "immer";
 
 enablePatches();
 
@@ -7,9 +7,10 @@ export type HistoryPatchEntry = {
   inversePatches: Patch[];
 };
 
+// FIXME: refactor - remove global
 const historyPatchMap = new WeakMap<object, HistoryPatchEntry>();
 
-export const produceWithHistory: typeof immerProduce = ((
+export const produceWithHistory: typeof produce = ((
   state: any,
   recipe: any,
   listener?: any
@@ -17,7 +18,7 @@ export const produceWithHistory: typeof immerProduce = ((
   let generatedPatches: Patch[] | undefined;
   let generatedInversePatches: Patch[] | undefined;
 
-  const next = immerProduce(
+  const next = produce(
     state,
     recipe,
     (patches: Patch[], inversePatches: Patch[]) => {
@@ -42,7 +43,7 @@ export const produceWithHistory: typeof immerProduce = ((
   }
 
   return next;
-}) as typeof immerProduce;
+}) as typeof produce;
 
 export function consumeHistoryPatches(
   state: unknown

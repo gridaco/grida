@@ -1,5 +1,5 @@
 import type { Action, InternalAction, EditorAction } from "../action";
-import { produce as immerProduce, type Draft } from "immer";
+import { produce as immerProduce, type Draft, type Patch } from "immer";
 import {
   self_update_gesture_transform,
   self_updateSurfaceHoverState,
@@ -27,11 +27,12 @@ export type ReducerContext = {
   paint_constraints: editor.config.IEditorRenderingConfig["paint_constraints"];
 };
 
-export default function reducer<S extends editor.state.IEditorState>(
-  state: S,
+export default function reducer(
+  state: editor.state.IEditorState,
   action: Action,
   context: ReducerContext
-): S {
+): editor.state.IEditorState {
+  // [editor.state.IEditorState, Patch[]]
   if (
     state.debug &&
     !(
@@ -45,7 +46,10 @@ export default function reducer<S extends editor.state.IEditorState>(
 
   switch (action.type) {
     case "__internal/webfonts#webfontList": {
-      return _internal_reducer(state, action);
+      const { webfontlist } = action;
+      return produce(state, (draft) => {
+        draft.webfontlist = webfontlist;
+      });
     }
     case "load": {
       const { scene } = action;
@@ -60,7 +64,7 @@ export default function reducer<S extends editor.state.IEditorState>(
         return state;
       }
 
-      return produce(state, (draft: Draft<S>) => {
+      return produce(state, (draft) => {
         // 1. change the scene_id
         draft.scene_id = scene;
         // 2. clear scene-specific state
@@ -84,7 +88,7 @@ export default function reducer<S extends editor.state.IEditorState>(
         return state;
       }
 
-      return produce(state, (draft: Draft<S>) => {
+      return produce(state, (draft) => {
         // 0. add the new scene
         draft.document.scenes[new_scene.id] = new_scene;
         // 1. change the scene_id
@@ -95,7 +99,7 @@ export default function reducer<S extends editor.state.IEditorState>(
     }
     case "scenes/delete": {
       const { scene } = action;
-      return produce(state, (draft: Draft<S>) => {
+      return produce(state, (draft) => {
         // 0. remove the scene
         delete draft.document.scenes[scene];
         // 1. change the scene_id
@@ -124,7 +128,7 @@ export default function reducer<S extends editor.state.IEditorState>(
         children: [],
       });
 
-      return produce(state, (draft: Draft<S>) => {
+      return produce(state, (draft) => {
         // 0. add the new scene
         draft.document.scenes[next.id] = next;
         // 1. change the scene_id to the new scene
@@ -150,19 +154,19 @@ export default function reducer<S extends editor.state.IEditorState>(
     }
     case "scenes/change/name": {
       const { scene, name } = action;
-      return produce(state, (draft: Draft<S>) => {
+      return produce(state, (draft) => {
         draft.document.scenes[scene].name = name;
       });
     }
     case "scenes/change/background-color": {
       const { scene } = action;
-      return produce(state, (draft: Draft<S>) => {
+      return produce(state, (draft) => {
         draft.document.scenes[scene].backgroundColor = action.backgroundColor;
       });
     }
     case "transform": {
       const { transform, sync } = action;
-      return produce(state, (draft: Draft<S>) => {
+      return produce(state, (draft) => {
         // set the transform
         draft.transform = transform;
 
@@ -206,30 +210,13 @@ export default function reducer<S extends editor.state.IEditorState>(
         });
       }
     case "clip/color": {
-      return produce(state, (draft: Draft<S>) => {
+      return produce(state, (draft) => {
         draft.user_clipboard_color = action.color;
         draft.brush_color = action.color;
       });
     }
     default:
       return historyExtension(state, action, _reducer(state, action, context));
-  }
-}
-
-/**
- * reducer for internal state changes, that does not rely on context
- */
-export function _internal_reducer<S extends editor.state.IEditorState>(
-  state: S,
-  action: InternalAction
-): S {
-  switch (action.type) {
-    case "__internal/webfonts#webfontList": {
-      const { webfontlist } = action;
-      return produce(state, (draft: Draft<S>) => {
-        draft.webfontlist = webfontlist;
-      });
-    }
   }
 }
 

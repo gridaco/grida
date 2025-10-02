@@ -1,6 +1,6 @@
-import produce from "immer";
+import produce, { Patch } from "immer";
 import { Action, editor } from ".";
-import reducer, { _internal_reducer } from "./reducers";
+import reducer, { type ReducerContext } from "./reducers";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import cg from "@grida/cg";
@@ -322,7 +322,21 @@ class EditorDocumentStore
     return this.mstate;
   }
 
+  /**
+   * If the editor is locked, no actions will be dispatched. (unless forced)
+   */
   private _locked: boolean = false;
+
+  /**
+   * If the editor is locked, no actions will be dispatched. (unless forced)
+   */
+  get locked() {
+    return this._locked;
+  }
+
+  set locked(value: boolean) {
+    this._locked = value;
+  }
 
   /**
    * @deprecated this is event target dependency - will be removed
@@ -372,17 +386,6 @@ class EditorDocumentStore
     return this._tid;
   }
 
-  /**
-   * If the editor is locked, no actions will be dispatched. (unless forced)
-   */
-  get locked() {
-    return this._locked;
-  }
-
-  set locked(value: boolean) {
-    this._locked = value;
-  }
-
   get transform() {
     return this.mstate.transform;
   }
@@ -428,17 +431,10 @@ class EditorDocumentStore
     this.listeners.forEach((l) => l?.(this));
   }
 
-  public __internal_dispatch(action: InternalAction, force: boolean = false) {
+  public dispatch(action: Action | Action[], force: boolean = false) {
     if (this._locked && !force) return;
-    this.mstate = _internal_reducer(this.mstate, action);
 
-    this._tid++;
-    this.listeners.forEach((l) => l(this, action));
-  }
-
-  public dispatch(action: Action, force: boolean = false) {
-    if (this._locked && !force) return;
-    this.mstate = reducer(this.mstate, action, {
+    const context: ReducerContext = {
       geometry: this.geometry,
       vector: this.vector,
       viewport: this.viewportSize,
@@ -449,35 +445,30 @@ class EditorDocumentStore
         stroke: this.backend === "dom" ? "stroke" : "strokes",
       },
       idgen: this.idgen,
-    });
-    this._tid++;
-    this.listeners.forEach((l) => l(this, action));
-  }
+    };
 
-  public dispatchAll(actions: Action[], force: boolean = false) {
-    if (this._locked && !force) return;
-    this.mstate = actions.reduce(
-      (state, action) =>
-        reducer(state, action, {
-          geometry: this.geometry,
-          vector: this.vector,
-          viewport: this.viewportSize,
-          backend: this.backend,
-          // TODO: LEGACY_PAINT_MODEL
-          paint_constraints: {
-            fill: this.backend === "dom" ? "fill" : "fills",
-            stroke: this.backend === "dom" ? "stroke" : "strokes",
-          },
-          idgen: this.idgen,
-        }),
-      this.mstate
-    );
+    if (Array.isArray(action)) {
+      this.mstate = action.reduce(
+        (state, action) => reducer(state, action, context),
+        this.mstate
+      );
+    } else {
+      this.mstate = reducer(this.mstate, action, context);
+    }
+
     this._tid++;
-    if (actions.length) {
-      this.listeners.forEach((l) => l(this, actions[actions.length - 1]));
+
+    if (Array.isArray(action)) {
+      this.listeners.forEach((l) => l(this, action[action.length - 1]));
+    } else {
+      this.listeners.forEach((l) => l(this, action));
     }
   }
 
+  /**
+   * subscribe to the document state changes
+   * @returns unsubscribe function
+   */
   public subscribe(fn: (editor: this, action?: Action) => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -485,7 +476,7 @@ class EditorDocumentStore
 
   public subscribeWithSelector<T>(
     selector: (state: editor.state.IEditorState) => T,
-    listener: (editor: this, selected: T, previous: T, action?: Action) => void,
+    fn: (editor: this, selected: T, previous: T, action?: Action) => void,
     isEqual: (a: T, b: T) => boolean = Object.is
   ): () => void {
     let previous = selector(this.mstate);
@@ -498,7 +489,7 @@ class EditorDocumentStore
         // [1]
         previous = next;
         // [2]
-        listener(this, next, prev, action);
+        fn(this, next, prev, action);
       }
     };
 
@@ -1277,7 +1268,7 @@ class EditorDocumentStore
 
   changeNodePropertyFills(node_id: string | string[], fills: cg.Paint[]) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
-    this.dispatchAll(
+    this.dispatch(
       node_ids.map((node_id) => ({
         type: "node/change/*",
         node_id,
@@ -1288,7 +1279,7 @@ class EditorDocumentStore
 
   changeNodePropertyStrokes(node_id: string | string[], strokes: cg.Paint[]) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
-    this.dispatchAll(
+    this.dispatch(
       node_ids.map((node_id) => ({
         type: "node/change/*",
         node_id,
@@ -1303,7 +1294,7 @@ class EditorDocumentStore
     at: "start" | "end" = "start"
   ) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
-    this.dispatchAll(
+    this.dispatch(
       node_ids.map((node_id) => {
         const current = this.getNodeSnapshotById(node_id);
         const currentFills = Array.isArray((current as any).fills)
@@ -1330,7 +1321,7 @@ class EditorDocumentStore
     at: "start" | "end" = "start"
   ) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
-    this.dispatchAll(
+    this.dispatch(
       node_ids.map((node_id) => {
         const current = this.getNodeSnapshotById(node_id);
         const currentStrokes = Array.isArray((current as any).strokes)
@@ -2134,7 +2125,7 @@ export class Editor
     // warm up
     // TODO: remove this from core document state.
     googlefonts.fetchWebfontList().then((webfontlist) => {
-      this.doc.__internal_dispatch({
+      this.doc.dispatch({
         type: "__internal/webfonts#webfontList",
         webfontlist,
       });
