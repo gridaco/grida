@@ -1288,25 +1288,6 @@ class EditorDocumentStore
     });
   }
 
-  changeNodePropertyOpacity(node_id: string, opacity: editor.api.NumberChange) {
-    try {
-      const value = resolveNumberChangeValue(
-        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-        "opacity",
-        opacity
-      );
-
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        opacity: value,
-      });
-    } catch (e) {
-      reportError(e);
-      return;
-    }
-  }
-
   changeNodePropertyBlendMode(
     node_id: editor.NodeID,
     blendMode: cg.LayerBlendMode
@@ -3854,10 +3835,8 @@ export class EditorSurface
   ) {
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
-      this._editor.doc.changeNodePropertyOpacity(node_id, {
-        type: "set",
-        value: opacity,
-      });
+      const _node = this._editor.doc.getNodeById(node_id);
+      if (_node) _node.opacity = opacity;
     }
   }
 
@@ -3935,6 +3914,9 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
     }) as T;
   }
 
+  /**
+   * {@link grida.program.nodes.UnknwonNode#rotation}
+   */
   set rotation(rotation: number) {
     this.doc.dispatch({
       type: "node/change/*",
@@ -3955,6 +3937,33 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
       type: "node/change/*",
       node_id: this.node_id,
       rotation: value,
+    });
+  }
+
+  /**
+   * {@link grida.program.nodes.UnknwonNode#opacity}
+   */
+  set opacity(opacity: number) {
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: this.node_id,
+      opacity,
+    });
+  }
+
+  public changeOpacity(change: editor.api.NumberChange) {
+    const value = resolveNumberChangeValue(
+      this.doc.getNodeSnapshotById(
+        this.node_id
+      ) as grida.program.nodes.UnknwonNode,
+      "opacity",
+      change
+    );
+
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: this.node_id,
+      opacity: value,
     });
   }
 }

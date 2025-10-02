@@ -78,16 +78,16 @@ export function useMixedProperties(ids: string[]) {
         instance.doc.getNodeById(id)?.changeRotation(change);
       });
     },
-    [mixedProperties.rotation?.ids, instance.commands]
+    [mixedProperties.rotation?.ids, instance]
   );
 
   const opacity = useCallback(
     (change: editor.api.NumberChange) => {
       mixedProperties.opacity?.ids.forEach((id) => {
-        instance.commands.changeNodePropertyOpacity(id, change);
+        instance.doc.getNodeById(id)?.changeOpacity(change);
       });
     },
-    [mixedProperties.opacity?.ids, instance.commands]
+    [mixedProperties.opacity?.ids, instance]
   );
 
   const width = useCallback(
