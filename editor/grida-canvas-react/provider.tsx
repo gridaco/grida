@@ -154,8 +154,9 @@ export function useNodeActions(node_id: string | undefined) {
       blendMode: (value: cg.LayerBlendMode) => {
         node.blendMode = value;
       },
-      maskType: (value: cg.LayerMaskType) =>
-        instance.commands.changeNodePropertyMaskType(node_id, value),
+      maskType: (value: cg.LayerMaskType) => {
+        node.mask = value;
+      },
       rotation: node.changeRotation,
       width: (value: grida.program.css.LengthPercentage | "auto") =>
         instance.commands.changeNodeSize(node_id, "width", value),

@@ -1288,14 +1288,6 @@ class EditorDocumentStore
     });
   }
 
-  changeNodePropertyMaskType(node_id: string, mask: cg.LayerMaskType) {
-    this.dispatch({
-      type: "node/change/*",
-      node_id: node_id,
-      mask,
-    });
-  }
-
   changeNodeSize(
     node_id: string,
     axis: "width" | "height",
@@ -3964,6 +3956,17 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
       type: "node/change/*",
       node_id: this.node_id,
       blendMode,
+    });
+  }
+
+  /**
+   * {@link grida.program.nodes.UnknwonNode#mask}
+   */
+  set mask(mask: cg.LayerMaskType | null | undefined) {
+    this.doc.dispatch({
+      type: "node/change/*",
+      node_id: this.node_id,
+      mask,
     });
   }
 }

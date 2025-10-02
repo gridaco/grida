@@ -2695,10 +2695,6 @@ export namespace editor.api {
       strokeAlign: cg.StrokeAlign
     ): void;
     changeNodePropertyFit(node_id: NodeID, fit: cg.BoxFit): void;
-    changeNodePropertyMaskType(
-      node_id: NodeID,
-      maskType: cg.LayerMaskType
-    ): void;
 
     addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
     addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;
