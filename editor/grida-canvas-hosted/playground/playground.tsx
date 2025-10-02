@@ -243,6 +243,7 @@ export default function CanvasPlayground({
     null
   );
   const [errmsg, setErrmsg] = useState<string | null>(null);
+  const [loadingOverlay, setLoadingOverlay] = useState(true);
   const handleCanvasRef = useCallback((node: HTMLCanvasElement | null) => {
     setCanvasElement(node);
   }, []);
@@ -340,7 +341,15 @@ export default function CanvasPlayground({
       <ErrorBoundary>
         <SidebarProvider className="w-full h-full">
           <TooltipProvider>
-            <FullscreenLoadingOverlay loading={!ready} errmsg={errmsg} />
+            {loadingOverlay && (
+              <FullscreenLoadingOverlay
+                loading={!ready}
+                errmsg={errmsg}
+                onExitComplete={() => {
+                  setLoadingOverlay(false);
+                }}
+              />
+            )}
             <main className="w-full h-full select-none">
               <FontFamilyListProvider fonts={fonts}>
                 <StandaloneDocumentEditor editor={instance}>
