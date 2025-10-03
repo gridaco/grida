@@ -2370,6 +2370,7 @@ export namespace editor.api {
     copy(target: "selection" | NodeID): void;
     paste(): void;
     pasteVector(network: vn.VectorNetwork): void;
+    pastePayload(payload: io.clipboard.ClipboardPayload): boolean;
     duplicate(target: "selection" | NodeID): void;
     flatten(target: "selection" | NodeID): void;
     op(target: ReadonlyArray<NodeID>, op: cg.BooleanOperation): void;

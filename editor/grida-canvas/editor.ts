@@ -374,18 +374,6 @@ class EditorDocumentStore
   // public peekNextNodeId() {}
 
   /**
-   *
-   * TODO: need a batch-peeker-flush system.
-   * TODO: remove this, do not never expose `.next()`
-   * this is temporary to use the legacy factory pattern where it directly needs a id generator.
-   * @deprecated this will be removed
-   * @returns minted id
-   */
-  public useNextNodeId() {
-    return this.idgen.next();
-  }
-
-  /**
    * @internal Transaction ID - does not clear on reset.
    */
   private _tid: number = 0;
@@ -766,6 +754,24 @@ class EditorDocumentStore
 
   public pasteVector(vector_network: vn.VectorNetwork): void {
     this.dispatch({ type: "paste", vector_network });
+  }
+
+  public pastePayload(payload: io.clipboard.ClipboardPayload): boolean {
+    switch (payload.type) {
+      case "prototypes": {
+        payload.prototypes.forEach((p) => {
+          const sub =
+            grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+              p,
+              () => this.idgen.next()
+            );
+          this.insert({ document: sub });
+        });
+        return true;
+      }
+    }
+
+    return false;
   }
 
   public duplicate(target: "selection" | editor.NodeID) {

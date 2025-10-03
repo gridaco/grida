@@ -250,14 +250,7 @@ export function useDataTransferEventTarget() {
             instance.commands.paste();
             pasted_from_data_transfer = true;
           } else if (grida_payload.clipboard.type === "prototypes") {
-            grida_payload.clipboard.prototypes.forEach((p) => {
-              const sub =
-                grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-                  p,
-                  instance.doc.useNextNodeId
-                );
-              instance.insert({ document: sub });
-            });
+            instance.commands.pastePayload(grida_payload.clipboard);
             pasted_from_data_transfer = true;
           } else {
             instance.commands.paste();
