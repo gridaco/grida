@@ -131,13 +131,13 @@ describe("History Management", () => {
       expect(history.snapshot.past).toHaveLength(1); // Merged into single entry
 
       // Undo to initial state (merged entries go back to initial state)
-      state = history.undo(state);
+      [state] = history.undo(state);
       expect(state.selection).toEqual([]);
       expect(history.snapshot.past).toHaveLength(0);
       expect(history.snapshot.future).toHaveLength(1);
 
       // Redo to final selection (merged entries go directly to final state)
-      state = history.redo(state);
+      [state] = history.redo(state);
       expect(state.selection).toEqual(["rect2"]);
       expect(history.snapshot.past).toHaveLength(1);
       expect(history.snapshot.future).toHaveLength(0);
@@ -159,14 +159,14 @@ describe("History Management", () => {
       expect(history.snapshot.past).toHaveLength(1); // select+delete merged
 
       // Undo deletion (goes back to initial state)
-      state = history.undo(state);
+      [state] = history.undo(state);
       expect(state.document.nodes.rect2).toBeDefined();
       expect(state.selection).toEqual([]);
       expect(history.snapshot.past).toHaveLength(0);
       expect(history.snapshot.future).toHaveLength(1);
 
       // Redo deletion (goes to final state)
-      state = history.redo(state);
+      [state] = history.redo(state);
       expect(state.document.nodes.rect2).toBeUndefined();
       expect(state.selection).toEqual([]);
       expect(history.snapshot.past).toHaveLength(1);
@@ -189,7 +189,7 @@ describe("History Management", () => {
       expect(history.snapshot.past).toHaveLength(1); // merged
 
       // Undo once
-      state = history.undo(state);
+      [state] = history.undo(state);
       expect(history.snapshot.past).toHaveLength(0);
       expect(history.snapshot.future).toHaveLength(1);
 
@@ -228,11 +228,11 @@ describe("History Management", () => {
       expect(history.snapshot.past[0].patches).toHaveLength(2); // Two patches in one entry
 
       // Undo should go to initial state
-      state = history.undo(state);
+      [state] = history.undo(state);
       expect(state.selection).toEqual([]);
 
       // Redo should go to final state
-      state = history.redo(state);
+      [state] = history.redo(state);
       expect(state.selection).toEqual(["rect2"]);
 
       nowSpy.mockRestore();
@@ -285,12 +285,12 @@ describe("History Management", () => {
       expect(history.snapshot.future).toHaveLength(0);
 
       // After undo
-      state = history.undo(state);
+      [state] = history.undo(state);
       expect(history.snapshot.past).toHaveLength(0);
       expect(history.snapshot.future).toHaveLength(1);
 
       // After redo
-      state = history.redo(state);
+      [state] = history.redo(state);
       expect(history.snapshot.past).toHaveLength(1);
       expect(history.snapshot.future).toHaveLength(0);
     });
@@ -341,12 +341,12 @@ describe("History Management", () => {
       expect(state.selection).toEqual(["rect2"]);
 
       // Undo all operations (goes back to initial state)
-      state = history.undo(state);
+      [state] = history.undo(state);
       expect(state.selection).toEqual([]);
       expect(state.document.nodes.rect1).toBeDefined();
 
       // Redo all operations (goes to final state)
-      state = history.redo(state);
+      [state] = history.redo(state);
       expect(state.document.nodes.rect1).toBeUndefined();
       expect(state.selection).toEqual(["rect2"]);
     });
@@ -367,7 +367,7 @@ describe("History Management", () => {
       expect(history.snapshot.past).toHaveLength(1); // select+blur merged
 
       // Undo blur (goes back to initial state)
-      state = history.undo(state);
+      [state] = history.undo(state);
       expect(state.selection).toEqual([]);
     });
   });

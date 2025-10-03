@@ -2398,6 +2398,8 @@ export namespace editor.api {
       };
 
   export interface IDocumentStoreActions {
+    undo(): void;
+    redo(): void;
     reset(
       state: editor.state.IEditorState,
       key?: string,
@@ -2423,8 +2425,6 @@ export namespace editor.api {
     select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
 
     blur(): void;
-    undo(): void;
-    redo(): void;
     cut(target: "selection" | NodeID): void;
     copy(target: "selection" | NodeID): void;
     paste(): void;

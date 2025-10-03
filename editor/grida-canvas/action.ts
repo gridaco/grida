@@ -228,7 +228,6 @@ export interface EditorBlurAction {
   type: "blur";
 }
 
-
 /**
  * set to editor clipbard
  */

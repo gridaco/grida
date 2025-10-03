@@ -1,7 +1,6 @@
 import { produce, applyPatches } from "immer";
 import { editor, type Action } from ".";
 import reducer, { type ReducerContext } from "./reducers";
-
 import type { tokens } from "@grida/tokens";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { TCanvasEventTargetDragGestureState } from "./action";
@@ -385,6 +384,36 @@ class EditorDocumentStore
     return this.mstate.transform;
   }
 
+  public undo() {
+    if (this._locked) return;
+
+    const [nextState, patches] = this.historyManager.undo(this.mstate);
+    if (nextState === this.mstate) {
+      return;
+    }
+
+    this.mstate = nextState;
+    this._tid++;
+    this.emit(undefined, patches);
+  }
+
+  public redo() {
+    if (this._locked) return;
+
+    const [nextState, patches] = this.historyManager.redo(this.mstate);
+    if (nextState === this.mstate) {
+      return;
+    }
+
+    this.mstate = nextState;
+    this._tid++;
+    this.emit(undefined, patches);
+  }
+
+  private emit(action: Action | undefined, patches: editor.history.Patch[]) {
+    this.listeners.forEach((l) => l(this, action, patches));
+  }
+
   public applyDocumentPatches(patches: editor.history.Patch[]) {
     if (!patches.length) {
       return;
@@ -408,13 +437,17 @@ class EditorDocumentStore
    */
   private apply(reducer: (draft: editor.state.IEditorState) => void) {
     this.mstate = produce(this.mstate, reducer);
-    this.listeners.forEach((l) => l?.(this));
+    this.emit(undefined, []);
   }
 
+  /**
+   * @deprecated use dispatch instead
+   * this will be removed, and only consumed by surface api. (which in the future, it will have its own physical state)
+   */
   public reduce(reducer: (draft: editor.state.IEditorState) => void) {
     this.mstate = produce(this.mstate, reducer);
     this._tid++;
-    this.listeners.forEach((l) => l?.(this));
+    this.emit(undefined, []);
   }
 
   public dispatch(action: Action | Action[], force: boolean = false) {
@@ -441,7 +474,7 @@ class EditorDocumentStore
     }
 
     let lastAction: Action;
-    let lastPatches: editor.history.Patch[] = [];
+    let allPatches: editor.history.Patch[] = [];
 
     for (const action of actions) {
       const [nextState, patches, inversePatches] = reducer(
@@ -456,12 +489,12 @@ class EditorDocumentStore
         inversePatches,
       });
       lastAction = action;
-      lastPatches = patches;
+      allPatches = allPatches.concat(patches);
     }
 
     this._tid++;
 
-    this.listeners.forEach((l) => l(this, lastAction, lastPatches));
+    this.emit(lastAction!, allPatches);
   }
 
   /**
@@ -517,7 +550,7 @@ class EditorDocumentStore
     });
     this.historyManager.clear();
     this._tid = 0;
-    this.listeners.forEach((l) => l?.(this));
+    this.emit(undefined, []);
     return this._tid;
   }
 
@@ -704,32 +737,6 @@ class EditorDocumentStore
     this.dispatch({
       type: "blur",
     });
-  }
-
-  public undo() {
-    if (this._locked) return;
-
-    const nextState = this.historyManager.undo(this.mstate);
-    if (nextState === this.mstate) {
-      return;
-    }
-
-    this.mstate = nextState;
-    this._tid++;
-    this.listeners.forEach((l) => l?.(this));
-  }
-
-  public redo() {
-    if (this._locked) return;
-
-    const nextState = this.historyManager.redo(this.mstate);
-    if (nextState === this.mstate) {
-      return;
-    }
-
-    this.mstate = nextState;
-    this._tid++;
-    this.listeners.forEach((l) => l?.(this));
   }
 
   public cut(target: "selection" | editor.NodeID) {

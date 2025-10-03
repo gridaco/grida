@@ -45,6 +45,19 @@ export type HistorySnapshot = {
   future: readonly editor.history.HistoryEntry[];
 };
 
+/**
+ * Manages document history with mathematical integrity for state synchronization.
+ *
+ * @remarks
+ * This class implements the principle of information preservation:
+ * - Every state change must be accompanied by its patch representation
+ * - Undo/redo operations return both the new state AND the patches that were applied
+ * - This ensures the sync system can properly synchronize undo/redo changes to remote clients
+ * - Without this design, undo/redo operations would be invisible to the sync system
+ *
+ * The return signature `[state, patches]` is not arbitrary - it's mathematically necessary
+ * for maintaining consistency between local and remote state across all operations.
+ */
 export class DocumentHistoryManager {
   private past: editor.history.HistoryEntry[] = [];
   private future: editor.history.HistoryEntry[] = [];
@@ -100,9 +113,33 @@ export class DocumentHistoryManager {
     this.future = [];
   }
 
-  undo(state: editor.state.IEditorState): editor.state.IEditorState {
+  /**
+   * Undoes the last recorded action and returns both the new state and the patches that were applied.
+   *
+   * @param state - The current editor state
+   * @returns A tuple containing:
+   *   - [0] The new state after applying the inverse patches
+   *   - [1] The inverse patches that were applied to achieve the undo
+   *
+   * @remarks
+   * This signature is mathematically necessary for information preservation:
+   * - Every state change must be accompanied by its patch representation
+   * - The sync system depends on patches to know what to synchronize to remote clients
+   * - Without patches, undo operations would be invisible to the sync system
+   * - This ensures undo/redo changes are properly synchronized across all clients
+   *
+   * @example
+   * ```typescript
+   * const [newState, patches] = historyManager.undo(currentState);
+   * // patches contain the inverse patches that were applied
+   * // These patches can be sent to remote clients for synchronization
+   * ```
+   */
+  undo(
+    state: editor.state.IEditorState
+  ): [editor.state.IEditorState, editor.history.Patch[]] {
     if (this.past.length === 0) {
-      return state;
+      return [state, []];
     }
 
     const entry = this.past.pop()!;
@@ -111,12 +148,36 @@ export class DocumentHistoryManager {
     });
 
     this.future.unshift({ ...entry, ts: Date.now() });
-    return nextState;
+    return [nextState, entry.inversePatches];
   }
 
-  redo(state: editor.state.IEditorState): editor.state.IEditorState {
+  /**
+   * Redoes the next action from the future and returns both the new state and the patches that were applied.
+   *
+   * @param state - The current editor state
+   * @returns A tuple containing:
+   *   - [0] The new state after applying the patches
+   *   - [1] The patches that were applied to achieve the redo
+   *
+   * @remarks
+   * This signature is mathematically necessary for information preservation:
+   * - Every state change must be accompanied by its patch representation
+   * - The sync system depends on patches to know what to synchronize to remote clients
+   * - Without patches, redo operations would be invisible to the sync system
+   * - This ensures undo/redo changes are properly synchronized across all clients
+   *
+   * @example
+   * ```typescript
+   * const [newState, patches] = historyManager.redo(currentState);
+   * // patches contain the patches that were applied
+   * // These patches can be sent to remote clients for synchronization
+   * ```
+   */
+  redo(
+    state: editor.state.IEditorState
+  ): [editor.state.IEditorState, editor.history.Patch[]] {
     if (this.future.length === 0) {
-      return state;
+      return [state, []];
     }
 
     const entry = this.future.shift()!;
@@ -125,7 +186,7 @@ export class DocumentHistoryManager {
     });
 
     this.past.push({ ...entry, ts: Date.now() });
-    return nextState;
+    return [nextState, entry.patches];
   }
 
   private entry(
