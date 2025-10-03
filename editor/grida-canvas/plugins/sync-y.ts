@@ -3,68 +3,10 @@ import { editor } from "..";
 import { WebsocketProvider } from "y-websocket";
 import type { Awareness } from "y-protocols/awareness";
 import type { Editor, EditorDocumentStore } from "../editor";
-import type cmath from "@grida/cmath";
 import type grida from "@grida/schema";
 import type { Patch } from "immer";
 import { YPatchBinder } from "./sync-y-patches";
 import equal from "fast-deep-equal";
-
-type AwarenessPayload = {
-  /**
-   * user-window-session unique cursor id
-   *
-   * one user can have multiple cursors (if multiple windows are open)
-   */
-  cursor_id: string;
-  /**
-   * player profile information (rarely changes)
-   */
-  profile: {
-    /**
-     * theme colors for this player within collaboration ui
-     */
-    palette: editor.state.MultiplayerCursorColorPalette;
-  };
-  /**
-   * current focus state (changes when switching pages/selecting)
-   */
-  focus: {
-    /**
-     * player's current scene (page)
-     */
-    scene_id: string | undefined;
-    /**
-     * the selection (node ids) of this player
-     */
-    selection: string[];
-  };
-  /**
-   * geometric state (changes frequently with mouse movement)
-   */
-  geo: {
-    /**
-     * current transform (camera)
-     */
-    transform: cmath.Transform;
-    /**
-     * current cursor position
-     */
-    position: [number, number];
-    /**
-     * marquee start point
-     * the full marquee is a rect with marquee_a and position (current cursor position)
-     */
-    marquee_a: [number, number] | null;
-  };
-  /**
-   * cursor chat is a ephemeral message that lives for a short time and disappears after few seconds (as configured)
-   * only the last message is kept
-   */
-  cursor_chat: {
-    txt: string;
-    ts: number;
-  } | null;
-};
 
 // Internal class for managing document synchronization
 class DocumentSyncManager {
@@ -301,7 +243,7 @@ class AwarenessSyncManager {
   private __unsubscribe_focus_change!: () => void;
 
   private _currentState: Partial<
-    Omit<AwarenessPayload, "cursor_id" | "profile">
+    Omit<editor.multiplayer.AwarenessPayload, "cursor_id" | "profile">
   > = {};
 
   private __unsubscribe_cursor_chat_change!: () => void;
@@ -326,7 +268,10 @@ class AwarenessSyncManager {
           return state && state.profile?.palette;
         })
         .map((_: any) => {
-          const [id, state] = _ as [string, AwarenessPayload];
+          const [id, state] = _ as [
+            string,
+            editor.multiplayer.AwarenessPayload,
+          ];
           const {
             cursor_id,
             profile: { palette },
@@ -453,7 +398,7 @@ class AwarenessSyncManager {
         marquee_a: null,
       },
       cursor_chat: this._currentState.cursor_chat || null,
-    } satisfies AwarenessPayload);
+    } satisfies editor.multiplayer.AwarenessPayload);
   }
 
   public destroy() {

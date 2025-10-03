@@ -1914,6 +1914,65 @@ export namespace editor.a11y {
   } as const;
 }
 
+export namespace editor.multiplayer {
+  export type AwarenessPayload = {
+    /**
+     * user-window-session unique cursor id
+     *
+     * one user can have multiple cursors (if multiple windows are open)
+     */
+    cursor_id: string;
+    /**
+     * player profile information (rarely changes)
+     */
+    profile: {
+      /**
+       * theme colors for this player within collaboration ui
+       */
+      palette: editor.state.MultiplayerCursorColorPalette;
+    };
+    /**
+     * current focus state (changes when switching pages/selecting)
+     */
+    focus: {
+      /**
+       * player's current scene (page)
+       */
+      scene_id: string | undefined;
+      /**
+       * the selection (node ids) of this player
+       */
+      selection: string[];
+    };
+    /**
+     * geometric state (changes frequently with mouse movement)
+     */
+    geo: {
+      /**
+       * current transform (camera)
+       */
+      transform: cmath.Transform;
+      /**
+       * current cursor position
+       */
+      position: [number, number];
+      /**
+       * marquee start point
+       * the full marquee is a rect with marquee_a and position (current cursor position)
+       */
+      marquee_a: [number, number] | null;
+    };
+    /**
+     * cursor chat is a ephemeral message that lives for a short time and disappears after few seconds (as configured)
+     * only the last message is kept
+     */
+    cursor_chat: {
+      txt: string;
+      ts: number;
+    } | null;
+  };
+}
+
 export namespace editor.api {
   export type SubscriptionCallbackFn<T = any> = (
     editor: T,

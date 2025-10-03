@@ -51,7 +51,7 @@ export namespace grida {
      *
      * @see https://grida.co/docs/wg/feat-crdt/id
      */
-    export namespace i32 {
+    export namespace u32 {
       //
 
       export namespace k {

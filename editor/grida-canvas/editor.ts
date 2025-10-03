@@ -2106,8 +2106,8 @@ export class Editor
     this.doc = new EditorDocumentStore(
       grida.id.noop.generator, // test only
       // // TODO: resolve from server
-      // new grida.id.i32.NodeIdGenerator({
-      //   actor: grida.id.i32.k.OFFLINE_ACTOR_ID,
+      // new grida.id.u32.NodeIdGenerator({
+      //   actor: grida.id.u32.k.OFFLINE_ACTOR_ID,
       // }),
       initialState,
       backend,
