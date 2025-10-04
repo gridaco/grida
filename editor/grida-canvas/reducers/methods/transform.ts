@@ -10,7 +10,7 @@ import {
   snapObjectsTranslation,
   threshold,
 } from "../tools/snap";
-import nodeTransformReducer from "../node-transform.reducer";
+import updateNodeTransform from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
 import grida from "@grida/schema";
@@ -66,8 +66,7 @@ export function self_nudge_transform<S extends editor.state.IEditorState>(
 
   for (const node_id of targets) {
     const node = dq.__getNodeById(draft, node_id);
-
-    draft.document.nodes[node_id] = nodeTransformReducer(node, {
+    updateNodeTransform(node, {
       type: "translate",
       dx: dx,
       dy: dy,
@@ -396,7 +395,7 @@ function __self_update_gesture_transform_translate(
         relative_position = r.position;
       }
 
-      draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      updateNodeTransform(node, {
         type: "position",
         x: relative_position[0],
         y: relative_position[1],
@@ -562,16 +561,17 @@ function __self_update_gesture_transform_scale(
 
   let i = 0;
   for (const node_id of selection) {
-    const node = initial_snapshot.document.nodes[node_id];
+    const node = draft.document.nodes[node_id];
+    const initial_node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
     const is_root = scene.children.includes(node_id);
 
     // TODO: scaling for bitmap node is not supported yet.
-    const is_scalable = node.type !== "bitmap";
+    const is_scalable = initial_node.type !== "bitmap";
     if (!is_scalable) continue;
 
     if (is_root) {
-      draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      updateNodeTransform(node, {
         type: "scale",
         rect: initial_rect,
         origin: origin,
@@ -605,7 +605,7 @@ function __self_update_gesture_transform_scale(
         parent_rect.y,
       ]);
 
-      draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      updateNodeTransform(node, {
         type: "scale",
         rect: relative_rect,
         origin: relative_origin,
@@ -614,9 +614,9 @@ function __self_update_gesture_transform_scale(
       });
     }
 
-    if (node.type === "vector") {
+    if (initial_node.type === "vector") {
       // TODO: mrege with the above
-      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+      const vne = new vn.VectorNetworkEditor(initial_node.vectorNetwork);
       const scale = cmath.rect.getScaleFactors(initial_rect, {
         x: initial_rect.x,
         y: initial_rect.y,

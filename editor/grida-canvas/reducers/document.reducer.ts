@@ -25,7 +25,7 @@ import {
 } from "../utils/paint-resolution";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
-import nodeTransformReducer from "./node-transform.reducer";
+import updateNodeTransform from "./node-transform.reducer";
 import {
   self_clearSelection,
   self_try_remove_node,
@@ -855,9 +855,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return updateState(state, (draft) => {
         for (const node_id of target_node_ids) {
-          const node = dq.__getNodeById(draft, node_id);
-
-          draft.document.nodes[node_id] = nodeTransformReducer(node, {
+          const node = draft.document.nodes[node_id];
+          updateNodeTransform(node, {
             type: "resize",
             delta: [dx, dy],
           });
@@ -1104,13 +1103,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           const dy = aligned.y - rect.y;
 
           return updateState(state, (draft) => {
-            const node = dq.__getNodeById(state, node_id);
-            const moved = nodeTransformReducer(node, {
+            const node = dq.__getNodeById(draft, node_id);
+            updateNodeTransform(node, {
               type: "translate",
               dx,
               dy,
             });
-            draft.document.nodes[node_id] = moved;
           });
         }
 
@@ -1133,13 +1131,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return updateState(state, (draft) => {
         let i = 0;
         for (const node_id of target_node_ids) {
-          const node = dq.__getNodeById(state, node_id);
-          const moved = nodeTransformReducer(node, {
+          const node = dq.__getNodeById(draft, node_id);
+          updateNodeTransform(node, {
             type: "translate",
             dx: deltas[i].dx,
             dy: deltas[i].dy,
           });
-          draft.document.nodes[node_id] = moved;
           i++;
         }
       });
@@ -1171,13 +1168,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return updateState(state, (draft) => {
         let i = 0;
         for (const node_id of target_node_ids) {
-          const node = dq.__getNodeById(state, node_id);
-          const moved = nodeTransformReducer(node, {
+          const node = dq.__getNodeById(draft, node_id);
+          updateNodeTransform(node, {
             type: "translate",
             dx: deltas[i].dx,
             dy: deltas[i].dy,
           });
-          draft.document.nodes[node_id] = moved;
           i++;
         }
       });

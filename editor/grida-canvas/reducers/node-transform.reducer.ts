@@ -1,7 +1,4 @@
-import { produce } from "immer";
-import { updateState } from "./utils/immer";
 import grida from "@grida/schema";
-import assert from "assert";
 import cmath from "@grida/cmath";
 
 type NodeTransformAction =
@@ -65,267 +62,174 @@ type NodeTransformAction =
       delta: cmath.Vector2;
     };
 
-export default function nodeTransformReducer(
-  node: grida.program.nodes.Node,
+/**
+ * @mutates draft
+ * @param draft node
+ * @param action scale, translate, resize, position
+ */
+export default function updateNodeTransform(
+  draft: grida.program.nodes.Node,
   action: NodeTransformAction
 ) {
-  return produce(node, (draft) => {
-    switch (action.type) {
-      case "position": {
-        const { x, y } = action;
-        if (draft.position == "absolute") {
-          // TODO: with resolve box model
-          // TODO: also need to update right, bottom, width, height
+  switch (action.type) {
+    case "position": {
+      const { x, y } = action;
+      if (draft.position == "absolute") {
+        // TODO: with resolve box model
+        // TODO: also need to update right, bottom, width, height
 
-          draft.left = cmath.quantize(x, 1);
-          draft.top = cmath.quantize(y, 1);
-        } else {
-          // ignore
-          reportError("node is not draggable");
-        }
-        break;
+        draft.left = cmath.quantize(x, 1);
+        draft.top = cmath.quantize(y, 1);
+      } else {
+        // ignore
+        reportError("node is not draggable");
       }
-      case "translate": {
-        const { dx, dy } = action;
-        return moveNode(draft, dx, dy);
-      }
-      case "scale": {
-        const { rect, origin, movement, preserveAspectRatio } = action;
+      break;
+    }
+    case "translate": {
+      const { dx, dy } = action;
+      moveNode(draft, dx, dy);
+      break;
+    }
+    case "scale": {
+      const { rect, origin, movement, preserveAspectRatio } = action;
 
-        let scale: cmath.Vector2;
+      let scale: cmath.Vector2;
 
-        if (preserveAspectRatio) {
-          // TODO: need to use scale-applied rectangle to calculate the dominant axis
-          // the current implementation works, but it's not best for the ux.
-          // conceptually, the movement point should align with certain side of the rectangle
-          const dominantAxis =
-            Math.abs(movement[0]) > Math.abs(movement[1]) ? "x" : "y";
+      if (preserveAspectRatio) {
+        // TODO: need to use scale-applied rectangle to calculate the dominant axis
+        // the current implementation works, but it's not best for the ux.
+        // conceptually, the movement point should align with certain side of the rectangle
+        const dominantAxis =
+          Math.abs(movement[0]) > Math.abs(movement[1]) ? "x" : "y";
 
-          switch (dominantAxis) {
-            case "x": {
-              const factor = (rect.width + movement[0]) / rect.width;
-              scale = [factor, factor];
-              break;
-            }
-            case "y": {
-              const factor = (rect.height + movement[1]) / rect.height;
-              scale = [factor, factor];
-              break;
-            }
+        switch (dominantAxis) {
+          case "x": {
+            const factor = (rect.width + movement[0]) / rect.width;
+            scale = [factor, factor];
+            break;
           }
-        } else {
-          scale = cmath.rect.getScaleFactors(rect, {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width + movement[0],
-            height: rect.height + movement[1],
-          });
-        }
-
-        const scaled = cmath.rect.positive(
-          cmath.rect.scale(rect, origin, scale)
-        );
-
-        const _draft = draft as grida.program.nodes.i.ICSSDimension &
-          grida.program.nodes.i.IPositioning;
-
-        const heightWasNumber = typeof _draft.height === "number";
-
-        if (_draft.position === "absolute") {
-          _draft.left = cmath.quantize(scaled.x, 1);
-          _draft.top = cmath.quantize(scaled.y, 1);
-        }
-
-        // For text nodes, use ceil to ensure we don't cut off content
-        if (draft.type === "text") {
-          _draft.width = Math.ceil(Math.max(scaled.width, 0));
-        } else {
-          _draft.width = cmath.quantize(Math.max(scaled.width, 0), 1);
-        }
-
-        if (draft.type === "line") {
-          _draft.height = 0;
-        } else {
-          const preserveAutoHeight =
-            draft.type === "text" && !heightWasNumber && movement[1] === 0;
-          if (!preserveAutoHeight) {
-            // For text nodes, use ceil to ensure we don't cut off content
-            if (draft.type === "text") {
-              _draft.height = Math.ceil(Math.max(scaled.height, 0));
-            } else {
-              _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
-            }
+          case "y": {
+            const factor = (rect.height + movement[1]) / rect.height;
+            scale = [factor, factor];
+            break;
           }
         }
-
-        return;
+      } else {
+        scale = cmath.rect.getScaleFactors(rect, {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width + movement[0],
+          height: rect.height + movement[1],
+        });
       }
-      case "resize": {
-        const { delta } = action;
-        const [dx, dy] = delta;
 
-        const _draft = draft as grida.program.nodes.i.IFixedDimension &
-          grida.program.nodes.i.IPositioning;
+      const scaled = cmath.rect.positive(cmath.rect.scale(rect, origin, scale));
 
-        // right, bottom
-        if (_draft.right) _draft.right -= dx;
-        if (_draft.bottom) _draft.bottom -= dy;
+      const _draft = draft as grida.program.nodes.i.ICSSDimension &
+        grida.program.nodes.i.IPositioning;
 
-        // size
-        // For text nodes, use ceil to ensure we don't cut off content
-        if (draft.type === "text") {
-          _draft.width = Math.ceil(Math.max(_draft.width + dx, 0));
-        } else {
-          _draft.width = cmath.quantize(Math.max(_draft.width + dx, 0), 1);
-        }
+      const heightWasNumber = typeof _draft.height === "number";
 
-        if (draft.type === "line") {
-          _draft.height = 0;
-        } else {
+      if (_draft.position === "absolute") {
+        _draft.left = cmath.quantize(scaled.x, 1);
+        _draft.top = cmath.quantize(scaled.y, 1);
+      }
+
+      // For text nodes, use ceil to ensure we don't cut off content
+      if (draft.type === "text") {
+        _draft.width = Math.ceil(Math.max(scaled.width, 0));
+      } else {
+        _draft.width = cmath.quantize(Math.max(scaled.width, 0), 1);
+      }
+
+      if (draft.type === "line") {
+        _draft.height = 0;
+      } else {
+        const preserveAutoHeight =
+          draft.type === "text" && !heightWasNumber && movement[1] === 0;
+        if (!preserveAutoHeight) {
           // For text nodes, use ceil to ensure we don't cut off content
           if (draft.type === "text") {
-            _draft.height = Math.ceil(Math.max(_draft.height + dy, 0));
+            _draft.height = Math.ceil(Math.max(scaled.height, 0));
           } else {
-            _draft.height = cmath.quantize(Math.max(_draft.height + dy, 0), 1);
+            _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
           }
         }
       }
+
+      break;
     }
-  });
+    case "resize": {
+      const { delta } = action;
+      const [dx, dy] = delta;
+
+      const _draft = draft as grida.program.nodes.i.IFixedDimension &
+        grida.program.nodes.i.IPositioning;
+
+      // right, bottom
+      if (_draft.right) _draft.right -= dx;
+      if (_draft.bottom) _draft.bottom -= dy;
+
+      // size
+      // For text nodes, use ceil to ensure we don't cut off content
+      if (draft.type === "text") {
+        _draft.width = Math.ceil(Math.max(_draft.width + dx, 0));
+      } else {
+        _draft.width = cmath.quantize(Math.max(_draft.width + dx, 0), 1);
+      }
+
+      if (draft.type === "line") {
+        _draft.height = 0;
+      } else {
+        // For text nodes, use ceil to ensure we don't cut off content
+        if (draft.type === "text") {
+          _draft.height = Math.ceil(Math.max(_draft.height + dy, 0));
+        } else {
+          _draft.height = cmath.quantize(Math.max(_draft.height + dy, 0), 1);
+        }
+      }
+      break;
+    }
+  }
 }
 
 function moveNode(
-  node: grida.program.nodes.Node,
+  draft: grida.program.nodes.i.IPositioning,
   dx: number,
   dy: number
-): grida.program.nodes.Node {
-  return produce(node, (draft: grida.program.nodes.i.IPositioning) => {
-    if (draft.position == "absolute") {
-      if (dx) {
-        if (draft.left !== undefined || draft.right !== undefined) {
-          if (draft.left !== undefined) {
-            const new_l = draft.left + dx;
-            draft.left = cmath.quantize(new_l, 1);
-          }
-          if (draft.right !== undefined) {
-            const new_r = draft.right - dx;
-            draft.right = cmath.quantize(new_r, 1);
-          }
-        } else {
-          draft.left = cmath.quantize(dx, 1);
+) {
+  if (draft.position == "absolute") {
+    if (dx) {
+      if (draft.left !== undefined || draft.right !== undefined) {
+        if (draft.left !== undefined) {
+          const new_l = draft.left + dx;
+          draft.left = cmath.quantize(new_l, 1);
         }
-      }
-      if (dy) {
-        if (draft.top !== undefined || draft.bottom !== undefined) {
-          if (draft.top !== undefined) {
-            const new_t = draft.top + dy;
-            draft.top = cmath.quantize(new_t, 1);
-          }
-          if (draft.bottom !== undefined) {
-            const new_b = draft.bottom - dy;
-            draft.bottom = cmath.quantize(new_b, 1);
-          }
-        } else {
-          draft.top = cmath.quantize(dy, 1);
+        if (draft.right !== undefined) {
+          const new_r = draft.right - dx;
+          draft.right = cmath.quantize(new_r, 1);
         }
+      } else {
+        draft.left = cmath.quantize(dx, 1);
       }
-    } else {
-      // ignore
-      reportError("node is not draggable");
     }
-  });
-}
-
-type BoxConstraint = { min: number; max: number; size: number };
-
-function resolveBoxModelAxis(box: Partial<BoxConstraint>): BoxConstraint {
-  const { min, max, size } = box;
-
-  // if already resolved, return
-  if (min !== undefined && max !== undefined && size !== undefined)
-    return box as BoxConstraint;
-
-  assert(
-    (min !== undefined && max !== undefined) ||
-      (min !== undefined && size !== undefined) ||
-      (max !== undefined && size !== undefined),
-    "Invalid state: At least 'min & max', 'min & size', or 'max & size' must be defined."
-  );
-
-  if (min !== undefined && size !== undefined) {
-    // Resolve max
-    return { min, max: min + size, size };
+    if (dy) {
+      if (draft.top !== undefined || draft.bottom !== undefined) {
+        if (draft.top !== undefined) {
+          const new_t = draft.top + dy;
+          draft.top = cmath.quantize(new_t, 1);
+        }
+        if (draft.bottom !== undefined) {
+          const new_b = draft.bottom - dy;
+          draft.bottom = cmath.quantize(new_b, 1);
+        }
+      } else {
+        draft.top = cmath.quantize(dy, 1);
+      }
+    }
+  } else {
+    // ignore
+    reportError("node is not draggable");
   }
-
-  if (max !== undefined && size !== undefined) {
-    // Resolve min
-    return { min: max - size, max, size };
-  }
-
-  if (min !== undefined && max !== undefined) {
-    // Resolve size
-    assert(max >= min, "'max' must be '>=' to 'min' when resolving 'size'.");
-    return { min, max, size: max - min };
-  }
-
-  // can't reach here
-  throw new Error();
-}
-
-function resolveBoxModel(node: {
-  left?: number;
-  top?: number;
-  right?: number;
-  bottom?: number;
-  width?: number;
-  height?: number;
-}): cmath.Rectangle {
-  assert(typeof node.left === "number" || node.left === undefined);
-  assert(typeof node.right === "number" || node.right === undefined);
-  assert(typeof node.top === "number" || node.top === undefined);
-  assert(typeof node.bottom === "number" || node.bottom === undefined);
-  assert(typeof node.width === "number" || node.width === undefined);
-  assert(typeof node.height === "number" || node.width === undefined);
-
-  // let top,
-  //   right,
-  //   bottom,
-  //   left,
-  //   width,
-  //   height = undefined;
-
-  assert(
-    node.left !== undefined ||
-      node.right !== undefined ||
-      node.width !== undefined,
-    "Either 'left' or 'right' or 'width' must be defined"
-  );
-
-  assert(
-    node.top !== undefined ||
-      node.bottom !== undefined ||
-      node.height !== undefined,
-    "Either 'top' or 'bottom' or 'height' must be defined"
-  );
-
-  // TODO: fallback left and top to 0 if not defined and cannot be inferred
-
-  const _x_axis = resolveBoxModelAxis({
-    min: node.left,
-    max: node.right,
-    size: node.width,
-  });
-
-  const _y_axis = resolveBoxModelAxis({
-    min: node.top,
-    max: node.bottom,
-    size: node.height,
-  });
-
-  return {
-    x: _x_axis.min,
-    y: _y_axis.min,
-    width: _x_axis.size,
-    height: _y_axis.size,
-  };
 }
