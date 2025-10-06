@@ -63,6 +63,32 @@ pub unsafe extern "C" fn load_scene_json(
 }
 
 #[no_mangle]
+/// js::_apply_scene_transactions
+pub unsafe extern "C" fn apply_scene_transactions(
+    app: *mut EmscriptenApplication,
+    ptr: *const u8,
+    len: usize,
+) -> *const u8 {
+    if let Some(app) = app.as_mut() {
+        if let Some(json) = __str_from_ptr_len(ptr, len) {
+            match app.apply_document_transactions_json(&json) {
+                Ok(reports) => {
+                    if let Ok(output) = serde_json::to_string(&reports) {
+                        if let Ok(cstr) = CString::new(output) {
+                            return cstr.into_raw() as *const u8;
+                        }
+                    }
+                }
+                Err(err) => {
+                    eprintln!("failed to apply scene transactions: {}", err);
+                }
+            }
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
 /// js::_pointer_move
 pub unsafe extern "C" fn pointer_move(app: *mut EmscriptenApplication, x: f32, y: f32) {
     if let Some(app) = app.as_mut() {

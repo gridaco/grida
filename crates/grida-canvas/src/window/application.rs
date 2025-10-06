@@ -4,7 +4,8 @@ use crate::devtools::{
 };
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
-use crate::io::io_grida::JSONVectorNetwork;
+use crate::io::io_grida::{self, JSONVectorNetwork};
+use crate::io::io_grida_patch::{self, TransactionApplyReport};
 use crate::node::schema::*;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
@@ -17,6 +18,7 @@ use crate::vectornetwork::VectorNetwork;
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
+use serde_json::Value;
 use skia_safe::Matrix;
 
 pub trait ApplicationApi {
@@ -61,6 +63,15 @@ pub trait ApplicationApi {
 
     /// Load a scene from a JSON string using the `io_grida` parser.
     fn load_scene_json(&mut self, json: &str);
+
+    /// Apply a batch of scene transactions represented as JSON Patch operations.
+    fn apply_document_transactions(
+        &mut self,
+        transactions: Vec<Vec<Value>>,
+    ) -> Vec<TransactionApplyReport> {
+        let _ = transactions;
+        Vec::new()
+    }
 
     // static demo scenes
     /// Load a simple demo scene with a few colored rectangles.
@@ -116,6 +127,7 @@ pub struct UnknownTargetApplication {
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::SurfaceState,
     pub(crate) input: super::input::InputState,
+    pub(crate) document_json: Option<Value>,
     pub(crate) hit_test_result: Option<crate::node::schema::NodeId>,
     pub(crate) hit_test_last: std::time::Instant,
     pub(crate) hit_test_interval: std::time::Duration,
@@ -358,40 +370,17 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn load_scene_json(&mut self, json: &str) {
-        use crate::io::io_grida;
-
-        let Ok(mut file) = io_grida::parse(json) else {
-            let err = io_grida::parse(json).unwrap_err();
-            eprintln!("failed to parse scene json: {}", err);
-            return;
-        };
-
-        let nodes = file
-            .document
-            .nodes
-            .into_iter()
-            .map(|(id, node)| (id, node.into()))
-            .collect();
-
-        let scene_id = file.document.entry_scene_id.unwrap_or_else(|| {
-            file.document
-                .scenes
-                .keys()
-                .next()
-                .cloned()
-                .unwrap_or_else(|| "scene".to_string())
-        });
-
-        if let Some(scene) = file.document.scenes.remove(&scene_id) {
-            let scene = crate::node::schema::Scene {
-                id: scene_id,
-                name: scene.name,
-                children: scene.children,
-                nodes,
-                background_color: scene.background_color.map(Into::into),
-            };
-            self.renderer.load_scene(scene);
+        match serde_json::from_str::<Value>(json) {
+            Ok(value) => self.load_scene_from_value(value),
+            Err(err) => eprintln!("failed to parse scene json: {}", err),
         }
+    }
+
+    fn apply_document_transactions(
+        &mut self,
+        transactions: Vec<Vec<Value>>,
+    ) -> Vec<TransactionApplyReport> {
+        self.process_document_transactions(transactions)
     }
 
     fn load_dummy_scene(&mut self) {
@@ -434,6 +423,7 @@ impl UnknownTargetApplication {
             renderer,
             state,
             input: super::input::InputState::default(),
+            document_json: None,
             hit_test_result: None,
             hit_test_last: std::time::Instant::now(),
             hit_test_interval: std::time::Duration::from_millis(0),
@@ -459,6 +449,82 @@ impl UnknownTargetApplication {
     /// Request a redraw from the host window using the provided callback.
     pub fn request_redraw(&self) {
         (self.request_redraw)();
+    }
+
+    fn load_scene_from_value(&mut self, value: Value) {
+        match serde_json::from_value::<io_grida::JSONCanvasFile>(value.clone()) {
+            Ok(file) => {
+                if self.load_scene_from_canvas_file(file) {
+                    self.document_json = Some(value);
+                }
+            }
+            Err(err) => eprintln!("failed to deserialize scene json: {}", err),
+        }
+    }
+
+    fn load_scene_from_canvas_file(&mut self, mut file: io_grida::JSONCanvasFile) -> bool {
+        let nodes = file
+            .document
+            .nodes
+            .into_iter()
+            .map(|(id, node)| (id, node.into()))
+            .collect();
+
+        let scene_id = file.document.entry_scene_id.unwrap_or_else(|| {
+            file.document
+                .scenes
+                .keys()
+                .next()
+                .cloned()
+                .unwrap_or_else(|| "scene".to_string())
+        });
+
+        if let Some(scene) = file.document.scenes.remove(&scene_id) {
+            let scene = crate::node::schema::Scene {
+                id: scene_id,
+                name: scene.name,
+                children: scene.children,
+                nodes,
+                background_color: scene.background_color.map(Into::into),
+            };
+            self.renderer.load_scene(scene);
+            true
+        } else {
+            eprintln!("failed to load scene: '{}' not found", scene_id);
+            false
+        }
+    }
+
+    fn process_document_transactions(
+        &mut self,
+        transactions: Vec<Vec<Value>>,
+    ) -> Vec<TransactionApplyReport> {
+        let Some(current_document) = self.document_json.take() else {
+            return transactions
+                .into_iter()
+                .map(|tx| TransactionApplyReport {
+                    success: false,
+                    applied: 0,
+                    total: tx.len(),
+                    error: Some("document not loaded".to_string()),
+                })
+                .collect();
+        };
+
+        let outcome = io_grida_patch::apply_transactions(current_document, transactions);
+        if let Some(file) = outcome.scene_file {
+            self.load_scene_from_canvas_file(file);
+        }
+        self.document_json = Some(outcome.document);
+        outcome.reports
+    }
+
+    pub(crate) fn apply_document_transactions_json(
+        &mut self,
+        json: &str,
+    ) -> Result<Vec<TransactionApplyReport>, serde_json::Error> {
+        let transactions: Vec<Vec<Value>> = serde_json::from_str(json)?;
+        Ok(self.process_document_transactions(transactions))
     }
 
     fn queue(&mut self) {

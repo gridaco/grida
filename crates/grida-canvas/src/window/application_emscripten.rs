@@ -1,4 +1,5 @@
 use crate::io::io_grida::JSONVectorNetwork;
+use crate::io::io_grida_patch::TransactionApplyReport;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
@@ -179,6 +180,13 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.load_scene_json(json);
     }
 
+    fn apply_document_transactions(
+        &mut self,
+        transactions: Vec<Vec<serde_json::Value>>,
+    ) -> Vec<TransactionApplyReport> {
+        self.base.apply_document_transactions(transactions)
+    }
+
     fn load_dummy_scene(&mut self) {
         self.base.load_dummy_scene();
     }
@@ -285,5 +293,12 @@ impl EmscriptenApplication {
 
     pub fn get_image_size(&self, id: &str) -> Option<(u32, u32)> {
         self.base.get_image_size(id)
+    }
+
+    pub fn apply_document_transactions_json(
+        &mut self,
+        json: &str,
+    ) -> Result<Vec<TransactionApplyReport>, serde_json::Error> {
+        self.base.apply_document_transactions_json(json)
     }
 }

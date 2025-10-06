@@ -31,6 +31,11 @@ declare namespace canvas {
       ptr: number,
       len: number
     ): void;
+    _apply_scene_transactions(
+      state: GridaCanvasWebGlApplicationPtr,
+      ptr: number,
+      len: number
+    ): Ptr;
     _load_dummy_scene(state: GridaCanvasWebGlApplicationPtr): void;
     _load_benchmark_scene(
       state: GridaCanvasWebGlApplicationPtr,
