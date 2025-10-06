@@ -1974,6 +1974,40 @@ export namespace editor.multiplayer {
 }
 
 export namespace editor.api {
+  /**
+   * api protocol with json patch
+   *
+   * can be used with language boundaries / cli / wasm-wasi / etc.
+   */
+  export namespace patch {
+    export type JsonPatchOperation =
+      | ({ op: editor.history.Patch["op"]; path: string } & {
+          value: editor.history.Patch["value"];
+        })
+      | { op: editor.history.Patch["op"]; path: string };
+
+    export function encodeJsonPointerSegment(segment: string | number): string {
+      const str = String(segment);
+      return str.replace(/~/g, "~0").replace(/\//g, "~1");
+    }
+
+    export function toJsonPointerPath(path: (string | number)[]): string {
+      return `/${path.map(encodeJsonPointerSegment).join("/")}`;
+    }
+
+    export function toJsonPatchOperations(
+      patches: editor.history.Patch[]
+    ): JsonPatchOperation[] {
+      return patches.map((patch) => {
+        const pointer = toJsonPointerPath(patch.path);
+        if ("value" in patch) {
+          return { op: patch.op, path: pointer, value: patch.value };
+        }
+        return { op: patch.op, path: pointer };
+      });
+    }
+  }
+
   export type SubscriptionCallbackFn<T = any> = (
     editor: T,
     action?: Action,

@@ -423,6 +423,7 @@ export class EditorYSyncPlugin {
       cursor_id: string;
     }
   ) {
+    console.log("sync-y::constructor");
     this.doc = new Y.Doc();
     this.provider = new WebsocketProvider(
       process.env.NODE_ENV === "development"

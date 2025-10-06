@@ -1,4 +1,4 @@
-import { produce, applyPatches } from "immer";
+import { produce, applyPatches, produceWithPatches } from "immer";
 import { editor, type Action } from ".";
 import reducer, { type ReducerContext } from "./reducers";
 import type { tokens } from "@grida/tokens";
@@ -434,10 +434,20 @@ class EditorDocumentStore
 
   /**
    * apply changes without incrementing the transaction id
+   *
+   * - use when applying changes from remote
+   *
+   * this won't
+   * - increment the transaction id
+   * - write history
+   *
+   * this will
+   * - emit the patches applied
    */
   private apply(reducer: (draft: editor.state.IEditorState) => void) {
-    this.mstate = produce(this.mstate, reducer);
-    this.emit(undefined, []);
+    const [state, patches] = produceWithPatches(this.mstate, reducer);
+    this.mstate = state;
+    this.emit(undefined, patches);
   }
 
   /**
@@ -2359,8 +2369,38 @@ export class Editor
       // subscribe
       this.doc.subscribeWithSelector(
         (state) => state.document,
-        (_, v) => {
-          syncDocument(this._m_wasm_canvas_scene!, v);
+        (_, document, _prev, _action, patches) => {
+          // FIXME: Unstable
+          // the current patch based sync is not stable, it WILL fail to direct sync when deleting a node, etc.
+          // this is not fully tested, and the direct sync fallback should kept as-is until we fully investicate this.
+
+          if (!this._m_wasm_canvas_scene) return;
+          if (!patches || patches.length === 0) return;
+
+          const documentPatches = patches.filter(
+            (patch) => patch.path[0] === "document"
+          );
+
+          if (documentPatches.length === 0) {
+            return;
+          }
+
+          const operations =
+            editor.api.patch.toJsonPatchOperations(documentPatches);
+          if (operations.length === 0) {
+            return;
+          }
+
+          const result = this._m_wasm_canvas_scene.applyTransactions([
+            operations,
+          ]);
+
+          if (!result || result.some((report) => !report.success)) {
+            syncDocument(this._m_wasm_canvas_scene, document);
+            this.log("falling back to direct sync", result);
+          } else {
+            this._m_wasm_canvas_scene.redraw();
+          }
         }
       );
 
