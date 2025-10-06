@@ -2338,11 +2338,20 @@ export class Editor
 
       const syncDocument = (
         surface: Scene,
-        document: grida.program.document.Document
+        document: grida.program.document.Document,
+        sceneId?: string
       ) => {
+        const payloadDocument: grida.program.document.Document =
+          sceneId && document.entry_scene_id !== sceneId
+            ? {
+                ...document,
+                entry_scene_id: sceneId,
+              }
+            : document;
+
         const p = JSON.stringify({
           version: "0.0.1-beta.1+20250728",
-          document,
+          document: payloadDocument,
         });
         surface.loadScene(p);
         surface.redraw();
@@ -2350,12 +2359,17 @@ export class Editor
 
       // setup hooks
       // - state.document
+      // - state.scene_id
       // - state.debug
       // - state.transform
       // - [state.hovered_node_id, state.selection]
 
       // once
-      syncDocument(this._m_wasm_canvas_scene!, this.doc.state.document);
+      syncDocument(
+        this._m_wasm_canvas_scene!,
+        this.doc.state.document,
+        this.doc.state.scene_id
+      );
       syncTransform(
         this._m_wasm_canvas_scene!,
         this.doc.state.transform,
@@ -2396,11 +2410,25 @@ export class Editor
           ]);
 
           if (!result || result.some((report) => !report.success)) {
-            syncDocument(this._m_wasm_canvas_scene, document);
+            syncDocument(
+              this._m_wasm_canvas_scene,
+              document,
+              this.doc.state.scene_id
+            );
             this.log("falling back to direct sync", result);
           } else {
             this._m_wasm_canvas_scene.redraw();
           }
+        }
+      );
+
+      this.doc.subscribeWithSelector(
+        (state) => state.scene_id,
+        (_, scene_id) => {
+          if (!this._m_wasm_canvas_scene) return;
+
+          const document = this.doc.state.document;
+          syncDocument(this._m_wasm_canvas_scene, document, scene_id);
         }
       );
 
