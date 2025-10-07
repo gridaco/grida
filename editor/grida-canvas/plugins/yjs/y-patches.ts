@@ -1,9 +1,4 @@
-import {
-  applyPatches as applyImmerPatches,
-  enablePatches,
-  Patch,
-  produceWithPatches,
-} from "immer";
+import { applyPatches, enablePatches, Patch, produceWithPatches } from "immer";
 import * as Y from "yjs";
 import assert from "assert";
 
@@ -54,6 +49,10 @@ function toYDataType(value: JSONValue): any {
   return value;
 }
 
+/**
+ * Ensures a Yjs container exists at the given key, creating it if necessary.
+ * Uses `nextKey` to determine whether to create a Y.Map (string key) or Y.Array (number key).
+ */
 function ensureContainer(
   base: Y.Map<any> | Y.Array<any>,
   key: string | number,
@@ -257,7 +256,7 @@ function applyYEventsWithPatches<S extends JSONObject | JSONArray>(
 ): [S, Patch[]] {
   const [result, patches] = produceWithPatches(snapshot, (draft: any) => {
     for (const event of events) {
-      let base: any = draft;
+      let base = draft;
       for (const step of event.path) {
         base = base[step as any];
       }
@@ -280,19 +279,11 @@ export class YPatchBinder<S extends JSONObject | JSONArray> {
     this.snapshot = initialSnapshot;
 
     this.observer = (events) => {
-      if (!events.length) {
-        return;
-      }
+      if (!events.length) return;
       const transaction = events[0].transaction;
-      if (!transaction) {
-        return;
-      }
-      if (transaction.local) {
-        return;
-      }
-      if (transaction.origin === this.origin) {
-        return;
-      }
+      if (!transaction) return;
+      if (transaction.local) return;
+
       const [nextSnapshot, patches] = applyYEventsWithPatches(
         this.snapshot,
         events
@@ -316,7 +307,7 @@ export class YPatchBinder<S extends JSONObject | JSONArray> {
       return;
     }
 
-    const nextSnapshot = applyImmerPatches(this.snapshot, patches) as S;
+    const nextSnapshot = applyPatches(this.snapshot, patches) as S;
     const doc = this.source.doc;
     const apply = () => {
       for (const patch of patches) {

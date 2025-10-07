@@ -1,8 +1,8 @@
 import * as Y from "yjs";
 import type { Patch } from "immer";
 
-import { YPatchBinder, applyPatchToTarget } from "../sync-y-patches";
-import { extractDocumentPatches } from "../sync-y";
+import { YPatchBinder, applyPatchToTarget } from "../y-patches";
+import { groupDocumentPatches } from "../y-document";
 
 describe("applyPatchToTarget", () => {
   it("updates nested values without clobbering siblings", () => {
@@ -149,7 +149,7 @@ describe("YPatchBinder", () => {
   });
 });
 
-describe("extractDocumentPatches", () => {
+describe("groupDocumentPatches", () => {
   it("splits document patches into nodes and scenes", () => {
     const patches: Patch[] = [
       {
@@ -162,39 +162,19 @@ describe("extractDocumentPatches", () => {
         path: ["document", "scenes", "scene-1"],
         value: { id: "scene-1" },
       },
-      {
-        op: "replace",
-        path: ["document"],
-        value: {
-          nodes: { "node-2": { id: "node-2" } },
-          scenes: { "scene-2": { id: "scene-2" } },
-        },
-      },
     ];
 
-    const result = extractDocumentPatches(patches);
+    const result = groupDocumentPatches(patches);
 
-    expect(result.nodes).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: ["node-1", "x"], value: 10 }),
-        expect.objectContaining({
-          path: [],
-          value: { "node-2": { id: "node-2" } },
-        }),
-      ])
-    );
-    expect(result.scenes).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          path: ["scene-1"],
-          value: { id: "scene-1" },
-        }),
-        expect.objectContaining({
-          path: [],
-          value: { "scene-2": { id: "scene-2" } },
-        }),
-      ])
-    );
+    expect(result.nodes).toEqual([
+      expect.objectContaining({ path: ["node-1", "x"], value: 10 }),
+    ]);
+    expect(result.scenes).toEqual([
+      expect.objectContaining({
+        path: ["scene-1"],
+        value: { id: "scene-1" },
+      }),
+    ]);
   });
 
   it("handles non-document patches", () => {
@@ -211,15 +191,32 @@ describe("extractDocumentPatches", () => {
       },
     ];
 
-    const result = extractDocumentPatches(patches);
+    const result = groupDocumentPatches(patches);
 
     expect(result.nodes).toHaveLength(1);
     expect(result.scenes).toHaveLength(0);
   });
 
   it("handles empty patches", () => {
-    const result = extractDocumentPatches([]);
+    const result = groupDocumentPatches([]);
     expect(result.nodes).toHaveLength(0);
     expect(result.scenes).toHaveLength(0);
+  });
+
+  it("throws error on full document replacement", () => {
+    const patches: Patch[] = [
+      {
+        op: "replace",
+        path: ["document"],
+        value: {
+          nodes: { "node-1": { id: "node-1" } },
+          scenes: { "scene-1": { id: "scene-1" } },
+        },
+      },
+    ];
+
+    expect(() => groupDocumentPatches(patches)).toThrow(
+      "Full document replacement not supported"
+    );
   });
 });

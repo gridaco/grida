@@ -120,7 +120,7 @@ import { editor } from "@/grida-canvas";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import { LibraryContent } from "./library";
-import { EditorYSyncPlugin } from "@/grida-canvas/plugins/sync-y";
+import { EditorYSyncPlugin } from "@/grida-canvas/plugins/yjs";
 import { Editor } from "@/grida-canvas/editor";
 import { PlayerAvatar } from "@/components/multiplayer/avatar";
 import colors, {
