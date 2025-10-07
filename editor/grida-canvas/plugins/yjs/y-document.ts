@@ -6,12 +6,12 @@ import type { Patch } from "immer";
 import { YPatchBinder } from "./y-patches";
 import assert from "assert";
 
-export function groupDocumentPatches(patches: Patch[]): {
-  nodes: Patch[];
-  scenes: Patch[];
-} {
-  const nodes: Patch[] = [];
-  const scenes: Patch[] = [];
+/**
+ * Filters and transforms patches to only include document-level changes,
+ * removing the "document" prefix from the path
+ */
+export function extractDocumentPatches(patches: Patch[]): Patch[] {
+  const documentPatches: Patch[] = [];
 
   for (const patch of patches) {
     // Skip non-document patches
@@ -19,27 +19,15 @@ export function groupDocumentPatches(patches: Patch[]): {
       continue;
     }
 
-    assert(
-      patch.path.length > 1,
-      "Full document replacement not supported. Use granular patches for nodes and scenes."
-    );
-
-    // Handle partial updates (path: ["document", "nodes"|"scenes", ...rest])
-    const [, key, ...rest] = patch.path;
-    if (key === "nodes") {
-      nodes.push({
-        ...patch,
-        path: rest,
-      });
-    } else if (key === "scenes") {
-      scenes.push({
-        ...patch,
-        path: rest,
-      });
-    }
+    // Remove the "document" prefix from the path
+    const [, ...rest] = patch.path;
+    documentPatches.push({
+      ...patch,
+      path: rest,
+    });
   }
 
-  return { nodes, scenes };
+  return documentPatches;
 }
 
 /**
@@ -47,11 +35,9 @@ export function groupDocumentPatches(patches: Patch[]): {
  */
 export class DocumentSyncManager {
   private __unsubscribe_document_change!: () => void;
-  private readonly ymap_nodes: Y.Map<grida.program.nodes.Node>;
-  private readonly ymap_scenes: Y.Map<grida.program.document.Scene>;
+  private readonly ymap_document: Y.Map<any>;
   private throttle_ms: number = 30;
-  private readonly nodesBinder: YPatchBinder<Record<string, any>>;
-  private readonly scenesBinder: YPatchBinder<Record<string, any>>;
+  private readonly documentBinder: YPatchBinder<Record<string, any>>;
 
   /**
    * Unique origin identifier for this client's transactions
@@ -68,24 +54,15 @@ export class DocumentSyncManager {
     private readonly _editor: Editor,
     doc: Y.Doc
   ) {
-    this.ymap_nodes = doc.getMap("nodes");
-    this.ymap_scenes = doc.getMap("scenes");
+    this.ymap_document = doc.getMap("document");
 
-    const initialNodes = this.ymap_nodes.toJSON() as Record<string, any>;
-    const initialScenes = this.ymap_scenes.toJSON() as Record<string, any>;
+    const initialDocument = this.ymap_document.toJSON() as Record<string, any>;
 
-    this.nodesBinder = new YPatchBinder(
-      this.ymap_nodes,
-      initialNodes,
+    this.documentBinder = new YPatchBinder(
+      this.ymap_document,
+      initialDocument,
       this.origin,
-      (patches) => this._handleRemoteNodePatches(patches)
-    );
-
-    this.scenesBinder = new YPatchBinder(
-      this.ymap_scenes,
-      initialScenes,
-      this.origin,
-      (patches) => this._handleRemoteScenePatches(patches)
+      (patches) => this._handleRemotePatches(patches)
     );
 
     this._initializeStateFromSources();
@@ -108,14 +85,11 @@ export class DocumentSyncManager {
           if (this.rc === editorStore.tid) return;
           this.rc = editorStore.tid;
 
-          const { nodes, scenes } = groupDocumentPatches(patches);
+          const documentPatches = extractDocumentPatches(patches);
 
           this.mutex(() => {
-            if (nodes.length) {
-              this.nodesBinder.applyLocalPatches(nodes);
-            }
-            if (scenes.length) {
-              this.scenesBinder.applyLocalPatches(scenes);
+            if (documentPatches.length) {
+              this.documentBinder.applyLocalPatches(documentPatches);
             }
           });
         },
@@ -126,91 +100,55 @@ export class DocumentSyncManager {
   }
 
   public destroy() {
-    this.nodesBinder.destroy();
-    this.scenesBinder.destroy();
+    this.documentBinder.destroy();
     this.__unsubscribe_document_change();
   }
 
   private _initializeStateFromSources() {
     const localDocument = this._editor.doc.state.document;
-    const remoteNodes = this.nodesBinder.getSnapshot();
-    const remoteScenes = this.scenesBinder.getSnapshot();
+    const remoteDocument = this.documentBinder.getSnapshot();
 
-    const hasRemoteNodes = Object.keys(remoteNodes ?? {}).length > 0;
-    const hasRemoteScenes = Object.keys(remoteScenes ?? {}).length > 0;
+    const hasRemoteData = Object.keys(remoteDocument ?? {}).length > 0;
+    const hasLocalData =
+      Object.keys(localDocument.nodes).length > 0 ||
+      Object.keys(localDocument.scenes).length > 0;
 
-    if (this.ymap_nodes.size === 0 && Object.keys(localDocument.nodes).length) {
-      this.nodesBinder.applyLocalPatches([
+    // If remote is empty but local has data, push local to remote
+    if (this.ymap_document.size === 0 && hasLocalData) {
+      this.documentBinder.applyLocalPatches([
         {
           op: "replace",
           path: [],
-          value: localDocument.nodes,
-        },
-      ]);
-    } else if (hasRemoteNodes) {
-      this.mutex(() => {
-        this._editor.doc.applyDocumentPatches([
-          {
-            op: "replace",
-            path: ["document", "nodes"],
-            value: remoteNodes,
+          value: {
+            nodes: localDocument.nodes,
+            scenes: localDocument.scenes,
           },
-        ]);
-      });
-    }
-
-    if (
-      this.ymap_scenes.size === 0 &&
-      Object.keys(localDocument.scenes).length
-    ) {
-      this.scenesBinder.applyLocalPatches([
-        {
-          op: "replace",
-          path: [],
-          value: localDocument.scenes,
         },
       ]);
-    } else if (hasRemoteScenes) {
+    }
+    // If remote has data, pull it to local
+    else if (hasRemoteData) {
       this.mutex(() => {
         this._editor.doc.applyDocumentPatches([
           {
             op: "replace",
-            path: ["document", "scenes"],
-            value: remoteScenes,
+            path: ["document"],
+            value: remoteDocument,
           },
         ]);
       });
     }
   }
 
-  private _handleRemoteNodePatches(patches: Patch[]) {
+  private _handleRemotePatches(patches: Patch[]) {
     if (!patches.length) {
       return;
     }
 
+    // Add "document" prefix to all patches
     const prefixed = patches.map((patch) => ({
       ...patch,
-      path: ["document", "nodes", ...patch.path],
-    }));
-
-    this.mutex(
-      () => {
-        this._editor.doc.applyDocumentPatches(prefixed);
-      },
-      () => {
-        console.log("sync:down skipped (mutex locked)");
-      }
-    );
-  }
-
-  private _handleRemoteScenePatches(patches: Patch[]) {
-    if (!patches.length) {
-      return;
-    }
-
-    const prefixed = patches.map((patch) => ({
-      ...patch,
-      path: ["document", "scenes", ...patch.path],
+      path: ["document", ...patch.path],
     }));
 
     this.mutex(
