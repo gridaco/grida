@@ -1,11 +1,12 @@
 /**
  * Move one or more nodes under a target node (mutates the input map in-place).
- * @param nodes – Record mapping node IDs to objects that each have a `children: string[]` array.
+ * @param nodes – Record mapping node IDs to objects that each have a children array.
  * @param sources – Single node ID or array of node IDs to move.
  * @param target – Target parent node ID to move into.
- * @param index – Desired insertion index in the target’s children array; -1 (default) appends at end.
+ * @param index – Desired insertion index in the target's children array; -1 (default) appends at end.
+ * @param key – The key name for the children array property (defaults to "children").
  * @returns The same `nodes` map, now mutated.
- * @mutates nodes – the input map’s `children` arrays are modified directly.
+ * @mutates nodes – the input map's children arrays are modified directly.
  *
  * @example
  * ```ts
@@ -17,17 +18,29 @@
  *
  * mv(nodes, "c", "b", 0);
  * // now nodes.b.children === ["c"]
+ *
+ * // Custom key example:
+ * const customNodes: Record<string, { items: string[] }> = {
+ *   a: { items: ["b","c"] },
+ *   b: { items: [] },
+ *   c: { items: [] }
+ * };
+ * mv(customNodes, "c", "b", 0, "items");
  * ```
  *
  * @remark
  * - This function is not recursive. It only moves direct children of the target node.
  * - This function does not check for cycles.
  */
-export function mv<T extends Partial<{ children: string[] }>>(
+export function mv<
+  K extends string = "children",
+  T extends Record<K, string[]> = Record<K, string[]>,
+>(
   nodes: Record<string, T>,
   sources: string | string[],
   target: string,
-  index = -1
+  index = -1,
+  key: K = "children" as K
 ): Record<string, T> {
   const srcs = Array.isArray(sources) ? sources : [sources];
   const pos_specified = index >= 0;
@@ -37,8 +50,8 @@ export function mv<T extends Partial<{ children: string[] }>>(
     throw new Error(`mv: cannot move to '${target}': No such node`);
   }
 
-  if (!nodes[target].children) {
-    throw new Error(`mv: cannot move to '${target}': No children`);
+  if (!nodes[target][key]) {
+    throw new Error(`mv: cannot move to '${target}': No ${key as string}`);
   }
 
   for (const src of srcs) {
@@ -48,7 +61,7 @@ export function mv<T extends Partial<{ children: string[] }>>(
 
     // detach from old parent (if any)
     for (const node of Object.values(nodes)) {
-      const list = node.children;
+      const list = node[key];
       if (!list) continue;
       const i = list.indexOf(src);
       if (i !== -1) {
@@ -57,7 +70,7 @@ export function mv<T extends Partial<{ children: string[] }>>(
       }
     }
 
-    const kids = nodes[target].children;
+    const kids = nodes[target][key];
     // determine insertion position
     const insert_at = !pos_specified || pos > kids.length ? kids.length : pos;
     kids.splice(insert_at, 0, src);
@@ -67,13 +80,15 @@ export function mv<T extends Partial<{ children: string[] }>>(
   return nodes;
 }
 /**
- * Remove a node from the flat tree and unlink it from any parent’s `children`.
+ * Remove a node from the flat tree and unlink it from any parent's children array.
  *
- * @typeParam T – Node shape, optionally with a `children` array of IDs.
+ * @typeParam K – The key name for the children array property.
+ * @typeParam T – Node shape with a children array at key K.
  * @param nodes – Record mapping node IDs to node objects.
  * @param id – ID of the node to remove.
+ * @param key – The key name for the children array property (defaults to "children").
  * @returns void
- * @mutates nodes – the input map’s `children` arrays are modified directly.
+ * @mutates nodes – the input map's children arrays are modified directly.
  * @throws {Error} If `id` does not exist in `nodes`.
  * @example
  * ```ts
@@ -83,20 +98,29 @@ export function mv<T extends Partial<{ children: string[] }>>(
  * };
  * unlink(nodes, 'child');
  * // now nodes.parent.children === []
+ *
+ * // Custom key example:
+ * const customNodes = {
+ *   parent: { items: ['child'] },
+ *   child:  { items: [] }
+ * };
+ * unlink(customNodes, 'child', 'items');
  * ```
  */
-export function unlink<T extends { children?: string[] }>(
-  nodes: Record<string, T>,
-  id: string
-): void {
+export function unlink<
+  K extends string = "children",
+  T extends Partial<Record<K, string[]>> = Partial<Record<K, string[]>>,
+>(nodes: Record<string, T>, id: string, key: K = "children" as K): void {
   if (!(id in nodes)) {
     throw new Error(`unlink: cannot unlink '${id}': No such node`);
   }
 
   for (const node of Object.values(nodes)) {
-    const idx = node.children?.indexOf(id);
-    if (idx != null && idx >= 0) {
-      node.children!.splice(idx, 1);
+    const list = node[key];
+    if (!list) continue;
+    const idx = list.indexOf(id);
+    if (idx >= 0) {
+      list.splice(idx, 1);
     }
   }
 
@@ -107,11 +131,13 @@ export function unlink<T extends { children?: string[] }>(
  * Recursively remove a node and its subtree, delegating actual removal to `unlink`,
  * and return a list of all IDs that were removed.
  *
- * @typeParam T – Node shape with optional `children` array of IDs.
+ * @typeParam K – The key name for the children array property.
+ * @typeParam T – Node shape with optional children array at key K.
  * @param nodes – Record mapping node IDs to node objects.
  * @param id – ID of the root node to remove.
+ * @param key – The key name for the children array property (defaults to "children").
  * @returns Array of removed IDs, in removal order (children first, then the node itself).
- * @mutates nodes – the input map’s `children` arrays are modified directly.
+ * @mutates nodes – the input map's children arrays are modified directly.
  * @throws {Error} If `id` does not exist in `nodes`.
  * @example
  * ```ts
@@ -121,12 +147,19 @@ export function unlink<T extends { children?: string[] }>(
  * };
  * rm(nodes, 'a');
  * // now nodes is {}
+ *
+ * // Custom key example:
+ * const customNodes = {
+ *   a: { items: ['b'] },
+ *   b: { items: [] }
+ * };
+ * rm(customNodes, 'a', 'items');
  * ```
  */
-export function rm<T extends { children?: string[] }>(
-  nodes: Record<string, T>,
-  id: string
-): string[] {
+export function rm<
+  K extends string = "children",
+  T extends Partial<Record<K, string[]>> = Partial<Record<K, string[]>>,
+>(nodes: Record<string, T>, id: string, key: K = "children" as K): string[] {
   if (!(id in nodes)) {
     throw new Error(`rm: cannot remove '${id}': No such node`);
   }
@@ -134,12 +167,15 @@ export function rm<T extends { children?: string[] }>(
   const removed: string[] = [];
 
   // remove children first
-  for (const child of [...(nodes[id].children ?? [])]) {
-    removed.push(...rm(nodes, child));
+  const childrenList = nodes[id][key];
+  if (childrenList) {
+    for (const child of [...childrenList]) {
+      removed.push(...rm(nodes, child, key));
+    }
   }
 
   // then unlink this node
-  unlink(nodes, id);
+  unlink(nodes, id, key);
   removed.push(id);
 
   return removed;

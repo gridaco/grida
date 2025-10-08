@@ -97,3 +97,45 @@ describe("mv:advanced", () => {
     expect(tree.a.children).toEqual(["e", "d"]);
   });
 });
+
+describe("mv:custom-key", () => {
+  interface CustomNode {
+    items: string[];
+  }
+
+  let tree: Record<string, CustomNode>;
+
+  beforeEach(() => {
+    tree = {
+      a: { items: ["b", "c"] },
+      b: { items: [] },
+      c: { items: ["d"] },
+      d: { items: [] },
+    };
+  });
+
+  test("moves single node using custom key", () => {
+    mv(tree, "b", "c", -1, "items");
+    expect(tree).toEqual({
+      a: { items: ["c"] },
+      b: { items: [] },
+      c: { items: ["d", "b"] },
+      d: { items: [] },
+    });
+  });
+
+  test("moves multiple nodes using custom key", () => {
+    mv(tree, ["b", "d"], "a", -1, "items");
+    expect(tree).toEqual({
+      a: { items: ["c", "b", "d"] },
+      b: { items: [] },
+      c: { items: [] },
+      d: { items: [] },
+    });
+  });
+
+  test("moves with index using custom key", () => {
+    mv(tree, "d", "a", 0, "items");
+    expect(tree.a.items).toEqual(["d", "b", "c"]);
+  });
+});
