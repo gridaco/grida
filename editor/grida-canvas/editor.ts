@@ -474,7 +474,7 @@ class EditorDocumentStore
         stroke: this.backend === "dom" ? "stroke" : "strokes",
       },
       idgen: this.idgen,
-      logger: this.log,
+      logger: this.log.bind(this),
     };
 
     const actions = Array.isArray(action) ? action : [action];

@@ -3,6 +3,7 @@
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   CaretDownIcon,
   CaretUpIcon,
@@ -25,6 +26,7 @@ import type grida from "@grida/schema";
 import { useCurrentEditor, useEditorState } from "../use-editor";
 import { useRecorder } from "../plugins/use-recorder";
 import { saveAs } from "file-saver";
+import { editor } from "@/grida-canvas/editor.i";
 
 export function DevtoolsPanel() {
   const expandable = useDialogState();
@@ -74,6 +76,13 @@ export function DevtoolsPanel() {
                 className="text-xs uppercase"
               >
                 Recorder
+              </TabsTrigger>
+              <TabsTrigger
+                onClick={onTabClick}
+                value="events"
+                className="text-xs uppercase"
+              >
+                Events
               </TabsTrigger>
             </TabsList>
           </div>
@@ -144,6 +153,9 @@ export function DevtoolsPanel() {
           </TabsContent>
           <TabsContent value="recorder" className="h-full">
             <RecorderPanel />
+          </TabsContent>
+          <TabsContent value="events" className="h-full">
+            <EventsPanel />
           </TabsContent>
         </CollapsibleContent>
       </Tabs>
@@ -330,6 +342,166 @@ function RecorderPanel() {
       >
         <DownloadIcon />
       </Button>
+    </div>
+  );
+}
+
+type PatchEvent = {
+  timestamp: number;
+  patches: editor.history.Patch[];
+  action?: any;
+};
+
+function EventsPanel() {
+  const currentEditor = useCurrentEditor();
+  const [events, setEvents] = React.useState<PatchEvent[]>([]);
+  const [showNonDocumentPatches, setShowNonDocumentPatches] =
+    React.useState(false);
+
+  React.useEffect(() => {
+    // Subscribe to document changes with selector
+    const unsubscribe = currentEditor.doc.subscribeWithSelector(
+      (state) => state.document,
+      (doc, next, prev, action, patches) => {
+        if (!patches || patches.length === 0) return;
+
+        setEvents((prevEvents) => {
+          const newEvent: PatchEvent = {
+            timestamp: Date.now(),
+            patches,
+            action,
+          };
+          // Keep only the last 50 events
+          const updated = [newEvent, ...prevEvents];
+          return updated.slice(0, 50);
+        });
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [currentEditor]);
+
+  // Filter patches within events based on toggle
+  const filteredEvents = React.useMemo(() => {
+    return events
+      .map((event) => {
+        const filteredPatches = showNonDocumentPatches
+          ? event.patches
+          : event.patches.filter((patch) => patch.path[0] === "document");
+
+        return {
+          ...event,
+          patches: filteredPatches,
+        };
+      })
+      .filter((event) => event.patches.length > 0); // Only show events that have patches after filtering
+  }, [events, showNonDocumentPatches]);
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium">
+            Recent Patches ({filteredEvents.length}/50)
+          </h3>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="show-non-document-patches"
+                checked={showNonDocumentPatches}
+                onCheckedChange={(checked) =>
+                  setShowNonDocumentPatches(checked === true)
+                }
+              />
+              <label
+                htmlFor="show-non-document-patches"
+                className="text-xs text-muted-foreground cursor-pointer select-none"
+              >
+                Show non-document patches
+              </label>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setEvents([])}
+              disabled={events.length === 0}
+            >
+              <TrashIcon className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+        {filteredEvents.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-8">
+            No patches yet. Make changes to see them here.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredEvents.map((event, index) => (
+              <Collapsible key={index}>
+                <div className="border rounded-lg p-3">
+                  <CollapsibleTrigger className="w-full">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-muted-foreground">
+                          #{filteredEvents.length - index}
+                        </span>
+                        <span className="font-medium">
+                          {event.action?.type || "unknown"}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {event.patches.length} patch
+                          {event.patches.length !== 1 ? "es" : ""}
+                        </span>
+                      </div>
+                      <span className="text-muted-foreground font-mono">
+                        {event.timestamp}
+                      </span>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="space-y-1">
+                      {event.patches.map((patch, patchIndex) => (
+                        <div
+                          key={patchIndex}
+                          className="text-xs font-mono bg-muted p-2 rounded"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span
+                              className={`font-bold ${
+                                patch.op === "add"
+                                  ? "text-green-600"
+                                  : patch.op === "remove"
+                                    ? "text-red-600"
+                                    : "text-blue-600"
+                              }`}
+                            >
+                              {patch.op}
+                            </span>
+                            <div className="flex-1">
+                              <div className="text-muted-foreground">
+                                {patch.path.join(" → ")}
+                              </div>
+                              {patch.value !== undefined && (
+                                <div className="mt-1 text-foreground">
+                                  {typeof patch.value === "object"
+                                    ? JSON.stringify(patch.value, null, 2)
+                                    : String(patch.value)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
