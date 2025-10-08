@@ -262,7 +262,7 @@ export function NodeHierarchyList() {
     },
     isItemFolder: (item) => {
       const node = item.getItemData();
-      return "children" in node;
+      return grida.program.nodes.is.ichildren(node);
     },
     onDrop(items, target) {
       const ids = items.map((item) => item.getId());

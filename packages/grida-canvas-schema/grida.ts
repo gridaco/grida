@@ -1923,6 +1923,16 @@ export namespace grida.program.nodes {
     }
   }
 
+  export namespace is {
+    /**
+     * @param node node to check
+     * @returns true if the node is a children reference
+     */
+    export function ichildren(node: any): node is i.IChildrenReference {
+      return "children" in node;
+    }
+  }
+
   type __ReplaceSubset<T, TSubset extends Partial<T>, TNew> = Omit<
     T,
     keyof TSubset
@@ -2644,7 +2654,10 @@ export namespace grida.program.nodes {
       delete prototype._$id;
 
       // Handle children recursively, if the node has children
-      if ("children" in node && Array.isArray(node.children)) {
+      if (
+        grida.program.nodes.is.ichildren(node) &&
+        Array.isArray(node.children)
+      ) {
         (prototype as __IPrototypeNodeChildren).children = node.children.map(
           (childId) => createPrototypeFromSnapshot(snapshot, childId)
         );

@@ -196,7 +196,10 @@ export function self_ungroup<S extends editor.state.IEditorState>(
     const node = dq.__getNodeById(draft, node_id);
 
     // Ensure the node has children (group or boolean nodes)
-    if (!("children" in node) || !Array.isArray(node.children)) {
+    if (
+      !grida.program.nodes.is.ichildren(node) ||
+      !Array.isArray(node.children)
+    ) {
       return;
     }
 
@@ -252,7 +255,10 @@ export function self_ungroup<S extends editor.state.IEditorState>(
     } else {
       // Remove from parent's children
       const parent = dq.__getNodeById(draft, parent_id);
-      if ("children" in parent && Array.isArray(parent.children)) {
+      if (
+        grida.program.nodes.is.ichildren(parent) &&
+        Array.isArray(parent.children)
+      ) {
         const index = parent.children.indexOf(node_id);
         if (index !== -1) {
           parent.children.splice(index, 1);

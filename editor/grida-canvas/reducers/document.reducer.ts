@@ -2025,7 +2025,10 @@ function __self_post_hierarchy_change_commit<
     // Only check boolean and group nodes
     if (parent_node.type === "boolean" || parent_node.type === "group") {
       // Check if the node has children property and if it's empty
-      if ("children" in parent_node && Array.isArray(parent_node.children)) {
+      if (
+        grida.program.nodes.is.ichildren(parent_node) &&
+        Array.isArray(parent_node.children)
+      ) {
         if (parent_node.children.length === 0) {
           // Remove the empty boolean/group node
           self_try_remove_node(draft, parent_id);

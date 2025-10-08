@@ -42,7 +42,7 @@ export function getRayTarget(
     .filter((node_id) => {
       const node = nodes[node_id];
       const top_id = dq.getTopId(context.document_ctx, node_id);
-      const maybeichildren = ichildren(node);
+      const maybeichildren = childrenOf(node);
 
       // Check if this is a root node with children that should be ignored
       if (
@@ -131,7 +131,7 @@ export function getMarqueeSelection(
     const hit = dq.__getNodeById(state, hit_id);
 
     // (1) shall not be a root node (if configured)
-    const maybeichildren = ichildren(hit);
+    const maybeichildren = childrenOf(hit);
     if (
       maybeichildren &&
       maybeichildren.length > 0 &&
@@ -167,9 +167,9 @@ export function getMarqueeSelection(
   return target_node_ids;
 }
 
-function ichildren(node: any): Array<any> | undefined {
+function childrenOf<T>(node: T): Array<string> | undefined {
   if (!node) return undefined;
-  if ("children" in node && Array.isArray(node.children)) {
+  if (grida.program.nodes.is.ichildren(node) && Array.isArray(node.children)) {
     return node.children;
   }
   return undefined;

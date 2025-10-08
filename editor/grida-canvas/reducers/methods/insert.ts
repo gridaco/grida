@@ -21,7 +21,7 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
     const parent_node = draft.document.nodes[parent_id];
     assert(parent_node, `Parent node not found with id: "${parent_id}"`);
     assert(
-      "children" in parent_node,
+      grida.program.nodes.is.ichildren(parent_node),
       `Parent must be a container node: "${parent_id}"`
     );
 
@@ -98,7 +98,10 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
 
     // TODO: this part shall be removed and ensured with data strictness
     // Initialize the parent's children array if it doesn't exist
-    if (!("children" in parent_node) || !parent_node.children) {
+    if (
+      !grida.program.nodes.is.ichildren(parent_node) ||
+      !parent_node.children
+    ) {
       assert(
         parent_node.type === "container",
         "Parent must be a container node"

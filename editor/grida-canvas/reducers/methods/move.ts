@@ -1,5 +1,5 @@
 import type { Draft } from "immer";
-import type grida from "@grida/schema";
+import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import { mv } from "@grida/tree";
 import { dq } from "@/grida-canvas/query";
@@ -30,7 +30,7 @@ export function self_moveNode<S extends editor.state.IEditorState>(
 
   // validate target is a container
   const target = itree[target_id];
-  if (!("children" in target)) {
+  if (!grida.program.nodes.is.ichildren(target)) {
     return false;
   }
 
