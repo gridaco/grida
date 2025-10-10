@@ -69,7 +69,7 @@ describe("archive comprehensive", () => {
 
   // Simple document data for testing
   const mockDocumentData: io.JSONDocumentFileModel = {
-    version: "0.0.1-beta.1+20250728",
+    version: "0.0.1-beta.1+20251010",
     document: {
       nodes: {},
       scenes: {
@@ -92,7 +92,7 @@ describe("archive comprehensive", () => {
 
   // Complex document data for testing (without bitmaps for now)
   const complexDocumentData: io.JSONDocumentFileModel = {
-    version: "0.0.1-beta.1+20250728",
+    version: "0.0.1-beta.1+20251010",
     document: {
       nodes: {
         node1: {

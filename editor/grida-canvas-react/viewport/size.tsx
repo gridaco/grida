@@ -27,7 +27,7 @@ const SizeContext = React.createContext<{
  *     width={100}
  *     height={100}
  *     data={{
- *       version: "0.0.1-beta.1+20250728",
+ *       version: "0.0.1-beta.1+20251010",
  *       document: state,
  *     }}
  *   />
