@@ -1,8 +1,8 @@
 import { tree } from "../src/lib";
 
 describe("TreeLUT", () => {
-  let lut: tree.ITreeLUT;
-  let treeLUT: tree.TreeLUT;
+  let lut: tree.lut.ITreeLUT;
+  let treeLUT: tree.lut.TreeLUT;
 
   beforeEach(() => {
     // Tree structure:
@@ -15,7 +15,7 @@ describe("TreeLUT", () => {
       lu_parent: { root: null, a: "root", b: "root", c: "a" },
       lu_children: { root: ["a", "b"], a: ["c"], b: [], c: [] },
     };
-    treeLUT = new tree.TreeLUT(lut);
+    treeLUT = new tree.lut.TreeLUT(lut);
   });
 
   describe("from", () => {
@@ -27,7 +27,7 @@ describe("TreeLUT", () => {
         c: { children: [] },
       };
 
-      const treeLUT = tree.TreeLUT.from(nodes);
+      const treeLUT = tree.lut.TreeLUT.from(nodes);
 
       expect(treeLUT.lut.lu_keys).toContain("root");
       expect(treeLUT.lut.lu_keys).toContain("a");
@@ -53,7 +53,7 @@ describe("TreeLUT", () => {
         c: { items: [] },
       };
 
-      const treeLUT = tree.TreeLUT.from(nodes, "items");
+      const treeLUT = tree.lut.TreeLUT.from(nodes, "items");
 
       expect(treeLUT.parentOf("a")).toBe("root");
       expect(treeLUT.parentOf("b")).toBe("root");
@@ -69,7 +69,7 @@ describe("TreeLUT", () => {
         b: { children: [], name: "B Node", value: 3 },
       };
 
-      const treeLUT = tree.TreeLUT.from(nodes);
+      const treeLUT = tree.lut.TreeLUT.from(nodes);
 
       expect(treeLUT.depthOf("root")).toBe(0);
       expect(treeLUT.depthOf("a")).toBe(1);
@@ -83,7 +83,7 @@ describe("TreeLUT", () => {
         b: {},
       };
 
-      const treeLUT = tree.TreeLUT.from(nodes);
+      const treeLUT = tree.lut.TreeLUT.from(nodes);
 
       expect(treeLUT.childrenOf("a")).toEqual([]);
       expect(treeLUT.childrenOf("b")).toEqual([]);
@@ -98,7 +98,7 @@ describe("TreeLUT", () => {
         b: { children: [] },
       };
 
-      const treeLUT = tree.TreeLUT.from(nodes);
+      const treeLUT = tree.lut.TreeLUT.from(nodes);
 
       expect(treeLUT.parentOf("root1")).toBeNull();
       expect(treeLUT.parentOf("root2")).toBeNull();
@@ -212,7 +212,7 @@ describe("TreeLUT", () => {
     });
 
     test("handles multiple root nodes", () => {
-      const multiRootLUT = new tree.TreeLUT({
+      const multiRootLUT = new tree.lut.TreeLUT({
         lu_keys: ["root1", "root2", "a"],
         lu_parent: { root1: null, root2: null, a: "root1" },
         lu_children: { root1: ["a"], root2: [], a: [] },

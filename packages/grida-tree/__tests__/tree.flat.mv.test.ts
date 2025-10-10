@@ -1,6 +1,6 @@
-import { mv } from "../src/lib";
+import { tree as lib } from "../src/lib";
 
-describe("mv", () => {
+describe("flat_with_children.mv", () => {
   let tree: Record<string, { children: string[] }>;
 
   beforeEach(() => {
@@ -13,7 +13,7 @@ describe("mv", () => {
   });
 
   test("moves single node under new parent", () => {
-    mv(tree, "b", "c");
+    lib.flat_with_children.mv(tree, "b", "c");
     expect(tree).toEqual({
       a: { children: ["c"] },
       b: { children: [] },
@@ -23,7 +23,7 @@ describe("mv", () => {
   });
 
   test("moves multiple nodes under new parent", () => {
-    mv(tree, ["b", "d"], "a");
+    lib.flat_with_children.mv(tree, ["b", "d"], "a");
     expect(tree).toEqual({
       a: { children: ["c", "b", "d"] },
       b: { children: [] },
@@ -33,23 +33,23 @@ describe("mv", () => {
   });
 
   test("throws error when source does not exist", () => {
-    expect(() => mv(tree, "x", "a")).toThrow(
+    expect(() => lib.flat_with_children.mv(tree, "x", "a")).toThrow(
       "mv: cannot move 'x': No such node"
     );
   });
 
   test("throws error when target does not exist", () => {
-    expect(() => mv(tree, "b", "x")).toThrow(
+    expect(() => lib.flat_with_children.mv(tree, "b", "x")).toThrow(
       "mv: cannot move to 'x': No such node"
     );
   });
 
   test("moving a node to its current parent reorders children", () => {
     // initial a: ['b', 'c']
-    mv(tree, "c", "a");
+    lib.flat_with_children.mv(tree, "c", "a");
     expect(tree.a.children).toEqual(["b", "c"]);
     // moving 'b' under the same parent moves it to end
-    mv(tree, "b", "a");
+    lib.flat_with_children.mv(tree, "b", "a");
     expect(tree.a.children).toEqual(["c", "b"]);
   });
 });
@@ -71,11 +71,11 @@ describe("mv:advanced", () => {
 
   test("complex chained moves with indices and bulk sources", () => {
     // move 'd' under 'b' at index 0
-    mv(tree, "d", "b", 0);
+    lib.flat_with_children.mv(tree, "d", "b", 0);
     // move 'e' under 'root' at index 1
-    mv(tree, "e", "root", 1);
+    lib.flat_with_children.mv(tree, "e", "root", 1);
     // move multiple ['f','a'] under 'b' (append)
-    mv(tree, ["f", "a"], "b");
+    lib.flat_with_children.mv(tree, ["f", "a"], "b");
     expect(tree).toEqual({
       root: { children: ["e", "b", "c"] },
       a: { children: [] },
@@ -90,10 +90,10 @@ describe("mv:advanced", () => {
   test("reordering within same parent using index", () => {
     // initial children of 'a' are ['d','e']
     // move 'e' within 'a' to index 0
-    mv(tree, "e", "a", 0);
+    lib.flat_with_children.mv(tree, "e", "a", 0);
     expect(tree.a.children).toEqual(["e", "d"]);
     // then move 'd' to index -1 (append) under 'a'
-    mv(tree, "d", "a", -1);
+    lib.flat_with_children.mv(tree, "d", "a", -1);
     expect(tree.a.children).toEqual(["e", "d"]);
   });
 });
@@ -115,7 +115,7 @@ describe("mv:custom-key", () => {
   });
 
   test("moves single node using custom key", () => {
-    mv(tree, "b", "c", -1, "items");
+    lib.flat_with_children.mv(tree, "b", "c", -1, "items");
     expect(tree).toEqual({
       a: { items: ["c"] },
       b: { items: [] },
@@ -125,7 +125,7 @@ describe("mv:custom-key", () => {
   });
 
   test("moves multiple nodes using custom key", () => {
-    mv(tree, ["b", "d"], "a", -1, "items");
+    lib.flat_with_children.mv(tree, ["b", "d"], "a", -1, "items");
     expect(tree).toEqual({
       a: { items: ["c", "b", "d"] },
       b: { items: [] },
@@ -135,7 +135,7 @@ describe("mv:custom-key", () => {
   });
 
   test("moves with index using custom key", () => {
-    mv(tree, "d", "a", 0, "items");
+    lib.flat_with_children.mv(tree, "d", "a", 0, "items");
     expect(tree.a.items).toEqual(["d", "b", "c"]);
   });
 });

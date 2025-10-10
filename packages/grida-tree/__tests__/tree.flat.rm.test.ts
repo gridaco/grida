@@ -1,9 +1,9 @@
-import { rm } from "../src/lib";
+import { tree as lib } from "../src/lib";
 
 describe("rm", () => {
   it("removes a standalone node", () => {
     const nodes = { a: {} as any, b: {} as any };
-    const removed = rm(nodes, "a");
+    const removed = lib.flat_with_children.rm(nodes, "a");
     expect(removed).toEqual(["a"]);
     expect(nodes).toEqual({ b: {} });
   });
@@ -15,7 +15,7 @@ describe("rm", () => {
       c: {},
       d: {},
     } as Record<string, any>;
-    const removed = rm(nodes, "a");
+    const removed = lib.flat_with_children.rm(nodes, "a");
     expect(removed).toEqual(["c", "b", "a"]);
     expect(nodes).toEqual({ d: {} });
   });
@@ -27,7 +27,7 @@ describe("rm", () => {
       y: {},
       z: {},
     } as Record<string, any>;
-    const removed = rm(nodes, "x");
+    const removed = lib.flat_with_children.rm(nodes, "x");
     expect(removed).toEqual(["z", "x"]);
     expect(nodes.root.children).toEqual(["y"]);
     expect(nodes).not.toHaveProperty("x");
@@ -37,7 +37,7 @@ describe("rm", () => {
 
   it("throws if id does not exist", () => {
     const nodes = { a: {} as any };
-    expect(() => rm(nodes, "missing")).toThrow(
+    expect(() => lib.flat_with_children.rm(nodes, "missing")).toThrow(
       /rm: cannot remove 'missing': No such node/
     );
   });
@@ -47,7 +47,7 @@ describe("rm", () => {
       a: {},
       b: { foo: "bar" },
     } as Record<string, any>;
-    const removed = rm(nodes, "a");
+    const removed = lib.flat_with_children.rm(nodes, "a");
     expect(removed).toEqual(["a"]);
     expect(nodes).toEqual({ b: { foo: "bar" } });
   });
@@ -59,7 +59,7 @@ describe("rm", () => {
       c: { children: ["d"] },
       d: {},
     } as Record<string, any>;
-    const removed = rm(nodes, "b");
+    const removed = lib.flat_with_children.rm(nodes, "b");
     expect(removed).toEqual(["b"]);
     expect(Object.keys(nodes).sort()).toEqual(["a", "c", "d"]);
     expect(nodes.a.children).toEqual([]);
@@ -83,20 +83,20 @@ describe("rm:advanced", () => {
       c: {},
     } as Record<string, any>;
 
-    let removed = rm(nodes, "a2");
+    let removed = lib.flat_with_children.rm(nodes, "a2");
     expect(removed).toEqual(["a2"]);
     expect(nodes.root.children).toEqual(["a", "b", "c"]);
     expect(nodes.a.children).toEqual(["a1"]);
     expect(nodes).not.toHaveProperty("a2");
 
-    removed = rm(nodes, "b2");
+    removed = lib.flat_with_children.rm(nodes, "b2");
     expect(removed).toEqual(["b2a", "b2b", "b2"]);
     expect(nodes.b.children).toEqual(["b1"]);
     expect(nodes).not.toHaveProperty("b2");
     expect(nodes).not.toHaveProperty("b2a");
     expect(nodes).not.toHaveProperty("b2b");
 
-    removed = rm(nodes, "a");
+    removed = lib.flat_with_children.rm(nodes, "a");
     expect(removed).toEqual(["a1a", "a1", "a"]);
     expect(nodes.root.children).toEqual(["b", "c"]);
     expect(nodes).not.toHaveProperty("a");
