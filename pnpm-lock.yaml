@@ -1176,12 +1176,17 @@ importers:
       '@grida/tokens':
         specifier: workspace:*
         version: link:../grida-tokens
+      '@grida/tree':
+        specifier: workspace:*
+        version: link:../grida-tree
       '@grida/vn':
         specifier: workspace:*
         version: link:../grida-canvas-vn
       csstype:
         specifier: 3.1.0
         version: 3.1.0
+
+  packages/grida-canvas-sequence: {}
 
   packages/grida-canvas-tailwind: {}
 

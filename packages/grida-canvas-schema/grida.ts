@@ -2,6 +2,7 @@ import type { tokens } from "@grida/tokens";
 import type { TokenizableExcept } from "@grida/tokens/utils";
 import type vn from "@grida/vn";
 import cg from "@grida/cg";
+import tree from "@grida/tree";
 import type cmath from "@grida/cmath";
 import * as CSS from "csstype";
 
@@ -850,7 +851,7 @@ export namespace grida.program.document {
   export namespace internal {
     /**
      * @internal
-     * Represents the current runtime state of the document hierarchy context.
+     * Nodes repository runtime hierarchy context for efficient hierarchical queries on flat document structures.
      *
      * This interface is designed for **in-memory, runtime-only** use and should not be used for persisting data.
      * It exists to provide efficient access to the parent and child relationships within the document tree without
@@ -858,43 +859,27 @@ export namespace grida.program.document {
      *
      * ## Why We Use This Interface
      * This interface allows for a structured, performant way to manage node hierarchy relationships without introducing
-     * a `parent_id` property on each `Node`. By using an in-memory context, we avoid potential issues with nullable `parent_id` fields,
-     * which could lead to unpredictable coding experiences. Additionally, maintaining these relationships within a dedicated
-     * context layer promotes separation of concerns, keeping core node definitions stable and interface-compatible.
+     * a `parent_id` property on each `Node`. By using an in-memory context, we avoid potential issues with nullable
+     * `parent_id` fields, which could lead to unpredictable coding experiences. Additionally, maintaining these
+     * relationships within a dedicated context layer promotes separation of concerns, keeping core node definitions
+     * stable and interface-compatible.
      *
      * ## Functionality
-     * - **Get Parent Node by Child ID**: Efficiently map a node's ID (`NodeID`) to its parent node ID.
-     * - **Get Child Nodes by Parent ID**: Access a list of child node IDs for any given parent node.
+     * - **Get Parent Node by Child ID**: Efficiently map a node's ID to its parent node ID with O(1) lookup.
+     * - **Get Child Nodes by Parent ID**: Access a list of child node IDs for any given parent node with O(1) lookup.
+     * - **Traverse Ancestors**: Walk up the tree from any node to its root.
+     * - **Query Depth**: Calculate how deep a node is in the hierarchy.
+     * - **Find Siblings**: Locate nodes that share the same parent.
      *
      * ## Management Notes
      * - This interface should be populated and managed only during runtime.
-     * - It is recommended to initialize `ctx_nid_to_parent_id` and `ctx_nid_to_children_ids` during document tree loading or
-     *   initial rendering.
-     * - If the node hierarchy is updated (e.g., nodes are added or removed), this context should be refreshed to reflect the
-     *   current relationships.
+     * - It is recommended to initialize the lookup table during document tree loading or initial rendering.
+     * - If the node hierarchy is updated (e.g., nodes are added, removed, or moved), this context should be refreshed
+     *   to reflect the current relationships.
+     * - For optimal performance, the context should be created once and reused for multiple queries.
      *
      */
-    export interface INodesRepositoryRuntimeHierarchyContext {
-      /**
-       * Array (Set) of all node IDs in the document, facilitating traversal and lookup.
-       */
-      readonly __ctx_nids: Array<nodes.NodeID>;
-
-      /**
-       * Maps each node ID to its respective parent node ID, facilitating upward traversal.
-       */
-      readonly __ctx_nid_to_parent_id: Record<
-        nodes.NodeID,
-        nodes.NodeID | null
-      >;
-
-      /**
-       * Maps each node ID to an array of its child node IDs, enabling efficient downward traversal.
-       *
-       * This does NOT ensure the order of the children. when to reorder, use the `children` property in the node.
-       */
-      readonly __ctx_nid_to_children_ids: Record<nodes.NodeID, nodes.NodeID[]>;
-    }
+    export type INodesRepositoryRuntimeHierarchyContext = tree.ITreeLUT;
   }
 
   export interface INodeHtmlDocumentQueryDataAttributes {

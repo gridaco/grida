@@ -1930,7 +1930,7 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
 
   const scene = draft.document.scenes[draft.scene_id!];
   const siblings = parent_id
-    ? draft.document_ctx.__ctx_nid_to_children_ids[parent_id] || []
+    ? draft.document_ctx.lu_children[parent_id] || []
     : scene.children;
   const order = Math.min(
     ...group.map((id) => siblings.indexOf(id)).filter((i) => i >= 0)

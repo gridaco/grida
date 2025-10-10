@@ -46,19 +46,19 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
     ...sub.nodes,
   };
 
-  draft.document_ctx.__ctx_nids = [
-    ...draft.document_ctx.__ctx_nids,
-    ...sub_ctx.__ctx_nids,
+  draft.document_ctx.lu_keys = [
+    ...draft.document_ctx.lu_keys,
+    ...sub_ctx.lu_keys,
   ];
 
-  draft.document_ctx.__ctx_nid_to_children_ids = {
-    ...draft.document_ctx.__ctx_nid_to_children_ids,
-    ...sub_ctx.__ctx_nid_to_children_ids,
+  draft.document_ctx.lu_children = {
+    ...draft.document_ctx.lu_children,
+    ...sub_ctx.lu_children,
   };
 
-  draft.document_ctx.__ctx_nid_to_parent_id = {
-    ...draft.document_ctx.__ctx_nid_to_parent_id,
-    ...sub_ctx.__ctx_nid_to_parent_id,
+  draft.document_ctx.lu_parent = {
+    ...draft.document_ctx.lu_parent,
+    ...sub_ctx.lu_parent,
   };
 
   draft.fontfaces = Array.from(

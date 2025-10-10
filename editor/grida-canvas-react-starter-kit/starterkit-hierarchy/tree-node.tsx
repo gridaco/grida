@@ -198,11 +198,9 @@ export function NodeHierarchyList() {
 
         // Find the parent of this node
         const parentId = Object.keys(
-          editor.state.document_ctx.__ctx_nid_to_children_ids
+          editor.state.document_ctx.lu_children
         ).find((parentId) =>
-          editor.state.document_ctx.__ctx_nid_to_children_ids[
-            parentId
-          ]?.includes(currentId)
+          editor.state.document_ctx.lu_children[parentId]?.includes(currentId)
         );
 
         if (parentId && parentId !== "<root>") {
@@ -226,7 +224,7 @@ export function NodeHierarchyList() {
   }, [
     selection,
     editor.state.document.nodes,
-    editor.state.document_ctx.__ctx_nid_to_children_ids,
+    editor.state.document_ctx.lu_children,
   ]);
 
   // Combine user's manual expansions with required expansions
@@ -274,7 +272,7 @@ export function NodeHierarchyList() {
           if (parentId === "<root>") {
             return children ?? [];
           }
-          return editor.state.document_ctx.__ctx_nid_to_children_ids[parentId];
+          return editor.state.document_ctx.lu_children[parentId];
         },
         inversed: true,
       });
@@ -289,9 +287,7 @@ export function NodeHierarchyList() {
         if (itemId === "<root>") {
           return toReversedCopy(children);
         }
-        return toReversedCopy(
-          editor.state.document_ctx.__ctx_nid_to_children_ids[itemId]
-        );
+        return toReversedCopy(editor.state.document_ctx.lu_children[itemId]);
       },
     },
     features: [
