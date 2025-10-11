@@ -1537,6 +1537,152 @@ export namespace tree {
       }
 
       /**
+       * Import an external sub-graph into the current graph, attaching specified roots to a parent.
+       *
+       * This method merges an external graph structure into the current one, handling both
+       * data (nodes) and structure (links) atomically. It's designed for scenarios like:
+       * - Inserting sub-documents (copy/paste, templates, components)
+       * - Merging separate graph structures
+       * - Batch insertion of hierarchical data
+       *
+       * The operation is **atomic**: either all validations pass and the entire subgraph
+       * is imported, or an error is thrown and the graph remains unchanged.
+       *
+       * @param subgraph - External graph to import (contains nodes and links)
+       * @param roots - Node IDs from subgraph to attach as children of parent
+       * @param parent - Parent node ID in the current graph to attach roots to
+       * @param index - Insertion index in parent's children array (default: -1 = append)
+       * @throws {Error} If any node ID from subgraph conflicts with existing nodes
+       * @throws {Error} If parent node doesn't exist in current graph
+       * @throws {Error} If any root ID doesn't exist in subgraph
+       * @throws {Error} If policy constraints are violated
+       * @mutates Modifies the graph in-place by adding nodes/links and attaching roots
+       *
+       * @example
+       * ```ts
+       * // Import a component sub-graph
+       * const mainGraph = new tree.graph.Graph({
+       *   nodes: { page: { name: "Page" } },
+       *   links: { page: [] }
+       * });
+       *
+       * const component = {
+       *   nodes: {
+       *     header: { name: "Header" },
+       *     logo: { name: "Logo" },
+       *     title: { name: "Title" }
+       *   },
+       *   links: {
+       *     header: ["logo", "title"],
+       *     logo: undefined,
+       *     title: undefined
+       *   }
+       * };
+       *
+       * // Import component into page at index 0
+       * mainGraph.import(component, ["header"], "page", 0);
+       * // Now: page -> [header], header -> [logo, title]
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Import multiple root nodes (like paste operation)
+       * const clipboard = {
+       *   nodes: {
+       *     box1: { type: "frame" },
+       *     box2: { type: "frame" },
+       *     text1: { type: "text" }
+       *   },
+       *   links: {
+       *     box1: undefined,
+       *     box2: undefined,
+       *     text1: undefined
+       *   }
+       * };
+       *
+       * graph.import(clipboard, ["box1", "box2", "text1"], "container");
+       * // Now: container -> [...existing, box1, box2, text1]
+       * ```
+       *
+       * @remarks
+       * **ID Conflict Handling:**
+       * - All node IDs in subgraph must be unique vs. existing nodes
+       * - Conflicts are detected before any mutations occur
+       * - Consider using a key remapping strategy if conflicts are expected
+       *
+       * **Orphan Nodes:**
+       * - All nodes in subgraph are added, even if not reachable from roots
+       * - Orphaned nodes remain unlinked (not attached to any parent)
+       * - Useful for preserving entire document structure
+       *
+       * **Link Preservation:**
+       * - All internal links within subgraph are preserved exactly
+       * - Only roots get new parent links (to the specified parent)
+       * - Order is preserved via the index parameter
+       *
+       * **Policy Integration:**
+       * - Root attachment goes through mv(), so all policy checks apply
+       * - If any root violates policy, entire import fails (atomic)
+       *
+       * @see {@link mv} for moving existing nodes (used internally for root attachment)
+       */
+      import(
+        subgraph: IGraph<T>,
+        roots: Key[],
+        parent: Key,
+        index: number = -1
+      ): void {
+        // === Validation Phase (all checks before any mutation) ===
+
+        // 1. Validate parent exists in current graph
+        if (!(parent in this.graph.nodes)) {
+          throw new Error(`import: cannot import to '${parent}': No such node`);
+        }
+
+        // 2. Validate all roots exist in subgraph
+        for (const root of roots) {
+          if (!(root in subgraph.nodes)) {
+            throw new Error(`import: root '${root}' not found in subgraph`);
+          }
+        }
+
+        // 3. Check for ID conflicts (all subgraph nodes vs existing nodes)
+        for (const nodeId of Object.keys(subgraph.nodes)) {
+          if (nodeId in this.graph.nodes) {
+            throw new Error(
+              `import: node ID conflict - '${nodeId}' already exists`
+            );
+          }
+        }
+
+        // === Mutation Phase (all validations passed) ===
+
+        // 4. Add all nodes from subgraph
+        Object.assign(this.graph.nodes, subgraph.nodes);
+
+        // 5. Add all links from subgraph
+        for (const [nodeId, children] of Object.entries(subgraph.links)) {
+          this.graph.links[nodeId] = children;
+        }
+
+        // 6. Attach roots to parent using mv() (handles policy, order preservation)
+        if (roots.length > 0) {
+          try {
+            this.mv(roots, parent, index);
+          } catch (error) {
+            // Rollback: Remove all added nodes and links to maintain atomicity
+            for (const nodeId of Object.keys(subgraph.nodes)) {
+              delete this.graph.nodes[nodeId];
+            }
+            for (const nodeId of Object.keys(subgraph.links)) {
+              delete this.graph.links[nodeId];
+            }
+            throw error; // Re-throw the original error
+          }
+        }
+      }
+
+      /**
        * Reorder a node within its current parent's children array.
        *
        * This method changes the position of a node among its siblings without changing

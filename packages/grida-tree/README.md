@@ -122,6 +122,9 @@ class Graph<T> {
     key: Key,
     order: "back" | "front" | "backward" | "forward" | number
   ): void;
+
+  // Import an external sub-graph into the current graph
+  import(subgraph: IGraph<T>, roots: Key[], parent: Key, index?: number): void;
 }
 
 // Policy interface for structural constraints
@@ -166,6 +169,13 @@ const graph = new tree.graph.Graph<DocumentNode>({
 graph.mv("title", "page"); // Move title to page
 graph.order("header", "front"); // Reorder header to front
 graph.rm("logo"); // Remove logo
+
+// Import external sub-graphs
+const component = {
+  nodes: { button: { id: "btn", type: "frame", name: "Button" } },
+  links: { button: [] },
+};
+graph.import(component, ["button"], "page"); // Add component
 
 // Get current state
 const snapshot = graph.snapshot();
@@ -549,10 +559,12 @@ graph.mv("frame", "text-node"); // ⚠️ Without policy, text can have children
 #### ✅ Perfect For:
 
 - **Design tools** - Scenes, frames, groups, text, images with hierarchy rules
+- **Copy/paste operations** - Import clipboard data with preserved structure
+- **Component systems** - Insert templates and reusable components
 - **Main data model** - Tree-based applications (editors, file systems, org charts)
 - **Immer integration** - State management with immutability
 - **Type constraints** - Enforce structural rules (leaf nodes, root-only types)
-- **Frequent changes** - Move, add, remove, reorder operations
+- **Frequent changes** - Move, add, remove, reorder, import operations
 - **Large trees** - Thousands of nodes with type-based constraints
 - **TypeScript projects** - Full type safety and policy validation
 
@@ -562,6 +574,116 @@ graph.mv("frame", "text-node"); // ⚠️ Without policy, text can have children
 - Already have nested tree structure (flatten first or use different approach)
 - Need cycle detection (use policy with `tree.lut.isAncestorOf` or wait for v2)
 - Working with extremely large trees (100k+ nodes) with frequent parent lookups
+
+### Importing Sub-Graphs
+
+The `import()` method allows you to merge external graph structures into the current graph. This is perfect for copy/paste, templates, and component insertion.
+
+#### Basic Import
+
+```ts
+const graph = new tree.graph.Graph({
+  nodes: { page: { name: "Page" } },
+  links: { page: [] },
+});
+
+// Import a component
+const component = {
+  nodes: {
+    header: { name: "Header" },
+    logo: { name: "Logo" },
+    title: { name: "Title" },
+  },
+  links: {
+    header: ["logo", "title"],
+    logo: undefined,
+    title: undefined,
+  },
+};
+
+graph.import(component, ["header"], "page");
+// Now: page -> [header], header -> [logo, title]
+```
+
+#### Import with Index (Insert Position)
+
+```ts
+// Insert at specific position
+graph.import(subgraph, ["newNode"], "container", 0); // Insert at start
+graph.import(subgraph, ["newNode"], "container", 2); // Insert at index 2
+graph.import(subgraph, ["newNode"], "container"); // Append (default)
+```
+
+#### Import Multiple Roots
+
+```ts
+// Paste multiple selected items
+const clipboard = {
+  nodes: {
+    box1: { type: "frame" },
+    box2: { type: "frame" },
+    text1: { type: "text" },
+  },
+  links: {
+    box1: undefined,
+    box2: undefined,
+    text1: undefined,
+  },
+};
+
+graph.import(clipboard, ["box1", "box2", "text1"], "container");
+// Preserves order: container -> [...existing, box1, box2, text1]
+```
+
+#### Import Behavior
+
+**All nodes are added**, even orphans:
+
+```ts
+const subgraph = {
+  nodes: {
+    attached: { name: "Attached" },
+    orphan: { name: "Orphan" }, // Not in roots
+  },
+  links: {
+    attached: undefined,
+    orphan: undefined,
+  },
+};
+
+graph.import(subgraph, ["attached"], "parent");
+// Both nodes added, but only "attached" is linked to parent
+// "orphan" remains unlinked in the graph
+```
+
+**ID conflicts are checked** before any changes:
+
+```ts
+// If any ID conflicts, entire import fails (atomic)
+try {
+  graph.import(subgraph, roots, parent);
+} catch (e) {
+  // Graph unchanged - nothing was added
+}
+```
+
+**Policy checks apply** to root attachment:
+
+```ts
+const policy = {
+  can_be_child: (node) => node.type !== "scene",
+};
+
+const graph = new tree.graph.Graph(data, policy);
+
+const subgraph = {
+  nodes: { scene: { type: "scene" } },
+  links: { scene: undefined },
+};
+
+// Throws - scenes cannot be children
+graph.import(subgraph, ["scene"], "container");
+```
 
 ### Advanced Usage
 
@@ -694,6 +816,19 @@ const nextState = produce({ document }, (draft) => {
 
   // ✅ Valid: Move title to nav
   graph.mv("title", "nav");
+
+  // ✅ Valid: Import a button component
+  const button = {
+    nodes: {
+      btn: { type: "frame", name: "Button" },
+      label: { type: "text", name: "Click me" },
+    },
+    links: {
+      btn: ["label"],
+      label: undefined,
+    },
+  };
+  graph.import(button, ["btn"], "nav");
 
   // ❌ Invalid: Would throw "text cannot be a parent"
   // graph.mv("logo", "title");
