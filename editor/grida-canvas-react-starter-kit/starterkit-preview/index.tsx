@@ -94,7 +94,7 @@ export function PreviewProvider({
       }
 
       // (2)
-      for (const node_id in scene.children) {
+      for (const node_id in scene.children_refs) {
         const top = tryGetTopPreviewNode(node_id);
         if (top) {
           return top;

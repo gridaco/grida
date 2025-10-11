@@ -164,8 +164,13 @@ export function NodeHierarchyList() {
     (a, b) => a === b
   );
 
-  const { id, name, children, selection, hovered_node_id } =
-    useCurrentSceneState();
+  const {
+    id,
+    name,
+    children_refs: children,
+    selection,
+    hovered_node_id,
+  } = useCurrentSceneState();
 
   const maskInfoMap = useMemo(
     () =>
@@ -260,7 +265,11 @@ export function NodeHierarchyList() {
     },
     isItemFolder: (item) => {
       const node = item.getItemData();
-      return grida.program.nodes.is.ichildren(node);
+      return (
+        node.type === "container" ||
+        node.type === "group" ||
+        node.type === "boolean"
+      );
     },
     onDrop(items, target) {
       const ids = items.map((item) => item.getId());

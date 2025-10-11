@@ -228,7 +228,7 @@ function __get_insertion_target(
   assert(state.scene_id, "scene_id is not set");
   const scene = state.document.scenes[state.scene_id];
   if (scene.constraints.children === "single") {
-    return scene.children[0];
+    return scene.children_refs[0];
   }
 
   const hits = state.hits.slice();

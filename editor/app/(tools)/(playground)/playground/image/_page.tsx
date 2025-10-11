@@ -78,7 +78,7 @@ export default function ImagePlayground() {
             type: "scene",
             id: "main",
             name: "main",
-            children: [],
+            children_refs: [],
             guides: [],
             constraints: {
               children: "multiple",

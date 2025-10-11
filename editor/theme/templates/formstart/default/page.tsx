@@ -201,4 +201,5 @@ _000.definition = {
     //   right: 0,
     // },
   },
+  links: {},
 } satisfies grida.program.document.template.TemplateDocumentDefinition;

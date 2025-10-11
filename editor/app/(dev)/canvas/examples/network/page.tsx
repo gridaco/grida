@@ -15,7 +15,7 @@ const document: editor.state.IEditorStateInit = {
         name: "Main",
         constraints: { children: "multiple" },
         guides: [],
-        children: ["a", "b"],
+        children_refs: ["a", "b"],
         edges: [
           {
             id: "a-b",

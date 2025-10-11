@@ -139,7 +139,7 @@ const document: editor.state.IEditorStateInit = {
         type: "scene",
         id: "invite",
         name: "Invite",
-        children: ["invite"],
+        children_refs: ["invite"],
         guides: [],
         constraints: {
           children: "multiple",
@@ -150,7 +150,7 @@ const document: editor.state.IEditorStateInit = {
         type: "scene",
         id: "join",
         name: "Join",
-        children: ["join", "join_main", "join_hello"],
+        children_refs: ["join", "join_main", "join_hello"],
         guides: [],
         constraints: {
           children: "multiple",
@@ -161,7 +161,7 @@ const document: editor.state.IEditorStateInit = {
         type: "scene",
         id: "portal",
         name: "Portal",
-        children: ["portal", "portal_verify"],
+        children_refs: ["portal", "portal_verify"],
         guides: [],
         constraints: {
           children: "multiple",
@@ -194,6 +194,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["tmp-2503-join"]: {
       name: "Join",
@@ -202,6 +203,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["tmp-2503-join-main"]: {
       name: "Join",
@@ -210,6 +212,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["tmp-2503-portal"]: {
       name: "Portal",
@@ -218,6 +221,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
   },
 };

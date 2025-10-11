@@ -1380,6 +1380,7 @@ export namespace editor.state {
     debug?: boolean;
   }): editor.state.IEditorState {
     const doc: grida.program.document.Document = {
+      links: {},
       bitmaps: {},
       images: {},
       properties: {},

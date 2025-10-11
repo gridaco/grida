@@ -246,6 +246,7 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
         data: {
           __schema_version: grida.program.document.SCHEMA_VERSION,
           nodes: {},
+          links: {},
           scenes: {
             "0": grida.program.document.init_scene({
               id: "0",

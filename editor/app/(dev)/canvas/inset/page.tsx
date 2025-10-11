@@ -25,7 +25,7 @@ export default function CanvasV2Page() {
           constraints: {
             children: "multiple",
           },
-          children: ["rect"],
+          children_refs: ["rect"],
         },
       },
       nodes: {

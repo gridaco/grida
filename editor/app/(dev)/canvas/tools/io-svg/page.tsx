@@ -41,7 +41,7 @@ export default function IOSVGPage() {
             type: "scene",
             id: "iosvg",
             name: "iosvg",
-            children: [],
+            children_refs: [],
             guides: [],
             constraints: {
               children: "single",

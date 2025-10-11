@@ -33,8 +33,6 @@ import type { MenuGroup } from "./menu";
 import { editor } from "@/grida-canvas";
 import { DataFormat } from "../data-format";
 
-// import * as samples from "@/theme/templates/formcollection/samples";
-
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
     case "v0_form":

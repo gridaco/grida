@@ -77,12 +77,13 @@ describe("archive comprehensive", () => {
           type: "scene",
           id: "scene1",
           name: "Test Scene",
-          children: [],
+          children_refs: [],
           guides: [],
           edges: [],
           constraints: { children: "multiple" },
         },
       },
+      links: {},
       entry_scene_id: "scene1",
       bitmaps: {},
       images: {},
@@ -121,12 +122,13 @@ describe("archive comprehensive", () => {
           type: "scene",
           id: "scene1",
           name: "Test Scene",
-          children: ["node1"],
+          children_refs: ["node1"],
           guides: [],
           edges: [],
           constraints: { children: "multiple" },
         },
       },
+      links: {},
       entry_scene_id: "scene1",
       bitmaps: {},
       images: {},
@@ -149,7 +151,9 @@ describe("archive comprehensive", () => {
 
   // Helper function to create a mock File object from real image data
   function createRealFile(filename: string, content: Uint8Array): File {
-    const blob = new Blob([content], { type: getMimeType(filename) });
+    const blob = new Blob([content as BlobPart], {
+      type: getMimeType(filename),
+    });
     return new File([blob], filename, { type: getMimeType(filename) });
   }
 

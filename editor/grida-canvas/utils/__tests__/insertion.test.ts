@@ -1,4 +1,8 @@
-import { getViewportAwareDelta, hitTestNestedInsertionTarget, getPackedSubtreeBoundingRect } from "@/grida-canvas/utils/insertion";
+import {
+  getViewportAwareDelta,
+  hitTestNestedInsertionTarget,
+  getPackedSubtreeBoundingRect,
+} from "@/grida-canvas/utils/insertion";
 import cmath from "@grida/cmath";
 
 import type grida from "@grida/schema";
@@ -45,10 +49,32 @@ describe("hitTestNestedInsertionTarget", () => {
 describe("getPackedSubtreeBoundingRect", () => {
   it("computes bounding box of packed scene document", () => {
     const sub: grida.program.document.IPackedSceneDocument = {
-      scene: { id: "s", name: "s", children: ["a", "b"], order: 0 },
+      scene: {
+        type: "scene",
+        id: "s",
+        name: "s",
+        children_refs: ["a", "b"],
+        order: 0,
+      },
       nodes: {
-        a: { id: "a", type: "rectangle", left: 10, top: 10, width: 20, height: 20, position: "absolute" },
-        b: { id: "b", type: "rectangle", left: 40, top: 40, width: 20, height: 20, position: "absolute" },
+        a: {
+          id: "a",
+          type: "rectangle",
+          left: 10,
+          top: 10,
+          width: 20,
+          height: 20,
+          position: "absolute",
+        },
+        b: {
+          id: "b",
+          type: "rectangle",
+          left: 40,
+          top: 40,
+          width: 20,
+          height: 20,
+          position: "absolute",
+        },
       },
     } as any;
     const box = getPackedSubtreeBoundingRect(sub);

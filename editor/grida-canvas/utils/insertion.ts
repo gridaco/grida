@@ -15,17 +15,13 @@ export function getPackedSubtreeBoundingRect(
   sub: grida.program.document.IPackedSceneDocument
 ): cmath.Rectangle {
   let bb: cmath.Rectangle | null = null;
-  for (const node_id of sub.scene.children) {
+  for (const node_id of sub.scene.children_refs) {
     const node = sub.nodes[node_id];
     const r: cmath.Rectangle = {
       x: "left" in node ? (node.left ?? 0) : 0,
       y: "top" in node ? (node.top ?? 0) : 0,
       width:
-        "width" in node
-          ? typeof node.width === "number"
-            ? node.width
-            : 0
-          : 0,
+        "width" in node ? (typeof node.width === "number" ? node.width : 0) : 0,
       height:
         "height" in node
           ? typeof node.height === "number"
@@ -99,4 +95,3 @@ export function hitTestNestedInsertionTarget(
   }
   return null;
 }
-

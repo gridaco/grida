@@ -41,14 +41,15 @@ export namespace io {
       [key: string]: unknown;
     };
 
-    export type PropertyFillImagePaintClipboardPayload = ClipboardPayloadBase & {
-      type: "property/fill-image-paint";
-      paint: SerializedImagePaint;
-      paint_target: "fill" | "stroke";
-      paint_index: number;
-      node_id: string;
-      document_key?: string;
-    };
+    export type PropertyFillImagePaintClipboardPayload =
+      ClipboardPayloadBase & {
+        type: "property/fill-image-paint";
+        paint: SerializedImagePaint;
+        paint_target: "fill" | "stroke";
+        paint_index: number;
+        node_id: string;
+        document_key?: string;
+      };
 
     export type ClipboardPayload =
       | PrototypesClipboardPayload
@@ -382,7 +383,7 @@ export namespace io {
         const { width, height, type } = dimensions;
 
         const mimeType = IMAGE_TYPE_TO_MIME_TYPE[type || "png"] || "image/png";
-        const blob = new Blob([imageData], { type: mimeType });
+        const blob = new Blob([imageData as BlobPart], { type: mimeType });
         const url = URL.createObjectURL(blob);
 
         images[url] = {
@@ -441,6 +442,7 @@ export namespace io {
         version: json.version,
         document: {
           nodes: json.document.nodes,
+          links: json.document.links,
           scenes: json.document.scenes,
           entry_scene_id: json.document.entry_scene_id,
           bitmaps: bitmaps,

@@ -2018,8 +2018,7 @@ export class Editor
     editor.api.IDocumentExportPluginActions,
     editor.api.IDocumentVectorInterfaceActions
 {
-  private readonly listeners: Set<(editor: this, action?: Action) => void> =
-    new Set();
+  // private readonly listeners: Set<(editor: this, action?: Action) => void> = new Set();
   private readonly logger: (...args: any[]) => void;
 
   /**

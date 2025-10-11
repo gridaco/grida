@@ -167,7 +167,7 @@ function devdata_hierarchy_only(
   document: grida.program.document.Document,
   document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
 ) {
-  const { scenes, nodes } = document;
+  const { scenes, nodes, links } = document;
   return {
     scenes,
     document_ctx,
@@ -180,6 +180,7 @@ function devdata_hierarchy_only(
       };
       return acc;
     }, {}),
+    links,
   };
 }
 
