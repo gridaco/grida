@@ -1,5 +1,4 @@
 {
-  "doctype": "v0_document",
   "document": {
     "nodes": {
       "454:341": {
@@ -30,14 +29,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "454:342",
-          "454:343",
-          "454:344",
-          "454:345",
-          "454:346"
-        ]
+        "cornerRadius": 0
       },
       "454:342": {
         "id": "454:342",
@@ -195,19 +187,18 @@
           }
         },
         "effects": []
-      }
-    },
-    "scenes": {
+      },
       "hello": {
+        "type": "scene",
         "id": "hello",
         "name": "hello",
-        "type": "scene",
-        "children": [
-          "454:341"
-        ],
+        "active": true,
+        "locked": false,
         "constraints": {
           "children": "multiple"
         },
+        "guides": [],
+        "edges": [],
         "backgroundColor": {
           "r": 245,
           "g": 245,
@@ -215,6 +206,24 @@
           "a": 1
         }
       }
-    }
+    },
+    "links": {
+      "454:341": [
+        "454:342",
+        "454:343",
+        "454:344",
+        "454:345",
+        "454:346"
+      ],
+      "hello": [
+        "454:341"
+      ]
+    },
+    "scenes_ref": [
+      "hello"
+    ],
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
   }
 }

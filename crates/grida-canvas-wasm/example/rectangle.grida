@@ -1,9 +1,6 @@
 {
   "version": "0.0.1-beta.1+20251010",
   "document": {
-    "bitmaps": {},
-    "images": {},
-    "properties": {},
     "nodes": {
       "25575e75-a544-4fa3-b199-15d1906588b2": {
         "id": "25575e75-a544-4fa3-b199-15d1906588b2",
@@ -33,21 +30,18 @@
         "effects": [],
         "strokeWidth": 0,
         "strokeCap": "butt"
-      }
-    },
-    "scenes": {
+      },
       "main": {
         "type": "scene",
-        "guides": [],
-        "edges": [],
+        "id": "main",
+        "name": "main",
+        "active": true,
+        "locked": false,
         "constraints": {
           "children": "multiple"
         },
-        "children": [
-          "25575e75-a544-4fa3-b199-15d1906588b2"
-        ],
-        "id": "main",
-        "name": "main",
+        "guides": [],
+        "edges": [],
         "backgroundColor": {
           "r": 245,
           "g": 245,
@@ -55,6 +49,17 @@
           "a": 1
         }
       }
-    }
+    },
+    "links": {
+      "main": [
+        "25575e75-a544-4fa3-b199-15d1906588b2"
+      ]
+    },
+    "scenes_ref": [
+      "main"
+    ],
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
   }
 }

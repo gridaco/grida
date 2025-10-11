@@ -1,5 +1,4 @@
 {
-  "doctype": "v0_document",
   "document": {
     "nodes": {
       "102:2": {
@@ -29,11 +28,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:3",
-          "102:41"
-        ]
+        "cornerRadius": 0
       },
       "102:3": {
         "id": "102:3",
@@ -53,12 +48,7 @@
         "style": {
           "padding": "29.999998092651367px 29.999998092651367px 29.999998092651367px 29.999998092651367px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:4",
-          "102:25",
-          "102:35"
-        ]
+        "cornerRadius": 0
       },
       "102:4": {
         "id": "102:4",
@@ -78,11 +68,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:5",
-          "102:24"
-        ]
+        "cornerRadius": 0
       },
       "102:5": {
         "id": "102:5",
@@ -102,10 +88,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:6"
-        ]
+        "cornerRadius": 0
       },
       "102:6": {
         "id": "102:6",
@@ -125,11 +108,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:7",
-          "102:11"
-        ]
+        "cornerRadius": 0
       },
       "102:7": {
         "id": "102:7",
@@ -149,12 +128,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:8",
-          "102:9",
-          "102:10"
-        ]
+        "cornerRadius": 0
       },
       "102:8": {
         "id": "102:8",
@@ -329,12 +303,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:26",
-          "102:30",
-          "102:31"
-        ]
+        "cornerRadius": 0
       },
       "102:26": {
         "id": "102:26",
@@ -354,15 +323,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:43",
-          "102:28",
-          "102:42",
-          "102:44",
-          "102:27",
-          "102:29"
-        ]
+        "cornerRadius": 0
       },
       "102:43": {
         "id": "102:43",
@@ -546,12 +507,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:32",
-          "102:33",
-          "102:34"
-        ]
+        "cornerRadius": 0
       },
       "102:32": {
         "id": "102:32",
@@ -628,11 +584,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:36",
-          "102:37"
-        ]
+        "cornerRadius": 0
       },
       "102:36": {
         "id": "102:36",
@@ -671,12 +623,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "102:38",
-          "102:39",
-          "102:40"
-        ]
+        "cornerRadius": 0
       },
       "102:38": {
         "id": "102:38",
@@ -893,19 +840,18 @@
             "fillRile": "nonzero"
           }
         ]
-      }
-    },
-    "scenes": {
+      },
       "hymym": {
+        "type": "scene",
         "id": "hymym",
         "name": "How I Met Your Mother",
-        "type": "scene",
-        "children": [
-          "102:2"
-        ],
+        "active": true,
+        "locked": false,
         "constraints": {
           "children": "multiple"
         },
+        "guides": [],
+        "edges": [],
         "backgroundColor": {
           "r": 245,
           "g": 245,
@@ -913,6 +859,69 @@
           "a": 1
         }
       }
-    }
+    },
+    "links": {
+      "102:2": [
+        "102:3",
+        "102:41"
+      ],
+      "102:3": [
+        "102:4",
+        "102:25",
+        "102:35"
+      ],
+      "102:4": [
+        "102:5",
+        "102:24"
+      ],
+      "102:5": [
+        "102:6"
+      ],
+      "102:6": [
+        "102:7",
+        "102:11"
+      ],
+      "102:7": [
+        "102:8",
+        "102:9",
+        "102:10"
+      ],
+      "102:25": [
+        "102:26",
+        "102:30",
+        "102:31"
+      ],
+      "102:26": [
+        "102:43",
+        "102:28",
+        "102:42",
+        "102:44",
+        "102:27",
+        "102:29"
+      ],
+      "102:31": [
+        "102:32",
+        "102:33",
+        "102:34"
+      ],
+      "102:35": [
+        "102:36",
+        "102:37"
+      ],
+      "102:37": [
+        "102:38",
+        "102:39",
+        "102:40"
+      ],
+      "hymym": [
+        "102:2"
+      ]
+    },
+    "scenes_ref": [
+      "hymym"
+    ],
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
   }
 }

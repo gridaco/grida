@@ -1,7 +1,42 @@
 {
-  "doctype": "v0_document",
   "document": {
     "nodes": {
+      "1": {
+        "type": "scene",
+        "id": "1",
+        "name": "Slide 1",
+        "active": true,
+        "locked": false,
+        "constraints": {
+          "children": "single"
+        },
+        "guides": [],
+        "edges": [],
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
+      },
+      "2": {
+        "type": "scene",
+        "id": "2",
+        "name": "Slide 2",
+        "active": true,
+        "locked": false,
+        "constraints": {
+          "children": "single"
+        },
+        "guides": [],
+        "edges": [],
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
+      },
       "422:1966": {
         "id": "422:1966",
         "name": "root",
@@ -30,19 +65,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "422:1967",
-          "422:1968",
-          "422:1969",
-          "422:1970",
-          "422:1972",
-          "422:1973",
-          "422:1974",
-          "422:1978",
-          "422:1982",
-          "422:1984"
-        ]
+        "cornerRadius": 0
       },
       "422:1967": {
         "id": "422:1967",
@@ -162,10 +185,7 @@
         "style": {
           "padding": "1px 6px 1px 6px"
         },
-        "cornerRadius": 499.5,
-        "children": [
-          "422:1971"
-        ]
+        "cornerRadius": 499.5
       },
       "422:1971": {
         "id": "422:1971",
@@ -263,9 +283,6 @@
           "padding": "0px 0px 0px 0px"
         },
         "cornerRadius": 0,
-        "children": [
-          "422:2015"
-        ],
         "right": 50.8046875
       },
       "422:2015": {
@@ -316,11 +333,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 20,
-        "children": [
-          "422:1975",
-          "422:1976"
-        ]
+        "cornerRadius": 20
       },
       "422:1975": {
         "id": "422:1975",
@@ -385,10 +398,7 @@
         "style": {
           "padding": "1px 6px 1px 6px"
         },
-        "cornerRadius": 499.5,
-        "children": [
-          "422:1977"
-        ]
+        "cornerRadius": 499.5
       },
       "422:1977": {
         "id": "422:1977",
@@ -453,11 +463,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 20,
-        "children": [
-          "422:1979",
-          "422:1980"
-        ]
+        "cornerRadius": 20
       },
       "422:1979": {
         "id": "422:1979",
@@ -522,10 +528,7 @@
         "style": {
           "padding": "1px 6px 1px 6px"
         },
-        "cornerRadius": 499.5,
-        "children": [
-          "422:1981"
-        ]
+        "cornerRadius": 499.5
       },
       "422:1981": {
         "id": "422:1981",
@@ -577,10 +580,7 @@
         "width": 16.66666603088379,
         "height": 16.66666603088379,
         "style": {},
-        "cornerRadius": 0,
-        "children": [
-          "422:1983"
-        ]
+        "cornerRadius": 0
       },
       "422:1983": {
         "id": "422:1983",
@@ -640,11 +640,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 20,
-        "children": [
-          "422:1985",
-          "422:1986"
-        ]
+        "cornerRadius": 20
       },
       "422:1985": {
         "id": "422:1985",
@@ -709,10 +705,7 @@
         "style": {
           "padding": "1px 6px 1px 6px"
         },
-        "cornerRadius": 499.5,
-        "children": [
-          "422:1987"
-        ]
+        "cornerRadius": 499.5
       },
       "422:1987": {
         "id": "422:1987",
@@ -776,13 +769,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "421:294",
-          "421:300",
-          "421:306",
-          "421:312"
-        ]
+        "cornerRadius": 0
       },
       "421:294": {
         "id": "421:294",
@@ -817,13 +804,7 @@
           "topRightRadius": 5,
           "bottomRightRadius": 5,
           "bottomLeftRadius": 5
-        },
-        "children": [
-          "421:295",
-          "421:296",
-          "421:297",
-          "421:298"
-        ]
+        }
       },
       "421:295": {
         "id": "421:295",
@@ -961,10 +942,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 5,
-        "children": [
-          "421:299"
-        ]
+        "cornerRadius": 5
       },
       "421:299": {
         "id": "421:299",
@@ -1018,13 +996,7 @@
           "topRightRadius": 5,
           "bottomRightRadius": 5,
           "bottomLeftRadius": 5
-        },
-        "children": [
-          "421:301",
-          "421:302",
-          "421:303",
-          "421:305"
-        ]
+        }
       },
       "421:301": {
         "id": "421:301",
@@ -1126,10 +1098,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 5,
-        "children": [
-          "421:304"
-        ]
+        "cornerRadius": 5
       },
       "421:304": {
         "id": "421:304",
@@ -1219,13 +1188,7 @@
           "topRightRadius": 5,
           "bottomRightRadius": 5,
           "bottomLeftRadius": 5
-        },
-        "children": [
-          "421:307",
-          "421:308",
-          "421:309",
-          "421:311"
-        ]
+        }
       },
       "421:307": {
         "id": "421:307",
@@ -1327,10 +1290,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 5,
-        "children": [
-          "421:310"
-        ]
+        "cornerRadius": 5
       },
       "421:310": {
         "id": "421:310",
@@ -1405,11 +1365,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "421:313",
-          "421:314"
-        ]
+        "cornerRadius": 0
       },
       "421:313": {
         "id": "421:313",
@@ -1480,42 +1436,100 @@
         "fontWeight": 500
       }
     },
+    "links": {
+      "1": [
+        "422:1966"
+      ],
+      "2": [
+        "421:293"
+      ],
+      "422:1966": [
+        "422:1967",
+        "422:1968",
+        "422:1969",
+        "422:1970",
+        "422:1972",
+        "422:1973",
+        "422:1974",
+        "422:1978",
+        "422:1982",
+        "422:1984"
+      ],
+      "422:1970": [
+        "422:1971"
+      ],
+      "422:1973": [
+        "422:2015"
+      ],
+      "422:1974": [
+        "422:1975",
+        "422:1976"
+      ],
+      "422:1976": [
+        "422:1977"
+      ],
+      "422:1978": [
+        "422:1979",
+        "422:1980"
+      ],
+      "422:1980": [
+        "422:1981"
+      ],
+      "422:1982": [
+        "422:1983"
+      ],
+      "422:1984": [
+        "422:1985",
+        "422:1986"
+      ],
+      "422:1986": [
+        "422:1987"
+      ],
+      "421:293": [
+        "421:294",
+        "421:300",
+        "421:306",
+        "421:312"
+      ],
+      "421:294": [
+        "421:295",
+        "421:296",
+        "421:297",
+        "421:298"
+      ],
+      "421:298": [
+        "421:299"
+      ],
+      "421:300": [
+        "421:301",
+        "421:302",
+        "421:303",
+        "421:305"
+      ],
+      "421:303": [
+        "421:304"
+      ],
+      "421:306": [
+        "421:307",
+        "421:308",
+        "421:309",
+        "421:311"
+      ],
+      "421:309": [
+        "421:310"
+      ],
+      "421:312": [
+        "421:313",
+        "421:314"
+      ]
+    },
+    "scenes_ref": [
+      "1",
+      "2"
+    ],
     "entry_scene_id": "1",
-    "scenes": {
-      "1": {
-        "id": "1",
-        "name": "Slide 1",
-        "type": "scene",
-        "children": [
-          "422:1966"
-        ],
-        "constraints": {
-          "children": "single"
-        },
-        "backgroundColor": {
-          "r": 245,
-          "g": 245,
-          "b": 245,
-          "a": 1
-        }
-      },
-      "2": {
-        "id": "2",
-        "name": "Slide 2",
-        "type": "scene",
-        "children": [
-          "421:293"
-        ],
-        "constraints": {
-          "children": "single"
-        },
-        "backgroundColor": {
-          "r": 245,
-          "g": 245,
-          "b": 245,
-          "a": 1
-        }
-      }
-    }
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
   }
 }
