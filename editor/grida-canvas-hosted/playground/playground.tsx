@@ -238,7 +238,7 @@ export default function CanvasPlayground({
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
   const [documentReady, setDocumentReady] = useState(() => !src);
-  const [canvasReady, setCanvasReady] = useState(() => backend !== "canvas");
+  const [canvasReady, setCanvasReady] = useState(false);
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(
     null
   );
