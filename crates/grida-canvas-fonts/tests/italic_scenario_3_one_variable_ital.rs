@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use fonts::{FaceRecord, FamilyScenario};
 use fonts::selection_italic as italic;
+use fonts::{FaceRecord, FamilyScenario};
 
 /// Test Scenario 3: One variable font with `ital` axis
 ///
@@ -206,14 +206,12 @@ fn test_scenario_3_family_aggregation() {
     assert!(capability_map.italic_slots.contains_key(&italic_key));
     let italic_face = &capability_map.italic_slots[&italic_key];
     assert!(italic_face.vf_recipe.is_some());
-    assert!(
-        italic_face
-            .vf_recipe
-            .as_ref()
-            .unwrap()
-            .axis_values
-            .contains_key("ital")
-    );
+    assert!(italic_face
+        .vf_recipe
+        .as_ref()
+        .unwrap()
+        .axis_values
+        .contains_key("ital"));
 
     println!(
         "✅ Scenario 3 (Family aggregation): Correctly identified as SingleVf scenario with ital recipe"
