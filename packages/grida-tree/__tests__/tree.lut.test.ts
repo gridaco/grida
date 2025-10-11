@@ -27,7 +27,7 @@ describe("TreeLUT", () => {
         c: { children: [] },
       };
 
-      const treeLUT = tree.lut.TreeLUT.from(nodes);
+      const treeLUT = tree.lut.TreeLUT.from_flat_with_children(nodes);
 
       expect(treeLUT.lut.lu_keys).toContain("root");
       expect(treeLUT.lut.lu_keys).toContain("a");
@@ -53,7 +53,7 @@ describe("TreeLUT", () => {
         c: { items: [] },
       };
 
-      const treeLUT = tree.lut.TreeLUT.from(nodes, "items");
+      const treeLUT = tree.lut.TreeLUT.from_flat_with_children(nodes, "items");
 
       expect(treeLUT.parentOf("a")).toBe("root");
       expect(treeLUT.parentOf("b")).toBe("root");
@@ -69,7 +69,7 @@ describe("TreeLUT", () => {
         b: { children: [], name: "B Node", value: 3 },
       };
 
-      const treeLUT = tree.lut.TreeLUT.from(nodes);
+      const treeLUT = tree.lut.TreeLUT.from_flat_with_children(nodes);
 
       expect(treeLUT.depthOf("root")).toBe(0);
       expect(treeLUT.depthOf("a")).toBe(1);
@@ -83,7 +83,7 @@ describe("TreeLUT", () => {
         b: {},
       };
 
-      const treeLUT = tree.lut.TreeLUT.from(nodes);
+      const treeLUT = tree.lut.TreeLUT.from_flat_with_children(nodes);
 
       expect(treeLUT.childrenOf("a")).toEqual([]);
       expect(treeLUT.childrenOf("b")).toEqual([]);
@@ -98,7 +98,7 @@ describe("TreeLUT", () => {
         b: { children: [] },
       };
 
-      const treeLUT = tree.lut.TreeLUT.from(nodes);
+      const treeLUT = tree.lut.TreeLUT.from_flat_with_children(nodes);
 
       expect(treeLUT.parentOf("root1")).toBeNull();
       expect(treeLUT.parentOf("root2")).toBeNull();

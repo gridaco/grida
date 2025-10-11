@@ -125,6 +125,12 @@ class Graph<T> {
 
   // Import an external sub-graph into the current graph
   import(subgraph: IGraph<T>, roots: Key[], parent: Key, index?: number): void;
+
+  // Generation counter (increments on mutations)
+  get generation(): number;
+
+  // Cached lookup table for efficient queries (O(1) parent/child access)
+  get lut(): ITreeLUT;
 }
 
 // Policy interface for structural constraints
@@ -133,6 +139,13 @@ interface IGraphPolicy<T> {
   can_link?(parent: T, parent_id: Key, child: T, child_id: Key): boolean;
   can_be_parent?(node: T, id: Key): boolean;
   can_be_child?(node: T, id: Key): boolean;
+}
+
+// Lookup table interface for O(1) hierarchy queries
+interface ITreeLUT {
+  lu_keys: string[];
+  lu_parent: Record<string, string | null>;
+  lu_children: Record<string, string[]>;
 }
 ```
 
@@ -352,8 +365,8 @@ if (needsUndo) {
 
 - ✅ **Efficient for most use cases**: Suitable for trees with thousands of nodes
 - ✅ **No data copying**: Operations mutate in-place, avoiding memory overhead
-- ⚠️ **Parent lookup is O(n)**: Finding a node's parent scans all links
-- 💡 **Optimization available**: For very large trees (100k+ nodes), consider caching parent relationships
+- ✅ **Built-in LUT caching**: O(1) parent lookups via `graph.lut` (auto-cached)
+- ✅ **Smart cache invalidation**: LUT recomputes only when structure changes
 
 ### Policy System
 
@@ -488,13 +501,36 @@ const policy: tree.graph.IGraphPolicy<Node> = {
 };
 ```
 
-#### Parent Lookup Performance
+#### Built-in LUT for Fast Queries ✅
 
-Finding a node's parent requires scanning all link entries (O(n)). For most applications this is acceptable, but if you need frequent parent lookups:
+The `Graph` class provides a **cached lookup table** via the `lut` getter for O(1) parent/child queries:
 
-- Use `tree.lut.TreeLUT` for O(1) parent queries
-- Consider maintaining your own parent cache
-- Profile before optimizing
+```ts
+const graph = new tree.graph.Graph(data);
+
+// Get cached LUT (computed once, cached until next mutation)
+const lut = graph.lut;
+
+// Use with TreeLUT for advanced queries
+const treeLUT = new tree.lut.TreeLUT(lut);
+console.log(treeLUT.parentOf("child")); // O(1)
+console.log(treeLUT.depthOf("child")); // O(1)
+console.log(treeLUT.isAncestorOf("root", "child")); // O(1)
+```
+
+**Caching Behavior:**
+
+- First access computes LUT (O(n + e))
+- Subsequent accesses return cached instance (O(1))
+- Cache automatically invalidates on mutations
+- Recomputes on next access after mutation
+
+**Use this when:**
+
+- You need frequent parent lookups
+- Performing ancestor/descendant checks
+- Calculating node depths
+- Finding siblings
 
 #### In-Place Mutation
 
@@ -683,6 +719,77 @@ const subgraph = {
 
 // Throws - scenes cannot be children
 graph.import(subgraph, ["scene"], "container");
+```
+
+### Generation and Caching
+
+The `Graph` class uses a **generation counter** to track mutations and enable efficient caching.
+
+#### Generation Counter
+
+```ts
+const graph = new tree.graph.Graph(data);
+
+console.log(graph.generation); // 0
+
+graph.mv("a", "b");
+console.log(graph.generation); // 1+
+
+graph.rm("c");
+console.log(graph.generation); // 2+
+```
+
+**Properties:**
+
+- Starts at 0 on construction
+- Increments on every effective mutation
+- Does NOT increment on failed operations or no-ops
+- May increment multiple times per operation (e.g., recursive `rm()`)
+
+**Use Cases:**
+
+- Detect if graph has changed
+- Implement custom caching strategies
+- Track operation count for debugging
+
+#### Cached LUT Access
+
+The `lut` getter provides **automatic caching** for parent/child lookups:
+
+```ts
+const graph = new tree.graph.Graph(largeData);
+
+// First access: computes LUT (O(n + e))
+const lut1 = graph.lut;
+const lut2 = graph.lut; // Cached (same instance)
+
+graph.mv("a", "b"); // Mutation invalidates cache
+
+const lut3 = graph.lut; // Recomputes (different instance)
+const lut4 = graph.lut; // Cached again (same as lut3)
+```
+
+**Benefits:**
+
+- ✅ No manual cache management
+- ✅ Always up-to-date with graph state
+- ✅ Zero overhead when not used
+- ✅ O(1) access to parent/child relationships
+
+**Example with TreeLUT:**
+
+```ts
+const graph = new tree.graph.Graph(document);
+
+// Perform mutations
+graph.mv("node1", "parent");
+graph.order("node2", "front");
+
+// Query efficiently
+const treeLUT = new tree.lut.TreeLUT(graph.lut);
+const depth = treeLUT.depthOf("node1"); // O(1)
+const parent = treeLUT.parentOf("node1"); // O(1)
+const siblings = treeLUT.siblingsOf("node1"); // O(1)
 ```
 
 ### Advanced Usage

@@ -233,13 +233,13 @@ export namespace tree {
      *
      * ## Management Notes
      * - This interface should be populated and managed only during runtime.
-     * - It is recommended to initialize the lookup table during tree loading or initial rendering using {@link TreeLUT.from}.
+     * - It is recommended to initialize the lookup table during tree loading or initial rendering using {@link TreeLUT.from_flat_with_children}.
      * - If the tree hierarchy is updated (e.g., nodes are added, removed, or moved), this lookup table should be
      *   refreshed to reflect the current relationships.
      * - For optimal performance, the lookup table should be created once and reused for multiple queries.
      *
      * @see {@link TreeLUT} for methods to query and traverse the tree efficiently.
-     * @see {@link TreeLUT.from} for creating a lookup table from a flat tree structure.
+     * @see {@link TreeLUT.from_flat_with_children} for creating a lookup table from a flat tree structure.
      */
     export interface ITreeLUT {
       /**
@@ -311,7 +311,7 @@ export namespace tree {
        * console.log(customTree.depthOf("c")); // 2
        * ```
        */
-      static from<
+      static from_flat_with_children<
         K extends string = "children",
         T extends Partial<Record<K, string[]>> = Partial<Record<K, string[]>>,
       >(nodes: Record<string, T>, key: K = "children" as K): TreeLUT {
@@ -1228,10 +1228,128 @@ export namespace tree {
      * ```
      */
     export class Graph<T> {
+      private _generation: number = 0;
+      private _cachedLUT: lut.ITreeLUT | null = null;
+      private _cachedLUTGeneration: number = -1;
+
       constructor(
         private readonly graph: IGraph<T>,
         private readonly policy: IGraphPolicy<T> = DEFAULT_POLICY_INFINITE
       ) {}
+
+      /**
+       * Generation counter that increments on every effective mutation.
+       *
+       * This counter is used to track changes to the graph structure. It increments
+       * whenever an operation modifies the graph (nodes or links), enabling efficient
+       * cache invalidation for derived data structures like LUT.
+       *
+       * @returns Current generation number (starts at 0)
+       *
+       * @example
+       * ```ts
+       * const graph = new Graph(data);
+       * const gen1 = graph.generation; // 0
+       *
+       * graph.mv("a", "b");
+       * const gen2 = graph.generation; // 1 (or higher)
+       *
+       * graph.rm("c");
+       * const gen3 = graph.generation; // 2+ (or higher)
+       * ```
+       *
+       * @remarks
+       * - Starts at 0 on construction
+       * - Increments on: mv(), rm(), unlink(), order(), import()
+       * - Does not increment on failed operations or no-ops
+       * - May increment multiple times per operation (e.g., recursive rm())
+       * - Used internally for LUT caching
+       */
+      get generation(): number {
+        return this._generation;
+      }
+
+      /**
+       * Get or compute the lookup table (LUT) for efficient hierarchy queries.
+       *
+       * This getter provides a {@link lut.ITreeLUT} structure for O(1) parent/child
+       * lookups. The LUT is computed once and cached until the graph structure changes
+       * (tracked via generation counter).
+       *
+       * @returns Lookup table with lu_keys, lu_parent, and lu_children
+       *
+       * @example
+       * ```ts
+       * const graph = new Graph(data);
+       * const lut = graph.lut;
+       *
+       * // Use with TreeLUT for advanced queries
+       * const tree = new TreeLUT(lut);
+       * console.log(tree.depthOf("node-id"));
+       * console.log(tree.ancestorsOf("node-id"));
+       * ```
+       *
+       * @remarks
+       * **Caching:**
+       * - First access computes LUT from current graph state
+       * - Subsequent accesses return cached LUT (O(1))
+       * - Cache invalidates when generation changes (any mutation)
+       * - Recomputes automatically on next access after mutation
+       *
+       * **Performance:**
+       * - Computation: O(n + e) where n = nodes, e = edges
+       * - Cached access: O(1)
+       * - Memory: O(n + e) for cached LUT
+       *
+       * **Use Cases:**
+       * - Frequent parent lookups (O(1) vs O(n))
+       * - Depth calculations
+       * - Ancestor/descendant checks
+       * - Sibling queries
+       *
+       * @see {@link lut.TreeLUT} for query methods
+       * @see {@link generation} for cache invalidation tracking
+       */
+      get lut(): lut.ITreeLUT {
+        // Return cached LUT if generation unchanged
+        if (this._cachedLUT && this._cachedLUTGeneration === this._generation) {
+          return this._cachedLUT;
+        }
+
+        // Build LUT directly from graph.links structure
+        const lu_keys = Object.keys(this.graph.nodes);
+        const lu_parent: Record<string, string | null> = {};
+        const lu_children: Record<string, string[]> = {};
+
+        // Initialize all nodes
+        for (const nodeId of lu_keys) {
+          lu_parent[nodeId] = null;
+          lu_children[nodeId] = [];
+        }
+
+        // Build parent-child relationships from links
+        for (const parentId in this.graph.links) {
+          const children = this.graph.links[parentId];
+          if (Array.isArray(children)) {
+            for (const childId of children) {
+              lu_parent[childId] = parentId;
+              lu_children[parentId].push(childId);
+            }
+          }
+        }
+
+        const computed: lut.ITreeLUT = {
+          lu_keys,
+          lu_parent,
+          lu_children,
+        };
+
+        // Cache for future access
+        this._cachedLUT = computed;
+        this._cachedLUTGeneration = this._generation;
+
+        return computed;
+      }
 
       /**
        * Ensures a node has a children array in links, initializing if needed.
@@ -1331,6 +1449,7 @@ export namespace tree {
         this.unlink(key);
         removed.push(key);
 
+        this._generation++;
         return removed;
       }
 
@@ -1384,6 +1503,8 @@ export namespace tree {
         // Delete the node itself
         delete this.graph.nodes[key];
         delete this.graph.links[key];
+
+        this._generation++;
       }
 
       /**
@@ -1534,6 +1655,8 @@ export namespace tree {
           targetChildren.splice(insert_at, 0, src);
           if (pos_specified) pos++;
         }
+
+        this._generation++;
       }
 
       /**
@@ -1668,6 +1791,7 @@ export namespace tree {
         // 6. Attach roots to parent using mv() (handles policy, order preservation)
         if (roots.length > 0) {
           try {
+            // Note: mv() will increment generation, so we don't increment here
             this.mv(roots, parent, index);
           } catch (error) {
             // Rollback: Remove all added nodes and links to maintain atomicity
@@ -1679,6 +1803,9 @@ export namespace tree {
             }
             throw error; // Re-throw the original error
           }
+        } else {
+          // No roots to attach, but nodes/links were added
+          this._generation++;
         }
       }
 
@@ -1775,6 +1902,8 @@ export namespace tree {
         // Perform the reorder: remove and reinsert at target position
         parent_children.splice(currentIndex, 1);
         parent_children.splice(targetIndex, 0, key);
+
+        this._generation++;
       }
     }
   }
