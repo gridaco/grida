@@ -670,7 +670,464 @@ export namespace tree {
     }
 
     /**
-     * Graph manipulation class providing safe tree operations.
+     * Graph Policy Interface - Universal constraints for tree structure validation.
+     *
+     * `IGraphPolicy` provides a flexible, extensible system for defining structural rules
+     * and constraints on tree operations. Policies are independent of node data shape (`T`)
+     * and operate purely on structural relationships, making them composable and reusable
+     * across different tree types.
+     *
+     * ## Design Philosophy
+     *
+     * **Separation of Concerns:**
+     * - Policies define WHAT is allowed (constraints)
+     * - Graph methods define HOW to execute (operations)
+     * - Node data defines content (domain objects)
+     *
+     * **Flexibility:**
+     * - All methods are optional (defaults to permissive behavior)
+     * - Policies can be node-specific (different rules for different node types)
+     * - Composable and extensible without modifying core graph code
+     *
+     * **Performance:**
+     * - Policies are queried only when needed (before mutations)
+     * - Simple checks (O(1)) per operation
+     * - No overhead when using default policy
+     *
+     * ## When to Use Policies
+     *
+     * Use policies to enforce:
+     * - **Type constraints**: "Text nodes cannot have children"
+     * - **Capacity limits**: "Containers can have max 100 children"
+     * - **Relationship rules**: "Images cannot contain frames"
+     * - **Hierarchy rules**: "Root nodes cannot be children"
+     * - **Business logic**: "Locked nodes cannot be moved"
+     *
+     * ## Integration with Graph Operations
+     *
+     * When integrated, policies will be checked before mutations:
+     * - `mv()` - Check `can_be_child`, `can_be_parent`, `can_link`, `max_out_degree`
+     * - `order()` - No policy checks (internal reordering)
+     * - `rm()` / `unlink()` - No policy checks (removal always allowed)
+     *
+     * Failed policy checks will throw descriptive errors instead of performing invalid operations.
+     *
+     * @typeParam T - The type of node data (your domain objects)
+     *
+     * @example
+     * ```ts
+     * // Example 1: Design tool with scene/frame/text/image hierarchy
+     * interface DesignNode {
+     *   type: "scene" | "frame" | "text" | "image" | "group";
+     * }
+     *
+     * const designPolicy: IGraphPolicy<DesignNode> = {
+     *   // Leaf nodes (text, image) cannot have children
+     *   max_out_degree: (node) => {
+     *     if (node.type === "text" || node.type === "image") return 0;
+     *     return Infinity; // Containers (scene, frame, group) have unlimited children
+     *   },
+     *
+     *   // Only container types can be parents
+     *   can_be_parent: (node) => {
+     *     return ["scene", "frame", "group"].includes(node.type);
+     *   },
+     *
+     *   // Scenes are top-level only (cannot be nested)
+     *   can_be_child: (node) => node.type !== "scene",
+     *
+     *   // Prevent self-parenting and group nesting
+     *   can_link: (parent, parent_id, child, child_id) => {
+     *     if (parent_id === child_id) return false; // No self-parenting
+     *     if (parent.type === "group" && child.type === "group") return false;
+     *     return true;
+     *   }
+     * };
+     *
+     * // Use with graph:
+     * const graph = new Graph(graphData, designPolicy);
+     * graph.mv("scene", "frame"); // ❌ Throws: Scenes cannot be children
+     * graph.mv("frame", "text"); // ❌ Throws: Text cannot be a parent
+     * ```
+     *
+     * @example
+     * ```ts
+     * // Example 2: Capacity limits
+     * interface ListNode {
+     *   type: "list" | "item";
+     *   maxItems?: number;
+     * }
+     *
+     * const listPolicy: IGraphPolicy<ListNode> = {
+     *   max_out_degree: (node) => {
+     *     if (node.type === "list") {
+     *       return node.maxItems ?? 10; // Default max 10 items
+     *     }
+     *     return 0; // Items cannot have children
+     *   }
+     * };
+     * ```
+     *
+     * @example
+     * ```ts
+     * // Example 3: Root node constraints
+     * interface DocumentNode {
+     *   id: string;
+     *   isRoot?: boolean;
+     * }
+     *
+     * const rootPolicy: IGraphPolicy<DocumentNode> = {
+     *   // Root nodes cannot become children
+     *   can_be_child: (node) => !node.isRoot,
+     *
+     *   // All nodes can be parents (even roots)
+     *   can_be_parent: () => true
+     * };
+     * ```
+     *
+     * @remarks
+     * **All methods are optional** - If not provided, defaults to permissive behavior:
+     * - `max_out_degree` → `Infinity` (unlimited children)
+     * - `can_link` → `true` (all links allowed)
+     * - `can_be_parent` → `true` (any node can be parent)
+     * - `can_be_child` → `true` (any node can be child)
+     *
+     * **Performance Considerations:**
+     * - Keep policy checks simple and fast (O(1) preferred)
+     * - Avoid expensive operations (database queries, deep traversals)
+     * - Cache computed values when possible
+     *
+     * **Error Handling:**
+     * - Policy violations will throw descriptive errors
+     * - Graph remains unchanged when policy check fails
+     * - No partial updates (atomic operations)
+     *
+     * @see {@link DEFAULT_POLICY_INFINITE} for the default permissive policy
+     * @see {@link Graph} for graph operations (integration coming soon)
+     */
+    export interface IGraphPolicy<T> {
+      /**
+       * Maximum number of children a node can have.
+       *
+       * This constraint is checked before adding children to a node. Use this to enforce:
+       * - **Leaf nodes**: Return `0` for nodes that cannot have children
+       * - **Capacity limits**: Return a number for maximum children allowed
+       * - **Containers**: Return `Infinity` for unlimited children (default)
+       *
+       * @param node - The node data that would become the parent
+       * @param id - The node's ID in the graph
+       * @returns Maximum children allowed, or `Infinity` for unlimited
+       *
+       * @example
+       * ```ts
+       * // Basic: Leaf vs container nodes
+       * max_out_degree: (node) => {
+       *   if (node.type === "leaf") return 0;
+       *   if (node.type === "container") return Infinity;
+       *   return 10; // Default max
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Dynamic limits based on node properties
+       * max_out_degree: (node) => {
+       *   if (node.isLeaf) return 0;
+       *   return node.maxChildren ?? Infinity;
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Type-specific constraints
+       * max_out_degree: (node) => {
+       *   switch (node.type) {
+       *     case "text":
+       *     case "image":
+       *       return 0; // Cannot have children
+       *     case "list":
+       *       return 100; // Max 100 items
+       *     case "frame":
+       *       return Infinity; // Unlimited
+       *     default:
+       *       return Infinity;
+       *   }
+       * }
+       * ```
+       *
+       * @remarks
+       * - Checked before `mv()` when adding a child
+       * - **Not checked** when node already has max children (use `can_link` for that)
+       * - Return `0` to create leaf nodes (no children allowed)
+       * - Return `Infinity` for containers (unlimited children)
+       * - Default (when not provided): `Infinity`
+       */
+      max_out_degree?(node: T, id: Key): number | typeof Infinity;
+
+      /**
+       * Whether a specific parent-child link is allowed.
+       *
+       * This is the most granular constraint, checked before creating any parent-child
+       * relationship. Use this for:
+       * - **Type compatibility**: "Images cannot contain frames"
+       * - **Relationship rules**: "Locked parents cannot accept children"
+       * - **Capacity enforcement**: Check current child count vs limit
+       * - **Business logic**: Custom domain-specific rules
+       *
+       * @param parent - The parent node data
+       * @param parent_id - The parent node's ID
+       * @param child - The child node data
+       * @param child_id - The child node's ID
+       * @returns `true` if the link is allowed, `false` otherwise
+       *
+       * @example
+       * ```ts
+       * // Basic type compatibility
+       * can_link: (parent, parent_id, child, child_id) => {
+       *   // Text nodes cannot contain anything
+       *   if (parent.type === "text") return false;
+       *   // Images can only contain text
+       *   if (parent.type === "image") return child.type === "text";
+       *   return true;
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Enforce capacity limits with current child count
+       * can_link: (parent, parent_id, child, child_id) => {
+       *   // Assuming you have access to the graph's links
+       *   const currentChildren = graph.links[parent_id]?.length ?? 0;
+       *   const maxChildren = parent.maxChildren ?? Infinity;
+       *   return currentChildren < maxChildren;
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Prevent cycles (if you have ancestry info)
+       * can_link: (parent, parent_id, child, child_id) => {
+       *   // Prevent self-parenting
+       *   if (parent_id === child_id) return false;
+       *   // Prevent adding ancestor as child (requires lut or cache)
+       *   // if (isAncestor(child_id, parent_id)) return false;
+       *   return true;
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Type-based relationship constraints
+       * can_link: (parent, parent_id, child, child_id) => {
+       *   // Scenes can only contain frames and groups (not text/image directly)
+       *   if (parent.type === "scene") {
+       *     return child.type === "frame" || child.type === "group";
+       *   }
+       *   // Groups cannot contain other groups (flat organization)
+       *   if (parent.type === "group" && child.type === "group") {
+       *     return false;
+       *   }
+       *   // All other combinations allowed
+       *   return true;
+       * }
+       * ```
+       *
+       * @remarks
+       * - **Most specific check** - called after `can_be_parent`, `can_be_child`, `max_out_degree`
+       * - Checked before every `mv()` operation
+       * - Receives both parent and child data for maximum flexibility
+       * - Use for complex business logic and relationship rules
+       * - Default (when not provided): `true` (all links allowed)
+       *
+       * @see {@link can_be_parent} for parent-only constraints
+       * @see {@link can_be_child} for child-only constraints
+       * @see {@link max_out_degree} for simple capacity limits
+       */
+      can_link?(parent: T, parent_id: Key, child: T, child_id: Key): boolean;
+
+      /**
+       * Whether a node can be a parent (have children).
+       *
+       * This is a node-level constraint checked before allowing a node to accept children.
+       * Use this for:
+       * - **Type constraints**: "Text nodes cannot be parents"
+       * - **State constraints**: "Disabled nodes cannot have children"
+       * - **Role constraints**: "Leaf nodes cannot become containers"
+       *
+       * @param node - The node data that would become a parent
+       * @param id - The node's ID in the graph
+       * @returns `true` if the node can be a parent, `false` otherwise
+       *
+       * @example
+       * ```ts
+       * // Type-based parent constraints
+       * can_be_parent: (node) => {
+       *   // Only container types can be parents
+       *   return ["frame", "group", "container"].includes(node.type);
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Container vs content type constraints
+       * can_be_parent: (node) => {
+       *   // Containers can have children
+       *   if (node.type === "container" || node.type === "folder") return true;
+       *   // Content types cannot have children
+       *   if (node.type === "content" || node.type === "asset") return false;
+       *   return true;
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Role-based constraints
+       * can_be_parent: (node) => {
+       *   // Only certain roles can have children
+       *   return node.role === "container" || node.role === "folder";
+       * }
+       * ```
+       *
+       * @remarks
+       * - Checked before `mv()` when node would receive a child
+       * - More efficient than `can_link` for simple "can/cannot be parent" checks
+       * - Use when constraint depends only on the parent node
+       * - Use `can_link` if you need to check parent-child compatibility
+       * - Default (when not provided): `true` (any node can be parent)
+       *
+       * @see {@link can_be_child} for child constraints
+       * @see {@link can_link} for relationship-specific constraints
+       * @see {@link max_out_degree} for capacity constraints
+       */
+      can_be_parent?(node: T, id: Key): boolean;
+
+      /**
+       * Whether a node can be a child (have a parent).
+       *
+       * This is a node-level constraint checked before allowing a node to be moved.
+       * Use this for:
+       * - **Type constraints**: "Root nodes cannot be children"
+       * - **State constraints**: "Locked nodes cannot be moved"
+       * - **Role constraints**: "Top-level containers must stay at root"
+       *
+       * @param node - The node data that would become a child
+       * @param id - The node's ID in the graph
+       * @returns `true` if the node can be a child, `false` otherwise
+       *
+       * @example
+       * ```ts
+       * // Root node constraints
+       * can_be_child: (node) => {
+       *   // Root nodes cannot be children
+       *   return !node.isRoot;
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Type-based movement constraints
+       * can_be_child: (node) => {
+       *   // Root-level types cannot be nested (like pages, artboards, scenes)
+       *   if (node.type === "page" || node.type === "artboard") return false;
+       *   // Master components stay at top level
+       *   if (node.type === "master") return false;
+       *   return true;
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Category-based constraints
+       * can_be_child: (node) => {
+       *   // System nodes cannot be moved
+       *   if (node.category === "system") return false;
+       *   // Only user-created content can be repositioned
+       *   return node.category === "user" || node.category === "template";
+       * }
+       * ```
+       *
+       * @example
+       * ```ts
+       * // Type-based constraints
+       * can_be_child: (node) => {
+       *   // Pages and artboards must stay at root level
+       *   return node.type !== "page" && node.type !== "artboard";
+       * }
+       * ```
+       *
+       * @remarks
+       * - Checked before `mv()` when moving a node
+       * - More efficient than `can_link` for simple "can/cannot be moved" checks
+       * - Use when constraint depends only on the child node
+       * - Use `can_link` if you need to check parent-child compatibility
+       * - Default (when not provided): `true` (any node can be child)
+       *
+       * @see {@link can_be_parent} for parent constraints
+       * @see {@link can_link} for relationship-specific constraints
+       */
+      can_be_child?(node: T, id: Key): boolean;
+    }
+
+    /**
+     * Default permissive policy that allows all operations.
+     *
+     * This policy imposes **no constraints** on tree structure, allowing:
+     * - Any node to be a parent (unlimited children)
+     * - Any node to be a child (freely movable)
+     * - Any parent-child relationship
+     * - Unlimited tree depth and breadth
+     *
+     * ## When to Use
+     *
+     * Use the default policy when:
+     * - You don't need structural constraints
+     * - Building a general-purpose tree without type-specific rules
+     * - Prototyping before adding constraints
+     * - Maximum flexibility is required
+     *
+     * ## Performance
+     *
+     * The default policy has **zero overhead**:
+     * - All checks return immediately (O(1))
+     * - No function calls in hot paths (can be inlined)
+     * - Equivalent to having no policy at all
+     *
+     * @example
+     * ```ts
+     * // Explicit use of default policy
+     * const graph = new Graph(graphData, DEFAULT_POLICY_INFINITE);
+     *
+     * // Equivalent to not providing a policy (when supported):
+     * const graph = new Graph(graphData);
+     * ```
+     *
+     * @example
+     * ```ts
+     * // Extend the default policy for partial constraints
+     * const myPolicy: IGraphPolicy<MyNode> = {
+     *   ...DEFAULT_POLICY_INFINITE,
+     *   // Only override what you need
+     *   max_out_degree: (node) => node.type === "leaf" ? 0 : Infinity,
+     * };
+     * ```
+     *
+     * @remarks
+     * - **Type-safe**: Works with any node type via `any`
+     * - **Composable**: Can be spread and overridden
+     * - **Zero cost**: No runtime overhead when used
+     * - **Default behavior**: Matches graph behavior before policies
+     *
+     * @see {@link IGraphPolicy} for creating custom policies
+     */
+    export const DEFAULT_POLICY_INFINITE: IGraphPolicy<any> = {
+      max_out_degree: () => Infinity,
+      can_link: () => true,
+      can_be_parent: () => true,
+      can_be_child: () => true,
+    };
+
+    /**
+     * Graph manipulation class providing safe tree operations with optional policy constraints.
      *
      * This class wraps an {@link IGraph} and provides methods to safely manipulate
      * the tree structure while maintaining data integrity. All structural changes
@@ -711,6 +1168,26 @@ export namespace tree {
      * console.log(removed); // ["section1", "section2"]
      * ```
      *
+     * @example
+     * ```ts
+     * // Using with policy constraints
+     * interface DesignNode {
+     *   type: "scene" | "frame" | "text" | "image";
+     * }
+     *
+     * const policy: IGraphPolicy<DesignNode> = {
+     *   max_out_degree: (node) => {
+     *     if (node.type === "text" || node.type === "image") return 0;
+     *     return Infinity;
+     *   },
+     *   can_be_child: (node) => node.type !== "scene",
+     * };
+     *
+     * const graph = new Graph<DesignNode>(graphData, policy);
+     * graph.mv("frame", "text"); // ❌ Throws: text cannot have children
+     * graph.mv("scene", "frame"); // ❌ Throws: scene cannot be a child
+     * ```
+     *
      * @remarks
      * **Mutability Pattern:**
      * - This class **modifies the constructor data directly** (in-place mutation)
@@ -719,9 +1196,16 @@ export namespace tree {
      *   you can pass a draft to the constructor and mutations will apply to that draft
      * - Use {@link snapshot} to get a copy of the current state when needed
      *
+     * **Policy Constraints:**
+     * - Optional {@link IGraphPolicy} can be provided to enforce structural rules
+     * - Policies are checked before mutations (atomic operations)
+     * - Failed policy checks throw descriptive errors
+     * - Use {@link DEFAULT_POLICY_INFINITE} for no constraints (default)
+     *
      * **Validation:**
-     * - The graph does not validate node existence automatically; invalid operations will throw
+     * - The graph validates node existence; invalid operations will throw
      * - Error messages follow file-system conventions for familiarity
+     * - Policy violations provide specific error messages
      *
      * @example
      * ```ts
@@ -744,7 +1228,21 @@ export namespace tree {
      * ```
      */
     export class Graph<T> {
-      constructor(private readonly graph: IGraph<T>) {}
+      constructor(
+        private readonly graph: IGraph<T>,
+        private readonly policy: IGraphPolicy<T> = DEFAULT_POLICY_INFINITE
+      ) {}
+
+      /**
+       * Ensures a node has a children array in links, initializing if needed.
+       *
+       * @param id - The node ID to ensure children for
+       * @returns The children array for the node (guaranteed to be defined)
+       * @internal
+       */
+      private enschildren(id: Key): string[] {
+        return (this.graph.links[id] ??= []);
+      }
 
       /**
        * Creates a snapshot of the current graph state.
@@ -942,19 +1440,78 @@ export namespace tree {
           throw new Error(`mv: cannot move to '${target}': No such node`);
         }
 
-        // Ensure target has a links array (initialize if missing or undefined)
-        // Note: Unlike flat_with_children which throws on missing children,
-        // graph explicitly allows undefined and will auto-initialize
-        if (!this.graph.links[target]) {
-          this.graph.links[target] = [];
-        }
-
         // Validate all source nodes exist
         for (const src of srcs) {
           if (!(src in this.graph.nodes)) {
             throw new Error(`mv: cannot move '${src}': No such node`);
           }
         }
+
+        const targetNode = this.graph.nodes[target];
+
+        // === Policy Validation (all checks before any mutation) ===
+
+        // 1. Check can_be_child for each source
+        if (this.policy.can_be_child) {
+          for (const src of srcs) {
+            const srcNode = this.graph.nodes[src];
+            if (!this.policy.can_be_child(srcNode, src)) {
+              throw new Error(
+                `mv: cannot move '${src}': Node cannot be a child`
+              );
+            }
+          }
+        }
+
+        // 2. Check can_be_parent for target
+        if (this.policy.can_be_parent) {
+          if (!this.policy.can_be_parent(targetNode, target)) {
+            throw new Error(
+              `mv: cannot move to '${target}': Node cannot be a parent`
+            );
+          }
+        }
+
+        // 3. Check max_out_degree for target
+        if (this.policy.max_out_degree) {
+          const maxDegree = this.policy.max_out_degree(targetNode, target);
+          const currentChildren = this.graph.links[target] ?? [];
+
+          // Count how many sources are NOT already children of target
+          const newSources = srcs.filter(
+            (src) => !currentChildren.includes(src)
+          );
+          const newChildrenCount = currentChildren.length + newSources.length;
+
+          if (maxDegree === 0) {
+            throw new Error(
+              `mv: cannot move to '${target}': Node cannot have children (max_out_degree = 0)`
+            );
+          }
+
+          if (newChildrenCount > maxDegree) {
+            throw new Error(
+              `mv: cannot move to '${target}': Parent at max capacity (${currentChildren.length}/${maxDegree} children)`
+            );
+          }
+        }
+
+        // 4. Check can_link for each source-target pair
+        if (this.policy.can_link) {
+          for (const src of srcs) {
+            const srcNode = this.graph.nodes[src];
+            if (!this.policy.can_link(targetNode, target, srcNode, src)) {
+              throw new Error(
+                `mv: cannot link '${target}' -> '${src}': Link not allowed by policy`
+              );
+            }
+          }
+        }
+
+        // === All validations passed, proceed with mutation ===
+
+        // Ensure target has a children array
+        const targetChildren = this.enschildren(target);
 
         // Move each source node
         for (const src of srcs) {
@@ -969,9 +1526,7 @@ export namespace tree {
             }
           }
 
-          // Attach to new parent
-          const targetChildren = this.graph.links[target]!;
-          // Determine insertion position
+          // Attach to new parent at specified position
           const insert_at =
             !pos_specified || pos > targetChildren.length
               ? targetChildren.length

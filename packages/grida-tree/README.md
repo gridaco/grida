@@ -87,6 +87,7 @@ graph.unlink("child1"); // Detach child1 without recursive removal
 4. **Flexibility**: The same node data can be used in different graph structures without duplication
 5. **Type Safety**: Full TypeScript support for your node types
 6. **Manageable Complexity**: Large trees remain manageable because operations work on structure independently from data
+7. **Policy Constraints**: Optional type-based rules to enforce structural validity
 
 #### Compared to Alternatives
 
@@ -102,7 +103,7 @@ graph.unlink("child1"); // Detach child1 without recursive removal
 
 ```ts
 class Graph<T> {
-  constructor(graph: IGraph<T>);
+  constructor(graph: IGraph<T>, policy?: IGraphPolicy<T>);
 
   // Get a snapshot of the current graph state
   snapshot(): IGraph<T>;
@@ -113,49 +114,126 @@ class Graph<T> {
   // Unlink (delete) a single node from the graph
   unlink(key: Key): void;
 
-  // Move one or more nodes to a new parent
+  // Move one or more nodes to a new parent (with policy validation)
   mv(sources: Key | Key[], target: Key, index?: number): void;
 
-  // Reorder a node within its parent
+  // Reorder a node within its parent (no policy checks)
   order(
     key: Key,
     order: "back" | "front" | "backward" | "forward" | number
   ): void;
 }
+
+// Policy interface for structural constraints
+interface IGraphPolicy<T> {
+  max_out_degree?(node: T, id: Key): number | typeof Infinity;
+  can_link?(parent: T, parent_id: Key, child: T, child_id: Key): boolean;
+  can_be_parent?(node: T, id: Key): boolean;
+  can_be_child?(node: T, id: Key): boolean;
+}
 ```
 
 ### Example Usage
+
+#### Basic Usage
 
 ```ts
 import { tree } from "@grida/tree";
 
 interface DocumentNode {
   id: string;
-  type: "frame" | "text" | "image";
+  type: "scene" | "frame" | "text" | "image";
   name: string;
-  // ... other properties
 }
 
-// Initialize graph
+// Initialize graph without policy (permissive)
 const graph = new tree.graph.Graph<DocumentNode>({
   nodes: {
-    root: { id: "root", type: "frame", name: "Page" },
+    page: { id: "page", type: "scene", name: "Page 1" },
     header: { id: "header", type: "frame", name: "Header" },
     title: { id: "title", type: "text", name: "Title" },
     logo: { id: "logo", type: "image", name: "Logo" },
   },
   links: {
-    root: ["header"],
+    page: ["header"],
     header: ["title", "logo"],
     title: undefined,
     logo: undefined,
   },
 });
 
-// Work with the graph
+// Perform operations
+graph.mv("title", "page"); // Move title to page
+graph.order("header", "front"); // Reorder header to front
+graph.rm("logo"); // Remove logo
+
+// Get current state
 const snapshot = graph.snapshot();
 // snapshot.nodes contains your data
 // snapshot.links contains your structure
+```
+
+#### With Policy Constraints
+
+```ts
+import { tree } from "@grida/tree";
+
+interface DesignNode {
+  type: "scene" | "frame" | "text" | "image" | "group";
+  name: string;
+}
+
+// Define structural constraints
+const designPolicy: tree.graph.IGraphPolicy<DesignNode> = {
+  // Leaf nodes (text, image) cannot have children
+  max_out_degree: (node) => {
+    if (node.type === "text" || node.type === "image") return 0;
+    return Infinity;
+  },
+
+  // Only containers can be parents
+  can_be_parent: (node) => {
+    return ["scene", "frame", "group"].includes(node.type);
+  },
+
+  // Scenes are top-level only (cannot be nested)
+  can_be_child: (node) => {
+    return node.type !== "scene";
+  },
+
+  // Prevent group nesting
+  can_link: (parent, parent_id, child, child_id) => {
+    if (parent.type === "group" && child.type === "group") return false;
+    return true;
+  },
+};
+
+// Create graph with policy
+const graph = new tree.graph.Graph<DesignNode>(
+  {
+    nodes: {
+      homePage: { type: "scene", name: "Home" },
+      aboutPage: { type: "scene", name: "About" },
+      container: { type: "frame", name: "Container" },
+      heading: { type: "text", name: "Title" },
+    },
+    links: {
+      homePage: ["container"],
+      aboutPage: undefined,
+      container: ["heading"],
+      heading: undefined,
+    },
+  },
+  designPolicy
+);
+
+// Valid operations
+graph.mv("heading", "homePage"); // ✅ Text can be child of scene
+
+// Invalid operations (throw descriptive errors)
+graph.mv("container", "heading"); // ❌ Text cannot be a parent
+graph.mv("aboutPage", "container"); // ❌ Scene cannot be nested
+graph.mv("aboutPage", "homePage"); // ❌ Scene cannot be a child
 ```
 
 ### Design Philosophy
@@ -267,26 +345,137 @@ if (needsUndo) {
 - ⚠️ **Parent lookup is O(n)**: Finding a node's parent scans all links
 - 💡 **Optimization available**: For very large trees (100k+ nodes), consider caching parent relationships
 
+### Policy System
+
+The `Graph` class supports optional **policy constraints** to enforce structural rules on your tree.
+
+#### What are Policies?
+
+Policies define **what operations are allowed** based on node types and relationships:
+
+```typescript
+interface IGraphPolicy<T> {
+  max_out_degree?(node: T, id: Key): number | typeof Infinity;
+  can_be_parent?(node: T, id: Key): boolean;
+  can_be_child?(node: T, id: Key): boolean;
+  can_link?(parent: T, parent_id: Key, child: T, child_id: Key): boolean;
+}
+```
+
+#### Common Use Cases
+
+**1. Enforce leaf nodes (nodes that cannot have children):**
+
+```ts
+const policy: IGraphPolicy<DesignNode> = {
+  max_out_degree: (node) => {
+    // Text and images are leaf nodes
+    if (node.type === "text" || node.type === "image") return 0;
+    return Infinity;
+  },
+};
+```
+
+**2. Restrict top-level nodes (like pages, artboards, scenes):**
+
+```ts
+const policy: IGraphPolicy<DesignNode> = {
+  can_be_child: (node) => {
+    // Scenes/pages must stay at root level
+    return node.type !== "scene";
+  },
+};
+```
+
+**3. Control which types can be parents:**
+
+```ts
+const policy: IGraphPolicy<DesignNode> = {
+  can_be_parent: (node) => {
+    // Only containers can have children
+    return ["scene", "frame", "group"].includes(node.type);
+  },
+};
+```
+
+**4. Define parent-child compatibility:**
+
+```ts
+const policy: IGraphPolicy<DesignNode> = {
+  can_link: (parent, parent_id, child, child_id) => {
+    // Scenes can only contain frames/groups (not leaf nodes directly)
+    if (parent.type === "scene") {
+      return child.type === "frame" || child.type === "group";
+    }
+    return true;
+  },
+};
+```
+
+#### Policy Check Order
+
+When you call `mv()`, policies are checked in this order:
+
+1. **`can_be_child`** - Can the source node be moved?
+2. **`can_be_parent`** - Can the target accept children?
+3. **`max_out_degree`** - Does target have capacity?
+4. **`can_link`** - Is this specific relationship allowed?
+
+All checks happen **before any mutation** (atomic operations).
+
+#### Example: Complete Design Tool Policy
+
+```ts
+const DESIGN_TOOL_POLICY: tree.graph.IGraphPolicy<DesignNode> = {
+  max_out_degree: (node) => {
+    // Leaf nodes
+    if (node.type === "text" || node.type === "image") return 0;
+    // Containers (unlimited)
+    return Infinity;
+  },
+
+  can_be_parent: (node) => {
+    return ["scene", "frame", "group"].includes(node.type);
+  },
+
+  can_be_child: (node) => {
+    // Scenes stay at root level
+    return node.type !== "scene";
+  },
+
+  can_link: (parent, parent_id, child, child_id) => {
+    // No self-parenting
+    if (parent_id === child_id) return false;
+    // No group nesting
+    if (parent.type === "group" && child.type === "group") return false;
+    return true;
+  },
+};
+
+const graph = new tree.graph.Graph(graphData, DESIGN_TOOL_POLICY);
+```
+
 ### Limitations & Warnings
 
 #### No Cycle Detection ⚠️
 
-The `mv()` method does **not detect cycles**. Moving an ancestor into its descendant will create a cycle and break tree integrity.
+The `mv()` method does **not detect cycles** by default. Moving an ancestor into its descendant will create a cycle.
 
-**How to prevent:**
+**Solution: Use policy to prevent cycles:**
 
 ```ts
-import { tree } from "@grida/tree";
+const policy: tree.graph.IGraphPolicy<Node> = {
+  can_link: (parent, parent_id, child, child_id) => {
+    // Prevent self-parenting (basic cycle prevention)
+    if (parent_id === child_id) return false;
 
-// Build a lookup table to check ancestry
-const lut = tree.lut.TreeLUT.from(graphData.links);
+    // For ancestor cycle detection, use tree.lut:
+    // const lut = tree.lut.TreeLUT.from(graph.snapshot().links);
+    // if (lut.isAncestorOf(child_id, parent_id)) return false;
 
-// Check before moving
-if (!lut.isAncestorOf(source, target)) {
-  graph.mv(source, target);
-} else {
-  console.error("Cannot move ancestor into descendant - would create cycle");
-}
+    return true;
+  },
+};
 ```
 
 #### Parent Lookup Performance
@@ -310,32 +499,33 @@ All operations mutate the graph directly. This is intentional for performance an
 #### ✅ Do's
 
 ```ts
-// Use with Immer for immutable state management
+// 1. Use with Immer for immutable state management
 const nextState = produce(state, (draft) => {
-  const graph = new tree.graph.Graph(draft.document);
+  const graph = new tree.graph.Graph(draft.document, policy);
   graph.mv("node-id", "new-parent");
 });
 
-// Check for cycles before moving
-if (!wouldCreateCycle(source, target)) {
-  graph.mv(source, target);
-}
+// 2. Define policies for structural constraints
+const policy: tree.graph.IGraphPolicy<Node> = {
+  can_be_child: (node) => node.type !== "scene",
+  max_out_degree: (node) => (node.type === "text" ? 0 : Infinity),
+};
 
-// Create snapshots for undo functionality
+// 3. Create snapshots for undo functionality
 const backup = graph.snapshot();
 graph.rm("node");
 if (needsUndo) Object.assign(graphData, backup);
 
-// Validate node existence before operations
-if (nodeId in graphData.nodes) {
-  graph.rm(nodeId);
-}
+// 4. Use policy for self-parenting prevention
+const policy = {
+  can_link: (parent, parent_id, child, child_id) => parent_id !== child_id,
+};
 ```
 
 #### ❌ Don'ts
 
 ```ts
-// Don't move ancestors into descendants
+// Don't allow cycles without policy checks
 graph.mv("root", "child"); // ❌ Creates cycle!
 
 // Don't mutate without Immer in immutable contexts
@@ -349,24 +539,28 @@ function reducer(state, action) {
 for (let i = 0; i < 100000; i++) {
   graph.mv(nodes[i], "target"); // ⚠️ O(n×m) per call
 }
+
+// Don't forget to define policies for type constraints
+graph.mv("frame", "text-node"); // ⚠️ Without policy, text can have children!
 ```
 
 ### When to Use `tree.graph`
 
 #### ✅ Perfect For:
 
-- Main data model for tree-based applications
-- Working with Immer for state management
-- Frequent structural changes (move, add, remove, reorder)
-- Need to keep data and structure separate
-- Trees with thousands of nodes
-- TypeScript projects requiring type safety
+- **Design tools** - Scenes, frames, groups, text, images with hierarchy rules
+- **Main data model** - Tree-based applications (editors, file systems, org charts)
+- **Immer integration** - State management with immutability
+- **Type constraints** - Enforce structural rules (leaf nodes, root-only types)
+- **Frequent changes** - Move, add, remove, reorder operations
+- **Large trees** - Thousands of nodes with type-based constraints
+- **TypeScript projects** - Full type safety and policy validation
 
 #### ⚠️ Consider Alternatives When:
 
 - Need O(1) parent lookups (use `tree.lut` for queries)
 - Already have nested tree structure (flatten first or use different approach)
-- Need cycle detection (implement your own check or wait for v2)
+- Need cycle detection (use policy with `tree.lut.isAncestorOf` or wait for v2)
 - Working with extremely large trees (100k+ nodes) with frequent parent lookups
 
 ### Advanced Usage
@@ -396,10 +590,26 @@ const flat: tree.graph.IGraph<Node> = {
 // Both share the same node objects
 ```
 
-#### Custom Operations
+#### Custom Policies
+
+Extend the default policy for your specific needs:
 
 ```ts
-class MyGraph<T> extends tree.graph.Graph<T> {
+// Start with permissive, add only what you need
+const myPolicy: tree.graph.IGraphPolicy<MyNode> = {
+  ...tree.graph.DEFAULT_POLICY_INFINITE,
+
+  // Only restrict scenes from nesting
+  can_be_child: (node) => node.type !== "scene",
+};
+```
+
+#### Custom Graph Class
+
+Extend `Graph` for additional functionality:
+
+```ts
+class DesignGraph<T> extends tree.graph.Graph<T> {
   // Add cycle detection
   mvSafe(source: Key, target: Key) {
     const lut = tree.lut.TreeLUT.from(this.snapshot().links);
@@ -415,7 +625,82 @@ class MyGraph<T> extends tree.graph.Graph<T> {
       this.mv(source, target);
     }
   }
+
+  // Helper: Check if node is a container
+  isContainer(id: Key): boolean {
+    const node = this.snapshot().nodes[id];
+    return ["scene", "frame", "group"].includes((node as any).type);
+  }
 }
+```
+
+### Real-World Example: Design Tool
+
+Complete example modeling a design tool like Figma or Sketch:
+
+```ts
+import { tree } from "@grida/tree";
+
+// 1. Define your node types
+interface CanvasNode {
+  type: "scene" | "frame" | "text" | "image" | "group";
+  name: string;
+}
+
+// 2. Define structural constraints
+const CANVAS_POLICY: tree.graph.IGraphPolicy<CanvasNode> = {
+  max_out_degree: (node) => {
+    // Leaf nodes
+    if (node.type === "text" || node.type === "image") return 0;
+    return Infinity;
+  },
+  can_be_parent: (node) => {
+    return ["scene", "frame", "group"].includes(node.type);
+  },
+  can_be_child: (node) => {
+    // Scenes are pages/artboards - stay at root
+    return node.type !== "scene";
+  },
+  can_link: (parent, parent_id, child, child_id) => {
+    if (parent_id === child_id) return false;
+    if (parent.type === "group" && child.type === "group") return false;
+    return true;
+  },
+};
+
+// 3. Create your document structure
+const document: tree.graph.IGraph<CanvasNode> = {
+  nodes: {
+    homepage: { type: "scene", name: "Homepage" },
+    header: { type: "frame", name: "Header" },
+    logo: { type: "image", name: "Logo" },
+    nav: { type: "group", name: "Navigation" },
+    title: { type: "text", name: "Welcome" },
+  },
+  links: {
+    homepage: ["header", "nav"],
+    header: ["logo", "title"],
+    logo: undefined,
+    nav: undefined,
+    title: undefined,
+  },
+};
+
+// 4. Use with Immer for state management
+import { produce } from "immer";
+
+const nextState = produce({ document }, (draft) => {
+  const graph = new tree.graph.Graph(draft.document, CANVAS_POLICY);
+
+  // ✅ Valid: Move title to nav
+  graph.mv("title", "nav");
+
+  // ❌ Invalid: Would throw "text cannot be a parent"
+  // graph.mv("logo", "title");
+
+  // ❌ Invalid: Would throw "scene cannot be a child"
+  // graph.mv("homepage", "header");
+});
 ```
 
 ### Roadmap
@@ -427,6 +712,7 @@ Future enhancements planned for v2:
 - [ ] Batch operations API
 - [ ] Tree validation utilities
 - [ ] Performance optimizations for large trees
+- [ ] More policy examples and presets
 
 ### Related Namespaces (Coming Soon)
 
