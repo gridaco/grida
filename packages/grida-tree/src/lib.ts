@@ -531,39 +531,549 @@ export namespace tree {
     }
   }
 
+  /**
+   * Graph-based tree structure with explicit node and link separation.
+   *
+   * The `graph` namespace provides a data structure and system for managing tree hierarchies
+   * where **nodes** (the actual data) and **links** (the relationships between nodes) are
+   * stored and managed separately. This design provides a clean, efficient way to work with
+   * large tree structures without the complexity of nested objects or the fragility of
+   * parent-pointer approaches.
+   *
+   * ## Core Design Principles
+   *
+   * ### 1. Explicit Separation of Data and Structure
+   * Unlike traditional tree implementations, `graph` keeps data and relationships separate:
+   * - **Nodes**: A flat record of your actual data `Record<string, T>`
+   * - **Links**: A separate record of parent-child relationships `Record<string, string[] | undefined>`
+   *
+   * This separation provides several benefits:
+   * - No need to re-wrap or re-map data when structure changes
+   * - Data remains immutable while structure can be modified
+   * - Easy to maintain different views of the same data
+   * - Clear separation of concerns
+   *
+   * ### 2. Single Source of Truth
+   * The graph serves as your **main source of truth** for hierarchical data. Instead of:
+   * - Maintaining duplicate structures (e.g., flat + nested)
+   * - Re-computing relationships on every operation
+   * - Storing derived or redundant parent/child references
+   *
+   * You work directly with the graph, which keeps everything synchronized and consistent.
+   *
+   * ### 3. Safe, Predictable Operations
+   * All tree manipulation methods maintain graph integrity:
+   * - Moving nodes updates all relevant links automatically
+   * - Removing nodes cleans up orphaned references
+   * - Operations are atomic and don't leave the graph in an invalid state
+   *
+   * ## When to Use This
+   *
+   * Use `tree.graph` when you need:
+   * - A robust, manipulable tree structure as your primary data model
+   * - Frequent structural changes (add, move, remove, reorder)
+   * - To work with large trees (thousands of nodes)
+   * - A single source of truth for hierarchical data
+   * - Type-safe operations on your domain objects
+   *
+   * For read-only querying, consider {@link lut.TreeLUT} which provides efficient lookups.
+   * For simple operations on existing structures, see {@link flat_with_children}.
+   *
+   * ## Example
+   *
+   * ```ts
+   * import { tree } from "@grida/tree";
+   *
+   * interface PageNode {
+   *   id: string;
+   *   name: string;
+   *   type: "frame" | "text" | "image";
+   * }
+   *
+   * // Create a graph with explicit nodes and links
+   * const graph = new tree.graph.Graph<PageNode>({
+   *   nodes: {
+   *     "page": { id: "page", name: "Page 1", type: "frame" },
+   *     "header": { id: "header", name: "Header", type: "frame" },
+   *     "title": { id: "title", name: "Title", type: "text" },
+   *   },
+   *   links: {
+   *     "page": ["header"],      // page contains header
+   *     "header": ["title"],     // header contains title
+   *     "title": undefined,      // title has no children
+   *   }
+   * });
+   *
+   * // Move title from header to page
+   * graph.mv("title", "page");
+   *
+   * // Get current state
+   * const state = graph.snapshot();
+   * console.log(state.links["page"]); // ["header", "title"]
+   * console.log(state.links["header"]); // []
+   * ```
+   *
+   * @see {@link IGraph} for the graph data structure interface
+   * @see {@link Graph} for graph manipulation methods
+   */
   export namespace graph {
+    /**
+     * Graph data structure interface with explicit node and link separation.
+     *
+     * This interface represents a tree structure where:
+     * - `nodes` contains the actual data objects
+     * - `links` contains the parent-child relationships
+     *
+     * The separation allows for efficient tree operations without modifying node data,
+     * and enables the same node data to be used in multiple graph structures if needed.
+     *
+     * @typeParam T - The type of data stored in each node
+     *
+     * @example
+     * ```ts
+     * interface MyData {
+     *   name: string;
+     *   value: number;
+     * }
+     *
+     * const graph: IGraph<MyData> = {
+     *   nodes: {
+     *     "root": { name: "Root", value: 0 },
+     *     "child": { name: "Child", value: 1 },
+     *   },
+     *   links: {
+     *     "root": ["child"],    // root has one child
+     *     "child": undefined,   // child has no children
+     *   }
+     * };
+     * ```
+     *
+     * @remarks
+     * - Node keys in `nodes` and `links` must be synchronized
+     * - A link value of `undefined` or empty array `[]` means no children
+     * - Links are stored as arrays to preserve child order
+     * - The graph does not enforce referential integrity automatically;
+     *   use the {@link Graph} class for safe operations
+     */
     export interface IGraph<T> {
+      /**
+       * The actual data nodes, keyed by node ID.
+       * Contains your domain objects without any tree-specific properties.
+       */
       nodes: Record<string, T>;
+      /**
+       * The hierarchical relationships between nodes.
+       * Each key maps to an array of child node IDs, or undefined if no children.
+       * The order of children in the array represents their visual/logical order.
+       */
       links: Record<string, string[] | undefined>;
     }
 
+    /**
+     * Graph manipulation class providing safe tree operations.
+     *
+     * This class wraps an {@link IGraph} and provides methods to safely manipulate
+     * the tree structure while maintaining data integrity. All structural changes
+     * (move, remove, reorder) are handled through this class to ensure the graph
+     * remains in a consistent state.
+     *
+     * @typeParam T - The type of data stored in each node
+     *
+     * @example
+     * ```ts
+     * interface DocumentNode {
+     *   id: string;
+     *   type: string;
+     *   name: string;
+     * }
+     *
+     * const graph = new Graph<DocumentNode>({
+     *   nodes: {
+     *     "doc": { id: "doc", type: "document", name: "My Doc" },
+     *     "section1": { id: "section1", type: "section", name: "Section 1" },
+     *     "section2": { id: "section2", type: "section", name: "Section 2" },
+     *   },
+     *   links: {
+     *     "doc": ["section1", "section2"],
+     *     "section1": undefined,
+     *     "section2": undefined,
+     *   }
+     * });
+     *
+     * // Reorder sections
+     * graph.order("section2", "front");
+     *
+     * // Move section1 inside section2
+     * graph.mv("section1", "section2", 0);
+     *
+     * // Remove section2 and its subtree (including section1)
+     * const removed = graph.rm("section2");
+     * console.log(removed); // ["section1", "section2"]
+     * ```
+     *
+     * @remarks
+     * **Mutability Pattern:**
+     * - This class **modifies the constructor data directly** (in-place mutation)
+     * - All methods mutate the graph reference passed to the constructor
+     * - This design works seamlessly with immutability libraries like Immer:
+     *   you can pass a draft to the constructor and mutations will apply to that draft
+     * - Use {@link snapshot} to get a copy of the current state when needed
+     *
+     * **Validation:**
+     * - The graph does not validate node existence automatically; invalid operations will throw
+     * - Error messages follow file-system conventions for familiarity
+     *
+     * @example
+     * ```ts
+     * // Using with Immer (or similar immutability patterns)
+     * import { produce } from "immer";
+     *
+     * const state = {
+     *   graph: {
+     *     nodes: { root: {...}, child: {...} },
+     *     links: { root: ["child"], child: undefined }
+     *   }
+     * };
+     *
+     * const nextState = produce(state, draft => {
+     *   // Pass draft.graph to constructor - mutations apply to draft
+     *   const graph = new Graph(draft.graph);
+     *   graph.rm("child");
+     *   // draft.graph is now modified, producing new immutable state
+     * });
+     * ```
+     */
     export class Graph<T> {
-      constructor(readonly graph: IGraph<T>) {}
+      constructor(private readonly graph: IGraph<T>) {}
 
+      /**
+       * Creates a snapshot of the current graph state.
+       *
+       * This method returns a copy of the graph structure, useful for:
+       * - Implementing undo/redo functionality
+       * - Creating checkpoints before operations
+       * - Comparing graph states
+       * - Exporting graph data
+       *
+       * @returns A new IGraph object with copied nodes and links
+       *
+       * @example
+       * ```ts
+       * const graph = new Graph({ nodes: {...}, links: {...} });
+       * const before = graph.snapshot();
+       *
+       * graph.mv("child", "newParent");
+       *
+       * const after = graph.snapshot();
+       * // before and after are independent objects
+       * ```
+       *
+       * @remarks
+       * - The `nodes` record is shallow-copied (node objects are not cloned)
+       * - The `links` record and all child arrays are deep-copied for independence
+       * - If you need deep copies of node data, clone the nodes separately
+       */
       snapshot(): IGraph<T> {
         return {
           nodes: { ...this.graph.nodes },
-          links: { ...this.graph.links },
+          links: Object.fromEntries(
+            Object.entries(this.graph.links).map(([key, children]) => [
+              key,
+              children ? [...children] : children,
+            ])
+          ),
         };
       }
       //
 
       /**
-       * remove the node from the graph
+       * Recursively remove a node and its entire subtree from the graph.
+       *
+       * This method removes the specified node along with all of its descendants,
+       * cleaning up all associated links. The removal is recursive, so if the node
+       * has children, those children and their children are also removed.
+       *
+       * @param key - The node ID to remove
+       * @returns Array of removed node IDs in removal order (children first, then parent)
+       * @throws {Error} If the node does not exist
+       * @mutates Modifies the graph in-place by removing nodes and updating links
+       *
+       * @example
+       * ```ts
+       * // Tree: root -> [a -> [b, c], d]
+       * const removed = graph.rm("a");
+       * console.log(removed); // ["b", "c", "a"]
+       * // Now the tree is: root -> [d]
+       * ```
+       *
+       * @remarks
+       * - Children are removed before parents (depth-first)
+       * - All links referencing the removed nodes are cleaned up
+       * - For removing a single node without its children, use {@link unlink}
+       * - The return value can be used to implement undo functionality
+       *
+       * @see {@link unlink} for removing a node without its children
        */
       rm(key: Key): RmResult {
-        throw new Error("not implemented");
+        if (!(key in this.graph.nodes)) {
+          throw new Error(`rm: cannot remove '${key}': No such node`);
+        }
+
+        const removed: string[] = [];
+
+        // Remove children first (depth-first)
+        const children = this.graph.links[key];
+        if (children && children.length > 0) {
+          for (const child of [...children]) {
+            removed.push(...this.rm(child));
+          }
+        }
+
+        // Then unlink this node
+        this.unlink(key);
+        removed.push(key);
+
+        return removed;
       }
 
-      mv(sources: Key | Key[], target: Key, index: number = -1) {
-        throw new Error("not implemented");
+      /**
+       * Unlink (delete) a single node from the graph without removing its children.
+       *
+       * This method removes only the specified node from the graph. If the node has children,
+       * those children become orphaned (detached from the tree). This is useful when you want
+       * to remove a node but preserve its subtree for re-attachment elsewhere.
+       *
+       * @param key - The node ID to unlink
+       * @throws {Error} If the node does not exist
+       * @mutates Modifies the graph in-place by removing the node and updating parent links
+       *
+       * @example
+       * ```ts
+       * // Tree: root -> a -> b
+       * graph.unlink("a");
+       * // Now: root (b exists but is orphaned)
+       *
+       * // b can be re-attached
+       * graph.mv("b", "root");
+       * // Now: root -> b
+       * ```
+       *
+       * @remarks
+       * - Only the specified node is removed; children are not affected
+       * - Children of the removed node become orphaned and may need re-attachment
+       * - For removing a node and its entire subtree, use {@link rm}
+       * - The node's entry is removed from both `nodes` and `links`
+       *
+       * @see {@link rm} for recursive removal including children
+       * @see {@link mv} for re-attaching orphaned nodes
+       */
+      unlink(key: Key): void {
+        if (!(key in this.graph.nodes)) {
+          throw new Error(`unlink: cannot unlink '${key}': No such node`);
+        }
+
+        // Remove this node from any parent's links
+        for (const nodeKey in this.graph.links) {
+          const children = this.graph.links[nodeKey];
+          if (children) {
+            const idx = children.indexOf(key);
+            if (idx >= 0) {
+              children.splice(idx, 1);
+            }
+          }
+        }
+
+        // Delete the node itself
+        delete this.graph.nodes[key];
+        delete this.graph.links[key];
       }
 
+      /**
+       * Move one or more nodes to a new parent at a specific position.
+       *
+       * This method relocates nodes within the tree, updating all relevant links automatically.
+       * Nodes are detached from their current parent (if any) and attached to the target parent
+       * at the specified index.
+       *
+       * @param sources - Single node ID or array of node IDs to move
+       * @param target - Target parent node ID to move into
+       * @param index - Insertion index in target's children array. -1 (default) appends at end.
+       * @throws {Error} If any source node or target node does not exist
+       * @mutates Modifies the graph in-place by updating links
+       *
+       * @example
+       * ```ts
+       * // Tree: root -> [a, b], b -> [c]
+       * graph.mv("c", "root", 0);
+       * // Now: root -> [c, a, b], b -> []
+       *
+       * // Move multiple nodes
+       * graph.mv(["a", "b"], "c");
+       * // Now: root -> [], c -> [a, b]
+       *
+       * // Insert at specific position
+       * graph.mv("a", "root", 1);
+       * // Now: root -> [c, a], b -> []
+       * ```
+       *
+       * @remarks
+       * - Nodes are automatically detached from their current parent
+       * - If moving multiple nodes, they maintain their relative order
+       * - Index is clamped to valid range (0 to children.length)
+       * - Moving a node to its current parent changes its position among siblings
+       * - Cycle detection is NOT implemented; avoid moving ancestors into descendants
+       *
+       * **Behavioral Note:**
+       * Unlike {@link flat_with_children.mv} which throws an error when the target lacks
+       * a children array, this method **auto-initializes** missing or undefined link entries.
+       * This is intentional: `graph.IGraph` explicitly allows `undefined` in its type signature
+       * (`links: Record<string, string[] | undefined>`), making this behavior consistent
+       * with the graph's design philosophy of handling sparse structures gracefully.
+       *
+       * @see {@link order} for reordering within the same parent
+       */
+      mv(sources: Key | Key[], target: Key, index: number = -1): void {
+        const srcs = Array.isArray(sources) ? sources : [sources];
+        const pos_specified = index >= 0;
+        let pos = index;
+
+        // Validate target exists
+        if (!(target in this.graph.nodes)) {
+          throw new Error(`mv: cannot move to '${target}': No such node`);
+        }
+
+        // Ensure target has a links array (initialize if missing or undefined)
+        // Note: Unlike flat_with_children which throws on missing children,
+        // graph explicitly allows undefined and will auto-initialize
+        if (!this.graph.links[target]) {
+          this.graph.links[target] = [];
+        }
+
+        // Validate all source nodes exist
+        for (const src of srcs) {
+          if (!(src in this.graph.nodes)) {
+            throw new Error(`mv: cannot move '${src}': No such node`);
+          }
+        }
+
+        // Move each source node
+        for (const src of srcs) {
+          // Detach from old parent (if any)
+          for (const nodeKey in this.graph.links) {
+            const children = this.graph.links[nodeKey];
+            if (!children) continue;
+            const i = children.indexOf(src);
+            if (i !== -1) {
+              children.splice(i, 1);
+              break;
+            }
+          }
+
+          // Attach to new parent
+          const targetChildren = this.graph.links[target]!;
+          // Determine insertion position
+          const insert_at =
+            !pos_specified || pos > targetChildren.length
+              ? targetChildren.length
+              : pos;
+          targetChildren.splice(insert_at, 0, src);
+          if (pos_specified) pos++;
+        }
+      }
+
+      /**
+       * Reorder a node within its current parent's children array.
+       *
+       * This method changes the position of a node among its siblings without changing
+       * its parent. Useful for z-index type operations or list reordering.
+       *
+       * @param key - The node ID to reorder
+       * @param order - Ordering directive:
+       *   - `"front"` - Move to the end (highest z-index)
+       *   - `"back"` - Move to the start (lowest z-index)
+       *   - `"forward"` - Move one position toward the end
+       *   - `"backward"` - Move one position toward the start
+       *   - `number` - Move to specific index
+       * @throws {Error} If the node does not exist
+       * @mutates Modifies the graph in-place by reordering links
+       *
+       * @example
+       * ```ts
+       * // Tree: parent -> [a, b, c, d]
+       * graph.order("b", "front");
+       * // Now: parent -> [a, c, d, b]
+       *
+       * graph.order("d", "back");
+       * // Now: parent -> [d, a, c, b]
+       *
+       * graph.order("c", "forward");
+       * // Now: parent -> [d, a, b, c]
+       *
+       * graph.order("b", 0);
+       * // Now: parent -> [b, d, a, c]
+       * ```
+       *
+       * @remarks
+       * - Only affects the node's position among siblings
+       * - Does not change the node's parent
+       * - Numeric indices are clamped to valid range
+       * - "forward" and "backward" are relative to current position
+       * - Has no effect if the node has no parent (orphan node)
+       *
+       * @see {@link mv} for moving nodes to a different parent
+       */
       order(
         key: Key,
         order: "back" | "front" | "backward" | "forward" | number
-      ) {
-        throw new Error("not implemented");
+      ): void {
+        // Validate node exists
+        if (!(key in this.graph.nodes)) {
+          throw new Error(`order: cannot reorder '${key}': No such node`);
+        }
+
+        // Find parent (the node that has this key in its children)
+        let parent_children: string[] | null = null;
+        for (const nodeKey in this.graph.links) {
+          const children = this.graph.links[nodeKey];
+          if (!children) continue;
+          if (children.includes(key)) {
+            parent_children = children;
+            break;
+          }
+        }
+
+        // If node has no parent (orphan), nothing to reorder
+        if (!parent_children) return;
+
+        const currentIndex = parent_children.indexOf(key);
+        if (currentIndex === -1) return;
+
+        // Calculate target index mathematically
+        const lengthAfterRemoval = parent_children.length - 1;
+        let targetIndex: number;
+
+        if (typeof order === "number") {
+          targetIndex = order;
+        } else {
+          // Map order directives to mathematical offsets/positions
+          const orderMap = {
+            back: 0,
+            backward: currentIndex - 1,
+            front: lengthAfterRemoval,
+            forward: currentIndex + 1,
+          };
+          targetIndex = orderMap[order];
+        }
+
+        // Clamp to valid range [0, lengthAfterRemoval]
+        targetIndex = Math.max(0, Math.min(lengthAfterRemoval, targetIndex));
+
+        // No-op optimization: if target equals current, skip the operation
+        if (targetIndex === currentIndex) return;
+
+        // Perform the reorder: remove and reinsert at target position
+        parent_children.splice(currentIndex, 1);
+        parent_children.splice(targetIndex, 0, key);
       }
     }
   }
