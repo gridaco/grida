@@ -15,45 +15,7 @@ import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
 import { StandaloneDocumentEditor } from "@/grida-canvas-react/provider";
 
 export default function CanvasV2Page() {
-  const editor = useEditor({
-    debug: false,
-    document: {
-      scenes: {
-        main: {
-          id: "main",
-          name: "main",
-          constraints: {
-            children: "multiple",
-          },
-          children_refs: ["rect"],
-        },
-      },
-      nodes: {
-        rect: {
-          id: "rect",
-          type: "rectangle",
-          active: true,
-          locked: false,
-          name: "a",
-          width: 100,
-          height: 100,
-          position: "relative",
-          zIndex: 0,
-          opacity: 1,
-          rotation: 0,
-          cornerRadius: 0,
-          fill: {
-            type: "solid",
-            color: { r: 0, g: 0, b: 0, a: 1 },
-            active: true,
-          },
-          strokeWidth: 0,
-          strokeCap: "butt",
-        },
-      },
-    },
-    editable: true,
-  });
+  const editor = useEditor();
 
   //
   return (

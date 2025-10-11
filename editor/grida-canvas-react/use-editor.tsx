@@ -16,18 +16,23 @@ import {
 const __DEFAULT_STATE: editor.state.IEditorStateInit = {
   debug: false,
   document: {
-    nodes: {},
-    entry_scene_id: "main",
-    scenes: {
+    scenes_ref: ["main"],
+    links: {
+      main: [],
+    },
+    nodes: {
       main: {
         type: "scene",
         id: "main",
         name: "main",
-        children_refs: [],
+        active: true,
+        locked: false,
         guides: [],
+        edges: [],
         constraints: { children: "multiple" },
       },
     },
+    entry_scene_id: "main",
   },
   editable: true,
 };

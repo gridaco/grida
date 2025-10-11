@@ -167,19 +167,41 @@ function devdata_hierarchy_only(
   document: grida.program.document.Document,
   document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
 ) {
-  const { scenes, nodes, links } = document;
+  const { scenes_ref, nodes, links } = document;
+  // Build scenes object from scenes_ref for backward compatibility with devtools UI
+  // (Devtools UI still expects the old Scene format with children_refs)
+  const scenes = scenes_ref.reduce(
+    (acc, scene_id) => {
+      const scene_node = nodes[scene_id];
+      if (scene_node?.type === "scene") {
+        const children_refs = links[scene_id] || [];
+        acc[scene_id] = {
+          ...scene_node,
+          children_refs,
+        };
+      }
+      return acc;
+    },
+    {} as Record<string, grida.program.document.Scene>
+  );
+
   return {
     scenes,
     document_ctx,
-    nodes: Object.entries(nodes).reduce((acc: any, [id, node]) => {
-      acc[id] = {
-        id: node.id,
-        name: node.name,
-        type: node.type,
-        children: (node as any).children,
-      };
-      return acc;
-    }, {}),
+    nodes: Object.entries(nodes).reduce(
+      (acc, [id, node]) => {
+        acc[id] = {
+          id: node.id,
+          name: node.name,
+          type: node.type,
+        };
+        return acc;
+      },
+      {} as Record<
+        string,
+        Pick<grida.program.nodes.Node, "id" | "name" | "type">
+      >
+    ),
     links,
   };
 }

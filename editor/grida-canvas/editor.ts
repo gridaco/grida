@@ -23,6 +23,7 @@ import { dq } from "@/grida-canvas/query";
 import { io } from "@grida/io";
 import * as googlefonts from "@grida/fonts/google";
 import grida from "@grida/schema";
+import tree from "@grida/tree";
 import vn from "@grida/vn";
 import cg from "@grida/cg";
 import iosvg from "@grida/io-svg";
@@ -427,7 +428,7 @@ class EditorDocumentStore
       applyPatches(draft, patches);
 
       if (shouldRecomputeDocumentCtx) {
-        draft.document_ctx = dq.Context.from(draft.document);
+        draft.document_ctx = new tree.graph.Graph(draft.document).lut;
       }
     });
   }

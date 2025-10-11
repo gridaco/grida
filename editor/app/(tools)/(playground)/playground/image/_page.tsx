@@ -64,30 +64,10 @@ import {
   useContinueWithAuth,
   AuthProvider,
 } from "@/host/auth/use-continue-with-auth";
-import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
 
 export default function ImagePlayground() {
-  const instance = useEditor(
-    editor.state.init({
-      editable: true,
-      document: {
-        nodes: {},
-        scenes: {
-          main: {
-            type: "scene",
-            id: "main",
-            name: "main",
-            children_refs: [],
-            guides: [],
-            constraints: {
-              children: "multiple",
-            },
-          },
-        },
-      },
-    })
-  );
+  const instance = useEditor();
 
   return (
     <main className="w-screen h-screen overflow-hidden select-none">

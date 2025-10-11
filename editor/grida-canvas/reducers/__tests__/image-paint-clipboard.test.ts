@@ -1,4 +1,5 @@
 import documentReducer from "../document.reducer";
+import grida from "@grida/schema";
 
 jest.mock("@grida/vn", () => {
   class VectorNetworkEditor {
@@ -30,18 +31,32 @@ function createImagePaint(overrides: Record<string, any> = {}) {
   };
 }
 
-function createDocument(nodes: Record<string, any>) {
+function createDocument(
+  nodes: Record<string, any>
+): grida.program.document.Document {
+  const scene_children = Object.keys(nodes);
   return {
-    nodes,
-    scenes: {
+    scenes_ref: ["scene"],
+    links: {
+      scene: scene_children,
+    },
+    nodes: {
       scene: {
+        type: "scene",
         id: "scene",
         name: "Scene",
-        constraints: { children: "many" },
-        children: Object.keys(nodes),
+        active: true,
+        locked: false,
+        constraints: { children: "multiple" },
+        guides: [],
+        edges: [],
       },
+      ...nodes,
     },
     entry_scene_id: "scene",
+    bitmaps: {},
+    images: {},
+    properties: {},
   };
 }
 

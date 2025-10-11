@@ -71,19 +71,22 @@ describe("archive comprehensive", () => {
   const mockDocumentData: io.JSONDocumentFileModel = {
     version: "0.0.1-beta.1+20251010",
     document: {
-      nodes: {},
-      scenes: {
+      nodes: {
         scene1: {
           type: "scene",
           id: "scene1",
           name: "Test Scene",
-          children_refs: [],
+          active: true,
+          locked: false,
           guides: [],
           edges: [],
           constraints: { children: "multiple" },
         },
       },
-      links: {},
+      links: {
+        scene1: [],
+      },
+      scenes_ref: ["scene1"],
       entry_scene_id: "scene1",
       bitmaps: {},
       images: {},
@@ -96,6 +99,16 @@ describe("archive comprehensive", () => {
     version: "0.0.1-beta.1+20251010",
     document: {
       nodes: {
+        scene1: {
+          type: "scene",
+          id: "scene1",
+          name: "Test Scene",
+          active: true,
+          locked: false,
+          guides: [],
+          edges: [],
+          constraints: { children: "multiple" },
+        },
         node1: {
           type: "rectangle",
           id: "node1",
@@ -117,18 +130,10 @@ describe("archive comprehensive", () => {
           },
         },
       },
-      scenes: {
-        scene1: {
-          type: "scene",
-          id: "scene1",
-          name: "Test Scene",
-          children_refs: ["node1"],
-          guides: [],
-          edges: [],
-          constraints: { children: "multiple" },
-        },
+      links: {
+        scene1: ["node1"],
       },
-      links: {},
+      scenes_ref: ["scene1"],
       entry_scene_id: "scene1",
       bitmaps: {},
       images: {},
@@ -692,8 +697,8 @@ describe("archive comprehensive", () => {
       const unpacked = io.archive.unpack(packed);
 
       expect(Object.keys(unpacked.images)).toHaveLength(4);
-      for (const filename of Object.keys(specialImages)) {
-        expect(unpacked.images[filename]).toEqual(specialImages[filename]);
+      for (const [filename, data] of Object.entries(specialImages)) {
+        expect(unpacked.images[filename]).toEqual(data);
       }
     });
   });

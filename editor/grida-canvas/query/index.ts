@@ -1,6 +1,5 @@
 import type { editor } from "..";
 import type grida from "@grida/schema";
-import tree from "@grida/tree";
 import assert from "assert";
 
 type NodeID = string & {};
@@ -516,110 +515,6 @@ export namespace dq {
     const repo = repositories.find((repo) => repo.nodes[node_id]);
     if (repo) return repo.nodes[node_id];
     throw new Error(`node not found with node_id: "${node_id}"`);
-  }
-
-  //
-  export function hierarchy(
-    node_id: string,
-    ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
-  ): { id: string; depth: number }[] {
-    const collectNodeIds = (
-      nodeId: string,
-      depth: number,
-      result: { id: string; depth: number }[] = []
-    ): { id: string; depth: number }[] => {
-      result.push({ id: nodeId, depth }); // Add current node ID with its depth
-
-      // Get children from context
-      const children = ctx.lu_children[nodeId] ?? [];
-      for (const childId of children) {
-        collectNodeIds(childId, depth + 1, result); // Increase depth for children
-      }
-
-      return result;
-    };
-
-    // Start traversal from the root node
-    return collectNodeIds(node_id, 0);
-  }
-
-  export class Context
-    implements
-      grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
-  {
-    readonly lu_keys: string[] = [];
-    readonly lu_parent: Record<string, string | null> = {};
-    readonly lu_children: Record<string, string[]> = {};
-    constructor(
-      init?: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
-    ) {
-      if (init) {
-        Object.assign(this, init);
-      }
-    }
-
-    static from(document: grida.program.document.IDocumentDefinition) {
-      const ctx = create_nodes_repository_runtime_hierarchy_context(document);
-      return new Context(ctx);
-    }
-
-    insert(node_id: NodeID, parent_id: NodeID | null) {
-      assert(this.lu_keys.indexOf(node_id) === -1, "node_id already exists");
-
-      if (parent_id) {
-        this.lu_keys.push(node_id);
-        this.lu_parent[node_id] = parent_id;
-
-        if (!this.lu_children[parent_id]) {
-          this.lu_children[parent_id] = [];
-        }
-
-        this.lu_children[parent_id].push(node_id);
-      } else {
-        // register to the document. done.
-        this.lu_keys.push(node_id);
-        this.lu_parent[node_id] = null;
-      }
-    }
-
-    /**
-     * place the node as a child of the parent node.
-     * this does not consider the current parent of the node. or does anything about it.
-     *
-     * The use of this methid is very limited.
-     *
-     * @param node_id
-     * @param parent_id
-     */
-    blindlymove(node_id: NodeID, parent_id: NodeID | null) {
-      this.lu_parent[node_id] = parent_id;
-
-      if (parent_id) {
-        if (!this.lu_children[parent_id]) {
-          this.lu_children[parent_id] = [];
-        }
-        this.lu_children[parent_id].push(node_id);
-      } else {
-        // register to the document. done.
-        this.lu_keys.push(node_id);
-      }
-    }
-
-    snapshot(): grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext {
-      return {
-        lu_keys: this.lu_keys.slice(),
-        lu_parent: { ...this.lu_parent },
-        lu_children: { ...this.lu_children },
-      };
-    }
-
-    getAncestors(node_id: NodeID): NodeID[] {
-      return getAncestors(this, node_id);
-    }
-
-    getDepth(node_id: NodeID): number {
-      return getDepth(this, node_id);
-    }
   }
 
   //

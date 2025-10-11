@@ -39,26 +39,7 @@ import {
 import { useEditor } from "@/grida-canvas-react";
 
 export default function MinimalCanvasDemo() {
-  const instance = useEditor(
-    editor.state.init({
-      editable: true,
-      document: {
-        nodes: {},
-        scenes: {
-          main: {
-            type: "scene",
-            id: "main",
-            name: "main",
-            children_refs: [],
-            guides: [],
-            constraints: {
-              children: "multiple",
-            },
-          },
-        },
-      },
-    })
-  );
+  const instance = useEditor();
 
   return (
     <TooltipProvider>

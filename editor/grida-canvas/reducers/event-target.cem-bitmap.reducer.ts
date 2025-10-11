@@ -226,9 +226,12 @@ function __get_insertion_target(
   state: editor.state.IEditorState
 ): string | null {
   assert(state.scene_id, "scene_id is not set");
-  const scene = state.document.scenes[state.scene_id];
+  const scene = state.document.nodes[
+    state.scene_id
+  ] as grida.program.nodes.SceneNode;
+  const scene_children = state.document.links[state.scene_id] || [];
   if (scene.constraints.children === "single") {
-    return scene.children_refs[0];
+    return scene_children[0];
   }
 
   const hits = state.hits.slice();

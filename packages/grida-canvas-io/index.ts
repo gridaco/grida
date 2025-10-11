@@ -110,7 +110,7 @@ export namespace io {
     export function encodeClipboardHtml(payload: ClipboardPayload): string {
       const json = JSON.stringify(payload);
       const utf8Bytes = new TextEncoder().encode(json);
-      const base64 = btoa(String.fromCharCode(...utf8Bytes));
+      const base64 = btoa(String.fromCharCode(...Array.from(utf8Bytes)));
       return `<span ${__data_grida_clipboard}="b64:${base64}"></span>`;
     }
 
@@ -443,7 +443,7 @@ export namespace io {
         document: {
           nodes: json.document.nodes,
           links: json.document.links,
-          scenes: json.document.scenes,
+          scenes_ref: json.document.scenes_ref,
           entry_scene_id: json.document.entry_scene_id,
           bitmaps: bitmaps,
           images: json.document.images ?? {},

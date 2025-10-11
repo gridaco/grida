@@ -71,7 +71,29 @@ function SceneItemContextMenuWrapper({
 
 export function ScenesList() {
   const editor = useCurrentEditor();
-  const scenesmap = useEditorState(editor, (state) => state.document.scenes);
+  const { scenesmap, scenes_ref } = useEditorState(editor, (state) => {
+    // Build scenes map from scenes_ref for backward compatibility
+    const scenesmap: Record<string, grida.program.nodes.SceneNode> =
+      state.document.scenes_ref.reduce(
+        (acc: any, scene_id: string) => {
+          const scene_node = state.document.nodes[
+            scene_id
+          ] as grida.program.nodes.SceneNode;
+          const children_refs = state.document.links[scene_id] || [];
+          acc[scene_id] = {
+            ...scene_node,
+            children_refs,
+          };
+          return acc;
+        },
+        {} as { [key: string]: grida.program.nodes.SceneNode }
+      );
+
+    return {
+      scenesmap,
+      scenes_ref: state.document.scenes_ref,
+    };
+  });
   const scene_id = useEditorState(editor, (state) => state.scene_id);
 
   const scenes = useMemo(() => {
@@ -80,7 +102,7 @@ export function ScenesList() {
     );
   }, [scenesmap]);
 
-  const tree = useTree<grida.program.document.Scene>({
+  const tree = useTree<grida.program.nodes.SceneNode>({
     rootItemId: "<document>",
     canReorder: true,
     initialState: {

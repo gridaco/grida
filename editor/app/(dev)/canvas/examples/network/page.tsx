@@ -7,15 +7,20 @@ const document: editor.state.IEditorStateInit = {
   editable: true,
   debug: false,
   document: {
-    scenes: {
+    scenes_ref: ["main"],
+    links: {
+      main: ["a", "b"],
+    },
+    nodes: {
       main: {
-        backgroundColor: cmath.color.hex_to_rgba8888("#00000000"),
         type: "scene",
+        active: true,
+        locked: false,
+        backgroundColor: cmath.color.hex_to_rgba8888("#00000000"),
         id: "main",
         name: "Main",
         constraints: { children: "multiple" },
         guides: [],
-        children_refs: ["a", "b"],
         edges: [
           {
             id: "a-b",
@@ -27,8 +32,6 @@ const document: editor.state.IEditorStateInit = {
           },
         ],
       },
-    },
-    nodes: {
       a: grida.program.nodes.factory.createContainerNode("a", {
         name: "A",
         fill: {

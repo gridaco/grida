@@ -71,15 +71,20 @@ export default function updateNodeTransform(
   draft: grida.program.nodes.Node,
   action: NodeTransformAction
 ) {
+  // Scene nodes cannot be transformed
+  if (draft.type === "scene") {
+    return;
+  }
+
   switch (action.type) {
     case "position": {
       const { x, y } = action;
-      if (draft.position == "absolute") {
+      if ("position" in draft && draft.position == "absolute") {
         // TODO: with resolve box model
         // TODO: also need to update right, bottom, width, height
 
-        draft.left = cmath.quantize(x, 1);
-        draft.top = cmath.quantize(y, 1);
+        if ("left" in draft) draft.left = cmath.quantize(x, 1);
+        if ("top" in draft) draft.top = cmath.quantize(y, 1);
       } else {
         // ignore
         reportError("node is not draggable");
@@ -88,7 +93,9 @@ export default function updateNodeTransform(
     }
     case "translate": {
       const { dx, dy } = action;
-      moveNode(draft, dx, dy);
+      if ("position" in draft) {
+        moveNode(draft as grida.program.nodes.i.IPositioning, dx, dy);
+      }
       break;
     }
     case "scale": {

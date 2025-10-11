@@ -8,6 +8,7 @@ import { domapi } from "../grida-canvas/backends/dom";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
 import cmath from "@grida/cmath";
+import grida from "@grida/schema";
 
 type CustomComponent = React.ComponentType<any>;
 
@@ -99,10 +100,15 @@ export function StandaloneSceneBackground({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   const instance = useCurrentEditor();
-  const slice = useEditorState(instance, (state) => ({
-    backgroundColor: state.document.scenes[state.scene_id!].backgroundColor,
-    transform: state.transform,
-  }));
+  const slice = useEditorState(instance, (state) => {
+    const scene = state.document.nodes[
+      state.scene_id!
+    ] as grida.program.nodes.SceneNode;
+    return {
+      backgroundColor: scene?.backgroundColor,
+      transform: state.transform,
+    };
+  });
   const { backgroundColor, transform } = slice;
 
   const [cssBackgroundColor, opacity] = useMemo(() => {

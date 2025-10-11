@@ -83,7 +83,9 @@ function __self_set_pixelgrid(
 
 function __self_guide_delete(draft: editor.state.IEditorState, idx: number) {
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
   scene.guides.splice(idx, 1);
 }
 
@@ -446,7 +448,9 @@ function __self_start_gesture(
       const { axis, idx } = gesture;
 
       assert(draft.scene_id, "scene_id is not set");
-      const scene = draft.document.scenes[draft.scene_id];
+      const scene = draft.document.nodes[
+        draft.scene_id
+      ] as grida.program.nodes.SceneNode;
 
       if (idx === -1) {
         const t = cmath.transform.getTranslate(draft.transform);

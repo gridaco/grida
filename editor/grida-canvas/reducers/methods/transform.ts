@@ -16,6 +16,7 @@ import assert from "assert";
 import grida from "@grida/schema";
 import vn from "@grida/vn";
 import tree from "@grida/tree";
+import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
 import type { ReducerContext } from "..";
 
 /**
@@ -115,7 +116,9 @@ function __self_update_gesture_transform_translate(
 ) {
   assert(draft.gesture.type === "translate", "Gesture type must be translate");
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
   const {
     movement: _movement,
     initial_selection,
@@ -285,25 +288,17 @@ function __self_update_gesture_transform_translate(
 
         is_parent_changed = true;
 
-        // Temporarily inject virtual root into draft
-        draft.document.nodes["<root>"] = scene as any;
-        draft.document.links["<root>"] = scene.children_refs;
+        // Use Graph.mv() - mutates draft.document directly (scene is now a node!)
+        const graphInstance = new tree.graph.Graph(
+          draft.document,
+          EDITOR_GRAPH_POLICY
+        );
 
-        // Use Graph.mv() - mutates draft.document directly
-        const graphInstance = new tree.graph.Graph(draft.document);
-
-        const target = new_parent_id || "<root>";
+        const target = new_parent_id ?? draft.scene_id!;
         graphInstance.mv(node_id, target);
 
-        // Extract scene children before cleanup
-        scene.children_refs = draft.document.links["<root>"] || [];
-
-        // Clean up virtual root
-        delete draft.document.nodes["<root>"];
-        delete draft.document.links["<root>"];
-
-        // update the context
-        draft.document_ctx = dq.Context.from(draft.document).snapshot();
+        // Update context from graph's cached LUT
+        draft.document_ctx = graphInstance.lut;
       });
 
       if (is_parent_changed) {
@@ -354,10 +349,12 @@ function __self_update_gesture_transform_translate(
       const r = translated[i++];
 
       const parent_id = dq.getParentId(draft.document_ctx, node_id);
+      const parent_node = parent_id ? dq.__getNodeById(draft, parent_id) : null;
+      const is_scene_parent = parent_node?.type === "scene";
 
       let relative_position: cmath.Vector2;
-      if (parent_id) {
-        // sub node
+      if (parent_id && !is_scene_parent) {
+        // sub node with non-scene parent
         const parent_rect =
           context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
 
@@ -383,7 +380,7 @@ function __self_update_gesture_transform_translate(
           parent_rect.y,
         ]);
       } else {
-        // top node
+        // top node (scene child or orphan)
         relative_position = r.position;
       }
 
@@ -486,7 +483,9 @@ function __self_update_gesture_transform_scale(
     "Gesture type must be scale or insert-and-resize"
   );
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
   const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =
     draft.gesture_modifiers;
 
@@ -556,13 +555,17 @@ function __self_update_gesture_transform_scale(
     const node = draft.document.nodes[node_id];
     const initial_node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
-    const is_root = scene.children_refs.includes(node_id);
+
+    const parent_id = dq.getParentId(draft.document_ctx, node_id);
+    const parent_node = parent_id ? dq.__getNodeById(draft, parent_id) : null;
+    const is_scene_parent = parent_node?.type === "scene";
 
     // TODO: scaling for bitmap node is not supported yet.
     const is_scalable = initial_node.type !== "bitmap";
     if (!is_scalable) continue;
 
-    if (is_root) {
+    if (!parent_id || is_scene_parent) {
+      // Scene child or orphan - use absolute positioning
       updateNodeTransform(node, {
         type: "scale",
         rect: initial_rect,
@@ -571,7 +574,7 @@ function __self_update_gesture_transform_scale(
         preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
       });
     } else {
-      const parent_id = dq.getParentId(draft.document_ctx, node_id)!;
+      // Nested node with non-scene parent - use relative positioning
       const parent_rect =
         context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
 

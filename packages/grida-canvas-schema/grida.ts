@@ -1,4 +1,5 @@
 import type { tokens } from "@grida/tokens";
+// @ts-ignore
 import type { TokenizableExcept } from "@grida/tokens/utils";
 import type vn from "@grida/vn";
 import cg from "@grida/cg";
@@ -776,9 +777,19 @@ export namespace grida.program.document {
    * [Grida Document Model]
    *
    * Grida document contains all nodes, properties, and embedded data required to render a complete document.
+   *
+   * **Note on scenes**: Scenes are stored as SceneNode in `nodes`, and referenced by ID in `scenes_ref`.
+   * The `nodes` collection is the single source of truth for all node-like data including scenes.
    */
   export interface Document extends IDocumentDefinition {
-    scenes: Record<string, Scene>;
+    /**
+     * Array of scene node IDs. Scene nodes themselves are stored in `nodes` as SceneNode.
+     * Use `scenes_ref.map(id => nodes[id] as SceneNode)` to access scene data.
+     */
+    scenes_ref: string[];
+    /**
+     * The currently active/entry scene ID.
+     */
     entry_scene_id?: string;
   }
 
@@ -793,6 +804,10 @@ export namespace grida.program.document {
 
   /**
    * The [Scene] node. (a.k.a Page) this is defined directly without the repository. hence, its id is not required to be globally unique across the nodes.
+   *
+   * @deprecated This interface is being migrated to {@link nodes.SceneNode} which is stored in the nodes repository.
+   * The Scene interface is kept for backward compatibility during the migration period.
+   * New code should use SceneNode stored in document.nodes instead of document.scenes.
    */
   export interface Scene
     extends document.ISceneBackground,
@@ -1086,6 +1101,7 @@ export namespace grida.program.nodes {
   export type NodeType = Node["type"];
 
   export type Node =
+    | SceneNode
     | BooleanPathOperationNode
     | GroupNode
     | TextNode
@@ -1924,6 +1940,26 @@ export namespace grida.program.nodes {
   // }
 
   /**
+   * Scene Node
+   *
+   * [SceneNode] represents a top-level scene (formerly known as Page).
+   * Scenes are always root-level nodes and cannot be nested under other nodes.
+   * They can contain multiple children based on their constraints.
+   */
+  export interface SceneNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      document.ISceneBackground,
+      document.I2DGuides,
+      document.IEdges {
+    readonly type: "scene";
+    constraints: {
+      children: "single" | "multiple";
+    };
+    order?: number;
+  }
+
+  /**
    * Group Node
    *
    * [GroupNode] is not supported in the html/svg backend.
@@ -2590,11 +2626,34 @@ export namespace grida.program.nodes {
       packed: document.IPackedSceneDocument
     ): document.Document {
       const { scene, ...defs } = packed;
+
+      // Create SceneNode from Scene
+      const sceneNode: nodes.SceneNode = {
+        type: "scene",
+        id: scene.id,
+        name: scene.name,
+        active: true,
+        locked: false,
+        constraints: scene.constraints,
+        order: scene.order,
+        guides: scene.guides,
+        edges: scene.edges,
+        backgroundColor: scene.backgroundColor,
+      };
+
+      // Add scene to nodes if not present
+      if (!defs.nodes[scene.id]) {
+        defs.nodes[scene.id] = sceneNode;
+      }
+
+      // Add scene children to links if not present
+      if (!defs.links[scene.id]) {
+        defs.links[scene.id] = scene.children_refs;
+      }
+
       return {
         ...defs,
-        scenes: {
-          [scene.id]: scene,
-        },
+        scenes_ref: [scene.id],
       };
     }
 

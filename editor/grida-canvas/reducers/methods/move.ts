@@ -4,52 +4,40 @@ import { editor } from "@/grida-canvas";
 import tree from "@grida/tree";
 import { dq } from "@/grida-canvas/query";
 import assert from "assert";
+import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
 
 export function self_moveNode<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   source_id: string,
-  target_id: "<root>" | string,
+  target_id: string,
   order?: number
 ): boolean {
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
   const source_parent_id = dq.getParentId(draft.document_ctx, source_id);
-  const source_is_root =
-    scene.children_refs.includes(source_id) || source_parent_id === null;
+  const source_is_scene_child = source_parent_id === draft.scene_id;
 
-  // do not allow move of the root node with constraints
-  if (scene.constraints.children === "single" && source_is_root) {
+  // do not allow move of the scene's only child with constraints
+  if (scene.constraints.children === "single" && source_is_scene_child) {
     return false;
   }
 
   // validate target is not a descendant of the node (otherwise it will create a cycle)
   if (
-    target_id !== "<root>" &&
+    target_id !== draft.scene_id &&
     dq.getAncestors(draft.document_ctx, target_id).includes(source_id)
   ) {
     return false;
   }
 
-  // Temporarily inject virtual root into draft
-  draft.document.nodes["<root>"] = scene as any;
-  draft.document.links["<root>"] = scene.children_refs;
-
-  // Use Graph.mv() - mutates draft.document directly
-  const graph = new tree.graph.Graph(draft.document);
-
-  // Move using graph API (mutates draft.document directly)
+  // Use Graph.mv() - mutates draft.document directly (scene is now a node!)
+  const graph = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
   graph.mv(source_id, target_id, order);
 
-  // Extract scene children before cleanup
-  scene.children_refs = draft.document.links["<root>"] || [];
-
-  // Clean up virtual root
-  delete draft.document.nodes["<root>"];
-  delete draft.document.links["<root>"];
-
-  // Refresh context
-  const context = dq.Context.from(draft.document);
-  draft.document_ctx = context.snapshot();
+  // Update context from graph's cached LUT
+  draft.document_ctx = graph.lut;
 
   return true;
 }

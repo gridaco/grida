@@ -111,7 +111,7 @@ export class DocumentSyncManager {
     const hasRemoteData = Object.keys(remoteDocument ?? {}).length > 0;
     const hasLocalData =
       Object.keys(localDocument.nodes).length > 0 ||
-      Object.keys(localDocument.scenes).length > 0;
+      (localDocument.scenes_ref?.length ?? 0) > 0;
 
     // If remote is empty but local has data, push local to remote
     if (this.ymap_document.size === 0 && hasLocalData) {
@@ -121,7 +121,8 @@ export class DocumentSyncManager {
           path: [],
           value: {
             nodes: localDocument.nodes,
-            scenes: localDocument.scenes,
+            scenes_ref: localDocument.scenes_ref,
+            links: localDocument.links,
           },
         },
       ]);

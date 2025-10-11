@@ -314,7 +314,8 @@ export function useDocumentState(): UseDocumentState {
   );
 }
 
-type UseSceneState = grida.program.document.Scene & {
+type UseSceneState = grida.program.nodes.SceneNode & {
+  children_refs: string[];
   selection: editor.state.IEditorState["selection"];
   hovered_node_id: editor.state.IEditorState["hovered_node_id"];
   document_ctx: editor.state.IEditorState["document_ctx"];
@@ -323,12 +324,17 @@ type UseSceneState = grida.program.document.Scene & {
 export function useSceneState(scene_id: string): UseSceneState {
   const editor = useCurrentEditor();
   return useEditorState(editor, (state) => {
+    const scene = state.document.nodes[
+      scene_id
+    ] as grida.program.nodes.SceneNode;
+    const children_refs = state.document.links[scene_id] || [];
     return {
       selection: state.selection,
       hovered_node_id: state.hovered_node_id,
       document_ctx: state.document_ctx,
-      ...state.document.scenes[scene_id],
-    } satisfies Omit<UseSceneState, "setBackgroundColor">;
+      ...scene,
+      children_refs,
+    } satisfies UseSceneState;
   });
 }
 

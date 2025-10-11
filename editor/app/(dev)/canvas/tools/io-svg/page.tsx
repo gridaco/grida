@@ -30,27 +30,7 @@ export default function IOSVGPage() {
     accept: ".svg",
   });
 
-  const instance = useEditor(
-    editor.state.init({
-      editable: true,
-      debug: true,
-      document: {
-        nodes: {},
-        scenes: {
-          iosvg: {
-            type: "scene",
-            id: "iosvg",
-            name: "iosvg",
-            children_refs: [],
-            guides: [],
-            constraints: {
-              children: "single",
-            },
-          },
-        },
-      },
-    })
-  );
+  const instance = useEditor();
 
   useHotkeys("ctrl+o, meta+o", openFilePicker, {
     preventDefault: true,

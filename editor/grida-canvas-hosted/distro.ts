@@ -13,14 +13,19 @@ export namespace distro {
       editable: true,
       debug: false,
       document: {
-        nodes: {},
-        scenes: {
+        scenes_ref: ["main"],
+        links: {
+          main: [],
+        },
+        nodes: {
           main: {
             type: "scene",
             id: "main",
             name: "main",
-            children_refs: [],
+            active: true,
+            locked: false,
             guides: [],
+            edges: [],
             constraints: {
               children: "multiple",
             },

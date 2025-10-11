@@ -4,6 +4,7 @@ import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import tree from "@grida/tree";
 import assert from "assert";
+import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
 
 export function self_insertSubDocument<S extends editor.state.IEditorState>(
   draft: Draft<S>,
@@ -11,14 +12,16 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
   sub: grida.program.document.IPackedSceneDocument
 ) {
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
 
   const sub_state = new dq.DocumentStateQuery(sub);
   const sub_fonts = sub_state.fonts();
 
-  const target = parent_id || "<root>";
+  const target = parent_id ?? draft.scene_id;
 
-  // Validate constraints for root insertion
+  // Validate constraints for scene-level insertion
   if (!parent_id) {
     assert(
       scene.constraints.children !== "single",
@@ -26,12 +29,11 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
     );
   }
 
-  // Temporarily inject virtual root into draft
-  draft.document.nodes["<root>"] = scene as any;
-  draft.document.links["<root>"] = scene.children_refs;
-
-  // Use Graph.import() - mutates draft.document directly
-  const graphInstance = new tree.graph.Graph(draft.document);
+  // Use Graph.import() - mutates draft.document directly (scene is now a node!)
+  const graphInstance = new tree.graph.Graph(
+    draft.document,
+    EDITOR_GRAPH_POLICY
+  );
 
   // Import sub-document (handles nodes, links, and attachment atomically)
   graphInstance.import(
@@ -43,13 +45,6 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
     target
   );
 
-  // Extract scene children before cleanup
-  scene.children_refs = draft.document.links["<root>"] || [];
-
-  // Clean up virtual root
-  delete draft.document.nodes["<root>"];
-  delete draft.document.links["<root>"];
-
   // Update font registry
   draft.fontfaces = Array.from(
     new Set([...draft.fontfaces.map((g) => g.family), ...sub_fonts])
@@ -59,8 +54,8 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
     italic: false,
   }));
 
-  // Rebuild context (single rebuild, no manual merging needed)
-  draft.document_ctx = dq.Context.from(draft.document).snapshot();
+  // Update context from graph's cached LUT
+  draft.document_ctx = graphInstance.lut;
 
   return sub.scene.children_refs;
 }
@@ -71,12 +66,14 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
   node: grida.program.nodes.Node // TODO: NodePrototype
 ): string {
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
 
   const node_id = node.id;
-  const target = parent_id || "<root>";
+  const target = parent_id ?? draft.scene_id;
 
-  // Validate constraints for root insertion
+  // Validate constraints for scene-level insertion
   if (!parent_id) {
     assert(
       scene.constraints.children !== "single",
@@ -84,12 +81,11 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
     );
   }
 
-  // Temporarily inject virtual root into draft
-  draft.document.nodes["<root>"] = scene as any;
-  draft.document.links["<root>"] = scene.children_refs;
-
-  // Use Graph.import() - mutates draft.document directly
-  const graphInstance = new tree.graph.Graph(draft.document);
+  // Use Graph.import() - mutates draft.document directly (scene is now a node!)
+  const graphInstance = new tree.graph.Graph(
+    draft.document,
+    EDITOR_GRAPH_POLICY
+  );
 
   // Import single node (mutates draft.document directly)
   graphInstance.import(
@@ -101,13 +97,6 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
     target
   );
 
-  // Extract scene children before cleanup
-  scene.children_refs = draft.document.links["<root>"] || [];
-
-  // Clean up virtual root
-  delete draft.document.nodes["<root>"];
-  delete draft.document.links["<root>"];
-
   // Update the document's font registry
   const s = new dq.DocumentStateQuery(draft.document);
   draft.fontfaces = s.fonts().map((family) => ({
@@ -116,8 +105,8 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
     italic: false,
   }));
 
-  // Rebuild context (single rebuild)
-  draft.document_ctx = dq.Context.from(draft.document).snapshot();
+  // Update context from graph's cached LUT
+  draft.document_ctx = graphInstance.lut;
 
   return node_id;
 }

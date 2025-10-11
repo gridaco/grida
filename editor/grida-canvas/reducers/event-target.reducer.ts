@@ -494,7 +494,9 @@ function __self_evt_on_drag(
   action: EditorEventTarget_Drag,
   context: ReducerContext
 ) {
-  const scene = draft.document.scenes[draft.scene_id!];
+  const scene = draft.document.nodes[
+    draft.scene_id!
+  ] as grida.program.nodes.SceneNode;
   const {
     event: { movement, delta },
   } = <EditorEventTarget_Drag>action;
@@ -554,10 +556,11 @@ function __self_evt_on_drag(
         // [snap the guide offset]
         // 1. to pixel grid (quantize 1)
         // 2. to objects geometry
+        const scene_children = draft.document.links[draft.scene_id!] || [];
         const { translated } = snapGuideTranslation(
           axis,
           initial_offset,
-          scene.children_refs.map(
+          scene_children.map(
             (id) => context.geometry.getNodeAbsoluteBoundingRect(id)!
           ),
           m,
@@ -570,7 +573,7 @@ function __self_evt_on_drag(
         const offset = cmath.quantize(translated, 1);
 
         draft.gesture.offset = offset;
-        draft.document.scenes[draft.scene_id!].guides[index].offset = offset;
+        scene.guides[index].offset = offset;
         break;
       }
       // [insertion mode - resize after insertion]
@@ -872,7 +875,7 @@ function __before_end_insert_and_resize(
   const parent_id = dq.getParentId(draft.document_ctx, pending.node_id);
   const siblings = parent_id
     ? [...(draft.document.links[parent_id] ?? [])]
-    : [...draft.document.scenes[draft.scene_id!].children_refs];
+    : [...(draft.document.links[draft.scene_id!] ?? [])];
 
   siblings.forEach((id) => {
     if (id === pending.node_id) return;
@@ -945,9 +948,12 @@ function __get_insertion_target(
   state: editor.state.IEditorState
 ): string | null {
   assert(state.scene_id, "scene_id is not set");
-  const scene = state.document.scenes[state.scene_id];
+  const scene = state.document.nodes[
+    state.scene_id
+  ] as grida.program.nodes.SceneNode;
+  const scene_children = state.document.links[state.scene_id] || [];
   if (scene.constraints.children === "single") {
-    return scene.children_refs[0];
+    return scene_children[0];
   }
 
   const hits = state.hits.slice();

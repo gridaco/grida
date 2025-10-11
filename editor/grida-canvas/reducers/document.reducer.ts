@@ -64,6 +64,7 @@ import type { ReducerContext } from ".";
 import cg from "@grida/cg";
 import vn from "@grida/vn";
 import tree from "@grida/tree";
+import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
 import "core-js/features/object/group-by";
 
 /**
@@ -85,6 +86,19 @@ const PLACEMENT_VIEWPORT_INSET = 40;
  */
 const INSERTION_HIT_TEST_MAX_DEPTH = 8;
 
+/**
+ * Helper to get a SceneNode from the document.
+ * Scenes are stored as nodes, so we lookup from document.nodes.
+ */
+function getScene(
+  document: grida.program.document.Document,
+  scene_id: string
+): grida.program.nodes.SceneNode {
+  const node = document.nodes[scene_id];
+  assert(node?.type === "scene", `Scene ${scene_id} not found or not a scene`);
+  return node as grida.program.nodes.SceneNode;
+}
+
 export default function documentReducer<S extends editor.state.IEditorState>(
   state: S,
   action: DocumentAction,
@@ -93,48 +107,72 @@ export default function documentReducer<S extends editor.state.IEditorState>(
   if (!state.editable) return state;
 
   assert(state.scene_id, "scene_id is required for autolayout");
-  const scene = state.document.scenes[state.scene_id];
 
   switch (action.type) {
     case "scenes/new": {
       const { scene } = action;
-      const new_scene = grida.program.document.init_scene(
-        scene ?? {
-          id: v4(),
-          name: `Scene ${Object.keys(state.document.scenes).length + 1}`,
-          order: Object.keys(state.document.scenes).length,
-        }
-      );
+      const scene_id = scene?.id ?? context.idgen.next();
+      const scene_count = state.document.scenes_ref.length;
 
-      const scene_id = new_scene.id;
       // check if the scene id does not conflict
-      if (state.document.scenes[scene_id]) {
+      if (state.document.nodes[scene_id]) {
         console.error(`Scene id ${scene_id} already exists`);
         return state;
       }
 
+      // Create scene as a SceneNode
+      const new_scene_node: grida.program.nodes.SceneNode = {
+        type: "scene",
+        id: scene_id,
+        name: scene?.name ?? `Scene ${scene_count + 1}`,
+        active: true,
+        locked: false,
+        constraints: {
+          children: scene?.constraints?.children ?? "multiple",
+        },
+        order: scene?.order ?? scene_count,
+        guides: scene?.guides ?? [],
+        edges: scene?.edges ?? [],
+        backgroundColor: scene?.backgroundColor,
+      };
+
       return updateState(state, (draft) => {
-        // 0. add the new scene
-        draft.document.scenes[new_scene.id] = new_scene;
-        // 1. change the scene_id
-        draft.scene_id = new_scene.id;
-        // 2. clear scene-specific state
+        // 0. add scene to nodes and initialize its links
+        draft.document.nodes[scene_id] = new_scene_node;
+        draft.document.links[scene_id] = [];
+
+        // 1. Add to scenes_ref array
+        draft.document.scenes_ref.push(scene_id);
+
+        // 2. change the scene_id
+        draft.scene_id = scene_id;
+        // 3. clear scene-specific state
         Object.assign(draft, editor.state.__RESET_SCENE_STATE);
       });
     }
     case "scenes/delete": {
-      const { scene } = action;
+      const { scene: scene_id } = action;
       return updateState(state, (draft) => {
-        // 0. remove the scene
-        delete draft.document.scenes[scene];
-        // 1. change the scene_id
-        if (draft.scene_id === scene) {
-          draft.scene_id = Object.keys(draft.document.scenes)[0];
+        // Use Graph.rm() to remove scene and all its children
+        const graph = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
+        const removed_ids = graph.rm(scene_id);
+
+        // Remove from scenes_ref array
+        draft.document.scenes_ref = draft.document.scenes_ref.filter(
+          (id) => id !== scene_id
+        );
+
+        // Update context from graph's cached LUT
+        draft.document_ctx = graph.lut;
+
+        // Update scene_id if the deleted scene was active
+        if (draft.scene_id === scene_id) {
+          draft.scene_id = draft.document.scenes_ref[0];
         }
-        if (draft.document.entry_scene_id === scene) {
+        if (draft.document.entry_scene_id === scene_id) {
           draft.document.entry_scene_id = draft.scene_id;
         }
-        // 2. clear scene-specific state
+        // Clear scene-specific state
         Object.assign(draft, editor.state.__RESET_SCENE_STATE);
       });
     }
@@ -142,27 +180,37 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { scene: scene_id } = action;
 
       // check if the scene exists
-      const origin = state.document.scenes[scene_id];
-      if (!origin) return state;
+      const origin_node = state.document.nodes[scene_id] as
+        | grida.program.nodes.SceneNode
+        | undefined;
+      if (!origin_node || origin_node.type !== "scene") return state;
 
-      const next = grida.program.document.init_scene({
-        ...origin,
-        id: context.idgen.next(),
-        name: origin.name + " copy",
-        order: origin.order ? origin.order + 1 : undefined,
-        children_refs: [],
-      });
+      const origin_children = state.document.links[scene_id] || [];
+      const new_scene_id = context.idgen.next();
+
+      // Create duplicated SceneNode
+      const new_scene_node: grida.program.nodes.SceneNode = {
+        ...origin_node,
+        id: new_scene_id,
+        name: origin_node.name + " copy",
+        order: origin_node.order ? origin_node.order + 1 : undefined,
+      };
 
       return updateState(state, (draft) => {
-        // 0. add the new scene
-        draft.document.scenes[next.id] = next;
-        // 1. change the scene_id to the new scene
-        draft.scene_id = next.id;
-        // 2. clear scene-specific state
+        // 0. add the new scene node
+        draft.document.nodes[new_scene_id] = new_scene_node;
+        draft.document.links[new_scene_id] = [];
+
+        // 1. Add to scenes_ref array
+        draft.document.scenes_ref.push(new_scene_id);
+
+        // 2. change the scene_id to the new scene
+        draft.scene_id = new_scene_id;
+        // 3. clear scene-specific state
         Object.assign(draft, editor.state.__RESET_SCENE_STATE);
 
-        // 3. clone nodes recursively
-        for (const child_id of origin.children_refs) {
+        // 4. clone nodes recursively
+        for (const child_id of origin_children) {
           const prototype =
             grida.program.nodes.factory.createPrototypeFromSnapshot(
               state.document,
@@ -173,20 +221,32 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               prototype,
               () => context.idgen.next()
             );
-          self_insertSubDocument(draft, null, sub);
+          self_insertSubDocument(draft, new_scene_id, sub);
         }
       });
     }
     case "scenes/change/name": {
       const { scene, name } = action;
       return updateState(state, (draft) => {
-        draft.document.scenes[scene].name = name;
+        // Update the SceneNode directly
+        const scene_node = draft.document.nodes[
+          scene
+        ] as grida.program.nodes.SceneNode;
+        if (scene_node?.type === "scene") {
+          scene_node.name = name;
+        }
       });
     }
     case "scenes/change/background-color": {
       const { scene } = action;
       return updateState(state, (draft) => {
-        draft.document.scenes[scene].backgroundColor = action.backgroundColor;
+        // Update the SceneNode directly
+        const scene_node = draft.document.nodes[
+          scene
+        ] as grida.program.nodes.SceneNode;
+        if (scene_node?.type === "scene") {
+          scene_node.backgroundColor = action.backgroundColor;
+        }
       });
     }
     case "select": {
@@ -753,8 +813,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
       assert(state.scene_id, "scene_id is required for insertion");
-      const scene = state.document.scenes[state.scene_id];
-      const siblings = scene.children_refs;
+      const siblings = state.document.links[state.scene_id] || [];
       const anchors = siblings
         .map((node_id) => {
           const r = context.geometry.getNodeAbsoluteBoundingRect(node_id);
@@ -945,7 +1004,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 selection
               );
 
-              const scene = draft.document.scenes[draft.scene_id!];
+              const scene = getScene(draft.document, draft.scene_id!);
               const agent_points = vertices.map((i) =>
                 cmath.vector2.add(node.vectorNetwork.vertices[i], [
                   node.left!,
@@ -1188,15 +1247,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       // group by parent, including root nodes
       const groups = Object.groupBy(
         target_node_ids,
-        (node_id) => dq.getParentId(state.document_ctx, node_id) ?? "<root>"
+        (node_id) =>
+          dq.getParentId(state.document_ctx, node_id) ?? state.scene_id!
       );
 
       const layouts = Object.keys(groups).map((parent_id) => {
         const g = groups[parent_id]!;
-        const is_root = parent_id === "<root>";
+        const is_scene = parent_id === state.scene_id;
 
         let delta: cmath.Vector2;
-        if (is_root) {
+        if (is_scene) {
           delta = [0, 0];
         } else {
           const parent_rect =
@@ -1216,7 +1276,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const lay = layout.flex.guess(rects);
 
         return {
-          parent: is_root ? null : parent_id,
+          parent: is_scene ? null : parent_id,
           layout: lay,
           children: g,
         };
@@ -1757,10 +1817,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
 
       return updateState(state, (draft) => {
+        // Get scene children from links
+        const scene_children = state.document.links[state.scene_id!] || [];
         const root_template_instance = dq.__getNodeById(
           draft,
           // FIXME: update api interface
-          scene.children_refs[0]
+          scene_children[0]
         );
         assert(root_template_instance.type === "template_instance");
         root_template_instance.props = data;
@@ -1902,7 +1964,7 @@ function flatten_with_union<S extends editor.state.IEditorState>(
 
   const groups = Object.groupBy(
     supported_node_ids,
-    (id) => dq.getParentId(draft.document_ctx, id) ?? "<root>"
+    (id) => dq.getParentId(draft.document_ctx, id) ?? draft.scene_id!
   );
 
   const ids: string[] = [];
@@ -1912,7 +1974,7 @@ function flatten_with_union<S extends editor.state.IEditorState>(
     const inserted = __flatten_group_with_union(
       draft,
       group,
-      parent === "<root>" ? null : parent,
+      parent === draft.scene_id ? null : parent,
       context
     );
     if (inserted) ids.push(inserted);
@@ -1929,10 +1991,10 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
 ): string | null {
   if (group.length === 0) return null;
 
-  const scene = draft.document.scenes[draft.scene_id!];
+  const scene_children = draft.document.links[draft.scene_id!] || [];
   const siblings = parent_id
     ? draft.document_ctx.lu_children[parent_id] || []
-    : scene.children_refs;
+    : scene_children;
   const order = Math.min(
     ...group.map((id) => siblings.indexOf(id)).filter((i) => i >= 0)
   );
@@ -1978,7 +2040,8 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
 
   self_try_insert_node(draft, parent_id, node);
   __self_delete_nodes(draft, group);
-  self_moveNode(draft, id, parent_id ?? "<root>", order);
+  // Use scene_id instead of "<root>" since scenes are now nodes
+  self_moveNode(draft, id, parent_id ?? draft.scene_id!, order);
 
   return id;
 }
@@ -2095,26 +2158,11 @@ function __self_order(
   order: "back" | "front" | "backward" | "forward" | number
 ) {
   assert(draft.scene_id, "scene_id is required for order");
-  const scene = draft.document.scenes[draft.scene_id];
 
-  // Temporarily inject virtual root into draft
-  draft.document.nodes["<root>"] = scene as any;
-  draft.document.links["<root>"] = scene.children_refs;
-
-  // Use Graph.order() - mutates draft.document directly
-  const graphData = new tree.graph.Graph(draft.document);
-
-  // Use graph.order API (mutates draft.document directly)
+  // Use Graph.order() - mutates draft.document directly (scene is now a node!)
+  const graphData = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
   graphData.order(node_id, order);
 
-  // Extract scene children before cleanup
-  scene.children_refs = draft.document.links["<root>"] || [];
-
-  // Clean up virtual root
-  delete draft.document.nodes["<root>"];
-  delete draft.document.links["<root>"];
-
-  // update the hierarchy context
-  const context = dq.Context.from(draft.document);
-  draft.document_ctx = context.snapshot();
+  // Update context from graph's cached LUT
+  draft.document_ctx = graphData.lut;
 }

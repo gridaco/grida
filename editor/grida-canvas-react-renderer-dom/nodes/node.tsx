@@ -210,6 +210,7 @@ export function NodeElement<P extends Record<string, any>>({
 }
 
 const fillings = {
+  scene: "background",
   boolean: "none",
   group: "none",
   text: "color",

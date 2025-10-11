@@ -32,60 +32,83 @@ function createContext(): ReducerContext {
   };
 }
 
-function createDocument() {
+function createDocument(): grida.program.document.Document {
   return {
+    scenes_ref: ["scene1"],
+    links: {
+      scene1: ["rect1", "rect2"],
+    },
     nodes: {
+      scene1: {
+        type: "scene",
+        id: "scene1",
+        name: "Scene 1",
+        active: true,
+        locked: false,
+        constraints: { children: "multiple" },
+        guides: [],
+        edges: [],
+        backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
+      },
       rect1: {
         id: "rect1",
         type: "rectangle",
         name: "Rectangle 1",
+        active: true,
+        locked: false,
+        position: "absolute",
         left: 0,
         top: 0,
         width: 100,
         height: 100,
         rotation: 0,
         opacity: 1,
-        visible: true,
-        locked: false,
-        children: [],
-        fills: [],
-        strokes: [],
+        zIndex: 0,
+        cornerRadius: 0,
+        strokeWidth: 0,
+        strokeCap: "butt",
+        fill: {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+          active: true,
+        },
       },
       rect2: {
         id: "rect2",
         type: "rectangle",
         name: "Rectangle 2",
+        active: true,
+        locked: false,
+        position: "absolute",
         left: 200,
         top: 0,
         width: 100,
         height: 100,
         rotation: 0,
         opacity: 1,
-        visible: true,
-        locked: false,
-        children: [],
-        fills: [],
-        strokes: [],
-      },
-    },
-    scenes: {
-      scene1: {
-        id: "scene1",
-        name: "Scene 1",
-        constraints: { children: "many" },
-        children: ["rect1", "rect2"],
-        backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
+        zIndex: 0,
+        cornerRadius: 0,
+        strokeWidth: 0,
+        strokeCap: "butt",
+        fill: {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+          active: true,
+        },
       },
     },
     entry_scene_id: "scene1",
-  } as const;
+    bitmaps: {},
+    images: {},
+    properties: {},
+  };
 }
 
 function createState() {
   return editor.state.init({
     editable: true,
     debug: false,
-    document: createDocument() as any,
+    document: createDocument(),
     templates: {},
   });
 }

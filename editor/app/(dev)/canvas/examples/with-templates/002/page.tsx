@@ -10,7 +10,52 @@ const document: editor.state.IEditorStateInit = {
   editable: true,
   debug: false,
   document: {
+    scenes_ref: ["scene_invite", "scene_join", "scene_portal"],
+    links: {
+      scene_invite: ["invite"],
+      scene_join: ["join", "join_main", "join_hello"],
+      scene_portal: ["portal", "portal_verify"],
+    },
     nodes: {
+      scene_invite: {
+        type: "scene",
+        id: "scene_invite",
+        name: "Invite",
+        active: true,
+        locked: false,
+        guides: [],
+        edges: [],
+        constraints: {
+          children: "multiple",
+        },
+        order: 1,
+      },
+      scene_join: {
+        type: "scene",
+        id: "scene_join",
+        name: "Join",
+        active: true,
+        locked: false,
+        guides: [],
+        edges: [],
+        constraints: {
+          children: "multiple",
+        },
+        order: 2,
+      },
+      scene_portal: {
+        type: "scene",
+        id: "scene_portal",
+        name: "Portal",
+        active: true,
+        locked: false,
+        guides: [],
+        edges: [],
+        constraints: {
+          children: "multiple",
+        },
+        order: 3,
+      },
       invite: {
         id: "invite",
         name: "Invite Page",
@@ -133,42 +178,7 @@ const document: editor.state.IEditorStateInit = {
         left: 500,
       },
     },
-    entry_scene_id: "invite",
-    scenes: {
-      invite: {
-        type: "scene",
-        id: "invite",
-        name: "Invite",
-        children_refs: ["invite"],
-        guides: [],
-        constraints: {
-          children: "multiple",
-        },
-        order: 1,
-      },
-      join: {
-        type: "scene",
-        id: "join",
-        name: "Join",
-        children_refs: ["join", "join_main", "join_hello"],
-        guides: [],
-        constraints: {
-          children: "multiple",
-        },
-        order: 2,
-      },
-      portal: {
-        type: "scene",
-        id: "portal",
-        name: "Portal",
-        children_refs: ["portal", "portal_verify"],
-        guides: [],
-        constraints: {
-          children: "multiple",
-        },
-        order: 3,
-      },
-    },
+    entry_scene_id: "scene_invite",
   },
   templates: {
     ["tmp-2503-invite"]: {

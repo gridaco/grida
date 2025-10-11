@@ -495,7 +495,9 @@ export function on_drag_gesture_curve(
   const anchor_points = vne.vertices.map((v) =>
     cmath.vector2.add(v, node_pos_abs)
   );
-  const scene = draft.document.scenes[draft.scene_id!];
+  const scene = draft.document.nodes[
+    draft.scene_id!
+  ] as grida.program.nodes.SceneNode;
 
   const { tarnslate_with_axis_lock, translate_with_force_disable_snap } =
     draft.gesture_modifiers;
@@ -609,7 +611,9 @@ export function on_drag_gesture_translate_vector_controls(
     tangents,
   } = draft.gesture;
 
-  const scene = draft.document.scenes[draft.scene_id!];
+  const scene = draft.document.nodes[
+    draft.scene_id!
+  ] as grida.program.nodes.SceneNode;
 
   const agent_points = vertices.map((i) =>
     cmath.vector2.add(initial_verticies[i], initial_absolute_position)
@@ -848,9 +852,12 @@ function __get_insertion_target(
   state: editor.state.IEditorState
 ): string | null {
   assert(state.scene_id, "scene_id is not set");
-  const scene = state.document.scenes[state.scene_id];
+  const scene = state.document.nodes[
+    state.scene_id
+  ] as grida.program.nodes.SceneNode;
+  const scene_children = state.document.links[state.scene_id] || [];
   if (scene.constraints.children === "single") {
-    return scene.children_refs[0];
+    return scene_children[0];
   }
 
   const hits = state.hits.slice();

@@ -1,5 +1,10 @@
 import type { Action, EditorAction } from "../action";
-import { enablePatches, produceWithPatches, type Draft, type Patch } from "immer";
+import {
+  enablePatches,
+  produceWithPatches,
+  type Draft,
+  type Patch,
+} from "immer";
 import { updateState } from "./utils/immer";
 import {
   self_update_gesture_transform,
@@ -11,7 +16,6 @@ import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 
 enablePatches();
-
 
 export type ReducerContext = {
   idgen: grida.id.INodeIdGenerator<string>;
@@ -26,11 +30,7 @@ export type ReducerContext = {
   paint_constraints: editor.config.IEditorRenderingConfig["paint_constraints"];
 };
 
-export type ReducerResult = [
-  editor.state.IEditorState,
-  Patch[],
-  Patch[]
-];
+export type ReducerResult = [editor.state.IEditorState, Patch[], Patch[]];
 
 export default function reducer(
   state: editor.state.IEditorState,
@@ -59,7 +59,8 @@ export default function reducer(
         case "load": {
           const { scene } = action;
 
-          if (!state.document.scenes[scene]) {
+          // Check if scene exists in scenes_ref
+          if (!state.document.scenes_ref.includes(scene)) {
             return;
           }
 

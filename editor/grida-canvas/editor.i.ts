@@ -12,6 +12,7 @@ import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
+import tree from "@grida/tree";
 import type { io } from "@grida/io";
 
 export namespace editor {
@@ -1364,13 +1365,28 @@ export namespace editor.state {
       grida.program.document.Document,
       "nodes" | "entry_scene_id"
     > &
-      Partial<grida.program.document.IBitmapsRepository> & {
-        scenes: Record<
-          string,
-          Partial<grida.program.document.Scene> &
-            Pick<grida.program.document.Scene, "id" | "name" | "constraints">
-        >;
-      };
+      Partial<
+        grida.program.document.IBitmapsRepository &
+          Pick<grida.program.document.Document, "links">
+      > &
+      (
+        | {
+            // New format - scenes_ref with links
+            scenes_ref: string[];
+            links?: Record<string, string[] | undefined>;
+          }
+        | {
+            // Old format (backward compat) - scenes as Record (links inferred from children_refs)
+            scenes: Record<
+              string,
+              Partial<grida.program.document.Scene> &
+                Pick<
+                  grida.program.document.Scene,
+                  "id" | "name" | "constraints"
+                >
+            >;
+          }
+      );
   }
 
   export function init({
@@ -1379,19 +1395,76 @@ export namespace editor.state {
   }: Omit<IEditorStateInit, "debug"> & {
     debug?: boolean;
   }): editor.state.IEditorState {
+    // Handle both old (scenes: Record) and new (scenes_ref: string[]) formats
+    const scenes_ref: string[] = [];
+    const migrated_nodes: Record<string, grida.program.nodes.Node> = {};
+    const migrated_links: Record<string, string[] | undefined> = {};
+    const input_doc = init.document;
+
+    if ("scenes_ref" in input_doc) {
+      // New format - scenes already in nodes
+      scenes_ref.push(...input_doc.scenes_ref);
+    } else if ("scenes" in input_doc) {
+      // Old format - convert scenes to SceneNodes
+      const input_scenes = input_doc.scenes;
+
+      for (const [scene_id, scene_input] of Object.entries(input_scenes)) {
+        const scene = grida.program.document.init_scene(scene_input);
+        scenes_ref.push(scene_id);
+
+        // Create SceneNode from Scene input (if not already in nodes)
+        if (!init.document.nodes[scene_id]) {
+          const sceneNode: grida.program.nodes.SceneNode = {
+            type: "scene",
+            id: scene_id,
+            name: scene.name,
+            active: true,
+            locked: false,
+            constraints: scene.constraints,
+            order: scene.order,
+            guides: scene.guides,
+            edges: scene.edges,
+            backgroundColor: scene.backgroundColor,
+          };
+          migrated_nodes[scene_id] = sceneNode;
+        }
+
+        // Migrate children_refs to links
+        migrated_links[scene_id] = scene.children_refs || [];
+      }
+    }
+
+    // Build final document with migrated data
+    const base_links = "links" in input_doc ? (input_doc.links ?? {}) : {};
+
+    // Explicitly destructure to exclude potential 'scenes' property from old format
+    const {
+      nodes: input_nodes,
+      entry_scene_id,
+      bitmaps = {},
+      images = {},
+      properties = {},
+      // Exclude 'scenes' from spreading (old format)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      scenes: _scenes,
+      ...rest
+    } = input_doc as any;
+
     const doc: grida.program.document.Document = {
-      links: {},
-      bitmaps: {},
-      images: {},
-      properties: {},
-      ...init.document,
-      scenes: Object.entries(init.document.scenes ?? {}).reduce(
-        (acc, [key, scene]) => {
-          acc[key] = grida.program.document.init_scene(scene);
-          return acc;
-        },
-        {} as grida.program.document.Document["scenes"]
-      ),
+      ...rest,
+      bitmaps,
+      images,
+      properties,
+      entry_scene_id,
+      nodes: {
+        ...input_nodes,
+        ...migrated_nodes,
+      },
+      links: {
+        ...base_links,
+        ...migrated_links,
+      },
+      scenes_ref,
     };
 
     const s = new dq.DocumentStateQuery(doc);
@@ -1415,7 +1488,7 @@ export namespace editor.state {
       ruler: "off",
       pixelgrid: "on",
       when_not_removable: "deactivate",
-      document_ctx: dq.Context.from(doc).snapshot(),
+      document_ctx: new tree.graph.Graph(doc).lut,
       pointer_hit_testing_config: editor.config.DEFAULT_HIT_TESTING_CONFIG,
       surface_measurement_targeting: "off",
       surface_measurement_targeting_locked: false,
@@ -1433,7 +1506,7 @@ export namespace editor.state {
       tool: { type: "cursor" },
       __tool_previous: null,
       brush: editor.config.DEFAULT_BRUSH,
-      scene_id: doc.entry_scene_id ?? Object.keys(doc.scenes)[0] ?? undefined,
+      scene_id: doc.entry_scene_id ?? scenes_ref[0] ?? undefined,
       flags: {
         __unstable_brush_tool: "off",
       },

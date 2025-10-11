@@ -307,6 +307,7 @@ export default function CanvasPlayground({
         if (cancelled) {
           return;
         }
+        console.log("file.document", file.document);
         instance.commands.reset(
           editor.state.init({
             editable: true,
