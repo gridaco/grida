@@ -4,6 +4,7 @@ import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import cmath from "@grida/cmath";
+import tree from "@grida/tree";
 import { self_moveNode } from "./move";
 import { self_insertSubDocument } from "./insert";
 import { self_selectNode } from "./selection";
@@ -38,20 +39,17 @@ function preserveOriginalOrder<S extends editor.state.IEditorState>(
       // For root nodes, sort by their index in scene.children
       const scene = draft.document.scenes[draft.scene_id!];
       const sorted = nodesInParent.sort((a, b) => {
-        const indexA = scene.children.indexOf(a);
-        const indexB = scene.children.indexOf(b);
+        const indexA = scene.children_refs.indexOf(a);
+        const indexB = scene.children_refs.indexOf(b);
         return indexA - indexB;
       });
       result.push(...sorted);
     } else {
-      // For child nodes, sort by their index in parent's children array
-      const parent = dq.__getNodeById(
-        draft,
-        parentId
-      ) as grida.program.nodes.i.IChildrenReference;
+      // For child nodes, sort by their index in parent's children array using links
+      const parentChildren = draft.document.links[parentId] || [];
       const sorted = nodesInParent.sort((a, b) => {
-        const indexA = parent.children.indexOf(a);
-        const indexB = parent.children.indexOf(b);
+        const indexA = parentChildren.indexOf(a);
+        const indexB = parentChildren.indexOf(b);
         return indexA - indexB;
       });
       result.push(...sorted);
@@ -85,7 +83,7 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
 
   // Filter nodes and preserve their original order
   const filteredNodeIds = nodeIds.filter((id) => {
-    const isRoot = scene.children.includes(id);
+    const isRoot = scene.children_refs.includes(id);
     return scene.constraints.children !== "single" || !isRoot;
   });
 
@@ -127,9 +125,9 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
       position: "absolute",
     } as grida.program.nodes.NodePrototype;
 
-    if (kind === "container") {
-      (prototype as grida.program.nodes.ContainerNode).width = union.width;
-      (prototype as grida.program.nodes.ContainerNode).height = union.height;
+    if (prototype.type === "container") {
+      prototype.width = union.width;
+      prototype.height = union.height;
     }
 
     const wrapperId = self_insertSubDocument(
@@ -195,11 +193,9 @@ export function self_ungroup<S extends editor.state.IEditorState>(
   validGroupNodeIds.forEach((node_id) => {
     const node = dq.__getNodeById(draft, node_id);
 
-    // Ensure the node has children (group or boolean nodes)
-    if (
-      !grida.program.nodes.is.ichildren(node) ||
-      !Array.isArray(node.children)
-    ) {
+    // Get node's children from links
+    const nodeChildren = draft.document.links[node_id];
+    if (!Array.isArray(nodeChildren) || nodeChildren.length === 0) {
       return;
     }
 
@@ -226,7 +222,7 @@ export function self_ungroup<S extends editor.state.IEditorState>(
     }
 
     // Move all children to the parent of the node, preserving their order
-    const children_to_move: string[] = [...node.children];
+    const children_to_move: string[] = [...nodeChildren];
     children_to_move.forEach((child_id) => {
       // Move the child to the node's parent
       self_moveNode(draft, child_id, target_parent);
@@ -244,30 +240,23 @@ export function self_ungroup<S extends editor.state.IEditorState>(
       ungroupedChildren.push(child_id);
     });
 
-    // Remove the node
-    if (parent_id === null) {
-      // Remove from scene children
-      const scene = draft.document.scenes[draft.scene_id!];
-      const index = scene.children.indexOf(node_id);
-      if (index !== -1) {
-        scene.children.splice(index, 1);
-      }
-    } else {
-      // Remove from parent's children
-      const parent = dq.__getNodeById(draft, parent_id);
-      if (
-        grida.program.nodes.is.ichildren(parent) &&
-        Array.isArray(parent.children)
-      ) {
-        const index = parent.children.indexOf(node_id);
-        if (index !== -1) {
-          parent.children.splice(index, 1);
-        }
-      }
-    }
+    // Temporarily inject virtual root into draft
+    const scene = draft.document.scenes[draft.scene_id!];
+    draft.document.nodes["<root>"] = scene as any;
+    draft.document.links["<root>"] = scene.children_refs;
 
-    // Remove the node from the document
-    delete draft.document.nodes[node_id];
+    // Use Graph.unlink() - mutates draft.document directly
+    const graphInstance = new tree.graph.Graph(draft.document);
+
+    // Unlink the node (removes only this node, not children - mutates directly)
+    graphInstance.unlink(node_id);
+
+    // Extract scene children before cleanup
+    scene.children_refs = draft.document.links["<root>"] || [];
+
+    // Clean up virtual root
+    delete draft.document.nodes["<root>"];
+    delete draft.document.links["<root>"];
   });
 
   // Update document context
@@ -300,7 +289,7 @@ export function self_wrapNodesAsBooleanOperation<
 
   // Filter nodes and preserve their original order
   const filteredNodeIds = nodeIds.filter((id) => {
-    const isRoot = scene.children.includes(id);
+    const isRoot = scene.children_refs.includes(id);
     return scene.constraints.children !== "single" || !isRoot;
   });
 

@@ -609,8 +609,9 @@ export namespace grida.program.document {
    *
    * @see {@link IDocumentDefinition}
    */
-  export interface INodesRepository {
+  export interface INodesGraph {
     nodes: Record<nodes.NodeID, nodes.Node>;
+    links: Record<nodes.NodeID, nodes.NodeID[] | undefined>;
   }
 
   export type ImageType =
@@ -766,7 +767,7 @@ export namespace grida.program.document {
   export interface IDocumentDefinition
     extends IImagesRepository,
       IBitmapsRepository,
-      document.INodesRepository,
+      document.INodesGraph,
       IDocumentProperties {
     // scene: Scene;
   }
@@ -813,7 +814,7 @@ export namespace grida.program.document {
     /**
      * the children of the scene. each children must be registreed in the node repository under the document where this scene is defined.
      */
-    children: nodes.NodeID[];
+    children_refs: nodes.NodeID[];
     constraints: {
       children: "single" | "multiple";
     };
@@ -843,7 +844,7 @@ export namespace grida.program.document {
       guides: [],
       edges: [],
       constraints: { children: "multiple" },
-      children: [],
+      children_refs: [],
       ...init,
     } as grida.program.document.Scene;
   }
@@ -879,7 +880,7 @@ export namespace grida.program.document {
      * - For optimal performance, the context should be created once and reused for multiple queries.
      *
      */
-    export type INodesRepositoryRuntimeHierarchyContext = tree.ITreeLUT;
+    export type INodesRepositoryRuntimeHierarchyContext = tree.lut.ITreeLUT;
   }
 
   export interface INodeHtmlDocumentQueryDataAttributes {
@@ -936,7 +937,7 @@ export namespace grida.program.document {
 
     export interface TemplateDocumentDefinition<
       P extends schema.Properties = schema.Properties,
-    > extends INodesRepository {
+    > extends INodesGraph {
       /**
        * @deprecated - rename to template_id
        */
@@ -1532,10 +1533,6 @@ export namespace grida.program.nodes {
       fit: cg.BoxFit;
     }
 
-    export interface IChildrenReference {
-      children: NodeID[];
-    }
-
     /**
      * Node that can be filled with color - such as rectangle, ellipse, etc.
      */
@@ -1908,16 +1905,6 @@ export namespace grida.program.nodes {
     }
   }
 
-  export namespace is {
-    /**
-     * @param node node to check
-     * @returns true if the node is a children reference
-     */
-    export function ichildren(node: any): node is i.IChildrenReference {
-      return "children" in node;
-    }
-  }
-
   type __ReplaceSubset<T, TSubset extends Partial<T>, TNew> = Omit<
     T,
     keyof TSubset
@@ -1945,7 +1932,6 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.IBlend,
-      i.IChildrenReference,
       i.IExpandable,
       i.IPositioning {
     type: "group";
@@ -1961,7 +1947,6 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.IBlend,
-      i.IChildrenReference,
       i.IExpandable,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -2079,7 +2064,6 @@ export namespace grida.program.nodes {
       i.IHrefable,
       i.IMouseCursor,
       i.IExpandable,
-      i.IChildrenReference,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IPadding,
@@ -2357,7 +2341,6 @@ export namespace grida.program.nodes {
       i.IHrefable,
       i.IMouseCursor,
       i.IExpandable,
-      i.IChildrenReference,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IPadding,
@@ -2505,7 +2488,6 @@ export namespace grida.program.nodes {
             opacity: 1,
             zIndex: 0,
             rotation: 0,
-            children: [],
             ...prototype,
             id: id,
           } as UnknwonNode;
@@ -2561,11 +2543,12 @@ export namespace grida.program.nodes {
         bitmaps: {},
         images: {},
         nodes: {},
+        links: {},
         scene: {
           type: "scene",
           id: "tmp",
           name: "tmp",
-          children: [],
+          children_refs: [],
           guides: [],
           edges: [],
           constraints: {
@@ -2584,20 +2567,21 @@ export namespace grida.program.nodes {
         const node = createNodeDataFromPrototypeWithoutChildren(prototype, id);
         document.nodes[node.id] = node;
 
-        if ("children" in prototype) {
-          const node_with_children = node as nodes.i.IChildrenReference;
-          node_with_children.children = [];
-          for (const childPrototype of prototype.children ?? []) {
-            const childNode = processNode(childPrototype, nid, depth + 1);
-            node_with_children.children.push(childNode.id);
-          }
-        }
+        // FIXME:graph:: instead of pushing children_refs, it should return new sub graph data, and that should be handled above.
+        // if ("children" in prototype) {
+        //   const node_with_children = node as nodes.i.IChildrenReference;
+        //   node_with_children.children_refs = [];
+        //   for (const childPrototype of prototype.children ?? []) {
+        //     const childNode = processNode(childPrototype, nid, depth + 1);
+        //     node_with_children.children_refs.push(childNode.id);
+        //   }
+        // }
 
         return node;
       }
 
       const rootNode = processNode(prototype, nid);
-      document.scene.children = [rootNode.id];
+      document.scene.children_refs = [rootNode.id];
 
       return document;
     }
@@ -2639,11 +2623,9 @@ export namespace grida.program.nodes {
       delete prototype._$id;
 
       // Handle children recursively, if the node has children
-      if (
-        grida.program.nodes.is.ichildren(node) &&
-        Array.isArray(node.children)
-      ) {
-        (prototype as __IPrototypeNodeChildren).children = node.children.map(
+      const children_refs = snapshot.links[id];
+      if (Array.isArray(children_refs)) {
+        (prototype as __IPrototypeNodeChildren).children = children_refs.map(
           (childId) => createPrototypeFromSnapshot(snapshot, childId)
         );
       }
@@ -2682,7 +2664,7 @@ export namespace grida.program.nodes {
         cornerRadiusBottomLeft: 0,
         cornerRadiusBottomRight: 0,
         style: {},
-        children: [],
+        // children_refs: [],
         ...partial,
       };
     }

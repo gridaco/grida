@@ -597,7 +597,7 @@ function RootFramesBarOverlay() {
   const { document } = useDocumentState();
   const scene = useCurrentSceneState();
   const rootframes = useMemo(() => {
-    const children = scene.children.map((id) => document.nodes[id]);
+    const children = scene.children_refs.map((id) => document.nodes[id]);
     return children.filter(
       (n) =>
         n.type === "container" ||
@@ -605,7 +605,7 @@ function RootFramesBarOverlay() {
         n.type === "component" ||
         n.type === "instance"
     );
-  }, [scene.children, document.nodes]);
+  }, [scene.children_refs, document.nodes]);
 
   if (scene.constraints.children === "single") {
     const rootframe = rootframes[0];

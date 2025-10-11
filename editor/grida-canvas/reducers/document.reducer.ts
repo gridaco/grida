@@ -63,6 +63,7 @@ import { v4 } from "uuid";
 import type { ReducerContext } from ".";
 import cg from "@grida/cg";
 import vn from "@grida/vn";
+import tree from "@grida/tree";
 import "core-js/features/object/group-by";
 
 /**
@@ -149,7 +150,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         id: context.idgen.next(),
         name: origin.name + " copy",
         order: origin.order ? origin.order + 1 : undefined,
-        children: [],
+        children_refs: [],
       });
 
       return updateState(state, (draft) => {
@@ -161,7 +162,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         Object.assign(draft, editor.state.__RESET_SCENE_STATE);
 
         // 3. clone nodes recursively
-        for (const child_id of origin.children) {
+        for (const child_id of origin.children_refs) {
           const prototype =
             grida.program.nodes.factory.createPrototypeFromSnapshot(
               state.document,
@@ -563,7 +564,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             const box = getPackedSubtreeBoundingRect(sub);
             const delta = getViewportAwareDelta(viewport_rect, box);
             if (delta) {
-              sub.scene.children.forEach((node_id) => {
+              sub.scene.children_refs.forEach((node_id) => {
                 const node = sub.nodes[node_id];
                 if ("position" in node && node.position === "absolute") {
                   node.left = (node.left ?? 0) + delta[0];
@@ -753,7 +754,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
       assert(state.scene_id, "scene_id is required for insertion");
       const scene = state.document.scenes[state.scene_id];
-      const siblings = scene.children;
+      const siblings = scene.children_refs;
       const anchors = siblings
         .map((node_id) => {
           const r = context.geometry.getNodeAbsoluteBoundingRect(node_id);
@@ -773,7 +774,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       assert(placement); // placement is always expected since allowOverflow is true
 
-      sub.scene.children.forEach((node_id) => {
+      sub.scene.children_refs.forEach((node_id) => {
         const node = sub.nodes[node_id];
         if ("position" in node && node.position === "absolute") {
           node.left = (node.left ?? 0) + placement.x;
@@ -1759,7 +1760,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const root_template_instance = dq.__getNodeById(
           draft,
           // FIXME: update api interface
-          scene.children[0]
+          scene.children_refs[0]
         );
         assert(root_template_instance.type === "template_instance");
         root_template_instance.props = data;
@@ -1931,7 +1932,7 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
   const scene = draft.document.scenes[draft.scene_id!];
   const siblings = parent_id
     ? draft.document_ctx.lu_children[parent_id] || []
-    : scene.children;
+    : scene.children_refs;
   const order = Math.min(
     ...group.map((id) => siblings.indexOf(id)).filter((i) => i >= 0)
   );
@@ -2025,19 +2026,16 @@ function __self_post_hierarchy_change_commit<
     // Only check boolean and group nodes
     if (parent_node.type === "boolean" || parent_node.type === "group") {
       // Check if the node has children property and if it's empty
-      if (
-        grida.program.nodes.is.ichildren(parent_node) &&
-        Array.isArray(parent_node.children)
-      ) {
-        if (parent_node.children.length === 0) {
-          // Remove the empty boolean/group node
-          self_try_remove_node(draft, parent_id);
+      const children_refs = draft.document.links[parent_id];
 
-          // Recursively check the parent of this removed node
-          const grandparent_id = dq.getParentId(draft.document_ctx, parent_id);
-          if (grandparent_id) {
-            nodes_to_check.add(grandparent_id);
-          }
+      if (children_refs?.length === 0) {
+        // Remove the empty boolean/group node
+        self_try_remove_node(draft, parent_id);
+
+        // Recursively check the parent of this removed node
+        const grandparent_id = dq.getParentId(draft.document_ctx, parent_id);
+        if (grandparent_id) {
+          nodes_to_check.add(grandparent_id);
         }
       }
     }
@@ -2099,60 +2097,24 @@ function __self_order(
   assert(draft.scene_id, "scene_id is required for order");
   const scene = draft.document.scenes[draft.scene_id];
 
-  const parent_id = dq.getParentId(draft.document_ctx, node_id);
-  // if (!parent_id) return; // root node case
-  let ichildren: grida.program.nodes.i.IChildrenReference;
-  if (parent_id) {
-    ichildren = dq.__getNodeById(
-      draft,
-      parent_id
-    ) as grida.program.nodes.i.IChildrenReference;
-  } else {
-    ichildren = scene;
-  }
+  // Temporarily inject virtual root into draft
+  draft.document.nodes["<root>"] = scene as any;
+  draft.document.links["<root>"] = scene.children_refs;
 
-  const childIndex = ichildren.children.indexOf(node_id);
-  assert(childIndex !== -1, "node not found in children");
+  // Use Graph.order() - mutates draft.document directly
+  const graphData = new tree.graph.Graph(draft.document);
 
-  const before = [...ichildren.children];
-  const reordered = [...before];
-  switch (order) {
-    case "back": {
-      // change the children id order - move the node_id to the first (first is the back)
-      reordered.splice(childIndex, 1);
-      reordered.unshift(node_id);
-      break;
-    }
-    case "backward": {
-      // change the children id order - move the node_id to the previous
-      if (childIndex === 0) return;
-      reordered.splice(childIndex, 1);
-      reordered.splice(childIndex - 1, 0, node_id);
-      break;
-    }
-    case "front": {
-      // change the children id order - move the node_id to the last (last is the front)
-      reordered.splice(childIndex, 1);
-      reordered.push(node_id);
-      break;
-    }
-    case "forward": {
-      // change the children id order - move the node_id to the next
-      if (childIndex === ichildren.children.length - 1) return;
-      reordered.splice(childIndex, 1);
-      reordered.splice(childIndex + 1, 0, node_id);
-      break;
-    }
-    default: {
-      // shift order
-      reordered.splice(childIndex, 1);
-      reordered.splice(order, 0, node_id);
-    }
-  }
+  // Use graph.order API (mutates draft.document directly)
+  graphData.order(node_id, order);
 
-  ichildren.children = reordered;
+  // Extract scene children before cleanup
+  scene.children_refs = draft.document.links["<root>"] || [];
 
-  // update the hierarchy graph
+  // Clean up virtual root
+  delete draft.document.nodes["<root>"];
+  delete draft.document.links["<root>"];
+
+  // update the hierarchy context
   const context = dq.Context.from(draft.document);
   draft.document_ctx = context.snapshot();
 }

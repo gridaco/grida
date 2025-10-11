@@ -15,6 +15,7 @@ import nodeReducer from "../node.reducer";
 import assert from "assert";
 import grida from "@grida/schema";
 import vn from "@grida/vn";
+import tree from "@grida/tree";
 import type { ReducerContext } from "..";
 
 /**
@@ -284,31 +285,22 @@ function __self_update_gesture_transform_translate(
 
         is_parent_changed = true;
 
-        // unregister the node from the previous parent
-        if (prev_parent_id) {
-          const parent = dq.__getNodeById(
-            draft,
-            prev_parent_id
-          ) as grida.program.nodes.i.IChildrenReference;
-          parent.children = parent.children.filter((id) => id !== node_id);
-        } else {
-          // root
-          // FIXME: do not directly modify scene children here.
-          scene.children = scene.children.filter((id) => id !== node_id);
-        }
+        // Temporarily inject virtual root into draft
+        draft.document.nodes["<root>"] = scene as any;
+        draft.document.links["<root>"] = scene.children_refs;
 
-        // register the node to the new parent
-        if (new_parent_id) {
-          const new_parent = dq.__getNodeById(
-            draft,
-            new_parent_id
-          ) as grida.program.nodes.i.IChildrenReference;
-          new_parent.children.push(node_id);
-        } else {
-          // root
-          // FIXME: do not directly modify scene children here.
-          scene.children.push(node_id);
-        }
+        // Use Graph.mv() - mutates draft.document directly
+        const graphInstance = new tree.graph.Graph(draft.document);
+
+        const target = new_parent_id || "<root>";
+        graphInstance.mv(node_id, target);
+
+        // Extract scene children before cleanup
+        scene.children_refs = draft.document.links["<root>"] || [];
+
+        // Clean up virtual root
+        delete draft.document.nodes["<root>"];
+        delete draft.document.links["<root>"];
 
         // update the context
         draft.document_ctx = dq.Context.from(draft.document).snapshot();
@@ -564,7 +556,7 @@ function __self_update_gesture_transform_scale(
     const node = draft.document.nodes[node_id];
     const initial_node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
-    const is_root = scene.children.includes(node_id);
+    const is_root = scene.children_refs.includes(node_id);
 
     // TODO: scaling for bitmap node is not supported yet.
     const is_scalable = initial_node.type !== "bitmap";

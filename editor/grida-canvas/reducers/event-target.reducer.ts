@@ -557,7 +557,7 @@ function __self_evt_on_drag(
         const { translated } = snapGuideTranslation(
           axis,
           initial_offset,
-          scene.children.map(
+          scene.children_refs.map(
             (id) => context.geometry.getNodeAbsoluteBoundingRect(id)!
           ),
           m,
@@ -858,9 +858,11 @@ function __before_end_insert_and_resize(
     draft,
     pending.node_id
   ) as grida.program.nodes.ContainerNode;
-  node.fill = (
-    pending.prototype as grida.program.nodes.ContainerNodePrototype
-  ).fill;
+
+  // UX: for container, the fill is set after insertion
+  if (pending.prototype.type === "container") {
+    node.fills = pending.prototype.fills;
+  }
 
   if (cmath.vector2.isZero(draft.gesture.movement)) return;
 
@@ -869,15 +871,8 @@ function __before_end_insert_and_resize(
   )!;
   const parent_id = dq.getParentId(draft.document_ctx, pending.node_id);
   const siblings = parent_id
-    ? [
-        ...(
-          dq.__getNodeById(
-            draft,
-            parent_id
-          ) as grida.program.nodes.i.IChildrenReference
-        ).children,
-      ]
-    : [...draft.document.scenes[draft.scene_id!].children];
+    ? [...(draft.document.links[parent_id] ?? [])]
+    : [...draft.document.scenes[draft.scene_id!].children_refs];
 
   siblings.forEach((id) => {
     if (id === pending.node_id) return;
@@ -952,7 +947,7 @@ function __get_insertion_target(
   assert(state.scene_id, "scene_id is not set");
   const scene = state.document.scenes[state.scene_id];
   if (scene.constraints.children === "single") {
-    return scene.children[0];
+    return scene.children_refs[0];
   }
 
   const hits = state.hits.slice();

@@ -1,57 +1,51 @@
 import type { editor } from "..";
 import type grida from "@grida/schema";
+import tree from "@grida/tree";
 import assert from "assert";
 
 type NodeID = string & {};
+
+/**
+ * Creates a runtime hierarchy context from a document.
+ * This builds a lookup table directly from document.links for efficient parent/child queries.
+ */
+function create_nodes_repository_runtime_hierarchy_context(
+  document: grida.program.document.IDocumentDefinition
+): grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext {
+  // Build LUT directly from document.links structure
+  const lu_keys = Object.keys(document.nodes);
+  const lu_parent: Record<string, string | null> = {};
+  const lu_children: Record<string, string[]> = {};
+
+  // Initialize all nodes
+  for (const nodeId of lu_keys) {
+    lu_parent[nodeId] = null;
+    lu_children[nodeId] = [];
+  }
+
+  // Build parent-child relationships from links
+  for (const parentId in document.links) {
+    const children = document.links[parentId];
+    if (Array.isArray(children)) {
+      for (const childId of children) {
+        lu_parent[childId] = parentId;
+        lu_children[parentId].push(childId);
+      }
+    }
+  }
+
+  return {
+    lu_keys,
+    lu_parent,
+    lu_children,
+  };
+}
 
 /**
  * @internal document /design query
  */
 export namespace dq {
   const HARD_MAX_WHILE_LOOP = 5000;
-
-  /**
-   * Builds the runtime context for document hierarchy, providing mappings for
-   * parent-child relationships without modifying core node structure.
-   *
-   * @param repository - The document definition containing all nodes.
-   * @returns {grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext} The hierarchy context,
-   * containing mappings of each node's parent and children.
-   */
-  export function create_nodes_repository_runtime_hierarchy_context(
-    repository: grida.program.document.INodesRepository
-  ): grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext {
-    const { nodes } = repository;
-    const ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext =
-      {
-        lu_keys: Object.keys(nodes),
-        lu_parent: {},
-        lu_children: {},
-      };
-
-    // First, default every node’s parent to null
-    for (const node_id of ctx.lu_keys) {
-      ctx.lu_parent[node_id] = null;
-      ctx.lu_children[node_id] = [];
-    }
-
-    // Then walk through and hook up actual parent/children relationships
-    for (const node_id in nodes) {
-      const node = nodes[node_id];
-
-      // If the node has children, map each child to its parent and add to the parent’s child array
-      if (Array.isArray((node as grida.program.nodes.UnknwonNode).children)) {
-        for (const child_id of (
-          node as grida.program.nodes.i.IChildrenReference
-        ).children) {
-          ctx.lu_parent[child_id] = node_id;
-          ctx.lu_children[node_id].push(child_id);
-        }
-      }
-    }
-
-    return ctx;
-  }
 
   /**
    * Queries nodes in the document hierarchy based on a specified selector.
@@ -406,9 +400,9 @@ export namespace dq {
     node_id: string,
     recursive = false
   ): NodeID[] {
-    const { lu_parent: __ctx_nid_to_parent_id } = context;
-    const directChildren = Object.keys(__ctx_nid_to_parent_id).filter(
-      (id) => __ctx_nid_to_parent_id[id] === node_id
+    const { lu_parent } = context;
+    const directChildren = Object.keys(lu_parent).filter(
+      (id) => lu_parent[id] === node_id
     );
 
     if (!recursive) {
@@ -516,7 +510,7 @@ export namespace dq {
    * @returns
    */
   function __getSubNodeById(
-    repositories: grida.program.document.INodesRepository[],
+    repositories: grida.program.document.INodesGraph[],
     node_id: string
   ): grida.program.nodes.Node {
     const repo = repositories.find((repo) => repo.nodes[node_id]);
@@ -635,7 +629,7 @@ export namespace dq {
       private readonly document: grida.program.document.IDocumentDefinition
     ) {}
 
-    private get nodes(): grida.program.document.INodesRepository["nodes"] {
+    private get nodes(): grida.program.document.INodesGraph["nodes"] {
       return this.document.nodes;
     }
 

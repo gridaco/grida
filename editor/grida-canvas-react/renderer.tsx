@@ -50,7 +50,7 @@ export function StandaloneSceneContent({
   primary = true,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & StandaloneDocumentContentProps) {
-  const { children } = useCurrentSceneState();
+  const { children_refs: children } = useCurrentSceneState();
 
   return (
     <div

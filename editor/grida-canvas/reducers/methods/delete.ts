@@ -1,9 +1,9 @@
 import type { Draft } from "immer";
 import type grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
-import { rm } from "@grida/tree";
 import { dq } from "@/grida-canvas/query";
 import { self_select_cursor_tool } from "./tool";
+import tree from "@grida/tree";
 import assert from "assert";
 
 /**
@@ -18,7 +18,8 @@ export function self_try_remove_node<S extends editor.state.IEditorState>(
   // check if the node is removable
   // do not allow deletion of the root node
   const is_single_child_constraint_root_node =
-    scene.constraints.children === "single" && scene.children.includes(node_id);
+    scene.constraints.children === "single" &&
+    scene.children_refs.includes(node_id);
   const node = draft.document.nodes[node_id];
   const is_removable_from_scene = node.removable !== false;
   if (is_single_child_constraint_root_node || !is_removable_from_scene) {
@@ -35,15 +36,22 @@ export function self_try_remove_node<S extends editor.state.IEditorState>(
     }
   }
 
-  // make a virtual tree, including the root, treating as a node.
-  // the rm relies on `delete` the nodes should be passed directly (no spread)
-  const nodes = draft.document.nodes as Record<
-    string,
-    grida.program.nodes.i.IChildrenReference
-  >;
-  nodes["<root>"] = scene;
-  const ids = rm(nodes, node_id);
-  delete nodes["<root>"];
+  // Temporarily inject virtual root into draft
+  draft.document.nodes["<root>"] = scene as any;
+  draft.document.links["<root>"] = scene.children_refs;
+
+  // Use tree.graph.Graph - mutates draft.document directly
+  const graphInstance = new tree.graph.Graph(draft.document);
+
+  // Remove node and its subtree (mutates draft.document directly)
+  const ids = graphInstance.rm(node_id);
+
+  // Extract scene children before cleanup
+  scene.children_refs = draft.document.links["<root>"] || [];
+
+  // Clean up virtual root
+  delete draft.document.nodes["<root>"];
+  delete draft.document.links["<root>"];
 
   // rebuild context
   const context = dq.Context.from(draft.document);
