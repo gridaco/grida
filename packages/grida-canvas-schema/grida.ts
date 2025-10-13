@@ -1305,6 +1305,16 @@ export namespace grida.program.nodes {
     children: NodePrototype[];
   };
 
+  /**
+   * Type guard to check if a prototype has children.
+   * Provides type safety for prototype-to-document conversion.
+   */
+  export function hasChildren(
+    prototype: Partial<NodePrototype>
+  ): prototype is Partial<NodePrototype> & __IPrototypeNodeChildren {
+    return "children" in prototype && Array.isArray(prototype.children);
+  }
+
   // #endregion node prototypes
 
   /**
@@ -2515,6 +2525,8 @@ export namespace grida.program.nodes {
         case "component":
         case "instance":
         case "template_instance": {
+          // Remove children from prototype before spreading to prevent leakage
+          const { children, ...prototypeWithoutChildren } = prototype as any;
           // @ts-expect-error
           return {
             name: prototype.type,
@@ -2524,7 +2536,7 @@ export namespace grida.program.nodes {
             opacity: 1,
             zIndex: 0,
             rotation: 0,
-            ...prototype,
+            ...prototypeWithoutChildren,
             id: id,
           } as UnknwonNode;
         }
@@ -2558,7 +2570,9 @@ export namespace grida.program.nodes {
           } as UnknwonNode;
         }
         default:
-          throw new Error(`Unsupported node prototype type: ${prototype.type}`);
+          throw new Error(
+            `Unsupported node prototype type: ${(prototype as any).type}`
+          );
       }
     }
 
@@ -2603,15 +2617,16 @@ export namespace grida.program.nodes {
         const node = createNodeDataFromPrototypeWithoutChildren(prototype, id);
         document.nodes[node.id] = node;
 
-        // FIXME:graph:: instead of pushing children_refs, it should return new sub graph data, and that should be handled above.
-        // if ("children" in prototype) {
-        //   const node_with_children = node as nodes.i.IChildrenReference;
-        //   node_with_children.children_refs = [];
-        //   for (const childPrototype of prototype.children ?? []) {
-        //     const childNode = processNode(childPrototype, nid, depth + 1);
-        //     node_with_children.children_refs.push(childNode.id);
-        //   }
-        // }
+        // Process children and populate links (not node properties)
+        if (nodes.hasChildren(prototype)) {
+          const childIds: nodes.NodeID[] = [];
+          for (const childPrototype of prototype.children) {
+            const childNode = processNode(childPrototype, nid, depth + 1);
+            childIds.push(childNode.id);
+          }
+          // Populate document.links instead of node.children
+          document.links[node.id] = childIds;
+        }
 
         return node;
       }
