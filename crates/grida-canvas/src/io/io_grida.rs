@@ -111,7 +111,10 @@ pub struct JSONDocument {
     pub bitmaps: HashMap<String, serde_json::Value>,
     pub properties: HashMap<String, serde_json::Value>,
     pub nodes: HashMap<String, JSONNode>,
-    pub scenes: HashMap<String, JSONScene>,
+    /// Scene IDs referencing scene nodes in document.nodes
+    pub scenes_ref: Vec<String>,
+    /// Hierarchy links map (node_id -> children IDs)
+    pub links: HashMap<String, Option<Vec<String>>>,
     pub entry_scene_id: Option<String>,
 }
 
@@ -456,17 +459,19 @@ pub fn merge_paints(paint: Option<JSONPaint>, paints: Option<Vec<JSONPaint>>) ->
     Paints::from(paints_vec)
 }
 
+/// SceneNode as it appears in document.nodes
 #[derive(Debug, Deserialize)]
-pub struct JSONScene {
+pub struct JSONSceneNode {
     pub id: String,
     pub name: String,
-    #[serde(rename = "type")]
-    pub type_name: String,
-    pub children: Vec<String>,
+    pub active: Option<bool>,
+    pub locked: Option<bool>,
     #[serde(rename = "backgroundColor")]
     pub background_color: Option<JSONRGBA>,
     pub guides: Option<Vec<serde_json::Value>>,
     pub constraints: Option<HashMap<String, String>>,
+    pub edges: Option<Vec<serde_json::Value>>,
+    pub order: Option<i32>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -662,6 +667,8 @@ pub enum JSONNode {
     BooleanOperation(JSONBooleanOperationNode),
     #[serde(rename = "image")]
     Image(JSONImageNode),
+    #[serde(rename = "scene")]
+    Scene(JSONSceneNode),
     Unknown(JSONUnknownNodeProperties),
 }
 
@@ -672,8 +679,6 @@ pub struct JSONContainerNode {
 
     #[serde(rename = "expanded")]
     pub expanded: Option<bool>,
-    #[serde(rename = "children")]
-    pub children: Option<Vec<String>>,
 
     // layout
     pub layout: Option<String>,
@@ -696,8 +701,6 @@ pub struct JSONGroupNode {
 
     #[serde(rename = "expanded")]
     pub expanded: Option<bool>,
-    #[serde(rename = "children")]
-    pub children: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -907,9 +910,6 @@ pub struct JSONBooleanOperationNode {
 
     #[serde(rename = "op")]
     pub op: BooleanPathOperation,
-
-    #[serde(rename = "children")]
-    pub children: Vec<String>,
 }
 
 // Default value functions
@@ -953,7 +953,8 @@ impl From<JSONGroupNode> for GroupNodeRec {
             active: node.base.active,
             // TODO: group's transform should be handled differently
             transform: Some(transform),
-            children: node.children.unwrap_or_default(),
+            // Children populated from links after conversion
+            children: vec![],
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
             mask: node.base.mask.map(|m| m.into()),
@@ -997,7 +998,8 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
             ),
-            children: node.children.unwrap_or_default(),
+            // Children populated from links after conversion
+            children: vec![],
             clip: true,
             mask: node.base.mask.map(|m| m.into()),
         }
@@ -1496,7 +1498,8 @@ impl From<JSONBooleanOperationNode> for Node {
                 .base
                 .corner_radius
                 .and_then(JSONCornerRadius::into_uniform),
-            children: node.children,
+            // Children populated from links after conversion
+            children: vec![],
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
@@ -1533,6 +1536,22 @@ impl From<JSONNode> for Node {
                 opacity: unknown.opacity,
                 error: "Unknown node".to_string(),
             }),
+            JSONNode::Scene(scene) => {
+                // Scene nodes should be filtered out before conversion
+                // This case should not be reached in normal operation
+                Node::Error(ErrorNodeRec {
+                    id: scene.id,
+                    name: Some(scene.name),
+                    active: scene.active.unwrap_or(true),
+                    transform: AffineTransform::identity(),
+                    size: Size {
+                        width: 0.0,
+                        height: 0.0,
+                    },
+                    opacity: 1.0,
+                    error: "Scene nodes should not be converted to regular nodes".to_string(),
+                })
+            }
         }
     }
 }
@@ -1783,7 +1802,6 @@ mod tests {
             "name": "Boolean Operation",
             "type": "boolean",
             "op": "union",
-            "children": ["child-1", "child-2"],
             "left": 100.0,
             "top": 100.0,
             "width": 200.0,
@@ -1802,7 +1820,6 @@ mod tests {
                     Some("Boolean Operation".to_string())
                 );
                 assert_eq!(boolean_node.op, BooleanPathOperation::Union);
-                assert_eq!(boolean_node.children, vec!["child-1", "child-2"]);
                 assert_eq!(boolean_node.base.left, 100.0);
                 assert_eq!(boolean_node.base.top, 100.0);
                 assert_eq!(boolean_node.base.width, CSSDimension::LengthPX(200.0));
@@ -2528,5 +2545,233 @@ mod tests {
             }
             _ => panic!("Expected Tile variant"),
         }
+    }
+
+    #[test]
+    fn deserialize_scene_node() {
+        let json = r#"{
+            "id": "main",
+            "name": "Main Scene",
+            "type": "scene",
+            "active": true,
+            "locked": false,
+            "backgroundColor": {"r": 245, "g": 245, "b": 245, "a": 1.0},
+            "constraints": {"children": "multiple"},
+            "guides": [],
+            "edges": []
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json).expect("failed to deserialize scene node");
+
+        match node {
+            JSONNode::Scene(scene_node) => {
+                assert_eq!(scene_node.id, "main");
+                assert_eq!(scene_node.name, "Main Scene");
+                assert_eq!(scene_node.active, Some(true));
+                assert_eq!(scene_node.locked, Some(false));
+                assert!(scene_node.background_color.is_some());
+            }
+            _ => panic!("Expected Scene node"),
+        }
+    }
+
+    #[test]
+    fn parse_grida_file_new_format() {
+        let json = r#"{
+            "version": "0.0.1-beta.1+20251010",
+            "document": {
+                "nodes": {
+                    "main": {
+                        "id": "main",
+                        "name": "Main Scene",
+                        "type": "scene",
+                        "active": true,
+                        "locked": false,
+                        "backgroundColor": {"r": 245, "g": 245, "b": 245, "a": 1.0},
+                        "constraints": {"children": "multiple"},
+                        "guides": [],
+                        "edges": []
+                    },
+                    "rect1": {
+                        "id": "rect1",
+                        "name": "Rectangle",
+                        "type": "rectangle",
+                        "left": 100,
+                        "top": 100,
+                        "width": 200,
+                        "height": 150
+                    }
+                },
+                "links": {
+                    "main": ["rect1"],
+                    "rect1": null
+                },
+                "scenes_ref": ["main"],
+                "entry_scene_id": "main",
+                "bitmaps": {},
+                "properties": {}
+            }
+        }"#;
+
+        let file: JSONCanvasFile =
+            serde_json::from_str(json).expect("failed to parse new format grida file");
+
+        // Verify structure
+        assert_eq!(file.document.scenes_ref, vec!["main".to_string()]);
+        assert_eq!(file.document.entry_scene_id, Some("main".to_string()));
+
+        // Verify scene node
+        let scene_node = file.document.nodes.get("main").unwrap();
+        assert!(matches!(scene_node, JSONNode::Scene(_)));
+
+        // Verify links
+        assert_eq!(
+            file.document.links.get("main"),
+            Some(&Some(vec!["rect1".to_string()]))
+        );
+    }
+
+    #[test]
+    fn parse_grida_file_with_container_children() {
+        // Test that container nodes with children in links work correctly
+        let json = r#"{
+            "version": "0.0.1-beta.1+20251010",
+            "document": {
+                "nodes": {
+                    "main": {
+                        "id": "main",
+                        "name": "Main Scene",
+                        "type": "scene",
+                        "active": true,
+                        "locked": false,
+                        "backgroundColor": {"r": 255, "g": 255, "b": 255, "a": 1.0},
+                        "constraints": {"children": "multiple"},
+                        "guides": [],
+                        "edges": []
+                    },
+                    "container1": {
+                        "id": "container1",
+                        "name": "Container",
+                        "type": "container",
+                        "left": 0,
+                        "top": 0,
+                        "width": 500,
+                        "height": 500
+                    },
+                    "rect1": {
+                        "id": "rect1",
+                        "name": "Rectangle",
+                        "type": "rectangle",
+                        "left": 10,
+                        "top": 10,
+                        "width": 100,
+                        "height": 100
+                    }
+                },
+                "links": {
+                    "main": ["container1"],
+                    "container1": ["rect1"],
+                    "rect1": null
+                },
+                "scenes_ref": ["main"],
+                "bitmaps": {},
+                "properties": {}
+            }
+        }"#;
+
+        let file: JSONCanvasFile =
+            serde_json::from_str(json).expect("failed to parse grida file with container children");
+
+        // Verify structure
+        assert_eq!(file.document.scenes_ref, vec!["main".to_string()]);
+
+        // Verify container node exists (children come from links)
+        assert!(matches!(
+            file.document.nodes.get("container1"),
+            Some(JSONNode::Container(_))
+        ));
+
+        // Verify links
+        assert_eq!(
+            file.document.links.get("container1"),
+            Some(&Some(vec!["rect1".to_string()]))
+        );
+    }
+
+    #[test]
+    fn test_nested_children_population() {
+        // Test that deeply nested children get properly populated from links
+        let json = r#"{
+            "version": "0.0.1-beta.1+20251010",
+            "document": {
+                "nodes": {
+                    "main": {
+                        "id": "main",
+                        "name": "Main Scene",
+                        "type": "scene",
+                        "active": true,
+                        "locked": false,
+                        "backgroundColor": {"r": 255, "g": 255, "b": 255, "a": 1.0},
+                        "constraints": {"children": "multiple"},
+                        "guides": [],
+                        "edges": []
+                    },
+                    "container1": {
+                        "id": "container1",
+                        "name": "Container 1",
+                        "type": "container",
+                        "left": 0,
+                        "top": 0,
+                        "width": 500,
+                        "height": 500
+                    },
+                    "container2": {
+                        "id": "container2",
+                        "name": "Container 2",
+                        "type": "container",
+                        "left": 10,
+                        "top": 10,
+                        "width": 400,
+                        "height": 400
+                    },
+                    "rect1": {
+                        "id": "rect1",
+                        "name": "Rectangle",
+                        "type": "rectangle",
+                        "left": 20,
+                        "top": 20,
+                        "width": 100,
+                        "height": 100
+                    }
+                },
+                "links": {
+                    "main": ["container1"],
+                    "container1": ["container2"],
+                    "container2": ["rect1"],
+                    "rect1": null
+                },
+                "scenes_ref": ["main"],
+                "bitmaps": {},
+                "properties": {}
+            }
+        }"#;
+
+        let file: JSONCanvasFile =
+            serde_json::from_str(json).expect("failed to parse grida file with nested children");
+
+        // Verify deeply nested links structure
+        assert_eq!(
+            file.document.links.get("main"),
+            Some(&Some(vec!["container1".to_string()]))
+        );
+        assert_eq!(
+            file.document.links.get("container1"),
+            Some(&Some(vec!["container2".to_string()]))
+        );
+        assert_eq!(
+            file.document.links.get("container2"),
+            Some(&Some(vec!["rect1".to_string()]))
+        );
+        assert_eq!(file.document.links.get("rect1"), Some(&None));
     }
 }

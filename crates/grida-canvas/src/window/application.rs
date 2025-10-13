@@ -462,37 +462,69 @@ impl UnknownTargetApplication {
         }
     }
 
-    fn load_scene_from_canvas_file(&mut self, mut file: io_grida::JSONCanvasFile) -> bool {
-        let nodes = file
+    fn load_scene_from_canvas_file(&mut self, file: io_grida::JSONCanvasFile) -> bool {
+        let links = file.document.links;
+
+        // Determine scene_id
+        let scene_id = file
             .document
-            .nodes
-            .into_iter()
-            .map(|(id, node)| (id, node.into()))
-            .collect();
+            .entry_scene_id
+            .or_else(|| file.document.scenes_ref.first().cloned())
+            .unwrap_or_else(|| "scene".to_string());
 
-        let scene_id = file.document.entry_scene_id.unwrap_or_else(|| {
-            file.document
-                .scenes
-                .keys()
-                .next()
-                .cloned()
-                .unwrap_or_else(|| "scene".to_string())
-        });
-
-        if let Some(scene) = file.document.scenes.remove(&scene_id) {
-            let scene = crate::node::schema::Scene {
-                id: scene_id,
-                name: scene.name,
-                children: scene.children,
-                nodes,
-                background_color: scene.background_color.map(Into::into),
-            };
-            self.renderer.load_scene(scene);
-            true
+        // Extract scene metadata from SceneNode
+        let (scene_name, bg_color) = if let Some(io_grida::JSONNode::Scene(scene_node)) =
+            file.document.nodes.get(&scene_id)
+        {
+            (
+                scene_node.name.clone(),
+                scene_node.background_color.clone().map(Into::into),
+            )
         } else {
-            eprintln!("failed to load scene: '{}' not found", scene_id);
-            false
+            (scene_id.clone(), None)
+        };
+
+        // Get scene children from links
+        let scene_children = links
+            .get(&scene_id)
+            .and_then(|c| c.clone())
+            .unwrap_or_default();
+
+        // Convert nodes to repository, filtering out scene nodes
+        let mut node_repo = crate::node::repository::NodeRepository::new();
+        for (node_id, json_node) in file.document.nodes {
+            // Skip scene nodes - they're handled separately
+            if matches!(json_node, io_grida::JSONNode::Scene(_)) {
+                continue;
+            }
+
+            let mut node: Node = json_node.into();
+
+            // Populate children from links
+            if let Some(children_opt) = links.get(&node_id) {
+                if let Some(children) = children_opt {
+                    match &mut node {
+                        Node::Container(n) => n.children = children.clone(),
+                        Node::Group(n) => n.children = children.clone(),
+                        Node::BooleanOperation(n) => n.children = children.clone(),
+                        _ => {} // Other nodes don't have children
+                    }
+                }
+            }
+
+            node_repo.insert(node);
         }
+
+        let scene = crate::node::schema::Scene {
+            id: scene_id,
+            name: scene_name,
+            children: scene_children,
+            nodes: node_repo,
+            background_color: bg_color,
+        };
+
+        self.renderer.load_scene(scene);
+        true
     }
 
     fn process_document_transactions(

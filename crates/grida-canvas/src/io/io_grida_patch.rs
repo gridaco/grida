@@ -125,18 +125,23 @@ mod tests {
             "document": {
                 "bitmaps": {},
                 "properties": {},
-                "nodes": {},
-                "scenes": {
+                "nodes": {
                     "scene": {
                         "id": "scene",
                         "name": "Scene",
                         "type": "scene",
-                        "children": [],
+                        "active": true,
+                        "locked": false,
                         "backgroundColor": null,
                         "guides": [],
-                        "constraints": null
+                        "edges": [],
+                        "constraints": {"children": "multiple"}
                     }
                 },
+                "links": {
+                    "scene": []
+                },
+                "scenes_ref": ["scene"],
                 "entry_scene_id": "scene"
             }
         })
@@ -147,7 +152,7 @@ mod tests {
         let doc = make_document();
         let transactions = vec![vec![json!({
             "op": "replace",
-            "path": "/document/scenes/scene/name",
+            "path": "/document/nodes/scene/name",
             "value": "Renamed"
         })]];
 
@@ -163,7 +168,7 @@ mod tests {
             }
         );
         assert_eq!(
-            outcome.document["document"]["scenes"]["scene"]["name"],
+            outcome.document["document"]["nodes"]["scene"]["name"],
             json!("Renamed")
         );
         assert!(outcome.scene_file.is_some());
@@ -175,12 +180,12 @@ mod tests {
         let transactions = vec![
             vec![json!({
                 "op": "replace",
-                "path": "/document/scenes/scene/does_not_exist",
+                "path": "/document/nodes/scene/does_not_exist",
                 "value": 1
             })],
             vec![json!({
                 "op": "replace",
-                "path": "/document/scenes/scene/name",
+                "path": "/document/nodes/scene/name",
                 "value": "Next"
             })],
         ];
@@ -190,7 +195,7 @@ mod tests {
         assert!(!outcome.reports[0].success);
         assert!(outcome.reports[1].success);
         assert_eq!(
-            outcome.document["document"]["scenes"]["scene"]["name"],
+            outcome.document["document"]["nodes"]["scene"]["name"],
             json!("Next")
         );
     }
