@@ -201,14 +201,11 @@ export function NodeHierarchyList() {
         const node = editor.state.document.nodes[currentId];
         if (!node) break;
 
-        // Find the parent of this node
-        const parentId = Object.keys(
-          editor.state.document_ctx.lu_children
-        ).find((parentId) =>
-          editor.state.document_ctx.lu_children[parentId]?.includes(currentId)
-        );
+        // Find the parent of this node using the context lookup
+        const parentId = editor.state.document_ctx.lu_parent[currentId];
 
-        if (parentId && parentId !== "<root>") {
+        // Stop at the scene (root) level - don't include the scene itself
+        if (parentId && parentId !== id) {
           parentIds.push(parentId);
           currentId = parentId;
         } else {
@@ -228,8 +225,9 @@ export function NodeHierarchyList() {
     return Array.from(expandedItems);
   }, [
     selection,
+    id,
     editor.state.document.nodes,
-    editor.state.document_ctx.lu_children,
+    editor.state.document_ctx.lu_parent,
   ]);
 
   // Combine user's manual expansions with required expansions
@@ -238,9 +236,9 @@ export function NodeHierarchyList() {
     return Array.from(combined);
   }, [userExpandedItems, requiredExpandedItems]);
 
-  // root item id must be "<root>"
+  // Use the scene id as root (scenes are now part of the nodes tree)
   const tree = useTree<grida.program.nodes.Node>({
-    rootItemId: "<root>",
+    rootItemId: id,
     canReorder: true,
     initialState: {
       selectedItems: selection,
@@ -258,14 +256,12 @@ export function NodeHierarchyList() {
       setUserExpandedItems(items);
     },
     getItemName: (item) => {
-      if (item.getId() === "<root>") {
-        return name;
-      }
       return item.getItemData().name;
     },
     isItemFolder: (item) => {
       const node = item.getItemData();
       return (
+        node.type === "scene" ||
         node.type === "container" ||
         node.type === "group" ||
         node.type === "boolean"
@@ -278,13 +274,13 @@ export function NodeHierarchyList() {
         target,
         draggedItemIds: ids,
         getActualChildren: (parentId) => {
-          if (parentId === "<root>") {
-            return children ?? [];
-          }
-          return editor.state.document_ctx.lu_children[parentId];
+          return editor.state.document_ctx.lu_children[parentId] ?? [];
         },
         inversed: true,
       });
+
+      // TODO: introduce a new mv command, where it preserves the absolute position of the moving node, while entering/exiting the parent
+      // simplu calling mv will only change the hierarchy, causing its location to change visually, not the expected ux when working with the tree ui.
       editor.commands.mv(ids, target_id, index);
     },
     indent: 6,
@@ -293,9 +289,6 @@ export function NodeHierarchyList() {
         return editor.state.document.nodes[itemId];
       },
       getChildren: (itemId) => {
-        if (itemId === "<root>") {
-          return toReversedCopy(children);
-        }
         return toReversedCopy(editor.state.document_ctx.lu_children[itemId]);
       },
     },
