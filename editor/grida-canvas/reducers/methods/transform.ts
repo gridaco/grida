@@ -21,13 +21,14 @@ import type { ReducerContext } from "..";
 
 /**
  * Determines if a node type allows hierarchy changes during translation.
- * Container nodes allow children to escape/enter during translation.
+ * Container nodes and scenes allow children to escape/enter during translation.
  * Group and boolean nodes do not allow hierarchy changes - children must stay within their parent.
  */
 function allows_hierarchy_change(
   node_type: grida.program.nodes.NodeType
 ): boolean {
   switch (node_type) {
+    case "scene":
     case "container":
       return true;
     case "group":
