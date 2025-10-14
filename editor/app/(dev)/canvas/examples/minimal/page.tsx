@@ -18,7 +18,6 @@ import {
   useCurrentEditor,
   useEditorState,
 } from "@/grida-canvas-react";
-import { editor } from "@/grida-canvas";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";

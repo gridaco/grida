@@ -2,8 +2,8 @@
   "version": "0.0.1-beta.1+20251010",
   "document": {
     "nodes": {
-      "25575e75-a544-4fa3-b199-15d1906588b2": {
-        "id": "25575e75-a544-4fa3-b199-15d1906588b2",
+      "rectangle": {
+        "id": "rectangle",
         "name": "rectangle",
         "locked": false,
         "active": true,
@@ -52,7 +52,7 @@
     },
     "links": {
       "main": [
-        "25575e75-a544-4fa3-b199-15d1906588b2"
+        "rectangle"
       ]
     },
     "scenes_ref": [

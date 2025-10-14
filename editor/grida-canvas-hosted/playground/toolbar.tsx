@@ -32,7 +32,7 @@ import {
   ToolsGroup,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
-import { ColorPicker } from "../../scaffolds/sidecontrol/controls/color-picker";
+import { ColorPicker } from "@/scaffolds/sidecontrol/controls/color-picker";
 import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { PaintBucketIcon } from "lucide-react";
 import {

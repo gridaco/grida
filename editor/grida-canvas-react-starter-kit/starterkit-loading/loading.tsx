@@ -297,6 +297,8 @@ export function FullscreenLoadingOverlay({
             {errmsg ? (
               <motion.p
                 className="text-xs text-destructive"
+                role="alert"
+                aria-live="assertive"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.3 }}

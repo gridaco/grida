@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback } from "react";
-import grida from "@grida/schema";
 import { io } from "@grida/io";
 import cg from "@grida/cg";
 import { useCurrentEditor, useEditorState } from "./use-editor";
