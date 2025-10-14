@@ -56,6 +56,11 @@ export default function reducer(
           draft.webfontlist = action.webfontlist;
           return;
         }
+        case "document/reset": {
+          // Special marker action - already handled by reset() method
+          // This should never actually reach the reducer, but handle it gracefully
+          return;
+        }
         case "load": {
           const { scene } = action;
 

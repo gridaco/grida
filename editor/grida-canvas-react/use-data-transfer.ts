@@ -203,6 +203,7 @@ export function useDataTransferEventTarget() {
 
       if (!event.clipboardData) {
         instance.commands.paste();
+        event.preventDefault();
         return;
       }
 
