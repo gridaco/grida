@@ -545,6 +545,44 @@ class EditorDocumentStore
   }
 
   // #region IDocumentEditorActions implementation
+  /**
+   * Reset the entire document state
+   *
+   * This is a special operation that bypasses the reducer and directly replaces
+   * the entire state. Unlike `dispatch()`, it does not generate patches.
+   *
+   * **Characteristics:**
+   * - Completely replaces the state (no Immer produce)
+   * - Preserves ONLY the current camera transform (everything else is replaced)
+   * - Clears undo/redo history
+   * - Resets transaction ID to 0
+   * - Emits a "document/reset" action so subscribers can detect the reset
+   *
+   * **Use cases:**
+   * - Loading a document from a file
+   * - Importing content from external sources
+   * - Resetting to a completely new state
+   *
+   * @param state - The new complete editor state to set
+   * @param key - Optional unique identifier for this reset operation.
+   *              If not provided, a timestamp is auto-generated.
+   * @param force - If true, bypass the locked check. Use with caution.
+   *
+   * @returns The new transaction ID (always 0 after reset)
+   *
+   * @example
+   * ```ts
+   * // Load a document from file
+   * const fileData = await fetch('/example.grida').then(r => r.json());
+   * editor.commands.reset(
+   *   editor.state.init({
+   *     editable: true,
+   *     document: fileData.document
+   *   }),
+   *   '/example.grida'
+   * );
+   * ```
+   */
   public reset(
     state: editor.state.IEditorState,
     key: string | undefined = undefined,
@@ -552,16 +590,20 @@ class EditorDocumentStore
   ): number {
     if (this._locked && !force) return this._tid;
 
-    const __prev_state = this.mstate;
-    const __prev_transform = __prev_state.transform;
-    this.mstate = produce(state, (draft) => {
-      if (key) draft.document_key = key;
-      // preserve the transform state
-      draft.transform = __prev_transform;
-    });
+    const document_key = key ?? Date.now().toString();
+    const prev_transform = this.mstate.transform;
+
+    // Explicit full reset: Use the provided state (typically from editor.state.init())
+    // and only preserve the current camera transform
+    this.mstate = {
+      ...state,
+      document_key, // Set reset identifier
+      transform: prev_transform, // Preserve camera transform
+    };
+
     this.historyManager.clear();
     this._tid = 0;
-    this.emit(undefined, []);
+    this.emit({ type: "document/reset", document_key }, []);
     return this._tid;
   }
 
@@ -2383,12 +2425,26 @@ export class Editor
       // subscribe
       this.doc.subscribeWithSelector(
         (state) => state.document,
-        (_, document, _prev, _action, patches) => {
+        (_, document, _prev, action, patches) => {
           // FIXME: Unstable
           // the current patch based sync is not stable, it WILL fail to direct sync when deleting a node, etc.
           // this is not fully tested, and the direct sync fallback should kept as-is until we fully investicate this.
 
           if (!this._m_wasm_canvas_scene) return;
+
+          // Full sync on document reset
+          if (action?.type === "document/reset") {
+            syncDocument(
+              this._m_wasm_canvas_scene,
+              document,
+              this.doc.state.scene_id
+            );
+            // Perform initial actions after reset
+            this.camera.fit("*");
+            return;
+          }
+
+          // Patch-based sync for normal changes
           if (!patches || patches.length === 0) return;
 
           const documentPatches = patches.filter(

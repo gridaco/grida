@@ -8,11 +8,28 @@ import type { GoogleWebFontList } from "@grida/fonts/google";
 
 export type Action =
   | InternalAction
+  | DocumentResetAction
   | EditorCameraAction
   | EditorAction
   | EditorClipAction;
 
 export type InternalAction = __InternalWebfontListLoadAction;
+
+/**
+ * Document Reset Action
+ *
+ * Special marker action emitted when the entire document state is replaced via `reset()`.
+ * This action is NOT handled by the global actions reducer - it only marks that a full
+ * state replacement occurred. Subscribers can check for this action to distinguish
+ * between full resets and incremental changes.
+ */
+export interface DocumentResetAction {
+  type: "document/reset";
+  /**
+   * Unique identifier for this reset operation (auto-generated timestamp if not provided)
+   */
+  document_key: string;
+}
 
 export type EditorAction =
   | EditorConfigAction

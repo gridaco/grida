@@ -2508,6 +2508,19 @@ export namespace editor.api {
   export interface IDocumentStoreActions {
     undo(): void;
     redo(): void;
+    /**
+     * Reset the entire document state
+     *
+     * Completely replaces the editor state, bypassing the reducer.
+     * - Preserves ONLY the camera transform (everything else is replaced)
+     * - Clears undo/redo history
+     * - Emits a "document/reset" action for subscribers
+     * - Auto-generates a timestamp key if not provided
+     *
+     * @param state - The new complete editor state
+     * @param key - Optional unique identifier (auto-generated if omitted)
+     * @param force - If true, bypass locked check
+     */
     reset(
       state: editor.state.IEditorState,
       key?: string,
