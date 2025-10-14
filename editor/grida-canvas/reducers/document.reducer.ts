@@ -144,9 +144,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         // 1. Add to scenes_ref array
         draft.document.scenes_ref.push(scene_id);
 
-        // 2. change the scene_id
+        // 2. Rebuild document context to include the new scene
+        const graph = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
+        draft.document_ctx = graph.lut;
+
+        // 3. change the scene_id
         draft.scene_id = scene_id;
-        // 3. clear scene-specific state
+        // 4. clear scene-specific state
         Object.assign(draft, editor.state.__RESET_SCENE_STATE);
       });
     }

@@ -289,7 +289,9 @@ export function NodeHierarchyList() {
         return editor.state.document.nodes[itemId];
       },
       getChildren: (itemId) => {
-        return toReversedCopy(editor.state.document_ctx.lu_children[itemId]);
+        return toReversedCopy(
+          editor.state.document_ctx.lu_children[itemId] ?? []
+        );
       },
     },
     features: [
