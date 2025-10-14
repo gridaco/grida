@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
@@ -8,8 +8,7 @@ use math2::transform::AffineTransform;
 async fn demo_n_shapes(n: usize) -> Scene {
     let nf = NodeFactory::new();
 
-    let mut repository = NodeRepository::new();
-    let mut all_shape_ids = Vec::new();
+    let mut graph = SceneGraph::new();
 
     // Grid parameters
     let shape_size = 100.0; // Fixed size of 100x100 per shape
@@ -52,15 +51,12 @@ async fn demo_n_shapes(n: usize) -> Scene {
 
         rect.set_fill(Paint::from(CGColor(r, g, b, 255)));
 
-        all_shape_ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(Node::Rectangle(rect), Parent::Root);
     }
 
     Scene {
-        id: "scene".to_string(),
         name: format!("{} Shapes Performance Test", n),
-        children: all_shape_ids,
-        nodes: repository,
+        graph,
         background_color: None,
     }
 }

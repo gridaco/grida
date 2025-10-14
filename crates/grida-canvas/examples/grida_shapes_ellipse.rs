@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
@@ -16,7 +16,7 @@ async fn demo_ellipses() -> Scene {
         height: 800.0,
     };
 
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut all_ellipse_ids = Vec::new();
     let spacing = 120.0;
@@ -40,7 +40,7 @@ async fn demo_ellipses() -> Scene {
             255,
         ))]); // Blue gradient
         all_ellipse_ids.push(ellipse.id.clone());
-        repository.insert(Node::Ellipse(ellipse));
+        graph.insert_node(Node::Ellipse(ellipse));
     }
 
     // Row 2: Ellipses with different inner radius (rings)
@@ -60,7 +60,7 @@ async fn demo_ellipses() -> Scene {
             255,
         ))]); // Orange gradient
         all_ellipse_ids.push(ring.id.clone());
-        repository.insert(Node::Ellipse(ring));
+        graph.insert_node(Node::Ellipse(ring));
     }
 
     // Row 3: Arcs with different angles
@@ -81,7 +81,7 @@ async fn demo_ellipses() -> Scene {
             255,
         ))]); // Green gradient
         all_ellipse_ids.push(arc.id.clone());
-        repository.insert(Node::Ellipse(arc));
+        graph.insert_node(Node::Ellipse(arc));
     }
 
     // Row 4: Arcs with inner radius (donut arcs)
@@ -103,7 +103,7 @@ async fn demo_ellipses() -> Scene {
             255,
         ))]); // Purple gradient
         all_ellipse_ids.push(donut_arc.id.clone());
-        repository.insert(Node::Ellipse(donut_arc));
+        graph.insert_node(Node::Ellipse(donut_arc));
     }
 
     // Row 5: Ellipses with strokes
@@ -124,19 +124,18 @@ async fn demo_ellipses() -> Scene {
         ))]); // Red gradient stroke
         stroke_ellipse.stroke_width = 3.0 + (i as f32 * 2.0); // 3 to 17 stroke weight
         all_ellipse_ids.push(stroke_ellipse.id.clone());
-        repository.insert(Node::Ellipse(stroke_ellipse));
+        graph.insert_node(Node::Ellipse(stroke_ellipse));
     }
 
     // Set up the root container
-    root_container_node.children.extend(all_ellipse_ids);
     let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
+    graph.insert_node(Node::Container(root_container_node));
+    graph.insert(Parent::Root, vec![root_container_id.clone()]);
+    graph.insert(Parent::NodeId(root_container_id), all_ellipse_ids);
 
     Scene {
-        id: "scene".to_string(),
         name: "Ellipse Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
+        graph,
         background_color: Some(CGColor(245, 245, 245, 255)),
     }
 }

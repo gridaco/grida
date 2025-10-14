@@ -1,13 +1,13 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 async fn demo_booleans() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
@@ -65,7 +65,6 @@ async fn demo_booleans() -> Scene {
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Union,
             corner_radius: None,
-            children: vec![rect.id.clone(), circle.id.clone()],
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
@@ -74,16 +73,24 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(rect.id.clone());
-        all_shape_ids.push(circle.id.clone());
-        all_shape_ids.push(text.id.clone());
-        all_shape_ids.push(bool_node.id.clone());
+        let rect_id = rect.id.clone();
+        let circle_id = circle.id.clone();
+        let text_id = text.id.clone();
+        let bool_id = bool_node.id.clone();
+
+        all_shape_ids.push(rect_id.clone());
+        all_shape_ids.push(circle_id.clone());
+        all_shape_ids.push(text_id);
+        all_shape_ids.push(bool_id.clone());
 
         // Insert all nodes
-        repository.insert(Node::Rectangle(rect));
-        repository.insert(Node::Ellipse(circle));
-        repository.insert(Node::TextSpan(text));
-        repository.insert(Node::BooleanOperation(bool_node));
+        graph.insert_node(Node::Rectangle(rect));
+        graph.insert_node(Node::Ellipse(circle));
+        graph.insert_node(Node::TextSpan(text));
+        graph.insert_node(Node::BooleanOperation(bool_node));
+
+        // Set up boolean operation hierarchy
+        graph.insert(Parent::NodeId(bool_id), vec![rect_id, circle_id]);
     }
 
     // Example 2: Two Circles Intersection
@@ -128,7 +135,6 @@ async fn demo_booleans() -> Scene {
             effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Intersection,
-            children: vec![circle1.id.clone(), circle2.id.clone()],
             corner_radius: None,
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
@@ -138,16 +144,24 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(circle1.id.clone());
-        all_shape_ids.push(circle2.id.clone());
-        all_shape_ids.push(text.id.clone());
-        all_shape_ids.push(bool_node.id.clone());
+        let circle1_id = circle1.id.clone();
+        let circle2_id = circle2.id.clone();
+        let text_id = text.id.clone();
+        let bool_id = bool_node.id.clone();
+
+        all_shape_ids.push(circle1_id.clone());
+        all_shape_ids.push(circle2_id.clone());
+        all_shape_ids.push(text_id);
+        all_shape_ids.push(bool_id.clone());
 
         // Insert all nodes
-        repository.insert(Node::Ellipse(circle1));
-        repository.insert(Node::Ellipse(circle2));
-        repository.insert(Node::TextSpan(text));
-        repository.insert(Node::BooleanOperation(bool_node));
+        graph.insert_node(Node::Ellipse(circle1));
+        graph.insert_node(Node::Ellipse(circle2));
+        graph.insert_node(Node::TextSpan(text));
+        graph.insert_node(Node::BooleanOperation(bool_node));
+
+        // Set up boolean operation hierarchy
+        graph.insert(Parent::NodeId(bool_id), vec![circle1_id, circle2_id]);
     }
 
     // Example 3: Star and Rectangle Difference
@@ -193,7 +207,6 @@ async fn demo_booleans() -> Scene {
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Difference,
             corner_radius: None,
-            children: vec![star.id.clone(), rect.id.clone()],
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
@@ -202,19 +215,27 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(star.id.clone());
-        all_shape_ids.push(rect.id.clone());
-        all_shape_ids.push(text.id.clone());
+        let star_id = star.id.clone();
+        let rect_id = rect.id.clone();
+        let text_id = text.id.clone();
+        let bool_id = bool_node.id.clone();
+
+        all_shape_ids.push(star_id.clone());
+        all_shape_ids.push(rect_id.clone());
+        all_shape_ids.push(text_id.clone());
         all_shape_ids.push(bool_node.id.clone());
 
         // Insert all nodes
-        repository.insert(Node::RegularStarPolygon(star));
-        repository.insert(Node::Rectangle(rect));
-        repository.insert(Node::TextSpan(text));
-        repository.insert(Node::BooleanOperation(bool_node));
+        graph.insert_node(Node::RegularStarPolygon(star));
+        graph.insert_node(Node::Rectangle(rect));
+        graph.insert_node(Node::TextSpan(text));
+        graph.insert_node(Node::BooleanOperation(bool_node));
+
+        // Set up boolean operation hierarchy
+        graph.insert(Parent::NodeId(bool_id), vec![star_id, rect_id]);
     }
 
-    // Example 4: Two Squares XOR
+    // Example 4): Two Squares XOR
     {
         let y_offset = 900.0; // Increased from 700.0
 
@@ -257,7 +278,6 @@ async fn demo_booleans() -> Scene {
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Xor,
             corner_radius: None,
-            children: vec![square1.id.clone(), square2.id.clone()],
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
@@ -266,29 +286,36 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(square1.id.clone());
-        all_shape_ids.push(square2.id.clone());
+        let square1_id = square1.id.clone();
+        let square2_id = square2.id.clone();
+        let text_id = text.id.clone();
+        let bool_id = bool_node.id.clone();
+
+        all_shape_ids.push(square1_id.clone());
+        all_shape_ids.push(square2_id.clone());
         all_shape_ids.push(text.id.clone());
         all_shape_ids.push(bool_node.id.clone());
 
         // Insert all nodes
-        repository.insert(Node::Rectangle(square1));
-        repository.insert(Node::Rectangle(square2));
-        repository.insert(Node::TextSpan(text));
-        repository.insert(Node::BooleanOperation(bool_node));
+        graph.insert_node(Node::Rectangle(square1));
+        graph.insert_node(Node::Rectangle(square2));
+        graph.insert_node(Node::TextSpan(text));
+        graph.insert_node(Node::BooleanOperation(bool_node));
+
+        // Set up boolean operation hierarchy
+        graph.insert(Parent::NodeId(bool_id), vec![square1_id, square2_id]);
     }
 
     // Set up the root container
-    root_container_node.children.extend(all_shape_ids);
     let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
+    graph.insert_node(Node::Container(root_container_node));
+    graph.insert(Parent::Root, vec![root_container_id.clone()]);
+    graph.insert(Parent::NodeId(root_container_id), all_shape_ids);
 
     Scene {
-        id: "scene".to_string(),
         name: "Boolean Operations Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     }
 }
 

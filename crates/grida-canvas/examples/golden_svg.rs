@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer, RendererOptions};
@@ -11,7 +11,7 @@ use std::io::Write;
 
 async fn demo_scene() -> Scene {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Create a root container
     let mut root_container = nf.create_container_node();
@@ -49,7 +49,7 @@ async fn demo_scene() -> Scene {
     title_text.text_align_vertical = TextAlignVertical::Center;
     title_text.fills = Paints::new([Paint::from(CGColor(50, 50, 50, 255))]);
     all_node_ids.push(title_text.id.clone());
-    repo.insert(Node::TextSpan(title_text));
+    graph.insert_node(Node::TextSpan(title_text));
 
     // Subtitle text
     let mut subtitle_text = nf.create_text_span_node();
@@ -63,7 +63,7 @@ async fn demo_scene() -> Scene {
     subtitle_text.text_align_vertical = TextAlignVertical::Center;
     subtitle_text.fills = Paints::new([Paint::from(CGColor(100, 100, 100, 255))]);
     all_node_ids.push(subtitle_text.id.clone());
-    repo.insert(Node::TextSpan(subtitle_text));
+    graph.insert_node(Node::TextSpan(subtitle_text));
 
     // Rectangle with gradient fill
     let mut rect_gradient = nf.create_rectangle_node();
@@ -104,7 +104,7 @@ async fn demo_scene() -> Scene {
         color: CGColor(0, 0, 0, 100),
     })]);
     all_node_ids.push(rect_gradient.id.clone());
-    repo.insert(Node::Rectangle(rect_gradient));
+    graph.insert_node(Node::Rectangle(rect_gradient));
 
     // Ellipse with radial gradient
     let mut ellipse_radial = nf.create_ellipse_node();
@@ -137,7 +137,7 @@ async fn demo_scene() -> Scene {
     ellipse_radial.stroke_width = 4.0;
     ellipse_radial.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
     all_node_ids.push(ellipse_radial.id.clone());
-    repo.insert(Node::Ellipse(ellipse_radial));
+    graph.insert_node(Node::Ellipse(ellipse_radial));
 
     // Polygon (hexagon)
     let hexagon_points = (0..6)
@@ -165,7 +165,7 @@ async fn demo_scene() -> Scene {
         color: CGColor(0, 0, 0, 150),
     })]);
     all_node_ids.push(hexagon.id.clone());
-    repo.insert(Node::Polygon(hexagon));
+    graph.insert_node(Node::Polygon(hexagon));
 
     // Star polygon
     let mut star = nf.create_regular_star_polygon_node();
@@ -181,7 +181,7 @@ async fn demo_scene() -> Scene {
     star.stroke_width = 2.0;
     star.strokes = Paints::new([Paint::from(CGColor(139, 69, 19, 255))]);
     all_node_ids.push(star.id.clone());
-    repo.insert(Node::RegularStarPolygon(star));
+    graph.insert_node(Node::RegularStarPolygon(star));
 
     // Path (complex shape)
     let mut path = nf.create_path_node();
@@ -192,7 +192,7 @@ async fn demo_scene() -> Scene {
     path.stroke_width = 2.0;
     path.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
     all_node_ids.push(path.id.clone());
-    repo.insert(Node::SVGPath(path));
+    graph.insert_node(Node::SVGPath(path));
 
     // Line with gradient stroke
     let mut line = nf.create_line_node();
@@ -224,7 +224,7 @@ async fn demo_scene() -> Scene {
     })]);
     line.stroke_width = 8.0;
     all_node_ids.push(line.id.clone());
-    repo.insert(Node::Line(line));
+    graph.insert_node(Node::Line(line));
 
     // Regular polygon (octagon)
     let mut octagon = nf.create_regular_polygon_node();
@@ -239,7 +239,7 @@ async fn demo_scene() -> Scene {
     octagon.stroke_width = 3.0;
     octagon.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
     all_node_ids.push(octagon.id.clone());
-    repo.insert(Node::RegularPolygon(octagon));
+    graph.insert_node(Node::RegularPolygon(octagon));
 
     // Description text
     let mut description_text = nf.create_text_span_node();
@@ -252,19 +252,19 @@ async fn demo_scene() -> Scene {
     description_text.text_align_vertical = TextAlignVertical::Center;
     description_text.fills = Paints::new([Paint::from(CGColor(80, 80, 80, 255))]);
     all_node_ids.push(description_text.id.clone());
-    repo.insert(Node::TextSpan(description_text));
+    graph.insert_node(Node::TextSpan(description_text));
 
     // Set up the root container
-    root_container.children = all_node_ids;
     let root_container_id = root_container.id.clone();
-    repo.insert(Node::Container(root_container));
+    graph.insert(Parent::NodeId(root_container_id.clone()), all_node_ids);
+    graph.insert_node(Node::Container(root_container));
+
+    graph.insert(Parent::Root, vec![root_container_id.clone()]);
 
     Scene {
-        id: "scene".into(),
         name: "SVG Demo".into(),
-        children: vec![root_container_id],
-        nodes: repo,
         background_color: Some(CGColor(255, 255, 255, 255)),
+        graph,
     }
 }
 

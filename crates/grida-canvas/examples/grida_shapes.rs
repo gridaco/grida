@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
@@ -16,7 +16,7 @@ async fn demo_shapes() -> Scene {
         height: 1200.0,
     };
 
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut all_shape_ids = Vec::new();
     let spacing = 100.0;
@@ -41,7 +41,7 @@ async fn demo_shapes() -> Scene {
             255,
         ))); // Fading gray
         all_shape_ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.insert_node(Node::Rectangle(rect));
     }
 
     // Ellipse Row - demonstrating width/height ratio variations
@@ -60,7 +60,7 @@ async fn demo_shapes() -> Scene {
             255,
         ))]); // Fading gray
         all_shape_ids.push(ellipse.id.clone());
-        repository.insert(Node::Ellipse(ellipse));
+        graph.insert_node(Node::Ellipse(ellipse));
     }
 
     // Polygon Row - demonstrating point count variations
@@ -89,7 +89,7 @@ async fn demo_shapes() -> Scene {
             255,
         ))]); // Fading gray
         all_shape_ids.push(polygon.id.clone());
-        repository.insert(Node::Polygon(polygon));
+        graph.insert_node(Node::Polygon(polygon));
     }
 
     // Regular Polygon Row - demonstrating point count variations
@@ -110,7 +110,7 @@ async fn demo_shapes() -> Scene {
         ))]); // Fading gray
         regular_polygon.corner_radius = 8.0;
         all_shape_ids.push(regular_polygon.id.clone());
-        repository.insert(Node::RegularPolygon(regular_polygon));
+        graph.insert_node(Node::RegularPolygon(regular_polygon));
     }
 
     // Path Row - demonstrating different path patterns
@@ -138,7 +138,7 @@ async fn demo_shapes() -> Scene {
             255,
         ))]); // Fading gray
         all_shape_ids.push(path.id.clone());
-        repository.insert(Node::SVGPath(path));
+        graph.insert_node(Node::SVGPath(path));
     }
 
     // Star Polygon Row - demonstrating different point counts and inner radius variations
@@ -160,7 +160,7 @@ async fn demo_shapes() -> Scene {
         ))]); // Fading gray
         star.corner_radius = 8.0;
         all_shape_ids.push(star.id.clone());
-        repository.insert(Node::RegularStarPolygon(star));
+        graph.insert_node(Node::RegularStarPolygon(star));
     }
 
     // Arc Row - demonstrating different angle variations
@@ -183,19 +183,18 @@ async fn demo_shapes() -> Scene {
         ))]); // Fading gray
         arc.corner_radius = Some(8.0);
         all_shape_ids.push(arc.id.clone());
-        repository.insert(Node::Ellipse(arc));
+        graph.insert_node(Node::Ellipse(arc));
     }
 
     // Set up the root container
-    root_container_node.children.extend(all_shape_ids);
     let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
+    graph.insert_node(Node::Container(root_container_node));
+    graph.insert(Parent::Root, vec![root_container_id.clone()]);
+    graph.insert(Parent::NodeId(root_container_id), all_shape_ids);
 
     Scene {
-        id: "scene".to_string(),
         name: "Shapes Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
+        graph,
         background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }

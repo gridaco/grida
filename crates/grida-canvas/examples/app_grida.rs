@@ -1,5 +1,6 @@
 use cg::cg::types::*;
 use cg::io::io_grida::parse;
+use cg::node::scene_graph::SceneGraph;
 use cg::node::schema::*;
 use cg::window;
 use clap::Parser;
@@ -40,37 +41,37 @@ async fn load_scene_from_file(file_path: &str) -> Scene {
         .and_then(|c| c.clone())
         .unwrap_or_default();
 
-    // Convert nodes to repository, filtering out scene nodes and populating children from links
-    let mut node_repo = cg::node::repository::NodeRepository::new();
-    for (node_id, json_node) in canvas_file.document.nodes {
-        // Skip scene nodes - they're handled separately
-        if matches!(json_node, cg::io::io_grida::JSONNode::Scene(_)) {
-            continue;
-        }
+    // Build scene graph from nodes and links using snapshot
+    let scene_node_ids: std::collections::HashSet<String> = canvas_file
+        .document
+        .nodes
+        .iter()
+        .filter(|(_, json_node)| matches!(json_node, cg::io::io_grida::JSONNode::Scene(_)))
+        .map(|(id, _)| id.clone())
+        .collect();
 
-        let mut node: cg::node::schema::Node = json_node.into();
+    // Convert all nodes (skip scene nodes)
+    let nodes: Vec<cg::node::schema::Node> = canvas_file
+        .document
+        .nodes
+        .into_iter()
+        .filter(|(_, json_node)| !matches!(json_node, cg::io::io_grida::JSONNode::Scene(_)))
+        .map(|(_, json_node)| json_node.into())
+        .collect();
 
-        // Populate children from links
-        if let Some(children_opt) = links.get(&node_id) {
-            if let Some(children) = children_opt {
-                match &mut node {
-                    cg::node::schema::Node::Container(n) => n.children = children.clone(),
-                    cg::node::schema::Node::Group(n) => n.children = children.clone(),
-                    cg::node::schema::Node::BooleanOperation(n) => n.children = children.clone(),
-                    _ => {} // Other nodes don't have children
-                }
-            }
-        }
+    // Filter links (skip scene nodes as parents)
+    let filtered_links: std::collections::HashMap<String, Vec<String>> = links
+        .into_iter()
+        .filter(|(parent_id, _)| !scene_node_ids.contains(parent_id))
+        .filter_map(|(parent_id, children_opt)| children_opt.map(|children| (parent_id, children)))
+        .collect();
 
-        node_repo.insert(node);
-    }
+    let graph = SceneGraph::new_from_snapshot(nodes, filtered_links, scene_children);
 
     Scene {
-        nodes: node_repo,
-        id: scene_id,
         name: scene_name,
-        children: scene_children,
         background_color: Some(CGColor(230, 230, 230, 255)),
+        graph,
     }
 }
 

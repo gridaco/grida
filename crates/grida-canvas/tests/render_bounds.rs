@@ -1,6 +1,10 @@
 use cg::cache::geometry::GeometryCache;
 use cg::cg::types::*;
-use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use cg::node::{
+    factory::NodeFactory,
+    scene_graph::{Parent, SceneGraph},
+    schema::*,
+};
 use cg::resources::ByteStore;
 use cg::runtime::font_repository::FontRepository;
 use std::sync::{Arc, Mutex};
@@ -8,20 +12,20 @@ use std::sync::{Arc, Mutex};
 #[test]
 fn stroke_affects_render_bounds() {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
     rect.stroke_width = 10.0;
     rect.stroke_align = StrokeAlign::Outside;
     let rect_id = rect.id.clone();
-    repo.insert(Node::Rectangle(rect));
+    graph.insert_node(Node::Rectangle(rect));
+
+    graph.insert(Parent::Root, vec![rect_id.clone()]);
 
     let scene = Scene {
-        id: "scene".into(),
         name: "test".into(),
-        children: vec![rect_id.clone()],
-        nodes: repo,
         background_color: None,
+        graph,
     };
 
     let store = Arc::new(Mutex::new(ByteStore::new()));
@@ -37,21 +41,21 @@ fn stroke_affects_render_bounds() {
 #[test]
 fn gaussian_blur_expands_render_bounds() {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
     rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
         radius: 5.0,
     })]);
     let rect_id = rect.id.clone();
-    repo.insert(Node::Rectangle(rect));
+    graph.insert_node(Node::Rectangle(rect));
+
+    graph.insert(Parent::Root, vec![rect_id.clone()]);
 
     let scene = Scene {
-        id: "scene".into(),
         name: "test".into(),
-        children: vec![rect_id.clone()],
-        nodes: repo,
         background_color: None,
+        graph,
     };
 
     let store = Arc::new(Mutex::new(ByteStore::new()));
@@ -67,7 +71,7 @@ fn gaussian_blur_expands_render_bounds() {
 #[test]
 fn drop_shadow_expands_render_bounds() {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
     rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
@@ -78,14 +82,14 @@ fn drop_shadow_expands_render_bounds() {
         color: CGColor(0, 0, 0, 255),
     })]);
     let rect_id = rect.id.clone();
-    repo.insert(Node::Rectangle(rect));
+    graph.insert_node(Node::Rectangle(rect));
+
+    graph.insert(Parent::Root, vec![rect_id.clone()]);
 
     let scene = Scene {
-        id: "scene".into(),
         name: "test".into(),
-        children: vec![rect_id.clone()],
-        nodes: repo,
         background_color: None,
+        graph,
     };
 
     let store = Arc::new(Mutex::new(ByteStore::new()));
@@ -101,7 +105,7 @@ fn drop_shadow_expands_render_bounds() {
 #[test]
 fn drop_shadow_spread_expands_render_bounds() {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
     rect.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
@@ -112,14 +116,14 @@ fn drop_shadow_spread_expands_render_bounds() {
         color: CGColor(0, 0, 0, 255),
     })]);
     let rect_id = rect.id.clone();
-    repo.insert(Node::Rectangle(rect));
+    graph.insert_node(Node::Rectangle(rect));
+
+    graph.insert(Parent::Root, vec![rect_id.clone()]);
 
     let scene = Scene {
-        id: "scene".into(),
         name: "test".into(),
-        children: vec![rect_id.clone()],
-        nodes: repo,
         background_color: None,
+        graph,
     };
 
     let store = Arc::new(Mutex::new(ByteStore::new()));

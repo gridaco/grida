@@ -6,6 +6,7 @@ use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
 use crate::io::io_grida::{self, JSONVectorNetwork};
 use crate::io::io_grida_patch::{self, TransactionApplyReport};
+use crate::node::scene_graph::{Parent, SceneGraph};
 use crate::node::schema::*;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
@@ -285,7 +286,7 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
         if let Some(scene) = self.renderer.scene.as_ref() {
-            if let Some(node) = scene.nodes.get(&id.to_string()) {
+            if let Ok(node) = scene.graph.get_node(&id.to_string()) {
                 let vn = match node {
                     Node::Rectangle(n) => Some(n.to_vector_network()),
                     Node::Ellipse(n) => Some(n.to_vector_network()),
@@ -490,36 +491,29 @@ impl UnknownTargetApplication {
             .and_then(|c| c.clone())
             .unwrap_or_default();
 
-        // Convert nodes to repository, filtering out scene nodes
-        let mut node_repo = crate::node::repository::NodeRepository::new();
-        for (node_id, json_node) in file.document.nodes {
-            // Skip scene nodes - they're handled separately
-            if matches!(json_node, io_grida::JSONNode::Scene(_)) {
-                continue;
-            }
+        // Convert all nodes (skip scene nodes)
+        let nodes: Vec<Node> = file
+            .document
+            .nodes
+            .into_iter()
+            .filter(|(_, json_node)| !matches!(json_node, io_grida::JSONNode::Scene(_)))
+            .map(|(_, json_node)| json_node.into())
+            .collect();
 
-            let mut node: Node = json_node.into();
+        // Filter links to remove None values
+        let filtered_links: std::collections::HashMap<String, Vec<String>> = links
+            .into_iter()
+            .filter_map(|(parent_id, children_opt)| {
+                children_opt.map(|children| (parent_id, children))
+            })
+            .collect();
 
-            // Populate children from links
-            if let Some(children_opt) = links.get(&node_id) {
-                if let Some(children) = children_opt {
-                    match &mut node {
-                        Node::Container(n) => n.children = children.clone(),
-                        Node::Group(n) => n.children = children.clone(),
-                        Node::BooleanOperation(n) => n.children = children.clone(),
-                        _ => {} // Other nodes don't have children
-                    }
-                }
-            }
-
-            node_repo.insert(node);
-        }
+        // Build scene graph from snapshot
+        let graph = SceneGraph::new_from_snapshot(nodes, filtered_links, scene_children);
 
         let scene = crate::node::schema::Scene {
-            id: scene_id,
             name: scene_name,
-            children: scene_children,
-            nodes: node_repo,
+            graph,
             background_color: bg_color,
         };
 

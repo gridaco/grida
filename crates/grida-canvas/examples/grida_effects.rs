@@ -1,13 +1,13 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 async fn demo_effects() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
@@ -43,7 +43,7 @@ async fn demo_effects() -> Scene {
                 color: CGColor(0, 0, 0, 128),
             })]);
             all_effect_ids.push(rect.id.clone());
-            repository.insert(Node::Rectangle(rect));
+            graph.insert_node(Node::Rectangle(rect));
         } else {
             // Last two shapes as regular polygons
             let mut polygon = nf.create_regular_polygon_node();
@@ -63,7 +63,7 @@ async fn demo_effects() -> Scene {
                 color: CGColor(0, 0, 0, 128),
             })]);
             all_effect_ids.push(polygon.id.clone());
-            repository.insert(Node::RegularPolygon(polygon));
+            graph.insert_node(Node::RegularPolygon(polygon));
         }
     }
 
@@ -85,7 +85,7 @@ async fn demo_effects() -> Scene {
                     radius: 4.0 * (i + 1) as f32,
                 })]);
             all_effect_ids.push(rect.id.clone());
-            repository.insert(Node::Rectangle(rect));
+            graph.insert_node(Node::Rectangle(rect));
         } else {
             // Last two shapes as regular polygons
             let mut polygon = nf.create_regular_polygon_node();
@@ -102,7 +102,7 @@ async fn demo_effects() -> Scene {
                     radius: 4.0 * (i + 1) as f32,
                 })]);
             all_effect_ids.push(polygon.id.clone());
-            repository.insert(Node::RegularPolygon(polygon));
+            graph.insert_node(Node::RegularPolygon(polygon));
         }
     }
 
@@ -136,7 +136,7 @@ async fn demo_effects() -> Scene {
         active: true,
     }));
     let vivid_gradient_rect_id = vivid_gradient_rect.id.clone();
-    repository.insert(Node::Rectangle(vivid_gradient_rect));
+    graph.insert_node(Node::Rectangle(vivid_gradient_rect));
 
     for i in 0..6 {
         if i < 3 {
@@ -155,7 +155,7 @@ async fn demo_effects() -> Scene {
                     radius: 8.0 * (i + 1) as f32,
                 })]);
             all_effect_ids.push(blur_rect.id.clone());
-            repository.insert(Node::Rectangle(blur_rect));
+            graph.insert_node(Node::Rectangle(blur_rect));
         } else {
             // Last two shapes as regular polygons
             let mut blur_polygon = nf.create_regular_polygon_node();
@@ -172,7 +172,7 @@ async fn demo_effects() -> Scene {
                     radius: 8.0 * (i + 1) as f32,
                 })]);
             all_effect_ids.push(blur_polygon.id.clone());
-            repository.insert(Node::RegularPolygon(blur_polygon));
+            graph.insert_node(Node::RegularPolygon(blur_polygon));
         }
     }
 
@@ -197,7 +197,7 @@ async fn demo_effects() -> Scene {
                 color: CGColor(0, 0, 0, 100),
             })]);
             all_effect_ids.push(rect.id.clone());
-            repository.insert(Node::Rectangle(rect));
+            graph.insert_node(Node::Rectangle(rect));
         } else {
             // Last three shapes as regular polygons
             let mut polygon = nf.create_regular_polygon_node();
@@ -217,7 +217,7 @@ async fn demo_effects() -> Scene {
                 color: CGColor(0, 0, 0, 100),
             })]);
             all_effect_ids.push(polygon.id.clone());
-            repository.insert(Node::RegularPolygon(polygon));
+            graph.insert_node(Node::RegularPolygon(polygon));
         }
     }
 
@@ -285,7 +285,7 @@ async fn demo_effects() -> Scene {
 
             rect.effects = LayerEffects::from_array(effects);
             all_effect_ids.push(rect.id.clone());
-            repository.insert(Node::Rectangle(rect));
+            graph.insert_node(Node::Rectangle(rect));
         } else {
             // Last three shapes as regular polygons with multiple effects
             let mut polygon = nf.create_regular_polygon_node();
@@ -342,22 +342,23 @@ async fn demo_effects() -> Scene {
 
             polygon.effects = LayerEffects::from_array(effects);
             all_effect_ids.push(polygon.id.clone());
-            repository.insert(Node::RegularPolygon(polygon));
+            graph.insert_node(Node::RegularPolygon(polygon));
         }
     }
 
     // Set up the root container
-    root_container_node.children = vec![vivid_gradient_rect_id];
-    root_container_node.children.extend(all_effect_ids);
     let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
+    graph.insert_node(Node::Container(root_container_node));
+
+    let mut root_children = vec![vivid_gradient_rect_id];
+    root_children.extend(all_effect_ids);
+    graph.insert(Parent::Root, vec![root_container_id.clone()]);
+    graph.insert(Parent::NodeId(root_container_id), root_children);
 
     Scene {
-        id: "scene".to_string(),
         name: "Effects Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     }
 }
 

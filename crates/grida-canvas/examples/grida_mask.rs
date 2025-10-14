@@ -1,13 +1,13 @@
 use cg::cg::types::*; // import style per repo convention [[memory:8559399]]
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 fn build_demo_content(
     nf: &NodeFactory,
-    repository: &mut NodeRepository,
+    graph: &mut SceneGraph,
     origin: (f32, f32),
     size: (f32, f32),
 ) -> Vec<NodeId> {
@@ -25,7 +25,7 @@ fn build_demo_content(
     a.corner_radius = RectangularCornerRadius::circular(12.0);
     a.set_fill(CGColor(255, 99, 71, 255).into());
     let a_id = a.id.clone();
-    repository.insert(Node::Rectangle(a));
+    graph.insert_node(Node::Rectangle(a));
 
     // Content B
     let mut b = nf.create_rectangle_node();
@@ -38,7 +38,7 @@ fn build_demo_content(
     b.corner_radius = RectangularCornerRadius::circular(12.0);
     b.set_fill(CGColor(65, 105, 225, 255).into());
     let b_id = b.id.clone();
-    repository.insert(Node::Rectangle(b));
+    graph.insert_node(Node::Rectangle(b));
 
     // Diagonal band (thin rotated rectangle)
     let mut band = nf.create_rectangle_node();
@@ -55,14 +55,14 @@ fn build_demo_content(
     band.corner_radius = RectangularCornerRadius::circular(8.0);
     band.set_fill(CGColor(60, 179, 113, 200).into());
     let band_id = band.id.clone();
-    repository.insert(Node::Rectangle(band));
+    graph.insert_node(Node::Rectangle(band));
 
     vec![a_id, b_id, band_id]
 }
 
 fn build_geometry_mask(
     nf: &NodeFactory,
-    repository: &mut NodeRepository,
+    graph: &mut SceneGraph,
     origin: (f32, f32),
     size: (f32, f32),
 ) -> NodeId {
@@ -79,13 +79,13 @@ fn build_geometry_mask(
     mask.set_fill(CGColor(0, 0, 0, 255).into());
     mask.mask = Some(LayerMaskType::Geometry);
     let id = mask.id.clone();
-    repository.insert(Node::Ellipse(mask));
+    graph.insert_node(Node::Ellipse(mask));
     id
 }
 
 fn build_alpha_mask(
     nf: &NodeFactory,
-    repository: &mut NodeRepository,
+    graph: &mut SceneGraph,
     origin: (f32, f32),
     size: (f32, f32),
 ) -> NodeId {
@@ -117,13 +117,13 @@ fn build_alpha_mask(
     })]);
     mask.mask = Some(LayerMaskType::Image(ImageMaskType::Alpha));
     let id = mask.id.clone();
-    repository.insert(Node::Rectangle(mask));
+    graph.insert_node(Node::Rectangle(mask));
     id
 }
 
 fn build_luminance_mask(
     nf: &NodeFactory,
-    repository: &mut NodeRepository,
+    graph: &mut SceneGraph,
     origin: (f32, f32),
     size: (f32, f32),
 ) -> NodeId {
@@ -155,13 +155,13 @@ fn build_luminance_mask(
     })]);
     mask.mask = Some(LayerMaskType::Image(ImageMaskType::Luminance));
     let id = mask.id.clone();
-    repository.insert(Node::Rectangle(mask));
+    graph.insert_node(Node::Rectangle(mask));
     id
 }
 
 async fn demo_mask_panels() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Root container
     let mut root = nf.create_container_node();
@@ -204,44 +204,42 @@ async fn demo_mask_panels() -> Scene {
         let mut children: Vec<NodeId> = Vec::new();
 
         // Content first
-        let mut content_ids =
-            build_demo_content(&nf, &mut repository, (0.0, 0.0), (panel_w, panel_h));
+        let mut content_ids = build_demo_content(&nf, &mut graph, (0.0, 0.0), (panel_w, panel_h));
         children.append(&mut content_ids);
 
         // Mask last (topmost) — flat list model: mask consumes preceding siblings
         if let Some(k) = kind {
             let mask_id = match k {
                 LayerMaskType::Geometry => {
-                    build_geometry_mask(&nf, &mut repository, (0.0, 0.0), (panel_w, panel_h))
+                    build_geometry_mask(&nf, &mut graph, (0.0, 0.0), (panel_w, panel_h))
                 }
                 LayerMaskType::Image(ImageMaskType::Alpha) => {
-                    build_alpha_mask(&nf, &mut repository, (0.0, 0.0), (panel_w, panel_h))
+                    build_alpha_mask(&nf, &mut graph, (0.0, 0.0), (panel_w, panel_h))
                 }
                 LayerMaskType::Image(ImageMaskType::Luminance) => {
-                    build_luminance_mask(&nf, &mut repository, (0.0, 0.0), (panel_w, panel_h))
+                    build_luminance_mask(&nf, &mut graph, (0.0, 0.0), (panel_w, panel_h))
                 }
             };
             children.push(mask_id);
         }
 
-        panel.children = children;
         let panel_id = panel.id.clone();
-        repository.insert(Node::Container(panel));
+        graph.insert_node(Node::Container(panel));
+        graph.insert(Parent::NodeId(panel_id.clone()), children);
         root_children.push(panel_id);
 
         left += panel_w + margin;
     }
 
-    root.children = root_children;
     let root_id = root.id.clone();
-    repository.insert(Node::Container(root));
+    graph.insert_node(Node::Container(root));
+    graph.insert(Parent::Root, vec![root_id.clone()]);
+    graph.insert(Parent::NodeId(root_id), root_children);
 
     Scene {
-        id: "scene".to_string(),
         name: "Mask Modes Demo".to_string(),
-        children: vec![root_id],
-        nodes: repository,
         background_color: None,
+        graph,
     }
 }
 

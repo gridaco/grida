@@ -1,6 +1,10 @@
 use cg::cg::types::*;
 use cg::export::{export_node_as, ExportAs};
-use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use cg::node::{
+    factory::NodeFactory,
+    scene_graph::{Parent, SceneGraph},
+    schema::*,
+};
 use cg::resources::ByteStore;
 use cg::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use math2::transform::AffineTransform;
@@ -10,7 +14,7 @@ use std::sync::{Arc, Mutex};
 fn test_pdf_export() {
     // Create a simple scene with a rectangle
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
     rect.name = Some("Test Rectangle".to_string());
@@ -22,14 +26,13 @@ fn test_pdf_export() {
     rect.fills = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
 
     let rect_id = rect.id.clone();
-    repo.insert(Node::Rectangle(rect));
+    graph.insert_node(Node::Rectangle(rect));
+    graph.insert(Parent::Root, vec![rect_id.clone()]);
 
     let scene = Scene {
-        id: "test_scene".into(),
         name: "Test Scene".into(),
-        children: vec![rect_id.clone()],
-        nodes: repo,
         background_color: Some(CGColor(255, 255, 255, 255)), // White background
+        graph,
     };
 
     let store = Arc::new(Mutex::new(ByteStore::new()));

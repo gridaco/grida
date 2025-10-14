@@ -1,6 +1,6 @@
 use cg::cg::{types::*, *};
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::resources::{hash_bytes, load_image};
 use cg::window;
@@ -234,7 +234,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     rect9.strokes = Paints::new([Paint::from(CGColor(128, 0, 128, 255))]);
     rect9.stroke_width = 2.0;
 
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let rect1_id = rect1.id.clone();
     let rect2_id = rect2.id.clone();
@@ -246,28 +246,32 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     let rect8_id = rect8.id.clone();
     let rect9_id = rect9.id.clone();
 
-    repository.insert(Node::Rectangle(rect1));
-    repository.insert(Node::Rectangle(rect2));
-    repository.insert(Node::Rectangle(rect3));
-    repository.insert(Node::Rectangle(rect4));
-    repository.insert(Node::Rectangle(rect5));
-    repository.insert(Node::Rectangle(rect6));
-    repository.insert(Node::Rectangle(rect7));
-    repository.insert(Node::Rectangle(rect8));
-    repository.insert(Node::Rectangle(rect9));
-
-    root.children = vec![
-        rect1_id, rect2_id, rect3_id, rect4_id, rect5_id, rect6_id, rect7_id, rect8_id, rect9_id,
-    ];
+    graph.insert_node(Node::Rectangle(rect1));
+    graph.insert_node(Node::Rectangle(rect2));
+    graph.insert_node(Node::Rectangle(rect3));
+    graph.insert_node(Node::Rectangle(rect4));
+    graph.insert_node(Node::Rectangle(rect5));
+    graph.insert_node(Node::Rectangle(rect6));
+    graph.insert_node(Node::Rectangle(rect7));
+    graph.insert_node(Node::Rectangle(rect8));
+    graph.insert_node(Node::Rectangle(rect9));
     let root_id = root.id.clone();
-    repository.insert(Node::Container(root));
+
+    graph.insert(
+        Parent::NodeId(root_id.clone()),
+        vec![
+            rect1_id, rect2_id, rect3_id, rect4_id, rect5_id, rect6_id, rect7_id, rect8_id,
+            rect9_id,
+        ],
+    );
+    graph.insert_node(Node::Container(root));
+
+    graph.insert(Parent::Root, vec![root_id.clone()]);
 
     let scene = Scene {
-        id: "scene".to_string(),
         name: "Images Demo".to_string(),
-        children: vec![root_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     };
 
     (scene, bytes)

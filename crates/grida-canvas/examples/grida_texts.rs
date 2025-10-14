@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::resources::{load_font, FontMessage};
 use cg::window;
@@ -112,7 +112,7 @@ async fn demo_texts() -> Scene {
     };
 
     // Create a node repository and add all nodes
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Collect all the IDs
     let word_text_id = word_text_node.id.clone();
@@ -122,29 +122,32 @@ async fn demo_texts() -> Scene {
     let blurry_text_id = blurry_text_node.id.clone();
 
     // Add all nodes to the repository
-    repository.insert(Node::TextSpan(word_text_node));
-    repository.insert(Node::TextSpan(sentence_text_node));
-    repository.insert(Node::TextSpan(paragraph_text_node));
-    repository.insert(Node::TextSpan(second_paragraph_text_node));
-    repository.insert(Node::TextSpan(blurry_text_node));
+    graph.insert_node(Node::TextSpan(word_text_node));
+    graph.insert_node(Node::TextSpan(sentence_text_node));
+    graph.insert_node(Node::TextSpan(paragraph_text_node));
+    graph.insert_node(Node::TextSpan(second_paragraph_text_node));
+    graph.insert_node(Node::TextSpan(blurry_text_node));
 
     // Set up the root container with all IDs
-    root_container_node.children = vec![
-        word_text_id,
-        sentence_text_id,
-        paragraph_text_id,
-        second_paragraph_text_id,
-        blurry_text_id,
-    ];
     let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
+    graph.insert(
+        Parent::NodeId(root_container_id.clone()),
+        vec![
+            word_text_id,
+            sentence_text_id,
+            paragraph_text_id,
+            second_paragraph_text_id,
+            blurry_text_id,
+        ],
+    );
+    graph.insert_node(Node::Container(root_container_node));
+
+    graph.insert(Parent::Root, vec![root_container_id.clone()]);
 
     Scene {
-        id: "scene".to_string(),
         name: "Text Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     }
 }
 

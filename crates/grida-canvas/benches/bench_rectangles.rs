@@ -1,5 +1,5 @@
 use cg::cg::types::*;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer};
@@ -7,47 +7,45 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use math2::transform::AffineTransform;
 
 fn create_rectangles(count: usize, with_effects: bool) -> Scene {
-    let mut repository = NodeRepository::new();
-    let mut ids = Vec::new();
+    let mut graph = SceneGraph::new();
 
     // Create rectangles
-    for i in 0..count {
-        let id = format!("rect-{}", i);
-        ids.push(id.clone());
+    let rectangles: Vec<Node> = (0..count)
+        .map(|i| {
+            let id = format!("rect-{}", i);
 
-        let rect = RectangleNodeRec {
-            id: id.clone(),
-            name: None,
-            active: true,
-            opacity: 1.0,
-            blend_mode: LayerBlendMode::default(),
-            mask: None,
-            transform: AffineTransform::identity(),
-            size: Size {
-                width: 100.0,
-                height: 100.0,
-            },
-            corner_radius: RectangularCornerRadius::zero(),
-            fills: Paints::new([Paint::from(CGColor(255, 0, 0, 255))]),
-            strokes: Paints::default(),
-            stroke_width: 1.0,
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            effects: if with_effects {
-                LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
-                    dx: 2.0,
-                    dy: 2.0,
-                    blur: 4.0,
-                    spread: 0.0,
-                    color: CGColor(0, 0, 0, 128),
-                })])
-            } else {
-                LayerEffects::default()
-            },
-        };
-
-        repository.insert(Node::Rectangle(rect));
-    }
+            Node::Rectangle(RectangleNodeRec {
+                id: id.clone(),
+                name: None,
+                active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::default(),
+                mask: None,
+                transform: AffineTransform::identity(),
+                size: Size {
+                    width: 100.0,
+                    height: 100.0,
+                },
+                corner_radius: RectangularCornerRadius::zero(),
+                fills: Paints::new([Paint::from(CGColor(255, 0, 0, 255))]),
+                strokes: Paints::default(),
+                stroke_width: 1.0,
+                stroke_align: StrokeAlign::Inside,
+                stroke_dash_array: None,
+                effects: if with_effects {
+                    LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
+                        dx: 2.0,
+                        dy: 2.0,
+                        blur: 4.0,
+                        spread: 0.0,
+                        color: CGColor(0, 0, 0, 128),
+                    })])
+                } else {
+                    LayerEffects::default()
+                },
+            })
+        })
+        .collect();
 
     // Create root group
     let root_group = GroupNodeRec {
@@ -55,20 +53,18 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         name: Some("Root Group".to_string()),
         active: true,
         transform: None,
-        children: ids.clone(),
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),
         mask: None,
     };
 
-    repository.insert(Node::Group(root_group));
+    let root_id = graph.append_child(Node::Group(root_group), Parent::Root);
+    graph.append_children(rectangles, Parent::NodeId(root_id));
 
     Scene {
-        id: "scene".to_string(),
-        name: "Test Scene".to_string(),
-        children: vec!["root".to_string()],
-        nodes: repository,
+        name: "Test Scene".into(),
         background_color: None,
+        graph,
     }
 }
 

@@ -1,13 +1,13 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 async fn demo_blendmode() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
@@ -81,7 +81,7 @@ async fn demo_blendmode() -> Scene {
         }));
 
         let background_id = background.id.clone();
-        repository.insert(Node::Rectangle(background));
+        graph.insert_node(Node::Rectangle(background));
 
         // Create a sweep gradient overlay (similar to C++ example's sweep gradient)
         let mut sweep_overlay = nf.create_rectangle_node();
@@ -137,7 +137,7 @@ async fn demo_blendmode() -> Scene {
         }));
 
         let sweep_overlay_id = sweep_overlay.id.clone();
-        repository.insert(Node::Rectangle(sweep_overlay));
+        graph.insert_node(Node::Rectangle(sweep_overlay));
 
         // Create a group for the colored circles with the specific blend mode
         let mut circle_group = nf.create_group_node();
@@ -161,7 +161,7 @@ async fn demo_blendmode() -> Scene {
         green_circle.set_fill(Paint::from(CGColor(0, 255, 0, 255)));
         green_circle.blend_mode = LayerBlendMode::default();
         let green_circle_id = green_circle.id.clone();
-        repository.insert(Node::Ellipse(green_circle));
+        graph.insert_node(Node::Ellipse(green_circle));
         circle_ids.push(green_circle_id);
 
         // Red circle (bottom left)
@@ -175,7 +175,7 @@ async fn demo_blendmode() -> Scene {
         red_circle.set_fill(Paint::from(CGColor(255, 0, 0, 255)));
         red_circle.blend_mode = LayerBlendMode::default();
         let red_circle_id = red_circle.id.clone();
-        repository.insert(Node::Ellipse(red_circle));
+        graph.insert_node(Node::Ellipse(red_circle));
         circle_ids.push(red_circle_id);
 
         // Blue circle (bottom right)
@@ -190,13 +190,13 @@ async fn demo_blendmode() -> Scene {
         blue_circle.set_fill(Paint::from(CGColor(0, 0, 255, 255)));
         blue_circle.blend_mode = LayerBlendMode::default();
         let blue_circle_id = blue_circle.id.clone();
-        repository.insert(Node::Ellipse(blue_circle));
+        graph.insert_node(Node::Ellipse(blue_circle));
         circle_ids.push(blue_circle_id);
 
         // Set up the circle group
-        circle_group.children = circle_ids;
         let circle_group_id = circle_group.id.clone();
-        repository.insert(Node::Group(circle_group));
+        graph.insert_node(Node::Group(circle_group));
+        graph.insert(Parent::NodeId(circle_group_id.clone()), circle_ids);
 
         // Create a text label for the blend mode
         let mut label = nf.create_text_span_node();
@@ -209,7 +209,7 @@ async fn demo_blendmode() -> Scene {
         label.text_align_vertical = TextAlignVertical::Top;
         label.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         let label_id = label.id.clone();
-        repository.insert(Node::TextSpan(label));
+        graph.insert_node(Node::TextSpan(label));
 
         // Add all elements for this blend mode
         all_blendmode_ids.push(background_id);
@@ -219,16 +219,15 @@ async fn demo_blendmode() -> Scene {
     }
 
     // Set up the root container
-    root_container_node.children = all_blendmode_ids;
     let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
+    graph.insert_node(Node::Container(root_container_node));
+    graph.insert(Parent::Root, vec![root_container_id.clone()]);
+    graph.insert(Parent::NodeId(root_container_id), all_blendmode_ids);
 
     Scene {
-        id: "scene".to_string(),
         name: "Blend Mode Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
         background_color: Some(CGColor(240, 240, 240, 255)),
+        graph,
     }
 }
 

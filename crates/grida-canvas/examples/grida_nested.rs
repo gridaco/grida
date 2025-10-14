@@ -1,13 +1,13 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 async fn demo_nested() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
     let n = 5; // number of nesting levels
 
     // Create innermost rectangle
@@ -19,7 +19,7 @@ async fn demo_nested() -> Scene {
     };
     rect.set_fill(Paint::from(CGColor(255, 0, 0, 255)));
     let mut current_id = rect.id.clone();
-    repository.insert(Node::Rectangle(rect));
+    graph.insert_node(Node::Rectangle(rect));
 
     // Create nested structure
     for i in 0..n {
@@ -42,11 +42,15 @@ async fn demo_nested() -> Scene {
             };
             group_rect.set_fill(Paint::from(CGColor(0, 255, 0, 255)));
             let group_rect_id = group_rect.id.clone();
-            repository.insert(Node::Rectangle(group_rect));
+            graph.insert_node(Node::Rectangle(group_rect));
 
-            group.children = vec![current_id, group_rect_id];
-            current_id = group.id.clone();
-            repository.insert(Node::Group(group));
+            let group_id = group.id.clone();
+            graph.insert_node(Node::Group(group));
+            graph.insert(
+                Parent::NodeId(group_id.clone()),
+                vec![current_id, group_rect_id],
+            );
+            current_id = group_id;
         } else {
             // Create container with scale transform
             let mut container = nf.create_container_node();
@@ -66,20 +70,24 @@ async fn demo_nested() -> Scene {
             };
             container_rect.set_fill(Paint::from(CGColor(0, 0, 255, 255)));
             let container_rect_id = container_rect.id.clone();
-            repository.insert(Node::Rectangle(container_rect));
+            graph.insert_node(Node::Rectangle(container_rect));
 
-            container.children = vec![current_id, container_rect_id];
-            current_id = container.id.clone();
-            repository.insert(Node::Container(container));
+            let container_id = container.id.clone();
+            graph.insert_node(Node::Container(container));
+            graph.insert(
+                Parent::NodeId(container_id.clone()),
+                vec![current_id, container_rect_id],
+            );
+            current_id = container_id;
         }
     }
 
+    graph.insert(Parent::Root, vec![current_id]);
+
     Scene {
-        id: "nested".to_string(),
         name: "Nested Demo".to_string(),
-        children: vec![current_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     }
 }
 

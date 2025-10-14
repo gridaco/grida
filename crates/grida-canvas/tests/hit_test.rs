@@ -1,6 +1,10 @@
 use cg::cache::scene::SceneCache;
 use cg::hittest::HitTester;
-use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use cg::node::{
+    factory::NodeFactory,
+    scene_graph::{Parent, SceneGraph},
+    schema::*,
+};
 use cg::resources::ByteStore;
 use cg::runtime::font_repository::FontRepository;
 use math2::{rect::Rectangle, transform::AffineTransform};
@@ -9,7 +13,6 @@ use std::sync::{Arc, Mutex};
 #[test]
 fn hit_first_returns_topmost() {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
 
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(10.0, 10.0, 0.0);
@@ -18,7 +21,6 @@ fn hit_first_returns_topmost() {
         height: 20.0,
     };
     let rect_id = rect.id.clone();
-    repo.insert(Node::Rectangle(rect));
 
     let mut container = nf.create_container_node();
     container.size = Size {
@@ -26,15 +28,17 @@ fn hit_first_returns_topmost() {
         height: 40.0,
     };
     let container_id = container.id.clone();
-    container.children.push(rect_id.clone());
-    repo.insert(Node::Container(container));
+
+    let mut graph = SceneGraph::new();
+    graph.insert_node(Node::Rectangle(rect));
+    graph.insert_node(Node::Container(container));
+    graph.insert(Parent::Root, vec![container_id.clone()]);
+    graph.insert(Parent::NodeId(container_id.clone()), vec![rect_id.clone()]);
 
     let scene = Scene {
-        id: "scene".into(),
         name: "test".into(),
-        children: vec![container_id.clone()],
-        nodes: repo,
         background_color: None,
+        graph,
     };
 
     let mut cache = SceneCache::new();
@@ -58,19 +62,19 @@ fn hit_first_returns_topmost() {
 #[test]
 fn path_hit_testing_uses_contains() {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
 
     let mut path_node = nf.create_path_node();
     path_node.data = "M0 0 L10 0 L10 10 Z".into();
     let path_id = path_node.id.clone();
-    repo.insert(Node::SVGPath(path_node.clone()));
+
+    let mut graph = SceneGraph::new();
+    graph.insert_node(Node::SVGPath(path_node.clone()));
+    graph.insert(Parent::Root, vec![path_id.clone()]);
 
     let scene = Scene {
-        id: "scene".into(),
         name: "test".into(),
-        children: vec![path_id.clone()],
-        nodes: repo,
         background_color: None,
+        graph,
     };
 
     let mut cache = SceneCache::new();
@@ -94,7 +98,6 @@ fn path_hit_testing_uses_contains() {
 #[test]
 fn intersects_returns_all_nodes_in_rect() {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
 
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(50.0, 50.0, 0.0);
@@ -103,7 +106,6 @@ fn intersects_returns_all_nodes_in_rect() {
         height: 100.0,
     };
     let rect_id = rect.id.clone();
-    repo.insert(Node::Rectangle(rect));
 
     let mut container = nf.create_container_node();
     container.size = Size {
@@ -111,15 +113,17 @@ fn intersects_returns_all_nodes_in_rect() {
         height: 100.0,
     };
     let container_id = container.id.clone();
-    container.children.push(rect_id.clone());
-    repo.insert(Node::Container(container));
+
+    let mut graph = SceneGraph::new();
+    graph.insert_node(Node::Rectangle(rect));
+    graph.insert_node(Node::Container(container));
+    graph.insert(Parent::Root, vec![container_id.clone()]);
+    graph.insert(Parent::NodeId(container_id.clone()), vec![rect_id.clone()]);
 
     let scene = Scene {
-        id: "scene".into(),
         name: "test".into(),
-        children: vec![container_id.clone()],
-        nodes: repo,
         background_color: None,
+        graph,
     };
 
     let mut cache = SceneCache::new();

@@ -1,8 +1,7 @@
 use super::geometry::*;
-use super::layer::{LayerList, PainterPictureLayer};
 use crate::cache::geometry::GeometryCache;
 use crate::cg::types::*;
-use crate::node::repository::NodeRepository;
+use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 
 /// A painter specifically for drawing nodes, using the main Painter for operations.
@@ -269,7 +268,7 @@ impl<'a> NodePainter<'a> {
     pub fn draw_container_node_recursively(
         &self,
         node: &ContainerNodeRec,
-        repository: &NodeRepository,
+        graph: &SceneGraph,
         cache: &GeometryCache,
     ) {
         self.painter.with_transform(&node.transform.matrix, || {
@@ -287,18 +286,20 @@ impl<'a> NodePainter<'a> {
                             // a clip region for the container's shape so that
                             // descendants are clipped but the container's own stroke
                             // remains unaffected.
-                            if node.clip {
-                                self.painter.with_clip(&shape, || {
-                                    for child_id in &node.children {
-                                        if let Some(child) = repository.get(child_id) {
-                                            self.draw_node_recursively(child, repository, cache);
+                            if let Some(children) = graph.get_children(&node.id) {
+                                if node.clip {
+                                    self.painter.with_clip(&shape, || {
+                                        for child_id in children {
+                                            if let Ok(child) = graph.get_node(child_id) {
+                                                self.draw_node_recursively(child, graph, cache);
+                                            }
                                         }
-                                    }
-                                });
-                            } else {
-                                for child_id in &node.children {
-                                    if let Some(child) = repository.get(child_id) {
-                                        self.draw_node_recursively(child, repository, cache);
+                                    });
+                                } else {
+                                    for child_id in children {
+                                        if let Ok(child) = graph.get_node(child_id) {
+                                            self.draw_node_recursively(child, graph, cache);
+                                        }
                                     }
                                 }
                             }
@@ -351,14 +352,16 @@ impl<'a> NodePainter<'a> {
     pub fn draw_group_node_recursively(
         &self,
         node: &GroupNodeRec,
-        repository: &NodeRepository,
+        graph: &SceneGraph,
         cache: &GeometryCache,
     ) {
         self.painter.with_transform_option(&node.transform, || {
             self.painter.with_opacity(node.opacity, || {
-                for child_id in &node.children {
-                    if let Some(child) = repository.get(child_id) {
-                        self.draw_node_recursively(child, repository, cache);
+                if let Some(children) = graph.get_children(&node.id) {
+                    for child_id in children {
+                        if let Ok(child) = graph.get_node(child_id) {
+                            self.draw_node_recursively(child, graph, cache);
+                        }
                     }
                 }
             });
@@ -368,11 +371,11 @@ impl<'a> NodePainter<'a> {
     pub fn draw_boolean_operation_node_recursively(
         &self,
         node: &BooleanPathOperationNodeRec,
-        repository: &NodeRepository,
+        graph: &SceneGraph,
         cache: &GeometryCache,
     ) {
         self.painter.with_transform_option(&node.transform, || {
-            if let Some(shape) = boolean_operation_shape(node, repository, cache) {
+            if let Some(shape) = boolean_operation_shape(node, graph, cache) {
                 self.painter
                     .draw_shape_with_effects(&node.effects, &shape, || {
                         self.painter.with_opacity(node.opacity, || {
@@ -393,9 +396,11 @@ impl<'a> NodePainter<'a> {
                         });
                     });
             } else {
-                for child_id in &node.children {
-                    if let Some(child) = repository.get(child_id) {
-                        self.draw_node_recursively(child, repository, cache);
+                if let Some(children) = graph.get_children(&node.id) {
+                    for child_id in children {
+                        if let Ok(child) = graph.get_node(child_id) {
+                            self.draw_node_recursively(child, graph, cache);
+                        }
                     }
                 }
             }
@@ -424,19 +429,14 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Dispatch to the correct node‐type draw method
-    pub fn draw_node_recursively(
-        &self,
-        node: &Node,
-        repository: &NodeRepository,
-        cache: &GeometryCache,
-    ) {
+    pub fn draw_node_recursively(&self, node: &Node, graph: &SceneGraph, cache: &GeometryCache) {
         if !node.active() {
             return;
         }
         match node {
             Node::Error(n) => self.draw_error_node(n),
-            Node::Group(n) => self.draw_group_node_recursively(n, repository, cache),
-            Node::Container(n) => self.draw_container_node_recursively(n, repository, cache),
+            Node::Group(n) => self.draw_group_node_recursively(n, graph, cache),
+            Node::Container(n) => self.draw_container_node_recursively(n, graph, cache),
             Node::Rectangle(n) => self.draw_rect_node(n),
             Node::Ellipse(n) => self.draw_ellipse_node(n),
             Node::Polygon(n) => self.draw_polygon_node(n),
@@ -449,7 +449,7 @@ impl<'a> NodePainter<'a> {
             Node::Vector(n) => self.draw_vector_node(n),
             Node::SVGPath(n) => self.draw_path_node(n),
             Node::BooleanOperation(n) => {
-                self.draw_boolean_operation_node_recursively(n, repository, cache)
+                self.draw_boolean_operation_node_recursively(n, graph, cache)
             }
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
         }

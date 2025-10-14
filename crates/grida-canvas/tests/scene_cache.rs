@@ -1,5 +1,9 @@
 use cg::cache::scene::SceneCache;
-use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use cg::node::{
+    factory::NodeFactory,
+    scene_graph::{Parent, SceneGraph},
+    schema::*,
+};
 use cg::painter::layer::Layer;
 use cg::resources::ByteStore;
 use cg::runtime::font_repository::FontRepository;
@@ -10,7 +14,7 @@ use std::sync::{Arc, Mutex};
 #[test]
 fn layers_in_rect_include_partially_visible_nested() {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(50.0, 50.0, 0.0);
@@ -19,7 +23,7 @@ fn layers_in_rect_include_partially_visible_nested() {
         height: 100.0,
     };
     let rect_id = rect.id.clone();
-    repo.insert(Node::Rectangle(rect));
+    graph.insert_node(Node::Rectangle(rect));
 
     let mut container = nf.create_container_node();
     container.size = Size {
@@ -27,15 +31,15 @@ fn layers_in_rect_include_partially_visible_nested() {
         height: 100.0,
     };
     let container_id = container.id.clone();
-    container.children.push(rect_id.clone());
-    repo.insert(Node::Container(container));
+    graph.insert_node(Node::Container(container));
+    graph.insert(Parent::NodeId(container_id.clone()), vec![rect_id.clone()]);
+
+    graph.insert(Parent::Root, vec![container_id.clone()]);
 
     let scene = Scene {
-        id: "scene".into(),
         name: "test".into(),
-        children: vec![container_id.clone()],
-        nodes: repo,
         background_color: None,
+        graph,
     };
 
     let mut cache = SceneCache::new();

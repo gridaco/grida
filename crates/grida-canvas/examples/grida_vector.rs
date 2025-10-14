@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::vectornetwork::*;
 use cg::window;
@@ -8,7 +8,7 @@ use math2::transform::AffineTransform;
 
 async fn demo_vectors() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Root container
     let mut root = nf.create_container_node();
@@ -52,7 +52,7 @@ async fn demo_vectors() -> Scene {
             };
 
             ids.push(vector_node_1_tri_open.id.clone());
-            repository.insert(Node::Vector(vector_node_1_tri_open));
+            graph.insert_node(Node::Vector(vector_node_1_tri_open));
         }
 
         {
@@ -84,7 +84,7 @@ async fn demo_vectors() -> Scene {
             };
 
             ids.push(vector_node_2_tri_closed.id.clone());
-            repository.insert(Node::Vector(vector_node_2_tri_closed));
+            graph.insert_node(Node::Vector(vector_node_2_tri_closed));
         }
 
         //
@@ -117,7 +117,7 @@ async fn demo_vectors() -> Scene {
             };
 
             ids.push(vector_node_3.id.clone());
-            repository.insert(Node::Vector(vector_node_3));
+            graph.insert_node(Node::Vector(vector_node_3));
         }
 
         {
@@ -149,7 +149,7 @@ async fn demo_vectors() -> Scene {
             };
 
             ids.push(vector_node_4.id.clone());
-            repository.insert(Node::Vector(vector_node_4));
+            graph.insert_node(Node::Vector(vector_node_4));
         }
 
         // FIXME: not working
@@ -184,7 +184,7 @@ async fn demo_vectors() -> Scene {
             };
 
             ids.push(vector_node_1_5.id.clone());
-            repository.insert(Node::Vector(vector_node_1_5));
+            graph.insert_node(Node::Vector(vector_node_1_5));
         }
     }
 
@@ -225,7 +225,7 @@ async fn demo_vectors() -> Scene {
             };
 
             ids.push(vector_node_5.id.clone());
-            repository.insert(Node::Vector(vector_node_5));
+            graph.insert_node(Node::Vector(vector_node_5));
         }
 
         // Single-segment 90-degree straight line
@@ -258,7 +258,7 @@ async fn demo_vectors() -> Scene {
             };
 
             ids.push(vector_node_5_5.id.clone());
-            repository.insert(Node::Vector(vector_node_5_5));
+            graph.insert_node(Node::Vector(vector_node_5_5));
         }
     }
 
@@ -298,7 +298,7 @@ async fn demo_vectors() -> Scene {
             };
 
             ids.push(vector_node_6.id.clone());
-            repository.insert(Node::Vector(vector_node_6));
+            graph.insert_node(Node::Vector(vector_node_6));
         }
 
         // Filled rectangle
@@ -336,21 +336,21 @@ async fn demo_vectors() -> Scene {
             };
 
             ids.push(vector_node_7.id.clone());
-            repository.insert(Node::Vector(vector_node_7));
+            graph.insert_node(Node::Vector(vector_node_7));
         }
     }
 
     // Add all nodes to root
-    root.children = ids.clone();
     let root_id = root.id.clone();
-    repository.insert(Node::Container(root));
+    graph.insert(Parent::NodeId(root_id.clone()), ids.clone());
+    graph.insert_node(Node::Container(root));
+
+    graph.insert(Parent::Root, vec![root_id.clone()]);
 
     Scene {
-        id: "scene".to_string(),
         name: "Vector Network Demo".to_string(),
-        children: vec![root_id],
-        nodes: repository,
         background_color: Some(CGColor(240, 240, 240, 255)),
+        graph,
     }
 }
 

@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window::{self, application::HostEvent};
 use math2::transform::AffineTransform;
@@ -8,7 +8,7 @@ use std::time::Instant;
 
 fn create_scene(t: f32) -> Scene {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
     rect.size = Size {
@@ -22,14 +22,13 @@ fn create_scene(t: f32) -> Scene {
     let g = ((t.cos() * 0.5 + 0.5) * 255.0) as u8;
     rect.set_fill(Paint::from(CGColor(r, g, 200, 255)));
     let rect_id = rect.id.clone();
-    repo.insert(Node::Rectangle(rect));
+    graph.insert_node(Node::Rectangle(rect));
+    graph.insert(Parent::Root, vec![rect_id]);
 
     Scene {
-        id: "scene".to_string(),
         name: "Animated".to_string(),
-        children: vec![rect_id],
-        nodes: repo,
         background_color: Some(CGColor(255, 255, 255, 255)),
+        graph,
     }
 }
 

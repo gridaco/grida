@@ -1,6 +1,6 @@
 use crate::cache::paragraph::ParagraphCache;
 use crate::cg::types::*;
-use crate::node::repository::NodeRepository;
+use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::{
     IntrinsicSizeNode, LayerEffects, Node, NodeGeometryMixin, NodeId, Scene,
 };
@@ -58,10 +58,10 @@ impl GeometryCache {
     ) -> Self {
         let mut cache = Self::new();
         let root_world = AffineTransform::identity();
-        for child in &scene.children {
+        for child in scene.graph.roots() {
             Self::build_recursive(
-                child,
-                &scene.nodes,
+                &child,
+                &scene.graph,
                 &root_world,
                 None,
                 &mut cache,
@@ -74,15 +74,15 @@ impl GeometryCache {
 
     fn build_recursive(
         id: &NodeId,
-        repo: &NodeRepository,
+        graph: &SceneGraph,
         parent_world: &AffineTransform,
         parent_id: Option<NodeId>,
         cache: &mut GeometryCache,
         paragraph_cache: &mut ParagraphCache,
         fonts: &FontRepository,
     ) -> Rectangle {
-        let node = repo
-            .get(id)
+        let node = graph
+            .get_node(id)
             .expect(&format!("node not found in geometry cache {id:?}"));
 
         match node {
@@ -90,25 +90,27 @@ impl GeometryCache {
                 let world_transform = parent_world.compose(&n.transform.unwrap_or_default());
                 let mut union_bounds: Option<Rectangle> = None;
                 let mut union_render_bounds: Option<Rectangle> = None;
-                for child_id in &n.children {
-                    let child_bounds = Self::build_recursive(
-                        child_id,
-                        repo,
-                        &world_transform,
-                        Some(id.clone()),
-                        cache,
-                        paragraph_cache,
-                        fonts,
-                    );
-                    union_bounds = match union_bounds {
-                        Some(b) => Some(rect::union(&[b, child_bounds])),
-                        None => Some(child_bounds),
-                    };
-                    if let Some(rb) = cache.get_render_bounds(child_id) {
-                        union_render_bounds = match union_render_bounds {
-                            Some(b) => Some(rect::union(&[b, rb])),
-                            None => Some(rb),
+                if let Some(children) = graph.get_children(id) {
+                    for child_id in children {
+                        let child_bounds = Self::build_recursive(
+                            child_id,
+                            graph,
+                            &world_transform,
+                            Some(id.clone()),
+                            cache,
+                            paragraph_cache,
+                            fonts,
+                        );
+                        union_bounds = match union_bounds {
+                            Some(b) => Some(rect::union(&[b, child_bounds])),
+                            None => Some(child_bounds),
                         };
+                        if let Some(rb) = cache.get_render_bounds(child_id) {
+                            union_render_bounds = match union_render_bounds {
+                                Some(b) => Some(rect::union(&[b, rb])),
+                                None => Some(rb),
+                            };
+                        }
                     }
                 }
 
@@ -149,20 +151,22 @@ impl GeometryCache {
             Node::BooleanOperation(n) => {
                 let world_transform = parent_world.compose(&n.transform.unwrap_or_default());
                 let mut union_bounds: Option<Rectangle> = None;
-                for child_id in &n.children {
-                    let child_bounds = Self::build_recursive(
-                        child_id,
-                        repo,
-                        &world_transform,
-                        Some(id.clone()),
-                        cache,
-                        paragraph_cache,
-                        fonts,
-                    );
-                    union_bounds = match union_bounds {
-                        Some(b) => Some(rect::union(&[b, child_bounds])),
-                        None => Some(child_bounds),
-                    };
+                if let Some(children) = graph.get_children(id) {
+                    for child_id in children {
+                        let child_bounds = Self::build_recursive(
+                            child_id,
+                            graph,
+                            &world_transform,
+                            Some(id.clone()),
+                            cache,
+                            paragraph_cache,
+                            fonts,
+                        );
+                        union_bounds = match union_bounds {
+                            Some(b) => Some(rect::union(&[b, child_bounds])),
+                            None => Some(child_bounds),
+                        };
+                    }
                 }
 
                 let world_bounds = union_bounds.unwrap_or_else(|| Rectangle {
@@ -225,17 +229,19 @@ impl GeometryCache {
                     &n.effects,
                 );
 
-                for child_id in &n.children {
-                    let child_bounds = Self::build_recursive(
-                        child_id,
-                        repo,
-                        &world_transform,
-                        Some(id.clone()),
-                        cache,
-                        paragraph_cache,
-                        fonts,
-                    );
-                    union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
+                if let Some(children) = graph.get_children(id) {
+                    for child_id in children {
+                        let child_bounds = Self::build_recursive(
+                            child_id,
+                            graph,
+                            &world_transform,
+                            Some(id.clone()),
+                            cache,
+                            paragraph_cache,
+                            fonts,
+                        );
+                        union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
+                    }
                 }
 
                 let entry = GeometryEntry {

@@ -1,6 +1,6 @@
 use cg::cg::{types::*, *};
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::resources::{hash_bytes, load_image};
 use cg::window;
@@ -46,21 +46,21 @@ async fn demo_image() -> (Scene, Vec<u8>) {
     rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     rect1.stroke_width = 2.0;
 
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let rect1_id = rect1.id.clone();
 
-    repository.insert(Node::Rectangle(rect1));
-
-    root.children = vec![rect1_id];
+    graph.insert_node(Node::Rectangle(rect1));
     let root_id = root.id.clone();
-    repository.insert(Node::Container(root));
+
+    graph.insert(Parent::NodeId(root_id.clone()), vec![rect1_id]);
+    graph.insert_node(Node::Container(root));
+
+    graph.insert(Parent::Root, vec![root_id.clone()]);
 
     let scene = Scene {
-        id: "scene".to_string(),
         name: "Images Demo".to_string(),
-        children: vec![root_id],
-        nodes: repository,
+        graph,
         background_color: Some(CGColor(250, 250, 250, 255)),
     };
 

@@ -1,6 +1,7 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::{
+    node::scene_graph::{Parent, SceneGraph},
     node::schema::*,
     runtime::camera::Camera2D,
     runtime::scene::{Backend, Renderer, RendererOptions},
@@ -25,7 +26,7 @@ use winit::{
 };
 
 fn create_static_scene() -> Scene {
-    let mut repository = cg::node::repository::NodeRepository::new();
+    let mut graph = SceneGraph::new();
     let nf = NodeFactory::new();
 
     // Create a grid of rectangles
@@ -40,7 +41,7 @@ fn create_static_scene() -> Scene {
                 width: 50.0,
                 height: 50.0,
             };
-            repository.insert(Node::Rectangle(rect));
+            graph.insert_node(Node::Rectangle(rect));
             ids.push(id);
         }
     }
@@ -51,20 +52,20 @@ fn create_static_scene() -> Scene {
         name: Some("Root Group".to_string()),
         active: true,
         transform: None,
-        children: ids,
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),
         mask: None,
     };
 
-    repository.insert(Node::Group(root_group));
+    let root_id = root_group.id.clone();
+    graph.insert_node(Node::Group(root_group));
+    graph.insert(Parent::Root, vec![root_id.clone()]);
+    graph.insert(Parent::NodeId(root_id), ids);
 
     Scene {
-        id: "scene".to_string(),
         name: "Test Scene".to_string(),
-        children: vec!["root".to_string()],
-        nodes: repository,
         background_color: Some(CGColor(255, 255, 255, 255)),
+        graph,
     }
 }
 
