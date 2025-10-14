@@ -10,6 +10,7 @@ fn build_demo_content(
     graph: &mut SceneGraph,
     origin: (f32, f32),
     size: (f32, f32),
+    parent: Parent,
 ) -> Vec<NodeId> {
     let (ox, oy) = origin;
     let (w, h) = size;
@@ -24,8 +25,7 @@ fn build_demo_content(
     };
     a.corner_radius = RectangularCornerRadius::circular(12.0);
     a.set_fill(CGColor(255, 99, 71, 255).into());
-    let a_id = a.id.clone();
-    graph.insert_node(Node::Rectangle(a));
+    let a_id = graph.append_child(Node::Rectangle(a), parent.clone());
 
     // Content B
     let mut b = nf.create_rectangle_node();
@@ -37,8 +37,7 @@ fn build_demo_content(
     };
     b.corner_radius = RectangularCornerRadius::circular(12.0);
     b.set_fill(CGColor(65, 105, 225, 255).into());
-    let b_id = b.id.clone();
-    graph.insert_node(Node::Rectangle(b));
+    let b_id = graph.append_child(Node::Rectangle(b), parent.clone());
 
     // Diagonal band (thin rotated rectangle)
     let mut band = nf.create_rectangle_node();
@@ -54,8 +53,7 @@ fn build_demo_content(
     };
     band.corner_radius = RectangularCornerRadius::circular(8.0);
     band.set_fill(CGColor(60, 179, 113, 200).into());
-    let band_id = band.id.clone();
-    graph.insert_node(Node::Rectangle(band));
+    let band_id = graph.append_child(Node::Rectangle(band), parent.clone());
 
     vec![a_id, b_id, band_id]
 }
@@ -65,6 +63,7 @@ fn build_geometry_mask(
     graph: &mut SceneGraph,
     origin: (f32, f32),
     size: (f32, f32),
+    parent: Parent,
 ) -> NodeId {
     let (ox, oy) = origin;
     let (w, h) = size;
@@ -78,9 +77,7 @@ fn build_geometry_mask(
     };
     mask.set_fill(CGColor(0, 0, 0, 255).into());
     mask.mask = Some(LayerMaskType::Geometry);
-    let id = mask.id.clone();
-    graph.insert_node(Node::Ellipse(mask));
-    id
+    graph.append_child(Node::Ellipse(mask), parent)
 }
 
 fn build_alpha_mask(
@@ -88,6 +85,7 @@ fn build_alpha_mask(
     graph: &mut SceneGraph,
     origin: (f32, f32),
     size: (f32, f32),
+    parent: Parent,
 ) -> NodeId {
     let (ox, oy) = origin;
     let (w, h) = size;
@@ -116,9 +114,7 @@ fn build_alpha_mask(
         active: true,
     })]);
     mask.mask = Some(LayerMaskType::Image(ImageMaskType::Alpha));
-    let id = mask.id.clone();
-    graph.insert_node(Node::Rectangle(mask));
-    id
+    graph.append_child(Node::Rectangle(mask), parent)
 }
 
 fn build_luminance_mask(
@@ -126,6 +122,7 @@ fn build_luminance_mask(
     graph: &mut SceneGraph,
     origin: (f32, f32),
     size: (f32, f32),
+    parent: Parent,
 ) -> NodeId {
     let (ox, oy) = origin;
     let (w, h) = size;
@@ -154,9 +151,7 @@ fn build_luminance_mask(
         active: true,
     })]);
     mask.mask = Some(LayerMaskType::Image(ImageMaskType::Luminance));
-    let id = mask.id.clone();
-    graph.insert_node(Node::Rectangle(mask));
-    id
+    graph.append_child(Node::Rectangle(mask), parent)
 }
 
 async fn demo_mask_panels() -> Scene {
@@ -172,6 +167,8 @@ async fn demo_mask_panels() -> Scene {
     root.clip = false;
     root.set_fill(CGColor(255, 255, 255, 255).into());
 
+    let root_id = graph.append_child(Node::Container(root), Parent::Root);
+
     // Panel layout
     let margin = 20.0;
     let panel_w = (width - 5.0 * margin) / 4.0;
@@ -186,8 +183,6 @@ async fn demo_mask_panels() -> Scene {
         Some(LayerMaskType::Image(ImageMaskType::Luminance)),
     ];
 
-    let mut root_children = Vec::new();
-
     for kind in kinds {
         // Panel container per kind
         let mut panel = nf.create_container_node();
@@ -200,41 +195,47 @@ async fn demo_mask_panels() -> Scene {
         panel.corner_radius = RectangularCornerRadius::circular(6.0);
         panel.set_fill(CGColor(245, 245, 245, 255).into());
 
-        // Build children inside panel
-        let mut children: Vec<NodeId> = Vec::new();
+        // Add panel to root first
+        let panel_id = graph.append_child(Node::Container(panel), Parent::NodeId(root_id.clone()));
 
-        // Content first
-        let mut content_ids = build_demo_content(&nf, &mut graph, (0.0, 0.0), (panel_w, panel_h));
-        children.append(&mut content_ids);
+        // Build content inside panel
+        let _content_ids: Vec<NodeId> = build_demo_content(
+            &nf,
+            &mut graph,
+            (0.0, 0.0),
+            (panel_w, panel_h),
+            Parent::NodeId(panel_id.clone()),
+        );
 
         // Mask last (topmost) — flat list model: mask consumes preceding siblings
         if let Some(k) = kind {
-            let mask_id = match k {
-                LayerMaskType::Geometry => {
-                    build_geometry_mask(&nf, &mut graph, (0.0, 0.0), (panel_w, panel_h))
-                }
-                LayerMaskType::Image(ImageMaskType::Alpha) => {
-                    build_alpha_mask(&nf, &mut graph, (0.0, 0.0), (panel_w, panel_h))
-                }
-                LayerMaskType::Image(ImageMaskType::Luminance) => {
-                    build_luminance_mask(&nf, &mut graph, (0.0, 0.0), (panel_w, panel_h))
-                }
+            let _mask_id = match k {
+                LayerMaskType::Geometry => build_geometry_mask(
+                    &nf,
+                    &mut graph,
+                    (0.0, 0.0),
+                    (panel_w, panel_h),
+                    Parent::NodeId(panel_id.clone()),
+                ),
+                LayerMaskType::Image(ImageMaskType::Alpha) => build_alpha_mask(
+                    &nf,
+                    &mut graph,
+                    (0.0, 0.0),
+                    (panel_w, panel_h),
+                    Parent::NodeId(panel_id.clone()),
+                ),
+                LayerMaskType::Image(ImageMaskType::Luminance) => build_luminance_mask(
+                    &nf,
+                    &mut graph,
+                    (0.0, 0.0),
+                    (panel_w, panel_h),
+                    Parent::NodeId(panel_id.clone()),
+                ),
             };
-            children.push(mask_id);
         }
-
-        let panel_id = panel.id.clone();
-        graph.insert_node(Node::Container(panel));
-        graph.insert(Parent::NodeId(panel_id.clone()), children);
-        root_children.push(panel_id);
 
         left += panel_w + margin;
     }
-
-    let root_id = root.id.clone();
-    graph.insert_node(Node::Container(root));
-    graph.insert(Parent::Root, vec![root_id.clone()]);
-    graph.insert(Parent::NodeId(root_id), root_children);
 
     Scene {
         name: "Mask Modes Demo".to_string(),

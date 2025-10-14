@@ -21,9 +21,7 @@ fn create_scene(t: f32) -> Scene {
     let r = ((t.sin() * 0.5 + 0.5) * 255.0) as u8;
     let g = ((t.cos() * 0.5 + 0.5) * 255.0) as u8;
     rect.set_fill(Paint::from(CGColor(r, g, 200, 255)));
-    let rect_id = rect.id.clone();
-    graph.insert_node(Node::Rectangle(rect));
-    graph.insert(Parent::Root, vec![rect_id]);
+    graph.append_child(Node::Rectangle(rect), Parent::Root);
 
     Scene {
         name: "Animated".to_string(),

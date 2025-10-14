@@ -16,25 +16,20 @@ fn layers_in_rect_include_partially_visible_nested() {
     let nf = NodeFactory::new();
     let mut graph = SceneGraph::new();
 
+    let mut container = nf.create_container_node();
+    container.size = Size {
+        width: 100.0,
+        height: 100.0,
+    };
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(50.0, 50.0, 0.0);
     rect.size = Size {
         width: 100.0,
         height: 100.0,
     };
-    let rect_id = rect.id.clone();
-    graph.insert_node(Node::Rectangle(rect));
 
-    let mut container = nf.create_container_node();
-    container.size = Size {
-        width: 100.0,
-        height: 100.0,
-    };
-    let container_id = container.id.clone();
-    graph.insert_node(Node::Container(container));
-    graph.insert(Parent::NodeId(container_id.clone()), vec![rect_id.clone()]);
-
-    graph.insert(Parent::Root, vec![container_id.clone()]);
+    let container_id = graph.append_child(Node::Container(container), Parent::Root);
+    let rect_id = graph.append_child(Node::Rectangle(rect), Parent::NodeId(container_id.clone()));
 
     let scene = Scene {
         name: "test".into(),

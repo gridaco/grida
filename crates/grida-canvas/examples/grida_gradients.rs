@@ -17,7 +17,8 @@ async fn demo_gradients() -> Scene {
         height: 800.0,
     };
 
-    let mut ids = Vec::new();
+    let root_id = graph.append_child(Node::Container(root), Parent::Root);
+
     let spacing = 160.0;
     let start_x = 60.0;
     let base = 120.0;
@@ -49,8 +50,7 @@ async fn demo_gradients() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         }));
-        ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
 
     // Radial gradient fills
@@ -82,8 +82,7 @@ async fn demo_gradients() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         }));
-        ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
 
     // Linear gradient strokes
@@ -115,8 +114,7 @@ async fn demo_gradients() -> Scene {
             active: true,
         })]);
         rect.stroke_width = 8.0;
-        ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
 
     // Radial gradient strokes
@@ -150,15 +148,8 @@ async fn demo_gradients() -> Scene {
             active: true,
         })]);
         rect.stroke_width = 8.0;
-        ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
-    let root_id = root.id.clone();
-
-    graph.insert(Parent::NodeId(root_id.clone()), ids.clone());
-    graph.insert_node(Node::Container(root));
-
-    graph.insert(Parent::Root, vec![root_id.clone()]);
 
     Scene {
         name: "Gradients Demo".to_string(),

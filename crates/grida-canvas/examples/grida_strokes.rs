@@ -18,7 +18,7 @@ async fn demo_strokes() -> Scene {
 
     let mut graph = SceneGraph::new();
 
-    let mut all_shape_ids = Vec::new();
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
     let spacing = 120.0;
     let start_x = 50.0;
     let base_size = 100.0;
@@ -50,8 +50,10 @@ async fn demo_strokes() -> Scene {
             _ => unreachable!(),
         };
 
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Stroke Width Demo Row
@@ -72,8 +74,10 @@ async fn demo_strokes() -> Scene {
         rect.stroke_width = (i + 1) as f32 * 2.0; // Increasing stroke width
         rect.stroke_align = StrokeAlign::Center;
 
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Stroke with Different Shapes Row
@@ -90,8 +94,10 @@ async fn demo_strokes() -> Scene {
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
         rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         rect.stroke_width = 4.0;
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Ellipse
         let mut ellipse = nf.create_ellipse_node();
@@ -104,8 +110,10 @@ async fn demo_strokes() -> Scene {
         ellipse.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
         ellipse.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         ellipse.stroke_width = 4.0;
-        all_shape_ids.push(ellipse.id.clone());
-        graph.insert_node(Node::Ellipse(ellipse));
+        graph.append_child(
+            Node::Ellipse(ellipse),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Regular Polygon (Hexagon)
         let mut polygon = nf.create_regular_polygon_node();
@@ -119,8 +127,10 @@ async fn demo_strokes() -> Scene {
         polygon.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
         polygon.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         polygon.stroke_width = 4.0;
-        all_shape_ids.push(polygon.id.clone());
-        graph.insert_node(Node::RegularPolygon(polygon));
+        graph.append_child(
+            Node::RegularPolygon(polygon),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Star
         let mut star = nf.create_regular_star_polygon_node();
@@ -135,8 +145,10 @@ async fn demo_strokes() -> Scene {
         star.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
         star.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
         star.stroke_width = 4.0;
-        all_shape_ids.push(star.id.clone());
-        graph.insert_node(Node::RegularStarPolygon(star));
+        graph.append_child(
+            Node::RegularStarPolygon(star),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Stroke with Effects Row
@@ -175,8 +187,10 @@ async fn demo_strokes() -> Scene {
             _ => unreachable!(),
         };
 
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Stroke Dash Array Demo Row
@@ -206,8 +220,10 @@ async fn demo_strokes() -> Scene {
             _ => unreachable!(),
         };
 
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Stroke Paint Types Demo Row
@@ -239,8 +255,10 @@ async fn demo_strokes() -> Scene {
             active: true,
         })]);
         rect.stroke_width = 8.0;
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Radial Gradient Stroke
         let mut rect = nf.create_rectangle_node();
@@ -269,8 +287,10 @@ async fn demo_strokes() -> Scene {
             active: true,
         })]);
         rect.stroke_width = 8.0;
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Conic Gradient Stroke
         let mut rect = nf.create_rectangle_node();
@@ -303,8 +323,10 @@ async fn demo_strokes() -> Scene {
             active: true,
         })]);
         rect.stroke_width = 8.0;
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Multi-color Solid Stroke
         let mut rect = nf.create_rectangle_node();
@@ -319,8 +341,10 @@ async fn demo_strokes() -> Scene {
         rect.strokes = Paints::new([Paint::from(CGColor(255, 128, 0, 255))]);
         rect.stroke_width = 8.0;
         rect.stroke_dash_array = Some(vec![20.0, 10.0, 5.0, 10.0]); // Complex dash pattern
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Multiple Strokes Demo Row
@@ -341,8 +365,10 @@ async fn demo_strokes() -> Scene {
             Paint::from(CGColor(0, 0, 255, 255)),
         ]);
         rect.stroke_width = 12.0; // Thick stroke to show layering
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Rectangle with solid + gradient strokes
         let mut rect = nf.create_rectangle_node();
@@ -374,8 +400,10 @@ async fn demo_strokes() -> Scene {
             }),
         ]);
         rect.stroke_width = 10.0;
-        all_shape_ids.push(rect.id.clone());
-        graph.insert_node(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Ellipse with multiple gradient strokes
         let mut ellipse = nf.create_ellipse_node();
@@ -421,8 +449,10 @@ async fn demo_strokes() -> Scene {
             }),
         ]);
         ellipse.stroke_width = 12.0;
-        all_shape_ids.push(ellipse.id.clone());
-        graph.insert_node(Node::Ellipse(ellipse));
+        graph.append_child(
+            Node::Ellipse(ellipse),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Polygon with complex multi-stroke pattern
         let mut polygon = nf.create_regular_polygon_node();
@@ -473,15 +503,11 @@ async fn demo_strokes() -> Scene {
         ]);
         polygon.stroke_width = 15.0; // Very thick to show all layers
         polygon.stroke_dash_array = Some(vec![8.0, 4.0]); // Dashed pattern
-        all_shape_ids.push(polygon.id.clone());
-        graph.insert_node(Node::RegularPolygon(polygon));
+        graph.append_child(
+            Node::RegularPolygon(polygon),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
-
-    // Set up the root container
-    let root_container_id = root_container_node.id.clone();
-    graph.insert_node(Node::Container(root_container_node));
-    graph.insert(Parent::Root, vec![root_container_id.clone()]);
-    graph.insert(Parent::NodeId(root_container_id), all_shape_ids);
 
     Scene {
         name: "Strokes Demo".to_string(),

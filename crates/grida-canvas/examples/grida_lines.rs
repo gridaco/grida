@@ -16,7 +16,6 @@ async fn demo_lines() -> Scene {
     };
 
     let mut graph = SceneGraph::new();
-    let mut ids = Vec::new();
 
     let start_x = 100.0;
     let start_y = 100.0;
@@ -33,8 +32,6 @@ async fn demo_lines() -> Scene {
     };
     line_basic.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
     line_basic.stroke_width = 2.0;
-    ids.push(line_basic.id.clone());
-    graph.insert_node(Node::Line(line_basic));
 
     // Outside aligned thick line
     let mut line_outside = nf.create_line_node();
@@ -47,8 +44,6 @@ async fn demo_lines() -> Scene {
     line_outside.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     line_outside.stroke_width = 8.0;
     line_outside._data_stroke_align = StrokeAlign::Outside;
-    ids.push(line_outside.id.clone());
-    graph.insert_node(Node::Line(line_outside));
 
     // Dashed line
     let mut line_dashed = nf.create_line_node();
@@ -61,8 +56,6 @@ async fn demo_lines() -> Scene {
     line_dashed.strokes = Paints::new([Paint::from(CGColor(0, 0, 255, 255))]);
     line_dashed.stroke_width = 4.0;
     line_dashed.stroke_dash_array = Some(vec![10.0, 5.0]);
-    ids.push(line_dashed.id.clone());
-    graph.insert_node(Node::Line(line_dashed));
 
     // Gradient stroke line
     let mut line_gradient = nf.create_line_node();
@@ -89,8 +82,6 @@ async fn demo_lines() -> Scene {
         active: true,
     })]);
     line_gradient.stroke_width = 6.0;
-    ids.push(line_gradient.id.clone());
-    graph.insert_node(Node::Line(line_gradient));
 
     // Rotated diagonal line
     let mut line_rotated = nf.create_line_node();
@@ -103,14 +94,19 @@ async fn demo_lines() -> Scene {
     };
     line_rotated.strokes = Paints::new([Paint::from(CGColor(0, 128, 128, 255))]);
     line_rotated.stroke_width = 4.0;
-    ids.push(line_rotated.id.clone());
-    graph.insert_node(Node::Line(line_rotated));
 
-    // Set up root container
-    let root_id = root.id.clone();
-    graph.insert_node(Node::Container(root));
-    graph.insert(Parent::Root, vec![root_id.clone()]);
-    graph.insert(Parent::NodeId(root_id), ids);
+    // Set up root container and add all lines
+    let root_id = graph.append_child(Node::Container(root), Parent::Root);
+    graph.append_children(
+        vec![
+            Node::Line(line_basic),
+            Node::Line(line_outside),
+            Node::Line(line_dashed),
+            Node::Line(line_gradient),
+            Node::Line(line_rotated),
+        ],
+        Parent::NodeId(root_id),
+    );
 
     Scene {
         name: "LineNode Demo".to_string(),

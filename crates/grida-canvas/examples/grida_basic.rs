@@ -159,48 +159,38 @@ async fn demo_basic() -> Scene {
     };
     root_container_node.name = Some("Root Container".to_string());
 
-    // Collect all the IDs
-    let rect_id = rect_node.id.clone();
-    let ellipse_id = ellipse_node.id.clone();
-    let polygon_id = polygon_node.id.clone();
-    let regular_polygon_id = regular_polygon_node.id.clone();
-    let text_span_id = text_span_node.id.clone();
-    let line_id = line_node.id.clone();
-    let image_id = image_node.id.clone();
-    let path_id = path_node.id.clone();
-    let shapes_group_id = shapes_group_node.id.clone();
-    let root_container_id = root_container_node.id.clone();
-
     // Build the scene graph
     let mut graph = SceneGraph::new();
 
-    // Add all nodes first
-    graph.insert_node(Node::Rectangle(rect_node));
-    graph.insert_node(Node::Ellipse(ellipse_node));
-    graph.insert_node(Node::Polygon(polygon_node));
-    graph.insert_node(Node::RegularPolygon(regular_polygon_node));
-    graph.insert_node(Node::TextSpan(text_span_node));
-    graph.insert_node(Node::Line(line_node));
-    graph.insert_node(Node::Image(image_node));
-    graph.insert_node(Node::SVGPath(path_node));
-    graph.insert_node(Node::Group(shapes_group_node));
-    graph.insert_node(Node::Container(root_container_node));
+    // Add root container
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
 
-    // Set up the hierarchy
-    graph.insert(Parent::Root, vec![root_container_id.clone()]);
-    graph.insert(
-        Parent::NodeId(root_container_id),
-        vec![
-            shapes_group_id.clone(),
-            text_span_id,
-            line_id,
-            path_id,
-            image_id,
-        ],
+    // Add shapes group to container
+    let shapes_group_id = graph.append_child(
+        Node::Group(shapes_group_node),
+        Parent::NodeId(root_container_id.clone()),
     );
-    graph.insert(
+
+    // Add shapes to group
+    graph.append_children(
+        vec![
+            Node::Rectangle(rect_node),
+            Node::Ellipse(ellipse_node),
+            Node::Polygon(polygon_node),
+            Node::RegularPolygon(regular_polygon_node),
+        ],
         Parent::NodeId(shapes_group_id),
-        vec![rect_id, ellipse_id, polygon_id, regular_polygon_id],
+    );
+
+    // Add other elements to container
+    graph.append_children(
+        vec![
+            Node::TextSpan(text_span_node),
+            Node::Line(line_node),
+            Node::SVGPath(path_node),
+            Node::Image(image_node),
+        ],
+        Parent::NodeId(root_container_id),
     );
 
     Scene {

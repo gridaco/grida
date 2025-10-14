@@ -8,81 +8,80 @@ use math2::transform::AffineTransform;
 async fn demo_nested() -> Scene {
     let nf = NodeFactory::new();
     let mut graph = SceneGraph::new();
-    let n = 5; // number of nesting levels
 
-    // Create innermost rectangle
-    let mut rect = nf.create_rectangle_node();
-    rect.name = Some("Inner Rect".to_string());
-    rect.size = Size {
-        width: 100.0,
-        height: 100.0,
-    };
-    rect.set_fill(Paint::from(CGColor(255, 0, 0, 255)));
-    let mut current_id = rect.id.clone();
-    graph.insert_node(Node::Rectangle(rect));
+    // Demonstrate nested transformations and hierarchy
+    // Each level applies cumulative transformations: translation + rotation + scale
+    // Visual: concentric rotating squares that get progressively smaller and rotated
 
-    // Create nested structure
-    for i in 0..n {
-        if i % 2 == 0 {
-            // Create group with rotation transform
-            let mut group = nf.create_group_node();
-            group.name = Some(format!("Group {}", i));
-            group.transform = Some(AffineTransform::new(
-                50.0 * (i as f32 + 1.0), // x offset
-                50.0 * (i as f32 + 1.0), // y offset
-                0.0,
-            ));
+    let levels: i32 = 6; // Number of nesting levels
+    let base_size = 400.0;
 
-            // Add a rectangle to the group
-            let mut group_rect = nf.create_rectangle_node();
-            group_rect.name = Some(format!("Group {} Rect", i));
-            group_rect.size = Size {
-                width: 100.0,
-                height: 100.0,
-            };
-            group_rect.set_fill(Paint::from(CGColor(0, 255, 0, 255)));
-            let group_rect_id = group_rect.id.clone();
-            graph.insert_node(Node::Rectangle(group_rect));
+    // Build from outermost to innermost
+    let mut current_parent = Parent::Root;
 
-            let group_id = group.id.clone();
-            graph.insert_node(Node::Group(group));
-            graph.insert(
-                Parent::NodeId(group_id.clone()),
-                vec![current_id, group_rect_id],
-            );
-            current_id = group_id;
-        } else {
-            // Create container with scale transform
-            let mut container = nf.create_container_node();
-            container.name = Some(format!("Container {}", i));
-            container.transform = AffineTransform::new(
-                -30.0 * (i as f32 + 1.0), // x offset
-                -30.0 * (i as f32 + 1.0), // y offset
-                0.0,
-            );
+    for i in 0..levels {
+        let depth_ratio = (i as f32) / (levels as f32);
+        let size_reduction = 0.85_f32; // Each level is 85% of parent
+        let current_size = base_size * size_reduction.powi(i as i32);
+        let rotation = 15.0_f32.to_radians() * (i as f32); // Rotate 15 degrees per level
 
-            // Add a rectangle to the container
-            let mut container_rect = nf.create_rectangle_node();
-            container_rect.name = Some(format!("Container {} Rect", i));
-            container_rect.size = Size {
-                width: 100.0,
-                height: 100.0,
-            };
-            container_rect.set_fill(Paint::from(CGColor(0, 0, 255, 255)));
-            let container_rect_id = container_rect.id.clone();
-            graph.insert_node(Node::Rectangle(container_rect));
+        // Create a container for this level
+        let mut container = nf.create_container_node();
+        container.name = Some(format!("Level {} Container", i));
 
-            let container_id = container.id.clone();
-            graph.insert_node(Node::Container(container));
-            graph.insert(
-                Parent::NodeId(container_id.clone()),
-                vec![current_id, container_rect_id],
-            );
-            current_id = container_id;
-        }
+        // Each level is centered in its parent with rotation
+        container.transform = AffineTransform::new(
+            current_size * 0.075, // Small offset for visual clarity
+            current_size * 0.075,
+            rotation,
+        );
+
+        container.size = Size {
+            width: current_size,
+            height: current_size,
+        };
+        container.corner_radius = RectangularCornerRadius::circular(8.0);
+
+        // Color gradient from blue (outer) to red (inner)
+        let r = (255.0 * depth_ratio) as u8;
+        let g = (100.0 * (1.0 - depth_ratio)) as u8;
+        let b = (255.0 * (1.0 - depth_ratio)) as u8;
+        container.set_fill(Paint::from(CGColor(r, g, b, 200)));
+
+        // Add stroke to show boundaries
+        container.strokes = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
+        container.stroke_width = 2.0;
+
+        let container_id = graph.append_child(Node::Container(container), current_parent);
+
+        // Add a label at each level
+        let mut label = nf.create_text_span_node();
+        label.name = Some(format!("Level {} Label", i));
+        label.transform = AffineTransform::new(10.0, 10.0, 0.0);
+        label.text = format!("Level {}", i);
+        label.text_style = TextStyleRec::from_font("", 14.0);
+        label.fills = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
+        graph.append_child(Node::TextSpan(label), Parent::NodeId(container_id.clone()));
+
+        // Move to next level (this container becomes the parent for the next iteration)
+        current_parent = Parent::NodeId(container_id);
     }
 
-    graph.insert(Parent::Root, vec![current_id]);
+    // Add final innermost content - a star
+    let mut star = nf.create_regular_star_polygon_node();
+    star.name = Some("Center Star".to_string());
+    let final_size = base_size * 0.85_f32.powi(levels);
+    star.transform = AffineTransform::new(final_size * 0.25, final_size * 0.25, 0.0);
+    star.size = Size {
+        width: final_size * 0.5,
+        height: final_size * 0.5,
+    };
+    star.point_count = 5;
+    star.inner_radius = 0.4;
+    star.set_fill(Paint::from(CGColor(255, 255, 0, 255)));
+    star.strokes = Paints::new([Paint::from(CGColor(255, 200, 0, 255))]);
+    star.stroke_width = 3.0;
+    graph.append_child(Node::RegularStarPolygon(star), current_parent);
 
     Scene {
         name: "Nested Demo".to_string(),

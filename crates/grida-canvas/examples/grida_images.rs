@@ -236,37 +236,24 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     let mut graph = SceneGraph::new();
 
-    let rect1_id = rect1.id.clone();
-    let rect2_id = rect2.id.clone();
-    let rect3_id = rect3.id.clone();
-    let rect4_id = rect4.id.clone();
-    let rect5_id = rect5.id.clone();
-    let rect6_id = rect6.id.clone();
-    let rect7_id = rect7.id.clone();
-    let rect8_id = rect8.id.clone();
-    let rect9_id = rect9.id.clone();
+    // Add root container first
+    let root_id = graph.append_child(Node::Container(root), Parent::Root);
 
-    graph.insert_node(Node::Rectangle(rect1));
-    graph.insert_node(Node::Rectangle(rect2));
-    graph.insert_node(Node::Rectangle(rect3));
-    graph.insert_node(Node::Rectangle(rect4));
-    graph.insert_node(Node::Rectangle(rect5));
-    graph.insert_node(Node::Rectangle(rect6));
-    graph.insert_node(Node::Rectangle(rect7));
-    graph.insert_node(Node::Rectangle(rect8));
-    graph.insert_node(Node::Rectangle(rect9));
-    let root_id = root.id.clone();
-
-    graph.insert(
-        Parent::NodeId(root_id.clone()),
+    // Add all rectangles to root container
+    graph.append_children(
         vec![
-            rect1_id, rect2_id, rect3_id, rect4_id, rect5_id, rect6_id, rect7_id, rect8_id,
-            rect9_id,
+            Node::Rectangle(rect1),
+            Node::Rectangle(rect2),
+            Node::Rectangle(rect3),
+            Node::Rectangle(rect4),
+            Node::Rectangle(rect5),
+            Node::Rectangle(rect6),
+            Node::Rectangle(rect7),
+            Node::Rectangle(rect8),
+            Node::Rectangle(rect9),
         ],
+        Parent::NodeId(root_id),
     );
-    graph.insert_node(Node::Container(root));
-
-    graph.insert(Parent::Root, vec![root_id.clone()]);
 
     let scene = Scene {
         name: "Images Demo".to_string(),

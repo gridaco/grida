@@ -14,26 +14,21 @@ use std::sync::{Arc, Mutex};
 fn hit_first_returns_topmost() {
     let nf = NodeFactory::new();
 
+    let mut container = nf.create_container_node();
+    container.size = Size {
+        width: 40.0,
+        height: 40.0,
+    };
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(10.0, 10.0, 0.0);
     rect.size = Size {
         width: 20.0,
         height: 20.0,
     };
-    let rect_id = rect.id.clone();
-
-    let mut container = nf.create_container_node();
-    container.size = Size {
-        width: 40.0,
-        height: 40.0,
-    };
-    let container_id = container.id.clone();
 
     let mut graph = SceneGraph::new();
-    graph.insert_node(Node::Rectangle(rect));
-    graph.insert_node(Node::Container(container));
-    graph.insert(Parent::Root, vec![container_id.clone()]);
-    graph.insert(Parent::NodeId(container_id.clone()), vec![rect_id.clone()]);
+    let container_id = graph.append_child(Node::Container(container), Parent::Root);
+    let rect_id = graph.append_child(Node::Rectangle(rect), Parent::NodeId(container_id.clone()));
 
     let scene = Scene {
         name: "test".into(),
@@ -63,13 +58,10 @@ fn hit_first_returns_topmost() {
 fn path_hit_testing_uses_contains() {
     let nf = NodeFactory::new();
 
+    let mut graph = SceneGraph::new();
     let mut path_node = nf.create_path_node();
     path_node.data = "M0 0 L10 0 L10 10 Z".into();
-    let path_id = path_node.id.clone();
-
-    let mut graph = SceneGraph::new();
-    graph.insert_node(Node::SVGPath(path_node.clone()));
-    graph.insert(Parent::Root, vec![path_id.clone()]);
+    let path_id = graph.append_child(Node::SVGPath(path_node.clone()), Parent::Root);
 
     let scene = Scene {
         name: "test".into(),
@@ -99,26 +91,21 @@ fn path_hit_testing_uses_contains() {
 fn intersects_returns_all_nodes_in_rect() {
     let nf = NodeFactory::new();
 
+    let mut container = nf.create_container_node();
+    container.size = Size {
+        width: 100.0,
+        height: 100.0,
+    };
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(50.0, 50.0, 0.0);
     rect.size = Size {
         width: 100.0,
         height: 100.0,
     };
-    let rect_id = rect.id.clone();
-
-    let mut container = nf.create_container_node();
-    container.size = Size {
-        width: 100.0,
-        height: 100.0,
-    };
-    let container_id = container.id.clone();
 
     let mut graph = SceneGraph::new();
-    graph.insert_node(Node::Rectangle(rect));
-    graph.insert_node(Node::Container(container));
-    graph.insert(Parent::Root, vec![container_id.clone()]);
-    graph.insert(Parent::NodeId(container_id.clone()), vec![rect_id.clone()]);
+    let container_id = graph.append_child(Node::Container(container), Parent::Root);
+    let rect_id = graph.append_child(Node::Rectangle(rect), Parent::NodeId(container_id.clone()));
 
     let scene = Scene {
         name: "test".into(),

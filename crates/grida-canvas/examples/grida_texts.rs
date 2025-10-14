@@ -114,35 +114,20 @@ async fn demo_texts() -> Scene {
     // Create a node repository and add all nodes
     let mut graph = SceneGraph::new();
 
-    // Collect all the IDs
-    let word_text_id = word_text_node.id.clone();
-    let sentence_text_id = sentence_text_node.id.clone();
-    let paragraph_text_id = paragraph_text_node.id.clone();
-    let second_paragraph_text_id = second_paragraph_text_node.id.clone();
-    let blurry_text_id = blurry_text_node.id.clone();
+    // Add root container first
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
 
-    // Add all nodes to the repository
-    graph.insert_node(Node::TextSpan(word_text_node));
-    graph.insert_node(Node::TextSpan(sentence_text_node));
-    graph.insert_node(Node::TextSpan(paragraph_text_node));
-    graph.insert_node(Node::TextSpan(second_paragraph_text_node));
-    graph.insert_node(Node::TextSpan(blurry_text_node));
-
-    // Set up the root container with all IDs
-    let root_container_id = root_container_node.id.clone();
-    graph.insert(
-        Parent::NodeId(root_container_id.clone()),
+    // Add all text nodes to the root container
+    graph.append_children(
         vec![
-            word_text_id,
-            sentence_text_id,
-            paragraph_text_id,
-            second_paragraph_text_id,
-            blurry_text_id,
+            Node::TextSpan(word_text_node),
+            Node::TextSpan(sentence_text_node),
+            Node::TextSpan(paragraph_text_node),
+            Node::TextSpan(second_paragraph_text_node),
+            Node::TextSpan(blurry_text_node),
         ],
+        Parent::NodeId(root_container_id),
     );
-    graph.insert_node(Node::Container(root_container_node));
-
-    graph.insert(Parent::Root, vec![root_container_id.clone()]);
 
     Scene {
         name: "Text Demo".to_string(),

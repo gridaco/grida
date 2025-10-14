@@ -18,7 +18,7 @@ async fn demo_vectors() -> Scene {
         height: 800.0,
     };
 
-    let mut ids = Vec::new();
+    let root_id = graph.append_child(Node::Container(root), Parent::Root);
     let spacing = 200.0;
     let start_x = 100.0;
     let base_y = 100.0;
@@ -51,8 +51,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            ids.push(vector_node_1_tri_open.id.clone());
-            graph.insert_node(Node::Vector(vector_node_1_tri_open));
+            graph.append_child(Node::Vector(vector_node_1_tri_open), Parent::NodeId(root_id.clone()));
         }
 
         {
@@ -83,8 +82,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            ids.push(vector_node_2_tri_closed.id.clone());
-            graph.insert_node(Node::Vector(vector_node_2_tri_closed));
+            graph.append_child(Node::Vector(vector_node_2_tri_closed), Parent::NodeId(root_id.clone()));
         }
 
         //
@@ -116,8 +114,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            ids.push(vector_node_3.id.clone());
-            graph.insert_node(Node::Vector(vector_node_3));
+            graph.append_child(Node::Vector(vector_node_3), Parent::NodeId(root_id.clone()));
         }
 
         {
@@ -148,8 +145,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            ids.push(vector_node_4.id.clone());
-            graph.insert_node(Node::Vector(vector_node_4));
+            graph.append_child(Node::Vector(vector_node_4), Parent::NodeId(root_id.clone()));
         }
 
         // FIXME: not working
@@ -183,8 +179,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            ids.push(vector_node_1_5.id.clone());
-            graph.insert_node(Node::Vector(vector_node_1_5));
+            graph.append_child(Node::Vector(vector_node_1_5), Parent::NodeId(root_id.clone()));
         }
     }
 
@@ -224,8 +219,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            ids.push(vector_node_5.id.clone());
-            graph.insert_node(Node::Vector(vector_node_5));
+            graph.append_child(Node::Vector(vector_node_5), Parent::NodeId(root_id.clone()));
         }
 
         // Single-segment 90-degree straight line
@@ -257,8 +251,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            ids.push(vector_node_5_5.id.clone());
-            graph.insert_node(Node::Vector(vector_node_5_5));
+            graph.append_child(Node::Vector(vector_node_5_5), Parent::NodeId(root_id.clone()));
         }
     }
 
@@ -297,8 +290,7 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            ids.push(vector_node_6.id.clone());
-            graph.insert_node(Node::Vector(vector_node_6));
+            graph.append_child(Node::Vector(vector_node_6), Parent::NodeId(root_id.clone()));
         }
 
         // Filled rectangle
@@ -335,17 +327,9 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            ids.push(vector_node_7.id.clone());
-            graph.insert_node(Node::Vector(vector_node_7));
+            graph.append_child(Node::Vector(vector_node_7), Parent::NodeId(root_id.clone()));
         }
     }
-
-    // Add all nodes to root
-    let root_id = root.id.clone();
-    graph.insert(Parent::NodeId(root_id.clone()), ids.clone());
-    graph.insert_node(Node::Container(root));
-
-    graph.insert(Parent::Root, vec![root_id.clone()]);
 
     Scene {
         name: "Vector Network Demo".to_string(),

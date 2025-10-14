@@ -1,3 +1,5 @@
+// FIXME: broken demo - make this golden_ not grida_
+
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
@@ -17,7 +19,7 @@ async fn demo_booleans() -> Scene {
         height: 1080.0,
     };
 
-    let mut all_shape_ids = Vec::new();
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
     let spacing = 200.0;
     let start_x = 100.0;
     let base_size = 100.0;
@@ -72,25 +74,19 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
         };
 
-        // Collect IDs before moving nodes
-        let rect_id = rect.id.clone();
-        let circle_id = circle.id.clone();
-        let text_id = text.id.clone();
-        let bool_id = bool_node.id.clone();
-
-        all_shape_ids.push(rect_id.clone());
-        all_shape_ids.push(circle_id.clone());
-        all_shape_ids.push(text_id);
-        all_shape_ids.push(bool_id.clone());
-
-        // Insert all nodes
-        graph.insert_node(Node::Rectangle(rect));
-        graph.insert_node(Node::Ellipse(circle));
-        graph.insert_node(Node::TextSpan(text));
-        graph.insert_node(Node::BooleanOperation(bool_node));
-
-        // Set up boolean operation hierarchy
-        graph.insert(Parent::NodeId(bool_id), vec![rect_id, circle_id]);
+        // Add boolean operation to root, then add operands to it
+        let bool_id = graph.append_child(
+            Node::BooleanOperation(bool_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
+        graph.append_children(
+            vec![Node::Rectangle(rect), Node::Ellipse(circle)],
+            Parent::NodeId(bool_id),
+        );
+        graph.append_child(
+            Node::TextSpan(text),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Example 2: Two Circles Intersection
@@ -144,24 +140,19 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        let circle1_id = circle1.id.clone();
-        let circle2_id = circle2.id.clone();
-        let text_id = text.id.clone();
-        let bool_id = bool_node.id.clone();
-
-        all_shape_ids.push(circle1_id.clone());
-        all_shape_ids.push(circle2_id.clone());
-        all_shape_ids.push(text_id);
-        all_shape_ids.push(bool_id.clone());
-
-        // Insert all nodes
-        graph.insert_node(Node::Ellipse(circle1));
-        graph.insert_node(Node::Ellipse(circle2));
-        graph.insert_node(Node::TextSpan(text));
-        graph.insert_node(Node::BooleanOperation(bool_node));
-
-        // Set up boolean operation hierarchy
-        graph.insert(Parent::NodeId(bool_id), vec![circle1_id, circle2_id]);
+        // Add boolean operation to root, then add operands to it
+        let bool_id = graph.append_child(
+            Node::BooleanOperation(bool_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
+        graph.append_children(
+            vec![Node::Ellipse(circle1), Node::Ellipse(circle2)],
+            Parent::NodeId(bool_id),
+        );
+        graph.append_child(
+            Node::TextSpan(text),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Example 3: Star and Rectangle Difference
@@ -215,24 +206,19 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        let star_id = star.id.clone();
-        let rect_id = rect.id.clone();
-        let text_id = text.id.clone();
-        let bool_id = bool_node.id.clone();
-
-        all_shape_ids.push(star_id.clone());
-        all_shape_ids.push(rect_id.clone());
-        all_shape_ids.push(text_id.clone());
-        all_shape_ids.push(bool_node.id.clone());
-
-        // Insert all nodes
-        graph.insert_node(Node::RegularStarPolygon(star));
-        graph.insert_node(Node::Rectangle(rect));
-        graph.insert_node(Node::TextSpan(text));
-        graph.insert_node(Node::BooleanOperation(bool_node));
-
-        // Set up boolean operation hierarchy
-        graph.insert(Parent::NodeId(bool_id), vec![star_id, rect_id]);
+        // Add boolean operation to root, then add operands to it
+        let bool_id = graph.append_child(
+            Node::BooleanOperation(bool_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
+        graph.append_children(
+            vec![Node::RegularStarPolygon(star), Node::Rectangle(rect)],
+            Parent::NodeId(bool_id),
+        );
+        graph.append_child(
+            Node::TextSpan(text),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Example 4): Two Squares XOR
@@ -286,31 +272,20 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        let square1_id = square1.id.clone();
-        let square2_id = square2.id.clone();
-        let text_id = text.id.clone();
-        let bool_id = bool_node.id.clone();
-
-        all_shape_ids.push(square1_id.clone());
-        all_shape_ids.push(square2_id.clone());
-        all_shape_ids.push(text.id.clone());
-        all_shape_ids.push(bool_node.id.clone());
-
-        // Insert all nodes
-        graph.insert_node(Node::Rectangle(square1));
-        graph.insert_node(Node::Rectangle(square2));
-        graph.insert_node(Node::TextSpan(text));
-        graph.insert_node(Node::BooleanOperation(bool_node));
-
-        // Set up boolean operation hierarchy
-        graph.insert(Parent::NodeId(bool_id), vec![square1_id, square2_id]);
+        // Add boolean operation to root, then add operands to it
+        let bool_id = graph.append_child(
+            Node::BooleanOperation(bool_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
+        graph.append_children(
+            vec![Node::Rectangle(square1), Node::Rectangle(square2)],
+            Parent::NodeId(bool_id),
+        );
+        graph.append_child(
+            Node::TextSpan(text),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
-
-    // Set up the root container
-    let root_container_id = root_container_node.id.clone();
-    graph.insert_node(Node::Container(root_container_node));
-    graph.insert(Parent::Root, vec![root_container_id.clone()]);
-    graph.insert(Parent::NodeId(root_container_id), all_shape_ids);
 
     Scene {
         name: "Boolean Operations Demo".to_string(),

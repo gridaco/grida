@@ -1,9 +1,6 @@
 use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
 use crate::cg::types::*;
-use crate::node::{
-    scene_graph::{Parent, SceneGraph},
-    schema::*,
-};
+use crate::node::{scene_graph::SceneGraph, schema::*};
 use crate::painter::layer::Layer;
 use crate::painter::Painter;
 use crate::runtime::counter::FrameCounter;
@@ -672,7 +669,11 @@ impl Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{factory::NodeFactory, scene_graph::SceneGraph, schema::Size};
+    use crate::node::{
+        factory::NodeFactory,
+        scene_graph::{Parent, SceneGraph},
+        schema::Size,
+    };
 
     #[test]
     fn picture_recorded_with_layer_bounds() {
@@ -683,11 +684,9 @@ mod tests {
             width: 50.0,
             height: 40.0,
         };
-        let rect_id = rect.id.clone();
 
         let mut graph = SceneGraph::new();
-        graph.insert_node(Node::Rectangle(rect));
-        graph.insert(Parent::Root, vec![rect_id.clone()]);
+        let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
         let scene = Scene {
             name: "test".into(),
@@ -753,8 +752,7 @@ mod tests {
         text.text_style.font_family = "MissingFont".into();
 
         let mut graph = SceneGraph::new();
-        let text_id = graph.insert_node(Node::TextSpan(text));
-        graph.insert(Parent::Root, vec![text_id]);
+        graph.append_child(Node::TextSpan(text), Parent::Root);
 
         let scene = Scene {
             name: "test".into(),

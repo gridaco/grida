@@ -17,7 +17,8 @@ async fn demo_fills() -> Scene {
         height: 800.0,
     };
 
-    let mut ids = Vec::new();
+    let root_id = graph.append_child(Node::Container(root), Parent::Root);
+
     let spacing = 200.0;
     let start_x = 100.0;
     let base_y = 100.0;
@@ -37,8 +38,7 @@ async fn demo_fills() -> Scene {
         Paint::from(CGColor(0, 0, 255, 255)),
     ]);
     multi_solid_rect.stroke_width = 3.0;
-    ids.push(multi_solid_rect.id.clone());
-    graph.insert_node(Node::Rectangle(multi_solid_rect));
+    graph.append_child(Node::Rectangle(multi_solid_rect), Parent::NodeId(root_id.clone()));
 
     // 2. Rectangle with solid + linear gradient fills
     let mut solid_gradient_rect = nf.create_rectangle_node();
@@ -69,8 +69,7 @@ async fn demo_fills() -> Scene {
         }),
     ]);
     solid_gradient_rect.stroke_width = 3.0;
-    ids.push(solid_gradient_rect.id.clone());
-    graph.insert_node(Node::Rectangle(solid_gradient_rect));
+    graph.append_child(Node::Rectangle(solid_gradient_rect), Parent::NodeId(root_id.clone()));
 
     // 3. Rectangle with solid + radial gradient fills
     let mut solid_radial_rect = nf.create_rectangle_node();
@@ -105,8 +104,7 @@ async fn demo_fills() -> Scene {
         }),
     ]);
     solid_radial_rect.stroke_width = 3.0;
-    ids.push(solid_radial_rect.id.clone());
-    graph.insert_node(Node::Rectangle(solid_radial_rect));
+    graph.append_child(Node::Rectangle(solid_radial_rect), Parent::NodeId(root_id.clone()));
 
     // 4. Rectangle with linear + radial gradient fills
     let mut gradient_gradient_rect = nf.create_rectangle_node();
@@ -154,8 +152,7 @@ async fn demo_fills() -> Scene {
         }),
     ]);
     gradient_gradient_rect.stroke_width = 3.0;
-    ids.push(gradient_gradient_rect.id.clone());
-    graph.insert_node(Node::Rectangle(gradient_gradient_rect));
+    graph.append_child(Node::Rectangle(gradient_gradient_rect), Parent::NodeId(root_id.clone()));
 
     // 5. Ellipse with multiple radial gradients (concentric circles effect)
     let mut multi_radial_ellipse = nf.create_ellipse_node();
@@ -216,8 +213,7 @@ async fn demo_fills() -> Scene {
         }),
     ]);
     multi_radial_ellipse.stroke_width = 3.0;
-    ids.push(multi_radial_ellipse.id.clone());
-    graph.insert_node(Node::Ellipse(multi_radial_ellipse));
+    graph.append_child(Node::Ellipse(multi_radial_ellipse), Parent::NodeId(root_id.clone()));
 
     // 6. Polygon with solid + linear gradient + radial gradient
     let pentagon_points = (0..5)
@@ -272,8 +268,7 @@ async fn demo_fills() -> Scene {
         }),
     ]);
     complex_fill_polygon.stroke_width = 4.0;
-    ids.push(complex_fill_polygon.id.clone());
-    graph.insert_node(Node::Polygon(complex_fill_polygon));
+    graph.append_child(Node::Polygon(complex_fill_polygon), Parent::NodeId(root_id.clone()));
 
     // 7. Regular polygon with multiple linear gradients at different angles
     let mut multi_linear_polygon = nf.create_regular_polygon_node();
@@ -336,8 +331,7 @@ async fn demo_fills() -> Scene {
         }),
     ]);
     multi_linear_polygon.stroke_width = 3.0;
-    ids.push(multi_linear_polygon.id.clone());
-    graph.insert_node(Node::RegularPolygon(multi_linear_polygon));
+    graph.append_child(Node::RegularPolygon(multi_linear_polygon), Parent::NodeId(root_id.clone()));
 
     // 8. Container with multiple fills (demonstrating container fill capability)
     let mut multi_fill_container = nf.create_container_node();
@@ -372,15 +366,7 @@ async fn demo_fills() -> Scene {
         }),
     ]);
     multi_fill_container.stroke_width = 3.0;
-    ids.push(multi_fill_container.id.clone());
-    graph.insert_node(Node::Container(multi_fill_container));
-
-    // Add all nodes to root
-    let root_id = root.id.clone();
-    graph.insert(Parent::NodeId(root_id.clone()), ids.clone());
-    graph.insert_node(Node::Container(root));
-
-    graph.insert(Parent::Root, vec![root_id.clone()]);
+    graph.append_child(Node::Container(multi_fill_container), Parent::NodeId(root_id.clone()));
 
     Scene {
         name: "Fills Demo".to_string(),

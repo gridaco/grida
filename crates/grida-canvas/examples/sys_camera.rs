@@ -29,23 +29,6 @@ fn create_static_scene() -> Scene {
     let mut graph = SceneGraph::new();
     let nf = NodeFactory::new();
 
-    // Create a grid of rectangles
-    let mut ids = Vec::new();
-    for i in 0..10 {
-        for j in 0..10 {
-            let mut rect = nf.create_rectangle_node();
-            let id = rect.id.clone();
-            rect.name = Some(format!("Rectangle {}-{}", i, j));
-            rect.transform = AffineTransform::new(i as f32 * 100.0, j as f32 * 100.0, 0.0);
-            rect.size = Size {
-                width: 50.0,
-                height: 50.0,
-            };
-            graph.insert_node(Node::Rectangle(rect));
-            ids.push(id);
-        }
-    }
-
     // Create a root group containing all rectangles
     let root_group = GroupNodeRec {
         id: "root".to_string(),
@@ -57,10 +40,21 @@ fn create_static_scene() -> Scene {
         mask: None,
     };
 
-    let root_id = root_group.id.clone();
-    graph.insert_node(Node::Group(root_group));
-    graph.insert(Parent::Root, vec![root_id.clone()]);
-    graph.insert(Parent::NodeId(root_id), ids);
+    let root_id = graph.append_child(Node::Group(root_group), Parent::Root);
+
+    // Create a grid of rectangles
+    for i in 0..10 {
+        for j in 0..10 {
+            let mut rect = nf.create_rectangle_node();
+            rect.name = Some(format!("Rectangle {}-{}", i, j));
+            rect.transform = AffineTransform::new(i as f32 * 100.0, j as f32 * 100.0, 0.0);
+            rect.size = Size {
+                width: 50.0,
+                height: 50.0,
+            };
+            graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
+        }
+    }
 
     Scene {
         name: "Test Scene".to_string(),

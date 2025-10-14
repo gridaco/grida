@@ -60,7 +60,7 @@ async fn demo_webfonts() -> Scene {
         letter_spacing: Default::default(),
         word_spacing: Default::default(),
         font_style_italic: false,
-        line_height: TextLineHeight::Fixed(1.5),
+        line_height: TextLineHeight::Factor(1.5),
         text_transform: TextTransform::None,
     };
     description_node.text_align = TextAlign::Left;
@@ -126,26 +126,24 @@ async fn demo_webfonts() -> Scene {
     // Create a node repository and add all nodes
     let mut graph = SceneGraph::new();
 
-    // Collect all the IDs
-    let heading_id = heading_node.id.clone();
-    let description_id = description_node.id.clone();
-    let albert_text_ids: Vec<_> = albert_text_nodes.iter().map(|n| n.id.clone()).collect();
+    // Add root container first
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
 
-    // Add all nodes to the repository
-    graph.insert_node(Node::TextSpan(heading_node));
-    graph.insert_node(Node::TextSpan(description_node));
+    // Add all text nodes to root container
+    graph.append_child(
+        Node::TextSpan(heading_node),
+        Parent::NodeId(root_container_id.clone()),
+    );
+    graph.append_child(
+        Node::TextSpan(description_node),
+        Parent::NodeId(root_container_id.clone()),
+    );
     for text_node in albert_text_nodes {
-        graph.insert_node(Node::TextSpan(text_node));
+        graph.append_child(
+            Node::TextSpan(text_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
-
-    // Set up the root container with all IDs
-    let mut children = vec![heading_id, description_id];
-    children.extend(albert_text_ids);
-    let root_container_id = root_container_node.id.clone();
-    graph.insert(Parent::NodeId(root_container_id.clone()), children);
-    graph.insert_node(Node::Container(root_container_node));
-
-    graph.insert(Parent::Root, vec![root_container_id.clone()]);
 
     Scene {
         name: "Webfonts Demo".to_string(),

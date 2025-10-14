@@ -17,10 +17,8 @@ fn stroke_affects_render_bounds() {
     let mut rect = nf.create_rectangle_node();
     rect.stroke_width = 10.0;
     rect.stroke_align = StrokeAlign::Outside;
-    let rect_id = rect.id.clone();
-    graph.insert_node(Node::Rectangle(rect));
 
-    graph.insert(Parent::Root, vec![rect_id.clone()]);
+    let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
     let scene = Scene {
         name: "test".into(),
@@ -47,10 +45,8 @@ fn gaussian_blur_expands_render_bounds() {
     rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
         radius: 5.0,
     })]);
-    let rect_id = rect.id.clone();
-    graph.insert_node(Node::Rectangle(rect));
 
-    graph.insert(Parent::Root, vec![rect_id.clone()]);
+    let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
     let scene = Scene {
         name: "test".into(),
@@ -81,10 +77,8 @@ fn drop_shadow_expands_render_bounds() {
         spread: 0.0,
         color: CGColor(0, 0, 0, 255),
     })]);
-    let rect_id = rect.id.clone();
-    graph.insert_node(Node::Rectangle(rect));
 
-    graph.insert(Parent::Root, vec![rect_id.clone()]);
+    let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
     let scene = Scene {
         name: "test".into(),
@@ -115,10 +109,8 @@ fn drop_shadow_spread_expands_render_bounds() {
         spread: 10.0,
         color: CGColor(0, 0, 0, 255),
     })]);
-    let rect_id = rect.id.clone();
-    graph.insert_node(Node::Rectangle(rect));
 
-    graph.insert(Parent::Root, vec![rect_id.clone()]);
+    let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
     let scene = Scene {
         name: "test".into(),

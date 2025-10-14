@@ -48,15 +48,8 @@ async fn demo_image() -> (Scene, Vec<u8>) {
 
     let mut graph = SceneGraph::new();
 
-    let rect1_id = rect1.id.clone();
-
-    graph.insert_node(Node::Rectangle(rect1));
-    let root_id = root.id.clone();
-
-    graph.insert(Parent::NodeId(root_id.clone()), vec![rect1_id]);
-    graph.insert_node(Node::Container(root));
-
-    graph.insert(Parent::Root, vec![root_id.clone()]);
+    let root_id = graph.append_child(Node::Container(root), Parent::Root);
+    graph.append_child(Node::Rectangle(rect1), Parent::NodeId(root_id));
 
     let scene = Scene {
         name: "Images Demo".to_string(),
