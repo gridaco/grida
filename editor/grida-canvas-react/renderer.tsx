@@ -7,10 +7,8 @@ import { NodeElement } from "@/grida-canvas-react-renderer-dom/nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
-import { SizeProvider } from "./viewport/size";
 import cmath from "@grida/cmath";
-import Canvas from "@/grida-canvas-react-renderer-canvas-wasm";
-import type { Editor } from "@/grida-canvas/editor";
+import grida from "@grida/schema";
 
 type CustomComponent = React.ComponentType<any>;
 
@@ -53,7 +51,7 @@ export function StandaloneSceneContent({
   primary = true,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & StandaloneDocumentContentProps) {
-  const { children } = useCurrentSceneState();
+  const { children_refs: children } = useCurrentSceneState();
 
   return (
     <div
@@ -62,43 +60,6 @@ export function StandaloneSceneContent({
     >
       {children?.map((id) => <NodeElement key={id} node_id={id} />)}
     </div>
-  );
-}
-
-export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
-  const document = useEditorState(editor, (state) => state.document);
-  const debug = useEditorState(editor, (state) => state.debug);
-  const transform = useEditorState(editor, (state) => state.transform);
-  const highlights = useEditorState(editor, (state) => {
-    const hovered = state.hovered_node_id;
-    const selected = state.selection;
-    return [...selected, ...(hovered ? [hovered] : [])];
-  });
-
-  return (
-    <SizeProvider
-      className="w-full h-full max-w-full max-h-full"
-      style={{
-        // Force the canvas to respect container boundaries
-        contain: "strict",
-      }}
-    >
-      <Canvas
-        initialSize={{ width: 100, height: 100 }}
-        transform={transform}
-        data={document}
-        debug={debug}
-        highlightStrokes={{
-          nodes: highlights,
-          style: {
-            strokeWidth: 1,
-            // --color-workbench-accent-sky
-            stroke: "#00a6f4",
-          },
-        }}
-        onMount={editor.bind.bind(editor)}
-      />
-    </SizeProvider>
   );
 }
 
@@ -139,10 +100,15 @@ export function StandaloneSceneBackground({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   const instance = useCurrentEditor();
-  const slice = useEditorState(instance, (state) => ({
-    backgroundColor: state.document.scenes[state.scene_id!].backgroundColor,
-    transform: state.transform,
-  }));
+  const slice = useEditorState(instance, (state) => {
+    const scene = state.document.nodes[
+      state.scene_id!
+    ] as grida.program.nodes.SceneNode;
+    return {
+      backgroundColor: scene?.backgroundColor,
+      transform: state.transform,
+    };
+  });
   const { backgroundColor, transform } = slice;
 
   const [cssBackgroundColor, opacity] = useMemo(() => {
@@ -198,10 +164,14 @@ function useFitInitiallyEffect() {
   const sceneId = useEditorState(editor, (state) => state.scene_id);
 
   useEffect(() => {
-    editor.fit("*");
+    editor.camera.fit("*");
   }, [documentKey, sceneId]);
 }
 
+/**
+ * @deprecated
+ * TODO: this should work in plugin-wise, without any react dependencies - like how canvas backend does on mount
+ */
 export function AutoInitialFitTransformer({
   children,
 }: React.PropsWithChildren<{}>) {

@@ -41,14 +41,14 @@ export function ZoomControl({ className }: { className?: string }) {
           max={256}
           onChange={(e) => {
             const v = parseInt(e.target.value) / 100;
-            if (v) editor.scale(v, "center");
+            if (v) editor.camera.scale(v, "center");
           }}
           className={WorkbenchUI.inputVariants({ size: "sm" })}
         />
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={editor.zoomIn.bind(editor)}
+          onSelect={editor.camera.zoomIn.bind(editor)}
           className="text-xs"
         >
           Zoom in
@@ -56,7 +56,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={editor.zoomOut.bind(editor)}
+          onSelect={editor.camera.zoomOut.bind(editor)}
           className="text-xs"
         >
           Zoom out
@@ -64,7 +64,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => editor.fit("*")}
+          onSelect={() => editor.camera.fit("*")}
           className="text-xs"
         >
           Zoom to fit
@@ -72,7 +72,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => editor.fit("selection")}
+          onSelect={() => editor.camera.fit("selection")}
           className="text-xs"
         >
           Zoom to selection
@@ -80,14 +80,14 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => editor.scale(0.5, "center")}
+          onSelect={() => editor.camera.scale(0.5, "center")}
           className="text-xs"
         >
           Zoom to 50%
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => editor.scale(1, "center")}
+          onSelect={() => editor.camera.scale(1, "center")}
           className="text-xs"
         >
           Zoom to 100%
@@ -95,7 +95,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => editor.scale(2, "center")}
+          onSelect={() => editor.camera.scale(2, "center")}
           className="text-xs"
         >
           Zoom to 200%
@@ -104,7 +104,7 @@ export function ZoomControl({ className }: { className?: string }) {
         <DropdownMenuCheckboxItem
           checked={pixelgrid === "on"}
           onSelect={() => {
-            editor.togglePixelGrid();
+            editor.surface.surfaceTogglePixelGrid();
           }}
           className="text-xs"
         >
@@ -114,7 +114,7 @@ export function ZoomControl({ className }: { className?: string }) {
         <DropdownMenuCheckboxItem
           checked={ruler === "on"}
           onSelect={() => {
-            editor.toggleRuler();
+            editor.surface.surfaceToggleRuler();
           }}
           className="text-xs"
         >

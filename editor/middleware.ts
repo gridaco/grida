@@ -98,6 +98,20 @@ async function updateSession(request: NextRequest) {
     request,
   });
 
+  if (
+    process.env.NODE_ENV === "development" &&
+    (!process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  ) {
+    console.warn(
+      "SUPABASE_URL or SUPABASE_ANON_KEY is not set this will break all db-requests, please set them in the .env.local file",
+      "If you are just testing things around, you can ignore this message",
+      "Larn more at https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md"
+    );
+
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

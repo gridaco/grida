@@ -160,4 +160,5 @@ _004.definition = {
   version: "1.0.0",
   default: {},
   nodes: {},
+  links: {},
 } satisfies grida.program.document.template.TemplateDocumentDefinition;

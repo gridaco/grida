@@ -1,5 +1,4 @@
 {
-  "doctype": "v0_document",
   "document": {
     "nodes": {
       "root": {
@@ -26,10 +25,7 @@
             "a": 1
           }
         },
-        "cornerRadius": 0,
-        "children": [
-          "text"
-        ]
+        "cornerRadius": 0
       },
       "text": {
         "id": "text",
@@ -64,8 +60,39 @@
         "fontSize": 32,
         "fontFamily": "Pretendard",
         "fontWeight": 600
+      },
+      "demo": {
+        "type": "scene",
+        "id": "demo",
+        "name": "demo",
+        "active": true,
+        "locked": false,
+        "constraints": {
+          "children": "multiple"
+        },
+        "guides": [],
+        "edges": [],
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
       }
     },
+    "links": {
+      "root": [
+        "text"
+      ],
+      "demo": [
+        "root"
+      ]
+    },
+    "scenes_ref": [
+      "demo"
+    ],
+    "bitmaps": {},
+    "images": {},
     "properties": {
       "background": {
         "type": "rgba",
@@ -75,25 +102,6 @@
           "r": 10,
           "g": 10,
           "b": 10,
-          "a": 1
-        }
-      }
-    },
-    "scenes": {
-      "demo": {
-        "id": "demo",
-        "name": "demo",
-        "type": "scene",
-        "children": [
-          "root"
-        ],
-        "constraints": {
-          "children": "multiple"
-        },
-        "backgroundColor": {
-          "r": 245,
-          "g": 245,
-          "b": 245,
           "a": 1
         }
       }

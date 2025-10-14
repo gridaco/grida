@@ -122,7 +122,7 @@ const document: editor.state.IEditorStateInit = {
         type: "scene",
         id: "main",
         name: "Referrer's Page",
-        children: [
+        children_refs: [
           "referrer",
           "referrer-share",
           "referrer-share-message",
@@ -145,6 +145,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["grida_west_referral.duo-000.referrer-share"]: {
       name: "Referrer Share Dialog",
@@ -153,6 +154,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["grida_west_referral.duo-000.referrer-share-message"]: {
       name: "Referrer Share Message",
@@ -161,6 +163,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["grida_west_referral.duo-000.invitation-ux-overlay"]: {
       name: "Invitation UX Overlay",
@@ -169,6 +172,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["grida_west_referral.duo-000.invitation"]: {
       name: "Invitation",
@@ -177,6 +181,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
   },
 };
@@ -280,8 +285,8 @@ function EditorUXServer({ focus }: { focus: { node?: string } }) {
   useEffect(
     () => {
       if (focus.node) {
-        editor.select([focus.node]);
-        editor.fit([focus.node], { margin: 64, animate: true });
+        editor.commands.select([focus.node]);
+        editor.camera.fit([focus.node], { margin: 64, animate: true });
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

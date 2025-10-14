@@ -1,7 +1,9 @@
 import type { tokens } from "@grida/tokens";
+// @ts-ignore
 import type { TokenizableExcept } from "@grida/tokens/utils";
 import type vn from "@grida/vn";
 import cg from "@grida/cg";
+import tree from "@grida/tree";
 import type cmath from "@grida/cmath";
 import * as CSS from "csstype";
 
@@ -21,6 +23,341 @@ interface CSSProperties extends CSS.Properties<string | number> {
 
 export namespace grida {
   export const mixed: unique symbol = Symbol();
+
+  export namespace id {
+    export type NodeIdentifier = string;
+
+    export interface INodeIdGenerator<T extends string | number> {
+      // peek(): T;
+      next(): T;
+    }
+
+    export namespace noop {
+      export const generator: INodeIdGenerator<string> = {
+        next: () => Math.random().toString(36).substring(2, 15),
+      };
+    }
+
+    /**
+     * Grida node identifier utilities.
+     *
+     * The identifier is a 32-bit unsigned integer composed of two fields:
+     * - 8 bits: actor identifier (1-255 for online actors, 0 reserved for offline)
+     * - 24 bits: per-actor node counter (0-16,777,215)
+     *
+     * While the packed representation is numeric, most of the JavaScript/TypeScript
+     * code continues to work with string identifiers. The helpers in this namespace
+     * provide safe packing, unpacking, formatting and generation utilities so that
+     * the rest of the system can transition to the CRDT-friendly layout without
+     * relying on random UUIDs.
+     *
+     * @see https://grida.co/docs/wg/feat-crdt/id
+     */
+    export namespace u32 {
+      //
+
+      export namespace k {
+        export const ACTOR_ID_BITS = 8;
+        export const NODE_COUNTER_BITS = 24;
+        /**
+         * 255
+         */
+        export const ACTOR_ID_MAX = (1 << ACTOR_ID_BITS) - 1;
+        /**
+         * 16,777,215
+         */
+        export const NODE_COUNTER_MAX = (1 << NODE_COUNTER_BITS) - 1;
+
+        /**
+         * 16,777,216
+         */
+        export const NODE_COUNTER_MODULO = NODE_COUNTER_MAX + 1;
+        /**
+         * 4,294,967,295
+         */
+        export const PACKED_MAX =
+          ACTOR_ID_MAX * NODE_COUNTER_MODULO + NODE_COUNTER_MAX;
+
+        /**
+         * e.g. "255-16777215" or "1-42"
+         */
+        export const NODE_ID_SEPARATOR = "-" as const;
+
+        /**
+         * 0 is reserved for offline-local (or non collaborative) work
+         */
+        export const OFFLINE_ACTOR_ID: ActorId = 0;
+      }
+
+      export type ActorId = number;
+      export type NodeCounter = number;
+      export type PackedNodeId = number;
+
+      export interface NodeIdComponents {
+        actor: ActorId;
+        counter: NodeCounter;
+      }
+
+      export type NodeIdGeneratorState = NodeIdComponents;
+
+      /**
+       * Packs the actor and node counter into a 32-bit unsigned integer.
+       */
+      export function pack(actor: ActorId, counter: NodeCounter): PackedNodeId {
+        assertActor(actor);
+        assertCounter(counter);
+        return actor * k.NODE_COUNTER_MODULO + counter;
+      }
+
+      /**
+       * Unpacks a packed node identifier into its actor and counter components.
+       */
+      export function unpack(packed: PackedNodeId): NodeIdComponents {
+        assertPacked(packed);
+        const actor = Math.floor(packed / k.NODE_COUNTER_MODULO);
+        const counter = packed % k.NODE_COUNTER_MODULO;
+        return { actor, counter };
+      }
+
+      /**
+       * Creates the canonical string representation of a node identifier.
+       */
+      export function format(
+        actor: ActorId,
+        counter: NodeCounter
+      ): NodeIdentifier {
+        assertActor(actor);
+        assertCounter(counter);
+        return `${actor}${k.NODE_ID_SEPARATOR}${counter}`;
+      }
+
+      /**
+       * Formats the provided components as a node identifier string.
+       */
+      export function fromComponents(
+        components: NodeIdComponents
+      ): NodeIdentifier {
+        return format(components.actor, components.counter);
+      }
+
+      /**
+       * Converts a packed node identifier into the canonical string representation.
+       */
+      export function fromPacked(packed: PackedNodeId): NodeIdentifier {
+        return fromComponents(unpack(packed));
+      }
+
+      /**
+       * Parses a node identifier expressed either as a string (e.g. "1:42") or as a
+       * packed numeric value.
+       */
+      export function parse(
+        input: NodeIdentifier | PackedNodeId
+      ): NodeIdComponents {
+        if (typeof input === "number") {
+          assertPacked(input);
+          return unpack(input);
+        }
+
+        const trimmed = input.trim();
+        if (trimmed.length === 0) {
+          throw new RangeError("Node identifier cannot be empty");
+        }
+
+        if (trimmed.includes(k.NODE_ID_SEPARATOR)) {
+          const [actorPart, counterPart, ...rest] = trimmed.split(
+            k.NODE_ID_SEPARATOR
+          );
+          if (rest.length > 0) {
+            throw new RangeError(`Invalid node identifier format: "${input}"`);
+          }
+
+          const actor = Number(actorPart);
+          const counter = Number(counterPart);
+
+          if (!Number.isFinite(actor) || !Number.isFinite(counter)) {
+            throw new RangeError(`Invalid node identifier: "${input}"`);
+          }
+
+          assertActor(actor);
+          assertCounter(counter);
+          return { actor, counter };
+        }
+
+        const numeric = Number(trimmed);
+        if (!Number.isFinite(numeric)) {
+          throw new RangeError(`Invalid node identifier: "${input}"`);
+        }
+
+        assertPacked(numeric);
+        return unpack(numeric);
+      }
+
+      /**
+       * Converts a node identifier (string or packed) into its numeric packed form.
+       */
+      export function toPacked(
+        input: NodeIdentifier | PackedNodeId
+      ): PackedNodeId {
+        if (typeof input === "number") {
+          assertPacked(input);
+          return input;
+        }
+
+        const { actor, counter } = parse(input);
+        return pack(actor, counter);
+      }
+
+      /**
+       * Returns true when the provided value is a valid packed node identifier.
+       */
+      export function isPackedNodeId(value: unknown): value is PackedNodeId {
+        return (
+          typeof value === "number" &&
+          Number.isInteger(value) &&
+          value >= 0 &&
+          value <= k.PACKED_MAX
+        );
+      }
+
+      function assertActor(value: number): asserts value is ActorId {
+        if (!Number.isInteger(value) || value < 0 || value > k.ACTOR_ID_MAX) {
+          throw new RangeError(
+            `Actor id must be an integer between 0 and ${k.ACTOR_ID_MAX} (received ${value})`
+          );
+        }
+      }
+
+      function assertCounter(value: number): asserts value is NodeCounter {
+        if (
+          !Number.isInteger(value) ||
+          value < 0 ||
+          value > k.NODE_COUNTER_MAX
+        ) {
+          throw new RangeError(
+            `Node counter must be an integer between 0 and ${k.NODE_COUNTER_MAX} (received ${value})`
+          );
+        }
+      }
+
+      function assertPacked(value: number): asserts value is PackedNodeId {
+        if (!Number.isInteger(value) || value < 0 || value > k.PACKED_MAX) {
+          throw new RangeError(
+            `Packed node id must be an integer between 0 and ${k.PACKED_MAX} (received ${value})`
+          );
+        }
+      }
+
+      const COUNTER_EXHAUSTED_ERROR =
+        "Node counter exhausted for the current actor. Rotate to a new actor id before minting more nodes.";
+
+      /**
+       * Stateful node identifier generator.
+       */
+      export class NodeIdGenerator {
+        private _actor: ActorId;
+        private _counter: NodeCounter;
+
+        constructor(initial: Partial<NodeIdGeneratorState> = {}) {
+          const actor = initial.actor ?? k.OFFLINE_ACTOR_ID;
+          const counter = initial.counter ?? 0;
+
+          assertActor(actor);
+          assertCounter(counter);
+
+          this._actor = actor;
+          this._counter = counter;
+        }
+
+        get actor(): ActorId {
+          return this._actor;
+        }
+
+        get counter(): NodeCounter {
+          return this._counter;
+        }
+
+        /**
+         * Sets the active actor identifier for subsequent allocations.
+         */
+        setActor(actor: ActorId): void {
+          assertActor(actor);
+          this._actor = actor;
+        }
+
+        /**
+         * Sets the next node counter value.
+         */
+        setCounter(counter: NodeCounter): void {
+          assertCounter(counter);
+          this._counter = counter;
+        }
+
+        /**
+         * Returns true when the generator has exhausted the counter range.
+         */
+        get exhausted(): boolean {
+          return this._counter > k.NODE_COUNTER_MAX;
+        }
+
+        /**
+         * Returns the next node identifier string and advances the counter.
+         */
+        next(): NodeIdentifier {
+          this.ensureCapacity();
+          const id = format(this._actor, this._counter);
+          this.advance();
+          return id;
+        }
+
+        /**
+         * Returns the next packed node identifier and advances the counter.
+         */
+        nextPacked(): PackedNodeId {
+          this.ensureCapacity();
+          const packed = pack(this._actor, this._counter);
+          this.advance();
+          return packed;
+        }
+
+        /**
+         * Returns the next identifier components without allocating.
+         */
+        peek(): NodeIdComponents {
+          this.ensureCapacity();
+          return { actor: this._actor, counter: this._counter };
+        }
+
+        /**
+         * Serialises the generator state so it can be restored later.
+         */
+        snapshot(): NodeIdGeneratorState {
+          this.ensureCapacity();
+          return { actor: this._actor, counter: this._counter };
+        }
+
+        /**
+         * Restores the generator state from a snapshot.
+         */
+        restore(state: NodeIdGeneratorState): void {
+          assertActor(state.actor);
+          assertCounter(state.counter);
+          this._actor = state.actor;
+          this._counter = state.counter;
+        }
+
+        private ensureCapacity(): void {
+          if (this._counter > k.NODE_COUNTER_MAX) {
+            throw new RangeError(COUNTER_EXHAUSTED_ERROR);
+          }
+        }
+
+        private advance(): void {
+          this._counter += 1;
+        }
+      }
+    }
+  }
 
   export namespace program {
     export namespace schema {
@@ -192,7 +529,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.0.1-beta.1+20250728";
+  export const SCHEMA_VERSION = "0.0.1-beta.1+20251010";
 
   /**
    * Simple Node Selector
@@ -273,8 +610,9 @@ export namespace grida.program.document {
    *
    * @see {@link IDocumentDefinition}
    */
-  export interface INodesRepository {
+  export interface INodesGraph {
     nodes: Record<nodes.NodeID, nodes.Node>;
+    links: Record<nodes.NodeID, nodes.NodeID[] | undefined>;
   }
 
   export type ImageType =
@@ -430,7 +768,7 @@ export namespace grida.program.document {
   export interface IDocumentDefinition
     extends IImagesRepository,
       IBitmapsRepository,
-      document.INodesRepository,
+      document.INodesGraph,
       IDocumentProperties {
     // scene: Scene;
   }
@@ -439,9 +777,19 @@ export namespace grida.program.document {
    * [Grida Document Model]
    *
    * Grida document contains all nodes, properties, and embedded data required to render a complete document.
+   *
+   * **Note on scenes**: Scenes are stored as SceneNode in `nodes`, and referenced by ID in `scenes_ref`.
+   * The `nodes` collection is the single source of truth for all node-like data including scenes.
    */
   export interface Document extends IDocumentDefinition {
-    scenes: Record<string, Scene>;
+    /**
+     * Array of scene node IDs. Scene nodes themselves are stored in `nodes` as SceneNode.
+     * Use `scenes_ref.map(id => nodes[id] as SceneNode)` to access scene data.
+     */
+    scenes_ref: string[];
+    /**
+     * The currently active/entry scene ID.
+     */
     entry_scene_id?: string;
   }
 
@@ -456,6 +804,10 @@ export namespace grida.program.document {
 
   /**
    * The [Scene] node. (a.k.a Page) this is defined directly without the repository. hence, its id is not required to be globally unique across the nodes.
+   *
+   * @deprecated This interface is being migrated to {@link nodes.SceneNode} which is stored in the nodes repository.
+   * The Scene interface is kept for backward compatibility during the migration period.
+   * New code should use SceneNode stored in document.nodes instead of document.scenes.
    */
   export interface Scene
     extends document.ISceneBackground,
@@ -477,7 +829,7 @@ export namespace grida.program.document {
     /**
      * the children of the scene. each children must be registreed in the node repository under the document where this scene is defined.
      */
-    children: nodes.NodeID[];
+    children_refs: nodes.NodeID[];
     constraints: {
       children: "single" | "multiple";
     };
@@ -507,7 +859,7 @@ export namespace grida.program.document {
       guides: [],
       edges: [],
       constraints: { children: "multiple" },
-      children: [],
+      children_refs: [],
       ...init,
     } as grida.program.document.Scene;
   }
@@ -515,7 +867,7 @@ export namespace grida.program.document {
   export namespace internal {
     /**
      * @internal
-     * Represents the current runtime state of the document hierarchy context.
+     * Nodes repository runtime hierarchy context for efficient hierarchical queries on flat document structures.
      *
      * This interface is designed for **in-memory, runtime-only** use and should not be used for persisting data.
      * It exists to provide efficient access to the parent and child relationships within the document tree without
@@ -523,43 +875,27 @@ export namespace grida.program.document {
      *
      * ## Why We Use This Interface
      * This interface allows for a structured, performant way to manage node hierarchy relationships without introducing
-     * a `parent_id` property on each `Node`. By using an in-memory context, we avoid potential issues with nullable `parent_id` fields,
-     * which could lead to unpredictable coding experiences. Additionally, maintaining these relationships within a dedicated
-     * context layer promotes separation of concerns, keeping core node definitions stable and interface-compatible.
+     * a `parent_id` property on each `Node`. By using an in-memory context, we avoid potential issues with nullable
+     * `parent_id` fields, which could lead to unpredictable coding experiences. Additionally, maintaining these
+     * relationships within a dedicated context layer promotes separation of concerns, keeping core node definitions
+     * stable and interface-compatible.
      *
      * ## Functionality
-     * - **Get Parent Node by Child ID**: Efficiently map a node's ID (`NodeID`) to its parent node ID.
-     * - **Get Child Nodes by Parent ID**: Access a list of child node IDs for any given parent node.
+     * - **Get Parent Node by Child ID**: Efficiently map a node's ID to its parent node ID with O(1) lookup.
+     * - **Get Child Nodes by Parent ID**: Access a list of child node IDs for any given parent node with O(1) lookup.
+     * - **Traverse Ancestors**: Walk up the tree from any node to its root.
+     * - **Query Depth**: Calculate how deep a node is in the hierarchy.
+     * - **Find Siblings**: Locate nodes that share the same parent.
      *
      * ## Management Notes
      * - This interface should be populated and managed only during runtime.
-     * - It is recommended to initialize `ctx_nid_to_parent_id` and `ctx_nid_to_children_ids` during document tree loading or
-     *   initial rendering.
-     * - If the node hierarchy is updated (e.g., nodes are added or removed), this context should be refreshed to reflect the
-     *   current relationships.
+     * - It is recommended to initialize the lookup table during document tree loading or initial rendering.
+     * - If the node hierarchy is updated (e.g., nodes are added, removed, or moved), this context should be refreshed
+     *   to reflect the current relationships.
+     * - For optimal performance, the context should be created once and reused for multiple queries.
      *
      */
-    export interface INodesRepositoryRuntimeHierarchyContext {
-      /**
-       * Array (Set) of all node IDs in the document, facilitating traversal and lookup.
-       */
-      readonly __ctx_nids: Array<nodes.NodeID>;
-
-      /**
-       * Maps each node ID to its respective parent node ID, facilitating upward traversal.
-       */
-      readonly __ctx_nid_to_parent_id: Record<
-        nodes.NodeID,
-        nodes.NodeID | null
-      >;
-
-      /**
-       * Maps each node ID to an array of its child node IDs, enabling efficient downward traversal.
-       *
-       * This does NOT ensure the order of the children. when to reorder, use the `children` property in the node.
-       */
-      readonly __ctx_nid_to_children_ids: Record<nodes.NodeID, nodes.NodeID[]>;
-    }
+    export type INodesRepositoryRuntimeHierarchyContext = tree.lut.ITreeLUT;
   }
 
   export interface INodeHtmlDocumentQueryDataAttributes {
@@ -616,7 +952,7 @@ export namespace grida.program.document {
 
     export interface TemplateDocumentDefinition<
       P extends schema.Properties = schema.Properties,
-    > extends INodesRepository {
+    > extends INodesGraph {
       /**
        * @deprecated - rename to template_id
        */
@@ -761,10 +1097,11 @@ export namespace grida.program.css {
 }
 
 export namespace grida.program.nodes {
-  export type NodeID = string;
+  export type NodeID = id.NodeIdentifier;
   export type NodeType = Node["type"];
 
   export type Node =
+    | SceneNode
     | BooleanPathOperationNode
     | GroupNode
     | TextNode
@@ -967,6 +1304,16 @@ export namespace grida.program.nodes {
   type __IPrototypeNodeChildren = {
     children: NodePrototype[];
   };
+
+  /**
+   * Type guard to check if a prototype has children.
+   * Provides type safety for prototype-to-document conversion.
+   */
+  export function hasChildren(
+    prototype: Partial<NodePrototype>
+  ): prototype is Partial<NodePrototype> & __IPrototypeNodeChildren {
+    return "children" in prototype && Array.isArray(prototype.children);
+  }
 
   // #endregion node prototypes
 
@@ -1210,10 +1557,6 @@ export namespace grida.program.nodes {
      */
     export interface IBoxFit {
       fit: cg.BoxFit;
-    }
-
-    export interface IChildrenReference {
-      children: NodeID[];
     }
 
     /**
@@ -1607,6 +1950,26 @@ export namespace grida.program.nodes {
   // }
 
   /**
+   * Scene Node
+   *
+   * [SceneNode] represents a top-level scene (formerly known as Page).
+   * Scenes are always root-level nodes and cannot be nested under other nodes.
+   * They can contain multiple children based on their constraints.
+   */
+  export interface SceneNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      document.ISceneBackground,
+      document.I2DGuides,
+      document.IEdges {
+    readonly type: "scene";
+    constraints: {
+      children: "single" | "multiple";
+    };
+    order?: number;
+  }
+
+  /**
    * Group Node
    *
    * [GroupNode] is not supported in the html/svg backend.
@@ -1614,7 +1977,7 @@ export namespace grida.program.nodes {
   export interface GroupNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IChildrenReference,
+      i.IBlend,
       i.IExpandable,
       i.IPositioning {
     type: "group";
@@ -1629,7 +1992,7 @@ export namespace grida.program.nodes {
   export interface BooleanPathOperationNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IChildrenReference,
+      i.IBlend,
       i.IExpandable,
       i.IRotation,
       i.IFill<cg.Paint>,
@@ -1747,7 +2110,6 @@ export namespace grida.program.nodes {
       i.IHrefable,
       i.IMouseCursor,
       i.IExpandable,
-      i.IChildrenReference,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IPadding,
@@ -2025,7 +2387,6 @@ export namespace grida.program.nodes {
       i.IHrefable,
       i.IMouseCursor,
       i.IExpandable,
-      i.IChildrenReference,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IPadding,
@@ -2039,6 +2400,7 @@ export namespace grida.program.nodes {
   export interface InstanceNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.IBlend,
       i.IPositioning,
       // i.ICSSStylable,
       i.IHrefable,
@@ -2065,9 +2427,9 @@ export namespace grida.program.nodes {
    */
   export interface TemplateInstanceNode
     extends i.IBaseNode,
+      i.ISceneNode,
       i.IHrefable,
       i.IMouseCursor,
-      i.ISceneNode,
       i.IPositioning,
       i.ICSSDimension,
       i.IProperties,
@@ -2163,6 +2525,8 @@ export namespace grida.program.nodes {
         case "component":
         case "instance":
         case "template_instance": {
+          // Remove children from prototype before spreading to prevent leakage
+          const { children, ...prototypeWithoutChildren } = prototype as any;
           // @ts-expect-error
           return {
             name: prototype.type,
@@ -2172,8 +2536,7 @@ export namespace grida.program.nodes {
             opacity: 1,
             zIndex: 0,
             rotation: 0,
-            children: [],
-            ...prototype,
+            ...prototypeWithoutChildren,
             id: id,
           } as UnknwonNode;
         }
@@ -2207,7 +2570,9 @@ export namespace grida.program.nodes {
           } as UnknwonNode;
         }
         default:
-          throw new Error(`Unsupported node prototype type: ${prototype.type}`);
+          throw new Error(
+            `Unsupported node prototype type: ${(prototype as any).type}`
+          );
       }
     }
 
@@ -2228,11 +2593,12 @@ export namespace grida.program.nodes {
         bitmaps: {},
         images: {},
         nodes: {},
+        links: {},
         scene: {
           type: "scene",
           id: "tmp",
           name: "tmp",
-          children: [],
+          children_refs: [],
           guides: [],
           edges: [],
           constraints: {
@@ -2251,20 +2617,22 @@ export namespace grida.program.nodes {
         const node = createNodeDataFromPrototypeWithoutChildren(prototype, id);
         document.nodes[node.id] = node;
 
-        if ("children" in prototype) {
-          const node_with_children = node as nodes.i.IChildrenReference;
-          node_with_children.children = [];
-          for (const childPrototype of prototype.children ?? []) {
+        // Process children and populate links (not node properties)
+        if (nodes.hasChildren(prototype)) {
+          const childIds: nodes.NodeID[] = [];
+          for (const childPrototype of prototype.children) {
             const childNode = processNode(childPrototype, nid, depth + 1);
-            node_with_children.children.push(childNode.id);
+            childIds.push(childNode.id);
           }
+          // Populate document.links instead of node.children
+          document.links[node.id] = childIds;
         }
 
         return node;
       }
 
       const rootNode = processNode(prototype, nid);
-      document.scene.children = [rootNode.id];
+      document.scene.children_refs = [rootNode.id];
 
       return document;
     }
@@ -2273,11 +2641,34 @@ export namespace grida.program.nodes {
       packed: document.IPackedSceneDocument
     ): document.Document {
       const { scene, ...defs } = packed;
+
+      // Create SceneNode from Scene
+      const sceneNode: nodes.SceneNode = {
+        type: "scene",
+        id: scene.id,
+        name: scene.name,
+        active: true,
+        locked: false,
+        constraints: scene.constraints,
+        order: scene.order,
+        guides: scene.guides,
+        edges: scene.edges,
+        backgroundColor: scene.backgroundColor,
+      };
+
+      // Add scene to nodes if not present
+      if (!defs.nodes[scene.id]) {
+        defs.nodes[scene.id] = sceneNode;
+      }
+
+      // Add scene children to links if not present
+      if (!defs.links[scene.id]) {
+        defs.links[scene.id] = scene.children_refs;
+      }
+
       return {
         ...defs,
-        scenes: {
-          [scene.id]: scene,
-        },
+        scenes_ref: [scene.id],
       };
     }
 
@@ -2306,8 +2697,9 @@ export namespace grida.program.nodes {
       delete prototype._$id;
 
       // Handle children recursively, if the node has children
-      if ("children" in node && Array.isArray(node.children)) {
-        (prototype as __IPrototypeNodeChildren).children = node.children.map(
+      const children_refs = snapshot.links[id];
+      if (Array.isArray(children_refs)) {
+        (prototype as __IPrototypeNodeChildren).children = children_refs.map(
           (childId) => createPrototypeFromSnapshot(snapshot, childId)
         );
       }
@@ -2346,7 +2738,7 @@ export namespace grida.program.nodes {
         cornerRadiusBottomLeft: 0,
         cornerRadiusBottomRight: 0,
         style: {},
-        children: [],
+        // children_refs: [],
         ...partial,
       };
     }

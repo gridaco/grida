@@ -37,7 +37,7 @@ export default function useTangentMirroring(
   const setValue = useCallback(
     (mode: vn.StrictTangentMirroringMode) => {
       if (mode === "none") {
-        instance.configureCurveTangentMirroringModifier("none");
+        instance.surface.surfaceConfigureCurveTangentMirroringModifier("none");
       } else {
         const verts = new Set<number>();
         for (const [v] of selected_tangents) verts.add(v);
@@ -48,11 +48,11 @@ export default function useTangentMirroring(
             const tA = segs[0].a === v ? segs[0].ta : segs[0].tb;
             const tB = segs[1].a === v ? segs[1].ta : segs[1].tb;
             if (cmath.vector2.isZero(tA) && cmath.vector2.isZero(tB)) {
-              instance.bendOrClearCorner(node_id, v);
+              instance.commands.bendOrClearCorner(node_id, v);
             }
           }
         });
-        instance.configureCurveTangentMirroringModifier(mode);
+        instance.surface.surfaceConfigureCurveTangentMirroringModifier(mode);
       }
     },
     [instance, selected_tangents, selected_vertices, segments]

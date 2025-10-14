@@ -10,7 +10,52 @@ const document: editor.state.IEditorStateInit = {
   editable: true,
   debug: false,
   document: {
+    scenes_ref: ["scene_invite", "scene_join", "scene_portal"],
+    links: {
+      scene_invite: ["invite"],
+      scene_join: ["join", "join_main", "join_hello"],
+      scene_portal: ["portal", "portal_verify"],
+    },
     nodes: {
+      scene_invite: {
+        type: "scene",
+        id: "scene_invite",
+        name: "Invite",
+        active: true,
+        locked: false,
+        guides: [],
+        edges: [],
+        constraints: {
+          children: "multiple",
+        },
+        order: 1,
+      },
+      scene_join: {
+        type: "scene",
+        id: "scene_join",
+        name: "Join",
+        active: true,
+        locked: false,
+        guides: [],
+        edges: [],
+        constraints: {
+          children: "multiple",
+        },
+        order: 2,
+      },
+      scene_portal: {
+        type: "scene",
+        id: "scene_portal",
+        name: "Portal",
+        active: true,
+        locked: false,
+        guides: [],
+        edges: [],
+        constraints: {
+          children: "multiple",
+        },
+        order: 3,
+      },
       invite: {
         id: "invite",
         name: "Invite Page",
@@ -133,42 +178,7 @@ const document: editor.state.IEditorStateInit = {
         left: 500,
       },
     },
-    entry_scene_id: "invite",
-    scenes: {
-      invite: {
-        type: "scene",
-        id: "invite",
-        name: "Invite",
-        children: ["invite"],
-        guides: [],
-        constraints: {
-          children: "multiple",
-        },
-        order: 1,
-      },
-      join: {
-        type: "scene",
-        id: "join",
-        name: "Join",
-        children: ["join", "join_main", "join_hello"],
-        guides: [],
-        constraints: {
-          children: "multiple",
-        },
-        order: 2,
-      },
-      portal: {
-        type: "scene",
-        id: "portal",
-        name: "Portal",
-        children: ["portal", "portal_verify"],
-        guides: [],
-        constraints: {
-          children: "multiple",
-        },
-        order: 3,
-      },
-    },
+    entry_scene_id: "scene_invite",
   },
   templates: {
     ["tmp-2503-invite"]: {
@@ -194,6 +204,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["tmp-2503-join"]: {
       name: "Join",
@@ -202,6 +213,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["tmp-2503-join-main"]: {
       name: "Join",
@@ -210,6 +222,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
     ["tmp-2503-portal"]: {
       name: "Portal",
@@ -218,6 +231,7 @@ const document: editor.state.IEditorStateInit = {
       default: {},
       version: "0.0.0",
       nodes: {},
+      links: {},
     },
   },
 };

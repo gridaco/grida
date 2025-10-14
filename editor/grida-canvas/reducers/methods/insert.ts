@@ -2,7 +2,9 @@ import type { Draft } from "immer";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
+import tree from "@grida/tree";
 import assert from "assert";
+import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
 
 export function self_insertSubDocument<S extends editor.state.IEditorState>(
   draft: Draft<S>,
@@ -10,57 +12,40 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
   sub: grida.program.document.IPackedSceneDocument
 ) {
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
 
   const sub_state = new dq.DocumentStateQuery(sub);
-  const sub_ctx = dq.Context.from(sub);
   const sub_fonts = sub_state.fonts();
 
-  if (parent_id) {
-    // Ensure the parent exists in the document
-    const parent_node = draft.document.nodes[parent_id];
-    assert(parent_node, `Parent node not found with id: "${parent_id}"`);
-    assert(
-      "children" in parent_node,
-      `Parent must be a container node: "${parent_id}"`
-    );
+  const target = parent_id ?? draft.scene_id;
 
-    // Add the child to the parent's children array (if not already added)
-    const __parent_children_set = new Set(parent_node.children);
-    // TODO: doing so will loose the children index info
-    sub.scene.children.forEach(
-      __parent_children_set.add,
-      __parent_children_set
-    );
-    parent_node.children = Array.from(__parent_children_set);
-  } else {
+  // Validate constraints for scene-level insertion
+  if (!parent_id) {
     assert(
       scene.constraints.children !== "single",
       "This scene cannot have multiple children"
     );
-    scene.children.push(...sub.scene.children);
   }
 
-  draft.document.nodes = {
-    ...draft.document.nodes,
-    ...sub.nodes,
-  };
+  // Use Graph.import() - mutates draft.document directly (scene is now a node!)
+  const graphInstance = new tree.graph.Graph(
+    draft.document,
+    EDITOR_GRAPH_POLICY
+  );
 
-  draft.document_ctx.__ctx_nids = [
-    ...draft.document_ctx.__ctx_nids,
-    ...sub_ctx.__ctx_nids,
-  ];
+  // Import sub-document (handles nodes, links, and attachment atomically)
+  graphInstance.import(
+    {
+      nodes: sub.nodes,
+      links: sub.links,
+    },
+    sub.scene.children_refs,
+    target
+  );
 
-  draft.document_ctx.__ctx_nid_to_children_ids = {
-    ...draft.document_ctx.__ctx_nid_to_children_ids,
-    ...sub_ctx.__ctx_nid_to_children_ids,
-  };
-
-  draft.document_ctx.__ctx_nid_to_parent_id = {
-    ...draft.document_ctx.__ctx_nid_to_parent_id,
-    ...sub_ctx.__ctx_nid_to_parent_id,
-  };
-
+  // Update font registry
   draft.fontfaces = Array.from(
     new Set([...draft.fontfaces.map((g) => g.family), ...sub_fonts])
   ).map((family) => ({
@@ -69,16 +54,10 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
     italic: false,
   }));
 
-  // Update the hierarchy with parent-child relationships
-  const context = new dq.Context(draft.document_ctx);
-  sub.scene.children.forEach((c) => {
-    context.blindlymove(c, parent_id);
-  });
+  // Update context from graph's cached LUT
+  draft.document_ctx = graphInstance.lut;
 
-  // Update the runtime context
-  draft.document_ctx = context.snapshot();
-
-  return sub.scene.children;
+  return sub.scene.children_refs;
 }
 
 export function self_try_insert_node<S extends editor.state.IEditorState>(
@@ -87,41 +66,36 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
   node: grida.program.nodes.Node // TODO: NodePrototype
 ): string {
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
 
   const node_id = node.id;
+  const target = parent_id ?? draft.scene_id;
 
-  if (parent_id) {
-    // Ensure the parent exists in the document
-    const parent_node = draft.document.nodes[parent_id];
-    assert(parent_node, `Parent node not found with id: "${parent_id}"`);
-
-    // TODO: this part shall be removed and ensured with data strictness
-    // Initialize the parent's children array if it doesn't exist
-    if (!("children" in parent_node) || !parent_node.children) {
-      assert(
-        parent_node.type === "container",
-        "Parent must be a container node"
-      );
-      parent_node.children = [];
-    }
-
-    // Add the child to the parent's children array (if not already added)
-    if (!parent_node.children.includes(node_id)) {
-      parent_node.children.push(node_id);
-    }
-
-    // Add the node to the document
-    draft.document.nodes[node_id] = node;
-  } else {
+  // Validate constraints for scene-level insertion
+  if (!parent_id) {
     assert(
       scene.constraints.children !== "single",
       "This scene cannot have multiple children"
     );
-    // Add the node to the document
-    draft.document.nodes[node_id] = node;
-    scene.children.push(node.id);
   }
+
+  // Use Graph.import() - mutates draft.document directly (scene is now a node!)
+  const graphInstance = new tree.graph.Graph(
+    draft.document,
+    EDITOR_GRAPH_POLICY
+  );
+
+  // Import single node (mutates draft.document directly)
+  graphInstance.import(
+    {
+      nodes: { [node_id]: node },
+      links: { [node_id]: undefined },
+    },
+    [node_id],
+    target
+  );
 
   // Update the document's font registry
   const s = new dq.DocumentStateQuery(draft.document);
@@ -131,10 +105,8 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
     italic: false,
   }));
 
-  // Update the runtime context with parent-child relationships
-  const context = new dq.Context(draft.document_ctx);
-  context.insert(node_id, parent_id);
-  draft.document_ctx = context.snapshot();
+  // Update context from graph's cached LUT
+  draft.document_ctx = graphInstance.lut;
 
   return node_id;
 }

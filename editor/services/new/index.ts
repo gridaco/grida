@@ -245,16 +245,24 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
         id: masterdoc_ref.id,
         data: {
           __schema_version: grida.program.document.SCHEMA_VERSION,
-          nodes: {},
-          scenes: {
-            "0": grida.program.document.init_scene({
+          nodes: {
+            "0": {
+              type: "scene",
               id: "0",
               name: "main",
+              active: true,
+              locked: false,
               constraints: {
                 children: "multiple",
               },
-            }),
+              guides: [],
+              edges: [],
+            } as grida.program.nodes.SceneNode,
           },
+          links: {
+            "0": [],
+          },
+          scenes_ref: ["0"],
           bitmaps: {},
           images: {},
           properties: {},

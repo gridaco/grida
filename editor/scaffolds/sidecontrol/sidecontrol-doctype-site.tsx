@@ -133,7 +133,7 @@ function ThemeEditorPortal({
                 }
                 `;
 
-                editor.schemaPutProperty("user-custom-css", {
+                editor.commands.schemaPutProperty("user-custom-css", {
                   type: "string",
                   default: propertiescss,
                 });

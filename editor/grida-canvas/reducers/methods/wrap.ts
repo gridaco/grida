@@ -1,11 +1,12 @@
 import type { Draft } from "immer";
+import type { ReducerContext } from "..";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import cmath from "@grida/cmath";
+import tree from "@grida/tree";
 import { self_moveNode } from "./move";
 import { self_insertSubDocument } from "./insert";
-import nid from "../tools/id";
 import { self_selectNode } from "./selection";
 import * as modeProperties from "@/grida-canvas/utils/properties";
 import cg from "@grida/cg";
@@ -26,7 +27,7 @@ function preserveOriginalOrder<S extends editor.state.IEditorState>(
   // Group nodes by their parent
   const groups = Object.groupBy(
     nodeIds,
-    (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? "<root>"
+    (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? draft.scene_id!
   );
 
   const result: string[] = [];
@@ -34,28 +35,14 @@ function preserveOriginalOrder<S extends editor.state.IEditorState>(
   Object.keys(groups).forEach((parentId) => {
     const nodesInParent = groups[parentId]!;
 
-    if (parentId === "<root>") {
-      // For root nodes, sort by their index in scene.children
-      const scene = draft.document.scenes[draft.scene_id!];
-      const sorted = nodesInParent.sort((a, b) => {
-        const indexA = scene.children.indexOf(a);
-        const indexB = scene.children.indexOf(b);
-        return indexA - indexB;
-      });
-      result.push(...sorted);
-    } else {
-      // For child nodes, sort by their index in parent's children array
-      const parent = dq.__getNodeById(
-        draft,
-        parentId
-      ) as grida.program.nodes.i.IChildrenReference;
-      const sorted = nodesInParent.sort((a, b) => {
-        const indexA = parent.children.indexOf(a);
-        const indexB = parent.children.indexOf(b);
-        return indexA - indexB;
-      });
-      result.push(...sorted);
-    }
+    // For all nodes, sort by their index in parent's children array using links
+    const parentChildren = draft.document.links[parentId] || [];
+    const sorted = nodesInParent.sort((a, b) => {
+      const indexA = parentChildren.indexOf(a);
+      const indexB = parentChildren.indexOf(b);
+      return indexA - indexB;
+    });
+    result.push(...sorted);
   });
 
   return result;
@@ -79,13 +66,16 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   nodeIds: string[],
   kind: "container" | "group",
-  geometry: editor.api.IDocumentGeometryQuery
+  context: ReducerContext
 ): grida.program.nodes.NodeID[] {
-  const scene = draft.document.scenes[draft.scene_id!];
+  const scene = draft.document.nodes[
+    draft.scene_id!
+  ] as grida.program.nodes.SceneNode;
+  const scene_children = draft.document.links[draft.scene_id!] || [];
 
   // Filter nodes and preserve their original order
   const filteredNodeIds = nodeIds.filter((id) => {
-    const isRoot = scene.children.includes(id);
+    const isRoot = scene_children.includes(id);
     return scene.constraints.children !== "single" || !isRoot;
   });
 
@@ -94,25 +84,26 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
 
   const groups = Object.groupBy(
     orderedNodeIds,
-    (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? "<root>"
+    (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? draft.scene_id!
   );
 
   const inserted: grida.program.nodes.NodeID[] = [];
 
   Object.keys(groups).forEach((parentId) => {
     const g = groups[parentId]!;
-    const isRoot = parentId === "<root>";
+    const isScene = parentId === draft.scene_id;
 
     let delta: cmath.Vector2;
-    if (isRoot) {
+    if (isScene) {
       delta = [0, 0];
     } else {
-      const parentRect = geometry.getNodeAbsoluteBoundingRect(parentId)!;
+      const parentRect =
+        context.geometry.getNodeAbsoluteBoundingRect(parentId)!;
       delta = [-parentRect.x, -parentRect.y];
     }
 
     const rects = g
-      .map((nodeId) => geometry.getNodeAbsoluteBoundingRect(nodeId)!)
+      .map((nodeId) => context.geometry.getNodeAbsoluteBoundingRect(nodeId)!)
       .map((rect) => cmath.rect.translate(rect, delta))
       .map((rect) => cmath.rect.quantize(rect, 1));
 
@@ -126,17 +117,17 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
       position: "absolute",
     } as grida.program.nodes.NodePrototype;
 
-    if (kind === "container") {
-      (prototype as grida.program.nodes.ContainerNode).width = union.width;
-      (prototype as grida.program.nodes.ContainerNode).height = union.height;
+    if (prototype.type === "container") {
+      prototype.width = union.width;
+      prototype.height = union.height;
     }
 
     const wrapperId = self_insertSubDocument(
       draft,
-      isRoot ? null : (parentId as string),
+      isScene ? null : (parentId as string),
       grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
-        nid
+        () => context.idgen.next()
       )
     )[0];
 
@@ -194,13 +185,14 @@ export function self_ungroup<S extends editor.state.IEditorState>(
   validGroupNodeIds.forEach((node_id) => {
     const node = dq.__getNodeById(draft, node_id);
 
-    // Ensure the node has children (group or boolean nodes)
-    if (!("children" in node) || !Array.isArray(node.children)) {
+    // Get node's children from links
+    const nodeChildren = draft.document.links[node_id];
+    if (!Array.isArray(nodeChildren) || nodeChildren.length === 0) {
       return;
     }
 
     const parent_id = dq.getParentId(draft.document_ctx, node_id);
-    const target_parent = parent_id === null ? "<root>" : parent_id;
+    const target_parent = parent_id ?? draft.scene_id!;
 
     // Get the node's absolute position
     const node_rect = geometry.getNodeAbsoluteBoundingRect(node_id);
@@ -212,8 +204,8 @@ export function self_ungroup<S extends editor.state.IEditorState>(
     let offset_x = node_rect.x;
     let offset_y = node_rect.y;
 
-    // If the target parent is not root, we need to account for its position
-    if (target_parent !== "<root>") {
+    // If the target parent is not the scene, we need to account for its position
+    if (target_parent !== draft.scene_id) {
       const parent_rect = geometry.getNodeAbsoluteBoundingRect(target_parent);
       if (parent_rect) {
         offset_x -= parent_rect.x;
@@ -222,7 +214,7 @@ export function self_ungroup<S extends editor.state.IEditorState>(
     }
 
     // Move all children to the parent of the node, preserving their order
-    const children_to_move: string[] = [...node.children];
+    const children_to_move: string[] = [...nodeChildren];
     children_to_move.forEach((child_id) => {
       // Move the child to the node's parent
       self_moveNode(draft, child_id, target_parent);
@@ -240,32 +232,15 @@ export function self_ungroup<S extends editor.state.IEditorState>(
       ungroupedChildren.push(child_id);
     });
 
-    // Remove the node
-    if (parent_id === null) {
-      // Remove from scene children
-      const scene = draft.document.scenes[draft.scene_id!];
-      const index = scene.children.indexOf(node_id);
-      if (index !== -1) {
-        scene.children.splice(index, 1);
-      }
-    } else {
-      // Remove from parent's children
-      const parent = dq.__getNodeById(draft, parent_id);
-      if ("children" in parent && Array.isArray(parent.children)) {
-        const index = parent.children.indexOf(node_id);
-        if (index !== -1) {
-          parent.children.splice(index, 1);
-        }
-      }
-    }
-
-    // Remove the node from the document
-    delete draft.document.nodes[node_id];
+    // Use Graph.unlink() - mutates draft.document directly (scene is now a node!)
+    const graphInstance = new tree.graph.Graph(draft.document);
+    graphInstance.unlink(node_id);
   });
 
-  // Update document context
-  const new_context = dq.Context.from(draft.document);
-  draft.document_ctx = new_context.snapshot();
+  // Update context from graph's cached LUT
+  // Create final graph instance to get updated LUT after all operations
+  const finalGraph = new tree.graph.Graph(draft.document);
+  draft.document_ctx = finalGraph.lut;
 
   // Select the ungrouped children
   self_selectNode(draft, "reset", ...ungroupedChildren);
@@ -287,13 +262,16 @@ export function self_wrapNodesAsBooleanOperation<
   draft: Draft<S>,
   nodeIds: string[],
   op: cg.BooleanOperation,
-  geometry: editor.api.IDocumentGeometryQuery
+  context: ReducerContext
 ): grida.program.nodes.NodeID[] {
-  const scene = draft.document.scenes[draft.scene_id!];
+  const scene = draft.document.nodes[
+    draft.scene_id!
+  ] as grida.program.nodes.SceneNode;
+  const scene_children = draft.document.links[draft.scene_id!] || [];
 
   // Filter nodes and preserve their original order
   const filteredNodeIds = nodeIds.filter((id) => {
-    const isRoot = scene.children.includes(id);
+    const isRoot = scene_children.includes(id);
     return scene.constraints.children !== "single" || !isRoot;
   });
 
@@ -302,25 +280,26 @@ export function self_wrapNodesAsBooleanOperation<
 
   const groups = Object.groupBy(
     orderedNodeIds,
-    (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? "<root>"
+    (nodeId) => dq.getParentId(draft.document_ctx, nodeId) ?? draft.scene_id!
   );
 
   const inserted: grida.program.nodes.NodeID[] = [];
 
   Object.keys(groups).forEach((parentId) => {
     const g = groups[parentId]!;
-    const isRoot = parentId === "<root>";
+    const isScene = parentId === draft.scene_id;
 
     let delta: cmath.Vector2;
-    if (isRoot) {
+    if (isScene) {
       delta = [0, 0];
     } else {
-      const parentRect = geometry.getNodeAbsoluteBoundingRect(parentId)!;
+      const parentRect =
+        context.geometry.getNodeAbsoluteBoundingRect(parentId)!;
       delta = [-parentRect.x, -parentRect.y];
     }
 
     const rects = g
-      .map((nodeId) => geometry.getNodeAbsoluteBoundingRect(nodeId)!)
+      .map((nodeId) => context.geometry.getNodeAbsoluteBoundingRect(nodeId)!)
       .map((rect) => cmath.rect.translate(rect, delta))
       .map((rect) => cmath.rect.quantize(rect, 1));
 
@@ -344,10 +323,10 @@ export function self_wrapNodesAsBooleanOperation<
 
     const wrapperId = self_insertSubDocument(
       draft,
-      isRoot ? null : (parentId as string),
+      isScene ? null : (parentId as string),
       grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
-        nid
+        () => context.idgen.next()
       )
     )[0];
 

@@ -85,6 +85,14 @@ interface Grida2DRuntime {
    * @param scene
    */
   loadScene(scene: TODO): void;
+  applyTransactions(
+    transactions: unknown[][]
+  ): {
+    success: boolean;
+    applied: number;
+    total: number;
+    error?: string;
+  }[];
 }
 
 export interface Grida2DScene extends Grida2DRuntime {

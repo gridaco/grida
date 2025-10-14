@@ -7,11 +7,10 @@ import {
   easeOut,
   steps as motionSteps,
   animate,
-  useTransform,
 } from "motion/react";
 import * as ProgressPrimitive from "@radix-ui/react-progress";
 import { cn } from "@/components/lib/utils";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 // Using motion's built-in easing functions
 
@@ -34,6 +33,7 @@ function useUXProgressValue(
 ) {
   const [progress, setProgress] = useState(0);
   const progressValue = useMotionValue(0);
+  const activeAnimationsRef = useRef<Array<{ stop: () => void }>>([]);
 
   const createAsymptoticAnimation = (
     targetValue: number,
@@ -41,7 +41,7 @@ function useUXProgressValue(
   ) => {
     const k = Math.log(2) / 2; // Mathematical decay rate
 
-    return animate(progressValue, targetValue, {
+    const animation = animate(progressValue, targetValue, {
       duration: Infinity,
       ease: (t: number) => {
         // Asymptotic function: approaches target asymptotically
@@ -53,6 +53,9 @@ function useUXProgressValue(
       },
       onUpdate: (value: number) => setProgress(value),
     });
+
+    activeAnimationsRef.current.push(animation);
+    return animation;
   };
 
   const createStepAnimation = async (
@@ -64,11 +67,14 @@ function useUXProgressValue(
     setProgress(stepProgress);
 
     // Animate to next step
-    await animate(progressValue, nextStepProgress, {
+    const animation = animate(progressValue, nextStepProgress, {
       duration: expectedDuration / 1000,
       ease: motionSteps(10, "end"),
       onUpdate: (value: number) => setProgress(value),
     });
+
+    activeAnimationsRef.current.push(animation);
+    await animation;
 
     return createAsymptoticAnimation(maxProgress, nextStepProgress);
   };
@@ -80,16 +86,27 @@ function useUXProgressValue(
     setProgress(0);
 
     // Animate to 80% of max
-    await animate(progressValue, targetProgress, {
+    const animation = animate(progressValue, targetProgress, {
       duration: expectedDuration / 1000,
       ease: easeIn,
       onUpdate: (value: number) => setProgress(value),
     });
 
+    activeAnimationsRef.current.push(animation);
+    await animation;
+
     return createAsymptoticAnimation(maxProgress, targetProgress);
   };
 
+  const clearAllAnimations = () => {
+    activeAnimationsRef.current.forEach((animation) => animation.stop());
+    activeAnimationsRef.current = [];
+  };
+
   const startAnimation = async () => {
+    // Clear any existing animations first
+    clearAllAnimations();
+
     progressValue.set(0);
     setProgress(0);
     const maxProgress = maxFakedProgress * 100;
@@ -121,6 +138,13 @@ function useUXProgressValue(
       setProgress(100);
     }
   }, [loading, progress, progressValue]);
+
+  // Cleanup effect to cancel all animations on unmount
+  useEffect(() => {
+    return () => {
+      clearAllAnimations();
+    };
+  }, []);
 
   return progress;
 }
@@ -166,6 +190,10 @@ interface FullscreenLoadingOverlayProps {
    * @default 0
    */
   exitDelay?: number;
+  /**
+   * Error message to display in the loading overlay.
+   */
+  errmsg?: string | null;
 }
 
 interface UXProgressProps {
@@ -199,12 +227,13 @@ function UXProgress({
 export function FullscreenLoadingOverlay({
   loading,
   expectedDuration = 3000,
-  minDuration = 0,
+  minDuration = 1000,
   steps,
   step,
   maxFakedProgress = 0.9,
   onExitComplete,
   exitDelay = 200,
+  errmsg,
 }: FullscreenLoadingOverlayProps) {
   const [showOverlay, setShowOverlay] = useState(true);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -265,6 +294,18 @@ export function FullscreenLoadingOverlay({
               maxFakedProgress={maxFakedProgress}
               className="w-52"
             />
+            {errmsg ? (
+              <motion.p
+                className="text-xs text-destructive"
+                role="alert"
+                aria-live="assertive"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.3 }}
+              >
+                {errmsg}
+              </motion.p>
+            ) : null}
             {/* <motion.p
               className="text-sm text-muted-foreground"
               initial={{ opacity: 0, y: 10 }}

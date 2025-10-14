@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use fonts::FaceRecord;
 use fonts::selection_italic as italic;
+use fonts::FaceRecord;
 
 /// Test italic instance detection with various name combinations
 #[test]
@@ -199,16 +199,12 @@ fn test_scenario_3_1_with_italic_instances() {
     assert_eq!(instance_info.ps_name, "TestFont-Italic");
     assert_eq!(instance_info.style_name, "Italic");
     assert!(!instance_info.italic_instances.is_empty());
-    assert!(
-        instance_info
-            .italic_instances
-            .contains(&"Italic".to_string())
-    );
-    assert!(
-        instance_info
-            .italic_instances
-            .contains(&"TestFont-Italic".to_string())
-    );
+    assert!(instance_info
+        .italic_instances
+        .contains(&"Italic".to_string()));
+    assert!(instance_info
+        .italic_instances
+        .contains(&"TestFont-Italic".to_string()));
 
     println!(
         "✅ Scenario 3-1 correctly detected with italic instances: {:?}",

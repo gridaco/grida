@@ -159,7 +159,7 @@ async function saveHostedGridaCanvasDocument(
     .update({
       data: document
         ? ({
-            __schema_version: "0.0.1-beta.1+20250728",
+            __schema_version: "0.0.1-beta.1+20251010",
             ...document,
           } satisfies CanvasDocumentSnapshotSchema as {})
         : null,
@@ -200,7 +200,7 @@ function HostedGridaCanvasDocumentProvider({
   const debouncedSave = useDebounceCallback(save, 1000);
 
   useEffect(() => {
-    editor.subscribeWithSelector(
+    editor.doc.subscribeWithSelector(
       (state) => state.document,
       () => {
         // save to server (with debounce)

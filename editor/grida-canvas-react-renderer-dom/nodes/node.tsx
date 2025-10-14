@@ -57,12 +57,14 @@ export function NodeElement<P extends Record<string, any>>({
     editable: state.editable,
     bitmaps: state.document.bitmaps,
     content_edit_mode: state.content_edit_mode,
+    graph: state.document.links,
   }));
 
   const node = useNode(node_id);
   const computed = useComputedNode(node_id);
 
-  const { component_id, template_id, children } = node;
+  const { component_id, template_id } = node;
+  const children = state.graph[node_id];
 
   const renderer = useMemo(() => {
     switch (node.type) {
@@ -208,6 +210,7 @@ export function NodeElement<P extends Record<string, any>>({
 }
 
 const fillings = {
+  scene: "background",
   boolean: "none",
   group: "none",
   text: "color",

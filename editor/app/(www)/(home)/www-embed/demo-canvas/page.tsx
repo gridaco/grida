@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import PlaygroundCanvas from "@/scaffolds/playground-canvas/playground-nossr";
+import PlaygroundCanvas from "@/grida-canvas-hosted/playground/playground-nossr";
 
 export const metadata: Metadata = {
   title: "Canvas Playground",
@@ -9,7 +9,10 @@ export const metadata: Metadata = {
 export default function CanvasPlaygroundPage() {
   return (
     <main className="w-screen h-screen overflow-hidden">
-      <PlaygroundCanvas src="/examples/canvas/hero-main-demo.grida" />
+      <PlaygroundCanvas
+        src="/examples/canvas/hero-main-demo.grida"
+        backend="canvas"
+      />
     </main>
   );
 }

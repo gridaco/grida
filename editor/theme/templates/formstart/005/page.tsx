@@ -276,6 +276,7 @@ _005.definition = {
   properties: userprops,
   version: "1.0.0",
   default: {},
+  links: {},
   nodes: {
     "005.title": {
       type: "text",

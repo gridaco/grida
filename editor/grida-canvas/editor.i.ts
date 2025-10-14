@@ -1,5 +1,5 @@
 import type {
-  EditorAction,
+  Action,
   TCanvasEventTargetDragGestureState,
 } from "@/grida-canvas/action";
 import type { BitmapEditorBrush, BitmapLayerEditor } from "@grida/bitmap";
@@ -12,6 +12,7 @@ import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
+import tree from "@grida/tree";
 import type { io } from "@grida/io";
 
 export namespace editor {
@@ -65,7 +66,72 @@ export namespace editor {
     } as T;
   }
 
-  export type NodeID = string & {};
+  /**
+   * Mutual exclusion (reentrancy guard) for JavaScript.
+   *
+   * Ensures that only one callback is executed at a time within the same call stack.
+   * If the mutex is already active, the main callback is skipped and the optional
+   * `elseCb` will be executed instead.
+   *
+   * This is synchronous-only:
+   * - Do not `await` inside the critical section — the lock will be released before
+   *   the awaited code runs.
+   * - Use this to prevent feedback loops when binding two reactive sources
+   *   (e.g. Monaco editor <-> Yjs).
+   *
+   * @example
+   * ```ts
+   * const mutex = createMutex()
+   *
+   * mutex(() => {
+   *   console.log("outer")
+   *   mutex(() => {
+   *     // This will be skipped, because the mutex is locked.
+   *     console.log("inner")
+   *   }, () => {
+   *     console.log("else branch called instead")
+   *   })
+   * })
+   *
+   * mutex(() => {
+   *   console.log("second outer") // will run after lock is released
+   * })
+   * ```
+   */
+  export type Mutex = (
+    /**
+     * Function executed only if the mutex is currently free.
+     */
+    cb: () => void,
+    /**
+     * Optional function executed if the mutex is already locked
+     * (i.e. the call is reentrant).
+     */
+    elseCb?: () => void
+  ) => void;
+
+  /**
+   * Create a new mutex function.
+   *
+   * @returns {Mutex} A function that enforces mutual exclusion.
+   */
+  export function createMutex(): Mutex {
+    let token = true;
+    return (cb: () => void, elseCb?: () => void): void => {
+      if (token) {
+        token = false;
+        try {
+          cb();
+        } finally {
+          token = true;
+        }
+      } else if (elseCb) {
+        elseCb();
+      }
+    };
+  }
+
+  export type NodeID = grida.program.nodes.NodeID;
 
   /**
    * a global class based editor instances
@@ -75,6 +141,16 @@ export namespace editor {
   export const __global_editors = {
     bitmap: null as BitmapLayerEditor | null,
   };
+
+  /**
+   * generic store subscription trait.
+   *
+   * this is commonly used for binding to a ui-store consumer, e.g. with react useSyncExternalStore
+   */
+  export interface IStoreSubscriptionTrait<Snapshot> {
+    subscribe: (onStoreChange: () => void) => () => void;
+    getSnapshot: () => Snapshot;
+  }
 }
 
 export namespace editor.config {
@@ -811,6 +887,10 @@ export namespace editor.state {
     marquee: editor.state.Marquee | null;
     selection: string[];
     scene_id: string | undefined;
+    ephemeral_chat: {
+      txt: string;
+      ts: number;
+    } | null;
   };
 
   /**
@@ -819,8 +899,26 @@ export namespace editor.state {
   export interface IEditorMultiplayerCursorState {
     /**
      * multiplayer cursors, does not include local cursor
+     * Object format {[cursorId]: cursor} for efficient lookups and natural deduplication
      */
-    cursors: MultiplayerCursor[];
+    cursors: Record<string, MultiplayerCursor>;
+    /**
+     * Local cursor chat state
+     */
+    local_cursor_chat: {
+      /**
+       * Current message being typed
+       */
+      message: string | null;
+      /**
+       * Whether the chat is open
+       */
+      is_open: boolean;
+      /**
+       * Timestamp of when the message was last modified, or null if no message
+       */
+      last_modified: number | null;
+    };
   }
 
   export interface IEditorUserClipboardState {
@@ -1172,13 +1270,6 @@ export namespace editor.state {
     content_edit_mode?: editor.state.ContentEditModeState;
   }
 
-  export interface IEditorHistoryExtensionState {
-    history: {
-      past: history.HistoryEntry[];
-      future: history.HistoryEntry[];
-    };
-  }
-
   /**
    * @deprecated remove when possible
    */
@@ -1222,7 +1313,6 @@ export namespace editor.state {
       editor.state.ISceneSurfaceState,
       editor.state.IEditorRuntimePreservedState,
       //
-      editor.state.IEditorHistoryExtensionState,
       editor.state.IDocumentState,
       grida.program.document.IDocumentTemplatesRepository {
     rotation_quantize_step: number;
@@ -1275,13 +1365,28 @@ export namespace editor.state {
       grida.program.document.Document,
       "nodes" | "entry_scene_id"
     > &
-      Partial<grida.program.document.IBitmapsRepository> & {
-        scenes: Record<
-          string,
-          Partial<grida.program.document.Scene> &
-            Pick<grida.program.document.Scene, "id" | "name" | "constraints">
-        >;
-      };
+      Partial<
+        grida.program.document.IBitmapsRepository &
+          Pick<grida.program.document.Document, "links">
+      > &
+      (
+        | {
+            // New format - scenes_ref with links
+            scenes_ref: string[];
+            links?: Record<string, string[] | undefined>;
+          }
+        | {
+            // Old format (backward compat) - scenes as Record (links inferred from children_refs)
+            scenes: Record<
+              string,
+              Partial<grida.program.document.Scene> &
+                Pick<
+                  grida.program.document.Scene,
+                  "id" | "name" | "constraints"
+                >
+            >;
+          }
+      );
   }
 
   export function init({
@@ -1290,18 +1395,76 @@ export namespace editor.state {
   }: Omit<IEditorStateInit, "debug"> & {
     debug?: boolean;
   }): editor.state.IEditorState {
+    // Handle both old (scenes: Record) and new (scenes_ref: string[]) formats
+    const scenes_ref: string[] = [];
+    const migrated_nodes: Record<string, grida.program.nodes.Node> = {};
+    const migrated_links: Record<string, string[] | undefined> = {};
+    const input_doc = init.document;
+
+    if ("scenes_ref" in input_doc) {
+      // New format - scenes already in nodes
+      scenes_ref.push(...input_doc.scenes_ref);
+    } else if ("scenes" in input_doc) {
+      // Old format - convert scenes to SceneNodes
+      const input_scenes = input_doc.scenes;
+
+      for (const [scene_id, scene_input] of Object.entries(input_scenes)) {
+        const scene = grida.program.document.init_scene(scene_input);
+        scenes_ref.push(scene_id);
+
+        // Create SceneNode from Scene input (if not already in nodes)
+        if (!init.document.nodes[scene_id]) {
+          const sceneNode: grida.program.nodes.SceneNode = {
+            type: "scene",
+            id: scene_id,
+            name: scene.name,
+            active: true,
+            locked: false,
+            constraints: scene.constraints,
+            order: scene.order,
+            guides: scene.guides,
+            edges: scene.edges,
+            backgroundColor: scene.backgroundColor,
+          };
+          migrated_nodes[scene_id] = sceneNode;
+        }
+
+        // Migrate children_refs to links
+        migrated_links[scene_id] = scene.children_refs || [];
+      }
+    }
+
+    // Build final document with migrated data
+    const base_links = "links" in input_doc ? (input_doc.links ?? {}) : {};
+
+    // Explicitly destructure to exclude potential 'scenes' property from old format
+    const {
+      nodes: input_nodes,
+      entry_scene_id,
+      bitmaps = {},
+      images = {},
+      properties = {},
+      // Exclude 'scenes' from spreading (old format)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      scenes: _scenes,
+      ...rest
+    } = input_doc as any;
+
     const doc: grida.program.document.Document = {
-      bitmaps: {},
-      images: {},
-      properties: {},
-      ...init.document,
-      scenes: Object.entries(init.document.scenes ?? {}).reduce(
-        (acc, [key, scene]) => {
-          acc[key] = grida.program.document.init_scene(scene);
-          return acc;
-        },
-        {} as grida.program.document.Document["scenes"]
-      ),
+      ...rest,
+      bitmaps,
+      images,
+      properties,
+      entry_scene_id,
+      nodes: {
+        ...input_nodes,
+        ...migrated_nodes,
+      },
+      links: {
+        ...base_links,
+        ...migrated_links,
+      },
+      scenes_ref,
     };
 
     const s = new dq.DocumentStateQuery(doc);
@@ -1315,16 +1478,17 @@ export namespace editor.state {
         last: cmath.vector2.zero,
         logical: cmath.vector2.zero,
       },
-      cursors: [],
-      history: {
-        future: [],
-        past: [],
+      cursors: {},
+      local_cursor_chat: {
+        message: null,
+        is_open: false,
+        last_modified: null,
       },
       gesture_modifiers: editor.config.DEFAULT_GESTURE_MODIFIERS,
       ruler: "off",
       pixelgrid: "on",
       when_not_removable: "deactivate",
-      document_ctx: dq.Context.from(doc).snapshot(),
+      document_ctx: new tree.graph.Graph(doc).lut,
       pointer_hit_testing_config: editor.config.DEFAULT_HIT_TESTING_CONFIG,
       surface_measurement_targeting: "off",
       surface_measurement_targeting_locked: false,
@@ -1342,7 +1506,7 @@ export namespace editor.state {
       tool: { type: "cursor" },
       __tool_previous: null,
       brush: editor.config.DEFAULT_BRUSH,
-      scene_id: doc.entry_scene_id ?? Object.keys(doc.scenes)[0] ?? undefined,
+      scene_id: doc.entry_scene_id ?? scenes_ref[0] ?? undefined,
       flags: {
         __unstable_brush_tool: "off",
       },
@@ -1780,78 +1944,27 @@ export namespace editor.gesture {
 }
 
 export namespace editor.history {
+  export interface Patch {
+    op: "replace" | "remove" | "add";
+    path: (string | number)[];
+    value?: any;
+  }
+
   export type HistoryEntry = {
-    actionType: EditorAction["type"];
-    timestamp: number;
-    state: editor.state.IDocumentState;
+    actionType: Action["type"];
+    /**
+     * timestamp
+     */
+    ts: number;
+    /**
+     * patches
+     */
+    patches: Patch[];
+    /**
+     * inverse patches
+     */
+    inversePatches: Patch[];
   };
-
-  /**
-   * @mutates draft
-   */
-  export function apply(
-    draft: editor.state.IEditorState,
-    snapshot: editor.state.IDocumentState
-  ) {
-    //
-    draft.selection = snapshot.selection;
-    draft.scene_id = snapshot.scene_id;
-    draft.document = snapshot.document;
-    draft.document_ctx = snapshot.document_ctx;
-    draft.content_edit_mode = snapshot.content_edit_mode;
-    draft.document_key = snapshot.document_key;
-    //
-
-    // hover state should be cleared to prevent errors
-    draft.hovered_node_id = null;
-    return;
-  }
-
-  export function snapshot(
-    state: editor.state.IDocumentState
-  ): editor.state.IDocumentState {
-    return {
-      selection: state.selection,
-      scene_id: state.scene_id,
-      document: state.document,
-      document_ctx: state.document_ctx,
-      content_edit_mode: state.content_edit_mode,
-      document_key: state.document_key,
-    };
-  }
-
-  export function entry(
-    actionType: editor.history.HistoryEntry["actionType"],
-    state: editor.state.IDocumentState
-  ): editor.history.HistoryEntry {
-    return {
-      actionType,
-      state: snapshot(state),
-      timestamp: Date.now(),
-    };
-  }
-
-  export function getMergableEntry(
-    snapshots: editor.history.HistoryEntry[],
-    timeout: number = 300
-  ): editor.history.HistoryEntry | undefined {
-    if (snapshots.length === 0) {
-      return;
-    }
-
-    const newTimestamp = Date.now();
-    const previousEntry = snapshots[snapshots.length - 1];
-
-    if (
-      // actionType !== previousEntry.actionType ||
-      newTimestamp - previousEntry.timestamp >
-      timeout
-    ) {
-      return;
-    }
-
-    return previousEntry;
-  }
 }
 
 export namespace editor.a11y {
@@ -1875,7 +1988,114 @@ export namespace editor.a11y {
   } as const;
 }
 
+export namespace editor.multiplayer {
+  export type AwarenessPayload = {
+    /**
+     * user-window-session unique cursor id
+     *
+     * one user can have multiple cursors (if multiple windows are open)
+     */
+    cursor_id: string;
+    /**
+     * player profile information (rarely changes)
+     */
+    profile: {
+      /**
+       * theme colors for this player within collaboration ui
+       */
+      palette: editor.state.MultiplayerCursorColorPalette;
+    };
+    /**
+     * current focus state (changes when switching pages/selecting)
+     */
+    focus: {
+      /**
+       * player's current scene (page)
+       */
+      scene_id: string | undefined;
+      /**
+       * the selection (node ids) of this player
+       */
+      selection: string[];
+    };
+    /**
+     * geometric state (changes frequently with mouse movement)
+     */
+    geo: {
+      /**
+       * current transform (camera)
+       */
+      transform: cmath.Transform;
+      /**
+       * current cursor position
+       */
+      position: [number, number];
+      /**
+       * marquee start point
+       * the full marquee is a rect with marquee_a and position (current cursor position)
+       */
+      marquee_a: [number, number] | null;
+    };
+    /**
+     * cursor chat is a ephemeral message that lives for a short time and disappears after few seconds (as configured)
+     * only the last message is kept
+     */
+    cursor_chat: {
+      txt: string;
+      ts: number;
+    } | null;
+  };
+}
+
 export namespace editor.api {
+  /**
+   * api protocol with json patch
+   *
+   * can be used with language boundaries / cli / wasm-wasi / etc.
+   */
+  export namespace patch {
+    export type JsonPatchOperation =
+      | ({ op: editor.history.Patch["op"]; path: string } & {
+          value: editor.history.Patch["value"];
+        })
+      | { op: editor.history.Patch["op"]; path: string };
+
+    export function encodeJsonPointerSegment(segment: string | number): string {
+      const str = String(segment);
+      return str.replace(/~/g, "~0").replace(/\//g, "~1");
+    }
+
+    export function toJsonPointerPath(path: (string | number)[]): string {
+      return `/${path.map(encodeJsonPointerSegment).join("/")}`;
+    }
+
+    export function toJsonPatchOperations(
+      patches: editor.history.Patch[]
+    ): JsonPatchOperation[] {
+      return patches.map((patch) => {
+        const pointer = toJsonPointerPath(patch.path);
+        if ("value" in patch) {
+          return { op: patch.op, path: pointer, value: patch.value };
+        }
+        return { op: patch.op, path: pointer };
+      });
+    }
+  }
+
+  export type SubscriptionCallbackFn<T = any> = (
+    editor: T,
+    action?: Action,
+    patches?: editor.history.Patch[]
+  ) => void;
+
+  export type SubscriptionWithSelectorCallbackFn<T, E = any> = (
+    editor: E,
+    selected: T,
+    previous: T,
+    action?: Action,
+    patches?: editor.history.Patch[]
+  ) => void;
+
   export class EditorConsumerVerboseError extends Error {
     context: any;
     constructor(message: string, context: any) {
@@ -1988,125 +2208,476 @@ export namespace editor.api {
     delay: number;
   };
 
-  export interface INodeChangeActions {
-    toggleNodeActive(node_id: NodeID): void;
-    toggleNodeLocked(node_id: NodeID): void;
+  export interface IDocumentBrushToolActions {
+    changeBrush(brush: BitmapEditorBrush): void;
+    changeBrushSize(size: editor.api.NumberChange): void;
+    changeBrushOpacity(opacity: editor.api.NumberChange): void;
+  }
+
+  export interface ICameraActions {
+    /**
+     * @get the transform of the camera
+     * @set set the transform of the camera
+     */
+    transform: cmath.Transform;
 
     /**
-     * @param node_id text node id
-     * @returns the font weight if the node is toggled, false otherwise
-     *
-     * @remarks
-     * not all fonts can be toggled bold, the font should actually have 400 / 700 weight defined.
+     * set the transform of the camera
+     * @param transform the transform to set
+     * @param sync if true, the transform will also re-calculate the cursor position.
      */
-    toggleNodeBold(node_id: NodeID): false | cg.NFontWeight;
+    transformWithSync(transform: cmath.Transform, sync: boolean): void;
 
     /**
-     * @param node_id text node id
-     * @returns true if the node is toggled, false otherwise
-     *
-     * note: the boolean does not return if its italic, it returns the result of successful toggle
-     * not all fonts can be toggled italic, the font should actually have italic style defined.
+     * zoom the camera by the given delta
+     * @param delta the delta to zoom by
+     * @param origin the origin of the zoom
      */
-    toggleNodeItalic(node_id: NodeID): boolean;
+    zoom(delta: number, origin: cmath.Vector2): void;
+    /**
+     * pan the camera by the given delta
+     * @param delta the delta to pan by
+     */
+    pan(delta: [number, number]): void;
 
-    toggleNodeUnderline(node_id: NodeID): void;
-    toggleNodeLineThrough(node_id: NodeID): void;
-    changeNodeActive(node_id: NodeID, active: boolean): void;
-    changeNodeLocked(node_id: NodeID, locked: boolean): void;
-    changeNodeName(node_id: NodeID, name: string): void;
-    changeNodeUserData(node_id: NodeID, userdata: unknown): void;
-    changeNodeSize(
-      node_id: NodeID,
-      axis: "width" | "height",
-      value: grida.program.css.LengthPercentage | "auto"
+    scale(
+      factor: number | cmath.Vector2,
+      origin: cmath.Vector2 | "center"
     ): void;
-    autoSizeTextNode(node_id: NodeID, axis: "width" | "height"): void;
-    changeNodeBorder(
-      node_id: NodeID,
-      border: grida.program.css.Border | undefined
+    fit(
+      selector: grida.program.document.Selector,
+      options?: {
+        margin?: number | [number, number, number, number];
+        animate?: boolean;
+      }
     ): void;
-    changeNodeProps(
+    zoomIn(): void;
+    zoomOut(): void;
+  }
+
+  export interface IDocumentGeometryInterfaceProvider {
+    /**
+     * returns a list of node ids that are intersecting with the pointer event
+     * @param event window event
+     * @returns
+     */
+    getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
+
+    /**
+     * returns a list of node ids that are intersecting with the point in canvas space
+     * @param point canvas space point
+     * @returns
+     */
+    getNodeIdsFromPoint(point: cmath.Vector2): string[];
+
+    /**
+     * returns a list of node ids that are intersecting with the envelope in canvas space
+     * @param envelope
+     * @returns
+     */
+    getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
+
+    /**
+     * returns a bounding rect of the node in canvas space
+     * @param node_id
+     * @returns
+     */
+    getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null;
+  }
+
+  export interface IDocumentImageExportInterfaceProvider {
+    /**
+     * exports the node as an image
+     * @param node_id
+     * @param format
+     * @returns
+     */
+    exportNodeAsImage(
       node_id: string,
-      key: string,
-      value?: tokens.StringValueExpression
+      format: "PNG" | "JPEG"
+    ): Promise<Uint8Array>;
+  }
+
+  export interface IDocumentSVGExportInterfaceProvider {
+    /**
+     * exports the node as an svg
+     * @param node_id
+     * @returns
+     */
+    exportNodeAsSVG(node_id: string): Promise<string>;
+  }
+
+  export interface IDocumentPDFExportInterfaceProvider {
+    /**
+     * exports the node as an pdf
+     * @param node_id
+     * @returns
+     */
+    exportNodeAsPDF(node_id: string): Promise<Uint8Array>;
+  }
+
+  export interface IDocumentExporterInterfaceProvider {
+    readonly formats: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})[];
+
+    canExportNodeAs(
+      node_id: string,
+      format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+    ): boolean;
+
+    exportNodeAs(
+      node_id: string,
+      format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+    ): Promise<Uint8Array | string>;
+  }
+
+  /**
+   * interface for font parser
+   *
+   * grida has 2 font parsers:
+   * 1. @grida/fonts (js)
+   * 2. @grida/canvas-wasm (rust)
+   *
+   */
+  export interface IDocumentFontParserInterfaceProvider {
+    // /**
+    //  * parse single ttf font
+    //  * @param bytes font ttf bytes
+    //  */
+    // parseTTF(bytes: ArrayBuffer): Promise<any | null>;
+
+    /**
+     * parse font family
+     * @param faces font faces
+     */
+    parseFamily(
+      familyName: string,
+      faces: {
+        faceId: string;
+        data: ArrayBuffer;
+        userFontStyleItalic?: boolean;
+      }[]
+    ): Promise<editor.font_spec.UIFontFamily | null>;
+  }
+
+  /**
+   * Agent interface that is responsible for resolving, managing and caching fonts.
+   */
+  export interface IDocumentFontCollectionInterfaceProvider {
+    /**
+     * loads the font so that the backend can render it
+     * @param font font descriptor
+     */
+    loadFont(font: { family: string }): Promise<void>;
+
+    /**
+     * Lists fonts that have been loaded and are available at runtime.
+     * This does not fetch the full webfont list; it only reports fonts
+     * that were explicitly loaded through {@link loadFont}.
+     */
+    listLoadedFonts(): string[];
+
+    /**
+     * Sets the default fallback fonts.
+     * @param fonts
+     */
+    setFallbackFonts(fonts: string[]): void;
+  }
+
+  export interface IDocumentVectorInterfaceProvider {
+    /**
+     * converts the node into a vector network
+     * @param node_id
+     * @returns vector network or null if unsupported
+     */
+    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+  }
+
+  //
+
+  export interface IDocumentGeometryQuery {
+    /**
+     * returns a list of node ids that are intersecting with the point in canvas space
+     * @param point canvas space point
+     * @returns
+     */
+    getNodeIdsFromPoint(point: cmath.Vector2): string[];
+    /**
+     * returns a list of node ids that are intersecting with the pointer event
+     * @param event window event
+     * @returns
+     */
+    getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
+    /**
+     * returns a list of node ids that are intersecting with the envelope in canvas space
+     * @param envelope canvas space envelope
+     * @returns
+     */
+    getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
+    /**
+     * returns a bounding rect of the node in canvas space
+     * @param node_id node id
+     * @returns
+     */
+    getNodeAbsoluteBoundingRect(node_id: NodeID): cmath.Rectangle | null;
+    /**
+     * returns the absolute rotation of the node in canvas space
+     * @param node_id node id
+     * @returns
+     */
+    getNodeAbsoluteRotation(node_id: NodeID): number;
+  }
+
+  export interface IDocumentVectorInterfaceActions {
+    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+  }
+
+  export interface IDocumentFontActions {
+    // #region fonts
+
+    /**
+     * Loads the font so that the backend can render it
+     */
+    loadFontSync(font: { family: string }): Promise<void>;
+
+    /**
+     * Lists fonts currently loaded and available to the renderer.
+     */
+    listLoadedFonts(): string[];
+
+    /**
+     * Loads platform default fonts and configures renderer fallback order.
+     */
+    loadPlatformDefaultFonts(): Promise<void>;
+
+    /**
+     * Retrieves font metadata, variation axes and features.
+     */
+    getFontFamilyDetailsSync(
+      fontFamily: string
+    ): Promise<editor.font_spec.UIFontFamily | null>;
+
+    // #endregion fonts
+  }
+
+  export interface IDocumentImageActions {
+    // #region image
+
+    /**
+     * creates an image (data) from the given data, registers it to the document
+     * @param data
+     */
+    createImage(
+      data: Uint8Array | File
+    ): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * creates an image (data) from the given src, registers it to the document
+     * @param src
+     */
+    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
+
+    /**
+     * gets the image instance from the given ref
+     * @param ref
+     */
+    getImage(ref: string): ImageInstance | null;
+
+    // #endregion image
+  }
+
+  export interface IEditorDocumentStoreConsumerWithConstraintsActions {
+    /**
+     * inserts the payload with assertions and constraints
+     */
+    insert(payload: InsertPayload): void;
+    autoSizeTextNode(node_id: string, axis: "width" | "height"): void;
+  }
+
+  /**
+   * Payload signature for inserting node or subdocument
+   */
+  export type InsertPayload =
+    | {
+        id?: string;
+        prototype: grida.program.nodes.NodePrototype;
+      }
+    | {
+        document: grida.program.document.IPackedSceneDocument;
+      };
+
+  export interface IDocumentStoreActions {
+    undo(): void;
+    redo(): void;
+    /**
+     * Reset the entire document state
+     *
+     * Completely replaces the editor state, bypassing the reducer.
+     * - Preserves ONLY the camera transform (everything else is replaced)
+     * - Clears undo/redo history
+     * - Emits a "document/reset" action for subscribers
+     * - Auto-generates a timestamp key if not provided
+     *
+     * @param state - The new complete editor state
+     * @param key - Optional unique identifier (auto-generated if omitted)
+     * @param force - If true, bypass locked check
+     */
+    reset(
+      state: editor.state.IEditorState,
+      key?: string,
+      force?: boolean
     ): void;
-    changeNodeComponent(node_id: NodeID, component: string): void;
-    changeNodeText(node_id: NodeID, text: tokens.StringValueExpression): void;
-    changeNodeStyle(
+    insert(payload: InsertPayload): void;
+    loadScene(scene_id: string): void;
+    createScene(scene?: grida.program.document.SceneInit): void;
+    deleteScene(scene_id: string): void;
+    duplicateScene(scene_id: string): void;
+    renameScene(scene_id: string, name: string): void;
+    changeSceneBackground(
+      scene_id: string,
+      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+    ): void;
+
+    /**
+     * select the nodes by the given selectors.
+     *
+     * @param selectors - {@link grida.program.document.Selector}[]
+     * @returns the selected node ids. or `false` if ignored.
+     */
+    select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
+
+    blur(): void;
+    cut(target: "selection" | NodeID): void;
+    copy(target: "selection" | NodeID): void;
+    paste(): void;
+    pasteVector(network: vn.VectorNetwork): void;
+    pastePayload(payload: io.clipboard.ClipboardPayload): boolean;
+    duplicate(target: "selection" | NodeID): void;
+    flatten(target: "selection" | NodeID): void;
+    op(target: ReadonlyArray<NodeID>, op: cg.BooleanOperation): void;
+    union(target: ReadonlyArray<NodeID>): void;
+    subtract(target: ReadonlyArray<NodeID>): void;
+    intersect(target: ReadonlyArray<NodeID>): void;
+    exclude(target: ReadonlyArray<NodeID>): void;
+    groupMask(target: ReadonlyArray<NodeID>): void;
+
+    // vector editor
+    selectVertex(
       node_id: NodeID,
-      key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
-      value: any
+      vertex: number,
+      options: { additive?: boolean }
     ): void;
-    changeNodeMouseCursor(
+    deleteVertex(node_id: NodeID, vertex: number): void;
+    selectSegment(
       node_id: NodeID,
-      mouseCursor: cg.SystemMouseCursor
+      segment: number,
+      options: { additive?: boolean }
     ): void;
-    changeNodeSrc(node_id: NodeID, src?: tokens.StringValueExpression): void;
-    changeNodeHref(
+    deleteSegment(node_id: NodeID, segment: number): void;
+    splitSegment(node_id: NodeID, point: vn.PointOnSegment): void;
+    selectTangent(
+      node_id: editor.NodeID,
+      vertex: number,
+      tangent: 0 | 1,
+      options: { additive?: boolean }
+    ): void;
+    translateVertex(
       node_id: NodeID,
-      href?: grida.program.nodes.i.IHrefable["href"]
+      vertex: number,
+      delta: cmath.Vector2
     ): void;
-    changeNodeTarget(
+    translateSegment(
       node_id: NodeID,
-      target?: grida.program.nodes.i.IHrefable["target"]
+      segment: number,
+      delta: cmath.Vector2
     ): void;
-    changeNodePositioning(
+    bendSegment(
       node_id: NodeID,
-      positioning: grida.program.nodes.i.IPositioning
+      segment: number,
+      ca: number,
+      cb: cmath.Vector2,
+      frozen: {
+        a: cmath.Vector2;
+        b: cmath.Vector2;
+        ta: cmath.Vector2;
+        tb: cmath.Vector2;
+      }
     ): void;
-    changeNodePositioningMode(
-      node_id: NodeID,
-      positioningMode: "absolute" | "relative"
+    bendOrClearCorner(
+      node_id: editor.NodeID,
+      vertex: number,
+      tangent?: cmath.Vector2 | 0,
+      ref?: "ta" | "tb"
     ): void;
-    changeNodeCornerRadius(
-      node_id: NodeID,
-      cornerRadius: cg.CornerRadius
+    planarize(ids: editor.NodeID | editor.NodeID[]): void;
+
+    selectVariableWidthStop(node_id: NodeID, stop: number): void;
+    deleteVariableWidthStop(node_id: NodeID, stop: number): void;
+    addVariableWidthStop(node_id: editor.NodeID, u: number, r: number): void;
+
+    //
+    getNodeSnapshotById(node_id: NodeID): Readonly<grida.program.nodes.Node>;
+    getNodeById(node_id: NodeID): NodeProxy<grida.program.nodes.Node>;
+    getNodeDepth(node_id: NodeID): number;
+    //
+
+    //
+    insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;
+    deleteNode(target: "selection" | NodeID): void;
+    //
+
+    createNodeFromSvg(
+      svg: string
+    ): Promise<NodeProxy<grida.program.nodes.ContainerNode>>;
+    createImageNode(
+      image: grida.program.document.ImageRef
+    ): NodeProxy<grida.program.nodes.ImageNode>;
+    createTextNode(text: string): NodeProxy<grida.program.nodes.TextNode>;
+    createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
+
+    order(target: "selection" | NodeID, order: "back" | "front" | number): void;
+    mv(source: NodeID[], target: NodeID, index?: number): void;
+
+    align(
+      target: "selection" | NodeID,
+      alignment: {
+        horizontal?: "none" | "min" | "max" | "center";
+        vertical?: "none" | "min" | "max" | "center";
+      }
     ): void;
-    changeNodeCornerRadiusWithDelta(node_id: NodeID, delta: number): void;
-    changeNodePointCount(node_id: NodeID, pointCount: number): void;
-    changeNodeInnerRadius(node_id: NodeID, innerRadius: number): void;
-    changeNodeArcData(
-      node_id: NodeID,
-      arcData: grida.program.nodes.i.IEllipseArcData
-    ): void;
-    changeNodeFills(node_id: NodeID, fills: cg.Paint[]): void;
-    changeNodeFills(node_id: NodeID[], fills: cg.Paint[]): void;
-    changeNodeStrokes(node_id: NodeID, strokes: cg.Paint[]): void;
-    changeNodeStrokes(node_id: NodeID[], strokes: cg.Paint[]): void;
-    addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
-    addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;
-    addNodeStroke(
-      node_id: NodeID,
-      stroke: cg.Paint,
-      at?: "start" | "end"
-    ): void;
-    addNodeStroke(
-      node_id: NodeID[],
-      stroke: cg.Paint,
-      at?: "start" | "end"
-    ): void;
-    changeNodeStrokeWidth(
-      node_id: NodeID,
-      strokeWidth: editor.api.NumberChange
-    ): void;
-    changeNodeStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
-    changeNodeStrokeAlign(node_id: NodeID, strokeAlign: cg.StrokeAlign): void;
-    changeNodeFit(node_id: NodeID, fit: cg.BoxFit): void;
-    changeNodeOpacity(node_id: NodeID, opacity: editor.api.NumberChange): void;
-    changeNodeBlendMode(node_id: NodeID, blendMode: cg.LayerBlendMode): void;
-    changeNodeRotation(
-      node_id: NodeID,
-      rotation: editor.api.NumberChange
-    ): void;
+
+    //
+    distributeEvenly(target: "selection" | NodeID[], axis: "x" | "y"): void;
+    autoLayout(target: "selection" | NodeID[]): void;
+    contain(target: "selection" | NodeID[]): void;
+
+    /**
+     * group the nodes
+     * @param target - the nodes to group
+     */
+    group(target: "selection" | NodeID[]): void;
+
+    /**
+     * ungroup the nodes (from group or boolean)
+     * @param target - the nodes to ungroup
+     */
+    ungroup(target: "selection" | NodeID[]): void;
+
+    /**
+     * delete the guide at the given index
+     * @param idx
+     */
+    deleteGuide(idx: number): void;
+  }
+
+  /**
+   * node reducer actions that requires font management & font parsing dependencies
+   */
+  export interface IDocumentNodeTextNodeFontActions {
     changeTextNodeFontFamilySync(
       node_id: NodeID,
       fontFamily: string,
       force?: boolean
     ): Promise<boolean>;
-    changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
-    changeTextNodeFontKerning(node_id: NodeID, fontKerning: boolean): void;
-    changeTextNodeFontWidth(node_id: NodeID, fontWidth: number): void;
 
     /**
      * use when font style change or family change
@@ -2126,6 +2697,162 @@ export namespace editor.api {
       node_id: NodeID,
       fontStyleDescription: editor.api.FontStyleChangeDescription
     ): void;
+
+    /**
+     * @param node_id text node id
+     * @returns the font weight if the node is toggled, false otherwise
+     *
+     * @remarks
+     * not all fonts can be toggled bold, the font should actually have 400 / 700 weight defined.
+     */
+    toggleTextNodeBold(node_id: NodeID): false | cg.NFontWeight;
+
+    /**
+     * @param node_id text node id
+     * @returns true if the node is toggled, false otherwise
+     *
+     * note: the boolean does not return if its italic, it returns the result of successful toggle
+     * not all fonts can be toggled italic, the font should actually have italic style defined.
+     */
+    toggleTextNodeItalic(node_id: NodeID): boolean;
+  }
+
+  export interface IDocumentNodeChangeActions {
+    toggleNodeActive(node_id: NodeID): void;
+    toggleNodeLocked(node_id: NodeID): void;
+
+    changeNodeUserData(node_id: NodeID, userdata: unknown): void;
+    changeNodeSize(
+      node_id: NodeID,
+      axis: "width" | "height",
+      value: grida.program.css.LengthPercentage | "auto"
+    ): void;
+
+    changeNodePropertyBorder(
+      node_id: NodeID,
+      border: grida.program.css.Border | undefined
+    ): void;
+    changeNodePropertyProps(
+      node_id: string,
+      key: string,
+      value?: tokens.StringValueExpression
+    ): void;
+    changeNodePropertyComponent(node_id: NodeID, component: string): void;
+    changeNodePropertyText(
+      node_id: NodeID,
+      text: tokens.StringValueExpression | null
+    ): void;
+    changeNodePropertyStyle(
+      node_id: NodeID,
+      key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
+      value: any
+    ): void;
+    changeNodePropertyMouseCursor(
+      node_id: NodeID,
+      mouseCursor: cg.SystemMouseCursor
+    ): void;
+    changeNodePropertySrc(
+      node_id: NodeID,
+      src?: tokens.StringValueExpression
+    ): void;
+    changeNodePropertyHref(
+      node_id: NodeID,
+      href?: grida.program.nodes.i.IHrefable["href"]
+    ): void;
+    changeNodePropertyTarget(
+      node_id: NodeID,
+      target?: grida.program.nodes.i.IHrefable["target"]
+    ): void;
+    changeNodePropertyPositioning(
+      node_id: NodeID,
+      positioning: grida.program.nodes.i.IPositioning
+    ): void;
+    changeNodePropertyPositioningMode(
+      node_id: NodeID,
+      positioningMode: "absolute" | "relative"
+    ): void;
+    changeNodePropertyCornerRadius(
+      node_id: NodeID,
+      cornerRadius: cg.CornerRadius
+    ): void;
+    changeNodePropertyCornerRadiusWithDelta(
+      node_id: NodeID,
+      delta: number
+    ): void;
+    changeNodePropertyPointCount(node_id: NodeID, pointCount: number): void;
+    changeNodePropertyInnerRadius(node_id: NodeID, innerRadius: number): void;
+    changeNodePropertyArcData(
+      node_id: NodeID,
+      arcData: grida.program.nodes.i.IEllipseArcData
+    ): void;
+    changeNodePropertyFills(node_id: NodeID, fills: cg.Paint[]): void;
+    changeNodePropertyFills(node_id: NodeID[], fills: cg.Paint[]): void;
+    changeNodePropertyStrokes(node_id: NodeID, strokes: cg.Paint[]): void;
+    changeNodePropertyStrokes(node_id: NodeID[], strokes: cg.Paint[]): void;
+
+    changeNodePropertyStrokeWidth(
+      node_id: NodeID,
+      strokeWidth: editor.api.NumberChange
+    ): void;
+    changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodePropertyStrokeAlign(
+      node_id: NodeID,
+      strokeAlign: cg.StrokeAlign
+    ): void;
+    changeNodePropertyFit(node_id: NodeID, fit: cg.BoxFit): void;
+
+    addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
+    addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;
+
+    addNodeStroke(
+      node_id: NodeID,
+      stroke: cg.Paint,
+      at?: "start" | "end"
+    ): void;
+    addNodeStroke(
+      node_id: NodeID[],
+      stroke: cg.Paint,
+      at?: "start" | "end"
+    ): void;
+
+    changeContainerNodePadding(
+      node_id: NodeID,
+      padding: grida.program.nodes.i.IPadding["padding"]
+    ): void;
+    changeContainerNodeLayout(
+      node_id: NodeID,
+      layout: grida.program.nodes.i.IFlexContainer["layout"]
+    ): void;
+    changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis): void;
+    changeFlexContainerNodeMainAxisAlignment(
+      node_id: string,
+      mainAxisAlignment: cg.MainAxisAlignment
+    ): void;
+    changeFlexContainerNodeCrossAxisAlignment(
+      node_id: string,
+      crossAxisAlignment: cg.CrossAxisAlignment
+    ): void;
+    changeFlexContainerNodeGap(
+      node_id: string,
+      gap: number | { mainAxisGap: number; crossAxisGap: number }
+    ): void;
+
+    changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
+    changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;
+    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeBlur): void;
+    changeNodeFeBackdropBlur(
+      node_id: NodeID,
+      effect?: cg.IFeGaussianBlur
+    ): void;
+
+    // ==============================================================
+    // TextNode
+    // ==============================================================
+
+    changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
+    changeTextNodeFontKerning(node_id: NodeID, fontKerning: boolean): void;
+    changeTextNodeFontWidth(node_id: NodeID, fontWidth: number): void;
+
     changeTextNodeFontFeature(
       node_id: NodeID,
       feature: cg.OpenTypeFeature,
@@ -2190,308 +2917,39 @@ export namespace editor.api {
       maxlength: number | undefined
     ): void;
     changeTextNodeMaxLines(node_id: NodeID, maxLines: number | null): void;
-    changeContainerNodePadding(
-      node_id: NodeID,
-      padding: grida.program.nodes.i.IPadding["padding"]
-    ): void;
-    changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
-    changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;
-    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeBlur): void;
-    changeNodeFeBackdropBlur(
-      node_id: NodeID,
-      effect?: cg.IFeGaussianBlur
-    ): void;
-    changeContainerNodeLayout(
-      node_id: NodeID,
-      layout: grida.program.nodes.i.IFlexContainer["layout"]
-    ): void;
-    changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis): void;
-    changeFlexContainerNodeMainAxisAlignment(
-      node_id: string,
-      mainAxisAlignment: cg.MainAxisAlignment
-    ): void;
-    changeFlexContainerNodeCrossAxisAlignment(
-      node_id: string,
-      crossAxisAlignment: cg.CrossAxisAlignment
-    ): void;
-    changeFlexContainerNodeGap(
-      node_id: string,
-      gap: number | { mainAxisGap: number; crossAxisGap: number }
-    ): void;
+
+    toggleTextNodeUnderline(node_id: NodeID): void;
+    toggleTextNodeLineThrough(node_id: NodeID): void;
+
+    // ==============================================================
   }
 
-  export interface IBrushToolActions {
-    changeBrush(brush: BitmapEditorBrush): void;
-    changeBrushSize(size: editor.api.NumberChange): void;
-    changeBrushOpacity(opacity: editor.api.NumberChange): void;
-  }
-
-  export interface IPixelGridActions {
-    configurePixelGrid(state: "on" | "off"): void;
-    togglePixelGrid(): "on" | "off";
-  }
-
-  export interface IRulerActions {
-    configureRuler(state: "on" | "off"): void;
-    toggleRuler(): "on" | "off";
-  }
-
-  export interface IGuide2DActions {
-    deleteGuide(idx: number): void;
-  }
-
-  export interface ICameraActions {
-    setTransform(transform: cmath.Transform): void;
-
-    /**
-     * zoom the camera by the given delta
-     * @param delta the delta to zoom by
-     * @param origin the origin of the zoom
-     */
-    zoom(delta: number, origin: cmath.Vector2): void;
-    /**
-     * pan the camera by the given delta
-     * @param delta the delta to pan by
-     */
-    pan(delta: [number, number]): void;
-
-    scale(
-      factor: number | cmath.Vector2,
-      origin: cmath.Vector2 | "center"
-    ): void;
-    fit(
-      selector: grida.program.document.Selector,
-      options?: {
-        margin?: number | [number, number, number, number];
-        animate?: boolean;
-      }
-    ): void;
-    zoomIn(): void;
-    zoomOut(): void;
-  }
-
-  export interface IEventTargetActions {
-    hoverNode(node_id: string, event: "enter" | "leave"): void;
-    hoverEnterNode(node_id: string): void;
-    hoverLeaveNode(node_id: string): void;
-
-    startGuideGesture(axis: cmath.Axis, idx: number | -1): void;
-    startScaleGesture(
-      selection: string | string[],
-      direction: cmath.CardinalDirection
-    ): void;
-    startSortGesture(selection: string | string[], node_id: string): void;
-    startGapGesture(selection: string | string[], axis: "x" | "y"): void;
-    startCornerRadiusGesture(
-      selection: string,
-      anchor?: cmath.IntercardinalDirection
-    ): void;
-    startRotateGesture(selection: string): void;
-    startTranslateVectorNetwork(node_id: string): void;
-    startCurveGesture(
-      node_id: string,
-      segment: number,
-      control: "ta" | "tb"
-    ): void;
-
-    pointerDown(event: PointerEvent): void;
-    pointerUp(event: PointerEvent): void;
-    pointerMove(event: PointerEvent): void;
-
-    click(event: MouseEvent): void;
-    doubleClick(event: MouseEvent): void;
-
-    dragStart(event: PointerEvent): void;
-    dragEnd(event: PointerEvent): void;
-    drag(event: TCanvasEventTargetDragGestureState): void;
-  }
-
-  export interface IDocumentGeometryInterfaceProvider {
-    /**
-     * returns a list of node ids that are intersecting with the pointer event
-     * @param event window event
-     * @returns
-     */
-    getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
-    /**
-     * returns a list of node ids that are intersecting with the point in canvas space
-     * @param point canvas space point
-     * @returns
-     */
-    getNodeIdsFromPoint(point: cmath.Vector2): string[];
-    /**
-     * returns a list of node ids that are intersecting with the envelope in canvas space
-     * @param envelope
-     * @returns
-     */
-    getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
-    /**
-     * returns a bounding rect of the node in canvas space
-     * @param node_id
-     * @returns
-     */
-    getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null;
-  }
-
-  export interface IDocumentImageExportInterfaceProvider {
-    /**
-     * exports the node as an image
-     * @param node_id
-     * @param format
-     * @returns
-     */
-    exportNodeAsImage(
-      node_id: string,
-      format: "PNG" | "JPEG"
-    ): Promise<Uint8Array>;
-  }
+  export type EditorCommands = editor.api.IDocumentStoreActions &
+    editor.api.IDocumentNodeChangeActions &
+    editor.api.IDocumentBrushToolActions &
+    editor.api.IDocumentSchemaActions_Experimental;
 
   /**
-   * interface for font parser
-   *
-   * grida has 2 font parsers:
-   * 1. @grida/fonts (js)
-   * 2. @grida/canvas-wasm (rust)
-   *
+   * ## A11y actions
    */
-  export interface IDocumentFontParserInterfaceProvider {
-    // /**
-    //  * parse single ttf font
-    //  * @param bytes font ttf bytes
-    //  */
-    // parseTTF(bytes: ArrayBuffer): Promise<any | null>;
-
-    /**
-     * parse font family
-     * @param faces font faces
-     */
-    parseFamily(
-      familyName: string,
-      faces: {
-        faceId: string;
-        data: ArrayBuffer;
-        userFontStyleItalic?: boolean;
-      }[]
-    ): Promise<editor.font_spec.UIFontFamily | null>;
-  }
-
-  /**
-   * Agent interface that is responsible for resolving, managing and caching fonts.
-   */
-  export interface IDocumentFontCollectionInterfaceProvider {
-    /**
-     * loads the font so that the backend can render it
-     * @param font font descriptor
-     */
-    loadFont(font: { family: string }): Promise<void>;
-
-    /**
-     * Lists fonts that have been loaded and are available at runtime.
-     * This does not fetch the full webfont list; it only reports fonts
-     * that were explicitly loaded through {@link loadFont}.
-     */
-    listLoadedFonts(): string[];
-
-    /**
-     * Sets the default fallback fonts.
-     * @param fonts
-     */
-    setFallbackFonts(fonts: string[]): void;
-  }
-
-  export interface IDocumentSVGExportInterfaceProvider {
-    /**
-     * exports the node as an svg
-     * @param node_id
-     * @returns
-     */
-    exportNodeAsSVG(node_id: string): Promise<string>;
-  }
-
-  export interface IDocumentPDFExportInterfaceProvider {
-    /**
-     * exports the node as an pdf
-     * @param node_id
-     * @returns
-     */
-    exportNodeAsPDF(node_id: string): Promise<Uint8Array>;
-  }
-
-  export interface IDocumentVectorInterfaceProvider {
-    /**
-     * converts the node into a vector network
-     * @param node_id
-     * @returns vector network or null if unsupported
-     */
-    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
-  }
-
-  export interface IDocumentGeometryQuery {
-    /**
-     * returns a list of node ids that are intersecting with the point in canvas space
-     * @param point canvas space point
-     * @returns
-     */
-    getNodeIdsFromPoint(point: cmath.Vector2): string[];
-    /**
-     * returns a list of node ids that are intersecting with the pointer event
-     * @param event window event
-     * @returns
-     */
-    getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
-    /**
-     * returns a list of node ids that are intersecting with the envelope in canvas space
-     * @param envelope canvas space envelope
-     * @returns
-     */
-    getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
-    /**
-     * returns a bounding rect of the node in canvas space
-     * @param node_id node id
-     * @returns
-     */
-    getNodeAbsoluteBoundingRect(node_id: NodeID): cmath.Rectangle | null;
-    /**
-     * returns the absolute rotation of the node in canvas space
-     * @param node_id node id
-     * @returns
-     */
-    getNodeAbsoluteRotation(node_id: NodeID): number;
-  }
-
-  export interface IDocumentEditorActions {
-    loadScene(scene_id: string): void;
-    createScene(scene?: grida.program.document.SceneInit): void;
-    deleteScene(scene_id: string): void;
-    duplicateScene(scene_id: string): void;
-    renameScene(scene_id: string, name: string): void;
-    changeSceneBackground(
-      scene_id: string,
-      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+  export interface IEditorA11yActions {
+    //
+    a11ySetClipboardColor(color: cg.RGBA8888): void;
+    a11yNudgeResize(
+      target: "selection" | NodeID,
+      axis: "x" | "y",
+      delta: number
     ): void;
 
-    //
-    setTool(tool: editor.state.ToolMode): void;
-    tryExitContentEditMode(): void;
-    tryToggleContentEditMode(): void;
-    tryEnterContentEditMode(): void;
-    tryEnterContentEditMode(
-      node_id?: string,
-      mode?: "auto" | "paint/gradient" | "paint/image",
-      options?: {
-        paintIndex?: number;
-        paintTarget?: "fill" | "stroke";
-      }
+    a11yArrow(
+      direction: "up" | "down" | "left" | "right",
+      shiftKey: boolean
     ): void;
-    //
 
-    /**
-     * select the nodes by the given selectors.
-     *
-     * @param selectors - {@link grida.program.document.Selector}[]
-     * @returns the selected node ids. or `false` if ignored.
-     */
-    select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
+    a11yAlign(alignment: {
+      horizontal?: "min" | "max" | "center";
+      vertical?: "min" | "max" | "center";
+    }): void;
 
     /**
      * ux a11y escape command.
@@ -2527,68 +2985,106 @@ export namespace editor.api {
      */
     a11yPaste(): void;
     a11yDelete(): void;
-    blur(): void;
-    undo(): void;
-    redo(): void;
-    cut(target: "selection" | NodeID): void;
-    copy(target: "selection" | NodeID): void;
-    paste(): void;
-    duplicate(target: "selection" | NodeID): void;
-    flatten(target: "selection" | NodeID): void;
-    op(target: ReadonlyArray<NodeID>, op: cg.BooleanOperation): void;
-    union(target: ReadonlyArray<NodeID>): void;
-    subtract(target: ReadonlyArray<NodeID>): void;
-    intersect(target: ReadonlyArray<NodeID>): void;
-    exclude(target: ReadonlyArray<NodeID>): void;
-    groupMask(target: ReadonlyArray<NodeID>): void;
+    //
+    // //
+    a11yToggleActive(target: "selection" | NodeID): void;
+    a11yToggleLocked(target: "selection" | NodeID): void;
+    a11yToggleBold(target: "selection" | NodeID): void;
+    a11yToggleItalic(target: "selection" | NodeID): void;
+    a11yToggleUnderline(target: "selection" | NodeID): void;
+    a11yToggleLineThrough(target: "selection" | NodeID): void;
+    // //
+    a11ySetOpacity(target: "selection" | NodeID, opacity: number): void;
+  }
 
-    setClipboardColor(color: cg.RGBA8888): void;
-
-    // vector editor
-    selectVertex(node_id: NodeID, vertex: number): void;
-    deleteVertex(node_id: NodeID, vertex: number): void;
-    selectSegment(node_id: NodeID, segment: number): void;
-    deleteSegment(node_id: NodeID, segment: number): void;
-    splitSegment(node_id: NodeID, point: vn.PointOnSegment): void;
-    translateVertex(
-      node_id: NodeID,
-      vertex: number,
-      delta: cmath.Vector2
-    ): void;
-    translateSegment(
-      node_id: NodeID,
-      segment: number,
-      delta: cmath.Vector2
-    ): void;
-    bendSegment(
-      node_id: NodeID,
-      segment: number,
-      ca: number,
-      cb: cmath.Vector2,
-      frozen: {
-        a: cmath.Vector2;
-        b: cmath.Vector2;
-        ta: cmath.Vector2;
-        tb: cmath.Vector2;
-      }
-    ): void;
-    planarize(node_id: NodeID): void;
+  /**
+   * ## Surface actions
+   *
+   * Surface actions are grida-distro specific opinionated surface api, which they won't be exposed to public api nor plugin api.
+   * They only make sense to be used within grida-distro.
+   *
+   * Difference between ally* and surface* actions:
+   * - a11y actions are "intended" to be used by users, specific to key binded actions, but make sense to be exposed as api as well.
+   * - surface actions are "NOT intended" to be used by developers, but rather directly called to UI-specific actions.
+   *
+   * a11y actions are generic, surface actions are specific.
+   */
+  export interface IEditorSurfaceActions {
+    surfaceHoverNode(node_id: string, event: "enter" | "leave"): void;
+    surfaceHoverEnterNode(node_id: string): void;
+    surfaceHoverLeaveNode(node_id: string): void;
 
     /**
-     * Updates the hovered control in vector content edit mode.
+     * [gesture/nudge] - used with `nudge` {@link EditorNudgeAction} or `nudge-resize` {@link EditorNudgeResizeAction}
      *
-     * @param hoveredControl - The hovered control with type and index, or null if no control is hovered
+     * By default, nudge is not a gesture, but a command. Unlike dragging, nudge does not has a "duration", as it's snap guides cannot be displayed.
+     * To mimic the nudge as a gesture (mostly when needed to display snap guides), use this action.
+     *
+     * @example when `nudge`, also call `gesture/nudge` to display snap guides. after certain duration, call `gesture/nudge` with `state: "off"`
      */
-    updateVectorHoveredControl(
-      hoveredControl: {
-        type: editor.state.VectorContentEditModeHoverableGeometryControlType;
-        index: number;
-      } | null
+    surfaceLockNudgeGesture(state: "on" | "off"): void;
+
+    surfaceStartGuideGesture(axis: cmath.Axis, idx: number | -1): void;
+    surfaceStartScaleGesture(
+      selection: string | string[],
+      direction: cmath.CardinalDirection
+    ): void;
+    surfaceStartSortGesture(
+      selection: string | string[],
+      node_id: string
+    ): void;
+    surfaceStartGapGesture(selection: string | string[], axis: "x" | "y"): void;
+    surfaceStartCornerRadiusGesture(
+      selection: string,
+      anchor?: cmath.IntercardinalDirection
+    ): void;
+    surfaceStartRotateGesture(selection: string): void;
+    surfaceStartTranslateVectorNetwork(node_id: string): void;
+    surfaceStartCurveGesture(
+      node_id: string,
+      segment: number,
+      control: "ta" | "tb"
     ): void;
 
+    surfacePointerDown(event: PointerEvent): void;
+    surfacePointerUp(event: PointerEvent): void;
+    surfacePointerMove(event: PointerEvent): void;
+
+    surfaceClick(event: MouseEvent): void;
+    surfaceDoubleClick(event: MouseEvent): void;
+    surfaceMultipleSelectionOverlayClick(
+      group: string[],
+      event: MouseEvent
+    ): void;
+
+    surfaceDragStart(event: PointerEvent): void;
+    surfaceDragEnd(event: PointerEvent): void;
+    surfaceDrag(event: TCanvasEventTargetDragGestureState): void;
+
+    // pixel grid
+    surfaceConfigurePixelGrid(state: "on" | "off"): void;
+    surfaceTogglePixelGrid(): "on" | "off";
+    //
+    // ruler
+    surfaceConfigureRuler(state: "on" | "off"): void;
+    surfaceToggleRuler(): "on" | "off";
     //
 
     //
+    surfaceSetTool(tool: editor.state.ToolMode): void;
+    surfaceTryExitContentEditMode(): void;
+    surfaceTryToggleContentEditMode(): void;
+    surfaceTryEnterContentEditMode(): void;
+    surfaceTryEnterContentEditMode(
+      node_id?: string,
+      mode?: "auto" | "paint/gradient" | "paint/image",
+      options?: {
+        paintIndex?: number;
+        paintTarget?: "fill" | "stroke";
+      }
+    ): void;
+    //
+
     /**
      * select the gradient stop by the given index
      *
@@ -2597,7 +3093,7 @@ export namespace editor.api {
      * @param node_id node id
      * @param stop index of the stop
      */
-    selectGradientStop(
+    surfaceSelectGradientStop(
       node_id: NodeID,
       stop: number,
       options?: {
@@ -2607,94 +3103,60 @@ export namespace editor.api {
     ): void;
     //
 
-    //
-    getNodeSnapshotById(node_id: NodeID): Readonly<grida.program.nodes.Node>;
-    getNodeById(node_id: NodeID): NodeProxy<grida.program.nodes.Node>;
-    getNodeDepth(node_id: NodeID): number;
-    //
-
-    //
-    insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;
-    deleteNode(target: "selection" | NodeID): void;
-    //
-
-    createNodeFromSvg(
-      svg: string
-    ): Promise<NodeProxy<grida.program.nodes.ContainerNode>>;
-    createImageNode(
-      image: grida.program.document.ImageRef
-    ): NodeProxy<grida.program.nodes.ImageNode>;
-    createTextNode(text: string): NodeProxy<grida.program.nodes.TextNode>;
-    createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
-
-    //
-    nudgeResize(
-      target: "selection" | NodeID,
-      axis: "x" | "y",
-      delta: number
-    ): void;
-    align(
-      target: "selection" | NodeID,
-      alignment: {
-        horizontal?: "none" | "min" | "max" | "center";
-        vertical?: "none" | "min" | "max" | "center";
-      }
-    ): void;
-    order(target: "selection" | NodeID, order: "back" | "front" | number): void;
-    mv(source: NodeID[], target: NodeID, index?: number): void;
-    //
-    distributeEvenly(target: "selection" | NodeID[], axis: "x" | "y"): void;
-    autoLayout(target: "selection" | NodeID[]): void;
-    contain(target: "selection" | NodeID[]): void;
-
     /**
-     * group the nodes
-     * @param target - the nodes to group
+     * Updates the hovered control in vector content edit mode.
+     *
+     * @param hoveredControl - The hovered control with type and index, or null if no control is hovered
      */
-    group(target: "selection" | NodeID[]): void;
+    surfaceUpdateVectorHoveredControl(
+      hoveredControl: {
+        type: editor.state.VectorContentEditModeHoverableGeometryControlType;
+        index: number;
+      } | null
+    ): void;
 
-    /**
-     * ungroup the nodes (from group or boolean)
-     * @param target - the nodes to ungroup
-     */
-    ungroup(target: "selection" | NodeID[]): void;
-    configureSurfaceRaycastTargeting(
+    //
+    surfaceConfigureSurfaceRaycastTargeting(
       config: Partial<state.HitTestingConfig>
     ): void;
-    configureMeasurement(measurement: "on" | "off"): void;
-    configureTranslateWithCloneModifier(
+    surfaceConfigureMeasurement(measurement: "on" | "off"): void;
+    surfaceConfigureTranslateWithCloneModifier(
       translate_with_clone: "on" | "off"
     ): void;
-    configureTranslateWithAxisLockModifier(
+    surfaceConfigureTranslateWithAxisLockModifier(
       tarnslate_with_axis_lock: "on" | "off"
     ): void;
-    configureTranslateWithForceDisableSnap(
+    surfaceConfigureTranslateWithForceDisableSnap(
       translate_with_force_disable_snap: "on" | "off"
     ): void;
-    configureTransformWithCenterOriginModifier(
+    surfaceConfigureTransformWithCenterOriginModifier(
       transform_with_center_origin: "on" | "off"
     ): void;
-    configureTransformWithPreserveAspectRatioModifier(
+    surfaceConfigureTransformWithPreserveAspectRatioModifier(
       transform_with_preserve_aspect_ratio: "on" | "off"
     ): void;
-    configureRotateWithQuantizeModifier(
+    surfaceConfigureRotateWithQuantizeModifier(
       rotate_with_quantize: number | "off"
     ): void;
-    configureCurveTangentMirroringModifier(
+    surfaceConfigureCurveTangentMirroringModifier(
       curve_tangent_mirroring: vn.TangentMirroringMode
     ): void;
-    // //
-    toggleActive(target: "selection" | NodeID): void;
-    toggleLocked(target: "selection" | NodeID): void;
-    toggleBold(target: "selection" | NodeID): void;
-    toggleItalic(target: "selection" | NodeID): void;
-    toggleUnderline(target: "selection" | NodeID): void;
-    toggleLineThrough(target: "selection" | NodeID): void;
-    // //
-    setOpacity(target: "selection" | NodeID, opacity: number): void;
+
+    /**
+     * Toggles whether the path tool should keep projecting after connecting
+     * to an existing vertex.
+     *
+     * When set to `"on"`, drawing a path and closing it on an existing
+     * vertex will continue extending the path from that vertex. When set to
+     * `"off"`, the path gesture concludes on close.
+     */
+    surfaceConfigurePathKeepProjectingModifier(
+      path_keep_projecting: "on" | "off"
+    ): void;
+    //
   }
 
-  export interface ISchemaActions {
+  export interface IDocumentSchemaActions_Experimental {
     // //
     schemaDefineProperty(
       key?: string,
@@ -2709,66 +3171,23 @@ export namespace editor.api {
     schemaDeleteProperty(key: string): void;
   }
 
-  export interface IFollowPluginActions {
+  export interface IDocumentExportPluginActions {
+    exportNodeAs(
+      node_id: string,
+      format: "PNG" | "JPEG"
+    ): Promise<Uint8Array | false>;
+    exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array | false>;
+    exportNodeAs(node_id: string, format: "SVG"): Promise<string | false>;
+  }
+
+  export interface ISurfaceMultiplayerFollowPluginActions {
     follow(cursor_id: string): void;
     unfollow(): void;
   }
 
-  export interface IVectorInterfaceActions {
-    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
-  }
-
-  export interface IDocumentImageInterfaceActions {
-    //
-
-    /**
-     * creates an image (data) from the given data, registers it to the document
-     * @param data
-     */
-    createImage(
-      data: Uint8Array | File
-    ): Promise<grida.program.document.ImageRef>;
-
-    /**
-     * creates an image (data) from the given src, registers it to the document
-     * @param src
-     */
-    createImageAsync(src: string): Promise<grida.program.document.ImageRef>;
-
-    /**
-     * gets the image instance from the given ref
-     * @param ref
-     */
-    getImage(ref: string): ImageInstance | null;
-  }
-
-  export interface IFontLoaderActions {
-    /**
-     * Loads the font so that the backend can render it
-     */
-    loadFontSync(font: { family: string }): Promise<void>;
-
-    /**
-     * Lists fonts currently loaded and available to the renderer.
-     */
-    listLoadedFonts(): string[];
-
-    /**
-     * Loads platform default fonts and configures renderer fallback order.
-     */
-    loadPlatformDefaultFonts(): Promise<void>;
-
-    /**
-     * Retrieves font metadata, variation axes and features.
-     */
-    getFontFamilyDetailsSync(
-      fontFamily: string
-    ): Promise<editor.font_spec.UIFontFamily | null>;
-  }
-
-  export interface IExportPluginActions {
-    exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
-    exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array>;
-    exportNodeAs(node_id: string, format: "SVG"): Promise<string>;
+  export interface ISurfaceMultiplayerCursorChatActions {
+    openCursorChat(): void;
+    closeCursorChat(): void;
+    updateCursorChatMessage(message: string | null): void;
   }
 }

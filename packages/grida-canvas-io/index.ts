@@ -41,14 +41,15 @@ export namespace io {
       [key: string]: unknown;
     };
 
-    export type PropertyFillImagePaintClipboardPayload = ClipboardPayloadBase & {
-      type: "property/fill-image-paint";
-      paint: SerializedImagePaint;
-      paint_target: "fill" | "stroke";
-      paint_index: number;
-      node_id: string;
-      document_key?: string;
-    };
+    export type PropertyFillImagePaintClipboardPayload =
+      ClipboardPayloadBase & {
+        type: "property/fill-image-paint";
+        paint: SerializedImagePaint;
+        paint_target: "fill" | "stroke";
+        paint_index: number;
+        node_id: string;
+        document_key?: string;
+      };
 
     export type ClipboardPayload =
       | PrototypesClipboardPayload
@@ -109,7 +110,7 @@ export namespace io {
     export function encodeClipboardHtml(payload: ClipboardPayload): string {
       const json = JSON.stringify(payload);
       const utf8Bytes = new TextEncoder().encode(json);
-      const base64 = btoa(String.fromCharCode(...utf8Bytes));
+      const base64 = btoa(String.fromCharCode(...Array.from(utf8Bytes)));
       return `<span ${__data_grida_clipboard}="b64:${base64}"></span>`;
     }
 
@@ -382,7 +383,7 @@ export namespace io {
         const { width, height, type } = dimensions;
 
         const mimeType = IMAGE_TYPE_TO_MIME_TYPE[type || "png"] || "image/png";
-        const blob = new Blob([imageData], { type: mimeType });
+        const blob = new Blob([imageData as BlobPart], { type: mimeType });
         const url = URL.createObjectURL(blob);
 
         images[url] = {
@@ -441,7 +442,8 @@ export namespace io {
         version: json.version,
         document: {
           nodes: json.document.nodes,
-          scenes: json.document.scenes,
+          links: json.document.links,
+          scenes_ref: json.document.scenes_ref,
           entry_scene_id: json.document.entry_scene_id,
           bitmaps: bitmaps,
           images: json.document.images ?? {},

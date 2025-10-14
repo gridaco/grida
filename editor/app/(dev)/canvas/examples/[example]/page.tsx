@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { canvas_examples } from "@/scaffolds/playground-canvas/examples";
+import { canvas_examples } from "@/grida-canvas-hosted/playground/examples";
 import { notFound } from "next/navigation";
 import Editor from "../../editor";
 
@@ -26,17 +26,20 @@ export async function generateMetadata({
 
 export default async function FileExamplePage({
   params,
+  searchParams,
 }: {
   params: Promise<Params>;
+  searchParams: Promise<{ backend: "canvas" | "dom" }>;
 }) {
   const { example: example_id } = await params;
+  const { backend = "canvas" } = await searchParams;
   const example = canvas_examples.find((e) => e.id === example_id);
 
   if (!example) return notFound();
 
   return (
     <main className="w-screen h-screen overflow-hidden">
-      <Editor src={example?.url} />
+      <Editor backend={backend} src={example.url} />
     </main>
   );
 }

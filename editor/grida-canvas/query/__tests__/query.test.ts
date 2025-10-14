@@ -1,20 +1,29 @@
 import { dq } from "../index";
+import tree from "@grida/tree";
 
 describe("query selectors", () => {
   const doc = {
-    root_id: "root",
     nodes: {
-      root: { type: "container", children: ["a", "b", "c"] },
-      a: { type: "container", children: ["a1", "a2"] },
-      b: { type: "container", children: ["b1"] },
-      c: { type: "container", children: [] },
-      a1: { type: "container", children: [] },
-      a2: { type: "container", children: [] },
-      b1: { type: "container", children: [] },
+      root: { type: "container", id: "root", name: "root" },
+      a: { type: "container", id: "a", name: "a" },
+      b: { type: "container", id: "b", name: "b" },
+      c: { type: "container", id: "c", name: "c" },
+      a1: { type: "container", id: "a1", name: "a1" },
+      a2: { type: "container", id: "a2", name: "a2" },
+      b1: { type: "container", id: "b1", name: "b1" },
+    },
+    links: {
+      root: ["a", "b", "c"],
+      a: ["a1", "a2"],
+      b: ["b1"],
+      c: [],
+      a1: [],
+      a2: [],
+      b1: [],
     },
   } as any;
 
-  const ctx = dq.Context.from(doc).snapshot();
+  const ctx = new tree.graph.Graph(doc).lut;
 
   describe("sibling selectors", () => {
     test("~+ selects next sibling and loops", () => {

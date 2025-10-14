@@ -113,7 +113,7 @@ function EditorUser({
 
   const setFocusedStop = useCallback(
     (stop: number | null) => {
-      editor.selectGradientStop(node_id, stop ?? 0, {
+      editor.surface.surfaceSelectGradientStop(node_id, stop ?? 0, {
         paintIndex: paint_index,
         paintTarget: paint_target,
       });
@@ -149,9 +149,9 @@ function EditorUser({
         }
 
         if (paint_target === "stroke") {
-          editor.changeNodeStrokes(node_id, updatedPaints);
+          editor.commands.changeNodePropertyStrokes(node_id, updatedPaints);
         } else {
-          editor.changeNodeFills(node_id, updatedPaints);
+          editor.commands.changeNodePropertyFills(node_id, updatedPaints);
         }
       }
     },

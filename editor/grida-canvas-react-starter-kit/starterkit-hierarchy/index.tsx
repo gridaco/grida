@@ -24,7 +24,7 @@ export function ScenesGroup() {
     >
       <SidebarGroupLabel>
         Scenes
-        <SidebarGroupAction onClick={() => editor.createScene()}>
+        <SidebarGroupAction onClick={() => editor.commands.createScene()}>
           <PlusIcon />
           <span className="sr-only">New Scene</span>
         </SidebarGroupAction>

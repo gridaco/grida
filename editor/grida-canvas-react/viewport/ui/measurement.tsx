@@ -77,7 +77,7 @@ function useMeasurement() {
         selection,
         surface_measurement_target,
         getNodeAbsoluteBoundingRect: (id: string) =>
-          editor.geometry.getNodeAbsoluteBoundingRect(id),
+          editor.geometryProvider.getNodeAbsoluteBoundingRect(id),
       });
 
       setMeasurement(result || undefined);
@@ -85,7 +85,12 @@ function useMeasurement() {
       console.error("useMeasurement", e);
       setMeasurement(undefined);
     }
-  }, [document, selection, surface_measurement_target, editor.geometry]);
+  }, [
+    document,
+    selection,
+    surface_measurement_target,
+    editor.geometryProvider,
+  ]);
 
   return measurement;
 }

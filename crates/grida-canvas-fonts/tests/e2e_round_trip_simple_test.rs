@@ -28,20 +28,22 @@ fn test_round_trip_italic_to_roman_to_italic() {
 
     // Create font faces with real data
     let font_data: Vec<_> = paths.iter().map(|p| fs::read(p).unwrap()).collect();
-    
+
     // Helper function to create font_faces
-    let create_font_faces = || vec![
-        UIFontFace {
-            face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[0],
-            user_font_style_italic: Some(false), // Roman
-        },
-        UIFontFace {
-            face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[1],
-            user_font_style_italic: Some(true), // Italic
-        },
-    ];
+    let create_font_faces = || {
+        vec![
+            UIFontFace {
+                face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[0],
+                user_font_style_italic: Some(false), // Roman
+            },
+            UIFontFace {
+                face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[1],
+                user_font_style_italic: Some(true), // Italic
+            },
+        ]
+    };
 
     // Start with italic style
     let initial_style = CurrentTextStyle {
@@ -122,20 +124,22 @@ fn test_round_trip_roman_to_italic_to_roman() {
 
     // Create font faces with real data
     let font_data: Vec<_> = paths.iter().map(|p| fs::read(p).unwrap()).collect();
-    
+
     // Helper function to create font_faces
-    let create_font_faces = || vec![
-        UIFontFace {
-            face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[0],
-            user_font_style_italic: Some(false), // Roman
-        },
-        UIFontFace {
-            face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[1],
-            user_font_style_italic: Some(true), // Italic
-        },
-    ];
+    let create_font_faces = || {
+        vec![
+            UIFontFace {
+                face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[0],
+                user_font_style_italic: Some(false), // Roman
+            },
+            UIFontFace {
+                face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[1],
+                user_font_style_italic: Some(true), // Italic
+            },
+        ]
+    };
 
     // Start with roman style
     let initial_style = CurrentTextStyle {
@@ -215,20 +219,22 @@ fn test_round_trip_with_smart_resolution() {
 
     // Create font faces with real data
     let font_data: Vec<_> = paths.iter().map(|p| fs::read(p).unwrap()).collect();
-    
+
     // Helper function to create font_faces
-    let create_font_faces = || vec![
-        UIFontFace {
-            face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[0],
-            user_font_style_italic: Some(false),
-        },
-        UIFontFace {
-            face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[1],
-            user_font_style_italic: Some(true),
-        },
-    ];
+    let create_font_faces = || {
+        vec![
+            UIFontFace {
+                face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[0],
+                user_font_style_italic: Some(false),
+            },
+            UIFontFace {
+                face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[1],
+                user_font_style_italic: Some(true),
+            },
+        ]
+    };
 
     // Test with smart resolution (explicit properties + custom_axes)
     let mut custom_axes = HashMap::new();

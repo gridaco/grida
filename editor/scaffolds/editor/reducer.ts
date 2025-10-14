@@ -375,7 +375,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
                     type: "scene",
                     id: "startpage",
                     name: "Start",
-                    children: ["page"],
+                    children_refs: ["page"],
                     guides: [],
                     constraints: {
                       children: "single",

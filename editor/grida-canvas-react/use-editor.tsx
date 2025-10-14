@@ -7,27 +7,32 @@ import deepEqual from "fast-deep-equal/es6/react.js";
 import {
   domapi,
   DOMGeometryQueryInterfaceProvider,
-  DOMImageExportInterfaceProvider,
   DOMFontManagerAgentInterfaceProvider,
   NoopGeometryQueryInterfaceProvider,
   DOMFontParserInterfaceProvider,
+  DOMDefaultExportInterfaceProvider,
 } from "@/grida-canvas/backends";
 
 const __DEFAULT_STATE: editor.state.IEditorStateInit = {
   debug: false,
   document: {
-    nodes: {},
-    entry_scene_id: "main",
-    scenes: {
+    scenes_ref: ["main"],
+    links: {
+      main: [],
+    },
+    nodes: {
       main: {
         type: "scene",
         id: "main",
         name: "main",
-        children: [],
+        active: true,
+        locked: false,
         guides: [],
+        edges: [],
         constraints: { children: "multiple" },
       },
     },
+    entry_scene_id: "main",
   },
   editable: true,
 };
@@ -42,11 +47,10 @@ export function useEditor(
         return new Editor({
           backend: backend,
           viewportElement: domapi.k.VIEWPORT_ELEMENT_ID,
-          contentElement: domapi.k.EDITOR_CONTENT_ELEMENT_ID,
           geometry: (_) => new DOMGeometryQueryInterfaceProvider(_),
           initialState: init ?? __DEFAULT_STATE,
-          plugins: {
-            export_as_image: (_) => new DOMImageExportInterfaceProvider(_),
+          interfaces: {
+            exporter: (_) => new DOMDefaultExportInterfaceProvider(_),
             font_collection: (_) => new DOMFontManagerAgentInterfaceProvider(_),
             font_parser: (_) => new DOMFontParserInterfaceProvider(_),
           },
@@ -56,7 +60,6 @@ export function useEditor(
         return new Editor({
           backend: backend,
           viewportElement: domapi.k.VIEWPORT_ELEMENT_ID,
-          contentElement: domapi.k.EDITOR_CONTENT_ELEMENT_ID,
           geometry: (_) => new NoopGeometryQueryInterfaceProvider(),
           initialState: init ?? __DEFAULT_STATE,
         });

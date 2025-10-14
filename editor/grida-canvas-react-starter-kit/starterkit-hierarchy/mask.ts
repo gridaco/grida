@@ -131,9 +131,7 @@ export function computeNodeMaskMap(
   processChildren(sceneChildren);
 
   if (documentCtx) {
-    Object.values(documentCtx.__ctx_nid_to_children_ids).forEach(
-      processChildren
-    );
+    Object.values(documentCtx.lu_children).forEach(processChildren);
   }
 
   return result;

@@ -1,4 +1,5 @@
 import { produce, type Draft } from "immer";
+import { updateState } from "./utils/immer";
 import type grida from "@grida/schema";
 import type { NodeChangeAction } from "../action";
 import type cg from "@grida/cg";

@@ -56,7 +56,7 @@ export class DOMGeometryQueryInterfaceProvider
   }
 
   getNodeIdsFromPoint(point: cmath.Vector2): string[] {
-    const _p = this.editor.canvasPointToClientPoint(point);
+    const _p = this.editor.camera.canvasPointToClientPoint(point);
     return this.getNodeIdsFromPointerEvent({
       clientX: _p[0],
       clientY: _p[1],

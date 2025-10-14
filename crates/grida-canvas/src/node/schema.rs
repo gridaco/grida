@@ -78,10 +78,15 @@ pub struct Size {
 }
 
 // region: Scene
+/// Runtime scene representation.
+///
+/// The children field is populated from the document's `links` map during deserialization.
+/// In the new format, scenes are stored in `document.nodes` and their children are in `document.links`.
 #[derive(Debug, Clone)]
 pub struct Scene {
     pub id: String,
     pub name: String,
+    /// Children node IDs - populated from document.links during load
     pub children: Vec<NodeId>,
     pub nodes: NodeRepository,
     pub background_color: Option<CGColor>,

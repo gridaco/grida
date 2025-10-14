@@ -118,7 +118,11 @@ fn test_multiple_static_font_styles() {
     assert!(style_names.contains(&&"Bold".to_string()));
 
     // Check that styles are unique by postscript name
-    let postscript_names: Vec<Option<&String>> = result.styles.iter().map(|s| s.postscript_name.as_ref()).collect();
+    let postscript_names: Vec<Option<&String>> = result
+        .styles
+        .iter()
+        .map(|s| s.postscript_name.as_ref())
+        .collect();
     let unique_postscript_names: std::collections::HashSet<Option<&String>> =
         postscript_names.iter().cloned().collect();
     assert_eq!(postscript_names.len(), unique_postscript_names.len());

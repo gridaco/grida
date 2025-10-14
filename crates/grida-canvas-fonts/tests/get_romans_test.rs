@@ -28,20 +28,22 @@ fn test_get_romans_no_current_style() {
 
     // Create font faces with real data
     let font_data: Vec<_> = paths.iter().map(|p| fs::read(p).unwrap()).collect();
-    
+
     // Helper function to create font_faces
-    let create_font_faces = || vec![
-        UIFontFace {
-            face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[0],
-            user_font_style_italic: Some(false), // Roman
-        },
-        UIFontFace {
-            face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[1],
-            user_font_style_italic: Some(true), // Italic
-        },
-    ];
+    let create_font_faces = || {
+        vec![
+            UIFontFace {
+                face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[0],
+                user_font_style_italic: Some(false), // Roman
+            },
+            UIFontFace {
+                face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[1],
+                user_font_style_italic: Some(true), // Italic
+            },
+        ]
+    };
 
     // Test without current style - should return all roman variants
     let roman_matches = parser
@@ -81,20 +83,22 @@ fn test_get_romans_with_current_style() {
 
     // Create font faces with real data
     let font_data: Vec<_> = paths.iter().map(|p| fs::read(p).unwrap()).collect();
-    
+
     // Helper function to create font_faces
-    let create_font_faces = || vec![
-        UIFontFace {
-            face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[0],
-            user_font_style_italic: Some(false), // Roman
-        },
-        UIFontFace {
-            face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
-            data: &font_data[1],
-            user_font_style_italic: Some(true), // Italic (should be filtered out)
-        },
-    ];
+    let create_font_faces = || {
+        vec![
+            UIFontFace {
+                face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[0],
+                user_font_style_italic: Some(false), // Roman
+            },
+            UIFontFace {
+                face_id: "Inter-Italic-VariableFont_opsz,wght.ttf".to_string(),
+                data: &font_data[1],
+                user_font_style_italic: Some(true), // Italic (should be filtered out)
+            },
+        ]
+    };
 
     // Current style with weight 500
     let current_style = CurrentTextStyle {
@@ -150,30 +154,32 @@ fn test_get_romans_max_results() {
         .iter()
         .map(|p| fs::read(*p).unwrap())
         .collect();
-    
+
     // Helper function to create font_faces
-    let create_font_faces = || vec![
-        UIFontFace {
-            face_id: "PTSerif-Regular.ttf".to_string(),
-            data: &font_data[0],
-            user_font_style_italic: None, // Let parser analyze
-        },
-        UIFontFace {
-            face_id: "PTSerif-Bold.ttf".to_string(),
-            data: &font_data[1],
-            user_font_style_italic: None, // Let parser analyze
-        },
-        UIFontFace {
-            face_id: "PTSerif-Italic.ttf".to_string(),
-            data: &font_data[2],
-            user_font_style_italic: None, // Let parser analyze
-        },
-        UIFontFace {
-            face_id: "PTSerif-BoldItalic.ttf".to_string(),
-            data: &font_data[3],
-            user_font_style_italic: None, // Let parser analyze
-        },
-    ];
+    let create_font_faces = || {
+        vec![
+            UIFontFace {
+                face_id: "PTSerif-Regular.ttf".to_string(),
+                data: &font_data[0],
+                user_font_style_italic: None, // Let parser analyze
+            },
+            UIFontFace {
+                face_id: "PTSerif-Bold.ttf".to_string(),
+                data: &font_data[1],
+                user_font_style_italic: None, // Let parser analyze
+            },
+            UIFontFace {
+                face_id: "PTSerif-Italic.ttf".to_string(),
+                data: &font_data[2],
+                user_font_style_italic: None, // Let parser analyze
+            },
+            UIFontFace {
+                face_id: "PTSerif-BoldItalic.ttf".to_string(),
+                data: &font_data[3],
+                user_font_style_italic: None, // Let parser analyze
+            },
+        ]
+    };
 
     let current_style = CurrentTextStyle {
         weight: Some(400), // Regular weight
@@ -226,20 +232,22 @@ fn test_get_romans_no_romans_available() {
         .iter()
         .map(|p| fs::read(*p).unwrap())
         .collect();
-    
+
     // Helper function to create font_faces
-    let create_font_faces = || vec![
-        UIFontFace {
-            face_id: "PTSerif-Italic.ttf".to_string(),
-            data: &font_data[0],
-            user_font_style_italic: None, // Let parser analyze
-        },
-        UIFontFace {
-            face_id: "PTSerif-BoldItalic.ttf".to_string(),
-            data: &font_data[1],
-            user_font_style_italic: None, // Let parser analyze
-        },
-    ];
+    let create_font_faces = || {
+        vec![
+            UIFontFace {
+                face_id: "PTSerif-Italic.ttf".to_string(),
+                data: &font_data[0],
+                user_font_style_italic: None, // Let parser analyze
+            },
+            UIFontFace {
+                face_id: "PTSerif-BoldItalic.ttf".to_string(),
+                data: &font_data[1],
+                user_font_style_italic: None, // Let parser analyze
+            },
+        ]
+    };
 
     let current_style = CurrentTextStyle {
         weight: Some(400),
@@ -275,11 +283,13 @@ fn test_get_romans_variable_font() {
 
     // Create a variable font face
     let font_data = fs::read(&path).unwrap();
-    let create_font_faces = || vec![UIFontFace {
-        face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
-        data: &font_data,
-        user_font_style_italic: None, // Let parser detect
-    }];
+    let create_font_faces = || {
+        vec![UIFontFace {
+            face_id: "Inter-VariableFont_opsz,wght.ttf".to_string(),
+            data: &font_data,
+            user_font_style_italic: None, // Let parser detect
+        }]
+    };
 
     let current_style = CurrentTextStyle {
         weight: Some(400),
@@ -327,20 +337,22 @@ fn test_get_romans_custom_axes() {
         .iter()
         .map(|p| fs::read(*p).unwrap())
         .collect();
-    
+
     // Helper function to create font_faces
-    let create_font_faces = || vec![
-        UIFontFace {
-            face_id: "PTSerif-Regular.ttf".to_string(),
-            data: &font_data[0],
-            user_font_style_italic: None, // Let parser analyze
-        },
-        UIFontFace {
-            face_id: "PTSerif-Bold.ttf".to_string(),
-            data: &font_data[1],
-            user_font_style_italic: None, // Let parser analyze
-        },
-    ];
+    let create_font_faces = || {
+        vec![
+            UIFontFace {
+                face_id: "PTSerif-Regular.ttf".to_string(),
+                data: &font_data[0],
+                user_font_style_italic: None, // Let parser analyze
+            },
+            UIFontFace {
+                face_id: "PTSerif-Bold.ttf".to_string(),
+                data: &font_data[1],
+                user_font_style_italic: None, // Let parser analyze
+            },
+        ]
+    };
 
     // Current style with custom axes
     let mut custom_axes = HashMap::new();
@@ -415,30 +427,32 @@ fn test_get_romans_round_trip_consistency() {
         .iter()
         .map(|p| fs::read(*p).unwrap())
         .collect();
-    
+
     // Helper function to create font_faces
-    let create_font_faces = || vec![
-        UIFontFace {
-            face_id: "PTSerif-Regular.ttf".to_string(),
-            data: &font_data[0],
-            user_font_style_italic: None, // Let parser analyze
-        },
-        UIFontFace {
-            face_id: "PTSerif-Bold.ttf".to_string(),
-            data: &font_data[1],
-            user_font_style_italic: None, // Let parser analyze
-        },
-        UIFontFace {
-            face_id: "PTSerif-Italic.ttf".to_string(),
-            data: &font_data[2],
-            user_font_style_italic: None, // Let parser analyze
-        },
-        UIFontFace {
-            face_id: "PTSerif-BoldItalic.ttf".to_string(),
-            data: &font_data[3],
-            user_font_style_italic: None, // Let parser analyze
-        },
-    ];
+    let create_font_faces = || {
+        vec![
+            UIFontFace {
+                face_id: "PTSerif-Regular.ttf".to_string(),
+                data: &font_data[0],
+                user_font_style_italic: None, // Let parser analyze
+            },
+            UIFontFace {
+                face_id: "PTSerif-Bold.ttf".to_string(),
+                data: &font_data[1],
+                user_font_style_italic: None, // Let parser analyze
+            },
+            UIFontFace {
+                face_id: "PTSerif-Italic.ttf".to_string(),
+                data: &font_data[2],
+                user_font_style_italic: None, // Let parser analyze
+            },
+            UIFontFace {
+                face_id: "PTSerif-BoldItalic.ttf".to_string(),
+                data: &font_data[3],
+                user_font_style_italic: None, // Let parser analyze
+            },
+        ]
+    };
 
     let current_style = CurrentTextStyle {
         weight: Some(400),

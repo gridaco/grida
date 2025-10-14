@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import Resizable from "./resizable";
-import ErrorBoundary from "@/scaffolds/playground-canvas/error-boundary";
+import ErrorBoundary from "@/grida-canvas-hosted/playground/error-boundary";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
@@ -41,6 +41,9 @@ const Context = React.createContext<{
   setMode: (mode: "framed" | "fullscreen") => void;
 } | null>(null);
 
+/**
+ * @deprecated needs re-design
+ */
 export function PreviewProvider({
   children,
 }: React.PropsWithChildren<StandaloneDocumentContentProps>) {
@@ -91,7 +94,7 @@ export function PreviewProvider({
       }
 
       // (2)
-      for (const node_id in scene.children) {
+      for (const node_id in scene.children_refs) {
         const top = tryGetTopPreviewNode(node_id);
         if (top) {
           return top;

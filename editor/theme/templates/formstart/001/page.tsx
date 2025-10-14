@@ -202,4 +202,5 @@ _001.definition = {
     background: "/images/abstract-placeholder.jpg",
   },
   nodes: {},
+  links: {},
 } satisfies grida.program.document.template.TemplateDocumentDefinition;

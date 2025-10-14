@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use fonts::{FaceRecord, FamilyScenario};
 use fonts::selection_italic as italic;
+use fonts::{FaceRecord, FamilyScenario};
 
 /// Test Scenario 4: Two variable fonts
 ///

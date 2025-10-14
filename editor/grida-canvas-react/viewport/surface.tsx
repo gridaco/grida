@@ -13,7 +13,6 @@ import {
   useGestureState,
   useIsTransforming,
   useMultiplayerCursorState,
-  useMultipleSelectionOverlayClick,
   usePointerState,
   useSelectionState,
   useToolState,
@@ -42,8 +41,8 @@ import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import cmath from "@grida/cmath";
-import { cursors } from "../components/cursor";
-import { PointerCursor } from "@/components/multiplayer/cursor";
+import { cursors } from "../../components/cursor/cursor-data";
+import { FakePointerCursorSVG } from "@/components/cursor/cursor-fake";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
@@ -71,6 +70,10 @@ import {
   NodeOverlayCornerRadiusHandle,
   NodeOverlayRectangularCornerRadiusHandles,
 } from "./ui/corner-radius-handle";
+import {
+  FakeCursorPosition,
+  FakeForeignCursor,
+} from "@/components/multiplayer/cursor";
 
 const DRAG_THRESHOLD = 2;
 
@@ -193,7 +196,7 @@ export function EditorSurface() {
       if (event.defaultPrevented) return;
       // for performance reasons, we don't want to update the overlay when transforming (except for translate)
       if (is_node_transforming && !is_node_translating) return;
-      editor.pointerMove(event);
+      editor.surface.surfacePointerMove(event);
     };
 
     et.addEventListener("pointermove", handlePointerMove, {
@@ -214,7 +217,7 @@ export function EditorSurface() {
         if (event.defaultPrevented) return;
         if (event.button === 1) {
           __hand_tool_triggered_by_aux_button.current = true;
-          editor.setTool({ type: "hand" });
+          editor.surface.surfaceSetTool({ type: "hand" });
         }
       },
       onMouseUp: ({ event }) => {
@@ -222,40 +225,40 @@ export function EditorSurface() {
         if (event.button === 1) {
           if (__hand_tool_triggered_by_aux_button.current) {
             __hand_tool_triggered_by_aux_button.current = false;
-            editor.setTool({ type: "cursor" });
+            editor.surface.surfaceSetTool({ type: "cursor" });
           }
         }
       },
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.pointerDown(event);
+        editor.surface.surfacePointerDown(event);
       },
       onPointerUp: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.pointerUp(event);
+        editor.surface.surfacePointerUp(event);
       },
       onClick: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.click(event);
+        editor.surface.surfaceClick(event);
       },
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
 
         // [order matters] - otherwise, it will always try to enter the content edit mode
-        editor.tryToggleContentEditMode(); // 1
-        editor.doubleClick(event); // 2
+        editor.surface.surfaceTryToggleContentEditMode(); // 1
+        editor.surface.surfaceDoubleClick(event); // 2
       },
       onDragStart: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.dragStart(event as PointerEvent);
+        editor.surface.surfaceDragStart(event as PointerEvent);
       },
       onDragEnd: ({ event }) => {
         if (event.defaultPrevented) return;
-        editor.dragEnd(event as PointerEvent);
+        editor.surface.surfaceDragEnd(event as PointerEvent);
       },
       onDrag: (e) => {
         if (e.event.defaultPrevented) return;
-        editor.drag({
+        editor.surface.surfaceDrag({
           delta: e.delta,
           distance: e.distance,
           movement: e.movement,
@@ -294,10 +297,10 @@ export function EditorSurface() {
           const d = delta[1];
           const sensitivity = 0.01;
           const zoom_delta = -d * sensitivity;
-          editor.zoom(zoom_delta, origin);
+          editor.camera.zoom(zoom_delta, origin);
         } else {
           const sensitivity = 2;
-          editor.pan(
+          editor.camera.pan(
             cmath.vector2.invert(
               cmath.vector2.multiply(delta, [sensitivity, sensitivity])
             )
@@ -455,18 +458,19 @@ export function EditorSurface() {
 function FollowingFrameOverlay() {
   const instance = useCurrentEditor();
   const { isFollowing, cursor: cursorId } = useFollowPlugin(
-    instance.__pligin_follow
+    instance.surface.__pligin_follow
   );
 
-  const cursor = useEditorState(instance, (state) =>
-    state.cursors.find((c) => c.id === cursorId)
-  );
+  const cursor = useEditorState(instance, (state) => {
+    if (!cursorId) return undefined;
+    return state.cursors[cursorId];
+  });
 
   const stop = React.useCallback(
     (e: React.SyntheticEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      instance.unfollow();
+      instance.surface.unfollow();
     },
     [instance]
   );
@@ -497,20 +501,24 @@ function RemoteCursorOverlay() {
   const cursors = useMultiplayerCursorState();
   const { transform } = useTransformState();
 
-  if (!cursors.length) return null;
+  const cursorArray = Object.values(cursors);
+  if (!cursorArray.length) return null;
   return (
     <>
-      {cursors.map((c) => {
+      {cursorArray.map((c) => {
         const pos = cmath.vector2.transform(c.position, transform);
         return (
           <React.Fragment key={c.id}>
-            <PointerCursor
-              key={c.id}
-              local={false}
-              x={pos[0]}
-              y={pos[1]}
-              color={{ hue: c.palette["100"], fill: c.palette["400"] }}
-            />
+            <FakeCursorPosition x={pos[0]} y={pos[1]}>
+              <FakeForeignCursor
+                color={{
+                  fill: c.palette["400"],
+                  hue: c.palette["100"],
+                }}
+                name={"Anonymous"}
+                message={c.ephemeral_chat?.txt}
+              />
+            </FakeCursorPosition>
             {c.marquee && (
               <MarqueeArea
                 a={cmath.vector2.transform(c.marquee.a, transform)}
@@ -589,7 +597,7 @@ function RootFramesBarOverlay() {
   const { document } = useDocumentState();
   const scene = useCurrentSceneState();
   const rootframes = useMemo(() => {
-    const children = scene.children.map((id) => document.nodes[id]);
+    const children = scene.children_refs.map((id) => document.nodes[id]);
     return children.filter(
       (n) =>
         n.type === "container" ||
@@ -597,7 +605,7 @@ function RootFramesBarOverlay() {
         n.type === "component" ||
         n.type === "instance"
     );
-  }, [scene.children, document.nodes]);
+  }, [scene.children_refs, document.nodes]);
 
   if (scene.constraints.children === "single") {
     const rootframe = rootframes[0];
@@ -665,17 +673,17 @@ function NodeTitleBar({
       //   editor.hoverEnterNode(node.id);
       // },
       onPointerEnter: () => {
-        editor.hoverEnterNode(node.id);
+        editor.surface.surfaceHoverEnterNode(node.id);
       },
       onPointerLeave: () => {
-        editor.hoverLeaveNode(node.id);
+        editor.surface.surfaceHoverLeaveNode(node.id);
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
         if (event.shiftKey) {
-          editor.select("selection", [node.id]);
+          editor.commands.select("selection", [node.id]);
         } else {
-          editor.select([node.id]);
+          editor.commands.select([node.id]);
         }
       },
     },
@@ -725,7 +733,7 @@ function NodeTitleBarTitle({
   const commit = () => {
     const name = value.trim();
     if (name && name !== node.name) {
-      editor.changeNodeName(node.id, name);
+      editor.doc.getNodeById(node.id).name = name;
     }
     setEditing(false);
   };
@@ -901,7 +909,7 @@ function SingleSelectionOverlay({
                 distribution={distribution}
                 style={style}
                 onGapGestureStart={(axis) => {
-                  editor.startGapGesture(node_id, axis);
+                  editor.surface.surfaceStartGapGesture(node_id, axis);
                 }}
               />
             </>
@@ -930,7 +938,7 @@ function MultpleSelectionGroupsOverlay({ readonly }: { readonly?: boolean }) {
                 distribution={g.distribution}
                 style={g.style}
                 onGapGestureStart={(axis) => {
-                  editor.startGapGesture(g.ids, axis);
+                  editor.surface.surfaceStartGapGesture(g.ids, axis);
                 }}
               />
             )}
@@ -953,7 +961,6 @@ function SelectionGroupOverlay({
 }) {
   const editor = useCurrentEditor();
   const tool = useToolState();
-  const { multipleSelectionOverlayClick } = useMultipleSelectionOverlayClick();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
@@ -970,7 +977,7 @@ function SelectionGroupOverlay({
         }
       },
       onClick: (e) => {
-        multipleSelectionOverlayClick(ids, e.event);
+        editor.surface.surfaceMultipleSelectionOverlayClick(ids, e.event);
         e.event.stopPropagation();
       },
     },
@@ -1012,7 +1019,7 @@ function SelectionGroupOverlay({
         <DistributeButton
           axis={preferredDistributeEvenlyActionAxis}
           onClick={(axis) => {
-            editor.distributeEvenly("selection", axis);
+            editor.commands.distributeEvenly("selection", axis);
           }}
         />
         {boundingSurfaceRect && (
@@ -1185,7 +1192,7 @@ function LayerOverlayRotationHandle({
   const bind = useSurfaceGesture({
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.startRotateGesture(node_id);
+      editor.surface.surfaceStartRotateGesture(node_id);
     },
   });
 
@@ -1243,7 +1250,7 @@ function LayerOverlayResizeHandle({
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.startScaleGesture(selection, anchor);
+      editor.surface.surfaceStartScaleGesture(selection, anchor);
     },
   });
 
@@ -1268,7 +1275,7 @@ function LayerOverlayResizeSide({
       },
       onDragStart: ({ event }) => {
         event.preventDefault();
-        editor.startScaleGesture(selection, anchor);
+        editor.surface.surfaceStartScaleGesture(selection, anchor);
       },
       onDoubleClick: ({ event }) => {
         event.preventDefault();
@@ -1277,7 +1284,7 @@ function LayerOverlayResizeSide({
         // feat: text-node-auto-size
         if (
           typeof selection === "string" &&
-          editor.getNodeSnapshotById(selection)?.type === "text"
+          editor.commands.getNodeSnapshotById(selection)?.type === "text"
         ) {
           const axis = anchor === "e" || anchor === "w" ? "width" : "height";
           editor.autoSizeTextNode(selection, axis);
@@ -1354,7 +1361,7 @@ function Edge({
         return cmath.vector2.transform([p.x, p.y], transform);
       case "anchor":
         try {
-          const n = editor.getNodeSnapshotById(p.target);
+          const n = editor.commands.getNodeSnapshotById(p.target);
           const cx = (n as any).left + (n as any).width / 2;
           const cy = (n as any).top + (n as any).height / 2;
           return cmath.vector2.transform([cx, cy], transform);
@@ -1417,7 +1424,7 @@ function RedDotSortHandle({
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.startSortGesture(selection, node_id);
+      editor.surface.surfaceStartSortGesture(selection, node_id);
     },
   });
 
@@ -1675,14 +1682,14 @@ function RulerGuideOverlay() {
 
   const bindX = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      editor.startGuideGesture("y", -1);
+      editor.surface.surfaceStartGuideGesture("y", -1);
       event.preventDefault();
     },
   });
 
   const bindY = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      editor.startGuideGesture("x", -1);
+      editor.surface.surfaceStartGuideGesture("x", -1);
       event.preventDefault();
     },
   });
@@ -1821,7 +1828,7 @@ function Guide({
     },
     onKeyDown: ({ event }) => {
       if (event.key === "Delete" || event.key === "Backspace") {
-        editor.deleteGuide(idx);
+        editor.commands.deleteGuide(idx);
       }
       if (event.key === "Escape") {
         (event.currentTarget as HTMLElement)?.blur();
@@ -1829,7 +1836,7 @@ function Guide({
       event.stopPropagation();
     },
     onDragStart: ({ event }) => {
-      editor.startGuideGesture(axis, idx);
+      editor.surface.surfaceStartGuideGesture(axis, idx);
       event.preventDefault();
     },
   });

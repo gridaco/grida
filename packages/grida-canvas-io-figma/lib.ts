@@ -221,6 +221,7 @@ export namespace iofigma {
         context: FactoryContext
       ): grida.program.document.IPackedSceneDocument {
         const nodes: Record<string, grida.program.nodes.Node> = {};
+        const graph: Record<string, string[]> = {};
 
         function processNode(
           currentNode: SubcanvasNode,
@@ -242,9 +243,7 @@ export namespace iofigma {
 
           // If the node has children, process them recursively
           if ("children" in currentNode && currentNode.children?.length) {
-            (
-              processedNode as grida.program.nodes.i.IChildrenReference
-            ).children = currentNode.children
+            graph[processedNode.id] = currentNode.children
               .map((c) => {
                 return processNode(c, currentNode as FigmaParentNode);
               }) // Process each child
@@ -266,11 +265,12 @@ export namespace iofigma {
 
         return {
           nodes,
+          links: graph,
           scene: {
             type: "scene",
             id: "scene-" + rootNode.id,
             name: rootNode.name,
-            children: [rootNode.id],
+            children_refs: [rootNode.id],
             guides: [],
             edges: [],
             constraints: {
@@ -368,7 +368,6 @@ export namespace iofigma {
               crossAxisAlignment: "start",
               mainAxisGap: 0,
               crossAxisGap: 0,
-              children: [],
             } satisfies grida.program.nodes.ContainerNode;
           }
           //
@@ -469,7 +468,6 @@ export namespace iofigma {
               crossAxisAlignment: "start",
               mainAxisGap: itemSpacing ?? 0,
               crossAxisGap: counterAxisSpacing ?? itemSpacing ?? 0,
-              children: [],
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -507,7 +505,6 @@ export namespace iofigma {
               crossAxisAlignment: "start",
               mainAxisGap: 0,
               crossAxisGap: 0,
-              children: [],
             } satisfies grida.program.nodes.ContainerNode;
             // throw new Error(`Unsupported node type: ${node.type}`);
           }

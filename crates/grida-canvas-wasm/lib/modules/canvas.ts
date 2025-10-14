@@ -17,6 +17,13 @@ export interface CreateImageResourceResult {
   type: string;
 }
 
+export interface TransactionApplyReport {
+  success: boolean;
+  applied: number;
+  total: number;
+  error?: string;
+}
+
 export class Scene {
   private appptr: number;
   private module: createGridaCanvas.GridaCanvasWasmBindings;
@@ -58,6 +65,24 @@ export class Scene {
     const [ptr, len] = this._alloc_string(data);
     this.module._load_scene_json(this.appptr, ptr, len - 1);
     this._free_string(ptr, len);
+  }
+
+  applyTransactions(batch: unknown[][]): TransactionApplyReport[] | null {
+    const json = JSON.stringify(batch);
+    const [ptr, len] = this._alloc_string(json);
+    const outptr = this.module._apply_scene_transactions(
+      this.appptr,
+      ptr,
+      len - 1
+    );
+    this._free_string(ptr, len);
+    if (outptr === 0) {
+      return null;
+    }
+    const str = this.module.UTF8ToString(outptr);
+    const outlen = this.module.lengthBytesUTF8(str) + 1;
+    this._free_string(outptr, outlen);
+    return JSON.parse(str) as TransactionApplyReport[];
   }
 
   /**

@@ -64,30 +64,10 @@ import {
   useContinueWithAuth,
   AuthProvider,
 } from "@/host/auth/use-continue-with-auth";
-import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
 
 export default function ImagePlayground() {
-  const instance = useEditor(
-    editor.state.init({
-      editable: true,
-      document: {
-        nodes: {},
-        scenes: {
-          main: {
-            type: "scene",
-            id: "main",
-            name: "main",
-            children: [],
-            guides: [],
-            constraints: {
-              children: "multiple",
-            },
-          },
-        },
-      },
-    })
-  );
+  const instance = useEditor();
 
   return (
     <main className="w-screen h-screen overflow-hidden select-none">
@@ -129,7 +109,7 @@ function CanvasConsumer() {
   const { generate, key, loading, image, start, end } = useGenerateImage();
 
   const onCommit = (value: { text: string }) => {
-    const id = editor.insertNode({
+    const id = editor.commands.insertNode({
       type: "image",
       name: value.text,
       width: model.width,
@@ -145,7 +125,7 @@ function CanvasConsumer() {
       prompt: value.text,
     })
       .then((image) => {
-        editor.changeNodeSrc(id, image.src);
+        editor.commands.changeNodePropertySrc(id, image.src);
       })
       .finally(() => {
         credits.refresh();

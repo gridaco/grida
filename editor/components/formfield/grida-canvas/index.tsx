@@ -44,32 +44,13 @@ import { useEditor } from "@/grida-canvas-react";
 
 export function GridaCanvasFormField() {
   useDisableSwipeBack();
-  const instance = useEditor(
-    editor.state.init({
-      editable: true,
-      document: {
-        nodes: {},
-        scenes: {
-          main: {
-            type: "scene",
-            id: "main",
-            name: "main",
-            children: [],
-            guides: [],
-            constraints: {
-              children: "multiple",
-            },
-          },
-        },
-      },
-    })
-  );
+  const instance = useEditor();
   //
 
   useEffect(() => {
     fetch("/examples/canvas/sketch-teimplate-01.grida").then((res) => {
       res.json().then((file) => {
-        instance.reset(
+        instance.commands.reset(
           editor.state.init({
             editable: true,
             document: file.document,
@@ -132,7 +113,7 @@ export function GridaCanvasFormField() {
                 <NodeHierarchyList />
               </SidebarSection>
             </SidebarRoot>
-              <SidebarRight />
+            <SidebarRight />
           </div>
         </StandaloneDocumentEditor>
       </DialogContent>

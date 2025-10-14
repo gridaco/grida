@@ -14,7 +14,7 @@ import {
 import { useMultiplayerRoom } from "./room";
 import { ICursorPos, ICursorNode } from "./types";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { PointerCursor } from "@/components/multiplayer/cursor";
+import { PointerCursor } from "./cursor-legacy";
 
 const RT_THROTTLE_MS = 50;
 

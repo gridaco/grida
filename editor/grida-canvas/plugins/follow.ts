@@ -37,7 +37,7 @@ export class EditorFollowPlugin {
 
   public follow(cursor_id: string): boolean {
     if (this._isFollowing) return false;
-    const cursor = this.editor.state.cursors.find((c) => c.id === cursor_id);
+    const cursor = this.editor.state.cursors[cursor_id];
     if (!cursor) return false;
 
     const initial =
@@ -47,20 +47,23 @@ export class EditorFollowPlugin {
         [0, 1, cursor.position[1]],
       ] as cmath.Transform);
 
-    if (cursor.scene_id) this.editor.loadScene(cursor.scene_id);
+    if (cursor.scene_id) this.editor.commands.loadScene(cursor.scene_id);
 
     this.__cursor_id = cursor_id;
 
-    this.editor.setTransform(this.fit(initial), false);
-    this.__unsubscribe_cursor = this.editor.subscribeWithSelector(
-      (state) => state.cursors.find((c) => c.id === cursor_id),
+    this.editor.camera.transformWithSync(this.fit(initial), false);
+    this.__unsubscribe_cursor = this.editor.doc.subscribeWithSelector(
+      (state) => state.cursors[cursor_id],
       (editor, cursor) => {
         if (!cursor) return;
         if (cursor.scene_id && cursor.scene_id !== editor.state.scene_id) {
           editor.loadScene(cursor.scene_id);
         }
         if (cursor.transform) {
-          editor.setTransform(this.fit(cursor.transform), false);
+          this.editor.camera.transformWithSync(
+            this.fit(cursor.transform),
+            false
+          );
         }
       },
       equal
@@ -95,7 +98,7 @@ export class EditorFollowPlugin {
    * - viewer's transform
    */
   private fit(presenter: cmath.Transform): cmath.Transform {
-    const { width, height } = this.editor.viewport.size;
+    const { width, height } = this.editor.camera.viewport.size;
     const viewport = { x: 0, y: 0, width, height };
     const inv = cmath.transform.invert(presenter);
     const presenter_viewbox = cmath.rect.transform(viewport, inv);

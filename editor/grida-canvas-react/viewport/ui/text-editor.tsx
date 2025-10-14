@@ -8,7 +8,7 @@ import { useSingleSelection } from "../surface-hooks";
 import { css } from "@/grida-canvas-utils/css";
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
-import ContentEditable from "./contenteditable";
+import ContentEditable from "@/components/primitives/contenteditable";
 
 export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const editor = useCurrentEditor();
@@ -77,11 +77,11 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
               }
               stopPropagation(e);
             }}
-            onBlur={() => editor.tryExitContentEditMode()}
+            onBlur={() => editor.surface.surfaceTryExitContentEditMode()}
             html={node.text as string}
             onChange={(e) => {
               const txt = e.currentTarget.textContent;
-              editor.changeNodeText(node_id, txt);
+              editor.commands.changeNodePropertyText(node_id, txt ?? "");
             }}
             style={{
               width: "100%",

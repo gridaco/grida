@@ -65,6 +65,7 @@ _003.definition = {
     subtitle: "Enter Subtitle",
     background: "/images/abstract-placeholder.jpg",
   },
+  links: {},
   nodes: {
     "003.title": {
       id: "003.title",

@@ -1,5 +1,4 @@
 {
-  "doctype": "v0_document",
   "document": {
     "nodes": {
       "173:49": {
@@ -36,11 +35,7 @@
         "mainAxisAlignment": "start",
         "crossAxisAlignment": "start",
         "mainAxisGap": 0,
-        "crossAxisGap": 0,
-        "children": [
-          "173:52",
-          "173:55"
-        ]
+        "crossAxisGap": 0
       },
       "173:52": {
         "id": "173:52",
@@ -65,12 +60,7 @@
         "mainAxisAlignment": "start",
         "crossAxisAlignment": "start",
         "mainAxisGap": 24,
-        "crossAxisGap": 24,
-        "children": [
-          "173:50",
-          "173:53",
-          "173:51"
-        ]
+        "crossAxisGap": 24
       },
       "173:50": {
         "id": "173:50",
@@ -167,12 +157,7 @@
         "mainAxisAlignment": "start",
         "crossAxisAlignment": "start",
         "mainAxisGap": 24,
-        "crossAxisGap": 24,
-        "children": [
-          "173:56",
-          "173:57",
-          "173:58"
-        ]
+        "crossAxisGap": 24
       },
       "173:56": {
         "id": "173:56",
@@ -245,19 +230,18 @@
         },
         "effects": [],
         "cornerRadius": 0
-      }
-    },
-    "scenes": {
+      },
       "flex": {
+        "type": "scene",
         "id": "flex",
         "name": "flex",
-        "type": "scene",
-        "children": [
-          "173:49"
-        ],
+        "active": true,
+        "locked": false,
         "constraints": {
           "children": "multiple"
         },
+        "guides": [],
+        "edges": [],
         "backgroundColor": {
           "r": 245,
           "g": 245,
@@ -265,6 +249,31 @@
           "a": 1
         }
       }
-    }
+    },
+    "links": {
+      "173:49": [
+        "173:52",
+        "173:55"
+      ],
+      "173:52": [
+        "173:50",
+        "173:53",
+        "173:51"
+      ],
+      "173:55": [
+        "173:56",
+        "173:57",
+        "173:58"
+      ],
+      "flex": [
+        "173:49"
+      ]
+    },
+    "scenes_ref": [
+      "flex"
+    ],
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
   }
 }

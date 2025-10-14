@@ -8,15 +8,28 @@ import type { GoogleWebFontList } from "@grida/fonts/google";
 
 export type Action =
   | InternalAction
+  | DocumentResetAction
   | EditorCameraAction
   | EditorAction
-  | EditorUndoAction
-  | EditorRedoAction
   | EditorClipAction;
 
-export type InternalAction =
-  | __InternalResetAction
-  | __InternalWebfontListLoadAction;
+export type InternalAction = __InternalWebfontListLoadAction;
+
+/**
+ * Document Reset Action
+ *
+ * Special marker action emitted when the entire document state is replaced via `reset()`.
+ * This action is NOT handled by the global actions reducer - it only marks that a full
+ * state replacement occurred. Subscribers can check for this action to distinguish
+ * between full resets and incremental changes.
+ */
+export interface DocumentResetAction {
+  type: "document/reset";
+  /**
+   * Unique identifier for this reset operation (auto-generated timestamp if not provided)
+   */
+  document_key: string;
+}
 
 export type EditorAction =
   | EditorConfigAction
@@ -171,12 +184,6 @@ interface ISelection {
   selection: NodeID[];
 }
 
-export interface __InternalResetAction {
-  type: "__internal/reset";
-  key?: string;
-  state: editor.state.IEditorState;
-}
-
 /**
  * load webfont list
  */
@@ -237,14 +244,6 @@ export interface EditorHoverAction {
 export interface EditorBlurAction {
   type: "blur";
 }
-
-export type EditorUndoAction = {
-  type: "undo";
-};
-
-export type EditorRedoAction = {
-  type: "redo";
-};
 
 /**
  * set to editor clipbard

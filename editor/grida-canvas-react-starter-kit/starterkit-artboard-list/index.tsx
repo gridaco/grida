@@ -18,7 +18,7 @@ const ArtboardList = () => {
   const editor = useCurrentEditor();
 
   const onClickItem = (item: ArtboardData) => {
-    editor.insertNode({
+    editor.commands.insertNode({
       type: "container",
       position: "absolute",
       name: item.name,

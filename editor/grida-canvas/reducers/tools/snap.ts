@@ -185,8 +185,10 @@ export function getSnapTargets(
   selection: string[],
   {
     document_ctx,
+    document,
   }: {
     document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext;
+    document: { nodes: Record<string, grida.program.nodes.Node> };
   }
 ): string[] {
   // set of each sibling and parent of selection
@@ -200,7 +202,16 @@ export function getSnapTargets(
         )
         .flat()
     )
-  ).filter((node_id) => !selection.includes(node_id));
+  ).filter((node_id) => {
+    // Exclude selection
+    if (selection.includes(node_id)) return false;
+
+    // Exclude scene nodes (they don't have bounding rects)
+    const node = document.nodes[node_id];
+    if (node?.type === "scene") return false;
+
+    return true;
+  });
 
   return snap_target_node_ids;
 }

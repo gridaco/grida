@@ -65,13 +65,19 @@ export function ExportNodeControl({
   });
 
   const exportHandler = (
-    dataPromise: Promise<Uint8Array | string>,
+    dataPromise: Promise<Uint8Array | string | false>,
     format: "SVG" | "PDF" | "PNG" | "JPEG"
   ): Promise<Blob> => {
     return new Promise<Blob>(async (resolve, reject) => {
       try {
         const data = await dataPromise;
-        const blob = new Blob([data], { type: mimes[format] });
+
+        if (!data) {
+          reject(new Error("Failed to export"));
+          return;
+        }
+
+        const blob = new Blob([data as BlobPart], { type: mimes[format] });
         resolve(blob);
       } catch (e) {
         reject(e);

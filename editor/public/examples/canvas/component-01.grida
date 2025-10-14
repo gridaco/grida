@@ -1,5 +1,4 @@
 {
-  "doctype": "v0_document",
   "document": {
     "nodes": {
       "component": {
@@ -31,13 +30,6 @@
           "padding": "0px 0px 0px 0px"
         },
         "cornerRadius": 0,
-        "children": [
-          "title",
-          "description",
-          "454:344",
-          "454:345",
-          "454:346"
-        ],
         "properties": {
           "title": {
             "type": "string",
@@ -201,19 +193,18 @@
           }
         },
         "effects": []
-      }
-    },
-    "scenes": {
+      },
       "demo": {
+        "type": "scene",
         "id": "demo",
         "name": "demo",
-        "type": "scene",
-        "children": [
-          "component"
-        ],
+        "active": true,
+        "locked": false,
         "constraints": {
           "children": "single"
         },
+        "guides": [],
+        "edges": [],
         "backgroundColor": {
           "r": 245,
           "g": 245,
@@ -221,6 +212,24 @@
           "a": 1
         }
       }
-    }
+    },
+    "links": {
+      "component": [
+        "title",
+        "description",
+        "454:344",
+        "454:345",
+        "454:346"
+      ],
+      "demo": [
+        "component"
+      ]
+    },
+    "scenes_ref": [
+      "demo"
+    ],
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
   }
 }

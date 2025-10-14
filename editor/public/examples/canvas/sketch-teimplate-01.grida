@@ -1,5 +1,4 @@
 {
-  "doctype": "v0_document",
   "document": {
     "nodes": {
       "2": {
@@ -10,9 +9,6 @@
         "opacity": 1,
         "zIndex": 0,
         "rotation": 0,
-        "children": [
-          "3"
-        ],
         "position": "absolute",
         "left": 85,
         "top": 130,
@@ -445,24 +441,19 @@
         "style": {
           "overflow": "clip"
         },
-        "cornerRadius": 0,
-        "children": [
-          "2",
-          "9"
-        ]
-      }
-    },
-    "scenes": {
+        "cornerRadius": 0
+      },
       "001": {
+        "type": "scene",
         "id": "001",
         "name": "sketch",
-        "type": "scene",
-        "children": [
-          "root"
-        ],
+        "active": true,
+        "locked": false,
         "constraints": {
           "children": "multiple"
         },
+        "guides": [],
+        "edges": [],
         "backgroundColor": {
           "r": 245,
           "g": 245,
@@ -470,6 +461,24 @@
           "a": 1
         }
       }
-    }
+    },
+    "links": {
+      "2": [
+        "3"
+      ],
+      "root": [
+        "2",
+        "9"
+      ],
+      "001": [
+        "root"
+      ]
+    },
+    "scenes_ref": [
+      "001"
+    ],
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
   }
 }

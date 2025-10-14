@@ -1,5 +1,4 @@
 {
-  "doctype": "v0_document",
   "document": {
     "nodes": {
       "202:2": {
@@ -30,15 +29,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "202:3",
-          "202:4",
-          "202:5",
-          "202:8",
-          "202:9",
-          "202:10"
-        ]
+        "cornerRadius": 0
       },
       "202:3": {
         "id": "202:3",
@@ -111,11 +102,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "202:6",
-          "202:7"
-        ]
+        "cornerRadius": 0
       },
       "202:6": {
         "id": "202:6",
@@ -271,11 +258,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "202:11",
-          "202:13"
-        ]
+        "cornerRadius": 0
       },
       "202:11": {
         "id": "202:11",
@@ -296,10 +279,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
-        "children": [
-          "202:12"
-        ]
+        "cornerRadius": 0
       },
       "202:12": {
         "id": "202:12",
@@ -364,19 +344,18 @@
         "fontSize": 20,
         "fontFamily": "Inter",
         "fontWeight": 800
-      }
-    },
-    "scenes": {
+      },
       "post": {
+        "type": "scene",
         "id": "post",
         "name": "post",
-        "type": "scene",
-        "children": [
-          "202:2"
-        ],
+        "active": true,
+        "locked": false,
         "constraints": {
           "children": "multiple"
         },
+        "guides": [],
+        "edges": [],
         "backgroundColor": {
           "r": 245,
           "g": 245,
@@ -384,6 +363,36 @@
           "a": 1
         }
       }
-    }
+    },
+    "links": {
+      "202:2": [
+        "202:3",
+        "202:4",
+        "202:5",
+        "202:8",
+        "202:9",
+        "202:10"
+      ],
+      "202:5": [
+        "202:6",
+        "202:7"
+      ],
+      "202:10": [
+        "202:11",
+        "202:13"
+      ],
+      "202:11": [
+        "202:12"
+      ],
+      "post": [
+        "202:2"
+      ]
+    },
+    "scenes_ref": [
+      "post"
+    ],
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
   }
 }

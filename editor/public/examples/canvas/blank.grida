@@ -1,16 +1,17 @@
 {
-  "doctype": "v0_document",
   "document": {
-    "nodes": {},
-    "scenes": {
+    "nodes": {
       "blank": {
+        "type": "scene",
         "id": "blank",
         "name": "blank",
-        "type": "scene",
-        "children": [],
+        "active": true,
+        "locked": false,
         "constraints": {
           "children": "multiple"
         },
+        "guides": [],
+        "edges": [],
         "backgroundColor": {
           "r": 245,
           "g": 245,
@@ -18,6 +19,15 @@
           "a": 1
         }
       }
-    }
+    },
+    "links": {
+      "blank": []
+    },
+    "scenes_ref": [
+      "blank"
+    ],
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
   }
 }

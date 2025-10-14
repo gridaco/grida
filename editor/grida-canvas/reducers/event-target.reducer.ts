@@ -1,4 +1,5 @@
-import { produce, type Draft } from "immer";
+import { type Draft } from "immer";
+import { updateState } from "./utils/immer";
 
 import type {
   EventTargetAction,
@@ -36,7 +37,6 @@ import * as cem_vector from "./event-target.cem-vector.reducer";
 import * as cem_bitmap from "./event-target.cem-bitmap.reducer";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import { snapGuideTranslation, threshold } from "./tools/snap";
-import nid from "./tools/id";
 import cmath from "@grida/cmath";
 import type { ReducerContext } from ".";
 
@@ -113,7 +113,12 @@ function __self_evt_on_click(
     case "insert":
       const parent = __get_insertion_target(draft);
 
-      const nnode = initialNode(draft.tool.node, {}, context.paint_constraints);
+      const nnode = initialNode(
+        draft.tool.node,
+        () => context.idgen.next(),
+        {},
+        context.paint_constraints
+      );
 
       let relpos: cmath.Vector2;
       if (parent) {
@@ -364,6 +369,7 @@ function __self_evt_on_drag_start(
       //
       const nnode = initialNode(
         draft.tool.node,
+        () => context.idgen.next(),
         {
           left: initial_rect.x,
           top: initial_rect.y,
@@ -488,7 +494,9 @@ function __self_evt_on_drag(
   action: EditorEventTarget_Drag,
   context: ReducerContext
 ) {
-  const scene = draft.document.scenes[draft.scene_id!];
+  const scene = draft.document.nodes[
+    draft.scene_id!
+  ] as grida.program.nodes.SceneNode;
   const {
     event: { movement, delta },
   } = <EditorEventTarget_Drag>action;
@@ -548,10 +556,11 @@ function __self_evt_on_drag(
         // [snap the guide offset]
         // 1. to pixel grid (quantize 1)
         // 2. to objects geometry
+        const scene_children = draft.document.links[draft.scene_id!] || [];
         const { translated } = snapGuideTranslation(
           axis,
           initial_offset,
-          scene.children.map(
+          scene_children.map(
             (id) => context.geometry.getNodeAbsoluteBoundingRect(id)!
           ),
           m,
@@ -564,7 +573,7 @@ function __self_evt_on_drag(
         const offset = cmath.quantize(translated, 1);
 
         draft.gesture.offset = offset;
-        draft.document.scenes[draft.scene_id!].guides[index].offset = offset;
+        scene.guides[index].offset = offset;
         break;
       }
       // [insertion mode - resize after insertion]
@@ -816,7 +825,7 @@ function __self_start_gesture_translate(
   draft.gesture = {
     type: "translate",
     selection: selection,
-    initial_clone_ids: selection.map(() => nid()),
+    initial_clone_ids: selection.map(() => context.idgen.next()),
     initial_selection: selection,
     initial_rects: rects,
     initial_snapshot: editor.state.snapshot(draft),
@@ -852,9 +861,11 @@ function __before_end_insert_and_resize(
     draft,
     pending.node_id
   ) as grida.program.nodes.ContainerNode;
-  node.fill = (
-    pending.prototype as grida.program.nodes.ContainerNodePrototype
-  ).fill;
+
+  // UX: for container, the fill is set after insertion
+  if (pending.prototype.type === "container") {
+    node.fills = pending.prototype.fills;
+  }
 
   if (cmath.vector2.isZero(draft.gesture.movement)) return;
 
@@ -863,15 +874,8 @@ function __before_end_insert_and_resize(
   )!;
   const parent_id = dq.getParentId(draft.document_ctx, pending.node_id);
   const siblings = parent_id
-    ? [
-        ...(
-          dq.__getNodeById(
-            draft,
-            parent_id
-          ) as grida.program.nodes.i.IChildrenReference
-        ).children,
-      ]
-    : [...draft.document.scenes[draft.scene_id!].children];
+    ? [...(draft.document.links[parent_id] ?? [])]
+    : [...(draft.document.links[draft.scene_id!] ?? [])];
 
   siblings.forEach((id) => {
     if (id === pending.node_id) return;
@@ -944,9 +948,12 @@ function __get_insertion_target(
   state: editor.state.IEditorState
 ): string | null {
   assert(state.scene_id, "scene_id is not set");
-  const scene = state.document.scenes[state.scene_id];
+  const scene = state.document.nodes[
+    state.scene_id
+  ] as grida.program.nodes.SceneNode;
+  const scene_children = state.document.links[state.scene_id] || [];
   if (scene.constraints.children === "single") {
-    return scene.children[0];
+    return scene_children[0];
   }
 
   const hits = state.hits.slice();
@@ -986,54 +993,54 @@ export default function eventTargetReducer<S extends editor.state.IEditorState>(
   switch (action.type) {
     // #region [html backend] canvas event target
     case "event-target/event/on-pointer-move": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_pointer_move(draft, action, context);
       });
     }
     case "event-target/event/on-pointer-move-raycast": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_pointer_move_raycast(draft, action);
       });
     }
     case "event-target/event/on-click": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_click(draft, action, context);
       });
     }
     case "event-target/event/on-double-click": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_double_click(draft);
       });
     }
     case "event-target/event/on-pointer-down": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_pointer_down(draft, action, context);
       });
     }
     case "event-target/event/on-pointer-up": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_pointer_up(draft);
       });
     }
     // #region drag event
     case "event-target/event/on-drag-start": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_drag_start(draft, action, context);
       });
     }
     case "event-target/event/on-drag-end": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_drag_end(draft, action, context);
       });
     }
     case "event-target/event/on-drag": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_drag(draft, action, context);
       });
     }
     //
     case "event-target/event/multiple-selection-overlay/on-click": {
-      return produce(state, (draft) => {
+      return updateState(state, (draft) => {
         __self_evt_on_multiple_selection_overlay_click(draft, action);
       });
     }

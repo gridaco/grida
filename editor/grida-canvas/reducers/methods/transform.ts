@@ -10,23 +10,25 @@ import {
   snapObjectsTranslation,
   threshold,
 } from "../tools/snap";
-import nodeTransformReducer from "../node-transform.reducer";
+import updateNodeTransform from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
 import grida from "@grida/schema";
 import vn from "@grida/vn";
-import nid from "../tools/id";
+import tree from "@grida/tree";
+import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
 import type { ReducerContext } from "..";
 
 /**
  * Determines if a node type allows hierarchy changes during translation.
- * Container nodes allow children to escape/enter during translation.
+ * Container nodes and scenes allow children to escape/enter during translation.
  * Group and boolean nodes do not allow hierarchy changes - children must stay within their parent.
  */
 function allows_hierarchy_change(
   node_type: grida.program.nodes.NodeType
 ): boolean {
   switch (node_type) {
+    case "scene":
     case "container":
       return true;
     case "group":
@@ -67,8 +69,7 @@ export function self_nudge_transform<S extends editor.state.IEditorState>(
 
   for (const node_id of targets) {
     const node = dq.__getNodeById(draft, node_id);
-
-    draft.document.nodes[node_id] = nodeTransformReducer(node, {
+    updateNodeTransform(node, {
       type: "translate",
       dx: dx,
       dy: dy,
@@ -116,7 +117,9 @@ function __self_update_gesture_transform_translate(
 ) {
   assert(draft.gesture.type === "translate", "Gesture type must be translate");
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
   const {
     movement: _movement,
     initial_selection,
@@ -169,7 +172,7 @@ function __self_update_gesture_transform_translate(
               if (depth === 0) return initial_clone_ids[i];
 
               // else, default.
-              return nid();
+              return context.idgen.next();
             }
           );
 
@@ -286,34 +289,17 @@ function __self_update_gesture_transform_translate(
 
         is_parent_changed = true;
 
-        // unregister the node from the previous parent
-        if (prev_parent_id) {
-          const parent = dq.__getNodeById(
-            draft,
-            prev_parent_id
-          ) as grida.program.nodes.i.IChildrenReference;
-          parent.children = parent.children.filter((id) => id !== node_id);
-        } else {
-          // root
-          // FIXME: do not directly modify scene children here.
-          scene.children = scene.children.filter((id) => id !== node_id);
-        }
+        // Use Graph.mv() - mutates draft.document directly (scene is now a node!)
+        const graphInstance = new tree.graph.Graph(
+          draft.document,
+          EDITOR_GRAPH_POLICY
+        );
 
-        // register the node to the new parent
-        if (new_parent_id) {
-          const new_parent = dq.__getNodeById(
-            draft,
-            new_parent_id
-          ) as grida.program.nodes.i.IChildrenReference;
-          new_parent.children.push(node_id);
-        } else {
-          // root
-          // FIXME: do not directly modify scene children here.
-          scene.children.push(node_id);
-        }
+        const target = new_parent_id ?? draft.scene_id!;
+        graphInstance.mv(node_id, target);
 
-        // update the context
-        draft.document_ctx = dq.Context.from(draft.document).snapshot();
+        // Update context from graph's cached LUT
+        draft.document_ctx = graphInstance.lut;
       });
 
       if (is_parent_changed) {
@@ -364,10 +350,12 @@ function __self_update_gesture_transform_translate(
       const r = translated[i++];
 
       const parent_id = dq.getParentId(draft.document_ctx, node_id);
+      const parent_node = parent_id ? dq.__getNodeById(draft, parent_id) : null;
+      const is_scene_parent = parent_node?.type === "scene";
 
       let relative_position: cmath.Vector2;
-      if (parent_id) {
-        // sub node
+      if (parent_id && !is_scene_parent) {
+        // sub node with non-scene parent
         const parent_rect =
           context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
 
@@ -393,11 +381,11 @@ function __self_update_gesture_transform_translate(
           parent_rect.y,
         ]);
       } else {
-        // top node
+        // top node (scene child or orphan)
         relative_position = r.position;
       }
 
-      draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      updateNodeTransform(node, {
         type: "position",
         x: relative_position[0],
         y: relative_position[1],
@@ -496,7 +484,9 @@ function __self_update_gesture_transform_scale(
     "Gesture type must be scale or insert-and-resize"
   );
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.scenes[draft.scene_id];
+  const scene = draft.document.nodes[
+    draft.scene_id
+  ] as grida.program.nodes.SceneNode;
   const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =
     draft.gesture_modifiers;
 
@@ -563,16 +553,21 @@ function __self_update_gesture_transform_scale(
 
   let i = 0;
   for (const node_id of selection) {
-    const node = initial_snapshot.document.nodes[node_id];
+    const node = draft.document.nodes[node_id];
+    const initial_node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
-    const is_root = scene.children.includes(node_id);
+
+    const parent_id = dq.getParentId(draft.document_ctx, node_id);
+    const parent_node = parent_id ? dq.__getNodeById(draft, parent_id) : null;
+    const is_scene_parent = parent_node?.type === "scene";
 
     // TODO: scaling for bitmap node is not supported yet.
-    const is_scalable = node.type !== "bitmap";
+    const is_scalable = initial_node.type !== "bitmap";
     if (!is_scalable) continue;
 
-    if (is_root) {
-      draft.document.nodes[node_id] = nodeTransformReducer(node, {
+    if (!parent_id || is_scene_parent) {
+      // Scene child or orphan - use absolute positioning
+      updateNodeTransform(node, {
         type: "scale",
         rect: initial_rect,
         origin: origin,
@@ -580,7 +575,7 @@ function __self_update_gesture_transform_scale(
         preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
       });
     } else {
-      const parent_id = dq.getParentId(draft.document_ctx, node_id)!;
+      // Nested node with non-scene parent - use relative positioning
       const parent_rect =
         context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
 
@@ -606,7 +601,7 @@ function __self_update_gesture_transform_scale(
         parent_rect.y,
       ]);
 
-      draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      updateNodeTransform(node, {
         type: "scale",
         rect: relative_rect,
         origin: relative_origin,
@@ -615,9 +610,9 @@ function __self_update_gesture_transform_scale(
       });
     }
 
-    if (node.type === "vector") {
+    if (initial_node.type === "vector") {
       // TODO: mrege with the above
-      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+      const vne = new vn.VectorNetworkEditor(initial_node.vectorNetwork);
       const scale = cmath.rect.getScaleFactors(initial_rect, {
         x: initial_rect.x,
         y: initial_rect.y,

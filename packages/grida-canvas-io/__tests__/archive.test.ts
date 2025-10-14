@@ -69,20 +69,24 @@ describe("archive comprehensive", () => {
 
   // Simple document data for testing
   const mockDocumentData: io.JSONDocumentFileModel = {
-    version: "0.0.1-beta.1+20250728",
+    version: "0.0.1-beta.1+20251010",
     document: {
-      nodes: {},
-      scenes: {
+      nodes: {
         scene1: {
           type: "scene",
           id: "scene1",
           name: "Test Scene",
-          children: [],
+          active: true,
+          locked: false,
           guides: [],
           edges: [],
           constraints: { children: "multiple" },
         },
       },
+      links: {
+        scene1: [],
+      },
+      scenes_ref: ["scene1"],
       entry_scene_id: "scene1",
       bitmaps: {},
       images: {},
@@ -92,9 +96,19 @@ describe("archive comprehensive", () => {
 
   // Complex document data for testing (without bitmaps for now)
   const complexDocumentData: io.JSONDocumentFileModel = {
-    version: "0.0.1-beta.1+20250728",
+    version: "0.0.1-beta.1+20251010",
     document: {
       nodes: {
+        scene1: {
+          type: "scene",
+          id: "scene1",
+          name: "Test Scene",
+          active: true,
+          locked: false,
+          guides: [],
+          edges: [],
+          constraints: { children: "multiple" },
+        },
         node1: {
           type: "rectangle",
           id: "node1",
@@ -116,17 +130,10 @@ describe("archive comprehensive", () => {
           },
         },
       },
-      scenes: {
-        scene1: {
-          type: "scene",
-          id: "scene1",
-          name: "Test Scene",
-          children: ["node1"],
-          guides: [],
-          edges: [],
-          constraints: { children: "multiple" },
-        },
+      links: {
+        scene1: ["node1"],
       },
+      scenes_ref: ["scene1"],
       entry_scene_id: "scene1",
       bitmaps: {},
       images: {},
@@ -149,7 +156,9 @@ describe("archive comprehensive", () => {
 
   // Helper function to create a mock File object from real image data
   function createRealFile(filename: string, content: Uint8Array): File {
-    const blob = new Blob([content], { type: getMimeType(filename) });
+    const blob = new Blob([content as BlobPart], {
+      type: getMimeType(filename),
+    });
     return new File([blob], filename, { type: getMimeType(filename) });
   }
 
@@ -688,8 +697,8 @@ describe("archive comprehensive", () => {
       const unpacked = io.archive.unpack(packed);
 
       expect(Object.keys(unpacked.images)).toHaveLength(4);
-      for (const filename of Object.keys(specialImages)) {
-        expect(unpacked.images[filename]).toEqual(specialImages[filename]);
+      for (const [filename, data] of Object.entries(specialImages)) {
+        expect(unpacked.images[filename]).toEqual(data);
       }
     });
   });

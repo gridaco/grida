@@ -1,18 +1,14 @@
 import { type Draft } from "immer";
 
 import type {
-  EditorEventTarget_PointerMove,
   EditorEventTarget_PointerDown,
-  EditorEventTarget_Drag,
   EditorEventTarget_DragStart,
-  EditorEventTarget_DragEnd,
 } from "../action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import assert from "assert";
 import {
-  self_updateVectorAreaSelection,
   getUXNeighbouringVertices,
   self_updateVectorSnappedSegmentP,
 } from "./methods/vector";
@@ -25,7 +21,6 @@ import {
 import { getInitialCurveGesture } from "./tools/gesture";
 import { threshold, snapMovement } from "./tools/snap";
 import { snapToCanvasGeometry } from "@grida/cmath/_snap";
-import nid from "./tools/id";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import type { ReducerContext } from ".";
@@ -363,7 +358,7 @@ export function create_new_vector_node(
   draft: editor.state.IEditorState,
   context: ReducerContext
 ) {
-  const new_node_id = nid();
+  const new_node_id = context.idgen.next();
 
   const vector = {
     type: "vector",
@@ -500,7 +495,9 @@ export function on_drag_gesture_curve(
   const anchor_points = vne.vertices.map((v) =>
     cmath.vector2.add(v, node_pos_abs)
   );
-  const scene = draft.document.scenes[draft.scene_id!];
+  const scene = draft.document.nodes[
+    draft.scene_id!
+  ] as grida.program.nodes.SceneNode;
 
   const { tarnslate_with_axis_lock, translate_with_force_disable_snap } =
     draft.gesture_modifiers;
@@ -614,7 +611,9 @@ export function on_drag_gesture_translate_vector_controls(
     tangents,
   } = draft.gesture;
 
-  const scene = draft.document.scenes[draft.scene_id!];
+  const scene = draft.document.nodes[
+    draft.scene_id!
+  ] as grida.program.nodes.SceneNode;
 
   const agent_points = vertices.map((i) =>
     cmath.vector2.add(initial_verticies[i], initial_absolute_position)
@@ -686,7 +685,7 @@ export function on_draw_pointer_down(
 
   let vector: grida.program.nodes.VectorNode;
 
-  const new_node_id = nid();
+  const new_node_id = context.idgen.next();
   const __base = {
     id: new_node_id,
     active: true,
@@ -853,9 +852,12 @@ function __get_insertion_target(
   state: editor.state.IEditorState
 ): string | null {
   assert(state.scene_id, "scene_id is not set");
-  const scene = state.document.scenes[state.scene_id];
+  const scene = state.document.nodes[
+    state.scene_id
+  ] as grida.program.nodes.SceneNode;
+  const scene_children = state.document.links[state.scene_id] || [];
   if (scene.constraints.children === "single") {
-    return scene.children[0];
+    return scene_children[0];
   }
 
   const hits = state.hits.slice();
