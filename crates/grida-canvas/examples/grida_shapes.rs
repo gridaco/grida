@@ -42,7 +42,10 @@ async fn demo_shapes() -> Scene {
             200 - (i * 20) as u8,
             255,
         ))); // Fading gray
-        graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Ellipse Row - demonstrating width/height ratio variations
@@ -60,7 +63,10 @@ async fn demo_shapes() -> Scene {
             200 - (i * 20) as u8,
             255,
         ))]); // Fading gray
-        graph.append_child(Node::Ellipse(ellipse), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::Ellipse(ellipse),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Polygon Row - demonstrating point count variations
@@ -88,7 +94,10 @@ async fn demo_shapes() -> Scene {
             200 - (i * 20) as u8,
             255,
         ))]); // Fading gray
-        graph.append_child(Node::Polygon(polygon), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::Polygon(polygon),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Regular Polygon Row - demonstrating point count variations
@@ -108,7 +117,10 @@ async fn demo_shapes() -> Scene {
             255,
         ))]); // Fading gray
         regular_polygon.corner_radius = 8.0;
-        graph.append_child(Node::RegularPolygon(regular_polygon), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::RegularPolygon(regular_polygon),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Path Row - demonstrating different path patterns
@@ -135,7 +147,10 @@ async fn demo_shapes() -> Scene {
             200 - (i * 20) as u8,
             255,
         ))]); // Fading gray
-        graph.append_child(Node::SVGPath(path), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::SVGPath(path),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Star Polygon Row - demonstrating different point counts and inner radius variations
@@ -156,7 +171,10 @@ async fn demo_shapes() -> Scene {
             255,
         ))]); // Fading gray
         star.corner_radius = 8.0;
-        graph.append_child(Node::RegularStarPolygon(star), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::RegularStarPolygon(star),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Arc Row - demonstrating different angle variations
@@ -178,7 +196,10 @@ async fn demo_shapes() -> Scene {
             255,
         ))]); // Fading gray
         arc.corner_radius = Some(8.0);
-        graph.append_child(Node::Ellipse(arc), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::Ellipse(arc),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     Scene {

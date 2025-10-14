@@ -51,7 +51,10 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            graph.append_child(Node::Vector(vector_node_1_tri_open), Parent::NodeId(root_id.clone()));
+            graph.append_child(
+                Node::Vector(vector_node_1_tri_open),
+                Parent::NodeId(root_id.clone()),
+            );
         }
 
         {
@@ -82,7 +85,10 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            graph.append_child(Node::Vector(vector_node_2_tri_closed), Parent::NodeId(root_id.clone()));
+            graph.append_child(
+                Node::Vector(vector_node_2_tri_closed),
+                Parent::NodeId(root_id.clone()),
+            );
         }
 
         //
@@ -179,7 +185,10 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            graph.append_child(Node::Vector(vector_node_1_5), Parent::NodeId(root_id.clone()));
+            graph.append_child(
+                Node::Vector(vector_node_1_5),
+                Parent::NodeId(root_id.clone()),
+            );
         }
     }
 
@@ -251,7 +260,10 @@ async fn demo_vectors() -> Scene {
                 stroke_dash_array: None,
             };
 
-            graph.append_child(Node::Vector(vector_node_5_5), Parent::NodeId(root_id.clone()));
+            graph.append_child(
+                Node::Vector(vector_node_5_5),
+                Parent::NodeId(root_id.clone()),
+            );
         }
     }
 

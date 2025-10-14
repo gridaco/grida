@@ -1,7 +1,7 @@
 use crate::cg::{types::*, Alignment};
 use crate::helpers::webfont_helper;
 use crate::node::repository::NodeRepository;
-use crate::node::scene_graph::{Parent, SceneGraph};
+use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
@@ -20,8 +20,6 @@ use math2::box_fit::BoxFit;
 use math2::transform::AffineTransform;
 
 const TRANSPARENT: Paint = Paint::Solid(SolidPaint::TRANSPARENT);
-
-const BLACK: Paint = Paint::Solid(SolidPaint::BLACK);
 
 // Map implementations
 impl From<&Rgba> for CGColor {
@@ -85,7 +83,7 @@ impl From<&FigmaPaint> for Paint {
                     }
                 };
 
-                let repeat = match image.scale_mode {
+                let _repeat = match image.scale_mode {
                     figma_api::models::image_paint::ScaleMode::Tile => ImageRepeat::Repeat,
                     _ => ImageRepeat::default(),
                 };
@@ -351,7 +349,7 @@ impl FigmaConverter {
                     }
                 };
 
-                let repeat = match image.scale_mode {
+                let _repeat = match image.scale_mode {
                     figma_api::models::image_paint::ScaleMode::Tile => ImageRepeat::Repeat,
                     _ => ImageRepeat::default(),
                 };

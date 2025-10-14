@@ -240,6 +240,27 @@ impl NodeTrait for Node {
     }
 }
 
+impl Node {
+    pub fn mask(&self) -> Option<LayerMaskType> {
+        match self {
+            Node::Group(n) => n.mask,
+            Node::Container(n) => n.mask,
+            Node::Rectangle(n) => n.mask,
+            Node::Ellipse(n) => n.mask,
+            Node::Polygon(n) => n.mask,
+            Node::RegularPolygon(n) => n.mask,
+            Node::RegularStarPolygon(n) => n.mask,
+            Node::Line(n) => n.mask,
+            Node::TextSpan(n) => n.mask,
+            Node::SVGPath(n) => n.mask,
+            Node::Vector(n) => n.mask,
+            Node::BooleanOperation(n) => n.mask,
+            Node::Image(n) => n.mask,
+            Node::Error(_) => None,
+        }
+    }
+}
+
 pub trait NodeFillsMixin {
     fn set_fill(&mut self, fill: Paint);
     fn set_fills(&mut self, fills: Paints);

@@ -6,7 +6,7 @@ use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
 use crate::io::io_grida::{self, JSONVectorNetwork};
 use crate::io::io_grida_patch::{self, TransactionApplyReport};
-use crate::node::scene_graph::{Parent, SceneGraph};
+use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;

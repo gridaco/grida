@@ -39,7 +39,10 @@ async fn demo_ellipses() -> Scene {
             200 + (i * 5) as u8,
             255,
         ))]); // Blue gradient
-        graph.append_child(Node::Ellipse(ellipse), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::Ellipse(ellipse),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Row 2: Ellipses with different inner radius (rings)
@@ -58,7 +61,10 @@ async fn demo_ellipses() -> Scene {
             50 + (i * 20) as u8,
             255,
         ))]); // Orange gradient
-        graph.append_child(Node::Ellipse(ring), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::Ellipse(ring),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Row 3: Arcs with different angles
@@ -78,7 +84,10 @@ async fn demo_ellipses() -> Scene {
             100 + (i * 15) as u8,
             255,
         ))]); // Green gradient
-        graph.append_child(Node::Ellipse(arc), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::Ellipse(arc),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Row 4: Arcs with inner radius (donut arcs)
@@ -99,7 +108,10 @@ async fn demo_ellipses() -> Scene {
             150 + (i * 12) as u8,
             255,
         ))]); // Purple gradient
-        graph.append_child(Node::Ellipse(donut_arc), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::Ellipse(donut_arc),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Row 5: Ellipses with strokes
@@ -119,7 +131,10 @@ async fn demo_ellipses() -> Scene {
             255,
         ))]); // Red gradient stroke
         stroke_ellipse.stroke_width = 3.0 + (i as f32 * 2.0); // 3 to 17 stroke weight
-        graph.append_child(Node::Ellipse(stroke_ellipse), Parent::NodeId(root_container_id.clone()));
+        graph.append_child(
+            Node::Ellipse(stroke_ellipse),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     Scene {

@@ -772,25 +772,6 @@ impl LayerList {
         out_commands
     }
 
-    fn node_mask(node: &Node) -> Option<LayerMaskType> {
-        match node {
-            Node::Group(n) => n.mask,
-            Node::Container(n) => n.mask,
-            Node::Rectangle(n) => n.mask,
-            Node::Ellipse(n) => n.mask,
-            Node::Polygon(n) => n.mask,
-            Node::RegularPolygon(n) => n.mask,
-            Node::RegularStarPolygon(n) => n.mask,
-            Node::Line(n) => n.mask,
-            Node::TextSpan(n) => n.mask,
-            Node::SVGPath(n) => n.mask,
-            Node::Vector(n) => n.mask,
-            Node::BooleanOperation(n) => n.mask,
-            Node::Image(n) => n.mask,
-            Node::Error(_) => None,
-        }
-    }
-
     pub fn filter(&self, filter: impl Fn(&PainterPictureLayer) -> bool) -> Self {
         let mut list = LayerList::default();
         for layer in &self.layers {

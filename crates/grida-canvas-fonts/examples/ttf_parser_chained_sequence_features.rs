@@ -102,9 +102,7 @@ fn main() {
 #[derive(Debug, Clone)]
 struct ChainedFeature {
     pub tag: String,
-    pub name: String,
     pub glyphs: Vec<String>,
-    pub source_table: String,
 }
 
 fn build_glyph_map(face: &ttf_parser::Face) -> std::collections::HashMap<u16, char> {
@@ -150,7 +148,7 @@ fn extract_features_via_chained_sequences(
 }
 
 fn extract_gsub_features_simplified(
-    face: &ttf_parser::Face,
+    _face: &ttf_parser::Face,
     gsub_table: ttf_parser::opentype_layout::LayoutTable,
     glyph_map: &std::collections::HashMap<u16, char>,
 ) -> Vec<ChainedFeature> {
@@ -160,7 +158,6 @@ fn extract_gsub_features_simplified(
     for i in 0..gsub_table.features.len() {
         if let Some(feature) = gsub_table.features.get(i as u16) {
             let tag = feature.tag.to_string();
-            let name = get_feature_name_from_font(face, &tag);
 
             // Extract glyphs from all lookups in this feature
             let mut all_glyphs = std::collections::HashSet::new();
@@ -224,9 +221,7 @@ fn extract_gsub_features_simplified(
 
             features.push(ChainedFeature {
                 tag,
-                name,
                 glyphs: glyph_chars,
-                source_table: "GSUB".to_string(),
             });
         }
     }
@@ -235,7 +230,7 @@ fn extract_gsub_features_simplified(
 }
 
 fn extract_gpos_features_simplified(
-    face: &ttf_parser::Face,
+    _face: &ttf_parser::Face,
     gpos_table: ttf_parser::opentype_layout::LayoutTable,
     glyph_map: &std::collections::HashMap<u16, char>,
 ) -> Vec<ChainedFeature> {
@@ -245,7 +240,6 @@ fn extract_gpos_features_simplified(
     for i in 0..gpos_table.features.len() {
         if let Some(feature) = gpos_table.features.get(i as u16) {
             let tag = feature.tag.to_string();
-            let name = get_feature_name_from_font(face, &tag);
 
             // Extract glyphs from all lookups in this feature
             let mut all_glyphs = std::collections::HashSet::new();
@@ -301,9 +295,7 @@ fn extract_gpos_features_simplified(
 
             features.push(ChainedFeature {
                 tag,
-                name,
                 glyphs: glyph_chars,
-                source_table: "GPOS".to_string(),
             });
         }
     }
@@ -336,32 +328,4 @@ fn extract_coverage_glyphs(coverage: &ttf_parser::opentype_layout::Coverage) -> 
     }
 
     glyphs
-}
-
-fn get_feature_name_from_font(_face: &ttf_parser::Face, tag: &str) -> String {
-    // Simplified feature name mapping
-    match tag {
-        "kern" => "Kerning".to_string(),
-        "liga" => "Ligatures".to_string(),
-        "ss01" => "Stylistic Set 1".to_string(),
-        "cv01" => "Character Variant 1".to_string(),
-        "locl" => "Localized Forms".to_string(),
-        "zero" => "Slashed Zero".to_string(),
-        "sinf" => "Scientific Inferiors".to_string(),
-        "aalt" => "Access All Alternates".to_string(),
-        "numr" => "Numerators".to_string(),
-        "ordn" => "Ordinals".to_string(),
-        "case" => "Case-Sensitive Forms".to_string(),
-        "pnum" => "Proportional Numbers".to_string(),
-        "ccmp" => "Glyph Composition/Decomposition".to_string(),
-        "dlig" => "Discretionary Ligatures".to_string(),
-        "sups" => "Superscript".to_string(),
-        "tnum" => "Tabular Numbers".to_string(),
-        "subs" => "Subscript".to_string(),
-        "salt" => "Stylistic Alternates".to_string(),
-        "dnom" => "Denominators".to_string(),
-        "frac" => "Fractions".to_string(),
-        "calt" => "Contextual Alternates".to_string(),
-        _ => format!("Feature {}", tag),
-    }
 }

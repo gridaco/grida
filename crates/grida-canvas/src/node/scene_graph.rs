@@ -445,7 +445,7 @@ mod tests {
 
         let id_a = graph.append_child(create_test_node("a"), Parent::Root);
         let id_b = graph.append_child(create_test_node("b"), Parent::NodeId(id_a.clone()));
-        let id_c = graph.append_child(create_test_node("c"), Parent::NodeId(id_b.clone()));
+        let _id_c = graph.append_child(create_test_node("c"), Parent::NodeId(id_b.clone()));
 
         let roots = graph.roots();
         assert_eq!(roots.len(), 1);

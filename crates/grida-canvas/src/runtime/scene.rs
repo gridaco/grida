@@ -601,7 +601,7 @@ impl Renderer {
     fn draw_nocache(
         &self,
         canvas: &Canvas,
-        plan: &FramePlan,
+        _plan: &FramePlan,
         background_color: Option<CGColor>,
         width: f32,
         height: f32,
