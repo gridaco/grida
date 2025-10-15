@@ -256,8 +256,7 @@ impl<'a> VNPainter<'a> {
 mod tests {
     use super::*;
     use crate::cg::types::{
-        BlendMode, CGColor, FillRule, ImagePaint, ImageRepeat, Paint, ResourceRef, SolidPaint,
-        StrokeAlign,
+        BlendMode, CGColor, FillRule, ImagePaint, Paint, ResourceRef, SolidPaint, StrokeAlign,
     };
     use crate::cg::Alignment;
     use crate::resources::ByteStore;

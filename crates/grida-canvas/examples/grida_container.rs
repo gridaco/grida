@@ -1,13 +1,12 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 async fn demo_clip() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
 
     // Create a single container with solid fill
     let mut container = nf.create_container_node();
@@ -42,22 +41,15 @@ async fn demo_clip() -> Scene {
     ellipse.strokes = Paints::new([Paint::from(CGColor(50, 150, 50, 255))]);
     ellipse.stroke_width = 2.0;
 
-    // Add nodes to repository and collect their IDs
-    let ellipse_id = ellipse.id.clone();
-    repository.insert(Node::Ellipse(ellipse));
-
-    // Add ellipse as child of container
-    container.children = vec![ellipse_id];
-
-    let container_id = container.id.clone();
-    repository.insert(Node::Container(container));
+    // Build scene graph
+    let mut graph = SceneGraph::new();
+    let container_id = graph.append_child(Node::Container(container), Parent::Root);
+    graph.append_child(Node::Ellipse(ellipse), Parent::NodeId(container_id));
 
     Scene {
-        id: "scene".to_string(),
         name: "Simple Container Demo".to_string(),
-        children: vec![container_id],
-        nodes: repository,
         background_color: None,
+        graph,
     }
 }
 

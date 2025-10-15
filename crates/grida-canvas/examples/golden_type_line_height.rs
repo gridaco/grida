@@ -253,7 +253,6 @@ fn main() {
         let x = start_x + (i as f32) * (col_width + col_spacing);
         draw_text_block(canvas, x, y_pos, col_width, label, line_height.clone());
     }
-    y_pos += row_height + section_spacing;
 
     // Save the result
     let image = surface.image_snapshot();

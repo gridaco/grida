@@ -1,13 +1,15 @@
+// FIXME: broken demo - make this golden_ not grida_
+
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 async fn demo_blendmode() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
@@ -17,7 +19,7 @@ async fn demo_blendmode() -> Scene {
     };
     root_container_node.name = Some("Root Container".to_string());
 
-    let mut all_blendmode_ids = Vec::new();
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
     let spacing = 400.0;
     let start_x = 50.0;
     let base_size = 256.0;
@@ -80,8 +82,10 @@ async fn demo_blendmode() -> Scene {
             active: true,
         }));
 
-        let background_id = background.id.clone();
-        repository.insert(Node::Rectangle(background));
+        graph.append_child(
+            Node::Rectangle(background),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Create a sweep gradient overlay (similar to C++ example's sweep gradient)
         let mut sweep_overlay = nf.create_rectangle_node();
@@ -136,8 +140,10 @@ async fn demo_blendmode() -> Scene {
             active: true,
         }));
 
-        let sweep_overlay_id = sweep_overlay.id.clone();
-        repository.insert(Node::Rectangle(sweep_overlay));
+        graph.append_child(
+            Node::Rectangle(sweep_overlay),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Create a group for the colored circles with the specific blend mode
         let mut circle_group = nf.create_group_node();
@@ -145,7 +151,11 @@ async fn demo_blendmode() -> Scene {
         circle_group.transform = Some(AffineTransform::new(x, y, 0.0));
         circle_group.blend_mode = LayerBlendMode::Blend(*blend_mode);
 
-        let mut circle_ids = Vec::new();
+        // Add group to root container first
+        let circle_group_id = graph.append_child(
+            Node::Group(circle_group),
+            Parent::NodeId(root_container_id.clone()),
+        );
 
         // Create three colored circles (green, red, blue) like in the C++ example
         let circle_radius = 80.0;
@@ -160,9 +170,10 @@ async fn demo_blendmode() -> Scene {
         };
         green_circle.set_fill(Paint::from(CGColor(0, 255, 0, 255)));
         green_circle.blend_mode = LayerBlendMode::default();
-        let green_circle_id = green_circle.id.clone();
-        repository.insert(Node::Ellipse(green_circle));
-        circle_ids.push(green_circle_id);
+        graph.append_child(
+            Node::Ellipse(green_circle),
+            Parent::NodeId(circle_group_id.clone()),
+        );
 
         // Red circle (bottom left)
         let mut red_circle = nf.create_ellipse_node();
@@ -174,9 +185,10 @@ async fn demo_blendmode() -> Scene {
         };
         red_circle.set_fill(Paint::from(CGColor(255, 0, 0, 255)));
         red_circle.blend_mode = LayerBlendMode::default();
-        let red_circle_id = red_circle.id.clone();
-        repository.insert(Node::Ellipse(red_circle));
-        circle_ids.push(red_circle_id);
+        graph.append_child(
+            Node::Ellipse(red_circle),
+            Parent::NodeId(circle_group_id.clone()),
+        );
 
         // Blue circle (bottom right)
         let mut blue_circle = nf.create_ellipse_node();
@@ -189,14 +201,10 @@ async fn demo_blendmode() -> Scene {
         };
         blue_circle.set_fill(Paint::from(CGColor(0, 0, 255, 255)));
         blue_circle.blend_mode = LayerBlendMode::default();
-        let blue_circle_id = blue_circle.id.clone();
-        repository.insert(Node::Ellipse(blue_circle));
-        circle_ids.push(blue_circle_id);
-
-        // Set up the circle group
-        circle_group.children = circle_ids;
-        let circle_group_id = circle_group.id.clone();
-        repository.insert(Node::Group(circle_group));
+        graph.append_child(
+            Node::Ellipse(blue_circle),
+            Parent::NodeId(circle_group_id.clone()),
+        );
 
         // Create a text label for the blend mode
         let mut label = nf.create_text_span_node();
@@ -208,27 +216,16 @@ async fn demo_blendmode() -> Scene {
         label.text_align = TextAlign::Left;
         label.text_align_vertical = TextAlignVertical::Top;
         label.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-        let label_id = label.id.clone();
-        repository.insert(Node::TextSpan(label));
-
-        // Add all elements for this blend mode
-        all_blendmode_ids.push(background_id);
-        all_blendmode_ids.push(sweep_overlay_id);
-        all_blendmode_ids.push(circle_group_id);
-        all_blendmode_ids.push(label_id);
+        graph.append_child(
+            Node::TextSpan(label),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
-    // Set up the root container
-    root_container_node.children = all_blendmode_ids;
-    let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
-
     Scene {
-        id: "scene".to_string(),
         name: "Blend Mode Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
         background_color: Some(CGColor(240, 240, 240, 255)),
+        graph,
     }
 }
 

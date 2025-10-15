@@ -1,6 +1,7 @@
 use crate::cg::{types::*, Alignment};
 use crate::helpers::webfont_helper;
 use crate::node::repository::NodeRepository;
+use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
@@ -19,8 +20,6 @@ use math2::box_fit::BoxFit;
 use math2::transform::AffineTransform;
 
 const TRANSPARENT: Paint = Paint::Solid(SolidPaint::TRANSPARENT);
-
-const BLACK: Paint = Paint::Solid(SolidPaint::BLACK);
 
 // Map implementations
 impl From<&Rgba> for CGColor {
@@ -84,7 +83,7 @@ impl From<&FigmaPaint> for Paint {
                     }
                 };
 
-                let repeat = match image.scale_mode {
+                let _repeat = match image.scale_mode {
                     figma_api::models::image_paint::ScaleMode::Tile => ImageRepeat::Repeat,
                     _ => ImageRepeat::default(),
                 };
@@ -250,6 +249,7 @@ fn convert_gradient_transform(handles: &Vec<Vector>) -> AffineTransform {
 /// Converts Figma nodes to Grida schema
 pub struct FigmaConverter {
     repository: NodeRepository,
+    links: std::collections::HashMap<NodeId, Vec<NodeId>>,
     image_urls: std::collections::HashMap<String, String>,
     font_store: webfont_helper::FontUsageStore,
 }
@@ -258,6 +258,7 @@ impl FigmaConverter {
     pub fn new() -> Self {
         Self {
             repository: NodeRepository::new(),
+            links: std::collections::HashMap::new(),
             image_urls: std::collections::HashMap::new(),
             font_store: webfont_helper::FontUsageStore::new(),
         }
@@ -348,7 +349,7 @@ impl FigmaConverter {
                     }
                 };
 
-                let repeat = match image.scale_mode {
+                let _repeat = match image.scale_mode {
                     figma_api::models::image_paint::ScaleMode::Tile => ImageRepeat::Repeat,
                     _ => ImageRepeat::default(),
                 };
@@ -604,8 +605,15 @@ impl FigmaConverter {
         let size = Self::convert_size(component.size.as_ref());
         let transform = Self::convert_transform(component.relative_transform.as_ref());
 
+        let node_id = component.id.clone();
+
+        // Store children relationship
+        if !children.is_empty() {
+            self.links.insert(node_id.clone(), children);
+        }
+
         Ok(Node::Container(ContainerNodeRec {
-            id: component.id.clone(),
+            id: node_id,
             name: Some(component.name.clone()),
             active: component.visible.unwrap_or(true),
             opacity: Self::convert_opacity(component.visible),
@@ -632,7 +640,6 @@ impl FigmaConverter {
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&component.effects),
-            children,
             clip: component.clips_content,
         }))
     }
@@ -693,8 +700,15 @@ impl FigmaConverter {
         let size = Self::convert_size(instance.size.as_ref());
         let transform = Self::convert_transform(instance.relative_transform.as_ref());
 
+        let node_id = instance.id.clone();
+
+        // Store children relationship
+        if !children.is_empty() {
+            self.links.insert(node_id.clone(), children);
+        }
+
         Ok(Node::Container(ContainerNodeRec {
-            id: instance.id.clone(),
+            id: node_id,
             name: Some(instance.name.clone()),
             active: instance.visible.unwrap_or(true),
             opacity: Self::convert_opacity(instance.visible),
@@ -721,7 +735,6 @@ impl FigmaConverter {
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&instance.effects),
-            children,
             clip: instance.clips_content,
         }))
     }
@@ -734,8 +747,15 @@ impl FigmaConverter {
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let node_id = section.id.clone();
+
+        // Store children relationship
+        if !children.is_empty() {
+            self.links.insert(node_id.clone(), children);
+        }
+
         Ok(Node::Container(ContainerNodeRec {
-            id: section.id.clone(),
+            id: node_id,
             name: Some(format!("[Section] {}", section.name)),
             active: section.visible.unwrap_or(true),
             opacity: Self::convert_opacity(section.visible),
@@ -744,7 +764,6 @@ impl FigmaConverter {
             transform: Self::convert_transform(section.relative_transform.as_ref()),
             size: Self::convert_size(section.size.as_ref()),
             corner_radius: RectangularCornerRadius::zero(),
-            children,
             fills: self.convert_fills(Some(&section.fills.as_ref())),
             strokes: Paints::default(),
             stroke_width: 0.0,
@@ -827,12 +846,14 @@ impl FigmaConverter {
             .iter()
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
-        // canvas.background_color
+
+        // Build scene graph from snapshot
+        let nodes = self.repository.iter().map(|(_, node)| node.clone());
+        let graph = SceneGraph::new_from_snapshot(nodes, self.links.clone(), children);
+
         Ok(Scene {
-            id: canvas.id.clone(),
             name: canvas.name.clone(),
-            children,
-            nodes: self.repository.clone(),
+            graph,
             background_color: Some(CGColor::from(&canvas.background_color)),
         })
     }
@@ -847,8 +868,15 @@ impl FigmaConverter {
         let size = Self::convert_size(origin.size.as_ref());
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
+        let node_id = origin.id.clone();
+
+        // Store children relationship
+        if !children.is_empty() {
+            self.links.insert(node_id.clone(), children);
+        }
+
         Ok(Node::Container(ContainerNodeRec {
-            id: origin.id.clone(),
+            id: node_id,
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -875,7 +903,6 @@ impl FigmaConverter {
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&origin.effects),
-            children,
             clip: origin.clips_content,
         }))
     }
@@ -1080,7 +1107,6 @@ impl FigmaConverter {
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             effects: LayerEffects::default(),
-            children,
             clip: false,
         }))
     }
@@ -1112,8 +1138,15 @@ impl FigmaConverter {
             }
         };
 
+        let node_id = origin.id.clone();
+
+        // Store children relationship
+        if !children.is_empty() {
+            self.links.insert(node_id.clone(), children);
+        }
+
         Ok(Node::BooleanOperation(BooleanPathOperationNodeRec {
-            id: origin.id.clone(),
+            id: node_id,
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1122,7 +1155,6 @@ impl FigmaConverter {
             effects: Self::convert_effects(&origin.effects),
             transform: Some(transform),
             op: op,
-            children,
             // map this
             corner_radius: None,
             fills: self.convert_fills(Some(&origin.fills)),
@@ -1332,13 +1364,19 @@ impl FigmaConverter {
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let node_id = origin.id.clone();
+
+        // Store children relationship
+        if !children.is_empty() {
+            self.links.insert(node_id.clone(), children);
+        }
+
         Ok(Node::Group(GroupNodeRec {
-            id: origin.id.clone(),
+            id: node_id,
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             // the figma's relativeTransform for group is a no-op on our model.
             transform: None,
-            children,
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
             mask: None,

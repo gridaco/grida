@@ -1,5 +1,5 @@
 use crate::cg::types::*;
-use crate::node::repository::NodeRepository;
+use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use crate::shape::*;
 use crate::{cache::geometry::GeometryCache, sk};
@@ -243,7 +243,7 @@ pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
 /// Compute the resulting path for a [`BooleanPathOperationNode`] in its local coordinate space.
 pub fn boolean_operation_path(
     node: &BooleanPathOperationNodeRec,
-    repo: &NodeRepository,
+    graph: &SceneGraph,
     cache: &GeometryCache,
 ) -> Option<Path> {
     let world = cache
@@ -253,11 +253,12 @@ pub fn boolean_operation_path(
 
     let mut shapes_with_ops = Vec::new();
 
-    for (i, child_id) in node.children.iter().enumerate() {
-        if let Some(child_node) = repo.get(child_id) {
+    let children = graph.get_children(&node.id)?;
+    for (i, child_id) in children.iter().enumerate() {
+        if let Ok(child_node) = graph.get_node(child_id) {
             let mut path = match child_node {
                 Node::BooleanOperation(child_bool) => {
-                    boolean_operation_path(child_bool, repo, cache)?
+                    boolean_operation_path(child_bool, graph, cache)?
                 }
                 _ => build_shape_from_node(child_node)?.to_path(),
             };
@@ -298,8 +299,8 @@ pub fn boolean_operation_path(
 /// Convenience wrapper around [`boolean_operation_path`] returning a [`PainterShape`].
 pub fn boolean_operation_shape(
     node: &BooleanPathOperationNodeRec,
-    repo: &NodeRepository,
+    graph: &SceneGraph,
     cache: &GeometryCache,
 ) -> Option<PainterShape> {
-    boolean_operation_path(node, repo, cache).map(PainterShape::from_path)
+    boolean_operation_path(node, graph, cache).map(PainterShape::from_path)
 }

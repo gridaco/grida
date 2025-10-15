@@ -1,6 +1,6 @@
 use cg::cg::{types::*, *};
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::resources::{hash_bytes, load_image};
 use cg::window;
@@ -234,40 +234,31 @@ async fn demo_images() -> (Scene, Vec<u8>) {
     rect9.strokes = Paints::new([Paint::from(CGColor(128, 0, 128, 255))]);
     rect9.stroke_width = 2.0;
 
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
-    let rect1_id = rect1.id.clone();
-    let rect2_id = rect2.id.clone();
-    let rect3_id = rect3.id.clone();
-    let rect4_id = rect4.id.clone();
-    let rect5_id = rect5.id.clone();
-    let rect6_id = rect6.id.clone();
-    let rect7_id = rect7.id.clone();
-    let rect8_id = rect8.id.clone();
-    let rect9_id = rect9.id.clone();
+    // Add root container first
+    let root_id = graph.append_child(Node::Container(root), Parent::Root);
 
-    repository.insert(Node::Rectangle(rect1));
-    repository.insert(Node::Rectangle(rect2));
-    repository.insert(Node::Rectangle(rect3));
-    repository.insert(Node::Rectangle(rect4));
-    repository.insert(Node::Rectangle(rect5));
-    repository.insert(Node::Rectangle(rect6));
-    repository.insert(Node::Rectangle(rect7));
-    repository.insert(Node::Rectangle(rect8));
-    repository.insert(Node::Rectangle(rect9));
-
-    root.children = vec![
-        rect1_id, rect2_id, rect3_id, rect4_id, rect5_id, rect6_id, rect7_id, rect8_id, rect9_id,
-    ];
-    let root_id = root.id.clone();
-    repository.insert(Node::Container(root));
+    // Add all rectangles to root container
+    graph.append_children(
+        vec![
+            Node::Rectangle(rect1),
+            Node::Rectangle(rect2),
+            Node::Rectangle(rect3),
+            Node::Rectangle(rect4),
+            Node::Rectangle(rect5),
+            Node::Rectangle(rect6),
+            Node::Rectangle(rect7),
+            Node::Rectangle(rect8),
+            Node::Rectangle(rect9),
+        ],
+        Parent::NodeId(root_id),
+    );
 
     let scene = Scene {
-        id: "scene".to_string(),
         name: "Images Demo".to_string(),
-        children: vec![root_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     };
 
     (scene, bytes)

@@ -1,10 +1,13 @@
 use crate::cg::types::*;
-use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+use crate::node::{
+    factory::NodeFactory,
+    scene_graph::{Parent, SceneGraph},
+    schema::*,
+};
 
 /// Load a simple demo scene with a few colored rectangles.
 pub(crate) fn create_dummy_scene() -> Scene {
     let nf = NodeFactory::new();
-    let mut nodes = NodeRepository::new();
 
     let mut rect1 = nf.create_rectangle_node();
     rect1.name = Some("Red Rectangle".to_string());
@@ -14,8 +17,6 @@ pub(crate) fn create_dummy_scene() -> Scene {
         height: 100.0,
     };
     rect1.set_fill(Paint::Solid(SolidPaint::RED));
-    let rect1_id = rect1.id.clone();
-    nodes.insert(Node::Rectangle(rect1));
 
     let mut rect2 = nf.create_rectangle_node();
     rect2.name = Some("Blue Rectangle".to_string());
@@ -25,8 +26,6 @@ pub(crate) fn create_dummy_scene() -> Scene {
         height: 80.0,
     };
     rect2.set_fill(Paint::Solid(SolidPaint::BLUE));
-    let rect2_id = rect2.id.clone();
-    nodes.insert(Node::Rectangle(rect2));
 
     let mut rect3 = nf.create_rectangle_node();
     rect3.name = Some("Green Rectangle".to_string());
@@ -36,23 +35,28 @@ pub(crate) fn create_dummy_scene() -> Scene {
         height: 120.0,
     };
     rect3.set_fill(Paint::Solid(SolidPaint::GREEN));
-    let rect3_id = rect3.id.clone();
-    nodes.insert(Node::Rectangle(rect3));
+
+    let mut graph = SceneGraph::new();
+    graph.append_children(
+        vec![
+            Node::Rectangle(rect1),
+            Node::Rectangle(rect2),
+            Node::Rectangle(rect3),
+        ],
+        Parent::Root,
+    );
 
     Scene {
-        id: "dummy".to_string(),
         name: "Dummy Scene".to_string(),
-        children: vec![rect1_id, rect2_id, rect3_id],
-        nodes,
-        background_color: Some(CGColor(240, 240, 240, 255)),
+        graph,
+        background_color: Some(CGColor::WHITE),
     }
 }
 
 /// Load a heavy scene useful for performance benchmarking.
 pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
     let nf = NodeFactory::new();
-    let mut nodes = NodeRepository::new();
-    let mut children = Vec::new();
+    let mut graph = SceneGraph::new();
 
     let size = 20.0f32;
     let spacing = 5.0f32;
@@ -74,17 +78,13 @@ pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
                 blend_mode: BlendMode::default(),
                 active: true,
             }));
-            let id = rect.id.clone();
-            nodes.insert(Node::Rectangle(rect));
-            children.push(id);
+            graph.append_child(Node::Rectangle(rect), Parent::Root);
         }
     }
 
     Scene {
-        id: "benchmark".to_string(),
         name: "Benchmark Scene".to_string(),
-        children,
-        nodes,
-        background_color: Some(CGColor(255, 255, 255, 255)),
+        graph,
+        background_color: Some(CGColor::WHITE),
     }
 }

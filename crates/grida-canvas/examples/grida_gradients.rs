@@ -1,13 +1,13 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 async fn demo_gradients() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // root container
     let mut root = nf.create_container_node();
@@ -17,7 +17,8 @@ async fn demo_gradients() -> Scene {
         height: 800.0,
     };
 
-    let mut ids = Vec::new();
+    let root_id = graph.append_child(Node::Container(root), Parent::Root);
+
     let spacing = 160.0;
     let start_x = 60.0;
     let base = 120.0;
@@ -49,8 +50,7 @@ async fn demo_gradients() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         }));
-        ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
 
     // Radial gradient fills
@@ -82,8 +82,7 @@ async fn demo_gradients() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         }));
-        ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
 
     // Linear gradient strokes
@@ -115,8 +114,7 @@ async fn demo_gradients() -> Scene {
             active: true,
         })]);
         rect.stroke_width = 8.0;
-        ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
 
     // Radial gradient strokes
@@ -150,20 +148,13 @@ async fn demo_gradients() -> Scene {
             active: true,
         })]);
         rect.stroke_width = 8.0;
-        ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
 
-    root.children = ids.clone();
-    let root_id = root.id.clone();
-    repository.insert(Node::Container(root));
-
     Scene {
-        id: "scene".to_string(),
         name: "Gradients Demo".to_string(),
-        children: vec![root_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     }
 }
 

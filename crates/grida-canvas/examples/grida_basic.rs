@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
@@ -149,8 +149,7 @@ async fn demo_basic() -> Scene {
     line_node.stroke_width = 4.0;
 
     // Create a group node for the shapes (rectangle, ellipse, polygon)
-    let mut shapes_group_node = nf.create_group_node();
-    shapes_group_node.name = Some("Shapes Group".to_string());
+    let shapes_group_node = nf.create_group_node();
 
     // Create a root container node containing the shapes group, text, and line
     let mut root_container_node = nf.create_container_node();
@@ -160,45 +159,44 @@ async fn demo_basic() -> Scene {
     };
     root_container_node.name = Some("Root Container".to_string());
 
-    // Create a node map and add all nodes
-    let mut repository = NodeRepository::new();
+    // Build the scene graph
+    let mut graph = SceneGraph::new();
 
-    // First, collect all the IDs we'll need
-    let rect_id = rect_node.id.clone();
-    let ellipse_id = ellipse_node.id.clone();
-    let polygon_id = polygon_node.id.clone();
-    let regular_polygon_id = regular_polygon_node.id.clone();
-    let text_span_id = text_span_node.id.clone();
-    let line_id = line_node.id.clone();
-    let image_id = image_node.id.clone();
-    let path_id = path_node.id.clone();
+    // Add root container
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
 
-    // Now add all nodes to the map
-    repository.insert(Node::Rectangle(rect_node));
-    repository.insert(Node::Ellipse(ellipse_node));
-    repository.insert(Node::Polygon(polygon_node));
-    repository.insert(Node::RegularPolygon(regular_polygon_node));
-    repository.insert(Node::TextSpan(text_span_node));
-    repository.insert(Node::Line(line_node));
-    repository.insert(Node::Image(image_node));
-    repository.insert(Node::SVGPath(path_node));
+    // Add shapes group to container
+    let shapes_group_id = graph.append_child(
+        Node::Group(shapes_group_node),
+        Parent::NodeId(root_container_id.clone()),
+    );
 
-    // Now set up the shapes group with the IDs we collected
-    shapes_group_node.children = vec![rect_id, ellipse_id, polygon_id, regular_polygon_id];
-    let shapes_group_id = shapes_group_node.id.clone();
-    repository.insert(Node::Group(shapes_group_node));
+    // Add shapes to group
+    graph.append_children(
+        vec![
+            Node::Rectangle(rect_node),
+            Node::Ellipse(ellipse_node),
+            Node::Polygon(polygon_node),
+            Node::RegularPolygon(regular_polygon_node),
+        ],
+        Parent::NodeId(shapes_group_id),
+    );
 
-    // Finally set up the root container with all IDs
-    root_container_node.children = vec![shapes_group_id, text_span_id, line_id, path_id, image_id];
-    let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
+    // Add other elements to container
+    graph.append_children(
+        vec![
+            Node::TextSpan(text_span_node),
+            Node::Line(line_node),
+            Node::SVGPath(path_node),
+            Node::Image(image_node),
+        ],
+        Parent::NodeId(root_container_id),
+    );
 
     Scene {
-        id: "scene".to_string(),
         name: "Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::cg;
 use crate::cg::types::*;
 pub use crate::cg::types::{FontFeature, FontVariation};
-use crate::node::repository::NodeRepository;
+use crate::node::scene_graph::SceneGraph;
 use crate::shape::*;
 use crate::vectornetwork::*;
 use math2::rect::Rectangle;
@@ -80,15 +80,13 @@ pub struct Size {
 // region: Scene
 /// Runtime scene representation.
 ///
-/// The children field is populated from the document's `links` map during deserialization.
-/// In the new format, scenes are stored in `document.nodes` and their children are in `document.links`.
+/// The scene graph contains both the tree structure (links) and node data (nodes).
+/// This provides a centralized, efficient way to manage scene hierarchy.
 #[derive(Debug, Clone)]
 pub struct Scene {
-    pub id: String,
     pub name: String,
-    /// Children node IDs - populated from document.links during load
-    pub children: Vec<NodeId>,
-    pub nodes: NodeRepository,
+    /// Scene graph containing tree structure and node data
+    pub graph: SceneGraph,
     pub background_color: Option<CGColor>,
 }
 
@@ -238,6 +236,27 @@ impl NodeTrait for Node {
             Node::Vector(n) => n.active,
             Node::BooleanOperation(n) => n.active,
             Node::Image(n) => n.active,
+        }
+    }
+}
+
+impl Node {
+    pub fn mask(&self) -> Option<LayerMaskType> {
+        match self {
+            Node::Group(n) => n.mask,
+            Node::Container(n) => n.mask,
+            Node::Rectangle(n) => n.mask,
+            Node::Ellipse(n) => n.mask,
+            Node::Polygon(n) => n.mask,
+            Node::RegularPolygon(n) => n.mask,
+            Node::RegularStarPolygon(n) => n.mask,
+            Node::Line(n) => n.mask,
+            Node::TextSpan(n) => n.mask,
+            Node::SVGPath(n) => n.mask,
+            Node::Vector(n) => n.mask,
+            Node::BooleanOperation(n) => n.mask,
+            Node::Image(n) => n.mask,
+            Node::Error(_) => None,
         }
     }
 }
@@ -396,7 +415,6 @@ pub struct GroupNodeRec {
     pub mask: Option<LayerMaskType>,
 
     pub transform: Option<AffineTransform>,
-    pub children: Vec<NodeId>,
 }
 
 #[derive(Debug, Clone)]
@@ -412,7 +430,6 @@ pub struct ContainerNodeRec {
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
-    pub children: Vec<NodeId>,
     pub fills: Paints,
     pub strokes: Paints,
     pub stroke_width: f32,
@@ -848,7 +865,6 @@ pub struct BooleanPathOperationNodeRec {
     pub transform: Option<AffineTransform>,
     pub op: BooleanPathOperation,
     pub corner_radius: Option<f32>,
-    pub children: Vec<NodeId>,
     pub fills: Paints,
     pub strokes: Paints,
     pub stroke_width: f32,

@@ -1,7 +1,7 @@
 use cg::cg::types::*;
 use cg::helpers::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::resources::{load_font, FontMessage};
 use cg::window;
@@ -60,7 +60,7 @@ async fn demo_webfonts() -> Scene {
         letter_spacing: Default::default(),
         word_spacing: Default::default(),
         font_style_italic: false,
-        line_height: TextLineHeight::Fixed(1.5),
+        line_height: TextLineHeight::Factor(1.5),
         text_transform: TextTransform::None,
     };
     description_node.text_align = TextAlign::Left;
@@ -124,33 +124,31 @@ async fn demo_webfonts() -> Scene {
     };
 
     // Create a node repository and add all nodes
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
-    // Collect all the IDs
-    let heading_id = heading_node.id.clone();
-    let description_id = description_node.id.clone();
-    let albert_text_ids: Vec<_> = albert_text_nodes.iter().map(|n| n.id.clone()).collect();
+    // Add root container first
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
 
-    // Add all nodes to the repository
-    repository.insert(Node::TextSpan(heading_node));
-    repository.insert(Node::TextSpan(description_node));
+    // Add all text nodes to root container
+    graph.append_child(
+        Node::TextSpan(heading_node),
+        Parent::NodeId(root_container_id.clone()),
+    );
+    graph.append_child(
+        Node::TextSpan(description_node),
+        Parent::NodeId(root_container_id.clone()),
+    );
     for text_node in albert_text_nodes {
-        repository.insert(Node::TextSpan(text_node));
+        graph.append_child(
+            Node::TextSpan(text_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
-    // Set up the root container with all IDs
-    let mut children = vec![heading_id, description_id];
-    children.extend(albert_text_ids);
-    root_container_node.children = children;
-    let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
-
     Scene {
-        id: "scene".to_string(),
         name: "Webfonts Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     }
 }
 

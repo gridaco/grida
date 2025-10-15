@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer};
@@ -8,7 +8,7 @@ use math2::{rect::Rectangle, transform::AffineTransform};
 
 async fn scene() -> Scene {
     let nf = NodeFactory::new();
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     let mut container = nf.create_container_node();
     container.size = Size {
@@ -35,19 +35,13 @@ async fn scene() -> Scene {
     // But we want it to overlap with the stroke, so position it at the edge
     circle.transform = AffineTransform::new(200.0, 200.0, 0.0);
 
-    let circle_id = circle.id.clone();
-    repo.insert(Node::Ellipse(circle));
-
-    let container_id = container.id.clone();
-    // Add the circle as a child of the container
-    container.children = vec![circle_id];
-    repo.insert(Node::Container(container));
+    // Add container as root, then add circle as its child
+    let container_id = graph.append_child(Node::Container(container), Parent::Root);
+    graph.append_child(Node::Ellipse(circle), Parent::NodeId(container_id));
 
     Scene {
-        id: "scene".into(),
         name: "container stroke".into(),
-        children: vec![container_id],
-        nodes: repo,
+        graph,
         background_color: None,
     }
 }

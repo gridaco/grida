@@ -954,7 +954,6 @@ impl From<JSONGroupNode> for GroupNodeRec {
             // TODO: group's transform should be handled differently
             transform: Some(transform),
             // Children populated from links after conversion
-            children: vec![],
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
             mask: node.base.mask.map(|m| m.into()),
@@ -999,7 +998,6 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 node.base.fe_backdrop_blur,
             ),
             // Children populated from links after conversion
-            children: vec![],
             clip: true,
             mask: node.base.mask.map(|m| m.into()),
         }
@@ -1499,7 +1497,6 @@ impl From<JSONBooleanOperationNode> for Node {
                 .corner_radius
                 .and_then(JSONCornerRadius::into_uniform),
             // Children populated from links after conversion
-            children: vec![],
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,

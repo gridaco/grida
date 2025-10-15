@@ -216,9 +216,6 @@ fn main() {
     let surface = unsafe { &mut *surface_ptr };
     let size = window.inner_size();
     let scene = CachedScene::new(size.width as f32, size.height as f32);
-    let mut camera_x = 0.0;
-    let mut camera_y = 0.0;
-    let mut zoom = 1.0;
     let start_time = Instant::now();
     let mut frame_count = 0;
     let mut last_fps_time = Instant::now();
@@ -246,12 +243,12 @@ fn main() {
                 let now = Instant::now();
                 let elapsed = now.duration_since(start_time).as_secs_f32();
                 let angle = elapsed * 2.0;
-                camera_x = angle.cos() * 100.0;
-                camera_y = angle.sin() * 100.0;
+                let camera_x = angle.cos() * 100.0;
+                let camera_y = angle.sin() * 100.0;
 
                 // Add zoom animation
                 let zoom_angle = elapsed * 1.0; // Slower zoom cycle
-                zoom = 1.0 + zoom_angle.sin() * 0.5; // Oscillate between 0.5 and 1.5
+                let zoom = 1.0 + zoom_angle.sin() * 0.5; // Oscillate between 0.5 and 1.5
 
                 // Clear and render
                 let canvas = surface.canvas();

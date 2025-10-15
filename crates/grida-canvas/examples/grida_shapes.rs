@@ -1,6 +1,6 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
@@ -16,13 +16,15 @@ async fn demo_shapes() -> Scene {
         height: 1200.0,
     };
 
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
-    let mut all_shape_ids = Vec::new();
     let spacing = 100.0;
     let start_x = 50.0;
     let base_size = 80.0;
     let items_per_row = 10;
+
+    // Set up the root container first
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
 
     // Rectangle Row - demonstrating corner radius variations
     for i in 0..items_per_row {
@@ -40,8 +42,10 @@ async fn demo_shapes() -> Scene {
             200 - (i * 20) as u8,
             255,
         ))); // Fading gray
-        all_shape_ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Ellipse Row - demonstrating width/height ratio variations
@@ -59,8 +63,10 @@ async fn demo_shapes() -> Scene {
             200 - (i * 20) as u8,
             255,
         ))]); // Fading gray
-        all_shape_ids.push(ellipse.id.clone());
-        repository.insert(Node::Ellipse(ellipse));
+        graph.append_child(
+            Node::Ellipse(ellipse),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Polygon Row - demonstrating point count variations
@@ -88,8 +94,10 @@ async fn demo_shapes() -> Scene {
             200 - (i * 20) as u8,
             255,
         ))]); // Fading gray
-        all_shape_ids.push(polygon.id.clone());
-        repository.insert(Node::Polygon(polygon));
+        graph.append_child(
+            Node::Polygon(polygon),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Regular Polygon Row - demonstrating point count variations
@@ -109,8 +117,10 @@ async fn demo_shapes() -> Scene {
             255,
         ))]); // Fading gray
         regular_polygon.corner_radius = 8.0;
-        all_shape_ids.push(regular_polygon.id.clone());
-        repository.insert(Node::RegularPolygon(regular_polygon));
+        graph.append_child(
+            Node::RegularPolygon(regular_polygon),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Path Row - demonstrating different path patterns
@@ -137,8 +147,10 @@ async fn demo_shapes() -> Scene {
             200 - (i * 20) as u8,
             255,
         ))]); // Fading gray
-        all_shape_ids.push(path.id.clone());
-        repository.insert(Node::SVGPath(path));
+        graph.append_child(
+            Node::SVGPath(path),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Star Polygon Row - demonstrating different point counts and inner radius variations
@@ -159,8 +171,10 @@ async fn demo_shapes() -> Scene {
             255,
         ))]); // Fading gray
         star.corner_radius = 8.0;
-        all_shape_ids.push(star.id.clone());
-        repository.insert(Node::RegularStarPolygon(star));
+        graph.append_child(
+            Node::RegularStarPolygon(star),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Arc Row - demonstrating different angle variations
@@ -182,20 +196,15 @@ async fn demo_shapes() -> Scene {
             255,
         ))]); // Fading gray
         arc.corner_radius = Some(8.0);
-        all_shape_ids.push(arc.id.clone());
-        repository.insert(Node::Ellipse(arc));
+        graph.append_child(
+            Node::Ellipse(arc),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
-    // Set up the root container
-    root_container_node.children.extend(all_shape_ids);
-    let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
-
     Scene {
-        id: "scene".to_string(),
         name: "Shapes Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
+        graph,
         background_color: Some(CGColor(250, 250, 250, 255)),
     }
 }

@@ -1,6 +1,6 @@
 use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
 use crate::cg::types::*;
-use crate::node::{repository::NodeRepository, schema::*};
+use crate::node::{scene_graph::SceneGraph, schema::*};
 use crate::painter::layer::Layer;
 use crate::painter::Painter;
 use crate::runtime::counter::FrameCounter;
@@ -63,35 +63,25 @@ impl Default for RendererOptions {
 }
 
 fn collect_scene_font_families(scene: &Scene) -> HashSet<String> {
-    fn walk(id: &NodeId, repo: &NodeRepository, set: &mut HashSet<String>) {
-        if let Some(node) = repo.get(id) {
+    fn walk(id: &NodeId, graph: &SceneGraph, set: &mut HashSet<String>) {
+        if let Ok(node) = graph.get_node(id) {
             match node {
                 Node::TextSpan(n) => {
                     set.insert(n.text_style.font_family.clone());
                 }
-                Node::Group(n) => {
-                    for child in &n.children {
-                        walk(child, repo, set);
-                    }
-                }
-                Node::Container(n) => {
-                    for child in &n.children {
-                        walk(child, repo, set);
-                    }
-                }
-                Node::BooleanOperation(n) => {
-                    for child in &n.children {
-                        walk(child, repo, set);
-                    }
-                }
                 _ => {}
+            }
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child in children {
+                walk(child, graph, set);
             }
         }
     }
 
     let mut set = HashSet::new();
-    for id in &scene.children {
-        walk(id, &scene.nodes, &mut set);
+    for id in scene.graph.roots() {
+        walk(&id, &scene.graph, &mut set);
     }
     set
 }
@@ -611,7 +601,7 @@ impl Renderer {
     fn draw_nocache(
         &self,
         canvas: &Canvas,
-        plan: &FramePlan,
+        _plan: &FramePlan,
         background_color: Option<CGColor>,
         width: f32,
         height: f32,
@@ -679,26 +669,28 @@ impl Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::Size};
+    use crate::node::{
+        factory::NodeFactory,
+        scene_graph::{Parent, SceneGraph},
+        schema::Size,
+    };
 
     #[test]
     fn picture_recorded_with_layer_bounds() {
         let nf = NodeFactory::new();
-        let mut repo = NodeRepository::new();
 
         let mut rect = nf.create_rectangle_node();
         rect.size = Size {
             width: 50.0,
             height: 40.0,
         };
-        let rect_id = rect.id.clone();
-        repo.insert(Node::Rectangle(rect));
+
+        let mut graph = SceneGraph::new();
+        let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
         let scene = Scene {
-            id: "scene".into(),
             name: "test".into(),
-            children: vec![rect_id.clone()],
-            nodes: repo,
+            graph,
             background_color: None,
         };
 
@@ -755,17 +747,16 @@ mod tests {
     #[test]
     fn renderer_tracks_missing_fonts_from_scene() {
         let nf = NodeFactory::new();
-        let mut repo = NodeRepository::new();
 
         let mut text = nf.create_text_span_node();
         text.text_style.font_family = "MissingFont".into();
-        let text_id = repo.insert(Node::TextSpan(text));
+
+        let mut graph = SceneGraph::new();
+        graph.append_child(Node::TextSpan(text), Parent::Root);
 
         let scene = Scene {
-            id: "scene".into(),
             name: "test".into(),
-            children: vec![text_id],
-            nodes: repo,
+            graph,
             background_color: None,
         };
 

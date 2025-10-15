@@ -1,5 +1,5 @@
 use cg::cg::types::*;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer, RendererOptions};
@@ -7,7 +7,7 @@ use math2::{rect::Rectangle, transform::AffineTransform};
 use uuid::Uuid;
 
 async fn scene() -> Scene {
-    let mut repo = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Text with Outside stroke alignment
     let text_outside = TextSpanNodeRec {
@@ -32,8 +32,6 @@ async fn scene() -> Scene {
         mask: None,
         effects: LayerEffects::default(),
     };
-    let text_outside_id = text_outside.id.clone();
-    repo.insert(Node::TextSpan(text_outside));
 
     // Text with Center stroke alignment
     let text_center = TextSpanNodeRec {
@@ -58,8 +56,6 @@ async fn scene() -> Scene {
         mask: None,
         effects: LayerEffects::default(),
     };
-    let text_center_id = text_center.id.clone();
-    repo.insert(Node::TextSpan(text_center));
 
     // Text with Inside stroke alignment
     let text_inside = TextSpanNodeRec {
@@ -84,14 +80,20 @@ async fn scene() -> Scene {
         mask: None,
         effects: LayerEffects::default(),
     };
-    let text_inside_id = text_inside.id.clone();
-    repo.insert(Node::TextSpan(text_inside));
+
+    // Add all text nodes as root children in one operation
+    graph.append_children(
+        vec![
+            Node::TextSpan(text_outside),
+            Node::TextSpan(text_center),
+            Node::TextSpan(text_inside),
+        ],
+        Parent::Root,
+    );
 
     Scene {
-        id: "scene".into(),
         name: "type stroke".into(),
-        children: vec![text_outside_id, text_center_id, text_inside_id],
-        nodes: repo,
+        graph,
         background_color: Some(CGColor(255, 255, 255, 255)),
     }
 }

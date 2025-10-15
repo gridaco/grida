@@ -1,13 +1,13 @@
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 async fn demo_paints() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
@@ -17,7 +17,7 @@ async fn demo_paints() -> Scene {
         height: 1080.0,
     };
 
-    let mut all_shape_ids = Vec::new();
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
     let spacing = 100.0;
     let start_x = 50.0;
     let base_size = 80.0;
@@ -39,8 +39,10 @@ async fn demo_paints() -> Scene {
             50 + (i * 20) as u8,
             255,
         )));
-        all_shape_ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Linear Gradient Row
@@ -74,8 +76,10 @@ async fn demo_paints() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         }));
-        all_shape_ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Radial Gradient Row
@@ -110,8 +114,10 @@ async fn demo_paints() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         }));
-        all_shape_ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Stroke Solid Colors Row
@@ -137,8 +143,10 @@ async fn demo_paints() -> Scene {
         ))]);
         rect.stroke_width = 4.0; // Consistent stroke width
 
-        all_shape_ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Stroke Linear Gradient Row
@@ -177,8 +185,10 @@ async fn demo_paints() -> Scene {
         })]);
         rect.stroke_width = 4.0; // Consistent stroke width
 
-        all_shape_ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Stroke Radial Gradient Row
@@ -218,21 +228,16 @@ async fn demo_paints() -> Scene {
         })]);
         rect.stroke_width = 4.0; // Consistent stroke width
 
-        all_shape_ids.push(rect.id.clone());
-        repository.insert(Node::Rectangle(rect));
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
-    // Set up the root container
-    root_container_node.children.extend(all_shape_ids);
-    let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
-
     Scene {
-        id: "scene".to_string(),
         name: "Paints Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     }
 }
 

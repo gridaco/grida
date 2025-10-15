@@ -1,13 +1,15 @@
+// FIXME: broken demo - make this golden_ not grida_
+
 use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
-use cg::node::repository::NodeRepository;
+use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
 async fn demo_booleans() -> Scene {
     let nf = NodeFactory::new();
-    let mut repository = NodeRepository::new();
+    let mut graph = SceneGraph::new();
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
@@ -17,7 +19,7 @@ async fn demo_booleans() -> Scene {
         height: 1080.0,
     };
 
-    let mut all_shape_ids = Vec::new();
+    let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
     let spacing = 200.0;
     let start_x = 100.0;
     let base_size = 100.0;
@@ -65,7 +67,6 @@ async fn demo_booleans() -> Scene {
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Union,
             corner_radius: None,
-            children: vec![rect.id.clone(), circle.id.clone()],
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
@@ -73,17 +74,19 @@ async fn demo_booleans() -> Scene {
             stroke_dash_array: None,
         };
 
-        // Collect IDs before moving nodes
-        all_shape_ids.push(rect.id.clone());
-        all_shape_ids.push(circle.id.clone());
-        all_shape_ids.push(text.id.clone());
-        all_shape_ids.push(bool_node.id.clone());
-
-        // Insert all nodes
-        repository.insert(Node::Rectangle(rect));
-        repository.insert(Node::Ellipse(circle));
-        repository.insert(Node::TextSpan(text));
-        repository.insert(Node::BooleanOperation(bool_node));
+        // Add boolean operation to root, then add operands to it
+        let bool_id = graph.append_child(
+            Node::BooleanOperation(bool_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
+        graph.append_children(
+            vec![Node::Rectangle(rect), Node::Ellipse(circle)],
+            Parent::NodeId(bool_id),
+        );
+        graph.append_child(
+            Node::TextSpan(text),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Example 2: Two Circles Intersection
@@ -128,7 +131,6 @@ async fn demo_booleans() -> Scene {
             effects: LayerEffects::default(),
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Intersection,
-            children: vec![circle1.id.clone(), circle2.id.clone()],
             corner_radius: None,
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
@@ -138,16 +140,19 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(circle1.id.clone());
-        all_shape_ids.push(circle2.id.clone());
-        all_shape_ids.push(text.id.clone());
-        all_shape_ids.push(bool_node.id.clone());
-
-        // Insert all nodes
-        repository.insert(Node::Ellipse(circle1));
-        repository.insert(Node::Ellipse(circle2));
-        repository.insert(Node::TextSpan(text));
-        repository.insert(Node::BooleanOperation(bool_node));
+        // Add boolean operation to root, then add operands to it
+        let bool_id = graph.append_child(
+            Node::BooleanOperation(bool_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
+        graph.append_children(
+            vec![Node::Ellipse(circle1), Node::Ellipse(circle2)],
+            Parent::NodeId(bool_id),
+        );
+        graph.append_child(
+            Node::TextSpan(text),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     // Example 3: Star and Rectangle Difference
@@ -193,7 +198,6 @@ async fn demo_booleans() -> Scene {
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Difference,
             corner_radius: None,
-            children: vec![star.id.clone(), rect.id.clone()],
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
@@ -202,19 +206,22 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(star.id.clone());
-        all_shape_ids.push(rect.id.clone());
-        all_shape_ids.push(text.id.clone());
-        all_shape_ids.push(bool_node.id.clone());
-
-        // Insert all nodes
-        repository.insert(Node::RegularStarPolygon(star));
-        repository.insert(Node::Rectangle(rect));
-        repository.insert(Node::TextSpan(text));
-        repository.insert(Node::BooleanOperation(bool_node));
+        // Add boolean operation to root, then add operands to it
+        let bool_id = graph.append_child(
+            Node::BooleanOperation(bool_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
+        graph.append_children(
+            vec![Node::RegularStarPolygon(star), Node::Rectangle(rect)],
+            Parent::NodeId(bool_id),
+        );
+        graph.append_child(
+            Node::TextSpan(text),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
-    // Example 4: Two Squares XOR
+    // Example 4): Two Squares XOR
     {
         let y_offset = 900.0; // Increased from 700.0
 
@@ -257,7 +264,6 @@ async fn demo_booleans() -> Scene {
             transform: Some(AffineTransform::new(start_x + spacing * 2.0, y_offset, 0.0)),
             op: BooleanPathOperation::Xor,
             corner_radius: None,
-            children: vec![square1.id.clone(), square2.id.clone()],
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_width: 2.0,
@@ -266,29 +272,25 @@ async fn demo_booleans() -> Scene {
         };
 
         // Collect IDs before moving nodes
-        all_shape_ids.push(square1.id.clone());
-        all_shape_ids.push(square2.id.clone());
-        all_shape_ids.push(text.id.clone());
-        all_shape_ids.push(bool_node.id.clone());
-
-        // Insert all nodes
-        repository.insert(Node::Rectangle(square1));
-        repository.insert(Node::Rectangle(square2));
-        repository.insert(Node::TextSpan(text));
-        repository.insert(Node::BooleanOperation(bool_node));
+        // Add boolean operation to root, then add operands to it
+        let bool_id = graph.append_child(
+            Node::BooleanOperation(bool_node),
+            Parent::NodeId(root_container_id.clone()),
+        );
+        graph.append_children(
+            vec![Node::Rectangle(square1), Node::Rectangle(square2)],
+            Parent::NodeId(bool_id),
+        );
+        graph.append_child(
+            Node::TextSpan(text),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
-    // Set up the root container
-    root_container_node.children.extend(all_shape_ids);
-    let root_container_id = root_container_node.id.clone();
-    repository.insert(Node::Container(root_container_node));
-
     Scene {
-        id: "scene".to_string(),
         name: "Boolean Operations Demo".to_string(),
-        children: vec![root_container_id],
-        nodes: repository,
         background_color: Some(CGColor(250, 250, 250, 255)),
+        graph,
     }
 }
 

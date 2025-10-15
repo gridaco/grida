@@ -122,20 +122,23 @@ pub struct FontMessage {
 
 /// Extract all image URLs from a scene.
 pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
+    // FIXME: this should either iterate the fills / strokes (all paints) rather then iterating the nodes. - the below implementation is legacy.
     let mut urls = Vec::new();
-    for (_, n) in scene.nodes.iter() {
-        if let crate::node::schema::Node::Rectangle(rect) = n {
-            for fill in &rect.fills {
-                if let Paint::Image(img) = fill {
-                    match &img.image {
-                        ResourceRef::RID(r) | ResourceRef::HASH(r) => urls.push(r.clone()),
+    for (id, _) in scene.graph.iter() {
+        if let Ok(n) = scene.graph.get_node(id) {
+            if let crate::node::schema::Node::Rectangle(rect) = n {
+                for fill in &rect.fills {
+                    if let Paint::Image(img) = fill {
+                        match &img.image {
+                            ResourceRef::RID(r) | ResourceRef::HASH(r) => urls.push(r.clone()),
+                        }
                     }
                 }
-            }
-            for stroke in &rect.strokes {
-                if let Paint::Image(img) = stroke {
-                    match &img.image {
-                        ResourceRef::RID(r) | ResourceRef::HASH(r) => urls.push(r.clone()),
+                for stroke in &rect.strokes {
+                    if let Paint::Image(img) = stroke {
+                        match &img.image {
+                            ResourceRef::RID(r) | ResourceRef::HASH(r) => urls.push(r.clone()),
+                        }
                     }
                 }
             }

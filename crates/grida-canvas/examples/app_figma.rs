@@ -241,9 +241,8 @@ async fn main() {
     .expect("Failed to load scene");
 
     println!("Rendering scene: {}", scene.name);
-    println!("Scene ID: {}", scene.id);
-    println!("Number of children: {}", scene.children.len());
-    println!("Total nodes in repository: {}", scene.nodes.len());
+    println!("Number of roots: {}", scene.graph.roots().len());
+    println!("Total nodes in graph: {}", scene.graph.node_count());
 
     // Load webfonts metadata and find matching font files
     let webfonts_metadata = load_webfonts_metadata()

@@ -19,6 +19,7 @@ futures = "0.3.31"
 gl = "0.14.0"
 figma-api = { version = "0.31.3", optional = true }
 seahash = "4.1.0"
+taffy = "0.9.1"
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
