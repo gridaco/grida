@@ -7,7 +7,8 @@ check:
     cargo check --all-targets --all-features
 
 # Run tests
-test: turbo test
+test:
+    turbo test
 
 
 # Build canvas WASM using the dedicated justfile in crates/grida-canvas-wasm
