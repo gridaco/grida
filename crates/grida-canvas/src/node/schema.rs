@@ -452,6 +452,8 @@ pub struct ContainerNodeRec {
     /// If a future “shape clip (self + children)” is added, it will be modeled as a separate attribute.
     pub clip: ContainerClipFlag,
 
+    /// layout direction
+    pub layout_direction: Axis,
     /// The padding of the container.
     pub padding: EdgeInsets,
     /// The gap of the container.

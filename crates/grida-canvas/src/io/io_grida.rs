@@ -1000,6 +1000,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             // Children populated from links after conversion
             clip: true,
             mask: node.base.mask.map(|m| m.into()),
+            layout_direction: Axis::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }

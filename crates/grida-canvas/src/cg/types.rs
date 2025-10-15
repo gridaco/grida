@@ -362,6 +362,22 @@ impl Default for StrokeAlign {
     }
 }
 
+/// Represents a single axis in 2D space.
+/// - [Flutter](https://api.flutter.dev/flutter/painting/Axis.html)
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum Axis {
+    #[serde(rename = "horizontal")]
+    Horizontal,
+    #[serde(rename = "vertical")]
+    Vertical,
+}
+
+impl Default for Axis {
+    fn default() -> Self {
+        Axis::Horizontal
+    }
+}
+
 /// Represents **inset distances from the edges** of a rectangular box.
 ///
 /// `EdgeInsets` defines per-edge padding or margin values around a box.
