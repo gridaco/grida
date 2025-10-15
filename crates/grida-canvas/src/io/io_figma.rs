@@ -642,6 +642,7 @@ impl FigmaConverter {
             effects: Self::convert_effects(&component.effects),
             clip: component.clips_content,
             layout_direction: Axis::default(),
+            layout_wrap: LayoutWrap::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))
@@ -740,6 +741,7 @@ impl FigmaConverter {
             effects: Self::convert_effects(&instance.effects),
             clip: instance.clips_content,
             layout_direction: Axis::default(),
+            layout_wrap: LayoutWrap::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))
@@ -778,6 +780,7 @@ impl FigmaConverter {
             effects: LayerEffects::default(),
             clip: false,
             layout_direction: Axis::default(),
+            layout_wrap: LayoutWrap::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))
@@ -914,6 +917,7 @@ impl FigmaConverter {
             effects: Self::convert_effects(&origin.effects),
             clip: origin.clips_content,
             layout_direction: Axis::default(),
+            layout_wrap: LayoutWrap::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))
@@ -1121,6 +1125,7 @@ impl FigmaConverter {
             effects: LayerEffects::default(),
             clip: false,
             layout_direction: Axis::default(),
+            layout_wrap: LayoutWrap::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))

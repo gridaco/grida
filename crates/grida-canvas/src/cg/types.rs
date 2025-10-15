@@ -480,6 +480,79 @@ impl Default for EdgeInsets {
     }
 }
 
+/// Defines whether flex items are forced into a single line or can wrap onto multiple lines.
+///
+/// `LayoutWrap` controls the wrapping behavior of flex items within a flex container.
+/// It is the equivalent of the CSS `flex-wrap` property and determines how items
+/// are laid out when they exceed the container's size along the main axis.
+///
+/// # Variants
+///
+/// * `NoWrap` — All flex items are laid out in a single line, which may cause them to overflow
+/// * `Wrap` — Flex items wrap onto multiple lines as needed, from top to bottom
+///
+/// # Behavior
+///
+/// ## NoWrap
+/// - **Single line**: All items are forced into one line along the main axis
+/// - **Overflow**: Items may overflow the container if their total size exceeds the container size
+/// - **Shrinking**: Items may shrink (if `flex_shrink > 0`) to fit within the container
+/// - **Use case**: When you want all items on one line regardless of container size
+///
+/// ## Wrap
+/// - **Multiple lines**: Items wrap onto new lines when they exceed the container size
+/// - **Natural sizing**: Items maintain their preferred size and wrap to new lines as needed
+/// - **Cross-axis growth**: Container grows along the cross axis to accommodate multiple lines
+/// - **Use case**: Responsive layouts where items should flow naturally (e.g., tag clouds, galleries)
+///
+/// # CSS Equivalents
+///
+/// * `flex-wrap: nowrap` → `LayoutWrap::NoWrap`
+/// * `flex-wrap: wrap` → `LayoutWrap::Wrap`
+///
+/// Note: CSS also supports `wrap-reverse`, which is not currently implemented in this enum.
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::LayoutWrap;
+///
+/// // Default: no wrapping
+/// let no_wrap = LayoutWrap::default();
+/// assert!(matches!(no_wrap, LayoutWrap::NoWrap));
+///
+/// // Enable wrapping
+/// let wrap = LayoutWrap::Wrap;
+/// ```
+///
+/// # Interaction with Other Properties
+///
+/// - **With `gap`**: Gap is applied between items on the same line and between lines
+/// - **With `flex_shrink`**: When `NoWrap`, items may shrink to fit; when `Wrap`, items wrap instead
+/// - **With container size**: `Wrap` allows the container to grow along the cross axis
+///
+/// # See also
+///
+/// * [CSS flex-wrap](https://developer.mozilla.org/en-US/docs/Web/CSS/flex-wrap)
+/// * [Taffy FlexWrap](https://docs.rs/taffy/latest/taffy/style/enum.FlexWrap.html)
+/// * [`LayoutGap`] — spacing between items and lines
+/// * [`Axis`] — main axis direction
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum LayoutWrap {
+    /// Items wrap onto multiple lines as needed
+    #[serde(rename = "wrap")]
+    Wrap,
+    /// All items are forced into a single line
+    #[serde(rename = "nowrap")]
+    NoWrap,
+}
+
+impl Default for LayoutWrap {
+    fn default() -> Self {
+        LayoutWrap::NoWrap
+    }
+}
+
 /// Represents the **spacing between adjacent elements** in a flex layout container.
 ///
 /// `LayoutGap` is a 2-dimensional scalar type describing the distance between

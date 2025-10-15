@@ -454,6 +454,8 @@ pub struct ContainerNodeRec {
 
     /// layout direction
     pub layout_direction: Axis,
+    /// layout wrap
+    pub layout_wrap: LayoutWrap,
     /// The padding of the container.
     pub padding: EdgeInsets,
     /// The gap of the container.
