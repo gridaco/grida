@@ -7,6 +7,7 @@ pub mod fonts;
 pub mod helpers;
 pub mod hittest;
 pub mod io;
+pub mod layout;
 pub mod node;
 pub mod os;
 pub mod painter;
