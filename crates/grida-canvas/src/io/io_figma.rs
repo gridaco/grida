@@ -641,6 +641,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&component.effects),
             clip: component.clips_content,
+            padding: EdgeInsets::default(),
         }))
     }
 
@@ -736,6 +737,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&instance.effects),
             clip: instance.clips_content,
+            padding: EdgeInsets::default(),
         }))
     }
 
@@ -771,6 +773,7 @@ impl FigmaConverter {
             stroke_dash_array: None,
             effects: LayerEffects::default(),
             clip: false,
+            padding: EdgeInsets::default(),
         }))
     }
 
@@ -904,6 +907,7 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&origin.effects),
             clip: origin.clips_content,
+            padding: EdgeInsets::default(),
         }))
     }
 
@@ -1108,6 +1112,7 @@ impl FigmaConverter {
             stroke_dash_array: None,
             effects: LayerEffects::default(),
             clip: false,
+            padding: EdgeInsets::default(),
         }))
     }
 

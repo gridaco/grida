@@ -363,6 +363,57 @@ impl Default for StrokeAlign {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EdgeInsets {
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+    pub left: f32,
+}
+
+impl EdgeInsets {
+    pub fn zero() -> Self {
+        Self {
+            top: 0.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 0.0,
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.top == 0.0 && self.right == 0.0 && self.bottom == 0.0 && self.left == 0.0
+    }
+
+    pub fn is_uniform(&self) -> bool {
+        self.top == self.right && self.right == self.bottom && self.bottom == self.left
+    }
+
+    pub fn all(value: f32) -> Self {
+        Self {
+            top: value,
+            right: value,
+            bottom: value,
+            left: value,
+        }
+    }
+
+    pub fn from_ltrb(left: f32, top: f32, right: f32, bottom: f32) -> Self {
+        Self {
+            top,
+            right,
+            bottom,
+            left,
+        }
+    }
+}
+
+impl Default for EdgeInsets {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Radius {
     pub rx: f32,
     pub ry: f32,

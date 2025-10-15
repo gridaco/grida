@@ -178,6 +178,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             effects: LayerEffects::default(),
             clip: true,
+            padding: EdgeInsets::default(),
         }
     }
 
