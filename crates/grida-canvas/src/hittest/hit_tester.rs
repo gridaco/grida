@@ -34,10 +34,10 @@ impl<'a> HitTester<'a> {
         let mut indices = self.cache.intersects_point(point);
         indices.sort();
         for idx in indices.into_iter().rev() {
-            let layer = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
+            let entry = &self.cache.layers.layers[idx];
+            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
-                    return Some(layer.id().clone());
+                    return Some(entry.id);
                 }
             }
         }
@@ -50,10 +50,10 @@ impl<'a> HitTester<'a> {
         indices.sort();
         let mut out = Vec::with_capacity(indices.len());
         for idx in indices.into_iter().rev() {
-            let layer = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
+            let entry = &self.cache.layers.layers[idx];
+            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
-                    out.push(layer.id().clone());
+                    out.push(entry.id);
                 }
             }
         }
@@ -78,18 +78,19 @@ impl<'a> HitTester<'a> {
         let mut indices = self.cache.intersects_point(point);
         indices.sort();
         for idx in indices.into_iter().rev() {
-            let layer = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
+            let entry = &self.cache.layers.layers[idx];
+            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
-                    let transform = layer.transform();
-                    let mut path = if let Some(entry) = self.cache.path.borrow().get(layer.id()) {
-                        (*entry.path).clone()
+                    let transform = entry.layer.transform();
+                    let mut path = if let Some(path_entry) = self.cache.path.borrow().get(&entry.id)
+                    {
+                        (*path_entry.path).clone()
                     } else {
-                        layer.shape().to_path()
+                        entry.layer.shape().to_path()
                     };
                     path.transform(&sk::sk_matrix(transform.matrix));
                     if path.contains((point[0], point[1])) {
-                        return Some(layer.id().clone());
+                        return Some(entry.id);
                     }
                 }
             }
@@ -106,19 +107,20 @@ impl<'a> HitTester<'a> {
         indices.sort();
         let mut out = Vec::with_capacity(indices.len());
         for idx in indices.into_iter().rev() {
-            let layer = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
+            let entry = &self.cache.layers.layers[idx];
+            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
-                    let shape = layer.shape();
-                    let transform = layer.transform();
-                    let mut path = if let Some(entry) = self.cache.path.borrow().get(layer.id()) {
-                        (*entry.path).clone()
+                    let shape = entry.layer.shape();
+                    let transform = entry.layer.transform();
+                    let mut path = if let Some(path_entry) = self.cache.path.borrow().get(&entry.id)
+                    {
+                        (*path_entry.path).clone()
                     } else {
                         shape.to_path()
                     };
                     path.transform(&sk::sk_matrix(transform.matrix));
                     if path.contains((point[0], point[1])) {
-                        out.push(layer.id().clone());
+                        out.push(entry.id);
                     }
                 }
             }
@@ -129,11 +131,11 @@ impl<'a> HitTester<'a> {
     /// Returns `true` if the specified node contains the point within its
     /// render bounds.
     pub fn contains(&self, id: &NodeId, point: Vector2) -> bool {
-        if let Some(layer) = self.cache.layers.layers.iter().find(|l| l.id() == id) {
-            let shape = layer.shape();
-            let transform = layer.transform();
-            let mut path = if let Some(entry) = self.cache.path.borrow().get(id) {
-                (*entry.path).clone()
+        if let Some(entry) = self.cache.layers.layers.iter().find(|e| &e.id == id) {
+            let shape = entry.layer.shape();
+            let transform = entry.layer.transform();
+            let mut path = if let Some(path_entry) = self.cache.path.borrow().get(id) {
+                (*path_entry.path).clone()
             } else {
                 shape.to_path()
             };
@@ -153,10 +155,10 @@ impl<'a> HitTester<'a> {
         indices.sort();
         let mut out = Vec::with_capacity(indices.len());
         for idx in indices.into_iter().rev() {
-            let layer = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
+            let entry = &self.cache.layers.layers[idx];
+            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
                 if rect::intersects(&bounds, rect) {
-                    out.push(layer.id().clone());
+                    out.push(entry.id);
                 }
             }
         }

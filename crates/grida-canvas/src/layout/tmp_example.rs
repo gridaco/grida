@@ -91,8 +91,10 @@ impl ContainerWithStyle {
     }
 
     /// Get container ID
+    /// Note: ID should be provided by the caller, not stored in the node
     pub fn id(&self) -> crate::node::schema::NodeId {
-        self.container.id
+        // TODO: Remove this method - ID should come from graph traversal
+        0
     }
 
     /// Get container name
@@ -165,7 +167,6 @@ mod tests {
         use crate::node::schema::ContainerNodeRec;
 
         let container = ContainerWithStyle::from_container(ContainerNodeRec {
-            id: 1,
             name: Some("Test Container".to_string()),
             active: true,
             opacity: 1.0,
@@ -201,7 +202,6 @@ mod tests {
         let children: Vec<ContainerWithStyle> = (0..3)
             .map(|i| {
                 ContainerWithStyle::from_container(ContainerNodeRec {
-                    id: i as u64,
                     name: Some(format!("Child {}", i)),
                     active: true,
                     opacity: 1.0,
@@ -250,7 +250,6 @@ mod tests {
         use crate::node::schema::ContainerNodeRec;
 
         let container = ContainerWithStyle::from_container(ContainerNodeRec {
-            id: 1,
             name: Some("Test Container".to_string()),
             active: true,
             opacity: 1.0,
@@ -289,7 +288,6 @@ mod tests {
         let children: Vec<ContainerWithStyle> = (0..4)
             .map(|i| {
                 ContainerWithStyle::from_container(ContainerNodeRec {
-                    id: i as u64,
                     name: Some(format!("Child {}", i)),
                     active: true,
                     opacity: 1.0,

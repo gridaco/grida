@@ -268,7 +268,7 @@ impl GeometryCache {
                     &n.ellipsis,
                     n.width,
                     fonts,
-                    Some(&n.id),
+                    Some(id),
                 );
 
                 // Create intrinsic bounds (starting at origin, like other nodes)

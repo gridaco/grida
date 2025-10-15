@@ -57,7 +57,6 @@ async fn demo_booleans() -> Scene {
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
-            id: 1,
             name: Some("Union Operation".to_string()),
             active: true,
             opacity: 1.0,
@@ -122,7 +121,6 @@ async fn demo_booleans() -> Scene {
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
-            id: 2,
             name: Some("Intersection Operation".to_string()),
             active: true,
             opacity: 1.0,
@@ -188,7 +186,6 @@ async fn demo_booleans() -> Scene {
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
-            id: 3,
             name: Some("Difference Operation".to_string()),
             active: true,
             opacity: 1.0,
@@ -254,7 +251,6 @@ async fn demo_booleans() -> Scene {
 
         // Create boolean operation
         let bool_node = BooleanPathOperationNodeRec {
-            id: 4,
             name: Some("XOR Operation".to_string()),
             active: true,
             opacity: 1.0,

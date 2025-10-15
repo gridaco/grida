@@ -13,7 +13,6 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
     let rectangles: Vec<Node> = (0..count)
         .map(|i| {
             Node::Rectangle(RectangleNodeRec {
-                id: i as u64,
                 name: None,
                 active: true,
                 opacity: 1.0,
@@ -47,7 +46,6 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
 
     // Create root group
     let root_group = GroupNodeRec {
-        id: u64::MAX, // Use max u64 for root to avoid collision with rectangles
         name: Some("Root Group".to_string()),
         active: true,
         transform: None,

@@ -20,7 +20,6 @@ fn create_container_with_alignment(
     let id_u64 = hasher.finish();
 
     ContainerNodeRec {
-        id: id_u64,
         name: Some(format!("Container {}", id)),
         active: true,
         opacity: 1.0,
@@ -55,7 +54,6 @@ fn create_child_container(id: &str, width: f32, height: f32) -> ContainerNodeRec
     let id_u64 = hasher.finish();
 
     ContainerNodeRec {
-        id: id_u64,
         name: Some(format!("Child {}", id)),
         active: true,
         opacity: 1.0,

@@ -596,7 +596,6 @@ impl FigmaConverter {
     /// Convert Figma's slice to our SliceNode
     fn convert_slice(&mut self, slice: &Box<SliceNode>) -> Result<Node, String> {
         Ok(Node::Error(ErrorNodeRec {
-            id: self.get_or_create_internal_id(&slice.id),
             name: Some(format!("[Slice] {}", slice.name)),
             active: slice.visible.unwrap_or(true),
             transform: AffineTransform::identity(),
@@ -632,7 +631,6 @@ impl FigmaConverter {
         }
 
         Ok(Node::Container(ContainerNodeRec {
-            id: node_id,
             name: Some(component.name.clone()),
             active: component.visible.unwrap_or(true),
             opacity: Self::convert_opacity(component.visible),
@@ -676,7 +674,6 @@ impl FigmaConverter {
         component_set: &Box<ComponentSetNode>,
     ) -> Result<Node, String> {
         Ok(Node::Error(ErrorNodeRec {
-            id: self.get_or_create_internal_id(&component_set.id),
             name: Some(format!("[ComponentSet] {}", component_set.name)),
             active: component_set.visible.unwrap_or(true),
             transform: Self::convert_transform(component_set.relative_transform.as_ref()),
@@ -735,7 +732,6 @@ impl FigmaConverter {
         }
 
         Ok(Node::Container(ContainerNodeRec {
-            id: node_id,
             name: Some(instance.name.clone()),
             active: instance.visible.unwrap_or(true),
             opacity: Self::convert_opacity(instance.visible),
@@ -790,7 +786,6 @@ impl FigmaConverter {
         }
 
         Ok(Node::Container(ContainerNodeRec {
-            id: node_id,
             name: Some(format!("[Section] {}", section.name)),
             active: section.visible.unwrap_or(true),
             opacity: Self::convert_opacity(section.visible),
@@ -819,7 +814,6 @@ impl FigmaConverter {
     /// Convert Figma's link to our LinkUnfurlNode
     fn convert_link(&mut self, link: &Box<LinkUnfurlNode>) -> Result<Node, String> {
         Ok(Node::Error(ErrorNodeRec {
-            id: self.get_or_create_internal_id(&link.id),
             name: Some(format!("[Link] {}", link.name)),
             active: link.visible.unwrap_or(true),
             transform: AffineTransform::identity(),
@@ -890,8 +884,8 @@ impl FigmaConverter {
             .collect::<Result<Vec<_>, _>>()?;
 
         // Build scene graph from snapshot
-        let nodes = self.repository.iter().map(|(_, node)| node.clone());
-        let graph = SceneGraph::new_from_snapshot(nodes, self.links.clone(), children);
+        let node_pairs = self.repository.iter().map(|(id, node)| (*id, node.clone()));
+        let graph = SceneGraph::new_from_snapshot(node_pairs, self.links.clone(), children);
 
         Ok(Scene {
             name: canvas.name.clone(),
@@ -919,7 +913,6 @@ impl FigmaConverter {
         }
 
         Ok(Node::Container(ContainerNodeRec {
-            id: node_id,
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1005,7 +998,6 @@ impl FigmaConverter {
         }
 
         Ok(Node::TextSpan(TextSpanNodeRec {
-            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             transform: Self::convert_transform(origin.relative_transform.as_ref()),
@@ -1095,7 +1087,6 @@ impl FigmaConverter {
         if let Some(fill_geometries) = &origin.fill_geometry {
             for geometry in fill_geometries {
                 let path_node = Node::SVGPath(SVGPathNodeRec {
-                    id: self.id_generator.next(),
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
                     opacity: Self::convert_opacity(origin.visible),
@@ -1120,7 +1111,6 @@ impl FigmaConverter {
         if let Some(stroke_geometries) = &origin.stroke_geometry {
             for geometry in stroke_geometries {
                 let path_node = Node::SVGPath(SVGPathNodeRec {
-                    id: self.id_generator.next(),
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
                     opacity: Self::convert_opacity(origin.visible),
@@ -1142,7 +1132,6 @@ impl FigmaConverter {
 
         // Create a group node containing all the path nodes
         Ok(Node::Container(ContainerNodeRec {
-            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1204,7 +1193,6 @@ impl FigmaConverter {
         }
 
         Ok(Node::BooleanOperation(BooleanPathOperationNodeRec {
-            id: node_id,
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1237,7 +1225,6 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::RegularStarPolygon(RegularStarPolygonNodeRec {
-            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1273,7 +1260,6 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Line(LineNodeRec {
-            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1310,7 +1296,6 @@ impl FigmaConverter {
             Self::convert_transform(origin.relative_transform.as_ref().map(|v| v.as_ref()));
 
         Ok(Node::Ellipse(EllipseNodeRec {
-            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1351,7 +1336,6 @@ impl FigmaConverter {
         let size = Self::convert_size(origin.size.as_ref());
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
         Ok(Node::RegularPolygon(RegularPolygonNodeRec {
-            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1385,7 +1369,6 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Rectangle(RectangleNodeRec {
-            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1431,7 +1414,6 @@ impl FigmaConverter {
         }
 
         Ok(Node::Group(GroupNodeRec {
-            id: node_id,
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             // the figma's relativeTransform for group is a no-op on our model.

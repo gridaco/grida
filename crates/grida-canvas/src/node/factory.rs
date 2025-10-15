@@ -15,12 +15,6 @@ impl NodeFactory {
         Self {}
     }
 
-    /// Returns a placeholder ID.
-    /// Real IDs should be assigned by the scene management layer.
-    fn id(&self) -> NodeId {
-        0
-    }
-
     // Internal factory defaults
     const DEFAULT_SIZE: Size = Size {
         width: 100.0,
@@ -58,7 +52,6 @@ impl NodeFactory {
     /// Creates a new rectangle node with default values
     pub fn create_rectangle_node(&self) -> RectangleNodeRec {
         RectangleNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
@@ -79,7 +72,6 @@ impl NodeFactory {
     /// Creates a new ellipse node with default values
     pub fn create_ellipse_node(&self) -> EllipseNodeRec {
         EllipseNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
@@ -103,7 +95,6 @@ impl NodeFactory {
     /// Creates a new line node with default values
     pub fn create_line_node(&self) -> LineNodeRec {
         LineNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
@@ -125,7 +116,6 @@ impl NodeFactory {
     /// Creates a new text span node with default values
     pub fn create_text_span_node(&self) -> TextSpanNodeRec {
         TextSpanNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
@@ -151,7 +141,6 @@ impl NodeFactory {
     /// Creates a new group node with default values
     pub fn create_group_node(&self) -> GroupNodeRec {
         GroupNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             transform: None,
@@ -164,7 +153,6 @@ impl NodeFactory {
     /// Creates a new container node with default values
     pub fn create_container_node(&self) -> ContainerNodeRec {
         ContainerNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
@@ -193,7 +181,6 @@ impl NodeFactory {
     /// Creates a new path node with default values
     pub fn create_path_node(&self) -> SVGPathNodeRec {
         SVGPathNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
@@ -213,7 +200,6 @@ impl NodeFactory {
     /// Creates a new regular polygon node with default values
     pub fn create_regular_polygon_node(&self) -> RegularPolygonNodeRec {
         RegularPolygonNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
@@ -234,7 +220,6 @@ impl NodeFactory {
 
     pub fn create_regular_star_polygon_node(&self) -> RegularStarPolygonNodeRec {
         RegularStarPolygonNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
@@ -256,7 +241,6 @@ impl NodeFactory {
 
     pub fn create_polygon_node(&self) -> PolygonNodeRec {
         PolygonNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
@@ -277,7 +261,6 @@ impl NodeFactory {
     /// Creates a new image node with default values
     pub fn create_image_node(&self) -> ImageNodeRec {
         ImageNodeRec {
-            id: self.id(),
             name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,

@@ -19,42 +19,18 @@ impl NodeRepository {
         }
     }
 
-    /// Inserts a node into the repository, automatically generating a new ID if the node has placeholder ID (0).
-    /// Returns the node's ID.
-    pub fn insert(&mut self, mut node: Node) -> NodeId {
-        let existing_id = node.id();
-
-        // If node has placeholder ID (0), assign a new one
-        let id = if existing_id == 0 {
-            let new_id = self.id_generator.next();
-            Self::set_node_id(&mut node, new_id);
-            new_id
-        } else {
-            existing_id
-        };
-
+    /// Inserts a node with automatic ID generation.
+    /// Returns the generated NodeId.
+    pub fn insert(&mut self, node: Node) -> NodeId {
+        let id = self.id_generator.next();
         self.nodes.insert(id, node);
         id
     }
 
-    /// Helper to set the ID on a node
-    fn set_node_id(node: &mut Node, id: NodeId) {
-        match node {
-            Node::Error(n) => n.id = id,
-            Node::Group(n) => n.id = id,
-            Node::Container(n) => n.id = id,
-            Node::Rectangle(n) => n.id = id,
-            Node::Ellipse(n) => n.id = id,
-            Node::Polygon(n) => n.id = id,
-            Node::RegularPolygon(n) => n.id = id,
-            Node::RegularStarPolygon(n) => n.id = id,
-            Node::Line(n) => n.id = id,
-            Node::TextSpan(n) => n.id = id,
-            Node::SVGPath(n) => n.id = id,
-            Node::Vector(n) => n.id = id,
-            Node::BooleanOperation(n) => n.id = id,
-            Node::Image(n) => n.id = id,
-        }
+    /// Inserts a node with an explicit ID (for IO layer use).
+    /// The ID must not already exist in the repository.
+    pub fn insert_with_id(&mut self, id: NodeId, node: Node) {
+        self.nodes.insert(id, node);
     }
 
     /// Gets a reference to a node by its ID
@@ -125,7 +101,6 @@ mod tests {
     fn node_repository_basic() {
         let mut repo = NodeRepository::new();
         let node = Node::Error(ErrorNodeRec {
-            id: 1,
             name: Some("err".to_string()),
             active: true,
             transform: math2::transform::AffineTransform::identity(),

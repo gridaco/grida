@@ -323,7 +323,7 @@ impl ApplicationApi for UnknownTargetApplication {
                             n.width,
                             &self.renderer.fonts,
                             &self.renderer.images,
-                            Some(&n.id),
+                            Some(&internal_id),
                         );
 
                         let layout_height = paragraph.borrow().height();

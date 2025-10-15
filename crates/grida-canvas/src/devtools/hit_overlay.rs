@@ -56,7 +56,7 @@ impl HitOverlay {
     ) {
         // Render hit if present
         if let Some(id) = hit {
-            if let Some(layer) = cache.layers.layers.iter().find(|l| l.id() == id) {
+            if let Some(entry) = cache.layers.layers.iter().find(|e| &e.id == id) {
                 if let Some(bounds) = cache.geometry.get_render_bounds(id) {
                     let screen_rect = math2::rect::transform(bounds, &camera.view_matrix());
                     let rect = Rect::from_xywh(
@@ -66,12 +66,12 @@ impl HitOverlay {
                         screen_rect.height,
                     );
 
-                    let shape = layer.shape();
-                    let transform = layer.transform();
-                    let mut path = if let Some(entry) = cache.path.borrow().get(id) {
-                        (*entry.path).clone()
+                    let shape = entry.layer.shape();
+                    let transform = entry.layer.transform();
+                    let mut path = if let Some(path_entry) = cache.path.borrow().get(id) {
+                        (*path_entry.path).clone()
                     } else {
-                        match layer {
+                        match &entry.layer {
                             crate::painter::layer::PainterPictureLayer::Text(t) => {
                                 if let Some(text_path) =
                                     text_overlay::TextOverlay::text_layer_baseline(cache, t)
@@ -125,7 +125,7 @@ impl HitOverlay {
         // Render focus if present (and different from hit)
         if let Some(focus_id) = focus {
             if hit.map_or(true, |hit_id| focus_id != hit_id) {
-                if let Some(_focus_layer) = cache.layers.layers.iter().find(|l| l.id() == focus_id)
+                if let Some(_focus_layer) = cache.layers.layers.iter().find(|e| &e.id == focus_id)
                 {
                     if let Some(focus_bounds) = cache.geometry.get_render_bounds(focus_id) {
                         let focus_screen_rect =

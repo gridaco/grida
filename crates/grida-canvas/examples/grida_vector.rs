@@ -26,7 +26,6 @@ async fn demo_vectors() -> Scene {
     {
         {
             let vector_node_1_tri_open = VectorNodeRec {
-                id: 1,
                 name: Some("triangle open".to_string()),
                 active: true,
                 opacity: 1.0,
@@ -59,7 +58,6 @@ async fn demo_vectors() -> Scene {
 
         {
             let vector_node_2_tri_closed = VectorNodeRec {
-                id: 2,
                 name: Some("triangle closed".to_string()),
                 active: true,
                 opacity: 1.0,
@@ -94,7 +92,6 @@ async fn demo_vectors() -> Scene {
         //
         {
             let vector_node_3 = VectorNodeRec {
-                id: 3,
                 name: Some("Vector 2".to_string()),
                 active: true,
                 opacity: 1.0,
@@ -125,7 +122,6 @@ async fn demo_vectors() -> Scene {
 
         {
             let vector_node_4 = VectorNodeRec {
-                id: 4,
                 name: Some("Vector 3".to_string()),
                 active: true,
                 opacity: 1.0,
@@ -157,7 +153,6 @@ async fn demo_vectors() -> Scene {
         // FIXME: not working
         {
             let vector_node_1_5 = VectorNodeRec {
-                id: 5,
                 name: Some("Vector 1_5".to_string()),
                 active: true,
                 opacity: 1.0,
@@ -197,7 +192,6 @@ async fn demo_vectors() -> Scene {
         // Simple curve (S-shape)
         {
             let vector_node_5 = VectorNodeRec {
-                id: 6,
                 name: Some("S-curve".to_string()),
                 active: true,
                 opacity: 1.0,
@@ -234,7 +228,6 @@ async fn demo_vectors() -> Scene {
         // Single-segment 90-degree straight line
         {
             let vector_node_5_5 = VectorNodeRec {
-                id: 7,
                 name: Some("90deg line".to_string()),
                 active: true,
                 opacity: 1.0,
@@ -272,7 +265,6 @@ async fn demo_vectors() -> Scene {
         // Filled triangle
         {
             let vector_node_6 = VectorNodeRec {
-                id: 8,
                 name: Some("filled triangle".to_string()),
                 active: true,
                 opacity: 1.0,
@@ -308,7 +300,6 @@ async fn demo_vectors() -> Scene {
         // Filled rectangle
         {
             let vector_node_7 = VectorNodeRec {
-                id: 9,
                 name: Some("filled rectangle".to_string()),
                 active: true,
                 opacity: 1.0,

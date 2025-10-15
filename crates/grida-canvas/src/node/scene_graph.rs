@@ -84,15 +84,15 @@ impl SceneGraph {
     /// * `links` - HashMap of parent->children relationships
     /// * `roots` - Root node IDs (direct children of the scene)
     pub fn new_from_snapshot(
-        nodes: impl IntoIterator<Item = Node>,
+        node_pairs: impl IntoIterator<Item = (NodeId, Node)>,
         links: HashMap<NodeId, Vec<NodeId>>,
         roots: Vec<NodeId>,
     ) -> Self {
         let mut graph = Self::new();
 
-        // Add all nodes to the repository
-        for node in nodes {
-            graph.nodes.insert(node);
+        // Add all nodes to the repository with their explicit IDs
+        for (id, node) in node_pairs {
+            graph.nodes.insert_with_id(id, node);
         }
 
         // Set up all links
@@ -354,7 +354,6 @@ mod tests {
 
     fn create_test_node(id: u64) -> Node {
         Node::Error(ErrorNodeRec {
-            id,
             name: Some(format!("node_{}", id)),
             active: true,
             transform: AffineTransform::identity(),
@@ -615,20 +614,20 @@ mod tests {
 
     #[test]
     fn test_new_from_snapshot() {
-        let node_a = create_test_node(1);
-        let node_b = create_test_node(2);
-        let node_c = create_test_node(3);
+        let id_a = 1;
+        let id_b = 2;
+        let id_c = 3;
 
-        let id_a = node_a.id().clone();
-        let id_b = node_b.id().clone();
-        let id_c = node_c.id().clone();
+        let node_a = create_test_node(id_a);
+        let node_b = create_test_node(id_b);
+        let node_c = create_test_node(id_c);
 
-        let nodes = vec![node_a, node_b, node_c];
+        let node_pairs = vec![(id_a, node_a), (id_b, node_b), (id_c, node_c)];
         let mut links = HashMap::new();
-        links.insert(id_a.clone(), vec![id_b.clone(), id_c.clone()]);
-        let roots = vec![id_a.clone()];
+        links.insert(id_a, vec![id_b, id_c]);
+        let roots = vec![id_a];
 
-        let graph = SceneGraph::new_from_snapshot(nodes, links, roots);
+        let graph = SceneGraph::new_from_snapshot(node_pairs, links, roots);
 
         assert_eq!(graph.node_count(), 3);
         assert_eq!(graph.roots().len(), 1);
@@ -646,23 +645,28 @@ mod tests {
 
     #[test]
     fn test_new_from_snapshot_complex_hierarchy() {
-        let node_root = create_test_node(100);
-        let node_a = create_test_node(1);
-        let node_b = create_test_node(2);
-        let node_c = create_test_node(3);
+        let id_root = 100;
+        let id_a = 1;
+        let id_b = 2;
+        let id_c = 3;
 
-        let id_root = node_root.id().clone();
-        let id_a = node_a.id().clone();
-        let id_b = node_b.id().clone();
-        let id_c = node_c.id().clone();
+        let node_root = create_test_node(id_root);
+        let node_a = create_test_node(id_a);
+        let node_b = create_test_node(id_b);
+        let node_c = create_test_node(id_c);
 
-        let nodes = vec![node_root, node_a, node_b, node_c];
+        let node_pairs = vec![
+            (id_root, node_root),
+            (id_a, node_a),
+            (id_b, node_b),
+            (id_c, node_c),
+        ];
         let mut links = HashMap::new();
-        links.insert(id_root.clone(), vec![id_a.clone(), id_b.clone()]);
-        links.insert(id_b.clone(), vec![id_c.clone()]);
-        let roots = vec![id_root.clone()];
+        links.insert(id_root, vec![id_a, id_b]);
+        links.insert(id_b, vec![id_c]);
+        let roots = vec![id_root];
 
-        let graph = SceneGraph::new_from_snapshot(nodes, links, roots);
+        let graph = SceneGraph::new_from_snapshot(node_pairs, links, roots);
 
         assert_eq!(graph.node_count(), 4);
         assert_eq!(graph.roots().len(), 1);
