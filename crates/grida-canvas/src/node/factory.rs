@@ -178,6 +178,7 @@ impl NodeFactory {
             stroke_dash_array: None,
             effects: LayerEffects::default(),
             clip: true,
+            layout_mode: LayoutMode::default(),
             layout_direction: Axis::default(),
             layout_wrap: LayoutWrap::default(),
             layout_main_axis_alignment: MainAxisAlignment::default(),

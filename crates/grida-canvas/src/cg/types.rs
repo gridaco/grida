@@ -534,6 +534,18 @@ impl Default for EdgeInsets {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum LayoutMode {
+    Normal,
+    Flex,
+}
+
+impl Default for LayoutMode {
+    fn default() -> Self {
+        LayoutMode::Normal
+    }
+}
+
 /// Defines whether flex items are forced into a single line or can wrap onto multiple lines.
 ///
 /// `LayoutWrap` controls the wrapping behavior of flex items within a flex container.
