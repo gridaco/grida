@@ -1001,6 +1001,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             clip: true,
             mask: node.base.mask.map(|m| m.into()),
             padding: EdgeInsets::default(),
+            gap: LayoutGap::default(),
         }
     }
 }

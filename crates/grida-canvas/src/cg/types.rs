@@ -362,6 +362,57 @@ impl Default for StrokeAlign {
     }
 }
 
+/// Represents **inset distances from the edges** of a rectangular box.
+///
+/// `EdgeInsets` defines per-edge padding or margin values around a box.
+/// It corresponds to CSS properties such as `padding-top`, `padding-right`,
+/// `padding-bottom`, and `padding-left`, or Flutter's `EdgeInsets`.
+///
+/// # Fields
+///
+/// * `top` — distance from the top edge  
+/// * `right` — distance from the right edge  
+/// * `bottom` — distance from the bottom edge  
+/// * `left` — distance from the left edge
+///
+/// Each field represents a *positive offset inward* from that edge
+/// when applied as padding, or an *outward extension* when used as margin.
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::EdgeInsets;
+///
+/// let padding = EdgeInsets::from_ltrb(8.0, 12.0, 8.0, 12.0);
+///
+/// assert_eq!(padding.top, 12.0);
+/// assert_eq!(padding.left, 8.0);
+///
+/// let uniform = EdgeInsets::all(10.0);
+/// assert!(uniform.is_uniform());
+///
+/// let none = EdgeInsets::zero();
+/// assert!(none.is_zero());
+/// ```
+///
+/// # Relation to other layout concepts
+///
+/// | Concept | Describes | Typical struct |
+/// |----------|------------|----------------|
+/// | **Padding / Margin** | insets *around* one element | `EdgeInsets` |
+/// | **Gap / Spacing** | distance *between* elements | [`Gap2D`] |
+///
+/// # Mathematical model
+///
+/// When applied to a content box of width `W` and height `H`,
+///
+/// ```text
+/// content_width  = W - (left + right)
+/// content_height = H - (top + bottom)
+/// ```
+///
+/// Positive values shrink the inner content region (for padding)
+/// or expand the outer region (for margin).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EdgeInsets {
     pub top: f32,
@@ -408,6 +459,119 @@ impl EdgeInsets {
 }
 
 impl Default for EdgeInsets {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
+/// Represents the **spacing between adjacent elements** in a flex layout container.
+///
+/// `LayoutGap` is a 2-dimensional scalar type describing the distance between
+/// neighboring items in a layout container. It is the geometric equivalent of
+/// the CSS `gap` property (or `row-gap`/`column-gap`) and Flutter's `spacing`/`runSpacing`.
+///
+/// Unlike [`EdgeInsets`], which describes insets around the edges of a single
+/// element, `LayoutGap` defines the *inter-element spacing* applied **between**
+/// consecutive elements along each axis of a flex container.
+///
+/// # Fields
+///
+/// * `main_axis_gap` — spacing between elements along the **main axis** (direction of flex flow)
+///   - For `flex-direction: row`, this is the horizontal spacing between items
+///   - For `flex-direction: column`, this is the vertical spacing between items
+/// * `cross_axis_gap` — spacing between **lines** along the **cross axis** (perpendicular to flex flow)
+///   - For `flex-direction: row`, this is the vertical spacing between wrapped rows
+///   - For `flex-direction: column`, this is the horizontal spacing between wrapped columns
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::LayoutGap;
+///
+/// // Uniform spacing in both directions
+/// let uniform = LayoutGap::uniform(8.0);
+///
+/// // Separate main-axis and cross-axis spacing
+/// let spacing = LayoutGap::new(12.0, 16.0);
+///
+/// assert!(spacing.main_axis_gap == 12.0);
+/// assert!(spacing.cross_axis_gap == 16.0);
+/// assert!(LayoutGap::zero().is_zero());
+/// ```
+///
+/// # Relation to other layout concepts
+///
+/// | Concept | Describes | Typical struct |
+/// |----------|------------|----------------|
+/// | **Padding / Margin** | insets *around* one element | [`EdgeInsets`] |
+/// | **Gap / Spacing** | distance *between* elements | `LayoutGap` |
+///
+/// # CSS Equivalents
+///
+/// * `gap: 10px` → `LayoutGap::uniform(10.0)`
+/// * `row-gap: 12px; column-gap: 16px` → `LayoutGap::new(16.0, 12.0)` (for row direction)
+/// * `row-gap: 12px; column-gap: 16px` → `LayoutGap::new(12.0, 16.0)` (for column direction)
+///
+/// # See also
+///
+/// * [`EdgeInsets`] — four-sided per-element insets.
+/// * [CSS gap property](https://developer.mozilla.org/en-US/docs/Web/CSS/gap)
+/// * [Taffy gap documentation](https://docs.rs/taffy/latest/taffy/)
+///
+/// # Mathematical model
+///
+/// For `n` elements of width `wᵢ` laid out along the main axis:
+///
+/// ```text
+/// total_main_size = Σ(wᵢ) + (n - 1) * main_axis_gap
+/// total_cross_size = Σ(hᵢ) + (lines - 1) * cross_axis_gap
+/// ```
+///
+/// This definition ensures that the gap is only applied **between**
+/// elements, never before the first or after the last.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LayoutGap {
+    pub main_axis_gap: f32,
+    pub cross_axis_gap: f32,
+}
+
+impl LayoutGap {
+    #[inline]
+    pub const fn zero() -> Self {
+        Self {
+            main_axis_gap: 0.0,
+            cross_axis_gap: 0.0,
+        }
+    }
+
+    #[inline]
+    pub const fn uniform(v: f32) -> Self {
+        Self {
+            main_axis_gap: v,
+            cross_axis_gap: v,
+        }
+    }
+
+    #[inline]
+    pub const fn new(main_axis_gap: f32, cross_axis_gap: f32) -> Self {
+        Self {
+            main_axis_gap,
+            cross_axis_gap,
+        }
+    }
+
+    #[inline]
+    pub fn is_zero(&self) -> bool {
+        self.main_axis_gap == 0.0 && self.cross_axis_gap == 0.0
+    }
+
+    #[inline]
+    pub fn is_uniform(&self) -> bool {
+        self.main_axis_gap == self.cross_axis_gap
+    }
+}
+
+impl Default for LayoutGap {
     fn default() -> Self {
         Self::zero()
     }

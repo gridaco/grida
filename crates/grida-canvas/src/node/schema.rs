@@ -453,8 +453,9 @@ pub struct ContainerNodeRec {
     pub clip: ContainerClipFlag,
 
     /// The padding of the container.
-    /// TODO: not implemented
     pub padding: EdgeInsets,
+    /// The gap of the container.
+    pub gap: LayoutGap,
 }
 
 impl ContainerNodeRec {

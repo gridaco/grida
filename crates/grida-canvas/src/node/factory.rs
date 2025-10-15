@@ -179,6 +179,7 @@ impl NodeFactory {
             effects: LayerEffects::default(),
             clip: true,
             padding: EdgeInsets::default(),
+            gap: LayoutGap::default(),
         }
     }
 
