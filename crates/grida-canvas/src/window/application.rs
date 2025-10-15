@@ -6,7 +6,6 @@ use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
 use crate::io::io_grida::{self, JSONVectorNetwork};
 use crate::io::io_grida_patch::{self, TransactionApplyReport};
-use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
@@ -148,6 +147,11 @@ pub struct UnknownTargetApplication {
 
     /// timer id for debouncing stable frame queues
     queue_stable_timer: Option<crate::sys::timer::TimerId>,
+
+    /// Bidirectional mapping between user string IDs and internal u64 IDs
+    /// Maintained across scene loads to enable API calls with string IDs
+    id_mapping: std::collections::HashMap<UserNodeId, NodeId>,
+    id_mapping_reverse: std::collections::HashMap<NodeId, UserNodeId>,
 }
 
 impl ApplicationApi for UnknownTargetApplication {
@@ -213,12 +217,15 @@ impl ApplicationApi for UnknownTargetApplication {
                 return true;
             }
             ApplicationCommand::TryCopyAsPNG => {
-                if let Some(id) = self.devtools_selection.as_ref() {
-                    let id = id.clone();
-                    let exported = self.export_node_as(&id, ExportAs::png());
-                    if let Some(exported) = exported {
-                        self.clipboard.set_data(exported.data().to_vec());
-                        return true;
+                if let Some(internal_id) = self.devtools_selection.as_ref() {
+                    let internal_id = internal_id.clone();
+                    // Convert internal ID to user ID for API call
+                    if let Some(user_id) = self.internal_id_to_user(internal_id) {
+                        let exported = self.export_node_as(&user_id, ExportAs::png());
+                        if let Some(exported) = exported {
+                            self.clipboard.set_data(exported.data().to_vec());
+                            return true;
+                        }
                     }
                 }
             }
@@ -253,31 +260,40 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn get_node_ids_from_point(&mut self, point: Vector2) -> Vec<String> {
         let tester = self.get_hit_tester();
-        tester.hits(point)
+        let internal_ids = tester.hits(point);
+        self.internal_ids_to_user(internal_ids)
     }
 
     fn get_node_id_from_point(&mut self, point: Vector2) -> Option<String> {
         let tester = self.get_hit_tester();
-        tester.hit_first(point)
+        tester
+            .hit_first(point)
+            .and_then(|id| self.internal_id_to_user(id))
     }
 
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String> {
         let tester = self.get_hit_tester();
-        tester.intersects(&envelope)
+        let internal_ids = tester.intersects(&envelope);
+        self.internal_ids_to_user(internal_ids)
     }
 
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
-        self.renderer.get_cache().geometry().get_world_bounds(id)
+        let internal_id = self.user_id_to_internal(id)?;
+        self.renderer
+            .get_cache()
+            .geometry()
+            .get_world_bounds(&internal_id)
     }
 
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported> {
+        let internal_id = self.user_id_to_internal(id)?;
         if let Some(scene) = self.renderer.scene.as_ref() {
             return export_node_as(
                 scene,
                 &self.renderer.get_cache().geometry,
                 &self.renderer.fonts,
                 &self.renderer.images,
-                id,
+                &internal_id,
                 format,
             );
         }
@@ -285,8 +301,9 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+        let internal_id = self.user_id_to_internal(id)?;
         if let Some(scene) = self.renderer.scene.as_ref() {
-            if let Ok(node) = scene.graph.get_node(&id.to_string()) {
+            if let Ok(node) = scene.graph.get_node(&internal_id) {
                 let vn = match node {
                     Node::Rectangle(n) => Some(n.to_vector_network()),
                     Node::Ellipse(n) => Some(n.to_vector_network()),
@@ -365,7 +382,11 @@ impl ApplicationApi for UnknownTargetApplication {
         ids: Vec<String>,
         style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
     ) {
-        self.highlight_strokes = ids;
+        // Convert user string IDs to internal u64 IDs
+        self.highlight_strokes = ids
+            .into_iter()
+            .filter_map(|user_id| self.user_id_to_internal(&user_id))
+            .collect();
         self.highlight_stroke_style = style;
         self.queue();
     }
@@ -444,6 +465,8 @@ impl UnknownTargetApplication {
             timer: TimerMgr::new(),
             queue_stable_timer: None,
             queue_stable_debounce_millis: 50,
+            id_mapping: std::collections::HashMap::new(),
+            id_mapping_reverse: std::collections::HashMap::new(),
         }
     }
 
@@ -464,61 +487,41 @@ impl UnknownTargetApplication {
     }
 
     fn load_scene_from_canvas_file(&mut self, file: io_grida::JSONCanvasFile) -> bool {
-        let links = file.document.links;
+        // Use IdConverter to handle string ID to u64 ID conversion
+        let mut converter = crate::io::id_converter::IdConverter::new();
 
-        // Determine scene_id
-        let scene_id = file
-            .document
-            .entry_scene_id
-            .or_else(|| file.document.scenes_ref.first().cloned())
-            .unwrap_or_else(|| "scene".to_string());
+        match converter.convert_json_canvas_file(file) {
+            Ok(scene) => {
+                // Store the ID mappings for future API calls
+                self.id_mapping = converter.string_to_internal.clone();
+                self.id_mapping_reverse = converter.internal_to_string.clone();
 
-        // Extract scene metadata from SceneNode
-        let (scene_name, bg_color) = if let Some(io_grida::JSONNode::Scene(scene_node)) =
-            file.document.nodes.get(&scene_id)
-        {
-            (
-                scene_node.name.clone(),
-                scene_node.background_color.clone().map(Into::into),
-            )
-        } else {
-            (scene_id.clone(), None)
-        };
+                self.renderer.load_scene(scene);
+                true
+            }
+            Err(err) => {
+                eprintln!("Failed to convert canvas file: {}", err);
+                false
+            }
+        }
+    }
 
-        // Get scene children from links
-        let scene_children = links
-            .get(&scene_id)
-            .and_then(|c| c.clone())
-            .unwrap_or_default();
+    /// Convert user string ID to internal u64 ID
+    fn user_id_to_internal(&self, user_id: &str) -> Option<NodeId> {
+        self.id_mapping.get(user_id).copied()
+    }
 
-        // Convert all nodes (skip scene nodes)
-        let nodes: Vec<Node> = file
-            .document
-            .nodes
+    /// Convert internal u64 ID to user string ID
+    fn internal_id_to_user(&self, internal_id: NodeId) -> Option<String> {
+        self.id_mapping_reverse.get(&internal_id).cloned()
+    }
+
+    /// Convert multiple internal IDs to user IDs
+    fn internal_ids_to_user(&self, internal_ids: Vec<NodeId>) -> Vec<String> {
+        internal_ids
             .into_iter()
-            .filter(|(_, json_node)| !matches!(json_node, io_grida::JSONNode::Scene(_)))
-            .map(|(_, json_node)| json_node.into())
-            .collect();
-
-        // Filter links to remove None values
-        let filtered_links: std::collections::HashMap<String, Vec<String>> = links
-            .into_iter()
-            .filter_map(|(parent_id, children_opt)| {
-                children_opt.map(|children| (parent_id, children))
-            })
-            .collect();
-
-        // Build scene graph from snapshot
-        let graph = SceneGraph::new_from_snapshot(nodes, filtered_links, scene_children);
-
-        let scene = crate::node::schema::Scene {
-            name: scene_name,
-            graph,
-            background_color: bg_color,
-        };
-
-        self.renderer.load_scene(scene);
-        true
+            .filter_map(|id| self.internal_id_to_user(id))
+            .collect()
     }
 
     fn process_document_transactions(
@@ -665,7 +668,10 @@ impl UnknownTargetApplication {
         self.hit_test_last = std::time::Instant::now();
         let camera = &self.renderer.camera;
         let point = camera.screen_to_canvas_point(self.input.cursor);
-        let new_hit_result = self.get_node_id_from_point(point);
+        // Get string ID from API, convert to internal ID for storage
+        let new_hit_result = self
+            .get_node_id_from_point(point)
+            .and_then(|user_id| self.user_id_to_internal(&user_id));
         if self.hit_test_result != new_hit_result {
             self.queue();
         }

@@ -738,7 +738,7 @@ mod tests {
         );
 
         // no scene loaded so geometry cache is empty
-        let pic = renderer.with_recording_cached(&"missing".to_string(), |_| {});
+        let pic = renderer.with_recording_cached(&9999, |_| {});
         assert!(pic.is_none());
 
         renderer.free();

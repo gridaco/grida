@@ -6,6 +6,8 @@ use std::collections::HashMap;
 pub struct NodeRepository {
     /// The map of all nodes indexed by their IDs
     nodes: HashMap<NodeId, Node>,
+    /// ID generator for auto-assigning IDs
+    id_generator: crate::node::id::NodeIdGenerator,
 }
 
 impl NodeRepository {
@@ -13,15 +15,46 @@ impl NodeRepository {
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
+            id_generator: crate::node::id::NodeIdGenerator::new(),
         }
     }
 
-    /// Inserts a node into the repository, automatically indexing it by its ID.
+    /// Inserts a node into the repository, automatically generating a new ID if the node has placeholder ID (0).
     /// Returns the node's ID.
-    pub fn insert(&mut self, node: Node) -> NodeId {
-        let id = node.id();
-        self.nodes.insert(id.clone(), node);
+    pub fn insert(&mut self, mut node: Node) -> NodeId {
+        let existing_id = node.id();
+
+        // If node has placeholder ID (0), assign a new one
+        let id = if existing_id == 0 {
+            let new_id = self.id_generator.next();
+            Self::set_node_id(&mut node, new_id);
+            new_id
+        } else {
+            existing_id
+        };
+
+        self.nodes.insert(id, node);
         id
+    }
+
+    /// Helper to set the ID on a node
+    fn set_node_id(node: &mut Node, id: NodeId) {
+        match node {
+            Node::Error(n) => n.id = id,
+            Node::Group(n) => n.id = id,
+            Node::Container(n) => n.id = id,
+            Node::Rectangle(n) => n.id = id,
+            Node::Ellipse(n) => n.id = id,
+            Node::Polygon(n) => n.id = id,
+            Node::RegularPolygon(n) => n.id = id,
+            Node::RegularStarPolygon(n) => n.id = id,
+            Node::Line(n) => n.id = id,
+            Node::TextSpan(n) => n.id = id,
+            Node::SVGPath(n) => n.id = id,
+            Node::Vector(n) => n.id = id,
+            Node::BooleanOperation(n) => n.id = id,
+            Node::Image(n) => n.id = id,
+        }
     }
 
     /// Gets a reference to a node by its ID
@@ -62,6 +95,7 @@ impl NodeRepository {
                 .filter(|(_, node)| filter(node))
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
+            id_generator: self.id_generator.clone(),
         }
     }
 }
@@ -91,7 +125,7 @@ mod tests {
     fn node_repository_basic() {
         let mut repo = NodeRepository::new();
         let node = Node::Error(ErrorNodeRec {
-            id: "1".to_string(),
+            id: 1,
             name: Some("err".to_string()),
             active: true,
             transform: math2::transform::AffineTransform::identity(),

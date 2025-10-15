@@ -6,7 +6,9 @@ use crate::shape::*;
 use crate::vectornetwork::*;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
-pub type NodeId = String;
+
+// Re-export the ID types from the id module
+pub use crate::node::id::{NodeId, NodeIdGenerator, UserNodeId};
 
 #[derive(Debug, Clone)]
 pub struct LayerEffects {

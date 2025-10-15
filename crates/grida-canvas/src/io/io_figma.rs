@@ -252,6 +252,10 @@ pub struct FigmaConverter {
     links: std::collections::HashMap<NodeId, Vec<NodeId>>,
     image_urls: std::collections::HashMap<String, String>,
     font_store: webfont_helper::FontUsageStore,
+    /// ID generator for creating internal u64 IDs
+    id_generator: NodeIdGenerator,
+    /// Maps Figma string IDs to internal u64 IDs
+    figma_id_to_internal: std::collections::HashMap<String, NodeId>,
 }
 
 impl FigmaConverter {
@@ -261,6 +265,8 @@ impl FigmaConverter {
             links: std::collections::HashMap::new(),
             image_urls: std::collections::HashMap::new(),
             font_store: webfont_helper::FontUsageStore::new(),
+            id_generator: NodeIdGenerator::new(),
+            figma_id_to_internal: std::collections::HashMap::new(),
         }
     }
 
@@ -275,6 +281,18 @@ impl FigmaConverter {
 
     fn add_font(&mut self, family: String, postscript_name: Option<String>, style: Option<String>) {
         self.font_store.add_font(family, postscript_name, style);
+    }
+
+    /// Get or create an internal ID for a Figma string ID
+    fn get_or_create_internal_id(&mut self, figma_id: &str) -> NodeId {
+        if let Some(&internal_id) = self.figma_id_to_internal.get(figma_id) {
+            return internal_id;
+        }
+
+        let internal_id = self.id_generator.next();
+        self.figma_id_to_internal
+            .insert(figma_id.to_string(), internal_id);
+        internal_id
     }
 
     /// Convert Figma's relative transform matrix to AffineTransform
@@ -578,7 +596,7 @@ impl FigmaConverter {
     /// Convert Figma's slice to our SliceNode
     fn convert_slice(&mut self, slice: &Box<SliceNode>) -> Result<Node, String> {
         Ok(Node::Error(ErrorNodeRec {
-            id: slice.id.clone(),
+            id: self.get_or_create_internal_id(&slice.id),
             name: Some(format!("[Slice] {}", slice.name)),
             active: slice.visible.unwrap_or(true),
             transform: AffineTransform::identity(),
@@ -605,7 +623,8 @@ impl FigmaConverter {
         let size = Self::convert_size(component.size.as_ref());
         let transform = Self::convert_transform(component.relative_transform.as_ref());
 
-        let node_id = component.id.clone();
+        // Convert Figma string ID to internal u64 ID
+        let node_id = self.get_or_create_internal_id(&component.id);
 
         // Store children relationship
         if !children.is_empty() {
@@ -657,7 +676,7 @@ impl FigmaConverter {
         component_set: &Box<ComponentSetNode>,
     ) -> Result<Node, String> {
         Ok(Node::Error(ErrorNodeRec {
-            id: component_set.id.clone(),
+            id: self.get_or_create_internal_id(&component_set.id),
             name: Some(format!("[ComponentSet] {}", component_set.name)),
             active: component_set.visible.unwrap_or(true),
             transform: Self::convert_transform(component_set.relative_transform.as_ref()),
@@ -707,7 +726,8 @@ impl FigmaConverter {
         let size = Self::convert_size(instance.size.as_ref());
         let transform = Self::convert_transform(instance.relative_transform.as_ref());
 
-        let node_id = instance.id.clone();
+        // Convert Figma string ID to internal u64 ID
+        let node_id = self.get_or_create_internal_id(&instance.id);
 
         // Store children relationship
         if !children.is_empty() {
@@ -761,7 +781,8 @@ impl FigmaConverter {
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let node_id = section.id.clone();
+        // Convert Figma string ID to internal u64 ID
+        let node_id = self.get_or_create_internal_id(&section.id);
 
         // Store children relationship
         if !children.is_empty() {
@@ -798,7 +819,7 @@ impl FigmaConverter {
     /// Convert Figma's link to our LinkUnfurlNode
     fn convert_link(&mut self, link: &Box<LinkUnfurlNode>) -> Result<Node, String> {
         Ok(Node::Error(ErrorNodeRec {
-            id: link.id.clone(),
+            id: self.get_or_create_internal_id(&link.id),
             name: Some(format!("[Link] {}", link.name)),
             active: link.visible.unwrap_or(true),
             transform: AffineTransform::identity(),
@@ -889,7 +910,8 @@ impl FigmaConverter {
         let size = Self::convert_size(origin.size.as_ref());
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
-        let node_id = origin.id.clone();
+        // Convert Figma string ID to internal u64 ID
+        let node_id = self.get_or_create_internal_id(&origin.id);
 
         // Store children relationship
         if !children.is_empty() {
@@ -983,7 +1005,7 @@ impl FigmaConverter {
         }
 
         Ok(Node::TextSpan(TextSpanNodeRec {
-            id: origin.id.clone(),
+            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             transform: Self::convert_transform(origin.relative_transform.as_ref()),
@@ -1073,7 +1095,7 @@ impl FigmaConverter {
         if let Some(fill_geometries) = &origin.fill_geometry {
             for geometry in fill_geometries {
                 let path_node = Node::SVGPath(SVGPathNodeRec {
-                    id: format!("{}-path-{}", origin.id, path_index),
+                    id: self.id_generator.next(),
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
                     opacity: Self::convert_opacity(origin.visible),
@@ -1098,7 +1120,7 @@ impl FigmaConverter {
         if let Some(stroke_geometries) = &origin.stroke_geometry {
             for geometry in stroke_geometries {
                 let path_node = Node::SVGPath(SVGPathNodeRec {
-                    id: format!("{}-path-{}", origin.id, path_index),
+                    id: self.id_generator.next(),
                     name: Some(format!("{}-path-{}", origin.name, path_index)),
                     active: origin.visible.unwrap_or(true),
                     opacity: Self::convert_opacity(origin.visible),
@@ -1120,7 +1142,7 @@ impl FigmaConverter {
 
         // Create a group node containing all the path nodes
         Ok(Node::Container(ContainerNodeRec {
-            id: origin.id.clone(),
+            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1173,7 +1195,8 @@ impl FigmaConverter {
             }
         };
 
-        let node_id = origin.id.clone();
+        // Convert Figma string ID to internal u64 ID
+        let node_id = self.get_or_create_internal_id(&origin.id);
 
         // Store children relationship
         if !children.is_empty() {
@@ -1214,7 +1237,7 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::RegularStarPolygon(RegularStarPolygonNodeRec {
-            id: origin.id.clone(),
+            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1250,7 +1273,7 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Line(LineNodeRec {
-            id: origin.id.clone(),
+            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1287,7 +1310,7 @@ impl FigmaConverter {
             Self::convert_transform(origin.relative_transform.as_ref().map(|v| v.as_ref()));
 
         Ok(Node::Ellipse(EllipseNodeRec {
-            id: origin.id.clone(),
+            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1328,7 +1351,7 @@ impl FigmaConverter {
         let size = Self::convert_size(origin.size.as_ref());
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
         Ok(Node::RegularPolygon(RegularPolygonNodeRec {
-            id: origin.id.clone(),
+            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1362,7 +1385,7 @@ impl FigmaConverter {
         let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Rectangle(RectangleNodeRec {
-            id: origin.id.clone(),
+            id: self.get_or_create_internal_id(&origin.id),
             name: Some(origin.name.clone()),
             active: origin.visible.unwrap_or(true),
             opacity: Self::convert_opacity(origin.visible),
@@ -1399,7 +1422,8 @@ impl FigmaConverter {
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let node_id = origin.id.clone();
+        // Convert Figma string ID to internal u64 ID
+        let node_id = self.get_or_create_internal_id(&origin.id);
 
         // Store children relationship
         if !children.is_empty() {

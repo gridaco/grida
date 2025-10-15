@@ -3,9 +3,11 @@ use std::f32;
 use super::schema::*;
 use crate::cg::{types::*, Alignment};
 use math2::{box_fit::BoxFit, transform::AffineTransform};
-use uuid::Uuid;
 
-/// Factory for creating nodes with default values
+/// Factory for creating nodes with default values.
+///
+/// Note: The factory creates nodes with a placeholder ID of 0.
+/// Actual IDs should be assigned by SceneRuntime or another ID management system.
 pub struct NodeFactory;
 
 impl NodeFactory {
@@ -13,10 +15,10 @@ impl NodeFactory {
         Self {}
     }
 
-    fn id(&self) -> String {
-        // random id
-        let id = Uuid::new_v4();
-        id.to_string()
+    /// Returns a placeholder ID.
+    /// Real IDs should be assigned by the scene management layer.
+    fn id(&self) -> NodeId {
+        0
     }
 
     // Internal factory defaults

@@ -15,8 +15,15 @@ fn create_container_with_padding(
     height: f32,
     padding: f32,
 ) -> ContainerNodeRec {
+    // Use a simple hash of the string as u64 ID
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    id.hash(&mut hasher);
+    let id_u64 = hasher.finish();
+
     ContainerNodeRec {
-        id: id.to_string(),
+        id: id_u64,
         name: Some(format!("Container {}", id)),
         active: true,
         opacity: 1.0,

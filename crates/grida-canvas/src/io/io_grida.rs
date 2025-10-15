@@ -948,7 +948,7 @@ impl From<JSONGroupNode> for GroupNodeRec {
         );
 
         GroupNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             // TODO: group's transform should be handled differently
@@ -964,7 +964,7 @@ impl From<JSONGroupNode> for GroupNodeRec {
 impl From<JSONContainerNode> for ContainerNodeRec {
     fn from(node: JSONContainerNode) -> Self {
         ContainerNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             transform: AffineTransform::from_box_center(
@@ -1025,7 +1025,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
         };
 
         TextSpanNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             transform: AffineTransform::from_box_center(
@@ -1108,7 +1108,7 @@ impl From<JSONEllipseNode> for Node {
         );
 
         Node::Ellipse(EllipseNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
@@ -1152,7 +1152,7 @@ impl From<JSONRectangleNode> for Node {
         );
 
         Node::Rectangle(RectangleNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
@@ -1236,7 +1236,7 @@ impl From<JSONImageNode> for Node {
         };
 
         Node::Image(ImageNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
@@ -1280,7 +1280,7 @@ impl From<JSONRegularPolygonNode> for Node {
         );
 
         Node::RegularPolygon(RegularPolygonNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
@@ -1322,7 +1322,7 @@ impl From<JSONRegularStarPolygonNode> for Node {
         );
 
         Node::RegularStarPolygon(RegularStarPolygonNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
@@ -1366,7 +1366,7 @@ impl From<JSONSVGPathNode> for Node {
 
         // For vector nodes, we'll create a path node with the path data
         Node::SVGPath(SVGPathNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
@@ -1405,7 +1405,7 @@ impl From<JSONLineNode> for Node {
         );
 
         Node::Line(LineNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
@@ -1446,7 +1446,7 @@ impl From<JSONVectorNode> for Node {
             .unwrap_or_default();
 
         Node::Vector(VectorNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
@@ -1486,7 +1486,7 @@ impl From<JSONBooleanOperationNode> for Node {
         );
 
         Node::BooleanOperation(BooleanPathOperationNodeRec {
-            id: node.base.id,
+            id: 0, // Placeholder - will be assigned by IdConverter
             name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
@@ -1529,7 +1529,7 @@ impl From<JSONNode> for Node {
             JSONNode::BooleanOperation(boolean) => boolean.into(),
             JSONNode::Image(image) => image.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNodeRec {
-                id: unknown.id,
+                id: 0, // Placeholder - will be assigned by IdConverter
                 name: unknown.name,
                 active: unknown.active,
                 transform: AffineTransform::identity(),
@@ -1544,7 +1544,7 @@ impl From<JSONNode> for Node {
                 // Scene nodes should be filtered out before conversion
                 // This case should not be reached in normal operation
                 Node::Error(ErrorNodeRec {
-                    id: scene.id,
+                    id: 0, // Placeholder - will be assigned by IdConverter
                     name: Some(scene.name),
                     active: scene.active.unwrap_or(true),
                     transform: AffineTransform::identity(),

@@ -10,7 +10,7 @@ use crate::{
         export_as_image::export_node_as_image, export_as_pdf::export_node_as_pdf,
         export_as_svg::export_node_as_svg,
     },
-    node::schema::Scene,
+    node::schema::{NodeId, Scene},
     runtime::{font_repository::FontRepository, image_repository::ImageRepository},
 };
 
@@ -80,7 +80,7 @@ pub fn export_node_as(
     geometry: &GeometryCache,
     fonts: &FontRepository,
     images: &ImageRepository,
-    node_id: &str,
+    node_id: &NodeId,
     format: ExportAs,
 ) -> Option<Exported> {
     let constraints = format.get_constraints();

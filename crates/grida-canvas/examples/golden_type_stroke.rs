@@ -4,14 +4,13 @@ use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer, RendererOptions};
 use math2::{rect::Rectangle, transform::AffineTransform};
-use uuid::Uuid;
 
 async fn scene() -> Scene {
     let mut graph = SceneGraph::new();
 
     // Text with Outside stroke alignment
     let text_outside = TextSpanNodeRec {
-        id: Uuid::new_v4().to_string(),
+        id: 1,
         name: Some("Outside".to_string()),
         active: true,
         transform: AffineTransform::new(50.0, 50.0, 0.0),
@@ -35,7 +34,7 @@ async fn scene() -> Scene {
 
     // Text with Center stroke alignment
     let text_center = TextSpanNodeRec {
-        id: Uuid::new_v4().to_string(),
+        id: 2,
         name: Some("Center".to_string()),
         active: true,
         transform: AffineTransform::new(50.0, 150.0, 0.0),
@@ -59,7 +58,7 @@ async fn scene() -> Scene {
 
     // Text with Inside stroke alignment
     let text_inside = TextSpanNodeRec {
-        id: Uuid::new_v4().to_string(),
+        id: 3,
         name: Some("Inside".to_string()),
         active: true,
         transform: AffineTransform::new(50.0, 250.0, 0.0),

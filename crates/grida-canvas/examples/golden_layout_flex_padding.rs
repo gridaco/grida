@@ -15,7 +15,7 @@ fn main() {
 
     // Create base container
     let base_container = ContainerNodeRec {
-        id: "demo-container".to_string(),
+        id: 1,
         name: Some("Demo Container".to_string()),
         active: true,
         opacity: 1.0,
@@ -97,7 +97,7 @@ fn main() {
     // Save the result
     let image = surface.image_snapshot();
     let data = image
-        .encode_to_data(skia_safe::EncodedImageFormat::PNG)
+        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
     std::fs::write("goldens/layout_flex_padding.png", data.as_bytes()).unwrap();
 
@@ -105,8 +105,15 @@ fn main() {
 }
 
 fn create_child_container(id: &str, width: f32, height: f32) -> ContainerNodeRec {
+    // Use a simple hash of the string as u64 ID
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    id.hash(&mut hasher);
+    let id_u64 = hasher.finish();
+
     ContainerNodeRec {
-        id: id.to_string(),
+        id: id_u64,
         name: Some(format!("Child {}", id)),
         active: true,
         opacity: 1.0,

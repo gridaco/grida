@@ -91,8 +91,8 @@ impl ContainerWithStyle {
     }
 
     /// Get container ID
-    pub fn id(&self) -> &str {
-        &self.container.id
+    pub fn id(&self) -> crate::node::schema::NodeId {
+        self.container.id
     }
 
     /// Get container name
@@ -165,7 +165,7 @@ mod tests {
         use crate::node::schema::ContainerNodeRec;
 
         let container = ContainerWithStyle::from_container(ContainerNodeRec {
-            id: "test-container".to_string(),
+            id: 1,
             name: Some("Test Container".to_string()),
             active: true,
             opacity: 1.0,
@@ -201,7 +201,7 @@ mod tests {
         let children: Vec<ContainerWithStyle> = (0..3)
             .map(|i| {
                 ContainerWithStyle::from_container(ContainerNodeRec {
-                    id: format!("child-{}", i),
+                    id: i as u64,
                     name: Some(format!("Child {}", i)),
                     active: true,
                     opacity: 1.0,
@@ -250,7 +250,7 @@ mod tests {
         use crate::node::schema::ContainerNodeRec;
 
         let container = ContainerWithStyle::from_container(ContainerNodeRec {
-            id: "test-container".to_string(),
+            id: 1,
             name: Some("Test Container".to_string()),
             active: true,
             opacity: 1.0,
@@ -289,7 +289,7 @@ mod tests {
         let children: Vec<ContainerWithStyle> = (0..4)
             .map(|i| {
                 ContainerWithStyle::from_container(ContainerNodeRec {
-                    id: format!("child-{}", i),
+                    id: i as u64,
                     name: Some(format!("Child {}", i)),
                     active: true,
                     opacity: 1.0,

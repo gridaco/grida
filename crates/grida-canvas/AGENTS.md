@@ -3,6 +3,23 @@ safe, high-performance, 2D real-time rendering engine.
 - uses [`skia-safe`](https://rust-skia.github.io/doc/skia_safe/) for painting
 - uses [`math2`](../math2/README.md) for geometry & common math operations
 
+## NodeID System
+
+The canvas uses a dual-ID system:
+
+- **NodeId** (`u64`): Internal counter-based IDs for high-performance operations. Ephemeral and not serialized.
+- **UserNodeId** (`String`): External user-provided IDs for public APIs. Stable and serialized in .grida files.
+
+### Key Points
+
+1. All internal structs (NodeRecs, SceneGraph, caches) use `NodeId` (u64)
+2. Public APIs accept/return `UserNodeId` (String) for stability
+3. `IdConverter` handles conversion during .grida file loading
+4. `NodeRepository` auto-generates IDs for factory-created nodes (ID=0)
+5. Application layer maintains bidirectional mapping for API boundary
+
+See [NODEID_MIGRATION.md](./NODEID_MIGRATION.md) for full migration details.
+
 ## Testing & Development
 
 ```sh
