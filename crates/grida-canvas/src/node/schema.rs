@@ -452,6 +452,7 @@ pub struct ContainerNodeRec {
     /// If a future “shape clip (self + children)” is added, it will be modeled as a separate attribute.
     pub clip: ContainerClipFlag,
 
+    // [container layout - common layout properties that is applicapable to the parent]
     /// layout mode
     pub layout_mode: LayoutMode,
     /// layout direction
@@ -462,10 +463,10 @@ pub struct ContainerNodeRec {
     pub layout_main_axis_alignment: MainAxisAlignment,
     /// layout cross axis alignment
     pub layout_cross_axis_alignment: CrossAxisAlignment,
+    /// The gap of the container.
+    pub layout_gap: LayoutGap,
     /// The padding of the container.
     pub padding: EdgeInsets,
-    /// The gap of the container.
-    pub gap: LayoutGap,
 }
 
 impl ContainerNodeRec {
