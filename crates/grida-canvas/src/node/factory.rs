@@ -180,6 +180,8 @@ impl NodeFactory {
             clip: true,
             layout_direction: Axis::default(),
             layout_wrap: LayoutWrap::default(),
+            layout_main_axis_alignment: MainAxisAlignment::default(),
+            layout_cross_axis_alignment: CrossAxisAlignment::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }

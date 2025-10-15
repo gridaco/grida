@@ -456,6 +456,10 @@ pub struct ContainerNodeRec {
     pub layout_direction: Axis,
     /// layout wrap
     pub layout_wrap: LayoutWrap,
+    /// layout main axis alignment
+    pub layout_main_axis_alignment: MainAxisAlignment,
+    /// layout cross axis alignment
+    pub layout_cross_axis_alignment: CrossAxisAlignment,
     /// The padding of the container.
     pub padding: EdgeInsets,
     /// The gap of the container.

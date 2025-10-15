@@ -643,6 +643,8 @@ impl FigmaConverter {
             clip: component.clips_content,
             layout_direction: Axis::default(),
             layout_wrap: LayoutWrap::default(),
+            layout_main_axis_alignment: MainAxisAlignment::default(),
+            layout_cross_axis_alignment: CrossAxisAlignment::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))
@@ -742,6 +744,8 @@ impl FigmaConverter {
             clip: instance.clips_content,
             layout_direction: Axis::default(),
             layout_wrap: LayoutWrap::default(),
+            layout_main_axis_alignment: MainAxisAlignment::default(),
+            layout_cross_axis_alignment: CrossAxisAlignment::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))
@@ -781,6 +785,8 @@ impl FigmaConverter {
             clip: false,
             layout_direction: Axis::default(),
             layout_wrap: LayoutWrap::default(),
+            layout_main_axis_alignment: MainAxisAlignment::default(),
+            layout_cross_axis_alignment: CrossAxisAlignment::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))
@@ -918,6 +924,8 @@ impl FigmaConverter {
             clip: origin.clips_content,
             layout_direction: Axis::default(),
             layout_wrap: LayoutWrap::default(),
+            layout_main_axis_alignment: MainAxisAlignment::default(),
+            layout_cross_axis_alignment: CrossAxisAlignment::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))
@@ -1126,6 +1134,8 @@ impl FigmaConverter {
             clip: false,
             layout_direction: Axis::default(),
             layout_wrap: LayoutWrap::default(),
+            layout_main_axis_alignment: MainAxisAlignment::default(),
+            layout_cross_axis_alignment: CrossAxisAlignment::default(),
             padding: EdgeInsets::default(),
             gap: LayoutGap::default(),
         }))

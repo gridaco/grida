@@ -378,6 +378,60 @@ impl Default for Axis {
     }
 }
 
+/// Alignment of items along the main axis.
+///
+/// See also:
+/// - [MDN justify-content](https://developer.mozilla.org/en-US/docs/Web/CSS/justify-content)
+/// - [MDN Main Axis](https://developer.mozilla.org/en-US/docs/Glossary/Main_Axis)
+/// - [Flutter MainAxisAlignment](https://api.flutter.dev/flutter/rendering/MainAxisAlignment.html)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum MainAxisAlignment {
+    #[serde(rename = "start")]
+    Start,
+    #[serde(rename = "end")]
+    End,
+    #[serde(rename = "center")]
+    Center,
+    #[serde(rename = "space-between")]
+    SpaceBetween,
+    #[serde(rename = "space-around")]
+    SpaceAround,
+    #[serde(rename = "space-evenly")]
+    SpaceEvenly,
+    #[serde(rename = "stretch")]
+    Stretch,
+}
+
+impl Default for MainAxisAlignment {
+    fn default() -> Self {
+        MainAxisAlignment::Start
+    }
+}
+
+/// Alignment of items along the cross axis.
+///
+/// See also:
+/// - [MDN align-items](https://developer.mozilla.org/en-US/docs/Web/CSS/align-items)
+/// - [MDN Cross Axis](https://developer.mozilla.org/en-US/docs/Glossary/Cross_Axis)
+/// - [Flutter CrossAxisAlignment](https://api.flutter.dev/flutter/rendering/CrossAxisAlignment.html)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum CrossAxisAlignment {
+    #[serde(rename = "start")]
+    Start,
+    #[serde(rename = "end")]
+    End,
+    #[serde(rename = "center")]
+    Center,
+    #[serde(rename = "stretch")]
+    Stretch,
+}
+
+impl Default for CrossAxisAlignment {
+    fn default() -> Self {
+        CrossAxisAlignment::Start
+    }
+}
+
 /// Represents **inset distances from the edges** of a rectangular box.
 ///
 /// `EdgeInsets` defines per-edge padding or margin values around a box.
