@@ -10,7 +10,6 @@ pub(crate) fn create_dummy_scene() -> Scene {
     let nf = NodeFactory::new();
 
     let mut rect1 = nf.create_rectangle_node();
-    rect1.name = Some("Red Rectangle".to_string());
     rect1.transform = math2::transform::AffineTransform::new(100.0, 100.0, 0.0);
     rect1.size = Size {
         width: 150.0,
@@ -19,7 +18,6 @@ pub(crate) fn create_dummy_scene() -> Scene {
     rect1.set_fill(Paint::Solid(SolidPaint::RED));
 
     let mut rect2 = nf.create_rectangle_node();
-    rect2.name = Some("Blue Rectangle".to_string());
     rect2.transform = math2::transform::AffineTransform::new(300.0, 100.0, 0.0);
     rect2.size = Size {
         width: 120.0,
@@ -28,7 +26,6 @@ pub(crate) fn create_dummy_scene() -> Scene {
     rect2.set_fill(Paint::Solid(SolidPaint::BLUE));
 
     let mut rect3 = nf.create_rectangle_node();
-    rect3.name = Some("Green Rectangle".to_string());
     rect3.transform = math2::transform::AffineTransform::new(500.0, 100.0, 0.0);
     rect3.size = Size {
         width: 100.0,
@@ -63,7 +60,6 @@ pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
     for y in 0..rows {
         for x in 0..cols {
             let mut rect = nf.create_rectangle_node();
-            rect.name = Some(format!("rect-{}-{}", x, y));
             rect.transform = math2::transform::AffineTransform::new(
                 x as f32 * (size + spacing),
                 y as f32 * (size + spacing),

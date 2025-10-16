@@ -10,7 +10,6 @@ async fn demo_ellipses() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1200.0,
         height: 800.0,
@@ -27,7 +26,6 @@ async fn demo_ellipses() -> Scene {
     // Row 1: Basic ellipses with different aspect ratios
     for i in 0..items_per_row {
         let mut ellipse = nf.create_ellipse_node();
-        ellipse.name = Some(format!("Ellipse {}", i + 1));
         ellipse.transform = AffineTransform::new(start_x + spacing * i as f32, 80.0, 0.0);
         ellipse.size = Size {
             width: base_size * (0.5 + (i as f32 * 0.2)), // 0.5x to 1.9x width
@@ -48,7 +46,6 @@ async fn demo_ellipses() -> Scene {
     // Row 2: Ellipses with different inner radius (rings)
     for i in 0..items_per_row {
         let mut ring = nf.create_ellipse_node();
-        ring.name = Some(format!("Ring {}", i + 1));
         ring.transform = AffineTransform::new(start_x + spacing * i as f32, 220.0, 0.0);
         ring.size = Size {
             width: base_size,
@@ -70,7 +67,6 @@ async fn demo_ellipses() -> Scene {
     // Row 3: Arcs with different angles
     for i in 0..items_per_row {
         let mut arc = nf.create_ellipse_node();
-        arc.name = Some(format!("Arc {}", i + 1));
         arc.transform = AffineTransform::new(start_x + spacing * i as f32, 360.0, 0.0);
         arc.size = Size {
             width: base_size,
@@ -93,7 +89,6 @@ async fn demo_ellipses() -> Scene {
     // Row 4: Arcs with inner radius (donut arcs)
     for i in 0..items_per_row {
         let mut donut_arc = nf.create_ellipse_node();
-        donut_arc.name = Some(format!("Donut Arc {}", i + 1));
         donut_arc.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         donut_arc.size = Size {
             width: base_size,
@@ -117,7 +112,6 @@ async fn demo_ellipses() -> Scene {
     // Row 5: Ellipses with strokes
     for i in 0..items_per_row {
         let mut stroke_ellipse = nf.create_ellipse_node();
-        stroke_ellipse.name = Some(format!("Stroke Ellipse {}", i + 1));
         stroke_ellipse.transform = AffineTransform::new(start_x + spacing * i as f32, 640.0, 0.0);
         stroke_ellipse.size = Size {
             width: base_size * (0.8 + (i as f32 * 0.15)), // 0.8x to 1.85x width

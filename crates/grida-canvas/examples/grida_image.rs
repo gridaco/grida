@@ -24,12 +24,10 @@ async fn demo_image() -> (Scene, Vec<u8>) {
 
     // Root container
     let mut root = nf.create_container_node();
-    root.name = Some("Root".to_string());
     root.size = image8ksize.clone();
 
     // First example: Rectangle with ImagePaint fill
     let mut rect1 = nf.create_rectangle_node();
-    rect1.name = Some("ImageFillRect".to_string());
     rect1.transform = AffineTransform::identity();
     rect1.size = image8ksize.clone();
     let url = format!("res://images/{}", hash_str.clone());

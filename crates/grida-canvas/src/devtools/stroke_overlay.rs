@@ -51,14 +51,14 @@ impl StrokeOverlay {
         paint.set_anti_alias(true);
 
         for id in nodes {
-            if let Some(layer) = cache.layers.layers.iter().find(|l| l.id() == id) {
+            if let Some(entry) = cache.layers.layers.iter().find(|e| &e.id == id) {
                 if cache.geometry.get_render_bounds(id).is_some() {
-                    let transform = layer.transform();
+                    let transform = entry.layer.transform();
 
-                    let mut path = if let Some(entry) = cache.path.borrow().get(id) {
-                        (*entry.path).clone()
+                    let mut path = if let Some(path_entry) = cache.path.borrow().get(id) {
+                        (*path_entry.path).clone()
                     } else {
-                        match layer {
+                        match &entry.layer {
                             PainterPictureLayer::Vector(vector_layer) => {
                                 // for overlay, we don't intentionally apply corner radius (for better performance)
                                 vector_layer.vector.to_appended_path()
@@ -75,7 +75,7 @@ impl StrokeOverlay {
                                     continue;
                                 }
                             }
-                            _ => layer.shape().to_path(),
+                            _ => entry.layer.shape().to_path(),
                         }
                     };
                     path.transform(&sk::sk_matrix(transform.matrix));

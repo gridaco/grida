@@ -1,7 +1,6 @@
 use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
 use crate::cg::types::*;
 use crate::node::{scene_graph::SceneGraph, schema::*};
-use crate::painter::layer::Layer;
 use crate::painter::Painter;
 use crate::runtime::counter::FrameCounter;
 use crate::sk;
@@ -564,10 +563,10 @@ impl Renderer {
         // Prefill picture cache for visible layers so Painter can reuse pictures even with masks
         for (_region, indices) in &plan.regions {
             for idx in indices {
-                if let Some(layer) = self.scene_cache.layers.layers.get(*idx).cloned() {
-                    let id = layer.id().clone();
+                if let Some(entry) = self.scene_cache.layers.layers.get(*idx).cloned() {
+                    let id = entry.id;
                     let _ = self.with_recording_cached(&id, |painter| {
-                        painter.draw_layer(&layer);
+                        painter.draw_layer(&entry.layer);
                     });
                 }
             }
@@ -738,7 +737,7 @@ mod tests {
         );
 
         // no scene loaded so geometry cache is empty
-        let pic = renderer.with_recording_cached(&"missing".to_string(), |_| {});
+        let pic = renderer.with_recording_cached(&9999, |_| {});
         assert!(pic.is_none());
 
         renderer.free();

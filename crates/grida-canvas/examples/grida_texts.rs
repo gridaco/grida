@@ -29,7 +29,6 @@ async fn demo_texts() -> Scene {
 
     // Create a single word text span
     let mut word_text_node = nf.create_text_span_node();
-    word_text_node.name = Some("Word Text".to_string());
     word_text_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
     word_text_node.text = "Grida Canvas".to_string();
     word_text_node.text_style = TextStyleRec {
@@ -58,7 +57,6 @@ async fn demo_texts() -> Scene {
 
     // Create a sentence text span
     let mut sentence_text_node = nf.create_text_span_node();
-    sentence_text_node.name = Some("Sentence Text".to_string());
     sentence_text_node.transform = AffineTransform::new(50.0, 150.0, 0.0);
     sentence_text_node.text =
         "Grida Canvas Skia Backend provides\nAccurate rendering of Texts and Text layouts"
@@ -69,7 +67,6 @@ async fn demo_texts() -> Scene {
 
     // Create a paragraph text span
     let mut paragraph_text_node = nf.create_text_span_node();
-    paragraph_text_node.name = Some("Paragraph Text".to_string());
     paragraph_text_node.transform = AffineTransform::new(50.0, 250.0, 0.0);
     paragraph_text_node.width = Some(800.0);
     paragraph_text_node.max_lines = Some(14);
@@ -80,7 +77,6 @@ async fn demo_texts() -> Scene {
 
     // Create a second paragraph text span with different color
     let mut second_paragraph_text_node = nf.create_text_span_node();
-    second_paragraph_text_node.name = Some("Second Paragraph Text".to_string());
     second_paragraph_text_node.transform = AffineTransform::new(50.0, 800.0, 0.0);
     second_paragraph_text_node.width = Some(800.0);
     second_paragraph_text_node.text = LOREM_SHORT.to_string();
@@ -91,7 +87,6 @@ async fn demo_texts() -> Scene {
 
     // Create a blurry text span with the commented style
     let mut blurry_text_node = nf.create_text_span_node();
-    blurry_text_node.name = Some("Blurry Text".to_string());
     blurry_text_node.transform = AffineTransform::new(50.0, 1000.0, 0.0);
     blurry_text_node.text = "This text has a blur effect applied".to_string();
     blurry_text_node.text_style = TextStyleRec::from_font("Geist", 40.0);
@@ -105,7 +100,6 @@ async fn demo_texts() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1080.0,
         height: 1080.0,

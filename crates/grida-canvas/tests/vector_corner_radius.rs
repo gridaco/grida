@@ -47,8 +47,6 @@ fn collect_verbs(path: &skia_safe::Path) -> Vec<Verb> {
 
 fn make_node(corner_radius: f32) -> VectorNodeRec {
     VectorNodeRec {
-        id: "node".into(),
-        name: None,
         active: true,
         opacity: 1.0,
         blend_mode: LayerBlendMode::default(),

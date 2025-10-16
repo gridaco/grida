@@ -242,23 +242,24 @@ pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
 
 /// Compute the resulting path for a [`BooleanPathOperationNode`] in its local coordinate space.
 pub fn boolean_operation_path(
+    id: &NodeId,
     node: &BooleanPathOperationNodeRec,
     graph: &SceneGraph,
     cache: &GeometryCache,
 ) -> Option<Path> {
     let world = cache
-        .get_world_transform(&node.id)
+        .get_world_transform(id)
         .unwrap_or_else(AffineTransform::identity);
     let inv = world.inverse().unwrap_or_else(AffineTransform::identity);
 
     let mut shapes_with_ops = Vec::new();
 
-    let children = graph.get_children(&node.id)?;
+    let children = graph.get_children(id)?;
     for (i, child_id) in children.iter().enumerate() {
         if let Ok(child_node) = graph.get_node(child_id) {
             let mut path = match child_node {
                 Node::BooleanOperation(child_bool) => {
-                    boolean_operation_path(child_bool, graph, cache)?
+                    boolean_operation_path(child_id, child_bool, graph, cache)?
                 }
                 _ => build_shape_from_node(child_node)?.to_path(),
             };
@@ -298,9 +299,10 @@ pub fn boolean_operation_path(
 
 /// Convenience wrapper around [`boolean_operation_path`] returning a [`PainterShape`].
 pub fn boolean_operation_shape(
+    id: &NodeId,
     node: &BooleanPathOperationNodeRec,
     graph: &SceneGraph,
     cache: &GeometryCache,
 ) -> Option<PainterShape> {
-    boolean_operation_path(node, graph, cache).map(PainterShape::from_path)
+    boolean_operation_path(id, node, graph, cache).map(PainterShape::from_path)
 }

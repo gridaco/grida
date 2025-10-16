@@ -6,6 +6,8 @@ use std::collections::HashMap;
 pub struct NodeRepository {
     /// The map of all nodes indexed by their IDs
     nodes: HashMap<NodeId, Node>,
+    /// ID generator for auto-assigning IDs
+    id_generator: crate::node::id::NodeIdGenerator,
 }
 
 impl NodeRepository {
@@ -13,15 +15,22 @@ impl NodeRepository {
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
+            id_generator: crate::node::id::NodeIdGenerator::new(),
         }
     }
 
-    /// Inserts a node into the repository, automatically indexing it by its ID.
-    /// Returns the node's ID.
+    /// Inserts a node with automatic ID generation.
+    /// Returns the generated NodeId.
     pub fn insert(&mut self, node: Node) -> NodeId {
-        let id = node.id();
-        self.nodes.insert(id.clone(), node);
+        let id = self.id_generator.next();
+        self.nodes.insert(id, node);
         id
+    }
+
+    /// Inserts a node with an explicit ID (for IO layer use).
+    /// The ID must not already exist in the repository.
+    pub fn insert_with_id(&mut self, id: NodeId, node: Node) {
+        self.nodes.insert(id, node);
     }
 
     /// Gets a reference to a node by its ID
@@ -62,6 +71,7 @@ impl NodeRepository {
                 .filter(|(_, node)| filter(node))
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
+            id_generator: self.id_generator.clone(),
         }
     }
 }
@@ -91,8 +101,6 @@ mod tests {
     fn node_repository_basic() {
         let mut repo = NodeRepository::new();
         let node = Node::Error(ErrorNodeRec {
-            id: "1".to_string(),
-            name: Some("err".to_string()),
             active: true,
             transform: math2::transform::AffineTransform::identity(),
             size: Size {

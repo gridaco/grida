@@ -15,7 +15,6 @@ async fn demo_effects() -> Scene {
         width: 2000.0,
         height: 2000.0,
     };
-    root_container_node.name = Some("Root Container".to_string());
 
     let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
     let spacing = 200.0;
@@ -27,7 +26,6 @@ async fn demo_effects() -> Scene {
         if i < 3 {
             // First three shapes as rectangles
             let mut rect = nf.create_rectangle_node();
-            rect.name = Some(format!("Drop Shadow Rect {}", i + 1));
             rect.transform = AffineTransform::new(start_x + spacing * i as f32, 100.0, 0.0);
             rect.size = Size {
                 width: base_size,
@@ -49,7 +47,6 @@ async fn demo_effects() -> Scene {
         } else {
             // Last two shapes as regular polygons
             let mut polygon = nf.create_regular_polygon_node();
-            polygon.name = Some(format!("Drop Shadow Polygon {}", i + 1));
             polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 100.0, 0.0);
             polygon.size = Size {
                 width: base_size,
@@ -76,7 +73,6 @@ async fn demo_effects() -> Scene {
         if i < 3 {
             // First three shapes as rectangles
             let mut rect = nf.create_rectangle_node();
-            rect.name = Some(format!("Gaussian Blur Rect {}", i + 1));
             rect.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
             rect.size = Size {
                 width: base_size,
@@ -95,7 +91,6 @@ async fn demo_effects() -> Scene {
         } else {
             // Last two shapes as regular polygons
             let mut polygon = nf.create_regular_polygon_node();
-            polygon.name = Some(format!("Gaussian Blur Polygon {}", i + 1));
             polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
             polygon.size = Size {
                 width: base_size,
@@ -117,7 +112,6 @@ async fn demo_effects() -> Scene {
     // Row 3: Backdrop Blur Variations
     // Add a vivid gradient background behind Row 2 (Backdrop Blur Variations)
     let mut vivid_gradient_rect = nf.create_rectangle_node();
-    vivid_gradient_rect.name = Some("Vivid Gradient Row2".to_string());
     vivid_gradient_rect.transform = AffineTransform::new(0.0, 530.0, 0.0); // y middle of row 2
     vivid_gradient_rect.size = Size {
         width: 2000.0,
@@ -152,7 +146,6 @@ async fn demo_effects() -> Scene {
         if i < 3 {
             // First three shapes as rectangles
             let mut blur_rect = nf.create_rectangle_node();
-            blur_rect.name = Some(format!("Backdrop Blur Rect {}", i + 1));
             blur_rect.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
             blur_rect.size = Size {
                 width: base_size,
@@ -171,7 +164,6 @@ async fn demo_effects() -> Scene {
         } else {
             // Last two shapes as regular polygons
             let mut blur_polygon = nf.create_regular_polygon_node();
-            blur_polygon.name = Some(format!("Backdrop Blur Polygon {}", i + 1));
             blur_polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
             blur_polygon.size = Size {
                 width: base_size,
@@ -195,7 +187,6 @@ async fn demo_effects() -> Scene {
         if i < 3 {
             // First three shapes as rectangles
             let mut rect = nf.create_rectangle_node();
-            rect.name = Some(format!("Inner Shadow Rect {}", i + 1));
             rect.transform = AffineTransform::new(start_x + spacing * i as f32, 700.0, 0.0);
             rect.size = Size {
                 width: base_size,
@@ -217,7 +208,6 @@ async fn demo_effects() -> Scene {
         } else {
             // Last three shapes as regular polygons
             let mut polygon = nf.create_regular_polygon_node();
-            polygon.name = Some(format!("Inner Shadow Polygon {}", i + 1));
             polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 700.0, 0.0);
             polygon.size = Size {
                 width: base_size,
@@ -244,7 +234,6 @@ async fn demo_effects() -> Scene {
         if i < 3 {
             // First three shapes as rectangles with multiple effects
             let mut rect = nf.create_rectangle_node();
-            rect.name = Some(format!("Multiple Effects Rect {}", i + 1));
             rect.transform = AffineTransform::new(start_x + spacing * i as f32, 950.0, 0.0);
             rect.size = Size {
                 width: base_size,
@@ -309,7 +298,6 @@ async fn demo_effects() -> Scene {
         } else {
             // Last three shapes as regular polygons with multiple effects
             let mut polygon = nf.create_regular_polygon_node();
-            polygon.name = Some(format!("Multiple Effects Polygon {}", i + 1));
             polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 950.0, 0.0);
             polygon.size = Size {
                 width: base_size,

@@ -17,7 +17,6 @@ fn test_pdf_export() {
     let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
-    rect.name = Some("Test Rectangle".to_string());
     rect.size = Size {
         width: 100.0,
         height: 50.0,

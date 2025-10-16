@@ -24,7 +24,6 @@ async fn scene() -> Scene {
 
     // Create a circle that will overlap with the container's stroke
     let mut circle = nf.create_ellipse_node();
-    circle.name = Some("Overlapping Circle".to_string());
     circle.size = Size {
         width: 400.0,
         height: 400.0,

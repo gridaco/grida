@@ -52,7 +52,7 @@ fn layers_in_rect_include_partially_visible_nested() {
     });
     assert_eq!(layer_indices.len(), 1);
     let layer = &cache.layers.layers[layer_indices[0]];
-    assert_eq!(layer.id(), &rect_id);
+    assert_eq!(layer.id, rect_id);
 
     let layer_indices = cache.intersects(Rectangle {
         x: 50.0,
@@ -63,6 +63,6 @@ fn layers_in_rect_include_partially_visible_nested() {
     assert_eq!(layer_indices.len(), 2);
     let layer0 = &cache.layers.layers[layer_indices[0]];
     let layer1 = &cache.layers.layers[layer_indices[1]];
-    assert_eq!(layer0.id(), &rect_id);
-    assert_eq!(layer1.id(), &container_id);
+    assert_eq!(layer0.id, rect_id);
+    assert_eq!(layer1.id, container_id);
 }

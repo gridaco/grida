@@ -10,7 +10,6 @@ async fn demo_strokes() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1000.0,
         height: 1200.0,
@@ -27,7 +26,6 @@ async fn demo_strokes() -> Scene {
     // Stroke Alignment Demo Row
     for i in 0..3 {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Stroke Alignment {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 100.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -84,7 +82,6 @@ async fn demo_strokes() -> Scene {
     {
         // Rectangle
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some("Rectangle Stroke".to_string());
         rect.transform = AffineTransform::new(start_x, 400.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -101,7 +98,6 @@ async fn demo_strokes() -> Scene {
 
         // Ellipse
         let mut ellipse = nf.create_ellipse_node();
-        ellipse.name = Some("Ellipse Stroke".to_string());
         ellipse.transform = AffineTransform::new(start_x + spacing, 400.0, 0.0);
         ellipse.size = Size {
             width: base_size,
@@ -117,7 +113,6 @@ async fn demo_strokes() -> Scene {
 
         // Regular Polygon (Hexagon)
         let mut polygon = nf.create_regular_polygon_node();
-        polygon.name = Some("Hexagon Stroke".to_string());
         polygon.transform = AffineTransform::new(start_x + spacing * 2.0, 400.0, 0.0);
         polygon.size = Size {
             width: base_size,
@@ -134,7 +129,6 @@ async fn demo_strokes() -> Scene {
 
         // Star
         let mut star = nf.create_regular_star_polygon_node();
-        star.name = Some("Star Stroke".to_string());
         star.transform = AffineTransform::new(start_x + spacing * 3.0, 400.0, 0.0);
         star.size = Size {
             width: base_size,
@@ -154,7 +148,6 @@ async fn demo_strokes() -> Scene {
     // Stroke with Effects Row
     for i in 0..3 {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Stroke with Effect {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 550.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -196,7 +189,6 @@ async fn demo_strokes() -> Scene {
     // Stroke Dash Array Demo Row
     for i in 0..4 {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Stroke Dash Array {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 700.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -230,7 +222,6 @@ async fn demo_strokes() -> Scene {
     {
         // Linear Gradient Stroke
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some("Linear Gradient Stroke".to_string());
         rect.transform = AffineTransform::new(start_x, 850.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -262,7 +253,6 @@ async fn demo_strokes() -> Scene {
 
         // Radial Gradient Stroke
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some("Radial Gradient Stroke".to_string());
         rect.transform = AffineTransform::new(start_x + spacing, 850.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -294,7 +284,6 @@ async fn demo_strokes() -> Scene {
 
         // Conic Gradient Stroke
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some("Conic Gradient Stroke".to_string());
         rect.transform = AffineTransform::new(start_x + spacing * 2.0, 850.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -330,7 +319,6 @@ async fn demo_strokes() -> Scene {
 
         // Multi-color Solid Stroke
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some("Multi-color Stroke".to_string());
         rect.transform = AffineTransform::new(start_x + spacing * 3.0, 850.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -351,7 +339,6 @@ async fn demo_strokes() -> Scene {
     {
         // Rectangle with multiple solid strokes (layered strokes)
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some("Multiple Solid Strokes".to_string());
         rect.transform = AffineTransform::new(start_x, 1000.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -372,7 +359,6 @@ async fn demo_strokes() -> Scene {
 
         // Rectangle with solid + gradient strokes
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some("Solid + Gradient Strokes".to_string());
         rect.transform = AffineTransform::new(start_x + spacing, 1000.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -407,7 +393,6 @@ async fn demo_strokes() -> Scene {
 
         // Ellipse with multiple gradient strokes
         let mut ellipse = nf.create_ellipse_node();
-        ellipse.name = Some("Multiple Gradient Strokes".to_string());
         ellipse.transform = AffineTransform::new(start_x + spacing * 2.0, 1000.0, 0.0);
         ellipse.size = Size {
             width: base_size,
@@ -456,7 +441,6 @@ async fn demo_strokes() -> Scene {
 
         // Polygon with complex multi-stroke pattern
         let mut polygon = nf.create_regular_polygon_node();
-        polygon.name = Some("Complex Multi-Stroke".to_string());
         polygon.transform = AffineTransform::new(start_x + spacing * 3.0, 1000.0, 0.0);
         polygon.size = Size {
             width: base_size,

@@ -16,7 +16,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Root container
     let mut root = nf.create_container_node();
-    root.name = Some("Root".to_string());
     root.size = Size {
         width: 800.0,
         height: 800.0,
@@ -24,7 +23,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // First example: Rectangle with ImagePaint fill
     let mut rect1 = nf.create_rectangle_node();
-    rect1.name = Some("ImageFillRect".to_string());
     rect1.transform = AffineTransform::new(50.0, 50.0, 0.0);
     rect1.size = Size {
         width: 200.0,
@@ -45,7 +43,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Second example: Rectangle with ImagePaint fill and stroke
     let mut rect2 = nf.create_rectangle_node();
-    rect2.name = Some("ImageFillAndStrokeRect".to_string());
     rect2.transform = AffineTransform::new(300.0, 50.0, 0.0);
     rect2.size = Size {
         width: 200.0,
@@ -75,7 +72,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Third example: Rectangle with ImagePaint stroke only
     let mut rect3 = nf.create_rectangle_node();
-    rect3.name = Some("ImageStrokeRect".to_string());
     rect3.transform = AffineTransform::new(550.0, 50.0, 0.0);
     rect3.size = Size {
         width: 200.0,
@@ -97,7 +93,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Fourth example: Rectangle with ImagePaint fill using a custom transform
     let mut rect4 = nf.create_rectangle_node();
-    rect4.name = Some("ImageTransformFillRect".to_string());
     rect4.transform = AffineTransform::new(50.0, 300.0, 0.0);
     rect4.size = Size {
         width: 200.0,
@@ -132,7 +127,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Fifth example: Rectangle demonstrating repeating image tiles
     let mut rect5 = nf.create_rectangle_node();
-    rect5.name = Some("ImageTileRect".to_string());
     rect5.transform = AffineTransform::new(300.0, 300.0, 0.0);
     rect5.size = Size {
         width: 200.0,
@@ -154,7 +148,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Sixth example: Rectangle with rotated image (90 degrees)
     let mut rect6 = nf.create_rectangle_node();
-    rect6.name = Some("ImageRotatedRect".to_string());
     rect6.transform = AffineTransform::new(550.0, 300.0, 0.0);
     rect6.size = Size {
         width: 200.0,
@@ -173,7 +166,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Seventh example: Rectangle with LEFT alignment
     let mut rect7 = nf.create_rectangle_node();
-    rect7.name = Some("ImageLeftRect".to_string());
     rect7.transform = AffineTransform::new(50.0, 550.0, 0.0);
     rect7.size = Size {
         width: 200.0,
@@ -194,7 +186,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Eighth example: Rectangle with CENTER alignment
     let mut rect8 = nf.create_rectangle_node();
-    rect8.name = Some("ImageCenterRect".to_string());
     rect8.transform = AffineTransform::new(300.0, 550.0, 0.0);
     rect8.size = Size {
         width: 200.0,
@@ -215,7 +206,6 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     // Ninth example: Rectangle with RIGHT alignment
     let mut rect9 = nf.create_rectangle_node();
-    rect9.name = Some("ImageRightRect".to_string());
     rect9.transform = AffineTransform::new(550.0, 550.0, 0.0);
     rect9.size = Size {
         width: 200.0,

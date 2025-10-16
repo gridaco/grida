@@ -948,8 +948,6 @@ impl From<JSONGroupNode> for GroupNodeRec {
         );
 
         GroupNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             // TODO: group's transform should be handled differently
             transform: Some(transform),
@@ -964,8 +962,6 @@ impl From<JSONGroupNode> for GroupNodeRec {
 impl From<JSONContainerNode> for ContainerNodeRec {
     fn from(node: JSONContainerNode) -> Self {
         ContainerNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             transform: AffineTransform::from_box_center(
                 node.base.left,
@@ -1000,6 +996,13 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             // Children populated from links after conversion
             clip: true,
             mask: node.base.mask.map(|m| m.into()),
+            layout_mode: LayoutMode::default(),
+            layout_direction: Axis::default(),
+            layout_wrap: LayoutWrap::default(),
+            layout_main_axis_alignment: MainAxisAlignment::default(),
+            layout_cross_axis_alignment: CrossAxisAlignment::default(),
+            layout_gap: LayoutGap::default(),
+            padding: EdgeInsets::default(),
         }
     }
 }
@@ -1018,8 +1021,6 @@ impl From<JSONTextNode> for TextSpanNodeRec {
         };
 
         TextSpanNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             transform: AffineTransform::from_box_center(
                 node.base.left,
@@ -1101,8 +1102,6 @@ impl From<JSONEllipseNode> for Node {
         );
 
         Node::Ellipse(EllipseNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1145,8 +1144,6 @@ impl From<JSONRectangleNode> for Node {
         );
 
         Node::Rectangle(RectangleNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1229,8 +1226,6 @@ impl From<JSONImageNode> for Node {
         };
 
         Node::Image(ImageNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1273,8 +1268,6 @@ impl From<JSONRegularPolygonNode> for Node {
         );
 
         Node::RegularPolygon(RegularPolygonNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1315,8 +1308,6 @@ impl From<JSONRegularStarPolygonNode> for Node {
         );
 
         Node::RegularStarPolygon(RegularStarPolygonNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1359,8 +1350,6 @@ impl From<JSONSVGPathNode> for Node {
 
         // For vector nodes, we'll create a path node with the path data
         Node::SVGPath(SVGPathNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1398,8 +1387,6 @@ impl From<JSONLineNode> for Node {
         );
 
         Node::Line(LineNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1439,8 +1426,6 @@ impl From<JSONVectorNode> for Node {
             .unwrap_or_default();
 
         Node::Vector(VectorNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1479,8 +1464,6 @@ impl From<JSONBooleanOperationNode> for Node {
         );
 
         Node::BooleanOperation(BooleanPathOperationNodeRec {
-            id: node.base.id,
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1522,8 +1505,6 @@ impl From<JSONNode> for Node {
             JSONNode::BooleanOperation(boolean) => boolean.into(),
             JSONNode::Image(image) => image.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNodeRec {
-                id: unknown.id,
-                name: unknown.name,
                 active: unknown.active,
                 transform: AffineTransform::identity(),
                 size: Size {
@@ -1537,8 +1518,6 @@ impl From<JSONNode> for Node {
                 // Scene nodes should be filtered out before conversion
                 // This case should not be reached in normal operation
                 Node::Error(ErrorNodeRec {
-                    id: scene.id,
-                    name: Some(scene.name),
                     active: scene.active.unwrap_or(true),
                     transform: AffineTransform::identity(),
                     size: Size {

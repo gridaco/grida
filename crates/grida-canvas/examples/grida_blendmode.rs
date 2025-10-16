@@ -17,7 +17,6 @@ async fn demo_blendmode() -> Scene {
         width: 2000.0,
         height: 4000.0,
     };
-    root_container_node.name = Some("Root Container".to_string());
 
     let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
     let spacing = 400.0;
@@ -52,7 +51,6 @@ async fn demo_blendmode() -> Scene {
 
         // Create background with radial gradient
         let mut background = nf.create_rectangle_node();
-        background.name = Some(format!("Background {}", i));
         background.transform = AffineTransform::new(x, y, 0.0);
         background.size = Size {
             width: base_size,
@@ -89,7 +87,6 @@ async fn demo_blendmode() -> Scene {
 
         // Create a sweep gradient overlay (similar to C++ example's sweep gradient)
         let mut sweep_overlay = nf.create_rectangle_node();
-        sweep_overlay.name = Some(format!("Sweep Overlay {}", i));
         sweep_overlay.transform = AffineTransform::new(x, y, 0.0);
         sweep_overlay.size = Size {
             width: base_size,
@@ -147,7 +144,6 @@ async fn demo_blendmode() -> Scene {
 
         // Create a group for the colored circles with the specific blend mode
         let mut circle_group = nf.create_group_node();
-        circle_group.name = Some(format!("Circle Group {}", i));
         circle_group.transform = Some(AffineTransform::new(x, y, 0.0));
         circle_group.blend_mode = LayerBlendMode::Blend(*blend_mode);
 
@@ -162,7 +158,6 @@ async fn demo_blendmode() -> Scene {
 
         // Green circle (top)
         let mut green_circle = nf.create_ellipse_node();
-        green_circle.name = Some(format!("Green Circle {}", i));
         green_circle.transform = AffineTransform::new(base_size / 2.0, circle_radius, 0.0);
         green_circle.size = Size {
             width: circle_radius * 2.0,
@@ -177,7 +172,6 @@ async fn demo_blendmode() -> Scene {
 
         // Red circle (bottom left)
         let mut red_circle = nf.create_ellipse_node();
-        red_circle.name = Some(format!("Red Circle {}", i));
         red_circle.transform = AffineTransform::new(circle_radius, base_size - circle_radius, 0.0);
         red_circle.size = Size {
             width: circle_radius * 2.0,
@@ -192,7 +186,6 @@ async fn demo_blendmode() -> Scene {
 
         // Blue circle (bottom right)
         let mut blue_circle = nf.create_ellipse_node();
-        blue_circle.name = Some(format!("Blue Circle {}", i));
         blue_circle.transform =
             AffineTransform::new(base_size - circle_radius, base_size - circle_radius, 0.0);
         blue_circle.size = Size {
@@ -208,7 +201,6 @@ async fn demo_blendmode() -> Scene {
 
         // Create a text label for the blend mode
         let mut label = nf.create_text_span_node();
-        label.name = Some(format!("Label {}", i));
         label.transform = AffineTransform::new(x + 10.0, y + 10.0, 0.0);
         label.width = Some(base_size - 20.0);
         label.text = format!("{:?}", blend_mode);

@@ -11,7 +11,6 @@ async fn demo_paints() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1080.0,
         height: 1080.0,
@@ -26,7 +25,6 @@ async fn demo_paints() -> Scene {
     // Solid Colors Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Solid Color {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 100.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -48,7 +46,6 @@ async fn demo_paints() -> Scene {
     // Linear Gradient Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Linear Gradient {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 200.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -85,7 +82,6 @@ async fn demo_paints() -> Scene {
     // Radial Gradient Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Radial Gradient {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -123,7 +119,6 @@ async fn demo_paints() -> Scene {
     // Stroke Solid Colors Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Stroke Solid Color {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 400.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -152,7 +147,6 @@ async fn demo_paints() -> Scene {
     // Stroke Linear Gradient Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Stroke Linear Gradient {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -194,7 +188,6 @@ async fn demo_paints() -> Scene {
     // Stroke Radial Gradient Row
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Stroke Radial Gradient {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 600.0, 0.0);
         rect.size = Size {
             width: base_size,

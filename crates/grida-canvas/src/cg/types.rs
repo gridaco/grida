@@ -362,6 +362,376 @@ impl Default for StrokeAlign {
     }
 }
 
+/// Represents a single axis in 2D space.
+/// - [Flutter](https://api.flutter.dev/flutter/painting/Axis.html)
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum Axis {
+    #[serde(rename = "horizontal")]
+    Horizontal,
+    #[serde(rename = "vertical")]
+    Vertical,
+}
+
+impl Default for Axis {
+    fn default() -> Self {
+        Axis::Horizontal
+    }
+}
+
+/// Alignment of items along the main axis.
+///
+/// See also:
+/// - [MDN justify-content](https://developer.mozilla.org/en-US/docs/Web/CSS/justify-content)
+/// - [MDN Main Axis](https://developer.mozilla.org/en-US/docs/Glossary/Main_Axis)
+/// - [Flutter MainAxisAlignment](https://api.flutter.dev/flutter/rendering/MainAxisAlignment.html)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum MainAxisAlignment {
+    #[serde(rename = "start")]
+    Start,
+    #[serde(rename = "end")]
+    End,
+    #[serde(rename = "center")]
+    Center,
+    #[serde(rename = "space-between")]
+    SpaceBetween,
+    #[serde(rename = "space-around")]
+    SpaceAround,
+    #[serde(rename = "space-evenly")]
+    SpaceEvenly,
+    #[serde(rename = "stretch")]
+    Stretch,
+}
+
+impl Default for MainAxisAlignment {
+    fn default() -> Self {
+        MainAxisAlignment::Start
+    }
+}
+
+/// Alignment of items along the cross axis.
+///
+/// See also:
+/// - [MDN align-items](https://developer.mozilla.org/en-US/docs/Web/CSS/align-items)
+/// - [MDN Cross Axis](https://developer.mozilla.org/en-US/docs/Glossary/Cross_Axis)
+/// - [Flutter CrossAxisAlignment](https://api.flutter.dev/flutter/rendering/CrossAxisAlignment.html)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum CrossAxisAlignment {
+    #[serde(rename = "start")]
+    Start,
+    #[serde(rename = "end")]
+    End,
+    #[serde(rename = "center")]
+    Center,
+    #[serde(rename = "stretch")]
+    Stretch,
+}
+
+impl Default for CrossAxisAlignment {
+    fn default() -> Self {
+        CrossAxisAlignment::Start
+    }
+}
+
+/// Represents **inset distances from the edges** of a rectangular box.
+///
+/// `EdgeInsets` defines per-edge padding or margin values around a box.
+/// It corresponds to CSS properties such as `padding-top`, `padding-right`,
+/// `padding-bottom`, and `padding-left`, or Flutter's `EdgeInsets`.
+///
+/// # Fields
+///
+/// * `top` — distance from the top edge  
+/// * `right` — distance from the right edge  
+/// * `bottom` — distance from the bottom edge  
+/// * `left` — distance from the left edge
+///
+/// Each field represents a *positive offset inward* from that edge
+/// when applied as padding, or an *outward extension* when used as margin.
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::EdgeInsets;
+///
+/// let padding = EdgeInsets::from_ltrb(8.0, 12.0, 8.0, 12.0);
+///
+/// assert_eq!(padding.top, 12.0);
+/// assert_eq!(padding.left, 8.0);
+///
+/// let uniform = EdgeInsets::all(10.0);
+/// assert!(uniform.is_uniform());
+///
+/// let none = EdgeInsets::zero();
+/// assert!(none.is_zero());
+/// ```
+///
+/// # Relation to other layout concepts
+///
+/// | Concept | Describes | Typical struct |
+/// |----------|------------|----------------|
+/// | **Padding / Margin** | insets *around* one element | `EdgeInsets` |
+/// | **Gap / Spacing** | distance *between* elements | [`Gap2D`] |
+///
+/// # Mathematical model
+///
+/// When applied to a content box of width `W` and height `H`,
+///
+/// ```text
+/// content_width  = W - (left + right)
+/// content_height = H - (top + bottom)
+/// ```
+///
+/// Positive values shrink the inner content region (for padding)
+/// or expand the outer region (for margin).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EdgeInsets {
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+    pub left: f32,
+}
+
+impl EdgeInsets {
+    pub fn zero() -> Self {
+        Self {
+            top: 0.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 0.0,
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.top == 0.0 && self.right == 0.0 && self.bottom == 0.0 && self.left == 0.0
+    }
+
+    pub fn is_uniform(&self) -> bool {
+        self.top == self.right && self.right == self.bottom && self.bottom == self.left
+    }
+
+    pub fn all(value: f32) -> Self {
+        Self {
+            top: value,
+            right: value,
+            bottom: value,
+            left: value,
+        }
+    }
+
+    pub fn from_ltrb(left: f32, top: f32, right: f32, bottom: f32) -> Self {
+        Self {
+            top,
+            right,
+            bottom,
+            left,
+        }
+    }
+}
+
+impl Default for EdgeInsets {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum LayoutMode {
+    Normal,
+    Flex,
+}
+
+impl Default for LayoutMode {
+    fn default() -> Self {
+        LayoutMode::Normal
+    }
+}
+
+/// Defines whether flex items are forced into a single line or can wrap onto multiple lines.
+///
+/// `LayoutWrap` controls the wrapping behavior of flex items within a flex container.
+/// It is the equivalent of the CSS `flex-wrap` property and determines how items
+/// are laid out when they exceed the container's size along the main axis.
+///
+/// # Variants
+///
+/// * `NoWrap` — All flex items are laid out in a single line, which may cause them to overflow
+/// * `Wrap` — Flex items wrap onto multiple lines as needed, from top to bottom
+///
+/// # Behavior
+///
+/// ## NoWrap
+/// - **Single line**: All items are forced into one line along the main axis
+/// - **Overflow**: Items may overflow the container if their total size exceeds the container size
+/// - **Shrinking**: Items may shrink (if `flex_shrink > 0`) to fit within the container
+/// - **Use case**: When you want all items on one line regardless of container size
+///
+/// ## Wrap
+/// - **Multiple lines**: Items wrap onto new lines when they exceed the container size
+/// - **Natural sizing**: Items maintain their preferred size and wrap to new lines as needed
+/// - **Cross-axis growth**: Container grows along the cross axis to accommodate multiple lines
+/// - **Use case**: Responsive layouts where items should flow naturally (e.g., tag clouds, galleries)
+///
+/// # CSS Equivalents
+///
+/// * `flex-wrap: nowrap` → `LayoutWrap::NoWrap`
+/// * `flex-wrap: wrap` → `LayoutWrap::Wrap`
+///
+/// Note: CSS also supports `wrap-reverse`, which is not currently implemented in this enum.
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::LayoutWrap;
+///
+/// // Default: no wrapping
+/// let no_wrap = LayoutWrap::default();
+/// assert!(matches!(no_wrap, LayoutWrap::NoWrap));
+///
+/// // Enable wrapping
+/// let wrap = LayoutWrap::Wrap;
+/// ```
+///
+/// # Interaction with Other Properties
+///
+/// - **With `gap`**: Gap is applied between items on the same line and between lines
+/// - **With `flex_shrink`**: When `NoWrap`, items may shrink to fit; when `Wrap`, items wrap instead
+/// - **With container size**: `Wrap` allows the container to grow along the cross axis
+///
+/// # See also
+///
+/// * [CSS flex-wrap](https://developer.mozilla.org/en-US/docs/Web/CSS/flex-wrap)
+/// * [Taffy FlexWrap](https://docs.rs/taffy/latest/taffy/style/enum.FlexWrap.html)
+/// * [`LayoutGap`] — spacing between items and lines
+/// * [`Axis`] — main axis direction
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum LayoutWrap {
+    /// Items wrap onto multiple lines as needed
+    #[serde(rename = "wrap")]
+    Wrap,
+    /// All items are forced into a single line
+    #[serde(rename = "nowrap")]
+    NoWrap,
+}
+
+impl Default for LayoutWrap {
+    fn default() -> Self {
+        LayoutWrap::NoWrap
+    }
+}
+
+/// Represents the **spacing between adjacent elements** in a flex layout container.
+///
+/// `LayoutGap` is a 2-dimensional scalar type describing the distance between
+/// neighboring items in a layout container. It is the geometric equivalent of
+/// the CSS `gap` property (or `row-gap`/`column-gap`) and Flutter's `spacing`/`runSpacing`.
+///
+/// Unlike [`EdgeInsets`], which describes insets around the edges of a single
+/// element, `LayoutGap` defines the *inter-element spacing* applied **between**
+/// consecutive elements along each axis of a flex container.
+///
+/// # Fields
+///
+/// * `main_axis_gap` — spacing between elements along the **main axis** (direction of flex flow)
+///   - For `flex-direction: row`, this is the horizontal spacing between items
+///   - For `flex-direction: column`, this is the vertical spacing between items
+/// * `cross_axis_gap` — spacing between **lines** along the **cross axis** (perpendicular to flex flow)
+///   - For `flex-direction: row`, this is the vertical spacing between wrapped rows
+///   - For `flex-direction: column`, this is the horizontal spacing between wrapped columns
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::LayoutGap;
+///
+/// // Uniform spacing in both directions
+/// let uniform = LayoutGap::uniform(8.0);
+///
+/// // Separate main-axis and cross-axis spacing
+/// let spacing = LayoutGap::new(12.0, 16.0);
+///
+/// assert!(spacing.main_axis_gap == 12.0);
+/// assert!(spacing.cross_axis_gap == 16.0);
+/// assert!(LayoutGap::zero().is_zero());
+/// ```
+///
+/// # Relation to other layout concepts
+///
+/// | Concept | Describes | Typical struct |
+/// |----------|------------|----------------|
+/// | **Padding / Margin** | insets *around* one element | [`EdgeInsets`] |
+/// | **Gap / Spacing** | distance *between* elements | `LayoutGap` |
+///
+/// # CSS Equivalents
+///
+/// * `gap: 10px` → `LayoutGap::uniform(10.0)`
+/// * `row-gap: 12px; column-gap: 16px` → `LayoutGap::new(16.0, 12.0)` (for row direction)
+/// * `row-gap: 12px; column-gap: 16px` → `LayoutGap::new(12.0, 16.0)` (for column direction)
+///
+/// # See also
+///
+/// * [`EdgeInsets`] — four-sided per-element insets.
+/// * [CSS gap property](https://developer.mozilla.org/en-US/docs/Web/CSS/gap)
+/// * [Taffy gap documentation](https://docs.rs/taffy/latest/taffy/)
+///
+/// # Mathematical model
+///
+/// For `n` elements of width `wᵢ` laid out along the main axis:
+///
+/// ```text
+/// total_main_size = Σ(wᵢ) + (n - 1) * main_axis_gap
+/// total_cross_size = Σ(hᵢ) + (lines - 1) * cross_axis_gap
+/// ```
+///
+/// This definition ensures that the gap is only applied **between**
+/// elements, never before the first or after the last.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LayoutGap {
+    pub main_axis_gap: f32,
+    pub cross_axis_gap: f32,
+}
+
+impl LayoutGap {
+    #[inline]
+    pub const fn zero() -> Self {
+        Self {
+            main_axis_gap: 0.0,
+            cross_axis_gap: 0.0,
+        }
+    }
+
+    #[inline]
+    pub const fn uniform(v: f32) -> Self {
+        Self {
+            main_axis_gap: v,
+            cross_axis_gap: v,
+        }
+    }
+
+    #[inline]
+    pub const fn new(main_axis_gap: f32, cross_axis_gap: f32) -> Self {
+        Self {
+            main_axis_gap,
+            cross_axis_gap,
+        }
+    }
+
+    #[inline]
+    pub fn is_zero(&self) -> bool {
+        self.main_axis_gap == 0.0 && self.cross_axis_gap == 0.0
+    }
+
+    #[inline]
+    pub fn is_uniform(&self) -> bool {
+        self.main_axis_gap == self.cross_axis_gap
+    }
+}
+
+impl Default for LayoutGap {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Radius {
     pub rx: f32,

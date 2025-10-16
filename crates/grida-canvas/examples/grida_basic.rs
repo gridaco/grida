@@ -15,7 +15,6 @@ async fn demo_basic() -> Scene {
 
     // Create a test image node with URL
     let mut image_node = nf.create_image_node();
-    image_node.name = Some("Test Image".to_string());
     image_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
     image_node.size = Size {
         width: 200.0,
@@ -34,7 +33,6 @@ async fn demo_basic() -> Scene {
 
     // Create a test rectangle node with linear gradient
     let mut rect_node = nf.create_rectangle_node();
-    rect_node.name = Some("Test Rectangle".to_string());
     rect_node.transform = AffineTransform::new(300.0, 50.0, 0.0);
     rect_node.size = Size {
         width: 200.0,
@@ -53,7 +51,6 @@ async fn demo_basic() -> Scene {
 
     // Create a test ellipse node with radial gradient and a visible stroke
     let mut ellipse_node = nf.create_ellipse_node();
-    ellipse_node.name = Some("Test Ellipse".to_string());
     ellipse_node.blend_mode = BlendMode::Multiply.into();
     ellipse_node.transform = AffineTransform::new(550.0, 50.0, 0.0);
     ellipse_node.size = Size {
@@ -94,7 +91,6 @@ async fn demo_basic() -> Scene {
         .collect::<Vec<_>>();
 
     let mut polygon_node = nf.create_polygon_node();
-    polygon_node.name = Some("Test Polygon".to_string());
     polygon_node.blend_mode = BlendMode::Screen.into();
     polygon_node.transform = AffineTransform::new(600.0, 50.0, 0.0);
     polygon_node.points = pentagon_points;
@@ -104,7 +100,6 @@ async fn demo_basic() -> Scene {
 
     // Create a test regular polygon node (hexagon)
     let mut regular_polygon_node = nf.create_regular_polygon_node();
-    regular_polygon_node.name = Some("Test Regular Polygon".to_string());
     regular_polygon_node.blend_mode = BlendMode::Overlay.into();
     regular_polygon_node.transform = AffineTransform::new(50.0, 300.0, 0.0);
     regular_polygon_node.size = Size {
@@ -118,7 +113,6 @@ async fn demo_basic() -> Scene {
 
     // Create a test text span node
     let mut text_span_node = nf.create_text_span_node();
-    text_span_node.name = Some("Test Text".to_string());
     text_span_node.transform = AffineTransform::new(300.0, 300.0, 0.0);
     text_span_node.width = Some(300.0);
     text_span_node.text = "Grida Canvas SKIA Bindings Backend".to_string();
@@ -130,7 +124,6 @@ async fn demo_basic() -> Scene {
 
     // Create a test path node
     let mut path_node = nf.create_path_node();
-    path_node.name = Some("Test Path".to_string());
     path_node.transform = AffineTransform::new(550.0, 300.0, 0.0);
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
     path_node.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
@@ -138,7 +131,6 @@ async fn demo_basic() -> Scene {
 
     // Create a test line node with solid color
     let mut line_node = nf.create_line_node();
-    line_node.name = Some("Test Line".to_string());
     line_node.opacity = 0.8;
     line_node.transform = AffineTransform::new(800.0, 300.0, 0.0);
     line_node.size = Size {
@@ -157,7 +149,6 @@ async fn demo_basic() -> Scene {
         width: 1080.0,
         height: 1080.0,
     };
-    root_container_node.name = Some("Root Container".to_string());
 
     // Build the scene graph
     let mut graph = SceneGraph::new();

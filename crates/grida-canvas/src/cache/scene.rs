@@ -66,10 +66,10 @@ impl SceneCache {
 
     pub fn update_layers(&mut self, scene: &Scene) {
         self.layers = LayerList::from_scene(scene, self);
-        self.layers.layers.sort_by_key(|l| l.z_index());
+        self.layers.layers.sort_by_key(|entry| entry.layer.z_index());
         self.layer_index = RTree::new();
-        for (i, layer) in self.layers.layers.iter().enumerate() {
-            if let Some(rb) = self.geometry.get_render_bounds(&layer.id()) {
+        for (i, entry) in self.layers.layers.iter().enumerate() {
+            if let Some(rb) = self.geometry.get_render_bounds(&entry.id) {
                 let bounds = AABB::from_corners([rb.x, rb.y], [rb.x + rb.width, rb.y + rb.height]);
                 self.layer_index.insert(IndexedLayer { index: i, bounds });
             }

@@ -191,10 +191,18 @@ pub struct PainterPictureVectorLayer {
     pub corner_radius: f32,
 }
 
-/// Flat list of [`PainterPictureLayer`] entries.
+/// A layer with its associated node ID.
+/// This pairs a layer with its source node ID, eliminating the need to store ID in the layer itself.
+#[derive(Debug, Clone)]
+pub struct LayerEntry {
+    pub id: NodeId,
+    pub layer: PainterPictureLayer,
+}
+
+/// Flat list of [`PainterPictureLayer`] entries with their IDs.
 #[derive(Debug, Default, Clone)]
 pub struct LayerList {
-    pub layers: Vec<PainterPictureLayer>,
+    pub layers: Vec<LayerEntry>,
     pub commands: Vec<PainterRenderCommand>,
 }
 
@@ -247,7 +255,7 @@ impl LayerList {
         graph: &SceneGraph,
         scene_cache: &SceneCache,
         parent_opacity: f32,
-        out: &mut Vec<PainterPictureLayer>,
+        out: &mut Vec<LayerEntry>,
     ) -> FlattenResult {
         let Ok(node) = graph.get_node(id) else {
             return FlattenResult::default();
@@ -292,12 +300,12 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -305,7 +313,10 @@ impl LayerList {
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 let mut commands = vec![PainterRenderCommand::Draw(layer)];
                 let children = graph.get_children(id).map(|c| c.as_slice()).unwrap_or(&[]);
                 let child_commands =
@@ -318,7 +329,7 @@ impl LayerList {
             }
             Node::BooleanOperation(n) => {
                 let opacity = parent_opacity * n.opacity;
-                if let Some(shape) = boolean_operation_shape(n, graph, scene_cache.geometry()) {
+                if let Some(shape) = boolean_operation_shape(id, n, graph, scene_cache.geometry()) {
                     let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
                         Some(stroke_geometry(
                             &shape.to_path(),
@@ -331,12 +342,12 @@ impl LayerList {
                     };
                     let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: n.id.clone(),
+                            id: id.clone(),
                             z_index: out.len(),
                             opacity,
                             blend_mode: n.blend_mode,
                             transform,
-                            clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                            clip_path: Self::compute_clip_path(id, graph, scene_cache),
                         },
                         shape,
                         effects: n.effects.clone(),
@@ -344,7 +355,10 @@ impl LayerList {
                         fills: Self::filter_visible_paints(&n.fills),
                         stroke_path,
                     });
-                    out.push(layer.clone());
+                    out.push(LayerEntry {
+                        id: id.clone(),
+                        layer: layer.clone(),
+                    });
                     FlattenResult {
                         commands: vec![PainterRenderCommand::Draw(layer)],
                         mask: n.mask,
@@ -377,12 +391,12 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -390,7 +404,10 @@ impl LayerList {
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
@@ -410,12 +427,12 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -423,7 +440,10 @@ impl LayerList {
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
@@ -443,12 +463,12 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -456,7 +476,10 @@ impl LayerList {
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
@@ -476,12 +499,12 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -489,7 +512,10 @@ impl LayerList {
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
@@ -509,12 +535,12 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -522,7 +548,10 @@ impl LayerList {
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
@@ -542,12 +571,12 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -555,29 +584,35 @@ impl LayerList {
                     fills: Paints::default(),
                     stroke_path,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
                 }
             }
             Node::TextSpan(n) => {
-                let text_bounds = scene_cache
-                    .geometry()
-                    .get_world_bounds(&n.id)
-                    .unwrap_or_else(|| Rectangle {
-                        x: n.x(),
-                        y: n.y(),
-                        width: n.width.unwrap_or(100.0),
-                        height: (n.text_style.font_size
-                            * match n.text_style.line_height {
-                                TextLineHeight::Fixed(height) => height / n.text_style.font_size,
-                                TextLineHeight::Factor(factor) => factor,
-                                TextLineHeight::Normal => 1.2,
-                            }
-                            * 2.0)
-                            .max(0.0),
-                    });
+                let text_bounds =
+                    scene_cache
+                        .geometry()
+                        .get_world_bounds(id)
+                        .unwrap_or_else(|| Rectangle {
+                            x: n.x(),
+                            y: n.y(),
+                            width: n.width.unwrap_or(100.0),
+                            height: (n.text_style.font_size
+                                * match n.text_style.line_height {
+                                    TextLineHeight::Fixed(height) => {
+                                        height / n.text_style.font_size
+                                    }
+                                    TextLineHeight::Factor(factor) => factor,
+                                    TextLineHeight::Normal => 1.2,
+                                }
+                                * 2.0)
+                                .max(0.0),
+                        });
 
                 let rect_height = n.height.unwrap_or(text_bounds.height);
                 let shape = PainterShape::from_rect(skia_safe::Rect::from_xywh(
@@ -589,12 +624,12 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Text(PainterPictureTextLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     width: n.width,
                     height: n.height,
@@ -611,9 +646,12 @@ impl LayerList {
                     text_style: n.text_style.clone(),
                     text_align: n.text_align,
                     text_align_vertical: n.text_align_vertical,
-                    id: n.id.clone(),
+                    id: id.clone(),
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
@@ -633,12 +671,12 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -646,7 +684,10 @@ impl LayerList {
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
@@ -656,12 +697,12 @@ impl LayerList {
                 let shape = build_shape(&IntrinsicSizeNode::Vector(n.clone()));
                 let layer = PainterPictureLayer::Vector(PainterPictureVectorLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -673,7 +714,10 @@ impl LayerList {
                     stroke_width_profile: n.stroke_width_profile.clone(),
                     corner_radius: n.corner_radius,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
@@ -693,12 +737,12 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: n.effects.clone(),
@@ -708,7 +752,10 @@ impl LayerList {
                     )])),
                     stroke_path,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: n.mask,
@@ -718,12 +765,12 @@ impl LayerList {
                 let shape = build_shape(&IntrinsicSizeNode::Error(n.clone()));
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: n.id.clone(),
+                        id: id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: LayerBlendMode::PassThrough,
                         transform,
-                        clip_path: Self::compute_clip_path(&n.id, graph, scene_cache),
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
                     effects: LayerEffects::default(),
@@ -731,7 +778,10 @@ impl LayerList {
                     fills: Paints::default(),
                     stroke_path: None,
                 });
-                out.push(layer.clone());
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: None,
@@ -745,7 +795,7 @@ impl LayerList {
         graph: &SceneGraph,
         scene_cache: &SceneCache,
         parent_opacity: f32,
-        out: &mut Vec<PainterPictureLayer>,
+        out: &mut Vec<LayerEntry>,
     ) -> Vec<PainterRenderCommand> {
         // Build render commands from child nodes using flat list model.
         // Iterate children in z-order (bottom→top). Accumulate non-mask commands in `run`.
@@ -774,9 +824,9 @@ impl LayerList {
 
     pub fn filter(&self, filter: impl Fn(&PainterPictureLayer) -> bool) -> Self {
         let mut list = LayerList::default();
-        for layer in &self.layers {
-            if filter(layer) {
-                list.layers.push(layer.clone());
+        for indexed in &self.layers {
+            if filter(&indexed.layer) {
+                list.layers.push(indexed.clone());
             }
         }
         list
@@ -842,7 +892,7 @@ impl LayerList {
                     }
                     Node::BooleanOperation(n) => {
                         if let Some(mut path) =
-                            boolean_operation_path(n, graph, scene_cache.geometry())
+                            boolean_operation_path(&id, n, graph, scene_cache.geometry())
                         {
                             let world_transform = scene_cache
                                 .geometry()

@@ -3,20 +3,16 @@ use std::f32;
 use super::schema::*;
 use crate::cg::{types::*, Alignment};
 use math2::{box_fit::BoxFit, transform::AffineTransform};
-use uuid::Uuid;
 
-/// Factory for creating nodes with default values
+/// Factory for creating nodes with default values.
+///
+/// Note: The factory creates nodes with a placeholder ID of 0.
+/// Actual IDs should be assigned by SceneRuntime or another ID management system.
 pub struct NodeFactory;
 
 impl NodeFactory {
     pub fn new() -> Self {
         Self {}
-    }
-
-    fn id(&self) -> String {
-        // random id
-        let id = Uuid::new_v4();
-        id.to_string()
     }
 
     // Internal factory defaults
@@ -56,8 +52,6 @@ impl NodeFactory {
     /// Creates a new rectangle node with default values
     pub fn create_rectangle_node(&self) -> RectangleNodeRec {
         RectangleNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -77,8 +71,6 @@ impl NodeFactory {
     /// Creates a new ellipse node with default values
     pub fn create_ellipse_node(&self) -> EllipseNodeRec {
         EllipseNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -101,8 +93,6 @@ impl NodeFactory {
     /// Creates a new line node with default values
     pub fn create_line_node(&self) -> LineNodeRec {
         LineNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -123,8 +113,6 @@ impl NodeFactory {
     /// Creates a new text span node with default values
     pub fn create_text_span_node(&self) -> TextSpanNodeRec {
         TextSpanNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -149,8 +137,6 @@ impl NodeFactory {
     /// Creates a new group node with default values
     pub fn create_group_node(&self) -> GroupNodeRec {
         GroupNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             transform: None,
             opacity: Self::DEFAULT_OPACITY,
@@ -162,8 +148,6 @@ impl NodeFactory {
     /// Creates a new container node with default values
     pub fn create_container_node(&self) -> ContainerNodeRec {
         ContainerNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -178,14 +162,19 @@ impl NodeFactory {
             stroke_dash_array: None,
             effects: LayerEffects::default(),
             clip: true,
+            layout_mode: LayoutMode::default(),
+            layout_direction: Axis::default(),
+            layout_wrap: LayoutWrap::default(),
+            layout_main_axis_alignment: MainAxisAlignment::default(),
+            layout_cross_axis_alignment: CrossAxisAlignment::default(),
+            padding: EdgeInsets::default(),
+            layout_gap: LayoutGap::default(),
         }
     }
 
     /// Creates a new path node with default values
     pub fn create_path_node(&self) -> SVGPathNodeRec {
         SVGPathNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -204,8 +193,6 @@ impl NodeFactory {
     /// Creates a new regular polygon node with default values
     pub fn create_regular_polygon_node(&self) -> RegularPolygonNodeRec {
         RegularPolygonNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -225,8 +212,6 @@ impl NodeFactory {
 
     pub fn create_regular_star_polygon_node(&self) -> RegularStarPolygonNodeRec {
         RegularStarPolygonNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -247,8 +232,6 @@ impl NodeFactory {
 
     pub fn create_polygon_node(&self) -> PolygonNodeRec {
         PolygonNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -268,8 +251,6 @@ impl NodeFactory {
     /// Creates a new image node with default values
     pub fn create_image_node(&self) -> ImageNodeRec {
         ImageNodeRec {
-            id: self.id(),
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),

@@ -14,7 +14,6 @@ async fn demo_scene() -> Scene {
 
     // Create a root container
     let mut root_container = nf.create_container_node();
-    root_container.name = Some("Root Container".to_string());
     root_container.size = Size {
         width: 900.0,
         height: 700.0,
@@ -22,7 +21,6 @@ async fn demo_scene() -> Scene {
 
     // Title text
     let mut title_text = nf.create_text_span_node();
-    title_text.name = Some("Title".to_string());
     title_text.transform = AffineTransform::new(50.0, 50.0, 0.0);
     title_text.width = Some(700.0);
     title_text.text = "Grida Canvas PDF Demo".to_string();
@@ -48,7 +46,6 @@ async fn demo_scene() -> Scene {
 
     // Subtitle text
     let mut subtitle_text = nf.create_text_span_node();
-    subtitle_text.name = Some("Subtitle".to_string());
     subtitle_text.transform = AffineTransform::new(50.0, 120.0, 0.0);
     subtitle_text.width = Some(700.0);
     subtitle_text.text =
@@ -75,7 +72,6 @@ async fn demo_scene() -> Scene {
 
     // Rectangle with gradient fill
     let mut rect_gradient = nf.create_rectangle_node();
-    rect_gradient.name = Some("Gradient Rectangle".to_string());
     rect_gradient.transform = AffineTransform::new(50.0, 200.0, 0.0);
     rect_gradient.size = Size {
         width: 200.0,
@@ -114,7 +110,6 @@ async fn demo_scene() -> Scene {
 
     // Ellipse with radial gradient
     let mut ellipse_radial = nf.create_ellipse_node();
-    ellipse_radial.name = Some("Radial Ellipse".to_string());
     ellipse_radial.transform = AffineTransform::new(300.0, 200.0, 0.0);
     ellipse_radial.size = Size {
         width: 180.0,
@@ -155,7 +150,6 @@ async fn demo_scene() -> Scene {
         .collect::<Vec<_>>();
 
     let mut hexagon = nf.create_polygon_node();
-    hexagon.name = Some("Hexagon".to_string());
     hexagon.transform = AffineTransform::new(550.0, 200.0, 0.0);
     hexagon.points = hexagon_points;
     hexagon.fills = Paints::new([Paint::from(CGColor(128, 0, 255, 255))]);
@@ -171,7 +165,6 @@ async fn demo_scene() -> Scene {
 
     // Star polygon
     let mut star = nf.create_regular_star_polygon_node();
-    star.name = Some("Star".to_string());
     star.transform = AffineTransform::new(50.0, 400.0, 0.0);
     star.size = Size {
         width: 120.0,
@@ -185,7 +178,6 @@ async fn demo_scene() -> Scene {
 
     // Path (complex shape)
     let mut path = nf.create_path_node();
-    path.name = Some("Complex Path".to_string());
     path.transform = AffineTransform::new(220.0, 400.0, 0.0);
     path.data = "M50,0 L61,35 L98,35 L68,57 L79,91 L50,71 L21,91 L32,57 L2,35 L39,35 Z".to_string();
     path.fills = Paints::new([Paint::from(CGColor(255, 20, 147, 255))]);
@@ -194,7 +186,6 @@ async fn demo_scene() -> Scene {
 
     // Line with gradient stroke
     let mut line = nf.create_line_node();
-    line.name = Some("Gradient Line".to_string());
     line.transform = AffineTransform::new(400.0, 400.0, 0.0);
     line.size = Size {
         width: 200.0,
@@ -224,7 +215,6 @@ async fn demo_scene() -> Scene {
 
     // Regular polygon (octagon)
     let mut octagon = nf.create_regular_polygon_node();
-    octagon.name = Some("Octagon".to_string());
     octagon.transform = AffineTransform::new(650.0, 400.0, 0.0);
     octagon.size = Size {
         width: 100.0,
@@ -237,7 +227,6 @@ async fn demo_scene() -> Scene {
 
     // Description text
     let mut description_text = nf.create_text_span_node();
-    description_text.name = Some("Description".to_string());
     description_text.transform = AffineTransform::new(50.0, 550.0, 0.0);
     description_text.width = Some(700.0);
     description_text.text = "This PDF demonstrates various rendering capabilities including gradients, shapes, text, and effects.".to_string();

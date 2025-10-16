@@ -17,7 +17,6 @@ fn build_demo_content(
 
     // Content A
     let mut a = nf.create_rectangle_node();
-    a.name = Some("A".to_string());
     a.transform = AffineTransform::new(ox + 10.0, oy + 10.0, 0.0);
     a.size = Size {
         width: w * 0.6,
@@ -29,7 +28,6 @@ fn build_demo_content(
 
     // Content B
     let mut b = nf.create_rectangle_node();
-    b.name = Some("B".to_string());
     b.transform = AffineTransform::new(ox + w * 0.3, oy + h * 0.3, 0.0);
     b.size = Size {
         width: w * 0.6,
@@ -41,7 +39,6 @@ fn build_demo_content(
 
     // Diagonal band (thin rotated rectangle)
     let mut band = nf.create_rectangle_node();
-    band.name = Some("Band".to_string());
     let band_x = ox + w * 0.05;
     let band_y = oy + h * 0.15;
     let band_w = w * 0.95;
@@ -69,7 +66,6 @@ fn build_geometry_mask(
     let (w, h) = size;
     let radius = (w.min(h)) * 0.4;
     let mut mask = nf.create_ellipse_node();
-    mask.name = Some("Mask Geometry".to_string());
     mask.transform = AffineTransform::new(ox + w * 0.5 - radius, oy + h * 0.5 - radius, 0.0);
     mask.size = Size {
         width: radius * 2.0,
@@ -90,7 +86,6 @@ fn build_alpha_mask(
     let (ox, oy) = origin;
     let (w, h) = size;
     let mut mask = nf.create_rectangle_node();
-    mask.name = Some("Mask Alpha".to_string());
     mask.transform = AffineTransform::new(ox, oy, 0.0);
     mask.size = Size {
         width: w,
@@ -127,7 +122,6 @@ fn build_luminance_mask(
     let (ox, oy) = origin;
     let (w, h) = size;
     let mut mask = nf.create_rectangle_node();
-    mask.name = Some("Mask Luminance".to_string());
     mask.transform = AffineTransform::new(ox, oy, 0.0);
     mask.size = Size {
         width: w,
@@ -160,7 +154,6 @@ async fn demo_mask_panels() -> Scene {
 
     // Root container
     let mut root = nf.create_container_node();
-    root.name = Some("Mask Modes Demo".to_string());
     let width = 1400.0;
     let height = 400.0;
     root.size = Size { width, height };
@@ -186,7 +179,6 @@ async fn demo_mask_panels() -> Scene {
     for kind in kinds {
         // Panel container per kind
         let mut panel = nf.create_container_node();
-        panel.name = Some("Panel".to_string());
         panel.transform = AffineTransform::new(left, top, 0.0);
         panel.size = Size {
             width: panel_w,
