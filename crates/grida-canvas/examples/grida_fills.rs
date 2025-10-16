@@ -11,7 +11,6 @@ async fn demo_fills() -> Scene {
 
     // Root container
     let mut root = nf.create_container_node();
-    root.name = Some("Root".to_string());
     root.size = Size {
         width: 1200.0,
         height: 800.0,
@@ -25,7 +24,6 @@ async fn demo_fills() -> Scene {
 
     // 1. Rectangle with multiple solid fills (layered colors)
     let mut multi_solid_rect = nf.create_rectangle_node();
-    multi_solid_rect.name = Some("Multi Solid Fills".to_string());
     multi_solid_rect.transform = AffineTransform::new(start_x, base_y, 0.0);
     multi_solid_rect.size = Size {
         width: 150.0,
@@ -45,7 +43,6 @@ async fn demo_fills() -> Scene {
 
     // 2. Rectangle with solid + linear gradient fills
     let mut solid_gradient_rect = nf.create_rectangle_node();
-    solid_gradient_rect.name = Some("Solid + Linear Gradient".to_string());
     solid_gradient_rect.transform = AffineTransform::new(start_x + spacing, base_y, 0.0);
     solid_gradient_rect.size = Size {
         width: 150.0,
@@ -79,7 +76,6 @@ async fn demo_fills() -> Scene {
 
     // 3. Rectangle with solid + radial gradient fills
     let mut solid_radial_rect = nf.create_rectangle_node();
-    solid_radial_rect.name = Some("Solid + Radial Gradient".to_string());
     solid_radial_rect.transform = AffineTransform::new(start_x + spacing * 2.0, base_y, 0.0);
     solid_radial_rect.size = Size {
         width: 150.0,
@@ -117,7 +113,6 @@ async fn demo_fills() -> Scene {
 
     // 4. Rectangle with linear + radial gradient fills
     let mut gradient_gradient_rect = nf.create_rectangle_node();
-    gradient_gradient_rect.name = Some("Linear + Radial Gradient".to_string());
     gradient_gradient_rect.transform = AffineTransform::new(start_x + spacing * 3.0, base_y, 0.0);
     gradient_gradient_rect.size = Size {
         width: 150.0,
@@ -168,7 +163,6 @@ async fn demo_fills() -> Scene {
 
     // 5. Ellipse with multiple radial gradients (concentric circles effect)
     let mut multi_radial_ellipse = nf.create_ellipse_node();
-    multi_radial_ellipse.name = Some("Multi Radial Gradients".to_string());
     multi_radial_ellipse.transform = AffineTransform::new(start_x, base_y + spacing, 0.0);
     multi_radial_ellipse.size = Size {
         width: 150.0,
@@ -242,7 +236,6 @@ async fn demo_fills() -> Scene {
         .collect::<Vec<_>>();
 
     let mut complex_fill_polygon = nf.create_polygon_node();
-    complex_fill_polygon.name = Some("Complex Multi-Fill Polygon".to_string());
     complex_fill_polygon.transform = AffineTransform::new(start_x + spacing, base_y + spacing, 0.0);
     complex_fill_polygon.points = pentagon_points;
     complex_fill_polygon.fills = Paints::new([
@@ -290,7 +283,6 @@ async fn demo_fills() -> Scene {
 
     // 7. Regular polygon with multiple linear gradients at different angles
     let mut multi_linear_polygon = nf.create_regular_polygon_node();
-    multi_linear_polygon.name = Some("Multi Linear Gradients".to_string());
     multi_linear_polygon.transform =
         AffineTransform::new(start_x + spacing * 2.0, base_y + spacing, 0.0);
     multi_linear_polygon.size = Size {
@@ -356,7 +348,6 @@ async fn demo_fills() -> Scene {
 
     // 8. Container with multiple fills (demonstrating container fill capability)
     let mut multi_fill_container = nf.create_container_node();
-    multi_fill_container.name = Some("Multi-Fill Container".to_string());
     multi_fill_container.transform =
         AffineTransform::new(start_x + spacing * 3.0, base_y + spacing, 0.0);
     multi_fill_container.size = Size {

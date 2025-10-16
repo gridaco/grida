@@ -18,7 +18,6 @@ fn create_container_with_gap(id: &str, width: f32, height: f32, gap: f32) -> Con
     let id_u64 = hasher.finish();
 
     ContainerNodeRec {
-        name: Some(format!("Container {}", id)),
         active: true,
         opacity: 1.0,
         blend_mode: LayerBlendMode::PassThrough,

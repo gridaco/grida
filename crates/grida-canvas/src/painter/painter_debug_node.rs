@@ -193,7 +193,6 @@ impl<'a> NodePainter<'a> {
         let points = node.to_points();
 
         let polygon = PolygonNodeRec {
-            name: node.name.clone(),
             active: node.active,
             opacity: node.opacity,
             blend_mode: node.blend_mode,
@@ -217,7 +216,6 @@ impl<'a> NodePainter<'a> {
         let points = node.to_points();
 
         let polygon = PolygonNodeRec {
-            name: node.name.clone(),
             active: node.active,
             opacity: node.opacity,
             blend_mode: node.blend_mode,

@@ -10,7 +10,6 @@ async fn demo_clip() -> Scene {
 
     // Create a single container with solid fill
     let mut container = nf.create_container_node();
-    container.name = Some("Simple Container".to_string());
     container.transform = AffineTransform::new(100.0, 100.0, 0.0);
     container.size = Size {
         width: 300.0,
@@ -31,7 +30,6 @@ async fn demo_clip() -> Scene {
 
     // Create an ellipse
     let mut ellipse = nf.create_ellipse_node();
-    ellipse.name = Some("Simple Ellipse".to_string());
     ellipse.transform = AffineTransform::new(100.0, 150.0, 0.0); // Position below container
     ellipse.size = Size {
         width: 300.0,

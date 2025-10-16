@@ -96,11 +96,6 @@ impl ContainerWithStyle {
         // TODO: Remove this method - ID should come from graph traversal
         0
     }
-
-    /// Get container name
-    pub fn name(&self) -> Option<&String> {
-        self.container.name.as_ref()
-    }
 }
 
 /// Compute flex layout for a container with style and its children
@@ -167,7 +162,6 @@ mod tests {
         use crate::node::schema::ContainerNodeRec;
 
         let container = ContainerWithStyle::from_container(ContainerNodeRec {
-            name: Some("Test Container".to_string()),
             active: true,
             opacity: 1.0,
             blend_mode: LayerBlendMode::PassThrough,
@@ -202,7 +196,6 @@ mod tests {
         let children: Vec<ContainerWithStyle> = (0..3)
             .map(|i| {
                 ContainerWithStyle::from_container(ContainerNodeRec {
-                    name: Some(format!("Child {}", i)),
                     active: true,
                     opacity: 1.0,
                     blend_mode: LayerBlendMode::PassThrough,
@@ -250,7 +243,6 @@ mod tests {
         use crate::node::schema::ContainerNodeRec;
 
         let container = ContainerWithStyle::from_container(ContainerNodeRec {
-            name: Some("Test Container".to_string()),
             active: true,
             opacity: 1.0,
             blend_mode: LayerBlendMode::PassThrough,
@@ -288,7 +280,6 @@ mod tests {
         let children: Vec<ContainerWithStyle> = (0..4)
             .map(|i| {
                 ContainerWithStyle::from_container(ContainerNodeRec {
-                    name: Some(format!("Child {}", i)),
                     active: true,
                     opacity: 1.0,
                     blend_mode: LayerBlendMode::PassThrough,

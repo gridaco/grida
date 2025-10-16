@@ -10,7 +10,6 @@ async fn scene() -> Scene {
 
     // Text with Outside stroke alignment
     let text_outside = TextSpanNodeRec {
-        name: Some("Outside".to_string()),
         active: true,
         transform: AffineTransform::new(50.0, 50.0, 0.0),
         width: None,
@@ -33,7 +32,6 @@ async fn scene() -> Scene {
 
     // Text with Center stroke alignment
     let text_center = TextSpanNodeRec {
-        name: Some("Center".to_string()),
         active: true,
         transform: AffineTransform::new(50.0, 150.0, 0.0),
         width: None,
@@ -56,7 +54,6 @@ async fn scene() -> Scene {
 
     // Text with Inside stroke alignment
     let text_inside = TextSpanNodeRec {
-        name: Some("Inside".to_string()),
         active: true,
         transform: AffineTransform::new(50.0, 250.0, 0.0),
         width: None,

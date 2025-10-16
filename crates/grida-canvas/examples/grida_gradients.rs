@@ -11,7 +11,6 @@ async fn demo_gradients() -> Scene {
 
     // root container
     let mut root = nf.create_container_node();
-    root.name = Some("Root".to_string());
     root.size = Size {
         width: 1200.0,
         height: 800.0,
@@ -26,7 +25,6 @@ async fn demo_gradients() -> Scene {
     // Linear gradient fills
     for i in 0..5 {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Linear Fill {}", i));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 80.0, 0.0);
         rect.size = Size {
             width: base,
@@ -56,7 +54,6 @@ async fn demo_gradients() -> Scene {
     // Radial gradient fills
     for i in 0..5 {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Radial Fill {}", i));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 280.0, 0.0);
         rect.size = Size {
             width: base,
@@ -88,7 +85,6 @@ async fn demo_gradients() -> Scene {
     // Linear gradient strokes
     for i in 0..5 {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Linear Stroke {}", i));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 480.0, 0.0);
         rect.size = Size {
             width: base,
@@ -120,7 +116,6 @@ async fn demo_gradients() -> Scene {
     // Radial gradient strokes
     for i in 0..5 {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Radial Stroke {}", i));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 680.0, 0.0);
         rect.size = Size {
             width: base,

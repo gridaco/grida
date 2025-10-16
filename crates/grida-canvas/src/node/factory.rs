@@ -52,7 +52,6 @@ impl NodeFactory {
     /// Creates a new rectangle node with default values
     pub fn create_rectangle_node(&self) -> RectangleNodeRec {
         RectangleNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -72,7 +71,6 @@ impl NodeFactory {
     /// Creates a new ellipse node with default values
     pub fn create_ellipse_node(&self) -> EllipseNodeRec {
         EllipseNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -95,7 +93,6 @@ impl NodeFactory {
     /// Creates a new line node with default values
     pub fn create_line_node(&self) -> LineNodeRec {
         LineNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -116,7 +113,6 @@ impl NodeFactory {
     /// Creates a new text span node with default values
     pub fn create_text_span_node(&self) -> TextSpanNodeRec {
         TextSpanNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -141,7 +137,6 @@ impl NodeFactory {
     /// Creates a new group node with default values
     pub fn create_group_node(&self) -> GroupNodeRec {
         GroupNodeRec {
-            name: None,
             active: true,
             transform: None,
             opacity: Self::DEFAULT_OPACITY,
@@ -153,7 +148,6 @@ impl NodeFactory {
     /// Creates a new container node with default values
     pub fn create_container_node(&self) -> ContainerNodeRec {
         ContainerNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -181,7 +175,6 @@ impl NodeFactory {
     /// Creates a new path node with default values
     pub fn create_path_node(&self) -> SVGPathNodeRec {
         SVGPathNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -200,7 +193,6 @@ impl NodeFactory {
     /// Creates a new regular polygon node with default values
     pub fn create_regular_polygon_node(&self) -> RegularPolygonNodeRec {
         RegularPolygonNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -220,7 +212,6 @@ impl NodeFactory {
 
     pub fn create_regular_star_polygon_node(&self) -> RegularStarPolygonNodeRec {
         RegularStarPolygonNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -241,7 +232,6 @@ impl NodeFactory {
 
     pub fn create_polygon_node(&self) -> PolygonNodeRec {
         PolygonNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),
@@ -261,7 +251,6 @@ impl NodeFactory {
     /// Creates a new image node with default values
     pub fn create_image_node(&self) -> ImageNodeRec {
         ImageNodeRec {
-            name: None,
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),

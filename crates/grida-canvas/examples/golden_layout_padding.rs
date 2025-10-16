@@ -23,7 +23,6 @@ fn create_container_with_padding(
     let id_u64 = hasher.finish();
 
     ContainerNodeRec {
-        name: Some(format!("Container {}", id)),
         active: true,
         opacity: 1.0,
         blend_mode: LayerBlendMode::PassThrough,

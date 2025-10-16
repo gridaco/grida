@@ -948,7 +948,6 @@ impl From<JSONGroupNode> for GroupNodeRec {
         );
 
         GroupNodeRec {
-            name: node.base.name,
             active: node.base.active,
             // TODO: group's transform should be handled differently
             transform: Some(transform),
@@ -963,7 +962,6 @@ impl From<JSONGroupNode> for GroupNodeRec {
 impl From<JSONContainerNode> for ContainerNodeRec {
     fn from(node: JSONContainerNode) -> Self {
         ContainerNodeRec {
-            name: node.base.name,
             active: node.base.active,
             transform: AffineTransform::from_box_center(
                 node.base.left,
@@ -1023,7 +1021,6 @@ impl From<JSONTextNode> for TextSpanNodeRec {
         };
 
         TextSpanNodeRec {
-            name: node.base.name,
             active: node.base.active,
             transform: AffineTransform::from_box_center(
                 node.base.left,
@@ -1105,7 +1102,6 @@ impl From<JSONEllipseNode> for Node {
         );
 
         Node::Ellipse(EllipseNodeRec {
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1148,7 +1144,6 @@ impl From<JSONRectangleNode> for Node {
         );
 
         Node::Rectangle(RectangleNodeRec {
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1231,7 +1226,6 @@ impl From<JSONImageNode> for Node {
         };
 
         Node::Image(ImageNodeRec {
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1274,7 +1268,6 @@ impl From<JSONRegularPolygonNode> for Node {
         );
 
         Node::RegularPolygon(RegularPolygonNodeRec {
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1315,7 +1308,6 @@ impl From<JSONRegularStarPolygonNode> for Node {
         );
 
         Node::RegularStarPolygon(RegularStarPolygonNodeRec {
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1358,7 +1350,6 @@ impl From<JSONSVGPathNode> for Node {
 
         // For vector nodes, we'll create a path node with the path data
         Node::SVGPath(SVGPathNodeRec {
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1396,7 +1387,6 @@ impl From<JSONLineNode> for Node {
         );
 
         Node::Line(LineNodeRec {
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1436,7 +1426,6 @@ impl From<JSONVectorNode> for Node {
             .unwrap_or_default();
 
         Node::Vector(VectorNodeRec {
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1475,7 +1464,6 @@ impl From<JSONBooleanOperationNode> for Node {
         );
 
         Node::BooleanOperation(BooleanPathOperationNodeRec {
-            name: node.base.name,
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -1517,7 +1505,6 @@ impl From<JSONNode> for Node {
             JSONNode::BooleanOperation(boolean) => boolean.into(),
             JSONNode::Image(image) => image.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNodeRec {
-                name: unknown.name,
                 active: unknown.active,
                 transform: AffineTransform::identity(),
                 size: Size {
@@ -1531,7 +1518,6 @@ impl From<JSONNode> for Node {
                 // Scene nodes should be filtered out before conversion
                 // This case should not be reached in normal operation
                 Node::Error(ErrorNodeRec {
-                    name: Some(scene.name),
                     active: scene.active.unwrap_or(true),
                     transform: AffineTransform::identity(),
                     size: Size {

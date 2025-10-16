@@ -10,7 +10,6 @@ async fn demo_shapes() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.name = Some("Root Container".to_string());
     root_container_node.size = Size {
         width: 1080.0,
         height: 1200.0,
@@ -29,7 +28,6 @@ async fn demo_shapes() -> Scene {
     // Rectangle Row - demonstrating corner radius variations
     for i in 0..items_per_row {
         let mut rect = nf.create_rectangle_node();
-        rect.name = Some(format!("Rectangle {}", i + 1));
         rect.transform = AffineTransform::new(start_x + spacing * i as f32, 100.0, 0.0);
         rect.size = Size {
             width: base_size,
@@ -51,7 +49,6 @@ async fn demo_shapes() -> Scene {
     // Ellipse Row - demonstrating width/height ratio variations
     for i in 0..items_per_row {
         let mut ellipse = nf.create_ellipse_node();
-        ellipse.name = Some(format!("Ellipse {}", i + 1));
         ellipse.transform = AffineTransform::new(start_x + spacing * i as f32, 200.0, 0.0);
         ellipse.size = Size {
             width: base_size * (1.0 + (i as f32 * 0.1)), // 1.0x to 1.9x width
@@ -84,7 +81,6 @@ async fn demo_shapes() -> Scene {
             .collect::<Vec<_>>();
 
         let mut polygon = nf.create_polygon_node();
-        polygon.name = Some(format!("Polygon {}", i + 1));
         polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
         polygon.points = points;
         polygon.corner_radius = 8.0;
@@ -103,7 +99,6 @@ async fn demo_shapes() -> Scene {
     // Regular Polygon Row - demonstrating point count variations
     for i in 0..items_per_row {
         let mut regular_polygon = nf.create_regular_polygon_node();
-        regular_polygon.name = Some(format!("Regular Polygon {}", i + 1));
         regular_polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 400.0, 0.0);
         regular_polygon.size = Size {
             width: base_size,
@@ -138,7 +133,6 @@ async fn demo_shapes() -> Scene {
     ];
     for (i, data) in path_data.iter().enumerate() {
         let mut path = nf.create_path_node();
-        path.name = Some(format!("Path {}", i + 1));
         path.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         path.data = data.to_string();
         path.fills = Paints::new([Paint::from(CGColor(
@@ -156,7 +150,6 @@ async fn demo_shapes() -> Scene {
     // Star Polygon Row - demonstrating different point counts and inner radius variations
     for i in 0..items_per_row {
         let mut star = nf.create_regular_star_polygon_node();
-        star.name = Some(format!("Star Polygon {}", i + 1));
         star.transform = AffineTransform::new(start_x + spacing * i as f32, 600.0, 0.0);
         star.size = Size {
             width: base_size,
@@ -180,7 +173,6 @@ async fn demo_shapes() -> Scene {
     // Arc Row - demonstrating different angle variations
     for i in 0..items_per_row {
         let mut arc = nf.create_ellipse_node();
-        arc.name = Some(format!("Arc {}", i + 1));
         arc.transform = AffineTransform::new(start_x + spacing * i as f32, 700.0, 0.0);
         arc.size = Size {
             width: base_size,

@@ -354,7 +354,6 @@ mod tests {
 
     fn create_test_node(id: u64) -> Node {
         Node::Error(ErrorNodeRec {
-            name: Some(format!("node_{}", id)),
             active: true,
             transform: AffineTransform::identity(),
             size: Size {

@@ -27,7 +27,6 @@ async fn demo_nested() -> Scene {
 
         // Create a container for this level
         let mut container = nf.create_container_node();
-        container.name = Some(format!("Level {} Container", i));
 
         // Each level is centered in its parent with rotation
         container.transform = AffineTransform::new(
@@ -56,7 +55,6 @@ async fn demo_nested() -> Scene {
 
         // Add a label at each level
         let mut label = nf.create_text_span_node();
-        label.name = Some(format!("Level {} Label", i));
         label.transform = AffineTransform::new(10.0, 10.0, 0.0);
         label.text = format!("Level {}", i);
         label.text_style = TextStyleRec::from_font("", 14.0);
@@ -69,7 +67,6 @@ async fn demo_nested() -> Scene {
 
     // Add final innermost content - a star
     let mut star = nf.create_regular_star_polygon_node();
-    star.name = Some("Center Star".to_string());
     let final_size = base_size * 0.85_f32.powi(levels);
     star.transform = AffineTransform::new(final_size * 0.25, final_size * 0.25, 0.0);
     star.size = Size {

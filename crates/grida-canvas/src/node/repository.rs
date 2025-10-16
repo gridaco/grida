@@ -101,7 +101,6 @@ mod tests {
     fn node_repository_basic() {
         let mut repo = NodeRepository::new();
         let node = Node::Error(ErrorNodeRec {
-            name: Some("err".to_string()),
             active: true,
             transform: math2::transform::AffineTransform::identity(),
             size: Size {

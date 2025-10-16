@@ -13,7 +13,6 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
     let rectangles: Vec<Node> = (0..count)
         .map(|i| {
             Node::Rectangle(RectangleNodeRec {
-                name: None,
                 active: true,
                 opacity: 1.0,
                 blend_mode: LayerBlendMode::default(),
@@ -46,7 +45,6 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
 
     // Create root group
     let root_group = GroupNodeRec {
-        name: Some("Root Group".to_string()),
         active: true,
         transform: None,
         opacity: 1.0,

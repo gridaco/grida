@@ -9,7 +9,6 @@ async fn demo_lines() -> Scene {
     let nf = NodeFactory::new();
 
     let mut root = nf.create_container_node();
-    root.name = Some("Lines Demo".to_string());
     root.size = Size {
         width: 1000.0,
         height: 600.0,
@@ -24,7 +23,6 @@ async fn demo_lines() -> Scene {
 
     // Basic horizontal line
     let mut line_basic = nf.create_line_node();
-    line_basic.name = Some("Basic".to_string());
     line_basic.transform = AffineTransform::new(start_x, start_y, 0.0);
     line_basic.size = Size {
         width: length,
@@ -35,7 +33,6 @@ async fn demo_lines() -> Scene {
 
     // Outside aligned thick line
     let mut line_outside = nf.create_line_node();
-    line_outside.name = Some("Outside".to_string());
     line_outside.transform = AffineTransform::new(start_x, start_y + spacing, 0.0);
     line_outside.size = Size {
         width: length,
@@ -47,7 +44,6 @@ async fn demo_lines() -> Scene {
 
     // Dashed line
     let mut line_dashed = nf.create_line_node();
-    line_dashed.name = Some("Dashed".to_string());
     line_dashed.transform = AffineTransform::new(start_x, start_y + spacing * 2.0, 0.0);
     line_dashed.size = Size {
         width: length,
@@ -59,7 +55,6 @@ async fn demo_lines() -> Scene {
 
     // Gradient stroke line
     let mut line_gradient = nf.create_line_node();
-    line_gradient.name = Some("Gradient".to_string());
     line_gradient.transform = AffineTransform::new(start_x, start_y + spacing * 3.0, 0.0);
     line_gradient.size = Size {
         width: length,
@@ -85,7 +80,6 @@ async fn demo_lines() -> Scene {
 
     // Rotated diagonal line
     let mut line_rotated = nf.create_line_node();
-    line_rotated.name = Some("Rotated".to_string());
     line_rotated.transform =
         AffineTransform::new(start_x, start_y + spacing * 4.0, 45f32.to_radians());
     line_rotated.size = Size {

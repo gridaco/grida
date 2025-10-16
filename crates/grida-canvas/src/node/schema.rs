@@ -178,30 +178,10 @@ pub enum Node {
 
 // node trait
 pub trait NodeTrait {
-    fn name(&self) -> Option<String>;
     fn active(&self) -> bool;
 }
 
 impl NodeTrait for Node {
-    fn name(&self) -> Option<String> {
-        match self {
-            Node::Error(n) => n.name.clone(),
-            Node::Group(n) => n.name.clone(),
-            Node::Container(n) => n.name.clone(),
-            Node::Rectangle(n) => n.name.clone(),
-            Node::Ellipse(n) => n.name.clone(),
-            Node::Polygon(n) => n.name.clone(),
-            Node::RegularPolygon(n) => n.name.clone(),
-            Node::RegularStarPolygon(n) => n.name.clone(),
-            Node::Line(n) => n.name.clone(),
-            Node::TextSpan(n) => n.name.clone(),
-            Node::SVGPath(n) => n.name.clone(),
-            Node::Vector(n) => n.name.clone(),
-            Node::BooleanOperation(n) => n.name.clone(),
-            Node::Image(n) => n.name.clone(),
-        }
-    }
-
     fn active(&self) -> bool {
         match self {
             Node::Error(n) => n.active,
@@ -305,22 +285,6 @@ pub enum LeafNode {
 }
 
 impl NodeTrait for LeafNode {
-    fn name(&self) -> Option<String> {
-        match self {
-            LeafNode::Error(n) => n.name.clone(),
-            LeafNode::Rectangle(n) => n.name.clone(),
-            LeafNode::Ellipse(n) => n.name.clone(),
-            LeafNode::Polygon(n) => n.name.clone(),
-            LeafNode::RegularPolygon(n) => n.name.clone(),
-            LeafNode::RegularStarPolygon(n) => n.name.clone(),
-            LeafNode::Line(n) => n.name.clone(),
-            LeafNode::TextSpan(n) => n.name.clone(),
-            LeafNode::SVGPath(n) => n.name.clone(),
-            LeafNode::Vector(n) => n.name.clone(),
-            LeafNode::Image(n) => n.name.clone(),
-        }
-    }
-
     fn active(&self) -> bool {
         match self {
             LeafNode::Error(n) => n.active,
@@ -340,7 +304,6 @@ impl NodeTrait for LeafNode {
 
 #[derive(Debug, Clone)]
 pub struct ErrorNodeRec {
-    pub name: Option<String>,
     pub active: bool,
     pub transform: AffineTransform,
     pub size: Size,
@@ -371,7 +334,6 @@ impl ErrorNodeRec {
 
 #[derive(Debug, Clone)]
 pub struct GroupNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -383,7 +345,6 @@ pub struct GroupNodeRec {
 
 #[derive(Debug, Clone)]
 pub struct ContainerNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -501,7 +462,6 @@ impl NodeShapeMixin for ContainerNodeRec {
 
 #[derive(Debug, Clone)]
 pub struct RectangleNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -588,7 +548,6 @@ impl NodeShapeMixin for RectangleNodeRec {
 
 #[derive(Debug, Clone)]
 pub struct LineNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -622,7 +581,6 @@ impl LineNodeRec {
 /// - `<div style="background-image: ...">` = multiple background layers (use other shape nodes)
 #[derive(Debug, Clone)]
 pub struct ImageNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -710,7 +668,6 @@ impl NodeGeometryMixin for ImageNodeRec {
 /// For details on arc mathematics, see: <https://mathworld.wolfram.com/Arc.html> (implementation varies)
 #[derive(Debug, Clone)]
 pub struct EllipseNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -828,7 +785,6 @@ impl NodeGeometryMixin for EllipseNodeRec {
 
 #[derive(Debug, Clone)]
 pub struct BooleanPathOperationNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -871,7 +827,6 @@ impl NodeStrokesMixin for BooleanPathOperationNodeRec {
 ///
 #[derive(Debug, Clone)]
 pub struct VectorNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -944,7 +899,6 @@ impl VectorNodeRec {
 ///
 #[derive(Debug, Clone)]
 pub struct SVGPathNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -1002,7 +956,6 @@ impl NodeTransformMixin for SVGPathNodeRec {
 /// https://developer.mozilla.org/en-US/docs/Web/SVG/Element/polygon
 #[derive(Debug, Clone)]
 pub struct PolygonNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
@@ -1100,7 +1053,6 @@ impl NodeShapeMixin for PolygonNodeRec {
 /// For details on regular polygon mathematics, see: <https://mathworld.wolfram.com/RegularPolygon.html> (implementation varies)
 #[derive(Debug, Clone)]
 pub struct RegularPolygonNodeRec {
-    pub name: Option<String>,
     pub active: bool,
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
@@ -1216,7 +1168,6 @@ impl NodeShapeMixin for RegularPolygonNodeRec {
 /// For details on star polygon mathematics, see: <https://mathworld.wolfram.com/StarPolygon.html>
 #[derive(Debug, Clone)]
 pub struct RegularStarPolygonNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     pub opacity: f32,
@@ -1337,7 +1288,6 @@ impl RegularStarPolygonNodeRec {
 /// For multi-style content, see `RichTextNode` (not implemented yet).
 #[derive(Debug, Clone)]
 pub struct TextSpanNodeRec {
-    pub name: Option<String>,
     pub active: bool,
 
     /// Transform applied to the text container.
