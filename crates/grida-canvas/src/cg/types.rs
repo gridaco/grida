@@ -2448,13 +2448,15 @@ pub struct FeLiquidGlass {
     /// Light angle in degrees (reserved for future use)
     pub light_angle: f32,
 
-    /// Index of refraction [1.0-2.0]
-    /// 1.0 = no refraction (air), 1.5 = typical glass, 2.0 = high refraction
+    /// Refraction strength [0.0-1.0]
+    /// 0.0 = no refraction, 0.5 = typical glass, 1.0 = maximum refraction
+    /// Internally mapped to IOR range [1.0-2.0]
     pub refraction: f32,
 
-    /// Glass thickness/depth for 3D surface effect [0.0-1.0] (normalized)
-    /// 0.0 = flat glass, 1.0 = depth equals min(width, height)
-    /// Higher values create more pronounced lens curvature
+    /// Glass thickness/depth for 3D surface effect in pixels [1.0+]
+    /// Controls the curvature height of the glass surface
+    /// Higher values create more pronounced lens curvature and stronger refraction
+    /// Typical values: 20-100 pixels
     pub depth: f32,
 
     /// Chromatic aberration strength [0.0-1.0]
@@ -2471,10 +2473,10 @@ impl Default for FeLiquidGlass {
         Self {
             light_intensity: 0.9,
             light_angle: 45.0,
-            refraction: 1.5,
-            depth: 0.15, // Normalized: 0.15 * min(w,h) gives good default depth
-            dispersion: 0.03,
-            blur_radius: 8.0,
+            refraction: 0.8,  // Normalized [0.0-1.0], maps to IOR [1.0-2.0]
+            depth: 20.0,      // Absolute pixels [1.0+], typical values: 20-100
+            dispersion: 0.5,  // Chromatic aberration strength [0.0-1.0]
+            blur_radius: 4.0, // Blur radius in pixels
         }
     }
 }

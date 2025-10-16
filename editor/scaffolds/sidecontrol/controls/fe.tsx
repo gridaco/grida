@@ -540,13 +540,13 @@ function FeLiquidGlassProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value.refraction}
-          min={1.0}
-          max={2.0}
-          step={0.1}
+          min={0.0}
+          max={1.0}
+          step={0.01}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
-              refraction: v ?? 1.5,
+              refraction: v ?? 0.5,
             })
           }
         />
@@ -556,13 +556,13 @@ function FeLiquidGlassProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value.depth}
-          min={0}
-          max={1}
-          step={0.01}
+          min={1.0}
+          max={editor.config.DEFAULT_MAX_LIQUID_GLASS_DEPTH}
+          step={1.0}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
-              depth: v ?? 0.15,
+              depth: v ?? 50.0,
             })
           }
         />
@@ -578,7 +578,7 @@ function FeLiquidGlassProperties({
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
-              dispersion: v ?? 0.02,
+              dispersion: v ?? 0.03,
             })
           }
         />
@@ -587,12 +587,12 @@ function FeLiquidGlassProperties({
         <PropertyLineLabel>Frost Blur</PropertyLineLabel>
         <InputPropertyNumber
           mode="fixed"
-          value={value.radius}
-          max={editor.config.DEFAULT_MAX_LIQUID_GLASS_RADIUS}
+          value={value.blurRadius}
+          max={editor.config.DEFAULT_MAX_LIQUID_GLASS_BLUR_RADIUS}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
-              radius: v ?? 2.0,
+              blurRadius: v ?? 8.0,
             })
           }
         />

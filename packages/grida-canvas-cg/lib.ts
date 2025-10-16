@@ -1028,7 +1028,7 @@ export namespace cg {
      * Adjust the angle and intensity of the light illuminating your glass containers
      * to change where the highlight appears on the container's edge.
      *
-     * @default 0.5
+     * @default 0.9
      */
     lightIntensity: number;
 
@@ -1036,57 +1036,49 @@ export namespace cg {
      * The angle of the specular light in degrees.
      * Controls the direction of highlights on the glass surface.
      *
-     * @default 0
+     * @default 45.0
      */
     lightAngle: number;
 
     /**
-     * The intensity of the refraction distortion.
-     * Must be between 0 and 1. Higher values create more distortion.
+     * Refraction strength [0.0-1.0]
+     * 0.0 = no refraction, 0.5 = typical glass, 1.0 = maximum refraction
+     * Internally mapped to IOR range [1.0-2.0]
      *
      * Control the way light bends along the edge of your glass container.
      * The higher the refraction value, the more your glass containers will
      * distort the elements around them.
      *
-     * @default 0.5
+     * @default 0.8
      */
     refraction: number;
 
     /**
-     * The depth of the refraction effect (normalized).
-     * Must be between 0 and 1.
-     * - 0 = flat glass (no 3D effect)
-     * - 1 = depth equals min(width, height) of the container
+     * Glass thickness/depth for 3D surface effect in pixels [1.0+]
+     * Controls the curvature height of the glass surface
+     * Higher values create more pronounced lens curvature and stronger refraction
+     * Typical values: 20-100 pixels
      *
-     * Change how thick your glass material appears to provide a more
-     * pronounced 3D feel to the edge of the container. The depth is
-     * automatically scaled relative to the container size for consistent
-     * appearance across different dimensions.
-     *
-     * @default 0.15
+     * @default 20.0
      */
     depth: number;
 
     /**
-     * The amount of chromatic aberration (color separation).
-     * Must be between 0 and 1. Higher values create more rainbow-like distortion at edges.
+     * Chromatic aberration strength [0.0-1.0]
+     * Controls color separation at edges (rainbow effect)
+     * Higher values create more rainbow-like distortion at edges.
      *
-     * Increase dispersion to add a hint of chromatic aberration at the edge
-     * of your glass containers. This works best in combination with refraction.
-     *
-     * @default 0
+     * @default 0.5
      */
     dispersion: number;
 
     /**
-     * The radius of frost on the glass effect.
+     * Blur radius for frosted glass effect [0.0+] in pixels
+     * Applied via Skia's native blur before refraction shader
      *
-     * Adjust the amount of background blur present on your glass containers to help
-     * glass elements stand out on busy backgrounds to provide better contrast.
-     *
-     * @default 0
+     * @default 4.0
      */
-    radius: number;
+    blurRadius: number;
   };
 
   /**

@@ -531,14 +531,20 @@ const safe_properties: Partial<
           ...value,
           lightIntensity: cmath.clamp(value.lightIntensity, 0, 1),
           lightAngle: value.lightAngle,
-          refraction: cmath.clamp(value.refraction, 1.0, 2.0),
-          // depth is now normalized 0-1 where 1.0 = min(width, height)
-          depth: cmath.clamp(value.depth, 0, 1),
+          // refraction is now normalized 0-1, maps to IOR 1.0-2.0
+          refraction: cmath.clamp(value.refraction, 0, 1),
+          // depth is now absolute pixels [1.0+]
+          depth: cmath.clamp(
+            value.depth,
+            1.0,
+            editor.config.DEFAULT_MAX_LIQUID_GLASS_DEPTH
+          ),
           dispersion: cmath.clamp(value.dispersion, 0, 1),
-          radius: ranged(
+          // renamed from radius to blurRadius
+          blurRadius: ranged(
             0,
-            value.radius,
-            editor.config.DEFAULT_MAX_LIQUID_GLASS_RADIUS
+            value.blurRadius,
+            editor.config.DEFAULT_MAX_LIQUID_GLASS_BLUR_RADIUS
           ),
         } as cg.FeLiquidGlass;
       }

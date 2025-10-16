@@ -21,8 +21,8 @@ uniform shader backdrop;        // Pre-blurred backdrop from SaveLayer (Skia pro
 // LiquidGlassEffect parameters
 uniform float light_intensity;  // Transmission/transparency [0.0-1.0]
 uniform float light_angle;      // Light angle in degrees (reserved)
-uniform float refraction;       // Index of refraction [1.0-2.0]
-uniform float depth;            // Glass thickness/depth for 3D effect [1.0+]
+uniform float refraction;       // Refraction strength [0.0-1.0], maps to IOR [1.0-2.0]
+uniform float depth;            // Glass thickness/depth in absolute pixels [1.0+]
 uniform float dispersion;       // Chromatic aberration strength [0.0-1.0]
 
 /**
@@ -103,58 +103,90 @@ float height(float sd, float thickness)
 
 /**
  * Calculate liquid glass material effect
- * Implements physically-based glass with refraction, fresnel, and chromatic aberration
+ * Top-view orthographic refraction - backdrop displacement based on surface angle
  */
 vec4 calculateLiquidGlass(float sd, vec2 g, vec2 fragCoord)
 {
     // Use LiquidGlassEffect parameters
-    float thickness = depth;
+    // Depth is in absolute pixels, minimum 1.0
+    float thickness = max(depth, 1.0);
     float transmission = light_intensity;  // Light intensity controls transmission
-    float roughness = 0.1;                 // Keep fixed for now
-    float ior = refraction;                // Refraction controls index of refraction
-    float chromaticAberration = dispersion; // Dispersion controls chromatic aberration
+    
+    // Convert normalized refraction [0.0-1.0] to IOR [1.0-2.0]
+    // 0.0 = no refraction (IOR 1.0, air), 1.0 = strong refraction (IOR 2.0)
+    float ior = 1.0 + refraction;
+    
+    float dispersionAmount = dispersion;   // Dispersion controls chromatic aberration
     float distortionScale = 1.0;           // Keep fixed for now
     
+    // Get surface normal at this point
     vec3 normal = getNormal(sd, g * distortionScale, thickness);
     
-    // View direction (straight down - this is what should refract)
+    // View direction (straight down - orthographic projection)
     vec3 view_dir = vec3(0.0, 0.0, -1.0);
     
-    // Fresnel effect - more reflection at grazing angles
-    float fresnel = pow(1.0 - abs(dot(view_dir, normal)), 3.0);
+    // Calculate base reflectance (F0) using Schlick's approximation
+    float F0 = pow((1.0 - ior) / (1.0 + ior), 2.0);
     
-    // Base refraction - based on view direction, not light direction
-    vec3 refract_vec = refract(view_dir, normal, 1.0/ior);
-    float h = height(sd, thickness);
-    float base_height = thickness * 8.0;
-    float refract_length = (h + base_height) / dot(vec3(0.0, 0.0, -1.0), refract_vec);
+    // Fresnel effect - physically accurate (Schlick's approximation)
+    float cosTheta = max(dot(-view_dir, normal), 0.0);
+    float fresnel = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
     
-    // Chromatic aberration - sample RGB channels separately with dispersion
-    vec2 base_coord = fragCoord + refract_vec.xy * refract_length;
-    vec2 uv_base = base_coord / resolution.xy;
+    // Top-view refraction: Calculate displacement based on surface angle
+    // When viewing from top, we see the backdrop displaced by the surface normal's tilt
+    // The XY components of the refracted ray determine the displacement
     
-    // Chromatic aberration offset - use original working approach
-    // Offset is proportional to refraction vector and dispersion parameter
-    vec2 offset = refract_vec.xy * chromaticAberration;
+    // Wavelength-dependent IOR for chromatic aberration (Cauchy's equation approximation)
+    // At dispersion=1.0, creates very strong, dramatic rainbow effect at edges
+    float ior_r = ior - dispersionAmount * 0.15;  // Red bends less
+    float ior_g = ior;                            // Green (reference)
+    float ior_b = ior + dispersionAmount * 0.15;  // Blue bends more
     
-    // Sample in UV space (normalized coordinates), then use pre-blurred backdrop
-    // Backdrop is already blurred by Skia's ImageFilter for optimal performance
-    vec2 coord_r = (uv_base - offset) * resolution;
-    vec2 coord_g = uv_base * resolution;
-    vec2 coord_b = (uv_base + offset) * resolution;
+    // Calculate refraction displacement for each color channel
+    vec3 refract_color = vec3(0.0);
+    vec3 iors = vec3(ior_r, ior_g, ior_b);
     
-    // Sample pre-blurred backdrop for each channel (chromatic aberration)
-    float r = backdrop.eval(coord_r).r;
-    float g_channel = backdrop.eval(coord_g).g;
-    float b = backdrop.eval(coord_b).b;
-    vec4 refract_color = vec4(r, g_channel, b, 1.0);
+    for(int i = 0; i < 3; i++) {
+        float channel_ior = iors[i];
+        
+        // Calculate refraction vector for this wavelength
+        vec3 refract_vec = refract(view_dir, normal, 1.0 / channel_ior);
+        
+        // Check for total internal reflection
+        if(length(refract_vec) < 0.01) {
+            // TIR - use white reflection
+            refract_color[i] = 1.0;
+            continue;
+        }
+        
+        // Calculate displacement based on surface angle and glass thickness
+        // The displacement is proportional to:
+        // 1. How much the surface is tilted (refract_vec.xy)
+        // 2. The thickness of the glass (creates more displacement)
+        // 3. The IOR (higher IOR = more bending)
+        
+        // For top-view, displacement should be visible
+        // Scale factor controls the strength of the refraction effect
+        float displacement_scale = thickness * 0.5;
+        
+        // Calculate the offset based on refracted ray's XY components
+        vec2 offset = refract_vec.xy * displacement_scale;
+        
+        // Sample backdrop with offset
+        vec2 sample_pos = fragCoord + offset;
+        refract_color[i] = backdrop.eval(sample_pos)[i];
+    }
     
-    // Roughness-based reflection blur (simplified)
-    vec3 reflect_vec = reflect(view_dir, normal);
-    vec4 reflect_color = vec4(0.0);
+    vec4 refracted = vec4(refract_color, 1.0);
     
-    // Mix reflection and refraction based on fresnel and transmission
-    vec4 glass_color = mix(refract_color, reflect_color, fresnel * (1.0 - transmission));
+    // Reflection - create bright highlights at grazing angles
+    // Use white reflection for rim lighting effect
+    vec4 reflected = vec4(1.0, 1.0, 1.0, 1.0);
+    
+    // Mix reflection and refraction based on Fresnel and transmission
+    // Fresnel determines reflection amount, transmission parameter scales it
+    float reflection_amount = fresnel * (1.0 - transmission);
+    vec4 glass_color = mix(refracted, reflected, reflection_amount);
     
     return glass_color;
 }

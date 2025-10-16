@@ -2,9 +2,11 @@
 
 ## Overview
 
-A physically-based glass shader featuring real-time refraction with chromatic aberration, Fresnel reflections, SDF-based shape morphing, and supersampled anti-aliasing.
+A physically-accurate glass shader featuring real-time refraction with chromatic aberration, Fresnel reflections, SDF-based shape rendering, and supersampled anti-aliasing.
 
-Based on React Native Skia glass shader examples.
+Implements top-view orthographic refraction where the backdrop is displaced based on the curved glass surface angle. Uses Schlick's Fresnel approximation and wavelength-dependent refraction for realistic chromatic aberration.
+
+Based on React Native Skia glass shader examples and improved for physical accuracy.
 
 ## Implementation
 
@@ -42,11 +44,68 @@ Based on React Native Skia glass shader examples.
 
 ## Features
 
-- **Real-time Refraction**: Light bending through glass using configurable index of refraction
-- **Chromatic Aberration**: Color separation at edges (dispersion) for realistic glass distortion
-- **Fresnel Reflections**: Surface becomes more reflective at grazing angles
-- **SDF-based Shape**: Uses signed distance fields for rounded rectangle shapes
-- **Supersampled Anti-aliasing**: 4x4 SSAA for smooth edges
+- **Physically-Accurate Refraction**: Top-view orthographic refraction with backdrop displacement based on curved glass surface
+- **Wavelength-Dependent Chromatic Aberration**: Per-channel IOR calculations for realistic color separation (Cauchy's equation approximation)
+- **Schlick's Fresnel**: Physically-based reflections at grazing angles with proper F0 calculation
+- **Total Internal Reflection (TIR)**: Handles edge cases where refraction is impossible
+- **SDF-based Curved Surface**: Uses signed distance fields to generate 3D lens-like curvature from 2D rounded rectangles
+- **Supersampled Anti-aliasing**: 4x4 SSAA for smooth edges and reduced artifacts
+
+## Physical Model
+
+### Top-View Refraction
+
+The shader simulates viewing a curved glass surface from directly above (orthographic projection). The glass acts like a lens, displacing the backdrop based on:
+
+1. **Surface Curvature**: The `depth` parameter controls the height of the curved surface
+
+   - Higher depth = more curved = steeper surface angles at edges
+   - The surface shape is derived from the SDF, creating a smooth lens-like profile
+
+2. **Material Refraction**: The `refraction` parameter (0.0-1.0) maps to physical IOR (1.0-2.0)
+
+   - IOR determines how much light bends when entering the glass
+   - Higher IOR = more bending = more visible displacement
+
+3. **Displacement Calculation**:
+   ```glsl
+   displacement = refract_vec(IOR, surface_normal).xy × depth × scale_factor
+   ```
+   - The refraction vector's XY components determine the offset direction
+   - Multiplied by depth for magnitude
+   - Result: backdrop appears displaced/magnified at edges
+
+### Why Depth Affects Refraction Strength
+
+Even with the same IOR (material property), thicker glass creates more visible refraction because:
+
+- **Steeper surface angles**: Thicker glass has more pronounced curvature
+- **Larger tilt**: Surface normals point more outward at edges
+- **Greater displacement**: Both the refraction angle AND the depth multiplier increase
+
+Think of it like magnifying glasses: a thicker lens magnifies more, even if made from the same glass material.
+
+### Chromatic Aberration
+
+Different wavelengths refract at different angles (dispersion):
+
+- **Red light** (λ ≈ 650nm): Lower IOR, bends less
+- **Green light** (λ ≈ 550nm): Reference IOR
+- **Blue light** (λ ≈ 450nm): Higher IOR, bends more
+
+The shader samples each RGB channel with its own IOR offset, creating the characteristic rainbow fringing at edges.
+
+### Fresnel Reflections
+
+Uses Schlick's approximation for physically-based reflections:
+
+```glsl
+F0 = ((1 - IOR) / (1 + IOR))²  // Base reflectance (~4% for glass)
+Fresnel = F0 + (1 - F0) × (1 - cos(θ))⁵
+```
+
+At normal incidence (looking straight down): minimal reflection
+At grazing angles (near edges): strong white highlights
 
 ## Parameters
 
@@ -64,10 +123,16 @@ Based on React Native Skia glass shader examples.
 ### Effect Parameters
 
 - `light_intensity` (float [0.0-1.0]): Controls transmission/transparency
+  - 0.0 = opaque with full reflection, 1.0 = fully transparent
 - `light_angle` (float): Light angle in degrees (reserved for future use)
-- `refraction` (float [1.0-2.0]): Index of refraction (1.0=air, 1.5=glass)
-- `depth` (float [0.0-1.0]): Glass thickness for 3D surface effect (normalized: 0=none, 1.0=min(width,height))
-- `dispersion` (float [0.0-1.0]): Chromatic aberration strength
+- `refraction` (float [0.0-1.0]): Refraction strength, internally mapped to IOR [1.0-2.0]
+  - 0.0 = no refraction (IOR 1.0, air), 0.5 = typical glass (IOR 1.5), 1.0 = strong refraction (IOR 2.0)
+- `depth` (float [1.0+]): Glass thickness in absolute pixels for 3D surface curvature
+  - Controls the height of the curved lens surface. Higher values = more pronounced curvature
+  - Typical values: 20-100 pixels
+  - Minimum enforced: 1.0 pixel
+- `dispersion` (float [0.0-1.0]): Chromatic aberration strength (wavelength separation)
+  - 0.0 = no color separation, 1.0 = maximum rainbow effect at edges
 - `blur_radius` (float [0.0+]): Blur radius for frosted glass effect in pixels (applied via Skia's native blur before shader)
 
 ## Limitations
@@ -93,9 +158,10 @@ Based on React Native Skia glass shader examples.
 
 ### Other Limitations
 
-- **Reflection**: Reflection color is simplified (always black/transparent)
+- **Reflection**: Reflection color is simplified (white highlights for rim lighting effect)
 - **Performance**: Supersampling (4x4) may be expensive for large shapes or real-time applications
-- **Fixed Parameters**: `roughness` and `distortionScale` are hardcoded to `0.1` and `1.0`
+- **Fixed Parameters**: `distortionScale` is hardcoded to `1.0` in the shader
+- **Top-View Only**: Optimized for orthographic top-view rendering, not perspective 3D
 - **Single Shape**: Each shader instance renders one rectangular glass shape
 
 ## Intended Usage
@@ -137,12 +203,12 @@ This shader is specifically designed for rectangular container elements (similar
 // Add glass effect to LayerEffects
 let effects = LayerEffects {
     glass: Some(FeLiquidGlass {
-        light_intensity: 0.9,
-        refraction: 1.5,
-        depth: 20.0,
-        dispersion: 0.02,
-        blur_radius: 2.0,
-        ..Default::default()
+        light_intensity: 0.7,  // 0.0-1.0: transmission/transparency
+        light_angle: 45.0,     // Reserved for future use
+        refraction: 0.5,       // 0.0-1.0: maps to IOR 1.0-2.0 (0.5 = typical glass)
+        depth: 50.0,           // Absolute pixels: glass thickness/curvature
+        dispersion: 0.5,       // 0.0-1.0: chromatic aberration strength
+        blur_radius: 2.0,      // Pixels: background blur for frosted effect
     }),
     ..Default::default()
 };

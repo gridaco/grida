@@ -115,11 +115,10 @@ pub fn create_liquid_glass_image_filter(
         .set_uniform_float("refraction", &[effect.refraction])
         .expect("set refraction");
 
-    // Normalize depth from 0-1 range to actual pixel depth
-    // 0 = 0, 1 = min(width, height)
-    let normalized_depth = effect.depth * width.min(height);
+    // Depth is already in absolute pixels
+    // Shader enforces minimum 1.0 pixel
     builder
-        .set_uniform_float("depth", &[normalized_depth])
+        .set_uniform_float("depth", &[effect.depth])
         .expect("set depth");
 
     builder

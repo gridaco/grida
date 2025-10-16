@@ -15,17 +15,25 @@ const BACKGROUND_IMAGE: &[u8] = include_bytes!("../../../fixtures/images/stripes
 
 fn main() {
     let canvas_size = (800, 800);
-    let corner_radius = 70.0;
+
+    // Glass parameters - square shape filling most of the canvas
+    let padding = 50.0;
+    let glass_size = canvas_size.0 as f32 - 2.0 * padding; // Square
+    let glass_width = glass_size;
+    let glass_height = glass_size;
+    let glass_x = padding;
+    let glass_y = padding;
+    let corner_radius = 100.0;
 
     // Use default effect parameters
-    // Note: depth is now normalized 0-1, where 1.0 = min(width, height)
+    // Note: depth is in absolute pixels
     let effect = FeLiquidGlass {
-        light_intensity: 0.9,
+        light_intensity: 0.7, // Lower for more reflection visibility
         light_angle: 45.0,
-        refraction: 1.5,
-        depth: 0.14, // 0.14 * 140 (min dimension) ≈ 20px
-        dispersion: 0.02,
-        blur_radius: 4.0,
+        refraction: 1.0,  // 0.0 = no refraction, 1.0 = max (maps to IOR 1.0-2.0)
+        depth: 100.0,     // Glass thickness in pixels (minimum 1.0)
+        dispersion: 1.0,  // Chromatic aberration strength
+        blur_radius: 0.0, // No blur to see pure refraction effect
     };
 
     // Create surface for final composition
@@ -42,11 +50,6 @@ fn main() {
         &Paint::default(),
     );
 
-    // Glass parameters
-    let glass_width = 300.0;
-    let glass_height = 140.0;
-    let glass_x = (canvas_size.0 as f32 - glass_width) / 2.0;
-    let glass_y = (canvas_size.1 as f32 - glass_height) / 2.0;
     let corner_radii = [corner_radius, corner_radius, corner_radius, corner_radius];
 
     // Create glass ImageFilter using backdrop approach
