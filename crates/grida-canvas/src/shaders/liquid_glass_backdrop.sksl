@@ -6,17 +6,17 @@
  * - Fresnel reflections at grazing angles
  * - SDF-based shape morphing
  * - Supersampled anti-aliasing
- * - Inline blur for frosted glass effect
+ * - Pre-blurred backdrop (via Skia's native blur ImageFilter)
  * 
  * This version uses SaveLayer backdrop input instead of manually captured images.
- * The 'input' shader is automatically wired by Skia from the backdrop.
+ * The backdrop is pre-blurred by Skia's ImageFilter chain for optimal performance.
  */
 
 uniform vec4 box;               // Bounding box (x, y, width, height)
 uniform vec4 corner_radii;      // Corner radii [top-left, top-right, bottom-right, bottom-left]
 uniform mat3 transform;         // Transformation matrix for shape positioning
 uniform vec2 resolution;        // Canvas resolution in pixels
-uniform shader backdrop;        // Backdrop from SaveLayer (Skia provides this automatically!)
+uniform shader backdrop;        // Pre-blurred backdrop from SaveLayer (Skia provides this automatically!)
 
 // LiquidGlassEffect parameters
 uniform float light_intensity;  // Transmission/transparency [0.0-1.0]
@@ -24,38 +24,6 @@ uniform float light_angle;      // Light angle in degrees (reserved)
 uniform float refraction;       // Index of refraction [1.0-2.0]
 uniform float depth;            // Glass thickness/depth for 3D effect [1.0+]
 uniform float dispersion;       // Chromatic aberration strength [0.0-1.0]
-uniform float blur_radius;      // Blur radius for frosted glass [0.0+]
-
-/**
- * Inline box blur function
- * Samples neighboring pixels in a circular kernel and averages them
- * This replaces the pre-blurred image approach
- */
-vec4 sampleBlurred(vec2 coord, float radius) {
-    if (radius < 0.5) {
-        return backdrop.eval(coord);
-    }
-    
-    vec4 sum = vec4(0.0);
-    float count = 0.0;
-    
-    // Box blur with fixed kernel size
-    // SKSL requires constant loop bounds
-    const int MAX_R = 10;
-    
-    for (int dx = -MAX_R; dx <= MAX_R; dx++) {
-        for (int dy = -MAX_R; dy <= MAX_R; dy++) {
-            float dist = length(vec2(float(dx), float(dy)));
-            // Only sample within the requested radius (clamped to MAX_R)
-            if (dist <= radius && dist <= float(MAX_R)) {
-                sum += backdrop.eval(coord + vec2(float(dx), float(dy)));
-                count += 1.0;
-            }
-        }
-    }
-    
-    return count > 0.0 ? sum / count : backdrop.eval(coord);
-}
 
 /**
  * Signed Distance Function for rounded box
@@ -169,16 +137,16 @@ vec4 calculateLiquidGlass(float sd, vec2 g, vec2 fragCoord)
     // Offset is proportional to refraction vector and dispersion parameter
     vec2 offset = refract_vec.xy * chromaticAberration;
     
-    // Sample in UV space (normalized coordinates), then use backdrop input
-    // With backdrop, fragCoord is already in the right coordinate space
+    // Sample in UV space (normalized coordinates), then use pre-blurred backdrop
+    // Backdrop is already blurred by Skia's ImageFilter for optimal performance
     vec2 coord_r = (uv_base - offset) * resolution;
     vec2 coord_g = uv_base * resolution;
     vec2 coord_b = (uv_base + offset) * resolution;
     
-    // Sample blurred backdrop for each channel (chromatic aberration)
-    float r = sampleBlurred(coord_r, blur_radius).r;
-    float g_channel = sampleBlurred(coord_g, blur_radius).g;
-    float b = sampleBlurred(coord_b, blur_radius).b;
+    // Sample pre-blurred backdrop for each channel (chromatic aberration)
+    float r = backdrop.eval(coord_r).r;
+    float g_channel = backdrop.eval(coord_g).g;
+    float b = backdrop.eval(coord_b).b;
     vec4 refract_color = vec4(r, g_channel, b, 1.0);
     
     // Roughness-based reflection blur (simplified)

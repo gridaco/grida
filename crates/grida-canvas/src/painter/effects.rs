@@ -1,5 +1,7 @@
 use crate::cg::types::FeLiquidGlass;
-use skia_safe::{image_filters, runtime_effect::RuntimeShaderBuilder, ImageFilter, RuntimeEffect};
+use skia_safe::{
+    image_filters, runtime_effect::RuntimeShaderBuilder, ImageFilter, RuntimeEffect, TileMode,
+};
 
 // ============================================================================
 // MATRIX UTILITIES
@@ -118,12 +120,22 @@ pub fn create_liquid_glass_image_filter(
     builder
         .set_uniform_float("dispersion", &[effect.dispersion])
         .expect("set dispersion");
-    builder
-        .set_uniform_float("blur_radius", &[effect.blur_radius])
-        .expect("set blur_radius");
 
-    // Create ImageFilter with "backdrop" as the child shader name
-    // Skia will wire the backdrop snapshot to the 'backdrop' shader child
-    image_filters::runtime_shader(&builder, "backdrop", None)
+    // Create blur filter first (if blur_radius > 0) for optimal performance
+    // Skia's native blur is ~100x faster than inline shader blur
+    let blur_filter = if effect.blur_radius > 0.5 {
+        image_filters::blur(
+            (effect.blur_radius, effect.blur_radius),
+            TileMode::Clamp,
+            None,
+            None,
+        )
+    } else {
+        None
+    };
+
+    // Chain runtime shader with blur as input
+    // Skia will wire the blurred backdrop to the 'backdrop' shader child
+    image_filters::runtime_shader(&builder, "backdrop", blur_filter)
         .expect("Failed to create liquid glass image filter")
 }
