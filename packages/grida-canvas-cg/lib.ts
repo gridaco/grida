@@ -1010,6 +1010,78 @@ export namespace cg {
   };
 
   /**
+   * Liquid Glass Effect
+   *
+   * A visual effect that creates a realistic glass appearance with light refraction,
+   * highlights, and chromatic aberration.
+   */
+  export type FeLiquidGlass = {
+    type: "glass";
+    /**
+     * The intensity of specular highlights.
+     * Must be between 0 and 1. Higher values create brighter highlights.
+     *
+     * Adjust the angle and intensity of the light illuminating your glass containers
+     * to change where the highlight appears on the container's edge.
+     *
+     * @default 0.5
+     */
+    lightIntensity: number;
+
+    /**
+     * The angle of the specular light in degrees.
+     * Controls the direction of highlights on the glass surface.
+     *
+     * @default 0
+     */
+    lightAngle: number;
+
+    /**
+     * The intensity of the refraction distortion.
+     * Must be between 0 and 1. Higher values create more distortion.
+     *
+     * Control the way light bends along the edge of your glass container.
+     * The higher the refraction value, the more your glass containers will
+     * distort the elements around them.
+     *
+     * @default 0.5
+     */
+    refraction: number;
+
+    /**
+     * The depth of the refraction effect.
+     * Must be >= 1. Higher values create deeper glass appearance.
+     *
+     * Change how thick your glass material appears to provide a more
+     * pronounced 3D feel to the edge of the container.
+     *
+     * @default 1
+     */
+    depth: number;
+
+    /**
+     * The amount of chromatic aberration (color separation).
+     * Must be between 0 and 1. Higher values create more rainbow-like distortion at edges.
+     *
+     * Increase dispersion to add a hint of chromatic aberration at the edge
+     * of your glass containers. This works best in combination with refraction.
+     *
+     * @default 0
+     */
+    dispersion: number;
+
+    /**
+     * The radius of frost on the glass effect.
+     *
+     * Adjust the amount of background blur present on your glass containers to help
+     * glass elements stand out on busy backgrounds to provide better contrast.
+     *
+     * @default 0
+     */
+    radius: number;
+  };
+
+  /**
    *
    *
    * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow

@@ -2417,6 +2417,67 @@ pub struct FeShadow {
     pub color: CGColor,
 }
 
+/// Liquid glass effect parameters
+///
+/// A physically-based glass effect with refraction, chromatic aberration, and Fresnel reflections.
+/// This effect is designed for rectangular container elements (similar to HTML `div` with `border-radius`).
+///
+/// ## Key Properties
+///
+/// - **`light_intensity`**: Controls transmission/transparency of the glass (0.0 = opaque, 1.0 = fully transparent)
+/// - **`refraction`**: Index of refraction that controls how much light bends (1.0 = no bend/air, 1.5 = typical glass)
+/// - **`depth`**: Glass thickness that creates the 3D curved surface effect
+/// - **`dispersion`**: Chromatic aberration strength (color separation at edges)
+/// - **`blur_radius`**: Background blur radius for frosted glass appearance
+///
+/// ## Limitations
+///
+/// This effect only works with rectangular shapes. It uses Signed Distance Fields (SDFs) to generate
+/// the 3D glass surface, which requires continuous distance information not available for arbitrary paths.
+///
+/// ## See also:
+/// - Shader implementation: `src/shaders/liquid_glass_effect.sksl`
+/// - Documentation: `src/shaders/liquid_glass_effect.md`
+/// - Example: `examples/golden_liquid_glass.rs`
+#[derive(Debug, Clone, Copy)]
+pub struct FeLiquidGlass {
+    /// Controls transmission/transparency [0.0-1.0]
+    /// Higher values = more see-through glass
+    pub light_intensity: f32,
+
+    /// Light angle in degrees (reserved for future use)
+    pub light_angle: f32,
+
+    /// Index of refraction [1.0-2.0]
+    /// 1.0 = no refraction (air), 1.5 = typical glass, 2.0 = high refraction
+    pub refraction: f32,
+
+    /// Glass thickness/depth for 3D surface effect [1.0+]
+    /// Higher values create more pronounced lens curvature
+    pub depth: f32,
+
+    /// Chromatic aberration strength [0.0-1.0]
+    /// Controls color separation at edges (rainbow effect)
+    pub dispersion: f32,
+
+    /// Blur radius for frosted glass effect [0.0+]
+    /// Applied to background before refraction
+    pub blur_radius: f32,
+}
+
+impl Default for FeLiquidGlass {
+    fn default() -> Self {
+        Self {
+            light_intensity: 0.9,
+            light_angle: 45.0,
+            refraction: 1.5,
+            depth: 14.0,
+            dispersion: 0.03,
+            blur_radius: 8.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum FeBlur {
     Gaussian(FeGaussianBlur),
