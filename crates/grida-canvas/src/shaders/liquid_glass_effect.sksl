@@ -11,7 +11,7 @@
  */
 
 uniform vec4 box;               // Bounding box (x, y, width, height)
-uniform float r;                // Corner radius for rounded rectangle
+uniform vec4 corner_radii;      // Corner radii [top-left, top-right, bottom-right, bottom-left]
 uniform mat3 transform;         // Transformation matrix for shape positioning
 uniform vec2 resolution;        // Canvas resolution in pixels
 uniform shader image;           // Original background image (sharp)
@@ -56,7 +56,7 @@ vec2 project(vec2 p, mat3 m) {
 float sdf(vec2 xy) {
   vec2 p = project(xy, transform);
   // Simple pill shape - only rounded rectangle
-  return sdRoundedBox(p - box.xy - box.zw * 0.5, box.zw * 0.5, vec4(r));
+  return sdRoundedBox(p - box.xy - box.zw * 0.5, box.zw * 0.5, corner_radii);
 }
 
 /**
@@ -132,16 +132,23 @@ vec4 calculateLiquidGlass(float sd, vec2 g, vec2 fragCoord)
     float base_height = thickness * 8.0;
     float refract_length = (h + base_height) / dot(vec3(0.0, 0.0, -1.0), refract_vec);
     
-    // Chromatic aberration - sample RGB channels separately
+    // Chromatic aberration - sample RGB channels separately with dispersion
     vec2 base_coord = fragCoord + refract_vec.xy * refract_length;
     vec2 uv_base = base_coord / resolution.xy;
     
-    // Sample the blurred background with chromatic aberration using correct canvas coordinates
+    // Chromatic aberration offset - use original working approach
+    // Offset is proportional to refraction vector and dispersion parameter
     vec2 offset = refract_vec.xy * chromaticAberration;
-    vec2 canvas_base = base_coord + glass_position;
-    float r = blurredImage.eval(canvas_base - offset).r;
-    float g_channel = blurredImage.eval(canvas_base).g;
-    float b = blurredImage.eval(canvas_base + offset).b;
+    
+    // Sample in UV space (normalized coordinates), then convert back to canvas space
+    // This matches the original working implementation
+    vec2 canvas_coord_r = ((uv_base - offset) * resolution) + glass_position;
+    vec2 canvas_coord_g = (uv_base * resolution) + glass_position;
+    vec2 canvas_coord_b = ((uv_base + offset) * resolution) + glass_position;
+    
+    float r = blurredImage.eval(canvas_coord_r).r;
+    float g_channel = blurredImage.eval(canvas_coord_g).g;
+    float b = blurredImage.eval(canvas_coord_b).b;
     vec4 refract_color = vec4(r, g_channel, b, 1.0);
     
     // Roughness-based reflection blur (simplified)
