@@ -19,7 +19,9 @@ import {
   PropertyLine,
   PropertyLineLabel,
 } from "../ui";
+import { PropertyLineLabelWithNumberGesture } from "../ui/label-with-number-gesture";
 import InputPropertyNumber from "../ui/number";
+import InputPropertyPercentage from "../ui/percentage";
 import {
   BoxIcon,
   MinusIcon,
@@ -505,39 +507,23 @@ function FeLiquidGlassProperties({
   return (
     <div className="flex flex-col gap-2">
       <PropertyLine>
-        <PropertyLineLabel>Light Intensity</PropertyLineLabel>
-        <InputPropertyNumber
-          mode="fixed"
-          value={value.lightIntensity}
+        <PropertyLineLabelWithNumberGesture
+          step={1}
           min={0}
-          max={1}
-          step={0.1}
-          onValueCommit={(v) =>
+          max={100}
+          onValueChange={(c) =>
             onValueChange?.({
               ...value,
-              lightIntensity: v ?? 0.9,
+              refraction: Math.max(
+                0,
+                Math.min(1, value.refraction + (c.value ?? 0) / 100)
+              ),
             })
           }
-        />
-      </PropertyLine>
-      <PropertyLine>
-        <PropertyLineLabel>Light Angle</PropertyLineLabel>
-        <InputPropertyNumber
-          mode="fixed"
-          value={value.lightAngle}
-          min={0}
-          max={360}
-          onValueCommit={(v) =>
-            onValueChange?.({
-              ...value,
-              lightAngle: v ?? 45.0,
-            })
-          }
-        />
-      </PropertyLine>
-      <PropertyLine>
-        <PropertyLineLabel>Refraction</PropertyLineLabel>
-        <InputPropertyNumber
+        >
+          Refraction
+        </PropertyLineLabelWithNumberGesture>
+        <InputPropertyPercentage
           mode="fixed"
           value={value.refraction}
           min={0.0}
@@ -552,24 +538,51 @@ function FeLiquidGlassProperties({
         />
       </PropertyLine>
       <PropertyLine>
-        <PropertyLineLabel>Depth</PropertyLineLabel>
-        <InputPropertyNumber
+        <PropertyLineLabelWithNumberGesture
+          step={1}
+          min={1}
+          max={100}
+          onValueChange={(c) =>
+            onValueChange?.({
+              ...value,
+              depth: Math.max(1, Math.min(100, value.depth + (c.value ?? 0))),
+            })
+          }
+        >
+          Depth
+        </PropertyLineLabelWithNumberGesture>
+        <InputPropertyPercentage
           mode="fixed"
-          value={value.depth}
-          min={1.0}
-          max={editor.config.DEFAULT_MAX_LIQUID_GLASS_DEPTH}
-          step={1.0}
+          value={value.depth / 100}
+          min={0.01}
+          max={1.0}
+          step={0.01}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
-              depth: v ?? 50.0,
+              depth: (v ?? 0.5) * 100,
             })
           }
         />
       </PropertyLine>
       <PropertyLine>
-        <PropertyLineLabel>Dispersion</PropertyLineLabel>
-        <InputPropertyNumber
+        <PropertyLineLabelWithNumberGesture
+          step={1}
+          min={0}
+          max={100}
+          onValueChange={(c) =>
+            onValueChange?.({
+              ...value,
+              dispersion: Math.max(
+                0,
+                Math.min(1, value.dispersion + (c.value ?? 0) / 100)
+              ),
+            })
+          }
+        >
+          Dispersion
+        </PropertyLineLabelWithNumberGesture>
+        <InputPropertyPercentage
           mode="fixed"
           value={value.dispersion}
           min={0}
@@ -584,7 +597,19 @@ function FeLiquidGlassProperties({
         />
       </PropertyLine>
       <PropertyLine>
-        <PropertyLineLabel>Frost Blur</PropertyLineLabel>
+        <PropertyLineLabelWithNumberGesture
+          step={1}
+          min={0}
+          max={editor.config.DEFAULT_MAX_LIQUID_GLASS_BLUR_RADIUS}
+          onValueChange={(c) =>
+            onValueChange?.({
+              ...value,
+              radius: c.value ?? 8.0,
+            })
+          }
+        >
+          Frost Blur
+        </PropertyLineLabelWithNumberGesture>
         <InputPropertyNumber
           mode="fixed"
           value={value.radius}
