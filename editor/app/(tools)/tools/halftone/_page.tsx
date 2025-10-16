@@ -14,14 +14,22 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ColorPicker } from "@/scaffolds/sidecontrol/controls/color-picker";
-import cmath from "@grida/cmath";
-import type cg from "@grida/cg";
 import { DownloadIcon } from "lucide-react";
+import type cg from "@grida/cg";
+import cmath from "@grida/cmath";
 
 const DEFAULT_GRID = 8;
 const MAX_SIZE = 1024; // px – down‑scale large uploads
 
-type Shape = "circle" | "square" | "triangle" | "star" | "spark" | "x" | "+";
+type Shape =
+  | "circle"
+  | "square"
+  | "triangle"
+  | "star"
+  | "spark"
+  | "x"
+  | "+"
+  | "image";
 
 function drawShape(
   ctx: CanvasRenderingContext2D,
@@ -108,7 +116,8 @@ function renderHalftone(
   gamma: number,
   jitter: number,
   opacity: number,
-  color: string
+  color: string,
+  customShapeImage?: HTMLImageElement | null
 ) {
   ctx.clearRect(0, 0, width, height);
 
@@ -134,9 +143,16 @@ function renderHalftone(
       const cx = x + grid / 2 + jx;
       const cy = y + grid / 2 + jy;
 
-      ctx.beginPath();
-      drawShape(ctx, shape, cx, cy, radius);
-      ctx.fill();
+      if (shape === "image" && customShapeImage) {
+        // Draw custom image shape as-is
+        const size = radius * 2;
+        ctx.drawImage(customShapeImage, cx - radius, cy - radius, size, size);
+      } else {
+        // Draw standard shapes
+        ctx.beginPath();
+        drawShape(ctx, shape, cx, cy, radius);
+        ctx.fill();
+      }
     }
   }
 
@@ -225,6 +241,8 @@ export default function HalftoneTool() {
     b: 0,
     a: 1,
   });
+  const [customShapeImage, setCustomShapeImage] =
+    useState<HTMLImageElement | null>(null);
   const imageDataRef = useRef<ImageData | null>(null);
   const sizeRef = useRef<{ w: number; h: number } | null>(null);
 
@@ -279,10 +297,21 @@ export default function HalftoneTool() {
         gamma,
         jitter,
         opacity,
-        cmath.color.rgba8888_to_hex(color)
+        cmath.color.rgba8888_to_hex(color),
+        customShapeImage
       );
     };
-  }, [imageSrc, shape, grid, maxRadius, gamma, jitter, opacity, color]);
+  }, [
+    imageSrc,
+    shape,
+    grid,
+    maxRadius,
+    gamma,
+    jitter,
+    opacity,
+    color,
+    customShapeImage,
+  ]);
 
   const exportPNG = () => {
     const canvas = canvasRef.current;
@@ -368,9 +397,33 @@ export default function HalftoneTool() {
                 <SelectItem value="spark">Spark</SelectItem>
                 <SelectItem value="x">X‑cross</SelectItem>
                 <SelectItem value="+">Plus‑cross</SelectItem>
+                <SelectItem value="image">Custom Image</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {shape === "image" && (
+            <div className="grid gap-2">
+              <span className="text-xs">Custom Shape Image</span>
+              <Input
+                type="file"
+                accept="image/png,image/svg+xml"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      const img = new Image();
+                      img.src = event.target?.result as string;
+                      img.onload = () => {
+                        setCustomShapeImage(img);
+                      };
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              />
+            </div>
+          )}
           <div className="grid gap-2">
             <span className="text-xs">Grid</span>
             <Slider
@@ -436,10 +489,24 @@ export default function HalftoneTool() {
               <Button variant="outline" onClick={exportPNG}>
                 <DownloadIcon className="size-4" /> PNG
               </Button>
-              <Button variant="outline" onClick={exportSVG}>
+              <Button
+                variant="outline"
+                onClick={exportSVG}
+                disabled={shape === "image"}
+                title={
+                  shape === "image"
+                    ? "SVG export not available for custom images"
+                    : ""
+                }
+              >
                 <DownloadIcon className="size-4" /> SVG
               </Button>
             </div>
+            {shape === "image" && (
+              <span className="text-xs text-muted-foreground">
+                SVG export is not available when using custom images
+              </span>
+            )}
           </div>
         </Card>
       </aside>
