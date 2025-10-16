@@ -1078,7 +1078,7 @@ export namespace cg {
      *
      * @default 4.0
      */
-    blurRadius: number;
+    radius: number;
   };
 
   /**

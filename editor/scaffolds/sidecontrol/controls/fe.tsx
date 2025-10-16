@@ -587,12 +587,12 @@ function FeLiquidGlassProperties({
         <PropertyLineLabel>Frost Blur</PropertyLineLabel>
         <InputPropertyNumber
           mode="fixed"
-          value={value.blurRadius}
+          value={value.radius}
           max={editor.config.DEFAULT_MAX_LIQUID_GLASS_BLUR_RADIUS}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
-              blurRadius: v ?? 8.0,
+              radius: v ?? 8.0,
             })
           }
         />

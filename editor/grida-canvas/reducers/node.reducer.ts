@@ -540,13 +540,12 @@ const safe_properties: Partial<
             editor.config.DEFAULT_MAX_LIQUID_GLASS_DEPTH
           ),
           dispersion: cmath.clamp(value.dispersion, 0, 1),
-          // renamed from radius to blurRadius
-          blurRadius: ranged(
+          radius: ranged(
             0,
-            value.blurRadius,
+            value.radius,
             editor.config.DEFAULT_MAX_LIQUID_GLASS_BLUR_RADIUS
           ),
-        } as cg.FeLiquidGlass;
+        } satisfies cg.FeLiquidGlass;
       }
       (draft as UN).feLiquidGlass = value;
     },
