@@ -280,7 +280,7 @@ pub struct JSONFeLiquidGlass {
     pub depth: f32,
     #[serde(default = "default_dispersion")]
     pub dispersion: f32,
-    #[serde(rename = "blurRadius", default = "default_glass_blur_radius")]
+    #[serde(rename = "radius", default = "default_glass_blur_radius")]
     pub blur_radius: f32,
 }
 
@@ -295,7 +295,7 @@ fn default_refraction() -> f32 {
     1.5
 }
 fn default_depth() -> f32 {
-    20.0
+    0.15 // Normalized: 0.15 * min(w,h)
 }
 fn default_dispersion() -> f32 {
     0.02

@@ -25,7 +25,7 @@ fn main() {
         refraction: 1.5,
         depth: 0.14, // 0.14 * 140 (min dimension) ≈ 20px
         dispersion: 0.02,
-        blur_radius: 2.0,
+        blur_radius: 4.0,
     };
 
     // Create surface for final composition
