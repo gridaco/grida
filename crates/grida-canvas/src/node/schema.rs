@@ -19,6 +19,8 @@ pub struct LayerEffects {
     pub backdrop_blur: Option<FeGaussianBlur>,
     /// multiple shadows are supported per layer (drop shadow, inner shadow)
     pub shadows: Vec<FilterShadowEffect>,
+    /// single liquid glass effect is supported per layer (only fully supported with rectangular shapes)
+    pub glass: Option<FeLiquidGlass>,
 }
 
 impl LayerEffects {
@@ -62,6 +64,7 @@ impl Default for LayerEffects {
             blur: None,
             backdrop_blur: None,
             shadows: vec![],
+            glass: None,
         }
     }
 }
