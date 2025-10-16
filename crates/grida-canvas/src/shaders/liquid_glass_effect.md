@@ -66,9 +66,9 @@ Based on React Native Skia glass shader examples.
 - `light_intensity` (float [0.0-1.0]): Controls transmission/transparency
 - `light_angle` (float): Light angle in degrees (reserved for future use)
 - `refraction` (float [1.0-2.0]): Index of refraction (1.0=air, 1.5=glass)
-- `depth` (float [1.0+]): Glass thickness for 3D surface effect
+- `depth` (float [0.0-1.0]): Glass thickness for 3D surface effect (normalized: 0=none, 1.0=min(width,height))
 - `dispersion` (float [0.0-1.0]): Chromatic aberration strength
-- `blur_radius` (float [0.0+]): Blur radius for frosted glass effect (applied via Skia's native blur before shader)
+- `blur_radius` (float [0.0+]): Blur radius for frosted glass effect in pixels (applied via Skia's native blur before shader)
 
 ## Limitations
 

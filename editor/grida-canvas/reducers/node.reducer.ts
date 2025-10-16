@@ -1,5 +1,4 @@
 import { produce, type Draft } from "immer";
-import { updateState } from "./utils/immer";
 import type grida from "@grida/schema";
 import type { NodeChangeAction } from "../action";
 import type cg from "@grida/cg";
@@ -533,11 +532,8 @@ const safe_properties: Partial<
           lightIntensity: cmath.clamp(value.lightIntensity, 0, 1),
           lightAngle: value.lightAngle,
           refraction: cmath.clamp(value.refraction, 1.0, 2.0),
-          depth: ranged(
-            1,
-            value.depth,
-            editor.config.DEFAULT_MAX_LIQUID_GLASS_DEPTH
-          ),
+          // depth is now normalized 0-1 where 1.0 = min(width, height)
+          depth: cmath.clamp(value.depth, 0, 1),
           dispersion: cmath.clamp(value.dispersion, 0, 1),
           radius: ranged(
             0,

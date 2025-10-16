@@ -2452,7 +2452,8 @@ pub struct FeLiquidGlass {
     /// 1.0 = no refraction (air), 1.5 = typical glass, 2.0 = high refraction
     pub refraction: f32,
 
-    /// Glass thickness/depth for 3D surface effect [1.0+]
+    /// Glass thickness/depth for 3D surface effect [0.0-1.0] (normalized)
+    /// 0.0 = flat glass, 1.0 = depth equals min(width, height)
     /// Higher values create more pronounced lens curvature
     pub depth: f32,
 
@@ -2460,8 +2461,8 @@ pub struct FeLiquidGlass {
     /// Controls color separation at edges (rainbow effect)
     pub dispersion: f32,
 
-    /// Blur radius for frosted glass effect [0.0+]
-    /// Applied to background before refraction
+    /// Blur radius for frosted glass effect [0.0+] in pixels
+    /// Applied via Skia's native blur before refraction shader
     pub blur_radius: f32,
 }
 
@@ -2471,7 +2472,7 @@ impl Default for FeLiquidGlass {
             light_intensity: 0.9,
             light_angle: 45.0,
             refraction: 1.5,
-            depth: 14.0,
+            depth: 0.15, // Normalized: 0.15 * min(w,h) gives good default depth
             dispersion: 0.03,
             blur_radius: 8.0,
         }

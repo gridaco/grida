@@ -18,11 +18,12 @@ fn main() {
     let corner_radius = 70.0;
 
     // Use default effect parameters
+    // Note: depth is now normalized 0-1, where 1.0 = min(width, height)
     let effect = FeLiquidGlass {
         light_intensity: 0.9,
         light_angle: 45.0,
         refraction: 1.5,
-        depth: 20.0,
+        depth: 0.14, // 0.14 * 140 (min dimension) ≈ 20px
         dispersion: 0.02,
         blur_radius: 2.0,
     };

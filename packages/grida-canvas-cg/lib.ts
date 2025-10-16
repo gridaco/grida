@@ -1053,13 +1053,17 @@ export namespace cg {
     refraction: number;
 
     /**
-     * The depth of the refraction effect.
-     * Must be >= 1. Higher values create deeper glass appearance.
+     * The depth of the refraction effect (normalized).
+     * Must be between 0 and 1.
+     * - 0 = flat glass (no 3D effect)
+     * - 1 = depth equals min(width, height) of the container
      *
      * Change how thick your glass material appears to provide a more
-     * pronounced 3D feel to the edge of the container.
+     * pronounced 3D feel to the edge of the container. The depth is
+     * automatically scaled relative to the container size for consistent
+     * appearance across different dimensions.
      *
-     * @default 1
+     * @default 0.15
      */
     depth: number;
 

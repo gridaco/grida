@@ -556,11 +556,13 @@ function FeLiquidGlassProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value.depth}
-          max={editor.config.DEFAULT_MAX_LIQUID_GLASS_DEPTH}
+          min={0}
+          max={1}
+          step={0.01}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
-              depth: v ?? 20.0,
+              depth: v ?? 0.15,
             })
           }
         />
