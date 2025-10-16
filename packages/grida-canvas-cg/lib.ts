@@ -990,7 +990,11 @@ export namespace cg {
     type: "progressive-blur";
   };
 
-  export type FilterEffect = FeShadow | FeLayerBlur | FeBackdropBlur;
+  export type FilterEffect =
+    | FeShadow
+    | FeLayerBlur
+    | FeBackdropBlur
+    | FeLiquidGlass;
 
   export type FeShadow = IFeShadow & {
     type: "shadow";

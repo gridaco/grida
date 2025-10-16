@@ -525,6 +525,30 @@ const safe_properties: Partial<
       (draft as UN).feBackdropBlur = value;
     },
   }),
+  feLiquidGlass: defineNodeProperty<"feLiquidGlass">({
+    apply: (draft, value, prev) => {
+      if (value) {
+        value = {
+          ...value,
+          lightIntensity: cmath.clamp(value.lightIntensity, 0, 1),
+          lightAngle: value.lightAngle,
+          refraction: cmath.clamp(value.refraction, 1.0, 2.0),
+          depth: ranged(
+            1,
+            value.depth,
+            editor.config.DEFAULT_MAX_LIQUID_GLASS_DEPTH
+          ),
+          dispersion: cmath.clamp(value.dispersion, 0, 1),
+          radius: ranged(
+            0,
+            value.radius,
+            editor.config.DEFAULT_MAX_LIQUID_GLASS_RADIUS
+          ),
+        } as cg.FeLiquidGlass;
+      }
+      (draft as UN).feLiquidGlass = value;
+    },
+  }),
   zIndex: defineNodeProperty<"zIndex">({
     assert: (node) => typeof node.zIndex === "number",
     apply: (draft, value, prev) => {

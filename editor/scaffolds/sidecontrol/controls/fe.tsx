@@ -31,6 +31,43 @@ import { editor } from "@/grida-canvas";
 import { Button } from "@/components/ui-editor/button";
 import { mergeDefinedProperties } from "./utils/merge";
 
+/**
+ * Constraints for filter effect types that control which effect types can be selected.
+ *
+ * This is needed because certain effect types can only exist once per node:
+ * - `filter-blur` (Layer Blur): Only one allowed per node
+ * - `backdrop-filter-blur` (Backdrop Blur): Only one allowed per node
+ * - `shadow`: Multiple allowed per node
+ *
+ * By setting a property to `false`, that effect type option will be disabled in the UI,
+ * preventing users from adding duplicate blur effects. This constraint is enforced at the
+ * model level in `changeNodeFilterEffects` (using `.find()` for blur effects), but this
+ * interface allows the UI to reflect and prevent invalid states proactively.
+ *
+ * @example
+ * ```tsx
+ * // Disable Layer Blur if it already exists on the node
+ * <FeControl
+ *   value={effect}
+ *   constraints={{
+ *     "filter-blur": !node.feBlur || effect.type === "filter-blur",
+ *     "backdrop-filter-blur": !node.feBackdropBlur || effect.type === "backdrop-filter-blur",
+ *     shadow: true, // Always allow (multiple shadows supported)
+ *   }}
+ * />
+ * ```
+ */
+export interface FeTypeConstraints {
+  /** Whether Layer Blur can be selected. Set to `false` to disable. */
+  "filter-blur"?: boolean;
+  /** Whether Backdrop Blur can be selected. Set to `false` to disable. */
+  "backdrop-filter-blur"?: boolean;
+  /** Whether Shadow can be selected. Set to `false` to disable. */
+  shadow?: boolean;
+  /** Whether Liquid Glass can be selected. Set to `false` to disable. */
+  glass?: boolean;
+}
+
 function getIcon(fe: cg.FilterEffect) {
   switch (fe.type) {
     case "filter-blur":
@@ -43,17 +80,77 @@ function getIcon(fe: cg.FilterEffect) {
       }
       return ShadowOuterIcon;
     }
+    case "glass": {
+      return BoxIcon;
+    }
   }
+}
+
+function FeTypeSelect({
+  value,
+  onValueChange,
+  constraints,
+}: {
+  value: cg.FilterEffect["type"];
+  onValueChange: (type: cg.FilterEffect["type"]) => void;
+  constraints?: FeTypeConstraints;
+}) {
+  return (
+    <PropertyEnum<cg.FilterEffect["type"]>
+      enum={[
+        {
+          label: "Layer Blur",
+          value: "filter-blur",
+          disabled: constraints?.["filter-blur"] === false,
+        },
+        {
+          label: "Backdrop Blur",
+          value: "backdrop-filter-blur",
+          disabled: constraints?.["backdrop-filter-blur"] === false,
+        },
+        {
+          label: "Shadow",
+          value: "shadow",
+          disabled: constraints?.["shadow"] === false,
+        },
+        {
+          label: "Liquid Glass",
+          value: "glass",
+          disabled: constraints?.["glass"] === false,
+        },
+      ]}
+      value={value}
+      onValueChange={(type) => {
+        switch (type) {
+          case "shadow": {
+            onValueChange(type);
+            break;
+          }
+          case "filter-blur":
+          case "backdrop-filter-blur": {
+            onValueChange(type);
+            break;
+          }
+          case "glass": {
+            onValueChange(type);
+            break;
+          }
+        }
+      }}
+    />
+  );
 }
 
 export function FeControl({
   value,
   onValueChange,
   onRemove,
+  constraints,
 }: {
   value: cg.FilterEffect;
   onValueChange?: (value: cg.FilterEffect) => void;
   onRemove?: () => void;
+  constraints?: FeTypeConstraints;
 }) {
   const Icon = getIcon(value);
   return (
@@ -63,12 +160,7 @@ export function FeControl({
           <Icon />
         </PopoverTrigger>
         <div className="flex items-center flex-1/2">
-          <PropertyEnum<cg.FilterEffect["type"]>
-            enum={[
-              { label: "Layer Blur", value: "filter-blur" },
-              { label: "Backdrop Blur", value: "backdrop-filter-blur" },
-              { label: "Shadow", value: "shadow" },
-            ]}
+          <FeTypeSelect
             value={value.type}
             onValueChange={(type) => {
               switch (type) {
@@ -90,8 +182,16 @@ export function FeControl({
                   });
                   break;
                 }
+                case "glass": {
+                  onValueChange?.({
+                    ...editor.config.DEFAULT_FE_LIQUID_GLASS,
+                    type,
+                  });
+                  break;
+                }
               }
             }}
+            constraints={constraints}
           />
           <Button
             variant="ghost"
@@ -149,6 +249,11 @@ function FeProperties({
     }
     case "shadow": {
       return <FeShadowProperties value={value} onValueChange={onValueChange} />;
+    }
+    case "glass": {
+      return (
+        <FeLiquidGlassProperties value={value} onValueChange={onValueChange} />
+      );
     }
   }
 }
@@ -384,6 +489,110 @@ function FeShadowProperties({
         <RGBAColorControl
           value={value.color}
           onValueChange={(v) => onValueChange?.({ ...value, color: v })}
+        />
+      </PropertyLine>
+    </div>
+  );
+}
+
+function FeLiquidGlassProperties({
+  value,
+  onValueChange,
+}: {
+  value: cg.FeLiquidGlass;
+  onValueChange?: (value: Omit<cg.FeLiquidGlass, "type">) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <PropertyLine>
+        <PropertyLineLabel>Light Intensity</PropertyLineLabel>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value.lightIntensity}
+          min={0}
+          max={1}
+          step={0.1}
+          onValueCommit={(v) =>
+            onValueChange?.({
+              ...value,
+              lightIntensity: v ?? 0.9,
+            })
+          }
+        />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabel>Light Angle</PropertyLineLabel>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value.lightAngle}
+          min={0}
+          max={360}
+          onValueCommit={(v) =>
+            onValueChange?.({
+              ...value,
+              lightAngle: v ?? 45.0,
+            })
+          }
+        />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabel>Refraction</PropertyLineLabel>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value.refraction}
+          min={1.0}
+          max={2.0}
+          step={0.1}
+          onValueCommit={(v) =>
+            onValueChange?.({
+              ...value,
+              refraction: v ?? 1.5,
+            })
+          }
+        />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabel>Depth</PropertyLineLabel>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value.depth}
+          max={editor.config.DEFAULT_MAX_LIQUID_GLASS_DEPTH}
+          onValueCommit={(v) =>
+            onValueChange?.({
+              ...value,
+              depth: v ?? 20.0,
+            })
+          }
+        />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabel>Dispersion</PropertyLineLabel>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value.dispersion}
+          min={0}
+          max={1}
+          step={0.01}
+          onValueCommit={(v) =>
+            onValueChange?.({
+              ...value,
+              dispersion: v ?? 0.02,
+            })
+          }
+        />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabel>Frost Blur</PropertyLineLabel>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value.radius}
+          max={editor.config.DEFAULT_MAX_LIQUID_GLASS_RADIUS}
+          onValueCommit={(v) =>
+            onValueChange?.({
+              ...value,
+              radius: v ?? 2.0,
+            })
+          }
         />
       </PropertyLine>
     </div>

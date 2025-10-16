@@ -1577,6 +1577,7 @@ export namespace grida.program.nodes {
       feBlur?: cg.FeBlur;
       feBackdropBlur?: cg.FeBlur;
       feShadows?: cg.FeShadow[];
+      feLiquidGlass?: cg.FeLiquidGlass;
     }
 
     export interface IEllipseArcData {
