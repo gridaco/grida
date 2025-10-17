@@ -1,16 +1,21 @@
 use cg::cg::types::FeProgressiveBlur;
 use skia_safe::{
     self as sk, canvas::SaveLayerRec, image_filters, runtime_effect::RuntimeShaderBuilder,
-    surfaces, Color, ImageFilter, Paint, Rect, RuntimeEffect,
+    surfaces, Color, Data, ImageFilter, Paint, Rect, RuntimeEffect,
 };
 
+// Include 8K background image
+const BACKGROUND_IMAGE: &[u8] = include_bytes!("../../../fixtures/images/8k.jpg");
+
+// Panel bounds: x=100, y=100, w=200, h=200
+// Try global canvas coordinates - backdrop might not use local transform
 static BLUR_EFFECT: FeProgressiveBlur = FeProgressiveBlur {
-    x1: 200.0, // Center of rectangle
-    y1: 50.0,  // Top of rectangle
-    x2: 200.0, // Center of rectangle
-    y2: 350.0, // Bottom of rectangle
+    x1: 200.0, // Center X in canvas coords
+    y1: 100.0, // Top in canvas coords - sharp
+    x2: 200.0, // Center X in canvas coords
+    y2: 300.0, // Bottom in canvas coords - max blur
     radius: 0.0,
-    radius2: 40.0,
+    radius2: 80.0, // Stronger blur for backdrop effect
 };
 
 /// Create RuntimeEffect for horizontal pass
@@ -74,35 +79,50 @@ fn create_progressive_blur_filter(
     image_filters::compose(v_filter, h_filter).expect("Failed to compose blur filters")
 }
 
-/// Draw a rectangle node with progressive blur effect bounded to it
-/// This demonstrates how effects are applied per-node in the graphics system
-fn draw_rect_with_progressive_blur(
+/// Draw a glass panel with progressive backdrop blur
+/// This demonstrates backdrop blur where the effect blurs the content behind the panel
+/// Follows the same pattern as draw_glass_effect in painter.rs
+fn draw_glass_panel_with_progressive_backdrop_blur(
     canvas: &sk::Canvas,
     rect: Rect,
-    color: Color,
     effect: &FeProgressiveBlur,
     canvas_size: (f32, f32),
 ) {
     let filter = create_progressive_blur_filter(effect, canvas_size);
 
-    // Use SaveLayer with bounds to isolate the effect to just this rectangle
-    let mut layer_paint = Paint::default();
-    layer_paint.set_image_filter(filter);
+    // Step 1: Translate to panel origin (like draw_glass_effect does)
+    // This makes the backdrop use local coordinates
+    canvas.save();
+    canvas.translate((rect.x(), rect.y()));
 
-    let save_layer_rec = SaveLayerRec::default().bounds(&rect).paint(&layer_paint);
+    // Step 2: Clip to the panel region in local coords (0,0,width,height)
+    let local_rect = Rect::from_wh(rect.width(), rect.height());
+    let rrect = sk::RRect::new_rect_radii(
+        local_rect,
+        &[
+            sk::Vector::new(20.0, 20.0), // top-left
+            sk::Vector::new(20.0, 20.0), // top-right
+            sk::Vector::new(20.0, 20.0), // bottom-right
+            sk::Vector::new(20.0, 20.0), // bottom-left
+        ],
+    );
+    canvas.clip_rrect(rrect, None, true);
 
-    // Start a new layer with the blur filter
-    canvas.save_layer(&save_layer_rec);
+    // Step 3: Use SaveLayer with backdrop filter
+    // This captures what's already drawn behind the clip and applies progressive blur
+    let layer_rec = SaveLayerRec::default().backdrop(&filter);
+    canvas.save_layer(&layer_rec);
 
-    // Draw the rectangle content within the bounded layer
-    let mut rect_paint = Paint::default();
-    rect_paint.set_color(color);
-    rect_paint.set_anti_alias(true);
-    canvas.draw_rect(rect, &rect_paint);
+    // We don't draw any content here - just push and pop the layer
+    // This applies the backdrop blur to what's behind
+    canvas.restore(); // pop the SaveLayer
+    canvas.restore(); // pop the translate
 
-    // Restore the layer, applying the progressive blur effect
-    // only to the content within the bounds
-    canvas.restore();
+    // Step 4: Draw the glass panel content on top of the blurred backdrop
+    let mut panel_paint = Paint::default();
+    panel_paint.set_color(Color::from_argb(80, 255, 255, 255)); // Semi-transparent white
+    panel_paint.set_anti_alias(true);
+    canvas.draw_round_rect(rect, 20.0, 20.0, &panel_paint);
 }
 
 fn main() {
@@ -110,19 +130,29 @@ fn main() {
     let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
     let canvas = surface.canvas();
 
-    // Draw solid black background
-    canvas.clear(Color::BLACK);
+    // Load and draw the 4K background image
+    let background = sk::Image::from_encoded(Data::new_copy(BACKGROUND_IMAGE))
+        .expect("Failed to decode background image");
 
-    // Define the rectangle bounds (1:2 ratio - width:height)
-    // With 50px margin on top and bottom
-    let rect_bounds = Rect::from_xywh(125.0, 50.0, 150.0, 300.0);
+    // Scale and draw the background to fill the canvas
+    let src_rect = Rect::from_wh(background.width() as f32, background.height() as f32);
+    let dst_rect = Rect::from_wh(width as f32, height as f32);
+    canvas.draw_image_rect(
+        background,
+        Some((&src_rect, sk::canvas::SrcRectConstraint::Fast)),
+        dst_rect,
+        &Paint::default(),
+    );
 
-    // Draw the blue rectangle with progressive blur effect
-    // The effect is bounded to just this rectangle, not the entire canvas
-    draw_rect_with_progressive_blur(
+    // Define the glass panel bounds
+    let panel_bounds = Rect::from_xywh(100.0, 100.0, 200.0, 200.0);
+
+    // Draw the glass panel with progressive backdrop blur
+    // The progressive blur will blur the background image behind the panel
+    // with varying intensity from top (sharp) to bottom (blurred)
+    draw_glass_panel_with_progressive_backdrop_blur(
         canvas,
-        rect_bounds,
-        Color::BLUE,
+        panel_bounds,
         &BLUR_EFFECT,
         (width as f32, height as f32),
     );
@@ -133,10 +163,13 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("Failed to encode image");
     std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/progressive_blur.png"),
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/progressive_blur_backdrop.png"
+        ),
         data.as_bytes(),
     )
     .expect("Failed to write output file");
 
-    println!("Progressive blur example saved to goldens/progressive_blur.png");
+    println!("Progressive backdrop blur example saved to goldens/progressive_blur_backdrop.png");
 }

@@ -1,0 +1,79 @@
+// Progressive Blur - Vertical Pass
+// Second pass of separable Gaussian blur - applies variable blur along Y-axis
+
+uniform shader image;
+
+// Gradient direction (start and end points)
+uniform float2 gradientStart;  // (x1, y1)
+uniform float2 gradientEnd;    // (x2, y2)
+
+// Blur parameters
+uniform float minRadius;  // Starting blur radius
+uniform float maxRadius;  // Maximum blur radius
+
+// Gaussian weight calculation
+float gaussian(float x, float sigma) {
+    float sigma2 = sigma * sigma;
+    if (sigma2 < 0.001) return 1.0;
+    return exp(-(x * x) / (2.0 * sigma2)) / (2.5066 * sigma);
+}
+
+// Calculate gradient mask value (0.0 to 1.0) based on position
+float calculateGradientMask(vec2 coord) {
+    vec2 gradDir = gradientEnd - gradientStart;
+    float gradLength = length(gradDir);
+    
+    if (gradLength < 0.001) {
+        return 0.0;
+    }
+    
+    vec2 gradNorm = gradDir / gradLength;
+    vec2 toCoord = coord - gradientStart;
+    float projection = dot(toCoord, gradNorm);
+    
+    // Normalize to 0-1 range
+    float t = clamp(projection / gradLength, 0.0, 1.0);
+    return t;
+}
+
+vec4 main(vec2 fragCoord) {
+    // Calculate mask value (0 = no blur, 1 = max blur)
+    float maskValue = calculateGradientMask(fragCoord);
+    
+    // Interpolate blur radius based on mask
+    float blurRadius = mix(minRadius, maxRadius, maskValue);
+    
+    // Early exit for no blur
+    if (blurRadius < 0.5) {
+        return image.eval(fragCoord);
+    }
+    
+    vec4 result = vec4(0.0);
+    float totalWeight = 0.0;
+    
+    // Fixed maximum kernel size (SkSL requires constant loop bounds)
+    const int MAX_RADIUS = 30;
+    float effectiveRadius = min(blurRadius * 3.0, float(MAX_RADIUS));
+    
+    // 1D vertical blur - only sample along Y-axis
+    for (int y = -MAX_RADIUS; y <= MAX_RADIUS; y++) {
+        float dist = abs(float(y));
+        
+        // Skip samples outside effective radius
+        if (dist > effectiveRadius) continue;
+        
+        float weight = gaussian(dist, blurRadius);
+        vec2 sampleCoord = fragCoord + vec2(0.0, float(y));
+        vec4 sample = image.eval(sampleCoord);
+        
+        result += sample * weight;
+        totalWeight += weight;
+    }
+    
+    if (totalWeight > 0.0) {
+        result /= totalWeight;
+    }
+    
+    return result;
+}
+
