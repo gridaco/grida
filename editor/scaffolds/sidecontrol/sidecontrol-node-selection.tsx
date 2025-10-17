@@ -1629,15 +1629,14 @@ function SectionMask({ node_id, editor }: { node_id: string; editor: Editor }) {
 function SectionEffects({ node_id }: { node_id: string }) {
   const backend = useBackendState();
   const instance = useCurrentEditor();
-  const { type, feShadows, feBlur, feBackdropBlur } = useNodeState(
-    node_id,
-    (node) => ({
+  const { type, feShadows, feBlur, feBackdropBlur, feLiquidGlass } =
+    useNodeState(node_id, (node) => ({
       type: node.type,
       feShadows: node.feShadows,
       feBlur: node.feBlur,
       feBackdropBlur: node.feBackdropBlur,
-    })
-  );
+      feLiquidGlass: node.feLiquidGlass,
+    }));
 
   const effects = useMemo(() => {
     const effects: cg.FilterEffect[] = [];
@@ -1656,8 +1655,11 @@ function SectionEffects({ node_id }: { node_id: string }) {
         blur: feBackdropBlur,
       });
     }
+    if (feLiquidGlass) {
+      effects.push(feLiquidGlass);
+    }
     return effects;
-  }, [feShadows, feBlur, feBackdropBlur]);
+  }, [feShadows, feBlur, feBackdropBlur, feLiquidGlass]);
 
   const onAddEffect = useCallback(() => {
     instance.commands.changeNodeFilterEffects(node_id, [

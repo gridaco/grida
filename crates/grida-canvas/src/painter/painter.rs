@@ -273,6 +273,65 @@ impl<'a> Painter<'a> {
         canvas.restore(); // pop the clip
     }
 
+    /// Draw liquid glass effect for a shape using SaveLayer backdrop.
+    ///
+    /// This renders a physically-based glass effect with refraction, chromatic aberration,
+    /// and Fresnel reflections using Skia's SaveLayer backdrop mechanism.
+    ///
+    /// The backdrop approach automatically captures the background without manual snapshots,
+    /// making it work seamlessly with both GPU and CPU backends.
+    ///
+    /// # Note
+    /// - Supports rectangular shapes with per-corner radii (extracted from RRect shapes)
+    /// - Rotation baked into the geometry via transformation matrix (applied via `with_transform`)
+    fn draw_glass_effect(&self, shape: &PainterShape, glass: &FeLiquidGlass) {
+        let canvas = self.canvas;
+        let bounds = shape.rect;
+        let width = bounds.width();
+        let height = bounds.height();
+
+        // Get canvas size from device bounds
+        let device_bounds = canvas.device_clip_bounds().unwrap_or_default();
+        let canvas_size = (device_bounds.width() as f32, device_bounds.height() as f32);
+
+        // Extract corner radii from shape (returns [0,0,0,0] for non-rounded shapes)
+        let corner_radii = shape.corner_radii();
+
+        // Rotation is applied via transform matrix (already in canvas state from with_transform)
+        // The shader receives rotation=0.0 since the transform is baked into the canvas
+        let rotation = 0.0;
+
+        // Create the glass ImageFilter
+        let glass_filter = crate::painter::effects::create_liquid_glass_image_filter(
+            width,
+            height,
+            corner_radii,
+            rotation,
+            canvas_size,
+            glass,
+        );
+
+        // Apply glass effect using SaveLayer with backdrop
+        canvas.save();
+        canvas.translate((bounds.x(), bounds.y()));
+
+        // Clip using the most efficient method based on shape type
+        if let Some(rect) = shape.rect_shape {
+            canvas.clip_rect(rect, None, true);
+        } else if let Some(rrect) = &shape.rrect {
+            canvas.clip_rrect(rrect, None, true);
+        } else {
+            canvas.clip_path(&shape.to_path(), None, true);
+        }
+
+        // SaveLayer with backdrop captures background and applies filter
+        let layer_rec = SaveLayerRec::default().backdrop(&glass_filter);
+        canvas.save_layer(&layer_rec);
+
+        canvas.restore();
+        canvas.restore();
+    }
+
     pub fn cached_path(&self, id: &NodeId, data: &str) -> Rc<Path> {
         self.path_cache.borrow_mut().get_or_create(id, data)
     }
@@ -359,6 +418,13 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw a shape applying all layer effects in the correct order.
+    ///
+    /// Effect ordering (as per specification):
+    /// 1. Drop shadows (before everything)
+    /// 2. Glass or Backdrop Blur (mutually exclusive - glass takes precedence if both present)
+    /// 3. Content (fills/strokes)
+    /// 4. Inner shadows (after content)
+    /// 5. Layer blur (wraps everything)
     pub fn draw_shape_with_effects<F: Fn()>(
         &self,
         effects: &LayerEffects,
@@ -366,18 +432,25 @@ impl<'a> Painter<'a> {
         draw_content: F,
     ) {
         let apply_effects = || {
-            if let Some(blur) = effects.backdrop_blur {
-                self.draw_backdrop_blur(shape, &blur);
-            }
-
+            // 1. Drop shadows (before everything)
             for shadow in &effects.shadows {
                 if let FilterShadowEffect::DropShadow(ds) = shadow {
                     self.draw_shadow(shape, ds);
                 }
             }
 
+            // 2. Glass or Backdrop Blur (mutually exclusive)
+            // Glass takes precedence over backdrop blur if both are present
+            if let Some(glass) = &effects.glass {
+                self.draw_glass_effect(shape, glass);
+            } else if let Some(blur) = effects.backdrop_blur {
+                self.draw_backdrop_blur(shape, &blur);
+            }
+
+            // 3. Content (fills/strokes)
             draw_content();
 
+            // 4. Inner shadows (after content)
             for shadow in &effects.shadows {
                 if let FilterShadowEffect::InnerShadow(is) = shadow {
                     self.draw_inner_shadow(shape, is);
@@ -385,6 +458,7 @@ impl<'a> Painter<'a> {
             }
         };
 
+        // 5. Layer blur (wraps everything)
         if let Some(layer_blur) = effects.blur {
             self.with_layer_blur(layer_blur.radius, apply_effects);
         } else {

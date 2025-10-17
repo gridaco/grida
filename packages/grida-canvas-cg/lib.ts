@@ -990,7 +990,11 @@ export namespace cg {
     type: "progressive-blur";
   };
 
-  export type FilterEffect = FeShadow | FeLayerBlur | FeBackdropBlur;
+  export type FilterEffect =
+    | FeShadow
+    | FeLayerBlur
+    | FeBackdropBlur
+    | FeLiquidGlass;
 
   export type FeShadow = IFeShadow & {
     type: "shadow";
@@ -1007,6 +1011,74 @@ export namespace cg {
   export type FeBackdropBlur = {
     type: "backdrop-filter-blur";
     blur: FeBlur;
+  };
+
+  /**
+   * Liquid Glass Effect
+   *
+   * A visual effect that creates a realistic glass appearance with light refraction,
+   * highlights, and chromatic aberration.
+   */
+  export type FeLiquidGlass = {
+    type: "glass";
+    /**
+     * The intensity of specular highlights.
+     * Must be between 0 and 1. Higher values create brighter highlights.
+     *
+     * Adjust the angle and intensity of the light illuminating your glass containers
+     * to change where the highlight appears on the container's edge.
+     *
+     * @default 0.9
+     */
+    lightIntensity: number;
+
+    /**
+     * The angle of the specular light in degrees.
+     * Controls the direction of highlights on the glass surface.
+     *
+     * @default 45.0
+     */
+    lightAngle: number;
+
+    /**
+     * Refraction strength [0.0-1.0]
+     * 0.0 = no refraction, 0.5 = typical glass, 1.0 = maximum refraction
+     * Internally mapped to IOR range [1.0-2.0]
+     *
+     * Control the way light bends along the edge of your glass container.
+     * The higher the refraction value, the more your glass containers will
+     * distort the elements around them.
+     *
+     * @default 0.8
+     */
+    refraction: number;
+
+    /**
+     * Glass thickness/depth for 3D surface effect in pixels [1.0+]
+     * Controls the curvature height of the glass surface
+     * Higher values create more pronounced lens curvature and stronger refraction
+     * Typical values: 20-100 pixels
+     *
+     * @default 20.0
+     */
+    depth: number;
+
+    /**
+     * Chromatic aberration strength [0.0-1.0]
+     * Controls color separation at edges (rainbow effect)
+     * Higher values create more rainbow-like distortion at edges.
+     *
+     * @default 0.5
+     */
+    dispersion: number;
+
+    /**
+     * Blur radius for frosted glass effect [0.0+] in pixels
+     * Applied via Skia's native blur before refraction shader
+     *
+     * @default 4.0
+     */
+    radius: number;
   };
 
   /**

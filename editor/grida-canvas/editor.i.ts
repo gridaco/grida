@@ -438,10 +438,21 @@ export namespace editor.config {
     radius2: 4,
   };
 
+  export const DEFAULT_FE_LIQUID_GLASS: Omit<cg.FeLiquidGlass, "type"> = {
+    lightIntensity: 0.9,
+    lightAngle: 45.0,
+    refraction: 0.8, // Normalized [0.0-1.0], maps to IOR [1.0-2.0]
+    depth: 20.0, // Absolute pixels [1.0+], typical values: 20-100
+    dispersion: 0.5,
+    radius: 4.0, // Renamed from radius, in pixels
+  };
+
   export const DEFAULT_MAX_STROKE_WIDTH = 1000;
   export const DEFAULT_MAX_BLUR_RADIUS = 250;
   export const DEFAULT_MAX_SHADOW_OFFSET = 10000;
   export const DEFAULT_MAX_SHADOW_SPREAD = 1000;
+  export const DEFAULT_MAX_LIQUID_GLASS_DEPTH = 200.0; // Absolute pixels: max depth
+  export const DEFAULT_MAX_LIQUID_GLASS_BLUR_RADIUS = 50; // Renamed from radius
 }
 
 export namespace editor.font_spec {

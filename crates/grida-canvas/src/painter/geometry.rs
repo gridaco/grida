@@ -78,6 +78,31 @@ impl PainterShape {
         }
     }
 
+    /// Extract corner radii from the shape
+    ///
+    /// Returns corner radii [top-left, top-right, bottom-right, bottom-left]
+    /// for shapes that support them (RRect). Returns uniform zeros for other shapes.
+    ///
+    /// # Returns
+    /// - For RRect: Actual corner radii extracted from the shape (uses x-radius)
+    /// - For Rect, Oval, Path: [0.0, 0.0, 0.0, 0.0] (no rounded corners)
+    pub fn corner_radii(&self) -> [f32; 4] {
+        if let Some(rrect) = &self.rrect {
+            // Extract radii from RRect using radii_ref()
+            // Returns [UpperLeft, UpperRight, LowerRight, LowerLeft]
+            let radii = rrect.radii_ref();
+            [
+                radii[0].x, // top-left (UpperLeft)
+                radii[1].x, // top-right (UpperRight)
+                radii[2].x, // bottom-right (LowerRight)
+                radii[3].x, // bottom-left (LowerLeft)
+            ]
+        } else {
+            // No rounded corners for other shape types
+            [0.0, 0.0, 0.0, 0.0]
+        }
+    }
+
     pub fn to_path(&self) -> Path {
         let mut path = Path::new();
 

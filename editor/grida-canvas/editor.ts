@@ -1897,11 +1897,15 @@ class EditorDocumentStore
       (effect) => effect.type === "backdrop-filter-blur"
     )?.blur;
     const feShadows = effects?.filter((effect) => effect.type === "shadow");
+    const feLiquidGlass = effects?.find((effect) => effect.type === "glass") as
+      | cg.FeLiquidGlass
+      | undefined;
 
     const i: grida.program.nodes.i.IEffects = {
       feBackdropBlur: feBackdropBlur,
       feBlur: feBlur,
       feShadows: feShadows,
+      feLiquidGlass: feLiquidGlass,
     };
 
     this.dispatch({

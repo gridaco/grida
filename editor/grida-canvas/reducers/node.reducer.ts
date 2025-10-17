@@ -1,5 +1,4 @@
 import { produce, type Draft } from "immer";
-import { updateState } from "./utils/immer";
 import type grida from "@grida/schema";
 import type { NodeChangeAction } from "../action";
 import type cg from "@grida/cg";
@@ -523,6 +522,32 @@ const safe_properties: Partial<
         }
       }
       (draft as UN).feBackdropBlur = value;
+    },
+  }),
+  feLiquidGlass: defineNodeProperty<"feLiquidGlass">({
+    apply: (draft, value, prev) => {
+      if (value) {
+        value = {
+          ...value,
+          lightIntensity: cmath.clamp(value.lightIntensity, 0, 1),
+          lightAngle: value.lightAngle,
+          // refraction is now normalized 0-1, maps to IOR 1.0-2.0
+          refraction: cmath.clamp(value.refraction, 0, 1),
+          // depth is now absolute pixels [1.0+]
+          depth: cmath.clamp(
+            value.depth,
+            1.0,
+            editor.config.DEFAULT_MAX_LIQUID_GLASS_DEPTH
+          ),
+          dispersion: cmath.clamp(value.dispersion, 0, 1),
+          radius: ranged(
+            0,
+            value.radius,
+            editor.config.DEFAULT_MAX_LIQUID_GLASS_BLUR_RADIUS
+          ),
+        } satisfies cg.FeLiquidGlass;
+      }
+      (draft as UN).feLiquidGlass = value;
     },
   }),
   zIndex: defineNodeProperty<"zIndex">({

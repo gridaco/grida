@@ -19,6 +19,8 @@ pub struct LayerEffects {
     pub backdrop_blur: Option<FeGaussianBlur>,
     /// multiple shadows are supported per layer (drop shadow, inner shadow)
     pub shadows: Vec<FilterShadowEffect>,
+    /// single liquid glass effect is supported per layer (only fully supported with rectangular shapes)
+    pub glass: Option<FeLiquidGlass>,
 }
 
 impl LayerEffects {
@@ -30,6 +32,7 @@ impl LayerEffects {
             match effect {
                 FilterEffect::LayerBlur(blur) => layer_effects.blur = Some(blur),
                 FilterEffect::BackdropBlur(blur) => layer_effects.backdrop_blur = Some(blur),
+                FilterEffect::LiquidGlass(glass) => layer_effects.glass = Some(glass),
                 FilterEffect::DropShadow(shadow) => layer_effects
                     .shadows
                     .push(FilterShadowEffect::DropShadow(shadow)),
@@ -62,6 +65,7 @@ impl Default for LayerEffects {
             blur: None,
             backdrop_blur: None,
             shadows: vec![],
+            glass: None,
         }
     }
 }

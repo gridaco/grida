@@ -1,55 +1,92 @@
-use cg::cg::types::*;
-use cg::shape::*;
-use skia_safe::surfaces;
+/*! Liquid Glass Effect Example
+ *
+ * Demonstrates the liquid glass effect with refraction, chromatic aberration,
+ * and Fresnel reflections using the SaveLayer backdrop approach.
+ *
+ * This example uses the modern backdrop-based implementation that works
+ * seamlessly with both GPU and CPU backends without manual snapshots.
+ */
 
-// **Light**
-// Adjust the angle and intensity of the light illuminating your glass frames to change where the highlight appears on the frame’s edge.
-// **Refraction**
-// Control the way light bends along the edge of your glass frame. The higher the refraction value, the more your glass frames will distort the elements around them.
-// **Depth**
-// Change how thick your glass material appears to provide a more pronounced 3D feel to the edge of the frame.
-// **Dispersion**
-// Increase dispersion to add a hint of chromatic aberration at the edge of your glass frames. This works best in combination with refraction.
-// **Frost**
-// Adjust the amount of background blur present on your glass frames to help glass elements stand out on busy backgrounds to provide better contrast.
-#[allow(dead_code)]
-struct LiquidGlassEffect {
-    /// The intensity of specular highlights. Must be between 0 and 1. Higher values create brighter highlights.
-    light_intensity: f32,
-    /// The angle of the specular light in degrees. Controls the direction of highlights on the glass surface.
-    light_angle: f32,
-    /// The intensity of the refraction distortion. Must be between 0 and 1. Higher values create more distortion.
-    refraction: f32,
-    /// The depth of the refraction effect. Must be >= 1. Higher values create deeper glass appearance.
-    depth: f32,
-    /// The amount of chromatic aberration (color separation). Must be between 0 and 1. Higher values create more rainbow-like distortion at edges.
-    dispersion: f32,
-    /// The radius of frost on the glass effect.
-    radius: f32,
-}
+use cg::cg::types::FeLiquidGlass;
+use cg::painter::effects;
+use skia_safe::{canvas::SaveLayerRec, surfaces, Data, EncodedImageFormat, Image, Paint, Rect};
 
-static _BACKGROUND: &[u8] = include_bytes!("../../../fixtures/images/stripes.png");
+const BACKGROUND_IMAGE: &[u8] = include_bytes!("../../../fixtures/images/stripes.png");
 
-// 1. background image
-// 2. forground glass shape 300x100 rounded rect
-// 3. glass effect on glass shape
 fn main() {
-    let _effect = LiquidGlassEffect {
-        light_intensity: 0.5,
+    let canvas_size = (800, 800);
+
+    // Glass parameters - square shape filling most of the canvas
+    let padding = 50.0;
+    let glass_size = canvas_size.0 as f32 - 2.0 * padding; // Square
+    let glass_width = glass_size;
+    let glass_height = glass_size;
+    let glass_x = padding;
+    let glass_y = padding;
+    let corner_radius = 100.0;
+
+    // Use default effect parameters
+    // Note: depth is in absolute pixels
+    let effect = FeLiquidGlass {
+        light_intensity: 0.7, // Lower for more reflection visibility
         light_angle: 45.0,
-        refraction: 0.5,
-        depth: 1.0,
-        dispersion: 0.5,
-        radius: 10.0,
+        refraction: 1.0,  // 0.0 = no refraction, 1.0 = max (maps to IOR 1.0-2.0)
+        depth: 100.0,     // Glass thickness in pixels (minimum 1.0)
+        dispersion: 1.0,  // Chromatic aberration strength
+        blur_radius: 0.0, // No blur to see pure refraction effect
     };
 
-    let _shape: RRectShape = RRectShape {
-        width: 300.0,
-        height: 100.0,
-        corner_radius: RectangularCornerRadius::circular(10.0),
-    };
+    // Create surface for final composition
+    let mut surface = surfaces::raster_n32_premul(canvas_size).expect("surface");
+    let canvas = surface.canvas();
 
-    let (width, height) = (400, 400);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
-    let _canvas = surface.canvas();
+    // Load and draw background image
+    let background_image =
+        Image::from_encoded(Data::new_copy(BACKGROUND_IMAGE)).expect("decode background image");
+    canvas.draw_image_rect(
+        &background_image,
+        None,
+        Rect::from_xywh(0.0, 0.0, canvas_size.0 as f32, canvas_size.1 as f32),
+        &Paint::default(),
+    );
+
+    let corner_radii = [corner_radius, corner_radius, corner_radius, corner_radius];
+
+    // Create glass ImageFilter using backdrop approach
+    let glass_filter = effects::create_liquid_glass_image_filter(
+        glass_width,
+        glass_height,
+        corner_radii,
+        0.0, // No rotation
+        (canvas_size.0 as f32, canvas_size.1 as f32),
+        &effect,
+    );
+
+    // Apply glass using SaveLayer with backdrop
+    canvas.save();
+    canvas.translate((glass_x, glass_y));
+
+    // Clip to glass bounds (rectangle with rounded corners)
+    let glass_rect = Rect::from_xywh(0.0, 0.0, glass_width, glass_height);
+    let rrect =
+        skia_safe::RRect::new_rect_radii(glass_rect, &[(corner_radius, corner_radius).into(); 4]);
+    canvas.clip_rrect(rrect, None, true);
+
+    // SaveLayer with backdrop - Skia captures and processes background automatically
+    let layer_rec = SaveLayerRec::default().backdrop(&glass_filter);
+    canvas.save_layer(&layer_rec);
+
+    canvas.restore();
+    canvas.restore();
+
+    // Save to PNG
+    let image = surface.image_snapshot();
+    let data = image
+        .encode(None, EncodedImageFormat::PNG, None)
+        .expect("encode png");
+    std::fs::write(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/liquid_glass.png"),
+        data.as_bytes(),
+    )
+    .expect("write png");
 }
