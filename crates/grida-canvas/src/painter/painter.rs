@@ -149,15 +149,26 @@ impl<'a> Painter<'a> {
         canvas.restore();
     }
 
-    /// Wrap a closure `f` in a layer that applies a Gaussian blur to everything drawn inside.
-    fn with_layer_blur<F: FnOnce()>(&self, radius: f32, f: F) {
+    /// Wrap a closure `f` in a layer that applies a blur to everything drawn inside.
+    fn with_layer_blur<F: FnOnce()>(&self, blur: &FeBlur, bounds: Rect, f: F) {
         let canvas = self.canvas;
-        let image_filter = skia_safe::image_filters::blur((radius, radius), None, None, None);
-        let mut paint = SkPaint::default();
-        paint.set_image_filter(image_filter);
-        canvas.save_layer(&SaveLayerRec::default().paint(&paint));
-        f();
-        canvas.restore();
+        let image_filter = match blur {
+            FeBlur::Gaussian(gaussian) => {
+                skia_safe::image_filters::blur((gaussian.radius, gaussian.radius), None, None, None)
+            }
+            FeBlur::Progressive(progressive) => Some(
+                crate::painter::effects::create_progressive_blur_image_filter(progressive, bounds),
+            ),
+        };
+        if let Some(filter) = image_filter {
+            let mut paint = SkPaint::default();
+            paint.set_image_filter(filter);
+            canvas.save_layer(&SaveLayerRec::default().paint(&paint));
+            f();
+            canvas.restore();
+        } else {
+            f();
+        }
     }
 
     /// Draw a drop shadow behind the content using a shape.
@@ -211,7 +222,7 @@ impl<'a> Painter<'a> {
     fn draw_text_backdrop_blur(
         &self,
         paragraph: &Rc<RefCell<textlayout::Paragraph>>,
-        blur: &FeGaussianBlur,
+        blur: &FeBlur,
         y_offset: f32,
     ) {
         // Build a path from all glyphs in the paragraph.
@@ -236,41 +247,59 @@ impl<'a> Painter<'a> {
         }
 
         let canvas = self.canvas;
-        let Some(image_filter) =
-            skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None)
-        else {
+        let text_bounds = path.bounds();
+        let image_filter = match blur {
+            FeBlur::Gaussian(gaussian) => {
+                skia_safe::image_filters::blur((gaussian.radius, gaussian.radius), None, None, None)
+            }
+            FeBlur::Progressive(progressive) => Some(
+                crate::painter::effects::create_progressive_blur_image_filter(
+                    progressive,
+                    *text_bounds,
+                ),
+            ),
+        };
+
+        let Some(filter) = image_filter else {
             return;
         };
 
         canvas.save();
         canvas.clip_path(&path, None, true);
-        let layer_rec = SaveLayerRec::default().backdrop(&image_filter);
+        let layer_rec = SaveLayerRec::default().backdrop(&filter);
         canvas.save_layer(&layer_rec);
         canvas.restore();
         canvas.restore();
     }
 
     /// Draw a backdrop blur: blur what's behind the shape.
-    fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeGaussianBlur) {
+    fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeBlur) {
         let canvas = self.canvas;
-        // 1) Build a Gaussian‐blur filter for the backdrop
-        let Some(image_filter) =
-            skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None)
-        else {
-            return;
+        let image_filter = match blur {
+            FeBlur::Gaussian(gaussian) => {
+                skia_safe::image_filters::blur((gaussian.radius, gaussian.radius), None, None, None)
+            }
+            FeBlur::Progressive(progressive) => Some(
+                crate::painter::effects::create_progressive_blur_image_filter(
+                    progressive,
+                    shape.rect,
+                ),
+            ),
         };
 
-        // 2) Clip to the shape
-        canvas.save();
-        canvas.clip_path(&shape.to_path(), None, true);
+        if let Some(filter) = image_filter {
+            // 1) Clip to the shape
+            canvas.save();
+            canvas.clip_path(&shape.to_path(), None, true);
 
-        // 3) Use a SaveLayerRec with a backdrop filter so that everything behind is blurred
-        let layer_rec = SaveLayerRec::default().backdrop(&image_filter);
-        canvas.save_layer(&layer_rec);
+            // 2) Use a SaveLayerRec with a backdrop filter so that everything behind is blurred
+            let layer_rec = SaveLayerRec::default().backdrop(&filter);
+            canvas.save_layer(&layer_rec);
 
-        // We don't draw any content here—just pushing and popping the layer
-        canvas.restore(); // pop the SaveLayer
-        canvas.restore(); // pop the clip
+            // We don't draw any content here—just pushing and popping the layer
+            canvas.restore(); // pop the SaveLayer
+            canvas.restore(); // pop the clip
+        }
     }
 
     /// Draw liquid glass effect for a shape using SaveLayer backdrop.
@@ -443,8 +472,8 @@ impl<'a> Painter<'a> {
             // Glass takes precedence over backdrop blur if both are present
             if let Some(glass) = &effects.glass {
                 self.draw_glass_effect(shape, glass);
-            } else if let Some(blur) = effects.backdrop_blur {
-                self.draw_backdrop_blur(shape, &blur);
+            } else if let Some(blur) = &effects.backdrop_blur {
+                self.draw_backdrop_blur(shape, blur);
             }
 
             // 3. Content (fills/strokes)
@@ -459,8 +488,8 @@ impl<'a> Painter<'a> {
         };
 
         // 5. Layer blur (wraps everything)
-        if let Some(layer_blur) = effects.blur {
-            self.with_layer_blur(layer_blur.radius, apply_effects);
+        if let Some(layer_blur) = &effects.blur {
+            self.with_layer_blur(layer_blur, shape.rect, apply_effects);
         } else {
             apply_effects();
         }
@@ -663,8 +692,8 @@ impl<'a> Painter<'a> {
                         };
 
                         let apply_effects = || {
-                            if let Some(blur) = effects.backdrop_blur {
-                                self.draw_text_backdrop_blur(&paragraph, &blur, y_offset);
+                            if let Some(blur) = &effects.backdrop_blur {
+                                self.draw_text_backdrop_blur(&paragraph, blur, y_offset);
                             }
 
                             for shadow in &effects.shadows {
@@ -683,8 +712,10 @@ impl<'a> Painter<'a> {
                         };
 
                         let draw_with_effects = || {
-                            if let Some(layer_blur) = effects.blur {
-                                self.with_layer_blur(layer_blur.radius, apply_effects);
+                            if let Some(layer_blur) = &effects.blur {
+                                let text_bounds =
+                                    Rect::from_xywh(0.0, y_offset, layout_size.0, container_height);
+                                self.with_layer_blur(layer_blur, text_bounds, apply_effects);
                             } else {
                                 apply_effects();
                             }

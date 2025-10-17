@@ -52,7 +52,9 @@ vec4 main(vec2 fragCoord) {
     float totalWeight = 0.0;
     
     // Fixed maximum kernel size (SkSL requires constant loop bounds)
-    const int MAX_RADIUS = 30;
+    // Set to 150 to support blur radii up to 50px (3-sigma coverage)
+    // Professional design tools commonly use blur values in the 0-100px range
+    const int MAX_RADIUS = 150;
     float effectiveRadius = min(blurRadius * 3.0, float(MAX_RADIUS));
     
     // 1D horizontal blur - only sample along X-axis

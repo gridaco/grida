@@ -296,6 +296,60 @@ impl Default for JSONFeLiquidGlass {
     }
 }
 
+/// JSON representation of blur effects with proper type tags
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum JSONFeBlur {
+    #[serde(rename = "blur")]
+    Gaussian { radius: f32 },
+    #[serde(rename = "progressive-blur")]
+    Progressive(JSONFeProgressiveBlur),
+}
+
+/// JSON representation of progressive blur with canvas-space coordinates (x1, y1, x2, y2)
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct JSONFeProgressiveBlur {
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32,
+    pub radius: f32,
+    pub radius2: f32,
+}
+
+impl From<JSONFeBlur> for FeBlur {
+    fn from(json_blur: JSONFeBlur) -> Self {
+        match json_blur {
+            JSONFeBlur::Gaussian { radius } => FeBlur::Gaussian(FeGaussianBlur { radius }),
+            JSONFeBlur::Progressive(json_progressive) => {
+                FeBlur::Progressive(json_progressive.into())
+            }
+        }
+    }
+}
+
+impl From<JSONFeProgressiveBlur> for FeProgressiveBlur {
+    fn from(json: JSONFeProgressiveBlur) -> Self {
+        // Convert canvas-space pixel coordinates to normalized Alignment coordinates
+        // Assuming the coordinates are in a normalized 0-1 space where:
+        // 0.0 = -1.0 in Alignment (edge), 0.5 = 0.0 in Alignment (center), 1.0 = 1.0 in Alignment (edge)
+        // This conversion formula: alignment = (normalized * 2.0) - 1.0
+        //
+        // However, if the incoming coordinates are already in the -1 to 1 range,
+        // we can use them directly. The safest approach is to assume they're normalized 0-1
+        // and convert accordingly.
+        //
+        // For now, we'll assume the coordinates come in as normalized values (0.0 to 1.0)
+        // and convert them to Alignment's -1.0 to 1.0 range:
+        FeProgressiveBlur {
+            start: Alignment(json.x1 * 2.0 - 1.0, json.y1 * 2.0 - 1.0),
+            end: Alignment(json.x2 * 2.0 - 1.0, json.y2 * 2.0 - 1.0),
+            radius: json.radius,
+            radius2: json.radius2,
+        }
+    }
+}
+
 impl From<JSONRGBA> for CGColor {
     fn from(color: JSONRGBA) -> Self {
         CGColor(color.r, color.g, color.b, (color.a * 255.0).round() as u8)
@@ -673,9 +727,9 @@ pub struct JSONUnknownNodeProperties {
     #[serde(rename = "feShadows")]
     pub fe_shadows: Option<Vec<JSONFeShadow>>,
     #[serde(rename = "feBlur")]
-    pub fe_blur: Option<FeGaussianBlur>,
+    pub fe_blur: Option<JSONFeBlur>,
     #[serde(rename = "feBackdropBlur")]
-    pub fe_backdrop_blur: Option<FeGaussianBlur>,
+    pub fe_backdrop_blur: Option<JSONFeBlur>,
     #[serde(rename = "feLiquidGlass")]
     pub fe_liquid_glass: Option<JSONFeLiquidGlass>,
     // vector
@@ -1705,16 +1759,16 @@ mod corner_radius_tests {
 
 fn merge_effects(
     fe_shadows: Option<Vec<JSONFeShadow>>,
-    fe_blur: Option<FeGaussianBlur>,
-    fe_backdrop_blur: Option<FeGaussianBlur>,
+    fe_blur: Option<JSONFeBlur>,
+    fe_backdrop_blur: Option<JSONFeBlur>,
     fe_liquid_glass: Option<JSONFeLiquidGlass>,
 ) -> LayerEffects {
     let mut effects = LayerEffects::default();
     if let Some(filter_blur) = fe_blur {
-        effects.blur = Some(filter_blur);
+        effects.blur = Some(filter_blur.into());
     }
     if let Some(filter_backdrop_blur) = fe_backdrop_blur {
-        effects.backdrop_blur = Some(filter_backdrop_blur);
+        effects.backdrop_blur = Some(filter_backdrop_blur.into());
     }
     if let Some(liquid_glass) = fe_liquid_glass {
         effects.glass = Some(liquid_glass.into());
@@ -2807,5 +2861,412 @@ mod tests {
             Some(&Some(vec!["rect1".to_string()]))
         );
         assert_eq!(file.document.links.get("rect1"), Some(&None));
+    }
+
+    #[test]
+    fn deserialize_gaussian_blur() {
+        let json = r#"{
+            "type": "blur",
+            "radius": 10.0
+        }"#;
+
+        let blur: JSONFeBlur =
+            serde_json::from_str(json).expect("failed to deserialize gaussian blur");
+
+        match blur {
+            JSONFeBlur::Gaussian { radius } => {
+                assert_eq!(radius, 10.0);
+            }
+            _ => panic!("Expected Gaussian blur variant"),
+        }
+
+        // Test conversion to FeBlur
+        let fe_blur: FeBlur = blur.into();
+        match fe_blur {
+            FeBlur::Gaussian(gaussian) => {
+                assert_eq!(gaussian.radius, 10.0);
+            }
+            _ => panic!("Expected Gaussian blur"),
+        }
+    }
+
+    #[test]
+    fn deserialize_progressive_blur() {
+        let json = r#"{
+            "type": "progressive-blur",
+            "x1": 0.5,
+            "y1": 0.0,
+            "x2": 0.5,
+            "y2": 1.0,
+            "radius": 0.0,
+            "radius2": 40.0
+        }"#;
+
+        let blur: JSONFeBlur =
+            serde_json::from_str(json).expect("failed to deserialize progressive blur");
+
+        match blur {
+            JSONFeBlur::Progressive(progressive) => {
+                assert_eq!(progressive.x1, 0.5);
+                assert_eq!(progressive.y1, 0.0);
+                assert_eq!(progressive.x2, 0.5);
+                assert_eq!(progressive.y2, 1.0);
+                assert_eq!(progressive.radius, 0.0);
+                assert_eq!(progressive.radius2, 40.0);
+            }
+            _ => panic!("Expected Progressive blur variant"),
+        }
+
+        // Test conversion to FeBlur
+        let fe_blur: FeBlur = blur.into();
+        match fe_blur {
+            FeBlur::Progressive(progressive) => {
+                // x1=0.5 -> (0.5 * 2.0 - 1.0) = 0.0 (center)
+                // y1=0.0 -> (0.0 * 2.0 - 1.0) = -1.0 (top edge)
+                // x2=0.5 -> (0.5 * 2.0 - 1.0) = 0.0 (center)
+                // y2=1.0 -> (1.0 * 2.0 - 1.0) = 1.0 (bottom edge)
+                assert_eq!(progressive.start.x(), 0.0);
+                assert_eq!(progressive.start.y(), -1.0);
+                assert_eq!(progressive.end.x(), 0.0);
+                assert_eq!(progressive.end.y(), 1.0);
+                assert_eq!(progressive.radius, 0.0);
+                assert_eq!(progressive.radius2, 40.0);
+            }
+            _ => panic!("Expected Progressive blur"),
+        }
+    }
+
+    #[test]
+    fn deserialize_rectangle_with_gaussian_blur() {
+        let json = r#"{
+            "id": "rect-1",
+            "name": "Blurred Rectangle",
+            "type": "rectangle",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": 200.0,
+            "feBlur": {
+                "type": "blur",
+                "radius": 5.0
+            }
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("failed to deserialize rectangle with gaussian blur");
+
+        match node {
+            JSONNode::Rectangle(rect) => {
+                let converted: Node = rect.into();
+                if let Node::Rectangle(rect_rec) = converted {
+                    assert!(rect_rec.effects.blur.is_some());
+                    match rect_rec.effects.blur.unwrap() {
+                        FeBlur::Gaussian(gaussian) => {
+                            assert_eq!(gaussian.radius, 5.0);
+                        }
+                        _ => panic!("Expected Gaussian blur"),
+                    }
+                } else {
+                    panic!("Expected Rectangle node");
+                }
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_rectangle_with_progressive_blur() {
+        let json = r#"{
+            "id": "rect-2",
+            "name": "Progressive Blur Rectangle",
+            "type": "rectangle",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": 400.0,
+            "feBlur": {
+                "type": "progressive-blur",
+                "x1": 0.5,
+                "y1": 0.0,
+                "x2": 0.5,
+                "y2": 1.0,
+                "radius": 0.0,
+                "radius2": 30.0
+            }
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize rectangle with progressive blur");
+
+        match node {
+            JSONNode::Rectangle(rect) => {
+                let converted: Node = rect.into();
+                if let Node::Rectangle(rect_rec) = converted {
+                    assert!(rect_rec.effects.blur.is_some());
+                    match rect_rec.effects.blur.unwrap() {
+                        FeBlur::Progressive(progressive) => {
+                            // Verify Alignment conversion
+                            assert_eq!(progressive.start.x(), 0.0); // 0.5 * 2.0 - 1.0 = 0.0 (center)
+                            assert_eq!(progressive.start.y(), -1.0); // 0.0 * 2.0 - 1.0 = -1.0 (top)
+                            assert_eq!(progressive.end.x(), 0.0); // 0.5 * 2.0 - 1.0 = 0.0 (center)
+                            assert_eq!(progressive.end.y(), 1.0); // 1.0 * 2.0 - 1.0 = 1.0 (bottom)
+                            assert_eq!(progressive.radius, 0.0);
+                            assert_eq!(progressive.radius2, 30.0);
+                        }
+                        _ => panic!("Expected Progressive blur"),
+                    }
+                } else {
+                    panic!("Expected Rectangle node");
+                }
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_rectangle_with_backdrop_blur() {
+        let json = r#"{
+            "id": "rect-3",
+            "name": "Backdrop Blur Rectangle",
+            "type": "rectangle",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": 200.0,
+            "feBackdropBlur": {
+                "type": "blur",
+                "radius": 15.0
+            }
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("failed to deserialize rectangle with backdrop blur");
+
+        match node {
+            JSONNode::Rectangle(rect) => {
+                let converted: Node = rect.into();
+                if let Node::Rectangle(rect_rec) = converted {
+                    assert!(rect_rec.effects.backdrop_blur.is_some());
+                    match rect_rec.effects.backdrop_blur.unwrap() {
+                        FeBlur::Gaussian(gaussian) => {
+                            assert_eq!(gaussian.radius, 15.0);
+                        }
+                        _ => panic!("Expected Gaussian blur"),
+                    }
+                } else {
+                    panic!("Expected Rectangle node");
+                }
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_rectangle_with_progressive_backdrop_blur() {
+        let json = r#"{
+            "id": "rect-4",
+            "name": "Progressive Backdrop Blur Rectangle",
+            "type": "rectangle",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": 300.0,
+            "feBackdropBlur": {
+                "type": "progressive-blur",
+                "x1": 0.0,
+                "y1": 0.0,
+                "x2": 1.0,
+                "y2": 1.0,
+                "radius": 0.0,
+                "radius2": 50.0
+            }
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize rectangle with progressive backdrop blur");
+
+        match node {
+            JSONNode::Rectangle(rect) => {
+                let converted: Node = rect.into();
+                if let Node::Rectangle(rect_rec) = converted {
+                    assert!(rect_rec.effects.backdrop_blur.is_some());
+                    match rect_rec.effects.backdrop_blur.unwrap() {
+                        FeBlur::Progressive(progressive) => {
+                            // Verify diagonal gradient conversion
+                            // x1=0.0 -> -1.0 (left), y1=0.0 -> -1.0 (top)
+                            // x2=1.0 -> 1.0 (right), y2=1.0 -> 1.0 (bottom)
+                            assert_eq!(progressive.start.x(), -1.0);
+                            assert_eq!(progressive.start.y(), -1.0);
+                            assert_eq!(progressive.end.x(), 1.0);
+                            assert_eq!(progressive.end.y(), 1.0);
+                            assert_eq!(progressive.radius, 0.0);
+                            assert_eq!(progressive.radius2, 50.0);
+                        }
+                        _ => panic!("Expected Progressive blur"),
+                    }
+                } else {
+                    panic!("Expected Rectangle node");
+                }
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_text_with_layer_blur() {
+        let json = r#"{
+            "id": "text-1",
+            "name": "Blurred Text",
+            "type": "text",
+            "text": "Hello World",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": "auto",
+            "feBlur": {
+                "type": "blur",
+                "radius": 8.0
+            }
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("failed to deserialize text with blur");
+
+        match node {
+            JSONNode::Text(text) => {
+                let converted: TextSpanNodeRec = text.into();
+                assert!(converted.effects.blur.is_some());
+                match converted.effects.blur.unwrap() {
+                    FeBlur::Gaussian(gaussian) => {
+                        assert_eq!(gaussian.radius, 8.0);
+                    }
+                    _ => panic!("Expected Gaussian blur"),
+                }
+            }
+            _ => panic!("Expected Text node"),
+        }
+    }
+
+    #[test]
+    fn test_progressive_blur_coordinate_conversion() {
+        // Test various coordinate conversions from normalized 0-1 to Alignment -1 to 1
+
+        // Top-left corner: (0.0, 0.0) -> (-1.0, -1.0)
+        let json_progressive = JSONFeProgressiveBlur {
+            x1: 0.0,
+            y1: 0.0,
+            x2: 1.0,
+            y2: 1.0,
+            radius: 0.0,
+            radius2: 20.0,
+        };
+        let progressive: FeProgressiveBlur = json_progressive.into();
+        assert_eq!(progressive.start.x(), -1.0);
+        assert_eq!(progressive.start.y(), -1.0);
+        assert_eq!(progressive.end.x(), 1.0);
+        assert_eq!(progressive.end.y(), 1.0);
+
+        // Center: (0.5, 0.5) -> (0.0, 0.0)
+        let json_progressive = JSONFeProgressiveBlur {
+            x1: 0.5,
+            y1: 0.5,
+            x2: 0.5,
+            y2: 0.5,
+            radius: 10.0,
+            radius2: 20.0,
+        };
+        let progressive: FeProgressiveBlur = json_progressive.into();
+        assert_eq!(progressive.start.x(), 0.0);
+        assert_eq!(progressive.start.y(), 0.0);
+        assert_eq!(progressive.end.x(), 0.0);
+        assert_eq!(progressive.end.y(), 0.0);
+
+        // Vertical gradient from top to bottom center
+        let json_progressive = JSONFeProgressiveBlur {
+            x1: 0.5,
+            y1: 0.0,
+            x2: 0.5,
+            y2: 1.0,
+            radius: 0.0,
+            radius2: 40.0,
+        };
+        let progressive: FeProgressiveBlur = json_progressive.into();
+        assert_eq!(progressive.start.x(), 0.0); // center horizontally
+        assert_eq!(progressive.start.y(), -1.0); // top edge
+        assert_eq!(progressive.end.x(), 0.0); // center horizontally
+        assert_eq!(progressive.end.y(), 1.0); // bottom edge
+
+        // Horizontal gradient from left to right center
+        let json_progressive = JSONFeProgressiveBlur {
+            x1: 0.0,
+            y1: 0.5,
+            x2: 1.0,
+            y2: 0.5,
+            radius: 0.0,
+            radius2: 25.0,
+        };
+        let progressive: FeProgressiveBlur = json_progressive.into();
+        assert_eq!(progressive.start.x(), -1.0); // left edge
+        assert_eq!(progressive.start.y(), 0.0); // center vertically
+        assert_eq!(progressive.end.x(), 1.0); // right edge
+        assert_eq!(progressive.end.y(), 0.0); // center vertically
+    }
+
+    #[test]
+    fn deserialize_container_with_multiple_blur_effects() {
+        let json = r#"{
+            "id": "container-1",
+            "name": "Container with Blurs",
+            "type": "container",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 300.0,
+            "height": 400.0,
+            "feBlur": {
+                "type": "progressive-blur",
+                "x1": 0.5,
+                "y1": 0.0,
+                "x2": 0.5,
+                "y2": 1.0,
+                "radius": 0.0,
+                "radius2": 35.0
+            },
+            "feBackdropBlur": {
+                "type": "blur",
+                "radius": 12.0
+            }
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize container with both blur types");
+
+        match node {
+            JSONNode::Container(container) => {
+                let converted: ContainerNodeRec = container.into();
+
+                // Verify layer blur is progressive
+                assert!(converted.effects.blur.is_some());
+                match converted.effects.blur.unwrap() {
+                    FeBlur::Progressive(progressive) => {
+                        assert_eq!(progressive.start.x(), 0.0);
+                        assert_eq!(progressive.start.y(), -1.0);
+                        assert_eq!(progressive.end.x(), 0.0);
+                        assert_eq!(progressive.end.y(), 1.0);
+                        assert_eq!(progressive.radius2, 35.0);
+                    }
+                    _ => panic!("Expected Progressive blur for layer blur"),
+                }
+
+                // Verify backdrop blur is gaussian
+                assert!(converted.effects.backdrop_blur.is_some());
+                match converted.effects.backdrop_blur.unwrap() {
+                    FeBlur::Gaussian(gaussian) => {
+                        assert_eq!(gaussian.radius, 12.0);
+                    }
+                    _ => panic!("Expected Gaussian blur for backdrop blur"),
+                }
+            }
+            _ => panic!("Expected Container node"),
+        }
     }
 }

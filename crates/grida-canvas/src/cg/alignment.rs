@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, serde::Deserialize)]
 /// A point within a rectangle.
 /// [Alignment](0.0, 0.0) represents the center of the rectangle. The distance from -1.0 to +1.0 is the distance from one side of the rectangle to the other side of the rectangle. Therefore, 2.0 units horizontally (or vertically) is equivalent to the width (or height) of the rectangle.
 ///
@@ -13,7 +13,7 @@
 /// [Alignment](x, y) in a rectangle with height h and width w describes the point (x * w/2 + w/2, y * h/2 + h/2) in the coordinate system of the rectangle.
 ///
 /// See Also:
-/// - https://docs.flutter.dev/ui/layout/constraints#alignment
+/// - https://api.flutter.dev/flutter/painting/Alignment-class.html
 /// - https://developer.mozilla.org/en-US/docs/Web/CSS/percentage
 pub struct Alignment(pub f32, pub f32);
 

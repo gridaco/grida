@@ -2363,11 +2363,11 @@ pub enum FilterEffect {
     InnerShadow(FeShadow),
 
     /// Layer blur filter
-    LayerBlur(FeGaussianBlur),
+    LayerBlur(FeBlur),
 
     /// Background blur filter
     /// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
-    BackdropBlur(FeGaussianBlur),
+    BackdropBlur(FeBlur),
 
     /// Liquid glass effect
     LiquidGlass(FeLiquidGlass),
@@ -2484,7 +2484,7 @@ impl Default for FeLiquidGlass {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub enum FeBlur {
     Gaussian(FeGaussianBlur),
     Progressive(FeProgressiveBlur),
@@ -2497,20 +2497,163 @@ pub struct FeGaussianBlur {
     pub radius: f32,
 }
 
+/// Progressive blur effect with gradient-based blur intensity.
+///
+/// Applies a blur that varies in intensity along a gradient direction, creating a smooth
+/// transition from sharp to blurred. The blur intensity is controlled by two points (start/end)
+/// and their corresponding blur radii.
+///
+/// ## Coordinate System: Normalized Node-Local Space
+///
+/// The `start` and `end` coordinates use **normalized node-local space** with [`Alignment`],
+/// identical to how linear gradient coordinates work:
+///
+/// - `Alignment(0.0, 0.0)` = center of the node
+/// - `Alignment(-1.0, -1.0)` = top-left corner
+/// - `Alignment(1.0, 1.0)` = bottom-right corner
+/// - `Alignment(0.0, -1.0)` = top edge center
+/// - `Alignment(0.0, 1.0)` = bottom edge center
+///
+/// Values can extend beyond `[-1.0, 1.0]` to define gradients that start/end outside the node bounds.
+///
+/// This normalized system ensures the effect scales correctly with the node regardless of its
+/// actual pixel dimensions, and works consistently across different rendering contexts.
+///
+/// ### Important: Canvas vs Node-Local Coordinates
+///
+/// **In production (node effects)**: Coordinates are **node-local** and automatically scaled
+/// to the node's dimensions. A vertical blur from top to bottom is simply:
+/// ```rust
+/// use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+///
+/// let blur = FeProgressiveBlur {
+///     start: Alignment(0.0, -1.0),  // Top center (node-local)
+///     end: Alignment(0.0, 1.0),      // Bottom center (node-local)
+///     radius: 0.0,
+///     radius2: 40.0,
+/// };
+/// ```
+/// This works for **any node size** - the coordinates are relative to the node's bounds.
+///
+/// **In standalone examples (canvas-space)**: When applying progressive blur directly to a
+/// canvas without a node (as in `golden_progressive_blur.rs`), you must manually calculate
+/// and convert canvas-space pixel coordinates to normalized coordinates:
+/// ```rust
+/// # use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+/// // For a 150×300 rectangle at canvas position (125, 50):
+/// // Node bounds: x=125..275, y=50..350
+/// // Node center: (200, 200)
+/// // Node half-size: (75, 150)
+///
+/// // To blur from top to bottom in node-local space:
+/// let blur = FeProgressiveBlur {
+///     start: Alignment(0.0, -1.0),  // Top edge of node
+///     end: Alignment(0.0, 1.0),      // Bottom edge of node  
+///     radius: 0.0,
+///     radius2: 40.0,
+/// };
+/// ```
+///
+/// ### Example: Vertical Gradient Blur
+///
+/// ```rust
+/// use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+///
+/// // Blur from sharp at top to maximum at bottom (works for any node size)
+/// let blur = FeProgressiveBlur {
+///     start: Alignment(0.0, -1.0),  // Top edge (sharp)
+///     end: Alignment(0.0, 1.0),      // Bottom edge (max blur)
+///     radius: 0.0,    // No blur at start
+///     radius2: 40.0,  // 40px blur at end
+/// };
+/// ```
+///
+/// ### Example: Diagonal Gradient Blur
+///
+/// ```rust
+/// # use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+/// // Blur from top-left to bottom-right
+/// let blur = FeProgressiveBlur {
+///     start: Alignment(-1.0, -1.0),  // Top-left corner (sharp)
+///     end: Alignment(1.0, 1.0),      // Bottom-right corner (max blur)
+///     radius: 0.0,
+///     radius2: 30.0,
+/// };
+/// ```
+///
+/// ### Example: Horizontal Gradient Blur
+///
+/// ```rust
+/// # use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+/// // Blur from left edge to right edge
+/// let blur = FeProgressiveBlur {
+///     start: Alignment(-1.0, 0.0),  // Left edge center (sharp)
+///     end: Alignment(1.0, 0.0),      // Right edge center (max blur)
+///     radius: 0.0,
+///     radius2: 25.0,
+/// };
+/// ```
+///
+/// ## Production Usage: Automatic Scaling
+///
+/// When used as a `LayerEffects` blur on scene graph nodes, the normalized coordinates
+/// are automatically scaled to the node's pixel dimensions:
+///
+/// ```ignore
+/// // For a 200×400 pixel rectangle node:
+/// FeProgressiveBlur {
+///     start: Alignment(0.0, -1.0),  // Top edge in node-local space
+///     end: Alignment(0.0, 1.0),      // Bottom edge in node-local space
+///     radius: 0.0,
+///     radius2: 40.0,
+/// }
+/// // The gradient runs vertically through the rectangle regardless of its position on canvas.
+/// // Alignment(0.0, -1.0) evaluates to y=0 (top), Alignment(0.0, 1.0) evaluates to y=400 (bottom).
+/// ```
+///
+/// The node can be positioned anywhere on the canvas, and the blur gradient will correctly
+/// follow the node's transform (translation, rotation, scale).
+///
+/// ## Gradient Direction & Interpolation
+///
+/// The blur intensity is determined by projecting each pixel onto the gradient vector from
+/// `start` to `end`:
+/// - Pixels at the start point have blur radius = `radius`  
+/// - Pixels at the end point have blur radius = `radius2`
+/// - Pixels between are linearly interpolated
+///
+/// ## Implementation Details
+///
+/// Uses a two-pass separable Gaussian blur for performance (~30× faster than 2D blur):
+/// 1. Horizontal pass: blur along X-axis with gradient-varying radius
+/// 2. Vertical pass: blur along Y-axis with gradient-varying radius
+///
+/// This is mathematically equivalent to 2D Gaussian blur while being significantly faster.
+///
+/// ## See Also
+///
+/// - [`Alignment`] - The coordinate system used for start/end points
+/// - Shader implementation: `src/shaders/progressive_blur_horizontal.sksl`, `progressive_blur_vertical.sksl`
+/// - Documentation: `src/shaders/progressive_blur.md`  
+/// - Examples: `examples/golden_progressive_blur.rs`, `examples/golden_progressive_blur_backdrop.rs`
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct FeProgressiveBlur {
-    // start offset
-    pub x1: f32,
-    pub y1: f32,
+    /// Gradient start point in normalized node-local space
+    ///
+    /// Uses [`Alignment`] coordinates where `(0.0, 0.0)` is the center,
+    /// `(-1.0, -1.0)` is top-left, and `(1.0, 1.0)` is bottom-right.
+    pub start: Alignment,
 
-    // end offset
-    pub x2: f32,
-    pub y2: f32,
+    /// Gradient end point in normalized node-local space
+    ///
+    /// Uses [`Alignment`] coordinates where `(0.0, 0.0)` is the center,
+    /// `(-1.0, -1.0)` is top-left, and `(1.0, 1.0)` is bottom-right.
+    pub end: Alignment,
 
-    // start radius
+    /// Blur radius at gradient start point (pixels)
     pub radius: f32,
 
-    // end radius
+    /// Blur radius at gradient end point (pixels)
     pub radius2: f32,
 }
 // #endregion

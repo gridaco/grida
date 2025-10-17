@@ -1,82 +1,24 @@
-use cg::cg::types::FeProgressiveBlur;
+use cg::cg::{alignment::Alignment, types::FeProgressiveBlur};
+use cg::painter::effects::create_progressive_blur_image_filter;
 use skia_safe::{
-    self as sk, canvas::SaveLayerRec, image_filters, runtime_effect::RuntimeShaderBuilder,
-    surfaces, Color, Data, ImageFilter, Paint, Rect, RuntimeEffect,
+    self as sk, canvas::SaveLayerRec, surfaces, Color, Data, ImageFilter, Paint, Rect,
 };
 
 // Include 8K background image
 const BACKGROUND_IMAGE: &[u8] = include_bytes!("../../../fixtures/images/8k.jpg");
 
-// Panel bounds: x=100, y=100, w=200, h=200
-// Try global canvas coordinates - backdrop might not use local transform
+// Progressive blur with node-local Alignment coordinates
+// Will be converted to pixel coordinates based on panel bounds
 static BLUR_EFFECT: FeProgressiveBlur = FeProgressiveBlur {
-    x1: 200.0, // Center X in canvas coords
-    y1: 100.0, // Top in canvas coords - sharp
-    x2: 200.0, // Center X in canvas coords
-    y2: 300.0, // Bottom in canvas coords - max blur
+    start: Alignment(0.0, -1.0), // Top edge center (node-local)
+    end: Alignment(0.0, 1.0),    // Bottom edge center (node-local)
     radius: 0.0,
     radius2: 80.0, // Stronger blur for backdrop effect
 };
 
-/// Create RuntimeEffect for horizontal pass
-fn progressive_blur_horizontal_effect() -> RuntimeEffect {
-    const SHADER_CODE: &str = include_str!("../src/shaders/progressive_blur_horizontal.sksl");
-    RuntimeEffect::make_for_shader(SHADER_CODE, None)
-        .expect("Failed to compile horizontal blur shader")
-}
-
-/// Create RuntimeEffect for vertical pass
-fn progressive_blur_vertical_effect() -> RuntimeEffect {
-    const SHADER_CODE: &str = include_str!("../src/shaders/progressive_blur_vertical.sksl");
-    RuntimeEffect::make_for_shader(SHADER_CODE, None)
-        .expect("Failed to compile vertical blur shader")
-}
-
 /// Create ImageFilter for progressive blur effect using two-pass separable blur
-/// This approach is ~30x faster than 2D blur while producing identical results
-fn create_progressive_blur_filter(
-    effect: &FeProgressiveBlur,
-    _canvas_size: (f32, f32),
-) -> ImageFilter {
-    // Horizontal pass
-    let h_effect = progressive_blur_horizontal_effect();
-    let mut h_builder = RuntimeShaderBuilder::new(h_effect);
-    h_builder
-        .set_uniform_float("gradientStart", &[effect.x1, effect.y1])
-        .expect("set gradientStart");
-    h_builder
-        .set_uniform_float("gradientEnd", &[effect.x2, effect.y2])
-        .expect("set gradientEnd");
-    h_builder
-        .set_uniform_float("minRadius", &[effect.radius])
-        .expect("set minRadius");
-    h_builder
-        .set_uniform_float("maxRadius", &[effect.radius2])
-        .expect("set maxRadius");
-    let h_filter = image_filters::runtime_shader(&h_builder, "image", None)
-        .expect("Failed to create horizontal blur filter");
-
-    // Vertical pass
-    let v_effect = progressive_blur_vertical_effect();
-    let mut v_builder = RuntimeShaderBuilder::new(v_effect);
-    v_builder
-        .set_uniform_float("gradientStart", &[effect.x1, effect.y1])
-        .expect("set gradientStart");
-    v_builder
-        .set_uniform_float("gradientEnd", &[effect.x2, effect.y2])
-        .expect("set gradientEnd");
-    v_builder
-        .set_uniform_float("minRadius", &[effect.radius])
-        .expect("set minRadius");
-    v_builder
-        .set_uniform_float("maxRadius", &[effect.radius2])
-        .expect("set maxRadius");
-    let v_filter = image_filters::runtime_shader(&v_builder, "image", None)
-        .expect("Failed to create vertical blur filter");
-
-    // Compose: vertical(horizontal(image))
-    // This chains the two passes together
-    image_filters::compose(v_filter, h_filter).expect("Failed to compose blur filters")
+fn create_progressive_blur_filter(effect: &FeProgressiveBlur, bounds: Rect) -> ImageFilter {
+    create_progressive_blur_image_filter(effect, bounds)
 }
 
 /// Draw a glass panel with progressive backdrop blur
@@ -86,17 +28,19 @@ fn draw_glass_panel_with_progressive_backdrop_blur(
     canvas: &sk::Canvas,
     rect: Rect,
     effect: &FeProgressiveBlur,
-    canvas_size: (f32, f32),
+    _canvas_size: (f32, f32),
 ) {
-    let filter = create_progressive_blur_filter(effect, canvas_size);
-
     // Step 1: Translate to panel origin (like draw_glass_effect does)
-    // This makes the backdrop use local coordinates
+    // This makes the backdrop use global coordinates still
     canvas.save();
     canvas.translate((rect.x(), rect.y()));
 
     // Step 2: Clip to the panel region in local coords (0,0,width,height)
     let local_rect = Rect::from_wh(rect.width(), rect.height());
+
+    // Create filter with the original rect bounds (global coordinates)
+    // Backdrop filters evaluate in global canvas coordinates, not local
+    let filter = create_progressive_blur_filter(effect, rect);
     let rrect = sk::RRect::new_rect_radii(
         local_rect,
         &[

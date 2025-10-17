@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::{alignment::Alignment, types::*};
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
@@ -80,10 +80,11 @@ async fn demo_effects() -> Scene {
             };
             rect.corner_radius = RectangularCornerRadius::circular(20.0);
             rect.set_fill(Paint::from(CGColor(200, 200, 200, 255)));
-            rect.effects =
-                LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
+            rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(
+                FeBlur::Gaussian(FeGaussianBlur {
                     radius: 4.0 * (i + 1) as f32,
-                })]);
+                }),
+            )]);
             graph.append_child(
                 Node::Rectangle(rect),
                 Parent::NodeId(root_container_id.clone()),
@@ -98,10 +99,11 @@ async fn demo_effects() -> Scene {
             };
             polygon.point_count = i + 3;
             polygon.fills = Paints::new([Paint::from(CGColor(200, 200, 200, 255))]);
-            polygon.effects =
-                LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeGaussianBlur {
+            polygon.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(
+                FeBlur::Gaussian(FeGaussianBlur {
                     radius: 4.0 * (i + 1) as f32,
-                })]);
+                }),
+            )]);
             graph.append_child(
                 Node::RegularPolygon(polygon),
                 Parent::NodeId(root_container_id.clone()),
@@ -153,10 +155,11 @@ async fn demo_effects() -> Scene {
             };
             blur_rect.corner_radius = RectangularCornerRadius::circular(20.0);
             blur_rect.set_fill(Paint::from(CGColor(255, 255, 255, 128)));
-            blur_rect.effects =
-                LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeGaussianBlur {
+            blur_rect.effects = LayerEffects::from_array(vec![FilterEffect::BackdropBlur(
+                FeBlur::Gaussian(FeGaussianBlur {
                     radius: 8.0 * (i + 1) as f32,
-                })]);
+                }),
+            )]);
             graph.append_child(
                 Node::Rectangle(blur_rect),
                 Parent::NodeId(root_container_id.clone()),
@@ -171,10 +174,11 @@ async fn demo_effects() -> Scene {
             };
             blur_polygon.point_count = i + 3;
             blur_polygon.fills = Paints::new([Paint::from(CGColor(255, 255, 255, 128))]);
-            blur_polygon.effects =
-                LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeGaussianBlur {
+            blur_polygon.effects = LayerEffects::from_array(vec![FilterEffect::BackdropBlur(
+                FeBlur::Gaussian(FeGaussianBlur {
                     radius: 8.0 * (i + 1) as f32,
-                })]);
+                }),
+            )]);
             graph.append_child(
                 Node::RegularPolygon(blur_polygon),
                 Parent::NodeId(root_container_id.clone()),
@@ -268,7 +272,7 @@ async fn demo_effects() -> Scene {
                         spread: 0.0,
                         color: CGColor(0, 0, 0, 120),
                     }),
-                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 }),
+                    FilterEffect::LayerBlur(FeBlur::Gaussian(FeGaussianBlur { radius: 2.0 })),
                 ],
                 2 => vec![
                     FilterEffect::DropShadow(FeShadow {
@@ -285,7 +289,7 @@ async fn demo_effects() -> Scene {
                         spread: 0.0,
                         color: CGColor(255, 255, 255, 100),
                     }),
-                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 1.0 }),
+                    FilterEffect::LayerBlur(FeBlur::Gaussian(FeGaussianBlur { radius: 1.0 })),
                 ],
                 _ => vec![],
             };
@@ -316,7 +320,7 @@ async fn demo_effects() -> Scene {
                         spread: 0.0,
                         color: CGColor(0, 0, 0, 110),
                     }),
-                    FilterEffect::BackdropBlur(FeGaussianBlur { radius: 4.0 }),
+                    FilterEffect::BackdropBlur(FeBlur::Gaussian(FeGaussianBlur { radius: 4.0 })),
                 ],
                 4 => vec![
                     FilterEffect::InnerShadow(FeShadow {
@@ -326,7 +330,7 @@ async fn demo_effects() -> Scene {
                         spread: 0.0,
                         color: CGColor(0, 0, 0, 90),
                     }),
-                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 3.0 }),
+                    FilterEffect::LayerBlur(FeBlur::Gaussian(FeGaussianBlur { radius: 3.0 })),
                 ],
                 5 => vec![
                     FilterEffect::DropShadow(FeShadow {
@@ -343,7 +347,7 @@ async fn demo_effects() -> Scene {
                         spread: 0.0,
                         color: CGColor(255, 255, 255, 120),
                     }),
-                    FilterEffect::LayerBlur(FeGaussianBlur { radius: 2.0 }),
+                    FilterEffect::LayerBlur(FeBlur::Gaussian(FeGaussianBlur { radius: 2.0 })),
                 ],
                 _ => vec![],
             };
@@ -354,6 +358,71 @@ async fn demo_effects() -> Scene {
                 Parent::NodeId(root_container_id.clone()),
             );
         }
+    }
+
+    // Progressive Blur Examples
+    let progressive_start_x = 50.0;
+    let progressive_y = 1200.0;
+
+    // Row: Progressive Layer Blur
+    for i in 0..3 {
+        let mut rect = nf.create_rectangle_node();
+        rect.transform =
+            AffineTransform::new(progressive_start_x + spacing * i as f32, progressive_y, 0.0);
+        rect.size = Size {
+            width: base_size,
+            height: base_size * 2.0, // Make it taller to show the gradient
+        };
+        rect.corner_radius = RectangularCornerRadius::circular(20.0);
+        rect.set_fill(Paint::from(CGColor(100, 150, 255, 255)));
+
+        // Create progressive blur effect with node-local coordinates
+        let progressive_blur = FeProgressiveBlur {
+            start: Alignment(0.0, -1.0), // Top edge center (node-local)
+            end: Alignment(0.0, 1.0),    // Bottom edge center (node-local)
+            radius: 0.0,
+            radius2: 20.0 + (i as f32 * 10.0), // Varying max blur
+        };
+
+        rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(
+            FeBlur::Progressive(progressive_blur),
+        )]);
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
+    }
+
+    // Row: Progressive Backdrop Blur
+    for i in 0..3 {
+        let mut rect = nf.create_rectangle_node();
+        rect.transform = AffineTransform::new(
+            progressive_start_x + spacing * (i + 3) as f32,
+            progressive_y,
+            0.0,
+        );
+        rect.size = Size {
+            width: base_size,
+            height: base_size * 2.0,
+        };
+        rect.corner_radius = RectangularCornerRadius::circular(20.0);
+        rect.set_fill(Paint::from(CGColor(255, 255, 255, 100))); // Semi-transparent
+
+        // Create progressive backdrop blur effect with node-local coordinates
+        let progressive_blur = FeProgressiveBlur {
+            start: Alignment(0.0, -1.0), // Top edge center (node-local)
+            end: Alignment(0.0, 1.0),    // Bottom edge center (node-local)
+            radius: 0.0,
+            radius2: 30.0 + (i as f32 * 15.0), // Varying max blur
+        };
+
+        rect.effects = LayerEffects::from_array(vec![FilterEffect::BackdropBlur(
+            FeBlur::Progressive(progressive_blur),
+        )]);
+        graph.append_child(
+            Node::Rectangle(rect),
+            Parent::NodeId(root_container_id.clone()),
+        );
     }
 
     Scene {
