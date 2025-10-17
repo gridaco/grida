@@ -32,6 +32,7 @@ impl LayerEffects {
             match effect {
                 FilterEffect::LayerBlur(blur) => layer_effects.blur = Some(blur),
                 FilterEffect::BackdropBlur(blur) => layer_effects.backdrop_blur = Some(blur),
+                FilterEffect::LiquidGlass(glass) => layer_effects.glass = Some(glass),
                 FilterEffect::DropShadow(shadow) => layer_effects
                     .shadows
                     .push(FilterShadowEffect::DropShadow(shadow)),

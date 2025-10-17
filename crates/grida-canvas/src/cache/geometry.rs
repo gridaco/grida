@@ -492,6 +492,7 @@ fn compute_render_bounds_from_effects(bounds: Rectangle, effects: &LayerEffects)
 
 fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -> Rectangle {
     match effect {
+        FilterEffect::LiquidGlass(glass) => inflate_rect(bounds, glass.blur_radius),
         FilterEffect::LayerBlur(blur) => inflate_rect(bounds, blur.radius),
         FilterEffect::BackdropBlur(blur) => inflate_rect(bounds, blur.radius),
         FilterEffect::DropShadow(shadow) => {

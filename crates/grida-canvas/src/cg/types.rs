@@ -2368,6 +2368,9 @@ pub enum FilterEffect {
     /// Background blur filter
     /// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
     BackdropBlur(FeGaussianBlur),
+
+    /// Liquid glass effect
+    LiquidGlass(FeLiquidGlass),
 }
 
 #[derive(Debug, Clone)]

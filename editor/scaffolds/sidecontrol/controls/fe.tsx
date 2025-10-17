@@ -604,7 +604,7 @@ function FeLiquidGlassProperties({
           onValueChange={(c) =>
             onValueChange?.({
               ...value,
-              radius: c.value ?? 8.0,
+              radius: c.value,
             })
           }
         >

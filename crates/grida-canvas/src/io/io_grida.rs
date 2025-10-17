@@ -269,39 +269,31 @@ pub struct JSONFeShadow {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct JSONFeLiquidGlass {
-    #[serde(rename = "lightIntensity", default = "default_light_intensity")]
+    #[serde(rename = "lightIntensity")]
     pub light_intensity: f32,
-    #[serde(rename = "lightAngle", default = "default_light_angle")]
+    #[serde(rename = "lightAngle")]
     pub light_angle: f32,
-    #[serde(default = "default_refraction")]
     pub refraction: f32,
-    #[serde(default = "default_depth")]
     pub depth: f32,
-    #[serde(default = "default_dispersion")]
     pub dispersion: f32,
-    #[serde(rename = "radius", default = "default_glass_blur_radius")]
+    #[serde(rename = "radius")]
     pub blur_radius: f32,
 }
 
-// Default value functions for liquid glass
-fn default_light_intensity() -> f32 {
-    0.9
-}
-fn default_light_angle() -> f32 {
-    45.0
-}
-fn default_refraction() -> f32 {
-    1.5
-}
-fn default_depth() -> f32 {
-    0.15 // Normalized: 0.15 * min(w,h)
-}
-fn default_dispersion() -> f32 {
-    0.02
-}
-fn default_glass_blur_radius() -> f32 {
-    2.0
+impl Default for JSONFeLiquidGlass {
+    fn default() -> Self {
+        let defaults = FeLiquidGlass::default();
+        Self {
+            light_intensity: defaults.light_intensity,
+            light_angle: defaults.light_angle,
+            refraction: defaults.refraction,
+            depth: defaults.depth,
+            dispersion: defaults.dispersion,
+            blur_radius: defaults.blur_radius,
+        }
+    }
 }
 
 impl From<JSONRGBA> for CGColor {
