@@ -272,7 +272,7 @@ function FeBlurProperties({
       <PropertyEnumTabs<cg.FeBlur["type"]>
         enum={[
           { label: "Normal", value: "blur" },
-          { label: "Progressive", value: "progressive-blur", disabled: true },
+          { label: "Progressive", value: "progressive-blur" },
         ]}
         value={value.type}
         onValueChange={(type) => {
@@ -282,6 +282,7 @@ function FeBlurProperties({
                 ...value,
                 type,
               } as cg.FeGaussianBlur);
+              break;
             }
             case "progressive-blur": {
               const __v = value as Partial<cg.IFeProgressiveBlur>;
@@ -300,6 +301,7 @@ function FeBlurProperties({
               );
 
               onValueChange?.(v as cg.FeProgressiveBlur);
+              break;
             }
           }
         }}
@@ -370,6 +372,7 @@ function FeProgressiveBlurProperties({
         <InputPropertyNumber
           mode="fixed"
           value={value?.radius}
+          min={0}
           max={editor.config.DEFAULT_MAX_BLUR_RADIUS}
           onValueCommit={(v) => onValueChange?.({ ...value, radius: v || 0 })}
         />
@@ -378,7 +381,8 @@ function FeProgressiveBlurProperties({
         <PropertyLineLabel>End</PropertyLineLabel>
         <InputPropertyNumber
           mode="fixed"
-          value={value?.radius}
+          value={value?.radius2}
+          min={0}
           max={editor.config.DEFAULT_MAX_BLUR_RADIUS}
           onValueCommit={(v) => onValueChange?.({ ...value, radius2: v || 0 })}
         />
