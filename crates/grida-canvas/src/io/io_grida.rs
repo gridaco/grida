@@ -306,7 +306,12 @@ pub enum JSONFeBlur {
     Progressive(JSONFeProgressiveBlur),
 }
 
-/// JSON representation of progressive blur with canvas-space coordinates (x1, y1, x2, y2)
+/// JSON representation of progressive blur with Alignment coordinates (x1, y1, x2, y2)
+///
+/// Coordinates are in Alignment range where:
+/// - -1.0 = edge (left/top)
+/// - 0.0 = center
+/// - 1.0 = edge (right/bottom)
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct JSONFeProgressiveBlur {
     pub x1: f32,
@@ -330,20 +335,11 @@ impl From<JSONFeBlur> for FeBlur {
 
 impl From<JSONFeProgressiveBlur> for FeProgressiveBlur {
     fn from(json: JSONFeProgressiveBlur) -> Self {
-        // Convert canvas-space pixel coordinates to normalized Alignment coordinates
-        // Assuming the coordinates are in a normalized 0-1 space where:
-        // 0.0 = -1.0 in Alignment (edge), 0.5 = 0.0 in Alignment (center), 1.0 = 1.0 in Alignment (edge)
-        // This conversion formula: alignment = (normalized * 2.0) - 1.0
-        //
-        // However, if the incoming coordinates are already in the -1 to 1 range,
-        // we can use them directly. The safest approach is to assume they're normalized 0-1
-        // and convert accordingly.
-        //
-        // For now, we'll assume the coordinates come in as normalized values (0.0 to 1.0)
-        // and convert them to Alignment's -1.0 to 1.0 range:
+        // Expect coordinates to already be in Alignment range (-1.0 to 1.0)
+        // where -1.0 = edge, 0.0 = center, 1.0 = edge
         FeProgressiveBlur {
-            start: Alignment(json.x1 * 2.0 - 1.0, json.y1 * 2.0 - 1.0),
-            end: Alignment(json.x2 * 2.0 - 1.0, json.y2 * 2.0 - 1.0),
+            start: Alignment(json.x1, json.y1),
+            end: Alignment(json.x2, json.y2),
             radius: json.radius,
             radius2: json.radius2,
         }
@@ -2894,9 +2890,9 @@ mod tests {
     fn deserialize_progressive_blur() {
         let json = r#"{
             "type": "progressive-blur",
-            "x1": 0.5,
-            "y1": 0.0,
-            "x2": 0.5,
+            "x1": 0.0,
+            "y1": -1.0,
+            "x2": 0.0,
             "y2": 1.0,
             "radius": 0.0,
             "radius2": 40.0
@@ -2907,9 +2903,9 @@ mod tests {
 
         match blur {
             JSONFeBlur::Progressive(progressive) => {
-                assert_eq!(progressive.x1, 0.5);
-                assert_eq!(progressive.y1, 0.0);
-                assert_eq!(progressive.x2, 0.5);
+                assert_eq!(progressive.x1, 0.0);
+                assert_eq!(progressive.y1, -1.0);
+                assert_eq!(progressive.x2, 0.0);
                 assert_eq!(progressive.y2, 1.0);
                 assert_eq!(progressive.radius, 0.0);
                 assert_eq!(progressive.radius2, 40.0);
@@ -2921,10 +2917,7 @@ mod tests {
         let fe_blur: FeBlur = blur.into();
         match fe_blur {
             FeBlur::Progressive(progressive) => {
-                // x1=0.5 -> (0.5 * 2.0 - 1.0) = 0.0 (center)
-                // y1=0.0 -> (0.0 * 2.0 - 1.0) = -1.0 (top edge)
-                // x2=0.5 -> (0.5 * 2.0 - 1.0) = 0.0 (center)
-                // y2=1.0 -> (1.0 * 2.0 - 1.0) = 1.0 (bottom edge)
+                // Values are used directly as Alignment coordinates
                 assert_eq!(progressive.start.x(), 0.0);
                 assert_eq!(progressive.start.y(), -1.0);
                 assert_eq!(progressive.end.x(), 0.0);
@@ -2986,9 +2979,9 @@ mod tests {
             "height": 400.0,
             "feBlur": {
                 "type": "progressive-blur",
-                "x1": 0.5,
-                "y1": 0.0,
-                "x2": 0.5,
+                "x1": 0.0,
+                "y1": -1.0,
+                "x2": 0.0,
                 "y2": 1.0,
                 "radius": 0.0,
                 "radius2": 30.0
@@ -3005,11 +2998,11 @@ mod tests {
                     assert!(rect_rec.effects.blur.is_some());
                     match rect_rec.effects.blur.unwrap() {
                         FeBlur::Progressive(progressive) => {
-                            // Verify Alignment conversion
-                            assert_eq!(progressive.start.x(), 0.0); // 0.5 * 2.0 - 1.0 = 0.0 (center)
-                            assert_eq!(progressive.start.y(), -1.0); // 0.0 * 2.0 - 1.0 = -1.0 (top)
-                            assert_eq!(progressive.end.x(), 0.0); // 0.5 * 2.0 - 1.0 = 0.0 (center)
-                            assert_eq!(progressive.end.y(), 1.0); // 1.0 * 2.0 - 1.0 = 1.0 (bottom)
+                            // Values are used directly as Alignment coordinates
+                            assert_eq!(progressive.start.x(), 0.0); // center
+                            assert_eq!(progressive.start.y(), -1.0); // top
+                            assert_eq!(progressive.end.x(), 0.0); // center
+                            assert_eq!(progressive.end.y(), 1.0); // bottom
                             assert_eq!(progressive.radius, 0.0);
                             assert_eq!(progressive.radius2, 30.0);
                         }
@@ -3073,8 +3066,8 @@ mod tests {
             "height": 300.0,
             "feBackdropBlur": {
                 "type": "progressive-blur",
-                "x1": 0.0,
-                "y1": 0.0,
+                "x1": -1.0,
+                "y1": -1.0,
                 "x2": 1.0,
                 "y2": 1.0,
                 "radius": 0.0,
@@ -3092,13 +3085,11 @@ mod tests {
                     assert!(rect_rec.effects.backdrop_blur.is_some());
                     match rect_rec.effects.backdrop_blur.unwrap() {
                         FeBlur::Progressive(progressive) => {
-                            // Verify diagonal gradient conversion
-                            // x1=0.0 -> -1.0 (left), y1=0.0 -> -1.0 (top)
-                            // x2=1.0 -> 1.0 (right), y2=1.0 -> 1.0 (bottom)
-                            assert_eq!(progressive.start.x(), -1.0);
-                            assert_eq!(progressive.start.y(), -1.0);
-                            assert_eq!(progressive.end.x(), 1.0);
-                            assert_eq!(progressive.end.y(), 1.0);
+                            // Verify diagonal gradient - values used directly
+                            assert_eq!(progressive.start.x(), -1.0); // left
+                            assert_eq!(progressive.start.y(), -1.0); // top
+                            assert_eq!(progressive.end.x(), 1.0); // right
+                            assert_eq!(progressive.end.y(), 1.0); // bottom
                             assert_eq!(progressive.radius, 0.0);
                             assert_eq!(progressive.radius2, 50.0);
                         }
@@ -3149,12 +3140,12 @@ mod tests {
 
     #[test]
     fn test_progressive_blur_coordinate_conversion() {
-        // Test various coordinate conversions from normalized 0-1 to Alignment -1 to 1
+        // Test that Alignment coordinates (-1 to 1) are used directly
 
-        // Top-left corner: (0.0, 0.0) -> (-1.0, -1.0)
+        // Top-left to bottom-right diagonal
         let json_progressive = JSONFeProgressiveBlur {
-            x1: 0.0,
-            y1: 0.0,
+            x1: -1.0,
+            y1: -1.0,
             x2: 1.0,
             y2: 1.0,
             radius: 0.0,
@@ -3166,12 +3157,12 @@ mod tests {
         assert_eq!(progressive.end.x(), 1.0);
         assert_eq!(progressive.end.y(), 1.0);
 
-        // Center: (0.5, 0.5) -> (0.0, 0.0)
+        // Center point
         let json_progressive = JSONFeProgressiveBlur {
-            x1: 0.5,
-            y1: 0.5,
-            x2: 0.5,
-            y2: 0.5,
+            x1: 0.0,
+            y1: 0.0,
+            x2: 0.0,
+            y2: 0.0,
             radius: 10.0,
             radius2: 20.0,
         };
@@ -3183,9 +3174,9 @@ mod tests {
 
         // Vertical gradient from top to bottom center
         let json_progressive = JSONFeProgressiveBlur {
-            x1: 0.5,
-            y1: 0.0,
-            x2: 0.5,
+            x1: 0.0,
+            y1: -1.0,
+            x2: 0.0,
             y2: 1.0,
             radius: 0.0,
             radius2: 40.0,
@@ -3198,10 +3189,10 @@ mod tests {
 
         // Horizontal gradient from left to right center
         let json_progressive = JSONFeProgressiveBlur {
-            x1: 0.0,
-            y1: 0.5,
+            x1: -1.0,
+            y1: 0.0,
             x2: 1.0,
-            y2: 0.5,
+            y2: 0.0,
             radius: 0.0,
             radius2: 25.0,
         };
@@ -3224,9 +3215,9 @@ mod tests {
             "height": 400.0,
             "feBlur": {
                 "type": "progressive-blur",
-                "x1": 0.5,
-                "y1": 0.0,
-                "x2": 0.5,
+                "x1": 0.0,
+                "y1": -1.0,
+                "x2": 0.0,
                 "y2": 1.0,
                 "radius": 0.0,
                 "radius2": 35.0

@@ -192,20 +192,51 @@ pub fn create_progressive_blur_image_filter(
     let end_x = center_x + effect.end.x() * half_width;
     let end_y = center_y + effect.end.y() * half_height;
 
+    // Detect inverted radius progression and swap accordingly
+    // The shader expects minRadius at gradientStart and maxRadius at gradientEnd
+    let (
+        gradient_start_x,
+        gradient_start_y,
+        gradient_end_x,
+        gradient_end_y,
+        min_radius,
+        max_radius,
+    ) = if effect.radius > effect.radius2 {
+        // Swap gradient endpoints and radius values
+        (
+            end_x,
+            end_y,
+            start_x,
+            start_y,
+            effect.radius2,
+            effect.radius,
+        )
+    } else {
+        // Use values as-is
+        (
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+            effect.radius,
+            effect.radius2,
+        )
+    };
+
     // Horizontal pass
     let h_effect = progressive_blur_horizontal_effect();
     let mut h_builder = RuntimeShaderBuilder::new(h_effect);
     h_builder
-        .set_uniform_float("gradientStart", &[start_x, start_y])
+        .set_uniform_float("gradientStart", &[gradient_start_x, gradient_start_y])
         .expect("set gradientStart");
     h_builder
-        .set_uniform_float("gradientEnd", &[end_x, end_y])
+        .set_uniform_float("gradientEnd", &[gradient_end_x, gradient_end_y])
         .expect("set gradientEnd");
     h_builder
-        .set_uniform_float("minRadius", &[effect.radius])
+        .set_uniform_float("minRadius", &[min_radius])
         .expect("set minRadius");
     h_builder
-        .set_uniform_float("maxRadius", &[effect.radius2])
+        .set_uniform_float("maxRadius", &[max_radius])
         .expect("set maxRadius");
     let h_filter = image_filters::runtime_shader(&h_builder, "image", None)
         .expect("Failed to create horizontal blur filter");
@@ -214,16 +245,16 @@ pub fn create_progressive_blur_image_filter(
     let v_effect = progressive_blur_vertical_effect();
     let mut v_builder = RuntimeShaderBuilder::new(v_effect);
     v_builder
-        .set_uniform_float("gradientStart", &[start_x, start_y])
+        .set_uniform_float("gradientStart", &[gradient_start_x, gradient_start_y])
         .expect("set gradientStart");
     v_builder
-        .set_uniform_float("gradientEnd", &[end_x, end_y])
+        .set_uniform_float("gradientEnd", &[gradient_end_x, gradient_end_y])
         .expect("set gradientEnd");
     v_builder
-        .set_uniform_float("minRadius", &[effect.radius])
+        .set_uniform_float("minRadius", &[min_radius])
         .expect("set minRadius");
     v_builder
-        .set_uniform_float("maxRadius", &[effect.radius2])
+        .set_uniform_float("maxRadius", &[max_radius])
         .expect("set maxRadius");
     let v_filter = image_filters::runtime_shader(&v_builder, "image", None)
         .expect("Failed to create vertical blur filter");

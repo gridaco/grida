@@ -152,6 +152,15 @@ impl<'a> Painter<'a> {
     /// Wrap a closure `f` in a layer that applies a blur to everything drawn inside.
     fn with_layer_blur<F: FnOnce()>(&self, blur: &FeBlur, bounds: Rect, f: F) {
         let canvas = self.canvas;
+
+        // Calculate expansion based on blur type
+        let expansion = match blur {
+            FeBlur::Gaussian(gaussian) => 3.0 * gaussian.radius,
+            FeBlur::Progressive(progressive) => 3.0 * progressive.radius.max(progressive.radius2),
+        };
+
+        let expanded_bounds = bounds.with_outset((expansion, expansion));
+
         let image_filter = match blur {
             FeBlur::Gaussian(gaussian) => {
                 skia_safe::image_filters::blur((gaussian.radius, gaussian.radius), None, None, None)
@@ -163,7 +172,11 @@ impl<'a> Painter<'a> {
         if let Some(filter) = image_filter {
             let mut paint = SkPaint::default();
             paint.set_image_filter(filter);
-            canvas.save_layer(&SaveLayerRec::default().paint(&paint));
+            canvas.save_layer(
+                &SaveLayerRec::default()
+                    .bounds(&expanded_bounds)
+                    .paint(&paint),
+            );
             f();
             canvas.restore();
         } else {
@@ -248,6 +261,15 @@ impl<'a> Painter<'a> {
 
         let canvas = self.canvas;
         let text_bounds = path.bounds();
+
+        // Calculate expansion based on blur type
+        let expansion = match blur {
+            FeBlur::Gaussian(gaussian) => 3.0 * gaussian.radius,
+            FeBlur::Progressive(progressive) => 3.0 * progressive.radius.max(progressive.radius2),
+        };
+
+        let expanded_bounds = text_bounds.with_outset((expansion, expansion));
+
         let image_filter = match blur {
             FeBlur::Gaussian(gaussian) => {
                 skia_safe::image_filters::blur((gaussian.radius, gaussian.radius), None, None, None)
@@ -266,7 +288,9 @@ impl<'a> Painter<'a> {
 
         canvas.save();
         canvas.clip_path(&path, None, true);
-        let layer_rec = SaveLayerRec::default().backdrop(&filter);
+        let layer_rec = SaveLayerRec::default()
+            .bounds(&expanded_bounds)
+            .backdrop(&filter);
         canvas.save_layer(&layer_rec);
         canvas.restore();
         canvas.restore();
@@ -275,6 +299,15 @@ impl<'a> Painter<'a> {
     /// Draw a backdrop blur: blur what's behind the shape.
     fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeBlur) {
         let canvas = self.canvas;
+
+        // Calculate expansion based on blur type
+        let expansion = match blur {
+            FeBlur::Gaussian(gaussian) => 3.0 * gaussian.radius,
+            FeBlur::Progressive(progressive) => 3.0 * progressive.radius.max(progressive.radius2),
+        };
+
+        let expanded_bounds = shape.rect.with_outset((expansion, expansion));
+
         let image_filter = match blur {
             FeBlur::Gaussian(gaussian) => {
                 skia_safe::image_filters::blur((gaussian.radius, gaussian.radius), None, None, None)
@@ -293,7 +326,9 @@ impl<'a> Painter<'a> {
             canvas.clip_path(&shape.to_path(), None, true);
 
             // 2) Use a SaveLayerRec with a backdrop filter so that everything behind is blurred
-            let layer_rec = SaveLayerRec::default().backdrop(&filter);
+            let layer_rec = SaveLayerRec::default()
+                .bounds(&expanded_bounds)
+                .backdrop(&filter);
             canvas.save_layer(&layer_rec);
 
             // We don't draw any content here—just pushing and popping the layer
