@@ -571,20 +571,21 @@ impl FigmaConverter {
             })
             .collect();
 
-        let layer_blur: Option<FeGaussianBlur> = effects.iter().find_map(|effect| match effect {
-            Effect::LayerBlur(blur) => blur.visible.then_some(FeGaussianBlur {
+        let layer_blur: Option<FeBlur> = effects.iter().find_map(|effect| match effect {
+            Effect::LayerBlur(blur) => blur.visible.then_some(FeBlur::Gaussian(FeGaussianBlur {
                 radius: blur.radius as f32,
-            }),
+            })),
             _ => None,
         });
 
-        let backdrop_blur: Option<FeGaussianBlur> =
-            effects.iter().find_map(|effect| match effect {
-                Effect::BackgroundBlur(blur) => blur.visible.then_some(FeGaussianBlur {
+        let backdrop_blur: Option<FeBlur> = effects.iter().find_map(|effect| match effect {
+            Effect::BackgroundBlur(blur) => {
+                blur.visible.then_some(FeBlur::Gaussian(FeGaussianBlur {
                     radius: blur.radius as f32,
-                }),
-                _ => None,
-            });
+                }))
+            }
+            _ => None,
+        });
 
         layer_effects.shadows = shadows;
         layer_effects.blur = layer_blur;

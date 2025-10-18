@@ -1,4 +1,4 @@
-use crate::cg::types::FeLiquidGlass;
+use crate::cg::types::{FeLiquidGlass, FeProgressiveBlur};
 use skia_safe::{
     image_filters, runtime_effect::RuntimeShaderBuilder, ImageFilter, RuntimeEffect, TileMode,
 };
@@ -142,4 +142,122 @@ pub fn create_liquid_glass_image_filter(
     // Skia will wire the blurred backdrop to the 'backdrop' shader child
     image_filters::runtime_shader(&builder, "backdrop", blur_filter)
         .expect("Failed to create liquid glass image filter")
+}
+
+// ============================================================================
+// PROGRESSIVE BLUR
+// ============================================================================
+
+fn progressive_blur_horizontal_effect() -> RuntimeEffect {
+    const SHADER_CODE: &str = include_str!("../shaders/progressive_blur_horizontal.sksl");
+    RuntimeEffect::make_for_shader(SHADER_CODE, None)
+        .expect("Failed to compile horizontal blur shader")
+}
+
+fn progressive_blur_vertical_effect() -> RuntimeEffect {
+    const SHADER_CODE: &str = include_str!("../shaders/progressive_blur_vertical.sksl");
+    RuntimeEffect::make_for_shader(SHADER_CODE, None)
+        .expect("Failed to compile vertical blur shader")
+}
+
+/// Creates a progressive blur image filter from node-local Alignment coordinates.
+///
+/// Converts the normalized Alignment coordinates to pixel coordinates based on the provided bounds,
+/// then creates a two-pass separable blur filter.
+///
+/// # Arguments
+///
+/// * `effect` - The progressive blur effect with node-local Alignment coordinates
+/// * `bounds` - The bounding rectangle to convert Alignment coordinates to pixels
+///
+/// # Coordinate Conversion
+///
+/// Alignment coordinates are converted to pixel coordinates using the bounds:
+/// ```text
+/// pixel_x = bounds.center_x() + alignment.x() * bounds.half_width()
+/// pixel_y = bounds.center_y() + alignment.y() * bounds.half_height()
+/// ```
+pub fn create_progressive_blur_image_filter(
+    effect: &FeProgressiveBlur,
+    bounds: skia_safe::Rect,
+) -> ImageFilter {
+    // Convert Alignment coordinates to pixel coordinates
+    let center_x = bounds.center_x();
+    let center_y = bounds.center_y();
+    let half_width = bounds.width() / 2.0;
+    let half_height = bounds.height() / 2.0;
+
+    let start_x = center_x + effect.start.x() * half_width;
+    let start_y = center_y + effect.start.y() * half_height;
+    let end_x = center_x + effect.end.x() * half_width;
+    let end_y = center_y + effect.end.y() * half_height;
+
+    // Detect inverted radius progression and swap accordingly
+    // The shader expects minRadius at gradientStart and maxRadius at gradientEnd
+    let (
+        gradient_start_x,
+        gradient_start_y,
+        gradient_end_x,
+        gradient_end_y,
+        min_radius,
+        max_radius,
+    ) = if effect.radius > effect.radius2 {
+        // Swap gradient endpoints and radius values
+        (
+            end_x,
+            end_y,
+            start_x,
+            start_y,
+            effect.radius2,
+            effect.radius,
+        )
+    } else {
+        // Use values as-is
+        (
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+            effect.radius,
+            effect.radius2,
+        )
+    };
+
+    // Horizontal pass
+    let h_effect = progressive_blur_horizontal_effect();
+    let mut h_builder = RuntimeShaderBuilder::new(h_effect);
+    h_builder
+        .set_uniform_float("gradientStart", &[gradient_start_x, gradient_start_y])
+        .expect("set gradientStart");
+    h_builder
+        .set_uniform_float("gradientEnd", &[gradient_end_x, gradient_end_y])
+        .expect("set gradientEnd");
+    h_builder
+        .set_uniform_float("minRadius", &[min_radius])
+        .expect("set minRadius");
+    h_builder
+        .set_uniform_float("maxRadius", &[max_radius])
+        .expect("set maxRadius");
+    let h_filter = image_filters::runtime_shader(&h_builder, "image", None)
+        .expect("Failed to create horizontal blur filter");
+
+    // Vertical pass
+    let v_effect = progressive_blur_vertical_effect();
+    let mut v_builder = RuntimeShaderBuilder::new(v_effect);
+    v_builder
+        .set_uniform_float("gradientStart", &[gradient_start_x, gradient_start_y])
+        .expect("set gradientStart");
+    v_builder
+        .set_uniform_float("gradientEnd", &[gradient_end_x, gradient_end_y])
+        .expect("set gradientEnd");
+    v_builder
+        .set_uniform_float("minRadius", &[min_radius])
+        .expect("set minRadius");
+    v_builder
+        .set_uniform_float("maxRadius", &[max_radius])
+        .expect("set maxRadius");
+    let v_filter = image_filters::runtime_shader(&v_builder, "image", None)
+        .expect("Failed to create vertical blur filter");
+
+    image_filters::compose(v_filter, h_filter).expect("Failed to compose blur filters")
 }

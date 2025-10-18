@@ -125,8 +125,7 @@ impl HitOverlay {
         // Render focus if present (and different from hit)
         if let Some(focus_id) = focus {
             if hit.map_or(true, |hit_id| focus_id != hit_id) {
-                if let Some(_focus_layer) = cache.layers.layers.iter().find(|e| &e.id == focus_id)
-                {
+                if let Some(_focus_layer) = cache.layers.layers.iter().find(|e| &e.id == focus_id) {
                     if let Some(focus_bounds) = cache.geometry.get_render_bounds(focus_id) {
                         let focus_screen_rect =
                             math2::rect::transform(focus_bounds, &camera.view_matrix());

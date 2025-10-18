@@ -14,9 +14,9 @@ pub use crate::node::id::{NodeId, NodeIdGenerator, UserNodeId};
 pub struct LayerEffects {
     /// single layer blur is supported per layer
     /// layer blur is applied after all other effects
-    pub blur: Option<FeGaussianBlur>,
+    pub blur: Option<FeBlur>,
     /// single backdrop blur is supported per layer
-    pub backdrop_blur: Option<FeGaussianBlur>,
+    pub backdrop_blur: Option<FeBlur>,
     /// multiple shadows are supported per layer (drop shadow, inner shadow)
     pub shadows: Vec<FilterShadowEffect>,
     /// single liquid glass effect is supported per layer (only fully supported with rectangular shapes)
@@ -46,11 +46,11 @@ impl LayerEffects {
 
     #[deprecated(note = "will be removed")]
     pub fn fallback_first_any_effect(&self) -> Option<FilterEffect> {
-        if let Some(blur) = self.blur {
-            return Some(FilterEffect::LayerBlur(blur));
+        if let Some(blur) = &self.blur {
+            return Some(FilterEffect::LayerBlur(blur.clone()));
         }
-        if let Some(backdrop_blur) = self.backdrop_blur {
-            return Some(FilterEffect::BackdropBlur(backdrop_blur));
+        if let Some(backdrop_blur) = &self.backdrop_blur {
+            return Some(FilterEffect::BackdropBlur(backdrop_blur.clone()));
         }
         if !self.shadows.is_empty() {
             return Some(self.shadows.last().unwrap().clone().into());
