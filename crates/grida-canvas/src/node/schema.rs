@@ -77,7 +77,7 @@ pub struct StrokeStyle {
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Size {
     pub width: f32,
     pub height: f32,
@@ -1006,6 +1006,51 @@ impl NodeStrokesMixin for PolygonNodeRec {
 
     fn set_strokes(&mut self, strokes: Paints) {
         self.strokes = strokes;
+    }
+}
+
+impl NodeGeometryMixin for PolygonNodeRec {
+    fn rect(&self) -> Rectangle {
+        // Compute bounding box from points
+        let mut min_x = f32::INFINITY;
+        let mut min_y = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+
+        for p in &self.points {
+            min_x = min_x.min(p.x);
+            min_y = min_y.min(p.y);
+            max_x = max_x.max(p.x);
+            max_y = max_y.max(p.y);
+        }
+
+        if self.points.is_empty() {
+            Rectangle {
+                x: 0.0,
+                y: 0.0,
+                width: 0.0,
+                height: 0.0,
+            }
+        } else {
+            Rectangle {
+                x: min_x,
+                y: min_y,
+                width: max_x - min_x,
+                height: max_y - min_y,
+            }
+        }
+    }
+
+    fn has_stroke_geometry(&self) -> bool {
+        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+    }
+
+    fn render_bounds_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width
+        } else {
+            0.0
+        }
     }
 }
 
