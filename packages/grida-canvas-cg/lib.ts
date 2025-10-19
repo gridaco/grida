@@ -644,6 +644,79 @@ export namespace cg {
     | "zoom-in"
     | "zoom-out";
 
+  /**
+   * A line segment in 2D space defined by two points.
+   *
+   * This type provides a generic structure for representing a line segment.
+   * The coordinate system and scale of the values depend on the usage context:
+   * - May represent **normalized coordinates** (e.g., 0.0 to 1.0 or -1.0 to 1.0)
+   * - May represent **relative coordinates** within a parent container
+   * - May represent **absolute pixel values**
+   *
+   * Always refer to the specific API documentation to understand which coordinate
+   * system is being used.
+   */
+  export type Line2D = {
+    /**
+     * X coordinate of the line's start point
+     */
+    x1: number;
+    /**
+     * Y coordinate of the line's start point
+     */
+    y1: number;
+    /**
+     * X coordinate of the line's end point
+     */
+    x2: number;
+    /**
+     * Y coordinate of the line's end point
+     */
+    y2: number;
+  };
+
+  /**
+   * A point within a rectangle using a normalized coordinate system.
+   *
+   * `Alignment(0.0, 0.0)` represents the center of the rectangle. The distance from -1.0 to +1.0
+   * is the distance from one side of the rectangle to the other side of the rectangle. Therefore,
+   * 2.0 units horizontally (or vertically) is equivalent to the width (or height) of the rectangle.
+   *
+   * ### Coordinate System:
+   * - `Alignment(-1.0, -1.0)` represents the top left of the rectangle.
+   * - `Alignment(1.0, 1.0)` represents the bottom right of the rectangle.
+   * - `Alignment(0.0, 0.0)` represents the center of the rectangle.
+   *
+   * ### Examples:
+   * - `Alignment(0.0, 3.0)` represents a point that is horizontally centered with respect to
+   *   the rectangle and vertically below the bottom of the rectangle by the height of the rectangle.
+   * - `Alignment(0.0, -0.5)` represents a point that is horizontally centered with respect to
+   *   the rectangle and vertically half way between the top edge and the center.
+   *
+   * ### Mapping to Pixel Coordinates:
+   * `Alignment(x, y)` in a rectangle with height `h` and width `w` describes the point
+   * `(x * w/2 + w/2, y * h/2 + h/2)` in the coordinate system of the rectangle.
+   *
+   * @see https://api.flutter.dev/flutter/painting/Alignment-class.html
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/percentage
+   */
+  export type Alignment = {
+    /**
+     * Horizontal alignment value.
+     * - `-1.0` = left edge
+     * - `0.0` = horizontal center
+     * - `1.0` = right edge
+     */
+    x: number;
+    /**
+     * Vertical alignment value.
+     * - `-1.0` = top edge
+     * - `0.0` = vertical center
+     * - `1.0` = bottom edge
+     */
+    y: number;
+  };
+
   export type Paint =
     | SolidPaint
     | LinearGradientPaint
@@ -977,12 +1050,27 @@ export namespace cg {
     type: "blur";
   };
 
-  export interface IFeProgressiveBlur {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
+  /**
+   * Progressive blur effect that interpolates blur radius along a line.
+   *
+   * Extends {@link Line2D} using **normalized coordinates** (-1.0 to 1.0).
+   * The blur gradually transitions from `radius` at the start point to `radius2` at the end point.
+   *
+   * ### Coordinate System:
+   * - `x1`, `y1`: Start point in normalized coordinates
+   * - `x2`, `y2`: End point in normalized coordinates
+   * - The coordinate system follows the same convention as {@link Alignment}:
+   *   - `-1.0` to `1.0` spans the full width/height
+   *   - `(0.0, 0.0)` is the center
+   */
+  export interface IFeProgressiveBlur extends Line2D {
+    /**
+     * Blur radius at the start point (x1, y1) in pixels
+     */
     radius: number;
+    /**
+     * Blur radius at the end point (x2, y2) in pixels
+     */
     radius2: number;
   }
 
@@ -1175,5 +1263,17 @@ export namespace cg {
       highlights: 0.0,
       shadows: 0.0,
     };
+
+    export const ALIGNMENT = {
+      CENTER: { x: 0.0, y: 0.0 },
+      TOP_LEFT: { x: -1.0, y: -1.0 },
+      TOP_CENTER: { x: 0.0, y: -1.0 },
+      TOP_RIGHT: { x: 1.0, y: -1.0 },
+      CENTER_LEFT: { x: -1.0, y: 0.0 },
+      CENTER_RIGHT: { x: 1.0, y: 0.0 },
+      BOTTOM_LEFT: { x: -1.0, y: 1.0 },
+      BOTTOM_CENTER: { x: 0.0, y: 1.0 },
+      BOTTOM_RIGHT: { x: 1.0, y: 1.0 },
+    } satisfies Record<string, cg.Alignment>;
   }
 }

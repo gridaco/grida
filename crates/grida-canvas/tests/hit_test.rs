@@ -43,14 +43,8 @@ fn hit_first_returns_topmost() {
 
     let tester = HitTester::new(&cache);
 
-    assert_eq!(
-        tester.hit_first_fast([15.0, 15.0]),
-        Some(rect_id)
-    );
-    assert_eq!(
-        tester.hit_first_fast([5.0, 5.0]),
-        Some(container_id)
-    );
+    assert_eq!(tester.hit_first_fast([15.0, 15.0]), Some(rect_id));
+    assert_eq!(tester.hit_first_fast([5.0, 5.0]), Some(container_id));
     assert!(tester.hit_first_fast([100.0, 100.0]).is_none());
 }
 
@@ -81,10 +75,7 @@ fn path_hit_testing_uses_contains() {
     let tester = HitTester::new(&cache);
 
     assert!(tester.hit_first([1.0, 9.0]).is_none());
-    assert_eq!(
-        tester.hit_first([9.0, 1.0]),
-        Some(path_id)
-    );
+    assert_eq!(tester.hit_first([9.0, 1.0]), Some(path_id));
 }
 
 #[test]
