@@ -73,7 +73,7 @@ Grida 를 함께 만들고 싶으신가요? 여러분의 팀과 작업 프로세
 [grida-youtube]: https://www.youtube.com/channel/UCgJO5apXl_pXRfTxNrkbEBw
 [grida-github]: https://github.com/gridaco
 [grida-join-slack]: https://grida.co/join-slack
-[grida-blog]: https://blog.grida.co
+[grida-blog]: https://grida.co/blog
 [grida-reddit]: https://www.reddit.com/r/gridaco/
 [grida-twitter]: https://twitter.com/grida_co
 [grida-facebook]: https://www.facebook.com/grida.co

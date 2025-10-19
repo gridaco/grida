@@ -33,7 +33,7 @@
   },
   "link.item.label.Blog": {
     "message": "블로그",
-    "description": "The label of footer link with label=Blog linking to https://blog.grida.co"
+    "description": "The label of footer link with label=Blog linking to https://grida.co/blog"
   },
   "link.item.label.Slack": {
     "message": "Slack",

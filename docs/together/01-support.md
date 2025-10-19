@@ -54,7 +54,7 @@ For the latest news about Grida, [follow @grida_co on Twitter][grida-twitter] an
 [grida-youtube]: https://www.youtube.com/channel/UCgJO5apXl_pXRfTxNrkbEBw
 [grida-github]: https://github.com/gridaco
 [grida-join-slack]: https://grida.co/join-slack
-[grida-blog]: https://blog.grida.co
+[grida-blog]: https://grida.co/blog
 [grida-reddit]: https://www.reddit.com/r/gridaco/
 [grida-twitter]: https://twitter.com/grida_co
 [grida-facebook]: https://www.facebook.com/grida.co
