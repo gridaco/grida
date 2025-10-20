@@ -1,7 +1,7 @@
 use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::Deserialize;
-use std::hash::Hash;
+use std::{default, hash::Hash};
 
 use super::alignment::Alignment;
 
@@ -544,6 +544,92 @@ impl Default for LayoutMode {
     fn default() -> Self {
         LayoutMode::Normal
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum LayoutPositioning {
+    Relative,
+    Absolute,
+}
+
+impl Default for LayoutPositioning {
+    fn default() -> Self {
+        LayoutPositioning::Absolute
+    }
+}
+
+/// Constraint positioning specifier for constraints layout.
+///
+/// Defines how a node is anchored along an axis (horizontal or vertical) relative to its parent container.
+///
+/// ## Horizontal Positioning
+/// - [`Start`](LayoutConstraintAnchor::Start): Anchored to the left edge
+/// - [`End`](LayoutConstraintAnchor::End): Anchored to the right edge
+/// - [`Center`](LayoutConstraintAnchor::Center): Centered horizontally
+/// - [`Stretch`](LayoutConstraintAnchor::Stretch): Anchored to both left and right edges
+///
+/// ## Vertical Positioning
+/// - [`Start`](LayoutConstraintAnchor::Start): Anchored to the top edge
+/// - [`End`](LayoutConstraintAnchor::End): Anchored to the bottom edge
+/// - [`Center`](LayoutConstraintAnchor::Center): Centered vertically
+/// - [`Stretch`](LayoutConstraintAnchor::Stretch): Anchored to both top and bottom edges
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum LayoutConstraintAnchor {
+    /// Start anchor (left for horizontal, top for vertical)
+    Start,
+    /// End anchor (right for horizontal, bottom for vertical)
+    End,
+    /// Center anchor (centered along the axis)
+    Center,
+    /// Stretch anchor (anchored to both edges of the axis)
+    Stretch,
+}
+
+impl Default for LayoutConstraintAnchor {
+    fn default() -> Self {
+        LayoutConstraintAnchor::Start
+    }
+}
+
+/// Defines how a node is constrained relative to its parent container.
+///
+/// Specifies the constraint positioning behavior for both horizontal and vertical axes,
+/// determining how the node will be resized and positioned when its parent's size changes.
+///
+/// ## Fields
+/// - `x`: Horizontal constraint anchor (left, right, center, or stretch)
+/// - `y`: Vertical constraint anchor (top, bottom, center, or stretch)
+///
+/// ## Examples
+///
+/// Fixed to top-left corner:
+/// ```ignore
+/// LayoutConstraints {
+///     x: LayoutConstraintAnchor::Start,  // left
+///     y: LayoutConstraintAnchor::Start,  // top
+/// }
+/// ```
+///
+/// Centered in parent:
+/// ```ignore
+/// LayoutConstraints {
+///     x: LayoutConstraintAnchor::Center,  // horizontally centered
+///     y: LayoutConstraintAnchor::Center,  // vertically centered
+/// }
+/// ```
+///
+/// Stretched to fill parent:
+/// ```ignore
+/// LayoutConstraints {
+///     x: LayoutConstraintAnchor::Stretch,  // left and right edges
+///     y: LayoutConstraintAnchor::Stretch,  // top and bottom edges
+/// }
+/// ```
+pub struct LayoutConstraints {
+    /// Horizontal constraint anchor determining how the node is positioned/resized along the x-axis
+    pub x: LayoutConstraintAnchor,
+    /// Vertical constraint anchor determining how the node is positioned/resized along the y-axis
+    pub y: LayoutConstraintAnchor,
 }
 
 /// Defines whether flex items are forced into a single line or can wrap onto multiple lines.
