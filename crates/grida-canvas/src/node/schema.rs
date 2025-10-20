@@ -162,6 +162,187 @@ pub struct UnknownNodeProperties {
     pub text_align_vertical: Option<TextAlignVertical>,
 }
 
+/// Universal **Layout Model** — geometry-first, with layout as an optional feature.
+///
+/// This structure defines a flexible, engine-agnostic layout model designed for
+/// 2D scene graphs, editors, and design tools (like Grida).  
+/// It treats **geometry** (`x`, `y`, `width`, `height`) as the source of truth,
+/// while **layout behavior** (constraints, flexbox, etc.) acts as a secondary feature.
+///
+///
+/// ## Design Philosophy
+///
+/// - **Geometry-first:**  
+///   Direct manipulation (drag, resize) writes to explicit coordinates.
+///   Layout only runs when explicitly enabled or attached.
+///
+/// - **Layout as a feature:**  
+///   Layout engines (constraint, flexbox, grid, etc.) are *plugins* rather than the primary model.
+///
+/// - **Universal 2D:**  
+///   Designed to accommodate constraint layout (AutoLayout-style),
+///   flow-based layout (CSS/Flexbox), and manual placement (absolute/anchored).
+///
+///
+/// ## Supported Concepts
+///
+/// - **Relative positioning**
+///   - Child elements positioned relative to their parent or constraints.
+/// - **Inset / constraint layout**
+///   - Anchors and offsets similar to Android’s ConstraintLayout or iOS AutoLayout.
+///   - Auto-resizing between opposing constraints (e.g., `left + right`).
+/// - **Min/Max size**
+///   - Optional bounds to clamp final computed size.
+/// - **Flexbox model**
+///   - Horizontal or vertical layout direction, wrapping, and alignment.
+/// - **Padding and gap**
+///   - Internal spacing and inter-item gaps (like CSS `padding` and `gap`).
+///
+///
+/// ## Why not just the CSS Box Model?
+///
+/// The CSS box model is layout-first — every element participates in flow,
+/// and geometry is derived from layout.  
+/// This model is **the inverse**: geometry exists independently, and layout
+/// is applied *optionally* as a feature.  
+///
+/// This allows:
+/// - Direct manipulation on canvas (like Figma, Sketch, Grida Canvas)
+/// - Partial layout (only certain containers auto-layout)
+/// - Constraint-based resizing (anchors, aspect ratios)
+/// - More intuitive runtime control for graphics tools
+///
+#[derive(Debug, Clone)]
+pub struct LayoutStyle {
+    pub layout_mode: LayoutMode,
+    pub layout_position: LayoutPositioning,
+    pub layout_constraints: LayoutConstraints,
+
+    pub x: Option<f32>,
+    pub y: Option<f32>,
+
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+    pub min_width: Option<f32>,
+    pub max_width: Option<f32>,
+    pub min_height: Option<f32>,
+    pub max_height: Option<f32>,
+
+    pub layout_direction: Axis,
+    pub layout_wrap: Option<LayoutWrap>,
+    pub layout_main_axis_alignment: Option<MainAxisAlignment>,
+    pub layout_cross_axis_alignment: Option<CrossAxisAlignment>,
+    pub layout_padding: Option<EdgeInsets>,
+    pub layout_gap: Option<LayoutGap>,
+    pub layout_grow: Option<f32>,
+}
+
+impl LayoutStyle {
+    /// Creates a new `LayoutStyle` with default values.
+    pub fn new() -> Self {
+        Self {
+            layout_mode: LayoutMode::Normal,
+            layout_position: LayoutPositioning::Absolute,
+            layout_constraints: LayoutConstraints::default(),
+            x: None,
+            y: None,
+            width: None,
+            height: None,
+            min_width: None,
+            max_width: None,
+            min_height: None,
+            max_height: None,
+            layout_direction: Axis::Horizontal,
+            layout_wrap: None,
+            layout_main_axis_alignment: None,
+            layout_cross_axis_alignment: None,
+            layout_padding: None,
+            layout_gap: None,
+            layout_grow: None,
+        }
+    }
+
+    /// Sets the layout mode.
+    pub fn with_layout_mode(mut self, mode: LayoutMode) -> Self {
+        self.layout_mode = mode;
+        self
+    }
+
+    /// Sets the layout positioning.
+    pub fn with_layout_position(mut self, position: LayoutPositioning) -> Self {
+        self.layout_position = position;
+        self
+    }
+
+    /// Sets the layout constraints.
+    pub fn with_layout_constraints(mut self, constraints: LayoutConstraints) -> Self {
+        self.layout_constraints = constraints;
+        self
+    }
+
+    /// Sets both x and y position.
+    pub fn with_position(mut self, x: f32, y: f32) -> Self {
+        self.x = Some(x);
+        self.y = Some(y);
+        self
+    }
+
+    /// Sets both width and height.
+    pub fn with_size(mut self, width: f32, height: f32) -> Self {
+        self.width = Some(width);
+        self.height = Some(height);
+        self
+    }
+
+    /// Sets the layout direction.
+    pub fn with_layout_direction(mut self, direction: Axis) -> Self {
+        self.layout_direction = direction;
+        self
+    }
+
+    /// Sets the layout wrap behavior.
+    pub fn with_layout_wrap(mut self, wrap: LayoutWrap) -> Self {
+        self.layout_wrap = Some(wrap);
+        self
+    }
+
+    /// Sets the main axis alignment.
+    pub fn with_layout_main_axis_alignment(mut self, alignment: MainAxisAlignment) -> Self {
+        self.layout_main_axis_alignment = Some(alignment);
+        self
+    }
+
+    /// Sets the cross axis alignment.
+    pub fn with_layout_cross_axis_alignment(mut self, alignment: CrossAxisAlignment) -> Self {
+        self.layout_cross_axis_alignment = Some(alignment);
+        self
+    }
+
+    /// Sets the layout padding.
+    pub fn with_padding(mut self, padding: EdgeInsets) -> Self {
+        self.layout_padding = Some(padding);
+        self
+    }
+
+    /// Sets the layout gap.
+    pub fn with_gap(mut self, gap: LayoutGap) -> Self {
+        self.layout_gap = Some(gap);
+        self
+    }
+
+    /// Sets the layout grow factor.
+    pub fn with_layout_grow(mut self, grow: f32) -> Self {
+        self.layout_grow = Some(grow);
+        self
+    }
+}
+
+impl Default for LayoutStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Node {
     Error(ErrorNodeRec),
