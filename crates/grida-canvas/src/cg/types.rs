@@ -625,11 +625,21 @@ impl Default for LayoutConstraintAnchor {
 ///     y: LayoutConstraintAnchor::Stretch,  // top and bottom edges
 /// }
 /// ```
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct LayoutConstraints {
     /// Horizontal constraint anchor determining how the node is positioned/resized along the x-axis
     pub x: LayoutConstraintAnchor,
     /// Vertical constraint anchor determining how the node is positioned/resized along the y-axis
     pub y: LayoutConstraintAnchor,
+}
+
+impl Default for LayoutConstraints {
+    fn default() -> Self {
+        LayoutConstraints {
+            x: LayoutConstraintAnchor::Start,
+            y: LayoutConstraintAnchor::Start,
+        }
+    }
 }
 
 /// Defines whether flex items are forced into a single line or can wrap onto multiple lines.
