@@ -106,7 +106,7 @@ async function updateSession(request: NextRequest) {
     console.warn(
       "SUPABASE_URL or SUPABASE_ANON_KEY is not set this will break all db-requests, please set them in the .env.local file",
       "If you are just testing things around, you can ignore this message",
-      "Larn more at https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md"
+      "Learn more at https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md"
     );
 
     return supabaseResponse;

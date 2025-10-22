@@ -4,6 +4,7 @@ import {
   useTransformState,
   useCurrentEditor,
 } from "@/grida-canvas-react";
+import { useBackendState } from "@/grida-canvas-react/provider";
 import { useSingleSelection } from "../surface-hooks";
 import { css } from "@/grida-canvas-utils/css";
 import grida from "@grida/schema";
@@ -17,9 +18,24 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const { transform } = useTransformState();
   const [scaleX, scaleY] = cmath.transform.getScale(transform);
   const ref = useRef<HTMLDivElement>(null);
+  const backend = useBackendState();
 
   const stopPropagation = (e: React.BaseSyntheticEvent) => {
     e.stopPropagation();
+  };
+
+  const styles = {
+    ...css.toReactTextStyle(
+      node as grida.program.nodes.TextNode as any as grida.program.nodes.ComputedTextNode
+    ),
+    ...(backend === "canvas"
+      ? {
+          color: "transparent",
+          WebkitFontSmoothing: "antialiased",
+          MozOsxFontSmoothing: "grayscale",
+          caretColor: "black",
+        }
+      : {}),
   };
 
   // initially focus & select all text
@@ -87,9 +103,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
               width: "100%",
               height: "100%",
               opacity: node.opacity,
-              ...css.toReactTextStyle(
-                node as grida.program.nodes.TextNode as any as grida.program.nodes.ComputedTextNode
-              ),
+              ...styles,
             }}
           />
         </div>

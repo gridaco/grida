@@ -49,7 +49,7 @@ just build canvas wasm
 ## Running backend (supabase) locally
 
 - follow this [guide](https://supabase.io/docs/guides/local-development) to run supabase locally
-  - supabase cli required (brew install supabase)
+  - supabase cli required (`brew install supabase/tap/supabase`)
   - [docker desktop](https://docker.com) required
 
 ```bash
