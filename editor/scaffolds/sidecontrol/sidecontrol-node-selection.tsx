@@ -20,8 +20,7 @@ import {
 import { BorderControl } from "./controls/border";
 import { PaddingControl } from "./controls/padding";
 import { GapControl } from "./controls/gap";
-import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
-import { MainAxisAlignmentControl } from "./controls/main-axis-alignment";
+import { FlexAlignControl } from "./controls/flex-align";
 import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
@@ -616,22 +615,29 @@ function ModeMixedNodeProperties({
               />
             </PropertyLine>
             <PropertyLine hidden={!has_flex_container}>
-              <PropertyLineLabel>Distribute</PropertyLineLabel>
-              <MainAxisAlignmentControl
-                value={mainAxisAlignment?.value}
-                onValueChange={change.mainAxisAlignment}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!has_flex_container}>
-              <PropertyLineLabel>Align</PropertyLineLabel>
-              <CrossAxisAlignmentControl
-                value={crossAxisAlignment?.value}
+              <PropertyLineLabel>Alignment</PropertyLineLabel>
+              <FlexAlignControl
+                className="w-full"
                 direction={
-                  direction?.value !== grida.mixed
-                    ? direction?.value
-                    : undefined
+                  direction?.value === grida.mixed
+                    ? "horizontal"
+                    : (direction?.value ?? "horizontal")
                 }
-                onValueChange={change.crossAxisAlignment}
+                value={
+                  mainAxisAlignment?.value === grida.mixed ||
+                  crossAxisAlignment?.value === grida.mixed ||
+                  mainAxisAlignment?.value === undefined ||
+                  crossAxisAlignment?.value === undefined
+                    ? undefined
+                    : {
+                        mainAxisAlignment: mainAxisAlignment.value,
+                        crossAxisAlignment: crossAxisAlignment.value,
+                      }
+                }
+                onValueChange={(value) => {
+                  change.mainAxisAlignment(value.mainAxisAlignment);
+                  change.crossAxisAlignment(value.crossAxisAlignment);
+                }}
               />
             </PropertyLine>
             {/* <PropertyLine hidden={!has_flex_container}>
@@ -1096,18 +1102,23 @@ function ModeNodeProperties({
               />
             </PropertyLine> */}
             <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Distribute</PropertyLineLabel>
-              <MainAxisAlignmentControl
-                value={mainAxisAlignment!}
-                onValueChange={actions.mainAxisAlignment}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Align</PropertyLineLabel>
-              <CrossAxisAlignmentControl
-                value={crossAxisAlignment!}
-                direction={direction}
-                onValueChange={actions.crossAxisAlignment}
+              <PropertyLineLabel>Alignment</PropertyLineLabel>
+              <FlexAlignControl
+                className="w-full"
+                direction={direction ?? "horizontal"}
+                value={
+                  mainAxisAlignment !== undefined &&
+                  crossAxisAlignment !== undefined
+                    ? {
+                        mainAxisAlignment,
+                        crossAxisAlignment,
+                      }
+                    : undefined
+                }
+                onValueChange={(value) => {
+                  actions.mainAxisAlignment(value.mainAxisAlignment);
+                  actions.crossAxisAlignment(value.crossAxisAlignment);
+                }}
               />
             </PropertyLine>
             <PropertyLine hidden={!is_flex_container}>
