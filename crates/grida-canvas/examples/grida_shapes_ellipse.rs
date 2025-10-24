@@ -10,10 +10,8 @@ async fn demo_ellipses() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.size = Size {
-        width: 1200.0,
-        height: 800.0,
-    };
+    root_container_node.layout_dimensions.width = Some(1200.0);
+    root_container_node.layout_dimensions.height = Some(800.0);
 
     let mut graph = SceneGraph::new();
 

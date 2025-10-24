@@ -237,8 +237,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeContainerNodeLayout(node_id, value),
       direction: (value: cg.Axis) =>
         instance.commands.changeFlexContainerNodeDirection(node_id, value),
-      // flexWrap: (value?: string) =>
-      //   changeNodeStyle(node_id, "flexWrap", value),
+      layoutWrap: (value: "wrap" | "nowrap") =>
+        instance.commands.changeFlexContainerNodeWrap(node_id, value),
       mainAxisAlignment: (value: cg.MainAxisAlignment) =>
         instance.commands.changeFlexContainerNodeMainAxisAlignment(
           node_id,

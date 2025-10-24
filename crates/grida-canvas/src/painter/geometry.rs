@@ -1,8 +1,19 @@
+//! Shape building for rendering
+//!
+//! ## Pipeline Guarantees
+//!
+//! This module guarantees:
+//! - build_shape() requires resolved bounds from GeometryCache for all nodes
+//! - V2 nodes (with auto-sizing) ALWAYS use provided bounds
+//! - V1 nodes (fixed schema) use schema values (bounds parameter for future migration)
+//! - Missing bounds when accessed is a PANIC (pipeline bug)
+
 use crate::cg::types::*;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use crate::shape::*;
 use crate::{cache::geometry::GeometryCache, sk};
+use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
 use skia_safe::{Path, RRect, Rect};
 
@@ -131,27 +142,31 @@ impl PainterShape {
     }
 }
 
-pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
+/// Build shape from node + resolved geometry
+///
+/// All dimensions come from bounds (resolved by GeometryCache).
+/// This ensures V2 auto-sized nodes and future migrations render correctly.
+pub fn build_shape(node: &Node, bounds: &Rectangle) -> PainterShape {
     match node {
-        IntrinsicSizeNode::Polygon(n) => {
+        Node::Polygon(n) => {
             let shape = n.to_shape();
             PainterShape::from_shape(&shape)
         }
-        IntrinsicSizeNode::RegularPolygon(n) => {
+        Node::RegularPolygon(n) => {
             let shape = n.to_shape();
             PainterShape::from_shape(&shape)
         }
-        IntrinsicSizeNode::RegularStarPolygon(n) => {
+        Node::RegularStarPolygon(n) => {
             let shape = n.to_shape();
             PainterShape::from_shape(&shape)
         }
-        IntrinsicSizeNode::Line(n) => {
+        Node::Line(n) => {
             let mut path = Path::new();
             path.move_to((0.0, 0.0));
             path.line_to((n.size.width, 0.0));
             PainterShape::from_path(path)
         }
-        IntrinsicSizeNode::SVGPath(n) => {
+        Node::SVGPath(n) => {
             if let Some(path) = Path::from_svg(&n.data) {
                 PainterShape::from_path(path)
             } else {
@@ -159,15 +174,15 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
                 PainterShape::from_rect(Rect::new(0.0, 0.0, 0.0, 0.0))
             }
         }
-        IntrinsicSizeNode::Vector(n) => {
+        Node::Vector(n) => {
             let path = n.to_path();
             PainterShape::from_path(path)
         }
-        IntrinsicSizeNode::Ellipse(n) => {
+        Node::Ellipse(n) => {
             let shape = n.to_shape();
             PainterShape::from_shape(&shape)
         }
-        IntrinsicSizeNode::Rectangle(n) => {
+        Node::Rectangle(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             let r = n.corner_radius;
             if !r.is_zero() {
@@ -177,7 +192,27 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
                 PainterShape::from_rect(rect)
             }
         }
-        IntrinsicSizeNode::Container(n) => {
+        Node::Container(n) => {
+            // ALWAYS use resolved bounds from GeometryCache
+            let width = bounds.width;
+            let height = bounds.height;
+
+            let r = n.corner_radius;
+            if !r.is_zero() {
+                // Build RRect with resolved dimensions
+                let shape = RRectShape {
+                    width,
+                    height,
+                    corner_radius: n.corner_radius,
+                };
+                let rrect = build_rrect(&shape);
+                PainterShape::from_rrect(rrect)
+            } else {
+                let rect = Rect::from_xywh(0.0, 0.0, width, height);
+                PainterShape::from_rect(rect)
+            }
+        }
+        Node::Image(n) => {
             let r = n.corner_radius;
             if !r.is_zero() {
                 let rrect = build_rrect(&n.to_own_shape());
@@ -187,20 +222,12 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
                 PainterShape::from_rect(rect)
             }
         }
-        IntrinsicSizeNode::Image(n) => {
-            let r = n.corner_radius;
-            if !r.is_zero() {
-                let rrect = build_rrect(&n.to_own_shape());
-                PainterShape::from_rrect(rrect)
-            } else {
-                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-                PainterShape::from_rect(rect)
-            }
-        }
-        IntrinsicSizeNode::Error(n) => {
+        Node::Error(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             PainterShape::from_rect(rect)
         }
+        // Non-shape nodes (Group, BooleanOperation, InitialContainer, TextSpan)
+        _ => PainterShape::from_rect(Rect::new(0.0, 0.0, 0.0, 0.0)),
     }
 }
 
@@ -247,24 +274,6 @@ pub fn merge_shapes(shapes: &[(PainterShape, BooleanPathOperation)]) -> Path {
     result
 }
 
-/// Build a [`PainterShape`] for a node if it has intrinsic geometry.
-pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
-    match node {
-        Node::Rectangle(n) => Some(build_shape(&IntrinsicSizeNode::Rectangle(n.clone()))),
-        Node::Ellipse(n) => Some(build_shape(&IntrinsicSizeNode::Ellipse(n.clone()))),
-        Node::Polygon(n) => Some(build_shape(&IntrinsicSizeNode::Polygon(n.clone()))),
-        Node::RegularPolygon(n) => Some(build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone()))),
-        Node::RegularStarPolygon(n) => Some(build_shape(&IntrinsicSizeNode::RegularStarPolygon(
-            n.clone(),
-        ))),
-        Node::Line(n) => Some(build_shape(&IntrinsicSizeNode::Line(n.clone()))),
-        Node::SVGPath(n) => Some(build_shape(&IntrinsicSizeNode::SVGPath(n.clone()))),
-        Node::Image(n) => Some(build_shape(&IntrinsicSizeNode::Image(n.clone()))),
-        Node::Error(n) => Some(build_shape(&IntrinsicSizeNode::Error(n.clone()))),
-        _ => None,
-    }
-}
-
 /// Compute the resulting path for a [`BooleanPathOperationNode`] in its local coordinate space.
 pub fn boolean_operation_path(
     id: &NodeId,
@@ -286,7 +295,27 @@ pub fn boolean_operation_path(
                 Node::BooleanOperation(child_bool) => {
                     boolean_operation_path(child_id, child_bool, graph, cache)?
                 }
-                _ => build_shape_from_node(child_node)?.to_path(),
+                _ => {
+                    // Get bounds from geometry cache - guaranteed to exist
+                    let bounds = cache
+                        .get_world_bounds(child_id)
+                        .expect("Geometry must exist for all nodes");
+                    let intrinsic = match child_node {
+                        Node::Rectangle(n) => Node::Rectangle(n.clone()),
+                        Node::Ellipse(n) => Node::Ellipse(n.clone()),
+                        Node::Polygon(n) => Node::Polygon(n.clone()),
+                        Node::RegularPolygon(n) => Node::RegularPolygon(n.clone()),
+                        Node::RegularStarPolygon(n) => Node::RegularStarPolygon(n.clone()),
+                        Node::Line(n) => Node::Line(n.clone()),
+                        Node::SVGPath(n) => Node::SVGPath(n.clone()),
+                        Node::Vector(n) => Node::Vector(n.clone()),
+                        Node::Image(n) => Node::Image(n.clone()),
+                        Node::Container(n) => Node::Container(n.clone()),
+                        Node::Error(n) => Node::Error(n.clone()),
+                        _ => return None, // Non-shape nodes
+                    };
+                    build_shape(&intrinsic, &bounds).to_path()
+                }
             };
 
             let child_world = cache

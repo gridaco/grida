@@ -166,11 +166,21 @@ impl ApplicationApi for UnknownTargetApplication {
     fn resize(&mut self, width: u32, height: u32) {
         self.state.resize(width as i32, height as i32);
         self.renderer.backend = Backend::GL(self.state.surface_mut_ptr());
-        self.renderer.invalidate_cache();
+
+        // Update viewport context (source of truth)
+        self.renderer
+            .update_viewport_size(width as f32, height as f32);
+
+        // Update camera to match viewport
         self.renderer.camera.set_size(crate::node::schema::Size {
             width: width as f32,
             height: height as f32,
         });
+
+        // Rebuild caches - ICB layout computed automatically from viewport context
+        self.renderer.rebuild_scene_caches();
+
+        self.renderer.invalidate_cache();
         self.queue();
     }
 

@@ -23,8 +23,32 @@
 //! // MyNode { width: CSSDimension::Auto, height: CSSDimension::LengthPX(100.0) }
 //! ```
 
+use crate::cg::types::*;
 use serde::Deserialize;
 use serde_json::Value;
+
+#[derive(Debug, PartialEq, Deserialize)]
+pub enum CSSPosition {
+    #[serde(rename = "relative")]
+    Relative,
+    #[serde(rename = "absolute")]
+    Absolute,
+}
+
+impl Default for CSSPosition {
+    fn default() -> Self {
+        CSSPosition::Relative
+    }
+}
+
+impl From<CSSPosition> for LayoutPositioning {
+    fn from(position: CSSPosition) -> Self {
+        match position {
+            CSSPosition::Relative => LayoutPositioning::Auto,
+            CSSPosition::Absolute => LayoutPositioning::Absolute,
+        }
+    }
+}
 
 /// CSS-style dimension value that can be either auto or a fixed length in pixels.
 #[derive(Debug, PartialEq)]

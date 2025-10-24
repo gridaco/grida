@@ -4,7 +4,6 @@ use cg::node::{
     scene_graph::{Parent, SceneGraph},
     schema::*,
 };
-use cg::painter::layer::Layer;
 use cg::resources::ByteStore;
 use cg::runtime::font_repository::FontRepository;
 use math2::rect::Rectangle;
@@ -17,10 +16,8 @@ fn layers_in_rect_include_partially_visible_nested() {
     let mut graph = SceneGraph::new();
 
     let mut container = nf.create_container_node();
-    container.size = Size {
-        width: 100.0,
-        height: 100.0,
-    };
+    container.layout_dimensions.width = Some(100.0);
+    container.layout_dimensions.height = Some(100.0);
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(50.0, 50.0, 0.0);
     rect.size = Size {

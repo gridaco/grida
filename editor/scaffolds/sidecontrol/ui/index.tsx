@@ -254,6 +254,7 @@ export function PropertyEnumToggle<T extends string>({
         const label = typeof e === "string" ? e : e.label;
         const icon = typeof e === "string" ? undefined : e.icon;
         const disabled = typeof e === "string" ? false : e.disabled;
+        const hasIcon = typeof e === "string" ? false : !!e.icon;
         return (
           <ToggleGroupItem
             key={value}
@@ -263,7 +264,7 @@ export function PropertyEnumToggle<T extends string>({
             onMouseEnter={() => onValueSeeked?.(value as T)}
             onMouseLeave={() => onValueSeeked?.(null)}
           >
-            {icon}
+            {hasIcon && icon ? <>{icon}</> : (label ?? value)}
           </ToggleGroupItem>
         );
       })}

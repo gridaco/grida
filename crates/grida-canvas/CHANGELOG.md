@@ -4,6 +4,16 @@ All notable changes to the grida-canvas crate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.0.0-local.2] - 2025-10-19
+
+### Added (WIP)
+
+- layout pipeline
+- container padding property
+- container layout_mode property
+
+<!--  -->
+
 ## [0.0.0-local.1] - 2025-10-16
 
 ### Added

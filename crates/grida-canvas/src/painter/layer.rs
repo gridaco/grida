@@ -287,7 +287,11 @@ impl LayerList {
             }
             Node::Container(n) => {
                 let opacity = parent_opacity * n.opacity;
-                let shape = build_shape(&IntrinsicSizeNode::Container(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
@@ -325,6 +329,20 @@ impl LayerList {
                 FlattenResult {
                     commands,
                     mask: n.mask,
+                }
+            }
+            Node::InitialContainer(_) => {
+                // ICB is invisible - only render children
+                let children = graph.get_children(id).map(|c| c.as_slice()).unwrap_or(&[]);
+                FlattenResult {
+                    commands: Self::build_render_commands(
+                        children,
+                        graph,
+                        scene_cache,
+                        parent_opacity,
+                        out,
+                    ),
+                    mask: None,
                 }
             }
             Node::BooleanOperation(n) => {
@@ -378,7 +396,11 @@ impl LayerList {
                 }
             }
             Node::Rectangle(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::Rectangle(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let stroke_path = if n.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
@@ -414,7 +436,11 @@ impl LayerList {
                 }
             }
             Node::Ellipse(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::Ellipse(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let stroke_path = if n.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
@@ -450,7 +476,11 @@ impl LayerList {
                 }
             }
             Node::Polygon(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::Polygon(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let stroke_path = if n.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
@@ -486,7 +516,11 @@ impl LayerList {
                 }
             }
             Node::RegularPolygon(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let stroke_path = if n.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
@@ -522,7 +556,11 @@ impl LayerList {
                 }
             }
             Node::RegularStarPolygon(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::RegularStarPolygon(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let stroke_path = if n.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
@@ -558,7 +596,11 @@ impl LayerList {
                 }
             }
             Node::Line(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::Line(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let stroke_path = if n.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
@@ -658,7 +700,11 @@ impl LayerList {
                 }
             }
             Node::SVGPath(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::SVGPath(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let stroke_path = if n.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
@@ -694,7 +740,11 @@ impl LayerList {
                 }
             }
             Node::Vector(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::Vector(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let layer = PainterPictureLayer::Vector(PainterPictureVectorLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -724,7 +774,11 @@ impl LayerList {
                 }
             }
             Node::Image(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::Image(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let stroke_path = if n.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
@@ -762,7 +816,11 @@ impl LayerList {
                 }
             }
             Node::Error(n) => {
-                let shape = build_shape(&IntrinsicSizeNode::Error(n.clone()));
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -879,7 +937,11 @@ impl LayerList {
                                 .unwrap_or_else(AffineTransform::identity);
 
                             // Build the shape and transform it relative to the current node
-                            let shape = build_shape(&IntrinsicSizeNode::Container(n.clone()));
+                            let bounds = scene_cache
+                                .geometry()
+                                .get_world_bounds(&id)
+                                .expect("Geometry must exist");
+                            let shape = build_shape(node, &bounds);
                             let mut path = shape.to_path();
                             let relative_transform = current_inv.compose(&world_transform);
                             path.transform(&sk::sk_matrix(relative_transform.matrix));

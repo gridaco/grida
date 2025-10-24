@@ -23,6 +23,10 @@ export function MainAxisAlignmentControl({
           value: "center",
         },
         {
+          label: "End",
+          value: "end",
+        },
+        {
           label: "Space Between",
           value: "space-between",
         },

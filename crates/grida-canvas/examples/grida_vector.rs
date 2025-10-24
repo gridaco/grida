@@ -12,10 +12,8 @@ async fn demo_vectors() -> Scene {
 
     // Root container
     let mut root = nf.create_container_node();
-    root.size = Size {
-        width: 1200.0,
-        height: 800.0,
-    };
+    root.layout_dimensions.width = Some(1200.0);
+    root.layout_dimensions.height = Some(800.0);
 
     let root_id = graph.append_child(Node::Container(root), Parent::Root);
     let spacing = 200.0;

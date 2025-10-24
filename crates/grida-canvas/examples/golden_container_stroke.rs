@@ -11,16 +11,15 @@ async fn scene() -> Scene {
     let mut graph = SceneGraph::new();
 
     let mut container = nf.create_container_node();
-    container.size = Size {
-        width: 400.0,
-        height: 400.0,
-    };
+    container.layout_dimensions.width = Some(400.0);
+    container.layout_dimensions.height = Some(400.0);
     container.stroke_width = 10.0;
     container.stroke_align = StrokeAlign::Outside;
     container.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     container.set_fill(Paint::from(CGColor(255, 255, 255, 255)));
     // Center the container in the 800x800 canvas
-    container.transform = AffineTransform::new(200.0, 200.0, 0.0);
+    container.position = CGPoint::new(200.0, 200.0).into();
+    container.rotation = 0.0;
 
     // Create a circle that will overlap with the container's stroke
     let mut circle = nf.create_ellipse_node();

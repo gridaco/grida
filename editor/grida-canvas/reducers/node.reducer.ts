@@ -613,6 +613,12 @@ const safe_properties: Partial<
       (draft as UN).crossAxisGap = value;
     },
   }),
+  layoutWrap: defineNodeProperty<"layoutWrap">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      (draft as UN).layoutWrap = value;
+    },
+  }),
   textAlign: defineNodeProperty<"textAlign">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {

@@ -11,10 +11,8 @@ async fn demo_effects() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.size = Size {
-        width: 2000.0,
-        height: 2000.0,
-    };
+    root_container_node.layout_dimensions.width = Some(2000.0);
+    root_container_node.layout_dimensions.height = Some(2000.0);
 
     let root_container_id = graph.append_child(Node::Container(root_container_node), Parent::Root);
     let spacing = 200.0;
