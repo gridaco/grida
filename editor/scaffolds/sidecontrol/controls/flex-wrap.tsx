@@ -1,7 +1,7 @@
 import { ToggleGroup, ToggleGroupItem } from "./utils/toggle-group";
 
 export function FlexWrapControl({
-  value,
+  value = "nowrap",
   onValueChange,
 }: {
   value?: "wrap" | "nowrap";
@@ -11,6 +11,7 @@ export function FlexWrapControl({
     <ToggleGroup
       id="flex-wrap"
       type="single"
+      size="sm"
       value={value}
       onValueChange={onValueChange}
     >

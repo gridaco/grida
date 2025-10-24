@@ -2847,6 +2847,7 @@ export namespace editor.api {
       node_id: string,
       gap: number | { mainAxisGap: number; crossAxisGap: number }
     ): void;
+    changeFlexContainerNodeWrap(node_id: string, wrap: "wrap" | "nowrap"): void;
 
     changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
     changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;

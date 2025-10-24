@@ -21,6 +21,7 @@ import { BorderControl } from "./controls/border";
 import { PaddingControl } from "./controls/padding";
 import { GapControl } from "./controls/gap";
 import { FlexAlignControl } from "./controls/flex-align";
+import { FlexWrapControl } from "./controls/flex-wrap";
 import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
@@ -41,8 +42,7 @@ import { LineHeightControl } from "./controls/line-height";
 import { NameControl } from "./controls/name";
 import { UserDataControl } from "./controls/x-userdata";
 import { LengthPercentageControl } from "./controls/length-percentage";
-import { LayoutControl, LayoutModeControl } from "./controls/layout";
-import { AxisControl } from "./controls/axis";
+import { LayoutControl } from "./controls/layout";
 import { MaxlengthControl } from "./controls/maxlength";
 import { BlendModeDropdown } from "./controls/blend-mode";
 import {
@@ -912,6 +912,7 @@ function ModeNodeProperties({
     crossAxisAlignment: node.crossAxisAlignment,
     mainAxisGap: node.mainAxisGap,
     crossAxisGap: node.crossAxisGap,
+    layoutWrap: node.layoutWrap,
 
     //
     href: node.href,
@@ -953,6 +954,7 @@ function ModeNodeProperties({
     crossAxisAlignment,
     mainAxisGap,
     crossAxisGap,
+    layoutWrap,
 
     //
     href,
@@ -1056,13 +1058,6 @@ function ModeNodeProperties({
             </PropertyLine>
           )}
           {config.size !== "off" && <SectionDimension node_id={node_id} />}
-          {/* <PropertyLine>
-            <PropertyLineLabel>Wrap</PropertyLineLabel>
-            <FlexWrapControl
-              value={flexWrap as any}
-              onValueChange={actions.flexWrap}
-            />
-          </PropertyLine> */}
           <PropertyLine hidden={!is_flex_container}>
             <PropertyLineLabel>Alignment</PropertyLineLabel>
             <FlexAlignControl
@@ -1081,6 +1076,13 @@ function ModeNodeProperties({
                 actions.mainAxisAlignment(value.mainAxisAlignment);
                 actions.crossAxisAlignment(value.crossAxisAlignment);
               }}
+            />
+          </PropertyLine>
+          <PropertyLine hidden={!is_flex_container}>
+            <PropertyLineLabel>Wrap</PropertyLineLabel>
+            <FlexWrapControl
+              value={layoutWrap}
+              onValueChange={actions.layoutWrap}
             />
           </PropertyLine>
           <PropertyLine hidden={!is_flex_container}>

@@ -1990,6 +1990,13 @@ class EditorDocumentStore
       crossAxisGap: typeof gap === "number" ? gap : gap.crossAxisGap,
     });
   }
+  changeFlexContainerNodeWrap(node_id: string, layoutWrap: "wrap" | "nowrap") {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      layoutWrap,
+    });
+  }
   //
   changeNodePropertyMouseCursor(node_id: string, cursor: cg.SystemMouseCursor) {
     this.dispatch({
