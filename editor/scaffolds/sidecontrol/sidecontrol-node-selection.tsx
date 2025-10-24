@@ -1088,20 +1088,14 @@ function ModeNodeProperties({
           <PropertyLine hidden={!is_flex_container}>
             <PropertyLineLabel>Gap</PropertyLineLabel>
             <GapControl
+              mode={layoutWrap === "wrap" ? "multiple" : "single"}
               value={{
                 mainAxisGap: mainAxisGap!,
-                crossAxisGap: crossAxisGap!,
+                crossAxisGap: crossAxisGap,
               }}
               onValueCommit={actions.gap}
             />
           </PropertyLine>
-          {/* <PropertyLine hidden={!is_flex_container}>
-            <PropertyLineLabel>Margin</PropertyLineLabel>
-            <MarginControl
-              value={margin as any}
-              onValueChange={actions.margin}
-            />
-          </PropertyLine> */}
           <PropertyLine hidden={!is_flex_container}>
             <PropertyLineLabel>Padding</PropertyLineLabel>
             <PaddingControl value={padding!} onValueCommit={actions.padding} />

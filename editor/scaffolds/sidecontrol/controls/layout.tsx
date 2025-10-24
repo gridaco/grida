@@ -6,6 +6,7 @@ import {
   ViewHorizontalIcon,
   ViewNoneIcon,
   ViewVerticalIcon,
+  ViewGridIcon,
 } from "@radix-ui/react-icons";
 
 type LayoutMode = grida.program.nodes.i.IFlexContainer["layout"];
@@ -50,6 +51,9 @@ export function LayoutControl({
         { value: "normal", icon: <ViewNoneIcon /> },
         { value: "flex-row", icon: <ViewVerticalIcon /> },
         { value: "flex-column", icon: <ViewHorizontalIcon /> },
+        // WILL BE 'GRID'
+        // @ts-expect-error grid is not yet supported
+        { value: "grid", icon: <ViewGridIcon />, disabled: true },
       ]}
       value={op}
       onValueChange={_onValueChange}
