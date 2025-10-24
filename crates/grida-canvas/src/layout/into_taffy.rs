@@ -8,18 +8,21 @@ use taffy::prelude::*;
 /// ## Key differences from Taffy's defaults:
 /// - `flex_shrink: 0.0` (instead of 1.0) - prevents children from automatically shrinking
 ///   when they overflow their flex container
+/// - `align_content: Some(AlignContent::Start)` - prevents wrapped rows from stretching
+///   and distributing extra vertical space, ensuring gap values are respected exactly
 ///
 /// ## Rationale:
 /// In design tools like Grida, users expect fixed-size elements to maintain their specified
-/// dimensions. Taffy's default `flex_shrink: 1.0` causes elements to shrink when the container
-/// is too small, which is unexpected behavior for a design canvas. Users should explicitly
-/// opt-in to shrinking behavior if needed.
+/// dimensions and spacing. Taffy's default `flex_shrink: 1.0` causes elements to shrink,
+/// and `align_content: None` (which behaves like Stretch) causes wrapped rows to distribute
+/// extra space, both of which are unexpected behaviors for a design canvas.
 ///
 /// This is a zero-cost abstraction - the compiler inlines this function.
 #[inline]
 fn grida_style_default() -> Style {
     Style {
         flex_shrink: 0.0,
+        align_content: Some(AlignContent::Start),
         overflow: taffy::Point {
             x: taffy::Overflow::Clip,
             y: taffy::Overflow::Clip,
@@ -87,13 +90,30 @@ impl From<EdgeInsets> for Rect<LengthPercentage> {
     }
 }
 
-/// Convert schema LayoutGap to Taffy Size<LengthPercentage>
-/// Note: In Taffy, gap.width is the main axis gap and gap.height is the cross axis gap
-impl From<LayoutGap> for Size<LengthPercentage> {
-    fn from(gap: LayoutGap) -> Self {
-        Size {
-            width: LengthPercentage::length(gap.main_axis_gap),
-            height: LengthPercentage::length(gap.cross_axis_gap),
+/// Convert schema LayoutGap to Taffy gap based on flex direction
+///
+/// **IMPORTANT**: Taffy's gap is absolute (not direction-relative):
+/// - `gap.width` = column-gap (horizontal spacing)
+/// - `gap.height` = row-gap (vertical spacing)
+///
+/// Our LayoutGap is direction-relative (main/cross), so we need the flex direction
+/// to map correctly. This function should NOT be used directly - use `layout_gap_to_taffy()`
+/// with the direction parameter instead.
+fn layout_gap_to_taffy(gap: LayoutGap, direction: Axis) -> Size<LengthPercentage> {
+    match direction {
+        Axis::Horizontal => {
+            // Horizontal flex: main=horizontal, cross=vertical
+            Size {
+                width: LengthPercentage::length(gap.main_axis_gap), // column-gap
+                height: LengthPercentage::length(gap.cross_axis_gap), // row-gap
+            }
+        }
+        Axis::Vertical => {
+            // Vertical flex: main=vertical, cross=horizontal
+            Size {
+                width: LengthPercentage::length(gap.cross_axis_gap), // column-gap
+                height: LengthPercentage::length(gap.main_axis_gap), // row-gap
+            }
         }
     }
 }
@@ -156,9 +176,9 @@ impl From<UniformNodeLayout> for Style {
                     style.align_items = Some(alignment.into());
                 }
 
-                // Gap
+                // Gap - convert with direction awareness
                 if let Some(gap) = layout.layout_gap {
-                    style.gap = gap.into();
+                    style.gap = layout_gap_to_taffy(gap, layout.layout_direction);
                 }
 
                 // Flex grow
@@ -267,10 +287,7 @@ fn icb_to_taffy_style(icb: &crate::node::schema::InitialContainerNodeRec) -> Sty
         flex_wrap: icb.layout_wrap.into(),
         justify_content: Some(icb.layout_main_axis_alignment.into()),
         align_items: Some(icb.layout_cross_axis_alignment.into()),
-        gap: taffy::Size {
-            width: LengthPercentage::length(icb.layout_gap.main_axis_gap),
-            height: LengthPercentage::length(icb.layout_gap.cross_axis_gap),
-        },
+        gap: layout_gap_to_taffy(icb.layout_gap, icb.layout_direction),
         padding: icb.padding.into(),
         // Size will be set by the layout engine for root ICB nodes
         ..grida_style_default()

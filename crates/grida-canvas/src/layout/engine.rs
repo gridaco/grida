@@ -154,7 +154,7 @@ impl LayoutEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cg::types::{Axis, LayoutGap, LayoutMode};
+    use crate::cg::types::{Axis, LayoutGap, LayoutMode, LayoutWrap};
     use crate::node::factory::NodeFactory;
     use crate::node::scene_graph::{Parent, SceneGraph};
     use crate::node::schema::*;
@@ -644,5 +644,78 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_flex_wrap_gap_spacing() {
+        // Verify that gap spacing is correct when items wrap
+        // This tests that cross_axis_gap maps to row-gap correctly
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Create a small width container (150px) with horizontal flex and wrap
+        // This will force two 100px items to wrap onto separate rows
+        let mut container = nf.create_container_node();
+        container.layout_container = LayoutContainerStyle {
+            layout_mode: LayoutMode::Flex,
+            layout_direction: Axis::Horizontal,
+            layout_wrap: Some(LayoutWrap::Wrap),
+            layout_gap: Some(LayoutGap {
+                main_axis_gap: 5.0,   // horizontal gap (column-gap)
+                cross_axis_gap: 20.0, // vertical gap (row-gap) - this should be exact!
+            }),
+            ..Default::default()
+        };
+        container.layout_dimensions.width = Some(150.0);
+        container.layout_dimensions.height = Some(300.0); // Tall enough to see vertical gap
+        let container_id = graph.append_child(Node::Container(container), Parent::Root);
+
+        // Add two 100px wide items (will wrap because 200px > 150px container)
+        let mut rect1 = nf.create_rectangle_node();
+        rect1.size = Size {
+            width: 100.0,
+            height: 50.0,
+        };
+        let child1_id = graph.append_child(Node::Rectangle(rect1), Parent::NodeId(container_id));
+
+        let mut rect2 = nf.create_rectangle_node();
+        rect2.size = Size {
+            width: 100.0,
+            height: 50.0,
+        };
+        let child2_id = graph.append_child(Node::Rectangle(rect2), Parent::NodeId(container_id));
+
+        // Compute layout
+        let scene = Scene {
+            name: "test".to_string(),
+            graph,
+            background_color: None,
+        };
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+        );
+
+        // Get layouts
+        let layout1 = result.get(&child1_id).expect("Child 1 should have layout");
+        let layout2 = result.get(&child2_id).expect("Child 2 should have layout");
+
+        // Child 1 should be at y=0
+        assert_eq!(layout1.y, 0.0, "First item should be at y=0");
+
+        // Child 2 should wrap to next row
+        // y position = first item height (50) + cross_axis_gap (20) = 70
+        assert_eq!(
+            layout2.y, 70.0,
+            "Second item should be at y = 50 (first item height) + 20 (cross_axis_gap)"
+        );
+
+        // Both items should be at x=0 (start of their respective rows)
+        assert_eq!(layout1.x, 0.0);
+        assert_eq!(layout2.x, 0.0);
     }
 }
