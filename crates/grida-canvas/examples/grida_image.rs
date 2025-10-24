@@ -24,7 +24,8 @@ async fn demo_image() -> (Scene, Vec<u8>) {
 
     // Root container
     let mut root = nf.create_container_node();
-    root.size = image8ksize.clone();
+    root.layout_dimensions.width = Some(image8ksize.width);
+    root.layout_dimensions.height = Some(image8ksize.height);
 
     // First example: Rectangle with ImagePaint fill
     let mut rect1 = nf.create_rectangle_node();

@@ -1,6 +1,7 @@
 use super::vn::{VectorNetwork, VectorNetworkSegment};
 use super::*;
 use crate::cg::CGPoint;
+use math2::Rectangle;
 use skia_safe;
 /// A simple (non-self-intersecting) closed polygon shape with optional corner radius.
 pub struct SimplePolygonShape {
@@ -57,5 +58,33 @@ pub fn build_simple_polygon_vector_network(shape: &SimplePolygonShape) -> Vector
         vertices,
         segments,
         regions: vec![],
+    }
+}
+
+pub(crate) fn polygon_bounds(points: &[CGPoint]) -> Rectangle {
+    let mut min_x = f32::INFINITY;
+    let mut min_y = f32::INFINITY;
+    let mut max_x = f32::NEG_INFINITY;
+    let mut max_y = f32::NEG_INFINITY;
+    for p in points {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    }
+    if points.is_empty() {
+        Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        }
+    } else {
+        Rectangle {
+            x: min_x,
+            y: min_y,
+            width: max_x - min_x,
+            height: max_y - min_y,
+        }
     }
 }

@@ -150,6 +150,23 @@ impl Backend {
     }
 }
 
+/// Window/viewport context for the renderer
+///
+/// This serves as the source of truth for window state and enables
+/// dependency-based layout where nodes can depend on viewport dimensions
+/// (e.g., ICB sizing, future vw/vh units)
+#[derive(Debug, Clone)]
+pub struct RendererWindowContext {
+    /// Current viewport/window size
+    pub viewport_size: Size,
+}
+
+impl RendererWindowContext {
+    pub fn new(viewport_size: Size) -> Self {
+        Self { viewport_size }
+    }
+}
+
 /// ---------------------------------------------------------------------------
 /// Renderer: manages backend, DPI, camera, and iterates over scene children
 /// ---------------------------------------------------------------------------
@@ -169,6 +186,10 @@ pub struct Renderer {
     plan: Option<FramePlan>,
     /// Runtime configuration for renderer behaviour
     config: RuntimeRendererConfig,
+    /// Layout computation engine (owns cache, detects changes)
+    layout_engine: crate::layout::engine::LayoutEngine,
+    /// Window/viewport context - source of truth for viewport state
+    pub window_context: RendererWindowContext,
 }
 
 impl Renderer {
@@ -209,6 +230,7 @@ impl Renderer {
         }
         let mut image_repository = ImageRepository::new(store);
         system_images::register(&mut resources, &mut image_repository);
+        let viewport_size = *camera.get_size();
         Self {
             backend,
             scene: None,
@@ -221,6 +243,8 @@ impl Renderer {
             fc: FrameCounter::new(),
             plan: None,
             config: RuntimeRendererConfig::default(),
+            layout_engine: crate::layout::engine::LayoutEngine::new(),
+            window_context: RendererWindowContext::new(viewport_size),
         }
     }
 
@@ -352,12 +376,30 @@ impl Renderer {
     /// Load a scene into the renderer. Caching will be performed lazily during
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
-        self.scene_cache = cache::scene::SceneCache::new();
-        let requested = collect_scene_font_families(&scene);
-        self.fonts.set_requested_families(requested.into_iter());
-        self.scene_cache.update_geometry(&scene, &self.fonts);
-        self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);
+
+        self.scene_cache = cache::scene::SceneCache::new();
+        if let Some(scene) = self.scene.as_ref() {
+            let requested = collect_scene_font_families(scene);
+            self.fonts.set_requested_families(requested.into_iter());
+
+            let viewport_size = self.window_context.viewport_size;
+
+            // 1. Compute layout phase
+            self.layout_engine.compute(scene, viewport_size);
+
+            // 2. Build geometry with layout results
+            let layout_result = self.layout_engine.result();
+            self.scene_cache.update_geometry_with_layout(
+                scene,
+                &self.fonts,
+                layout_result,
+                viewport_size,
+            );
+
+            // 3. Build layers
+            self.scene_cache.update_layers(scene);
+        }
         self.queue_stable();
     }
 
@@ -394,6 +436,37 @@ impl Renderer {
     /// Clear the cached scene picture.
     pub fn invalidate_cache(&mut self) {
         self.scene_cache.invalidate();
+    }
+
+    /// Rebuild scene caches after scene geometry has changed.
+    /// Call this after modifying node sizes, positions, or other geometry properties.
+    pub fn rebuild_scene_caches(&mut self) {
+        if let Some(scene) = self.scene.as_ref() {
+            let viewport_size = self.window_context.viewport_size;
+
+            // 1. Recompute layout
+            self.layout_engine.compute(scene, viewport_size);
+
+            // 2. Rebuild geometry with layout results
+            let layout_result = self.layout_engine.result();
+            self.scene_cache.update_geometry_with_layout(
+                scene,
+                &self.fonts,
+                layout_result,
+                viewport_size,
+            );
+
+            // 3. Rebuild layers
+            self.scene_cache.update_layers(scene);
+        }
+    }
+
+    /// Update viewport context with new size
+    ///
+    /// This updates the source of truth for viewport/window dimensions.
+    /// Should be called before resolving viewport dependencies.
+    pub fn update_viewport_size(&mut self, width: f32, height: f32) {
+        self.window_context.viewport_size = Size { width, height };
     }
 
     fn with_recording(

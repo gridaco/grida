@@ -150,23 +150,52 @@ impl NodeFactory {
         ContainerNodeRec {
             active: true,
             opacity: Self::DEFAULT_OPACITY,
-            blend_mode: LayerBlendMode::default(),
+            blend_mode: Default::default(),
             mask: None,
-            transform: AffineTransform::identity(),
-            size: Self::DEFAULT_SIZE,
-            corner_radius: RectangularCornerRadius::zero(),
+            rotation: 0.0,
+            position: Default::default(),
+            corner_radius: Default::default(),
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
-            strokes: Paints::default(),
+            strokes: Default::default(),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
-            effects: LayerEffects::default(),
+            effects: Default::default(),
             clip: true,
-            layout_mode: LayoutMode::default(),
-            layout_direction: Axis::default(),
-            layout_wrap: LayoutWrap::default(),
-            layout_main_axis_alignment: MainAxisAlignment::default(),
-            layout_cross_axis_alignment: CrossAxisAlignment::default(),
+            layout_container: LayoutContainerStyle {
+                layout_mode: LayoutMode::Normal,
+                layout_direction: Axis::Horizontal,
+                layout_wrap: None,
+                layout_main_axis_alignment: None,
+                layout_cross_axis_alignment: None,
+                layout_padding: None,
+                layout_gap: None,
+            },
+            layout_dimensions: LayoutDimensionStyle {
+                width: Some(Self::DEFAULT_SIZE.width),
+                height: Some(Self::DEFAULT_SIZE.height),
+                min_width: None,
+                max_width: None,
+                min_height: None,
+                max_height: None,
+            },
+            layout_child: None,
+        }
+    }
+
+    /// Creates a new initial container block (ICB) node
+    ///
+    /// ICB fills viewport. By default has Normal layout (no flex).
+    /// Set layout_mode to Flex to enable flex layout for children.
+    /// No visual properties - purely structural.
+    pub fn create_initial_container_node(&self) -> InitialContainerNodeRec {
+        InitialContainerNodeRec {
+            active: true,
+            layout_mode: LayoutMode::Normal,
+            layout_direction: Axis::Horizontal,
+            layout_wrap: LayoutWrap::NoWrap,
+            layout_main_axis_alignment: MainAxisAlignment::Start,
+            layout_cross_axis_alignment: CrossAxisAlignment::Start,
             padding: EdgeInsets::default(),
             layout_gap: LayoutGap::default(),
         }

@@ -29,16 +29,11 @@ async fn demo_nested() -> Scene {
         let mut container = nf.create_container_node();
 
         // Each level is centered in its parent with rotation
-        container.transform = AffineTransform::new(
-            current_size * 0.075, // Small offset for visual clarity
-            current_size * 0.075,
-            rotation,
-        );
-
-        container.size = Size {
-            width: current_size,
-            height: current_size,
-        };
+        container.layout_container = container.layout_container;
+        container.position = CGPoint::new(current_size * 0.075, current_size * 0.075).into();
+        container.rotation = rotation;
+        container.layout_dimensions.width = Some(current_size);
+        container.layout_dimensions.height = Some(current_size);
         container.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // Color gradient from blue (outer) to red (inner)

@@ -1,9 +1,19 @@
+//! Geometry cache - Transform and bounds resolution
+//!
+//! ## Pipeline Guarantees
+//!
+//! This module guarantees:
+//! - Every node in scene graph has a GeometryEntry
+//! - All transforms are fully resolved (no None/fallbacks)
+//! - All bounds include layout-computed dimensions for V2 nodes
+//! - Consumes LayoutResult as immutable input from LayoutEngine
+//! - Missing layout for Inset nodes is a PANIC (LayoutEngine bug)
+//! - Missing geometry entry when accessed is a PANIC (GeometryCache bug)
+
 use crate::cache::paragraph::ParagraphCache;
 use crate::cg::types::*;
 use crate::node::scene_graph::SceneGraph;
-use crate::node::schema::{
-    IntrinsicSizeNode, LayerEffects, Node, NodeGeometryMixin, NodeId, Scene,
-};
+use crate::node::schema::{LayerEffects, Node, NodeGeometryMixin, NodeId, NodeRectMixin, Scene};
 use crate::runtime::font_repository::FontRepository;
 use math2::rect;
 use math2::rect::Rectangle;
@@ -35,6 +45,11 @@ pub struct GeometryEntry {
     pub dirty_bounds: bool,
 }
 
+/// Context passed during geometry building
+struct GeometryBuildContext {
+    viewport_size: crate::node::schema::Size,
+}
+
 #[derive(Debug, Clone)]
 pub struct GeometryCache {
     entries: HashMap<NodeId, GeometryEntry>,
@@ -56,8 +71,31 @@ impl GeometryCache {
         paragraph_cache: &mut ParagraphCache,
         fonts: &FontRepository,
     ) -> Self {
+        let empty_layout = crate::layout::cache::LayoutResult::new();
+        let default_viewport = crate::node::schema::Size {
+            width: 1920.0,
+            height: 1080.0,
+        };
+        Self::from_scene_with_layout(
+            scene,
+            paragraph_cache,
+            fonts,
+            &empty_layout,
+            default_viewport,
+        )
+    }
+
+    pub fn from_scene_with_layout(
+        scene: &Scene,
+        paragraph_cache: &mut ParagraphCache,
+        fonts: &FontRepository,
+        layout_result: &crate::layout::cache::LayoutResult,
+        viewport_size: crate::node::schema::Size,
+    ) -> Self {
         let mut cache = Self::new();
         let root_world = AffineTransform::identity();
+        let context = GeometryBuildContext { viewport_size };
+
         for child in scene.graph.roots() {
             Self::build_recursive(
                 &child,
@@ -67,6 +105,8 @@ impl GeometryCache {
                 &mut cache,
                 paragraph_cache,
                 fonts,
+                layout_result,
+                &context,
             );
         }
         cache
@@ -80,6 +120,8 @@ impl GeometryCache {
         cache: &mut GeometryCache,
         paragraph_cache: &mut ParagraphCache,
         fonts: &FontRepository,
+        layout_result: &crate::layout::cache::LayoutResult,
+        context: &GeometryBuildContext,
     ) -> Rectangle {
         let node = graph
             .get_node(id)
@@ -100,6 +142,8 @@ impl GeometryCache {
                             cache,
                             paragraph_cache,
                             fonts,
+                            layout_result,
+                            context,
                         );
                         union_bounds = match union_bounds {
                             Some(b) => Some(rect::union(&[b, child_bounds])),
@@ -148,6 +192,57 @@ impl GeometryCache {
                 cache.entries.insert(id.clone(), entry.clone());
                 entry.absolute_bounding_box
             }
+            Node::InitialContainer(_n) => {
+                // ICB fills viewport - size from context
+                // Layout was already computed by LayoutEngine
+                let size = context.viewport_size;
+
+                let local_transform = AffineTransform::identity();
+                let world_transform = parent_world.compose(&local_transform);
+
+                let local_bounds = Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: size.width,
+                    height: size.height,
+                };
+
+                // Build children geometries (may use computed layouts from LayoutEngine)
+                let mut union_world_bounds = transform_rect(&local_bounds, &world_transform);
+
+                if let Some(children) = graph.get_children(id) {
+                    for child_id in children {
+                        let child_bounds = Self::build_recursive(
+                            child_id,
+                            graph,
+                            &world_transform,
+                            Some(id.clone()),
+                            cache,
+                            paragraph_cache,
+                            fonts,
+                            layout_result,
+                            context,
+                        );
+                        union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
+                    }
+                }
+
+                let render_bounds = union_world_bounds; // ICB has no effects
+
+                let entry = GeometryEntry {
+                    transform: local_transform,
+                    absolute_transform: world_transform,
+                    bounding_box: local_bounds,
+                    absolute_bounding_box: union_world_bounds,
+                    absolute_render_bounds: render_bounds,
+                    parent: parent_id,
+                    dirty_transform: false,
+                    dirty_bounds: false,
+                };
+
+                cache.entries.insert(id.clone(), entry);
+                union_world_bounds
+            }
             Node::BooleanOperation(n) => {
                 let world_transform = parent_world.compose(&n.transform.unwrap_or_default());
                 let mut union_bounds: Option<Rectangle> = None;
@@ -161,6 +256,8 @@ impl GeometryCache {
                             cache,
                             paragraph_cache,
                             fonts,
+                            layout_result,
+                            context,
                         );
                         union_bounds = match union_bounds {
                             Some(b) => Some(rect::union(&[b, child_bounds])),
@@ -213,9 +310,51 @@ impl GeometryCache {
                 entry.absolute_bounding_box
             }
             Node::Container(n) => {
-                let local_transform = n.transform;
+                // Transform resolution with rotation - NO FALLBACKS (except root init)
+                //
+                // Position handling:
+                // - Root nodes (parent_id.is_none()): Always use direct x, y fields
+                //   This is "preview mode" where root xy is respected for positioning
+                //   multiple canvases or artboards in a scene.
+                // - Child nodes: Use computed layout position from LayoutEngine
+                //   The layout engine computes positions based on flex/layout rules.
+                //
+                // Note: In "pure runtime" mode (single window), root xy would be ignored,
+                // but we don't have a use case for this currently.
+                let (x, y) = if parent_id.is_none() {
+                    // Root node: preserve original x, y (preview mode)
+                    (n.position.x().unwrap_or(0.0), n.position.y().unwrap_or(0.0))
+                } else {
+                    // Child node: must have computed layout position
+                    let computed = layout_result
+                        .get(id)
+                        .expect("Container child must have layout result");
+                    (computed.x, computed.y)
+                };
+                let local_transform = AffineTransform::new(x, y, n.rotation);
+
+                // Size resolution - prefer computed; fallback to layout dimensions for root only
+                let (width, height) = {
+                    if let Some(computed) = layout_result.get(id) {
+                        (computed.width, computed.height)
+                    } else if parent_id.is_none() {
+                        (
+                            n.layout_dimensions.width.unwrap_or(0.0),
+                            n.layout_dimensions.height.unwrap_or(0.0),
+                        )
+                    } else {
+                        panic!("Container with auto-sizing must have layout result");
+                    }
+                };
+
+                let local_bounds = Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width,
+                    height,
+                };
+
                 let world_transform = parent_world.compose(&local_transform);
-                let local_bounds = n.rect();
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
                 let mut union_world_bounds = world_bounds;
                 let render_bounds = compute_render_bounds_from_style(
@@ -239,6 +378,8 @@ impl GeometryCache {
                             cache,
                             paragraph_cache,
                             fonts,
+                            layout_result,
+                            context,
                         );
                         union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
                     }
@@ -305,25 +446,38 @@ impl GeometryCache {
                 intrinsic_bounds
             }
             _ => {
-                let intrinsic_node = Box::new(match node {
-                    Node::SVGPath(n) => IntrinsicSizeNode::SVGPath(n.clone()),
-                    Node::Vector(n) => IntrinsicSizeNode::Vector(n.clone()),
-                    Node::Rectangle(n) => IntrinsicSizeNode::Rectangle(n.clone()),
-                    Node::Ellipse(n) => IntrinsicSizeNode::Ellipse(n.clone()),
-                    Node::Polygon(n) => IntrinsicSizeNode::Polygon(n.clone()),
-                    Node::RegularPolygon(n) => IntrinsicSizeNode::RegularPolygon(n.clone()),
-                    Node::RegularStarPolygon(n) => IntrinsicSizeNode::RegularStarPolygon(n.clone()),
-                    Node::Line(n) => IntrinsicSizeNode::Line(n.clone()),
-                    Node::Image(n) => IntrinsicSizeNode::Image(n.clone()),
-                    Node::Container(n) => IntrinsicSizeNode::Container(n.clone()),
-                    Node::Error(n) => IntrinsicSizeNode::Error(n.clone()),
-                    Node::TextSpan(_) | Node::Group(_) | Node::BooleanOperation(_) => {
-                        unreachable!()
+                // V1 nodes - use schema transform and size directly
+                let (local_transform, width, height) = match node {
+                    Node::Rectangle(n) => (n.transform, n.size.width, n.size.height),
+                    Node::Ellipse(n) => (n.transform, n.size.width, n.size.height),
+                    Node::Image(n) => (n.transform, n.size.width, n.size.height),
+                    Node::RegularPolygon(n) => (n.transform, n.size.width, n.size.height),
+                    Node::RegularStarPolygon(n) => (n.transform, n.size.width, n.size.height),
+                    Node::Line(n) => (n.transform, n.size.width, 0.0),
+                    Node::Polygon(n) => {
+                        let rect = n.rect();
+                        (n.transform, rect.width, rect.height)
                     }
-                });
-                let intrinsic = intrinsic_node.as_ref();
+                    Node::SVGPath(n) => {
+                        let rect = path_bounds(&n.data);
+                        (n.transform, rect.width, rect.height)
+                    }
+                    Node::Vector(n) => {
+                        let rect = n.network.bounds();
+                        (n.transform, rect.width, rect.height)
+                    }
+                    Node::Error(n) => (n.transform, n.size.width, n.size.height),
+                    // V2/special nodes handled above
+                    _ => unreachable!("Has dedicated case above"),
+                };
 
-                let (local_transform, local_bounds) = node_geometry(intrinsic);
+                let local_bounds = Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width,
+                    height,
+                };
+
                 let world_transform = parent_world.compose(&local_transform);
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
                 let render_bounds = compute_render_bounds(node, world_bounds);
@@ -343,6 +497,10 @@ impl GeometryCache {
                 entry.absolute_bounding_box
             }
         }
+    }
+
+    pub fn get_transform(&self, id: &NodeId) -> Option<AffineTransform> {
+        self.entries.get(id).map(|e| e.transform)
     }
 
     pub fn get_world_transform(&self, id: &NodeId) -> Option<AffineTransform> {
@@ -384,60 +542,8 @@ impl GeometryCache {
     }
 }
 
-fn node_geometry(node: &IntrinsicSizeNode) -> (AffineTransform, Rectangle) {
-    match node {
-        IntrinsicSizeNode::Error(n) => (n.transform, n.rect()),
-        IntrinsicSizeNode::Container(n) => (n.transform, n.rect()),
-        IntrinsicSizeNode::Rectangle(n) => (n.transform, n.rect()),
-        IntrinsicSizeNode::Ellipse(n) => (n.transform, n.rect()),
-        IntrinsicSizeNode::Polygon(n) => (n.transform, polygon_bounds(&n.points)),
-        IntrinsicSizeNode::RegularPolygon(n) => (n.transform, n.rect()),
-        IntrinsicSizeNode::RegularStarPolygon(n) => (n.transform, n.rect()),
-        IntrinsicSizeNode::Line(n) => (
-            n.transform,
-            Rectangle {
-                x: 0.0,
-                y: 0.0,
-                width: n.size.width,
-                height: 0.0,
-            },
-        ),
-        IntrinsicSizeNode::SVGPath(n) => (n.transform, path_bounds(&n.data)),
-        IntrinsicSizeNode::Vector(n) => (n.transform, n.network.bounds()),
-        IntrinsicSizeNode::Image(n) => (n.transform, n.rect()),
-    }
-}
-
 fn transform_rect(rect: &Rectangle, t: &AffineTransform) -> Rectangle {
     rect::transform(*rect, t)
-}
-
-fn polygon_bounds(points: &[CGPoint]) -> Rectangle {
-    let mut min_x = f32::INFINITY;
-    let mut min_y = f32::INFINITY;
-    let mut max_x = f32::NEG_INFINITY;
-    let mut max_y = f32::NEG_INFINITY;
-    for p in points {
-        min_x = min_x.min(p.x);
-        min_y = min_y.min(p.y);
-        max_x = max_x.max(p.x);
-        max_y = max_y.max(p.y);
-    }
-    if points.is_empty() {
-        Rectangle {
-            x: 0.0,
-            y: 0.0,
-            width: 0.0,
-            height: 0.0,
-        }
-    } else {
-        Rectangle {
-            x: min_x,
-            y: min_y,
-            width: max_x - min_x,
-            height: max_y - min_y,
-        }
-    }
 }
 
 fn path_bounds(data: &str) -> Rectangle {
@@ -622,6 +728,6 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
             &n.effects,
         ),
         Node::Error(_) => world_bounds,
-        Node::Group(_) | Node::BooleanOperation(_) => world_bounds,
+        Node::Group(_) | Node::BooleanOperation(_) | Node::InitialContainer(_) => world_bounds,
     }
 }

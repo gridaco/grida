@@ -1,4 +1,4 @@
-use crate::node::schema::{Node, NodeId, NodeTrait};
+use crate::node::schema::{Node, NodeId};
 use std::collections::HashMap;
 
 /// A repository for managing nodes with automatic ID indexing.

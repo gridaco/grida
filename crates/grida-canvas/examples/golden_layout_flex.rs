@@ -1,9 +1,12 @@
 use cg::cg::types::*;
-use cg::layout::tmp_example::{compute_flex_layout_for_container, ContainerWithStyle};
-use cg::layout::{ComputedLayout, LayoutStyle};
-use cg::node::schema::{ContainerNodeRec, Size as SchemaSize};
+use cg::layout::engine::LayoutEngine;
+use cg::layout::ComputedLayout;
+use cg::node::factory::NodeFactory;
+use cg::node::scene_graph::{Parent, SceneGraph};
+use cg::node::schema::{
+    ContainerNodeRec, LayoutContainerStyle, LayoutDimensionStyle, Node, Scene, Size,
+};
 use skia_safe::{surfaces, Color, Font, FontMgr, Paint, Rect};
-use taffy::prelude::*;
 
 fn create_container(id: &str, width: f32, height: f32) -> ContainerNodeRec {
     create_container_with_gap(id, width, height, 10.0)
@@ -15,33 +18,44 @@ fn create_container_with_gap(id: &str, width: f32, height: f32, gap: f32) -> Con
     use std::hash::{Hash, Hasher};
     let mut hasher = DefaultHasher::new();
     id.hash(&mut hasher);
-    let id_u64 = hasher.finish();
+    let _ = hasher.finish(); // Generate ID but don't store it since it's not used
 
     ContainerNodeRec {
         active: true,
         opacity: 1.0,
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
-        transform: math2::transform::AffineTransform::identity(),
-        size: SchemaSize { width, height },
-        corner_radius: RectangularCornerRadius::default(),
-        fills: Paints::new([]),
-        strokes: Paints::new([]),
+        rotation: 0.0,
+        position: Default::default(),
+        corner_radius: Default::default(),
+        fills: Default::default(),
+        strokes: Default::default(),
         stroke_width: 0.0,
         stroke_align: StrokeAlign::Center,
         stroke_dash_array: None,
-        effects: cg::node::schema::LayerEffects::default(),
-        clip: ContainerClipFlag::default(),
-        layout_mode: LayoutMode::Flex,
-        layout_direction: Axis::Horizontal,
-        layout_wrap: LayoutWrap::Wrap,
-        layout_main_axis_alignment: MainAxisAlignment::Start,
-        layout_cross_axis_alignment: CrossAxisAlignment::Start,
-        padding: EdgeInsets::default(),
-        layout_gap: LayoutGap {
-            main_axis_gap: gap,
-            cross_axis_gap: gap,
+        effects: Default::default(),
+        clip: Default::default(),
+        layout_container: LayoutContainerStyle {
+            layout_mode: LayoutMode::Flex,
+            layout_direction: Axis::Horizontal,
+            layout_wrap: Some(LayoutWrap::Wrap),
+            layout_main_axis_alignment: Some(MainAxisAlignment::Start),
+            layout_cross_axis_alignment: Some(CrossAxisAlignment::Start),
+            layout_padding: None,
+            layout_gap: Some(LayoutGap {
+                main_axis_gap: gap,
+                cross_axis_gap: gap,
+            }),
         },
+        layout_dimensions: LayoutDimensionStyle {
+            width: Some(width),
+            height: Some(height),
+            min_width: None,
+            max_width: None,
+            min_height: None,
+            max_height: None,
+        },
+        layout_child: None,
     }
 }
 
@@ -86,30 +100,50 @@ fn main() {
 
     // Scenario 1: Wide container (800px) - No wrap expected
     {
-        let container =
-            ContainerWithStyle::from_container(create_container("scenario-1", 800.0, 200.0))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(800.0),
-                    height: Dimension::auto(),
-                    flex_grow: 0.0,
-                });
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
 
-        let children: Vec<ContainerWithStyle> = (0..6)
-            .map(|i| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-1-{}", i),
-                    100.0,
-                    100.0,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(100.0),
-                    height: Dimension::length(100.0),
-                    ..Default::default()
-                })
-            })
+        // Create ICB with flex layout
+        let mut icb = nf.create_initial_container_node();
+        icb.layout_mode = LayoutMode::Flex;
+        icb.layout_direction = Axis::Horizontal;
+        icb.layout_wrap = LayoutWrap::Wrap;
+        icb.layout_main_axis_alignment = MainAxisAlignment::Start;
+        icb.layout_cross_axis_alignment = CrossAxisAlignment::Start;
+        icb.layout_gap = LayoutGap {
+            main_axis_gap: 10.0,
+            cross_axis_gap: 10.0,
+        };
+        let icb_id = graph.append_child(Node::InitialContainer(icb), Parent::Root);
+
+        // Add children to scene graph
+        for i in 0..6 {
+            let child = create_container(&format!("child-1-{}", i), 100.0, 100.0);
+            // Position is now handled by layout field
+            graph.append_child(Node::Container(child), Parent::NodeId(icb_id));
+        }
+
+        // Compute layout using production pipeline
+        let scene = Scene {
+            name: String::new(),
+            graph,
+            background_color: None,
+        };
+        let mut layout_engine = LayoutEngine::new();
+        let layout_result = layout_engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 200.0,
+            },
+        );
+
+        // Extract layouts in order
+        let children_ids = scene.graph.get_children(&icb_id).unwrap();
+        let layouts: Vec<ComputedLayout> = children_ids
+            .iter()
+            .map(|id| layout_result.get(id).cloned().unwrap())
             .collect();
-
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
 
         let height_used = render_scenario(
             canvas,
@@ -128,30 +162,46 @@ fn main() {
 
     // Scenario 2: Medium container (400px) - Partial wrap
     {
-        let container =
-            ContainerWithStyle::from_container(create_container("scenario-2", 400.0, 300.0))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(400.0),
-                    height: Dimension::auto(),
-                    flex_grow: 0.0,
-                });
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
 
-        let children: Vec<ContainerWithStyle> = (0..6)
-            .map(|i| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-2-{}", i),
-                    100.0,
-                    100.0,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(100.0),
-                    height: Dimension::length(100.0),
-                    ..Default::default()
-                })
-            })
+        let mut icb = nf.create_initial_container_node();
+        icb.layout_mode = LayoutMode::Flex;
+        icb.layout_direction = Axis::Horizontal;
+        icb.layout_wrap = LayoutWrap::Wrap;
+        icb.layout_main_axis_alignment = MainAxisAlignment::Start;
+        icb.layout_cross_axis_alignment = CrossAxisAlignment::Start;
+        icb.layout_gap = LayoutGap {
+            main_axis_gap: 10.0,
+            cross_axis_gap: 10.0,
+        };
+        let icb_id = graph.append_child(Node::InitialContainer(icb), Parent::Root);
+
+        for i in 0..6 {
+            let child = create_container(&format!("child-2-{}", i), 100.0, 100.0);
+            // Position is now handled by layout field
+            graph.append_child(Node::Container(child), Parent::NodeId(icb_id));
+        }
+
+        let scene = Scene {
+            name: String::new(),
+            graph,
+            background_color: None,
+        };
+        let mut layout_engine = LayoutEngine::new();
+        let layout_result = layout_engine.compute(
+            &scene,
+            Size {
+                width: 400.0,
+                height: 300.0,
+            },
+        );
+
+        let children_ids = scene.graph.get_children(&icb_id).unwrap();
+        let layouts: Vec<ComputedLayout> = children_ids
+            .iter()
+            .map(|id| layout_result.get(id).cloned().unwrap())
             .collect();
-
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
 
         let height_used = render_scenario(
             canvas,
@@ -170,30 +220,46 @@ fn main() {
 
     // Scenario 3: Narrow container (250px) - Heavy wrap
     {
-        let container =
-            ContainerWithStyle::from_container(create_container("scenario-3", 250.0, 700.0))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(250.0),
-                    height: Dimension::auto(),
-                    flex_grow: 0.0,
-                });
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
 
-        let children: Vec<ContainerWithStyle> = (0..6)
-            .map(|i| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-3-{}", i),
-                    100.0,
-                    100.0,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(100.0),
-                    height: Dimension::length(100.0),
-                    ..Default::default()
-                })
-            })
+        let mut icb = nf.create_initial_container_node();
+        icb.layout_mode = LayoutMode::Flex;
+        icb.layout_direction = Axis::Horizontal;
+        icb.layout_wrap = LayoutWrap::Wrap;
+        icb.layout_main_axis_alignment = MainAxisAlignment::Start;
+        icb.layout_cross_axis_alignment = CrossAxisAlignment::Start;
+        icb.layout_gap = LayoutGap {
+            main_axis_gap: 10.0,
+            cross_axis_gap: 10.0,
+        };
+        let icb_id = graph.append_child(Node::InitialContainer(icb), Parent::Root);
+
+        for i in 0..6 {
+            let child = create_container(&format!("child-3-{}", i), 100.0, 100.0);
+            // Position is now handled by layout field
+            graph.append_child(Node::Container(child), Parent::NodeId(icb_id));
+        }
+
+        let scene = Scene {
+            name: String::new(),
+            graph,
+            background_color: None,
+        };
+        let mut layout_engine = LayoutEngine::new();
+        let layout_result = layout_engine.compute(
+            &scene,
+            Size {
+                width: 250.0,
+                height: 700.0,
+            },
+        );
+
+        let children_ids = scene.graph.get_children(&icb_id).unwrap();
+        let layouts: Vec<ComputedLayout> = children_ids
+            .iter()
+            .map(|id| layout_result.get(id).cloned().unwrap())
             .collect();
-
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
 
         let height_used = render_scenario(
             canvas,
@@ -212,13 +278,20 @@ fn main() {
 
     // Scenario 4: Different child sizes in medium container
     {
-        let container =
-            ContainerWithStyle::from_container(create_container("scenario-4", 500.0, 300.0))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(500.0),
-                    height: Dimension::auto(),
-                    flex_grow: 0.0,
-                });
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        let mut icb = nf.create_initial_container_node();
+        icb.layout_mode = LayoutMode::Flex;
+        icb.layout_direction = Axis::Horizontal;
+        icb.layout_wrap = LayoutWrap::Wrap;
+        icb.layout_main_axis_alignment = MainAxisAlignment::Start;
+        icb.layout_cross_axis_alignment = CrossAxisAlignment::Start;
+        icb.layout_gap = LayoutGap {
+            main_axis_gap: 10.0,
+            cross_axis_gap: 10.0,
+        };
+        let icb_id = graph.append_child(Node::InitialContainer(icb), Parent::Root);
 
         let child_sizes = vec![
             (80.0, 80.0),
@@ -229,24 +302,31 @@ fn main() {
             (110.0, 70.0),
         ];
 
-        let children: Vec<ContainerWithStyle> = child_sizes
-            .iter()
-            .enumerate()
-            .map(|(i, (w, h))| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-4-{}", i),
-                    *w,
-                    *h,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(*w),
-                    height: Dimension::length(*h),
-                    ..Default::default()
-                })
-            })
-            .collect();
+        for (i, (w, h)) in child_sizes.iter().enumerate() {
+            let child = create_container(&format!("child-4-{}", i), *w, *h);
+            // Position is now handled by layout field
+            graph.append_child(Node::Container(child), Parent::NodeId(icb_id));
+        }
 
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
+        let scene = Scene {
+            name: String::new(),
+            graph,
+            background_color: None,
+        };
+        let mut layout_engine = LayoutEngine::new();
+        let layout_result = layout_engine.compute(
+            &scene,
+            Size {
+                width: 500.0,
+                height: 300.0,
+            },
+        );
+
+        let children_ids = scene.graph.get_children(&icb_id).unwrap();
+        let layouts: Vec<ComputedLayout> = children_ids
+            .iter()
+            .map(|id| layout_result.get(id).cloned().unwrap())
+            .collect();
 
         let _height_used = render_scenario(
             canvas,
@@ -266,13 +346,12 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/layout_flex.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    // Use cargo env to get the correct output directory
+    let output_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let output_path = format!("{}/goldens/layout_flex.png", output_dir);
+    std::fs::write(&output_path, data.as_bytes()).unwrap();
 
-    println!("✓ Generated goldens/layout_flex.png");
+    println!("✓ Generated {}", output_path);
 }
 
 /// Render a single layout scenario and return the total height used

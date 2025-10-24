@@ -1,7 +1,7 @@
 use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::Deserialize;
-use std::{default, hash::Hash};
+use std::hash::Hash;
 
 use super::alignment::Alignment;
 
@@ -13,6 +13,10 @@ pub struct CGPoint {
 }
 
 impl CGPoint {
+    pub fn zero() -> Self {
+        Self { x: 0.0, y: 0.0 }
+    }
+
     pub fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
@@ -32,6 +36,12 @@ impl CGPoint {
             x: self.x - other.x * scale,
             y: self.y - other.y * scale,
         }
+    }
+}
+
+impl Default for CGPoint {
+    fn default() -> Self {
+        Self::zero()
     }
 }
 
@@ -548,13 +558,13 @@ impl Default for LayoutMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub enum LayoutPositioning {
-    Relative,
+    Auto,
     Absolute,
 }
 
 impl Default for LayoutPositioning {
     fn default() -> Self {
-        LayoutPositioning::Absolute
+        LayoutPositioning::Auto
     }
 }
 

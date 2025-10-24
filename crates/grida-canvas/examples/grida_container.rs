@@ -10,11 +10,10 @@ async fn demo_clip() -> Scene {
 
     // Create a single container with solid fill
     let mut container = nf.create_container_node();
-    container.transform = AffineTransform::new(100.0, 100.0, 0.0);
-    container.size = Size {
-        width: 300.0,
-        height: 300.0,
-    };
+    container.position = CGPoint::new(100.0, 100.0).into();
+    container.rotation = 0.0;
+    container.layout_dimensions.width = Some(300.0);
+    container.layout_dimensions.height = Some(300.0);
     container.corner_radius = RectangularCornerRadius::circular(20.0);
     container.set_fill(Paint::from(CGColor(240, 100, 100, 255)));
     container.strokes = Paints::new([Paint::from(CGColor(200, 50, 50, 255))]);

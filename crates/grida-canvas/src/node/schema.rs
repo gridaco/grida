@@ -213,14 +213,11 @@ pub struct UnknownNodeProperties {
 /// - More intuitive runtime control for graphics tools
 ///
 #[derive(Debug, Clone)]
-pub struct LayoutStyle {
-    pub layout_mode: LayoutMode,
-    pub layout_position: LayoutPositioning,
-    pub layout_constraints: LayoutConstraints,
+pub struct UniformNodeLayout {
+    // position
+    pub position: LayoutPositioningBasis,
 
-    pub x: Option<f32>,
-    pub y: Option<f32>,
-
+    // dimensions
     pub width: Option<f32>,
     pub height: Option<f32>,
     pub min_width: Option<f32>,
@@ -228,24 +225,27 @@ pub struct LayoutStyle {
     pub min_height: Option<f32>,
     pub max_height: Option<f32>,
 
+    // layout container
+    pub layout_mode: LayoutMode,
     pub layout_direction: Axis,
     pub layout_wrap: Option<LayoutWrap>,
     pub layout_main_axis_alignment: Option<MainAxisAlignment>,
     pub layout_cross_axis_alignment: Option<CrossAxisAlignment>,
     pub layout_padding: Option<EdgeInsets>,
     pub layout_gap: Option<LayoutGap>,
+
+    // layout child
+    pub layout_positioning: LayoutPositioning,
     pub layout_grow: Option<f32>,
 }
 
-impl LayoutStyle {
+impl UniformNodeLayout {
     /// Creates a new `LayoutStyle` with default values.
     pub fn new() -> Self {
         Self {
             layout_mode: LayoutMode::Normal,
-            layout_position: LayoutPositioning::Absolute,
-            layout_constraints: LayoutConstraints::default(),
-            x: None,
-            y: None,
+            layout_positioning: LayoutPositioning::Auto,
+            position: LayoutPositioningBasis::Cartesian(CGPoint::default()),
             width: None,
             height: None,
             min_width: None,
@@ -262,6 +262,35 @@ impl LayoutStyle {
         }
     }
 
+    pub fn merge_from_container_style(mut self, container_style: LayoutContainerStyle) -> Self {
+        self.layout_mode = container_style.layout_mode;
+        self.layout_direction = container_style.layout_direction;
+        self.layout_wrap = container_style.layout_wrap;
+        self.layout_main_axis_alignment = container_style.layout_main_axis_alignment;
+        self.layout_cross_axis_alignment = container_style.layout_cross_axis_alignment;
+        self.layout_padding = container_style.layout_padding;
+        self.layout_gap = container_style.layout_gap;
+        self
+    }
+
+    pub fn merge_from_child_style(mut self, child_style: Option<LayoutChildStyle>) -> Self {
+        if let Some(child_style) = child_style {
+            self.layout_grow = Some(child_style.layout_grow);
+            self.layout_positioning = child_style.layout_positioning;
+        }
+        self
+    }
+
+    pub fn merge_from_dimensions(mut self, dimensions: LayoutDimensionStyle) -> Self {
+        self.width = dimensions.width;
+        self.height = dimensions.height;
+        self.min_width = dimensions.min_width;
+        self.max_width = dimensions.max_width;
+        self.min_height = dimensions.min_height;
+        self.max_height = dimensions.max_height;
+        self
+    }
+
     /// Sets the layout mode.
     pub fn with_layout_mode(mut self, mode: LayoutMode) -> Self {
         self.layout_mode = mode;
@@ -270,20 +299,23 @@ impl LayoutStyle {
 
     /// Sets the layout positioning.
     pub fn with_layout_position(mut self, position: LayoutPositioning) -> Self {
-        self.layout_position = position;
-        self
-    }
-
-    /// Sets the layout constraints.
-    pub fn with_layout_constraints(mut self, constraints: LayoutConstraints) -> Self {
-        self.layout_constraints = constraints;
+        self.layout_positioning = position;
         self
     }
 
     /// Sets both x and y position.
-    pub fn with_position(mut self, x: f32, y: f32) -> Self {
-        self.x = Some(x);
-        self.y = Some(y);
+    pub fn with_position(mut self, position: LayoutPositioningBasis) -> Self {
+        self.position = position;
+        self
+    }
+
+    pub fn with_position_cartesian(mut self, x: f32, y: f32) -> Self {
+        self.position = LayoutPositioningBasis::Cartesian(CGPoint::new(x, y));
+        self
+    }
+
+    pub fn with_position_inset(mut self, inset: EdgeInsets) -> Self {
+        self.position = LayoutPositioningBasis::Inset(inset);
         self
     }
 
@@ -337,17 +369,291 @@ impl LayoutStyle {
     }
 }
 
-impl Default for LayoutStyle {
+impl Default for UniformNodeLayout {
     fn default() -> Self {
         Self::new()
     }
 }
 
+/// Layout properties that define how a **container** arranges its **children**.
+///
+/// This struct represents the "parent-side" layout behavior — how a container organizes
+/// and positions its child elements. It is conceptually separate from how a node behaves
+/// **as a child** within its parent's layout (see [`LayoutChildStyle`]).
+///
+/// ## Purpose
+///
+/// `LayoutContainerStyle` defines the layout algorithm and spacing rules that a container
+/// applies to its children. This includes:
+/// - The layout mode (flex, grid, flow, etc.)
+/// - Flexbox properties (direction, wrap, alignment)
+/// - Spacing between children (gap, padding)
+///
+/// ## When to Use
+///
+/// Apply this style to nodes that **contain** other nodes and need to control their layout.
+/// Examples:
+/// - A flex container arranging buttons horizontally
+/// - A vertical list of cards with gaps
+/// - A grid of images with padding
+///
+/// ## Relationship with LayoutChildStyle
+///
+/// - **`LayoutContainerStyle`**: "How should I lay out my children?"
+/// - **[`LayoutChildStyle`]**: "How should I behave as a child in my parent's layout?"
+///
+/// A single node can have both:
+/// - As a **parent**: Uses its `LayoutContainerStyle` to arrange children
+/// - As a **child**: Uses its `LayoutChildStyle` to participate in parent's layout
+///
+/// ## Example
+///
+/// ```rust,ignore
+/// // A horizontal flex container with gaps
+/// LayoutContainerStyle {
+///     layout_mode: LayoutMode::Flex,
+///     layout_direction: Axis::Horizontal,
+///     layout_wrap: Some(LayoutWrap::Wrap),
+///     layout_main_axis_alignment: Some(MainAxisAlignment::Center),
+///     layout_cross_axis_alignment: Some(CrossAxisAlignment::Start),
+///     layout_padding: Some(EdgeInsets::all(16.0)),
+///     layout_gap: Some(LayoutGap::all(8.0)),
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct LayoutContainerStyle {
+    /// The layout algorithm to use for arranging children.
+    ///
+    /// - `LayoutMode::Flex`: Children are arranged using flexbox rules
+    /// - `LayoutMode::Normal`: Children use default positioning (no layout engine)
+    pub layout_mode: LayoutMode,
+
+    /// The primary axis direction for flex layout (horizontal or vertical).
+    ///
+    /// - `Axis::Horizontal`: Children flow left-to-right (or right-to-left in RTL)
+    /// - `Axis::Vertical`: Children flow top-to-bottom
+    ///
+    /// Only applies when `layout_mode` is `Flex`.
+    pub layout_direction: Axis,
+
+    /// Whether flex children should wrap to a new line when they exceed the container width/height.
+    ///
+    /// - `Some(LayoutWrap::Wrap)`: Children wrap to next line/column
+    /// - `Some(LayoutWrap::NoWrap)`: All children stay on same line (may overflow)
+    /// - `None`: Uses default (NoWrap)
+    ///
+    /// Only applies when `layout_mode` is `Flex`.
+    pub layout_wrap: Option<LayoutWrap>,
+
+    /// How children should be aligned along the **main axis** (primary direction).
+    ///
+    /// Examples:
+    /// - `Start`: Pack children at the start
+    /// - `Center`: Center children along the main axis
+    /// - `SpaceBetween`: Distribute children with space between them
+    ///
+    /// Only applies when `layout_mode` is `Flex`.
+    pub layout_main_axis_alignment: Option<MainAxisAlignment>,
+
+    /// How children should be aligned along the **cross axis** (perpendicular direction).
+    ///
+    /// Examples:
+    /// - `Start`: Align children at the start of cross axis
+    /// - `Center`: Center children along the cross axis
+    /// - `Stretch`: Stretch children to fill cross axis
+    ///
+    /// Only applies when `layout_mode` is `Flex`.
+    pub layout_cross_axis_alignment: Option<CrossAxisAlignment>,
+
+    /// Internal spacing (padding) between the container's edges and its children.
+    ///
+    /// Padding creates space inside the container, pushing children away from the edges.
+    /// Uses CSS-style edge insets (top, right, bottom, left).
+    ///
+    /// Example: `EdgeInsets::all(16.0)` adds 16px padding on all sides.
+    pub layout_padding: Option<EdgeInsets>,
+
+    /// Spacing between children (gap between items).
+    ///
+    /// - `main_axis_gap`: Space between children along the primary direction
+    /// - `cross_axis_gap`: Space between rows/columns (when wrapping)
+    ///
+    /// Unlike margin (which is per-child), gap is a container-level property that
+    /// uniformly spaces all children.
+    pub layout_gap: Option<LayoutGap>,
+}
+
+impl Default for LayoutContainerStyle {
+    fn default() -> Self {
+        Self {
+            layout_mode: LayoutMode::Normal,
+            layout_direction: Axis::Horizontal,
+            layout_wrap: None,
+            layout_main_axis_alignment: None,
+            layout_cross_axis_alignment: None,
+            layout_padding: None,
+            layout_gap: None,
+        }
+    }
+}
+
+/// Layout properties that define how a **child** behaves within its **parent's layout**.
+///
+/// This struct represents the "child-side" layout behavior — how a node participates
+/// and responds to its parent's layout algorithm. It is conceptually separate from
+/// how a node arranges its own children (see [`LayoutContainerStyle`]).
+///
+/// ## Purpose
+///
+/// `LayoutChildStyle` defines how a child node should behave when placed inside a
+/// layout container. This includes:
+/// - Growth behavior (flex-grow)
+/// - Positioning mode (absolute, relative, constraint-based)
+/// - Constraint anchors for advanced positioning
+///
+/// ## When to Use
+///
+/// Apply this style to nodes that **are children** of a layout container and need to
+/// control their participation in that layout. Examples:
+/// - A button that should grow to fill available space
+/// - A sidebar with fixed width while content area grows
+/// - A child positioned absolutely within a flex container
+///
+/// ## Relationship with LayoutContainerStyle
+///
+/// - **[`LayoutContainerStyle`]**: "How should I lay out my children?"
+/// - **`LayoutChildStyle`**: "How should I behave as a child in my parent's layout?"
+///
+/// A single node can have both:
+/// - As a **parent**: Uses its [`LayoutContainerStyle`] to arrange children
+/// - As a **child**: Uses its `LayoutChildStyle` to participate in parent's layout
+///
+/// ## Example
+///
+/// ```rust,ignore
+/// // A child that grows to fill available space
+/// LayoutChildStyle {
+///     layout_grow: 1.0,
+///     layout_position: LayoutPositioning::Relative,
+///     layout_constraints: LayoutConstraints::default(),
+/// }
+/// ```
+///
+/// ## Design Note
+///
+/// This explicit separation (container vs child styles) aligns with CSS's model where:
+/// - Container properties (`display: flex`, `flex-direction`, `gap`) affect children
+/// - Child properties (`flex-grow`, `position`, `align-self`) affect the child itself
+#[derive(Debug, Clone)]
+pub struct LayoutChildStyle {
+    /// The flex growth factor — how much this child should grow relative to siblings.
+    ///
+    /// - `0.0` (default): Child doesn't grow beyond its initial size
+    /// - `1.0`: Child grows proportionally with other growing children
+    /// - `2.0`: Child grows twice as much as children with `1.0`
+    ///
+    /// Only applies when parent's `layout_mode` is `Flex` and there is available space.
+    ///
+    /// ## Example
+    ///
+    /// In a horizontal flex container with 3 children:
+    /// - Child A: `layout_grow: 0.0` → stays at minimum size
+    /// - Child B: `layout_grow: 1.0` → gets 1/3 of extra space
+    /// - Child C: `layout_grow: 2.0` → gets 2/3 of extra space
+    pub layout_grow: f32,
+
+    /// How this child is positioned within its parent's coordinate space.
+    ///
+    /// - `Absolute`: Positioned at explicit coordinates, removed from layout flow
+    /// - `Relative`: Positioned by layout engine, with optional offset adjustments
+    ///
+    /// This is analogous to CSS's `position` property.
+    pub layout_positioning: LayoutPositioning,
+    /*
+    /// Constraint-based positioning anchors (left, right, top, bottom).
+    ///
+    /// Defines how this child is anchored to its parent's edges. Used for:
+    /// - Auto-sizing: Setting opposite constraints (e.g., `left + right`) makes width auto-computed
+    /// - Advanced positioning: Centering, edge alignment, or custom constraint layouts
+    ///
+    /// Similar to iOS AutoLayout or Android ConstraintLayout.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,ignore
+    /// // Center child horizontally, anchor to top with 20px offset
+    /// LayoutConstraints {
+    ///     horizontal: LayoutConstraintAnchor::Center,
+    ///     vertical: LayoutConstraintAnchor::Start(20.0),
+    /// }
+    /// ```
+    pub layout_constraints: LayoutConstraints,
+     */
+}
+
+#[derive(Debug, Clone)]
+pub enum LayoutPositioningBasis {
+    /// Cartesian position mode is the default mode.
+    /// In this mode, the position is specified using x and y coordinates.
+    Cartesian(CGPoint),
+    /// Inset position mode is used when the position is specified using left, right, top, and bottom insets.
+    Inset(EdgeInsets),
+    /// Anchored position mode is used when the position is specified using left, right, top, and bottom insets.
+    /// In this mode, the position is specified using left, right, top, and bottom insets.
+    #[deprecated(note = "will be implemented later")]
+    Anchored,
+}
+
+impl LayoutPositioningBasis {
+    pub fn zero() -> Self {
+        Self::Cartesian(CGPoint::zero())
+    }
+
+    pub fn x(&self) -> Option<f32> {
+        match self {
+            Self::Cartesian(point) => Some(point.x),
+            Self::Inset(inset) => Some(inset.left),
+            Self::Anchored => unreachable!("Anchored positioning is not supported"),
+        }
+    }
+
+    pub fn y(&self) -> Option<f32> {
+        match self {
+            Self::Cartesian(point) => Some(point.y),
+            Self::Inset(inset) => Some(inset.top),
+            Self::Anchored => unreachable!("Anchored positioning is not supported"),
+        }
+    }
+}
+
+impl From<CGPoint> for LayoutPositioningBasis {
+    fn from(point: CGPoint) -> Self {
+        Self::Cartesian(point)
+    }
+}
+
+impl Default for LayoutPositioningBasis {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LayoutDimensionStyle {
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+    pub min_width: Option<f32>,
+    pub max_width: Option<f32>,
+    pub min_height: Option<f32>,
+    pub max_height: Option<f32>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Node {
+    InitialContainer(InitialContainerNodeRec),
+    Container(ContainerNodeRec),
     Error(ErrorNodeRec),
     Group(GroupNodeRec),
-    Container(ContainerNodeRec),
     Rectangle(RectangleNodeRec),
     Ellipse(EllipseNodeRec),
     Polygon(PolygonNodeRec),
@@ -372,6 +678,7 @@ impl NodeTrait for Node {
             Node::Error(n) => n.active,
             Node::Group(n) => n.active,
             Node::Container(n) => n.active,
+            Node::InitialContainer(n) => n.active,
             Node::Rectangle(n) => n.active,
             Node::Ellipse(n) => n.active,
             Node::Polygon(n) => n.active,
@@ -392,6 +699,7 @@ impl Node {
         match self {
             Node::Group(n) => n.mask,
             Node::Container(n) => n.mask,
+            Node::InitialContainer(_) => None,
             Node::Rectangle(n) => n.mask,
             Node::Ellipse(n) => n.mask,
             Node::Polygon(n) => n.mask,
@@ -424,7 +732,6 @@ pub trait NodeTransformMixin {
 }
 
 pub trait NodeGeometryMixin {
-    fn rect(&self) -> Rectangle;
     /// if there is any valud stroke that should be taken into account for rendering, return true.
     /// stroke_width > 0.0 and at least one stroke with opacity > 0.0.
     fn has_stroke_geometry(&self) -> bool;
@@ -432,26 +739,14 @@ pub trait NodeGeometryMixin {
     fn render_bounds_stroke_width(&self) -> f32;
 }
 
+pub trait NodeRectMixin {
+    fn rect(&self) -> Rectangle;
+}
+
 pub trait NodeShapeMixin {
     fn to_shape(&self) -> Shape;
     fn to_path(&self) -> skia_safe::Path;
     fn to_vector_network(&self) -> VectorNetwork;
-}
-
-/// Intrinsic size node is a node that has a fixed size, and can be rendered soley on its own.
-#[derive(Debug, Clone)]
-pub enum IntrinsicSizeNode {
-    Error(ErrorNodeRec),
-    Container(ContainerNodeRec),
-    Rectangle(RectangleNodeRec),
-    Ellipse(EllipseNodeRec),
-    Polygon(PolygonNodeRec),
-    RegularPolygon(RegularPolygonNodeRec),
-    RegularStarPolygon(RegularStarPolygonNodeRec),
-    Line(LineNodeRec),
-    SVGPath(SVGPathNodeRec),
-    Vector(VectorNodeRec),
-    Image(ImageNodeRec),
 }
 
 #[derive(Debug, Clone)]
@@ -536,8 +831,20 @@ pub struct ContainerNodeRec {
     pub blend_mode: LayerBlendMode,
     pub mask: Option<LayerMaskType>,
 
-    pub transform: AffineTransform,
-    pub size: Size,
+    pub rotation: f32,
+
+    /// positioning
+    pub position: LayoutPositioningBasis,
+
+    /// layout style for the container.
+    pub layout_container: LayoutContainerStyle,
+
+    /// Defines the width, height and its constraints
+    pub layout_dimensions: LayoutDimensionStyle,
+
+    /// Layout style for this node when it is a child of a layout.
+    pub layout_child: Option<LayoutChildStyle>,
+
     pub corner_radius: RectangularCornerRadius,
     pub fills: Paints,
     pub strokes: Paints,
@@ -560,29 +867,22 @@ pub struct ContainerNodeRec {
     /// This flag is intentionally equivalent to an **overflow/content** clip.
     /// If a future “shape clip (self + children)” is added, it will be modeled as a separate attribute.
     pub clip: ContainerClipFlag,
-
-    // [container layout - common layout properties that is applicapable to the parent]
-    /// layout mode
-    pub layout_mode: LayoutMode,
-    /// layout direction
-    pub layout_direction: Axis,
-    /// layout wrap
-    pub layout_wrap: LayoutWrap,
-    /// layout main axis alignment
-    pub layout_main_axis_alignment: MainAxisAlignment,
-    /// layout cross axis alignment
-    pub layout_cross_axis_alignment: CrossAxisAlignment,
-    /// The gap of the container.
-    pub layout_gap: LayoutGap,
-    /// The padding of the container.
-    pub padding: EdgeInsets,
 }
 
 impl ContainerNodeRec {
+    /// Returns the effective layout style combining all layout-related fields.
+    pub fn layout(&self) -> UniformNodeLayout {
+        UniformNodeLayout::new()
+            .merge_from_container_style(self.layout_container.clone())
+            .merge_from_child_style(self.layout_child.clone())
+            .merge_from_dimensions(self.layout_dimensions.clone())
+            .with_position(self.position.clone())
+    }
+
     pub fn to_own_shape(&self) -> RRectShape {
         RRectShape {
-            width: self.size.width,
-            height: self.size.height,
+            width: self.layout_dimensions.width.unwrap_or(0.0),
+            height: self.layout_dimensions.height.unwrap_or(0.0),
             corner_radius: self.corner_radius,
         }
     }
@@ -598,26 +898,7 @@ impl NodeFillsMixin for ContainerNodeRec {
     }
 }
 
-impl NodeTransformMixin for ContainerNodeRec {
-    fn x(&self) -> f32 {
-        self.transform.x()
-    }
-
-    fn y(&self) -> f32 {
-        self.transform.y()
-    }
-}
-
 impl NodeGeometryMixin for ContainerNodeRec {
-    fn rect(&self) -> Rectangle {
-        Rectangle {
-            x: 0.0,
-            y: 0.0,
-            width: self.size.width,
-            height: self.size.height,
-        }
-    }
-
     fn has_stroke_geometry(&self) -> bool {
         self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
@@ -631,18 +912,25 @@ impl NodeGeometryMixin for ContainerNodeRec {
     }
 }
 
-impl NodeShapeMixin for ContainerNodeRec {
-    fn to_shape(&self) -> Shape {
-        Shape::RRect(self.to_own_shape())
-    }
+/// Initial Container Block - Viewport-filling flex container
+///
+/// Similar to `<html>` in DOM. Fills viewport and positions direct children
+/// using flex layout. Has no visual properties - purely structural.
+///
+/// Direct children are positioned by layout engine (their transforms ignored).
+/// Deeper descendants use schema geometry normally.
+#[derive(Debug, Clone)]
+pub struct InitialContainerNodeRec {
+    pub active: bool,
 
-    fn to_path(&self) -> skia_safe::Path {
-        build_rrect_path(&self.to_own_shape())
-    }
-
-    fn to_vector_network(&self) -> VectorNetwork {
-        build_rrect_vector_network(&self.to_own_shape())
-    }
+    // Flex layout properties for children
+    pub layout_mode: LayoutMode,
+    pub layout_direction: Axis,
+    pub layout_wrap: LayoutWrap,
+    pub layout_main_axis_alignment: MainAxisAlignment,
+    pub layout_cross_axis_alignment: CrossAxisAlignment,
+    pub padding: EdgeInsets,
+    pub layout_gap: LayoutGap,
 }
 
 #[derive(Debug, Clone)]
@@ -694,7 +982,7 @@ impl NodeTransformMixin for RectangleNodeRec {
     }
 }
 
-impl NodeGeometryMixin for RectangleNodeRec {
+impl NodeRectMixin for RectangleNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -703,7 +991,9 @@ impl NodeGeometryMixin for RectangleNodeRec {
             height: self.size.height,
         }
     }
+}
 
+impl NodeGeometryMixin for RectangleNodeRec {
     fn has_stroke_geometry(&self) -> bool {
         self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
@@ -816,7 +1106,7 @@ impl NodeTransformMixin for ImageNodeRec {
     }
 }
 
-impl NodeGeometryMixin for ImageNodeRec {
+impl NodeRectMixin for ImageNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -825,7 +1115,9 @@ impl NodeGeometryMixin for ImageNodeRec {
             height: self.size.height,
         }
     }
+}
 
+impl NodeGeometryMixin for ImageNodeRec {
     fn has_stroke_geometry(&self) -> bool {
         self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
@@ -945,7 +1237,7 @@ impl NodeTransformMixin for EllipseNodeRec {
     }
 }
 
-impl NodeGeometryMixin for EllipseNodeRec {
+impl NodeRectMixin for EllipseNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -954,7 +1246,9 @@ impl NodeGeometryMixin for EllipseNodeRec {
             height: self.size.height,
         }
     }
+}
 
+impl NodeGeometryMixin for EllipseNodeRec {
     fn has_stroke_geometry(&self) -> bool {
         self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
@@ -1190,38 +1484,13 @@ impl NodeStrokesMixin for PolygonNodeRec {
     }
 }
 
-impl NodeGeometryMixin for PolygonNodeRec {
+impl NodeRectMixin for PolygonNodeRec {
     fn rect(&self) -> Rectangle {
-        // Compute bounding box from points
-        let mut min_x = f32::INFINITY;
-        let mut min_y = f32::INFINITY;
-        let mut max_x = f32::NEG_INFINITY;
-        let mut max_y = f32::NEG_INFINITY;
-
-        for p in &self.points {
-            min_x = min_x.min(p.x);
-            min_y = min_y.min(p.y);
-            max_x = max_x.max(p.x);
-            max_y = max_y.max(p.y);
-        }
-
-        if self.points.is_empty() {
-            Rectangle {
-                x: 0.0,
-                y: 0.0,
-                width: 0.0,
-                height: 0.0,
-            }
-        } else {
-            Rectangle {
-                x: min_x,
-                y: min_y,
-                width: max_x - min_x,
-                height: max_y - min_y,
-            }
-        }
+        polygon_bounds(&self.points)
     }
+}
 
+impl NodeGeometryMixin for PolygonNodeRec {
     fn has_stroke_geometry(&self) -> bool {
         self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
@@ -1334,7 +1603,7 @@ impl NodeTransformMixin for RegularPolygonNodeRec {
     }
 }
 
-impl NodeGeometryMixin for RegularPolygonNodeRec {
+impl NodeRectMixin for RegularPolygonNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -1343,7 +1612,9 @@ impl NodeGeometryMixin for RegularPolygonNodeRec {
             height: self.size.height,
         }
     }
+}
 
+impl NodeGeometryMixin for RegularPolygonNodeRec {
     fn has_stroke_geometry(&self) -> bool {
         self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
@@ -1460,7 +1731,7 @@ impl NodeTransformMixin for RegularStarPolygonNodeRec {
     }
 }
 
-impl NodeGeometryMixin for RegularStarPolygonNodeRec {
+impl NodeRectMixin for RegularStarPolygonNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -1469,10 +1740,11 @@ impl NodeGeometryMixin for RegularStarPolygonNodeRec {
             height: self.size.height,
         }
     }
+}
 
+impl NodeGeometryMixin for RegularStarPolygonNodeRec {
     fn has_stroke_geometry(&self) -> bool {
-        // TODO: implement this
-        true
+        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {

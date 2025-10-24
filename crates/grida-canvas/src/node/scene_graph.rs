@@ -349,10 +349,10 @@ impl Default for SceneGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::schema::{ErrorNodeRec, NodeTrait, Size};
+    use crate::node::schema::{ErrorNodeRec, Size};
     use math2::transform::AffineTransform;
 
-    fn create_test_node(id: u64) -> Node {
+    fn create_test_node() -> Node {
         Node::Error(ErrorNodeRec {
             active: true,
             transform: AffineTransform::identity(),
@@ -369,9 +369,9 @@ mod tests {
     fn test_scene_graph_basic() {
         let mut graph = SceneGraph::new();
 
-        let node_a = create_test_node(1);
-        let node_b = create_test_node(2);
-        let node_c = create_test_node(3);
+        let node_a = create_test_node();
+        let node_b = create_test_node();
+        let node_c = create_test_node();
 
         let id_a = graph.append_child(node_a, Parent::Root);
         let id_b = graph.append_child(node_b, Parent::NodeId(id_a.clone()));
@@ -386,9 +386,9 @@ mod tests {
     fn test_add_child() {
         let mut graph = SceneGraph::new();
 
-        let node_a = create_test_node(1);
-        let node_b = create_test_node(2);
-        let node_c = create_test_node(3);
+        let node_a = create_test_node();
+        let node_b = create_test_node();
+        let node_c = create_test_node();
 
         // Create parent with one child first
         let id_a = graph.append_child(node_a, Parent::Root);
@@ -407,10 +407,10 @@ mod tests {
     fn test_add_child_at() {
         let mut graph = SceneGraph::new();
 
-        let id_a = graph.append_child(create_test_node(1), Parent::Root);
-        let id_b = graph.append_child(create_test_node(2), Parent::NodeId(id_a.clone()));
-        let id_c = graph.append_child(create_test_node(3), Parent::NodeId(id_a.clone()));
-        let id_d = graph.append_child(create_test_node(4), Parent::Root);
+        let id_a = graph.append_child(create_test_node(), Parent::Root);
+        let id_b = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
+        let id_c = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
+        let id_d = graph.append_child(create_test_node(), Parent::Root);
 
         // Insert id_d at index 1 in id_a's children (between id_b and id_c)
         graph.add_child_at(&id_a, id_d.clone(), 1).unwrap();
@@ -426,9 +426,9 @@ mod tests {
     fn test_remove_child() {
         let mut graph = SceneGraph::new();
 
-        let id_a = graph.append_child(create_test_node(1), Parent::Root);
-        let id_b = graph.append_child(create_test_node(2), Parent::NodeId(id_a.clone()));
-        let id_c = graph.append_child(create_test_node(3), Parent::NodeId(id_a.clone()));
+        let id_a = graph.append_child(create_test_node(), Parent::Root);
+        let id_b = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
+        let id_c = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
 
         graph.remove_child(&id_a, &id_b).unwrap();
 
@@ -441,9 +441,9 @@ mod tests {
     fn test_roots() {
         let mut graph = SceneGraph::new();
 
-        let id_a = graph.append_child(create_test_node(1), Parent::Root);
-        let id_b = graph.append_child(create_test_node(2), Parent::NodeId(id_a.clone()));
-        let _id_c = graph.append_child(create_test_node(3), Parent::NodeId(id_b.clone()));
+        let id_a = graph.append_child(create_test_node(), Parent::Root);
+        let id_b = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
+        let _id_c = graph.append_child(create_test_node(), Parent::NodeId(id_b.clone()));
 
         let roots = graph.roots();
         assert_eq!(roots.len(), 1);
@@ -454,9 +454,9 @@ mod tests {
     fn test_walk_preorder() {
         let mut graph = SceneGraph::new();
 
-        let id_a = graph.append_child(create_test_node(1), Parent::Root);
-        let id_b = graph.append_child(create_test_node(2), Parent::NodeId(id_a.clone()));
-        let id_c = graph.append_child(create_test_node(3), Parent::NodeId(id_a.clone()));
+        let id_a = graph.append_child(create_test_node(), Parent::Root);
+        let id_b = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
+        let id_c = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
 
         let mut visited = Vec::new();
         graph
@@ -470,9 +470,9 @@ mod tests {
     fn test_walk_postorder() {
         let mut graph = SceneGraph::new();
 
-        let id_a = graph.append_child(create_test_node(1), Parent::Root);
-        let id_b = graph.append_child(create_test_node(2), Parent::NodeId(id_a.clone()));
-        let id_c = graph.append_child(create_test_node(3), Parent::NodeId(id_a.clone()));
+        let id_a = graph.append_child(create_test_node(), Parent::Root);
+        let id_b = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
+        let id_c = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
 
         let mut visited = Vec::new();
         graph
@@ -486,9 +486,9 @@ mod tests {
     fn test_ancestors() {
         let mut graph = SceneGraph::new();
 
-        let id_a = graph.append_child(create_test_node(1), Parent::Root);
-        let id_b = graph.append_child(create_test_node(2), Parent::NodeId(id_a.clone()));
-        let id_c = graph.append_child(create_test_node(3), Parent::NodeId(id_b.clone()));
+        let id_a = graph.append_child(create_test_node(), Parent::Root);
+        let id_b = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
+        let id_c = graph.append_child(create_test_node(), Parent::NodeId(id_b.clone()));
 
         let ancestors = graph.ancestors(&id_c).unwrap();
         assert_eq!(ancestors, vec![id_b, id_a]);
@@ -498,9 +498,9 @@ mod tests {
     fn test_descendants() {
         let mut graph = SceneGraph::new();
 
-        let id_a = graph.append_child(create_test_node(1), Parent::Root);
-        let id_b = graph.append_child(create_test_node(2), Parent::NodeId(id_a.clone()));
-        let id_c = graph.append_child(create_test_node(3), Parent::NodeId(id_b.clone()));
+        let id_a = graph.append_child(create_test_node(), Parent::Root);
+        let id_b = graph.append_child(create_test_node(), Parent::NodeId(id_a.clone()));
+        let id_c = graph.append_child(create_test_node(), Parent::NodeId(id_b.clone()));
 
         let descendants = graph.descendants(&id_a).unwrap();
         assert_eq!(descendants.len(), 2);
@@ -518,7 +518,7 @@ mod tests {
     #[test]
     fn test_error_parent_not_found() {
         let mut graph = SceneGraph::new();
-        let id_b = graph.append_child(create_test_node(2), Parent::Root);
+        let id_b = graph.append_child(create_test_node(), Parent::Root);
         let result = graph.add_child(&9999, id_b);
         assert!(matches!(result, Err(SceneGraphError::ParentNotFound(_))));
     }
@@ -526,7 +526,7 @@ mod tests {
     #[test]
     fn test_append_child_to_root() {
         let mut graph = SceneGraph::new();
-        let node_a = create_test_node(1);
+        let node_a = create_test_node();
         let id_a = graph.append_child(node_a, Parent::Root);
 
         assert_eq!(graph.roots().len(), 1);
@@ -537,8 +537,8 @@ mod tests {
     #[test]
     fn test_append_child_to_parent() {
         let mut graph = SceneGraph::new();
-        let parent = create_test_node(10);
-        let child = create_test_node(11);
+        let parent = create_test_node();
+        let child = create_test_node();
 
         let parent_id = graph.append_child(parent, Parent::Root);
         let child_id = graph.append_child(child, Parent::NodeId(parent_id.clone()));
@@ -550,9 +550,9 @@ mod tests {
     #[test]
     fn test_append_multiple_children() {
         let mut graph = SceneGraph::new();
-        let parent = create_test_node(10);
-        let child1 = create_test_node(21);
-        let child2 = create_test_node(22);
+        let parent = create_test_node();
+        let child1 = create_test_node();
+        let child2 = create_test_node();
 
         let parent_id = graph.append_child(parent, Parent::Root);
         let child1_id = graph.append_child(child1, Parent::NodeId(parent_id.clone()));
@@ -567,11 +567,7 @@ mod tests {
     #[test]
     fn test_append_children_to_root() {
         let mut graph = SceneGraph::new();
-        let nodes = vec![
-            create_test_node(1),
-            create_test_node(2),
-            create_test_node(3),
-        ];
+        let nodes = vec![create_test_node(), create_test_node(), create_test_node()];
         let ids = graph.append_children(nodes, Parent::Root);
 
         assert_eq!(graph.roots().len(), 3);
@@ -584,14 +580,10 @@ mod tests {
     #[test]
     fn test_append_children_to_parent() {
         let mut graph = SceneGraph::new();
-        let parent = create_test_node(10);
+        let parent = create_test_node();
         let parent_id = graph.append_child(parent, Parent::Root);
 
-        let children_nodes = vec![
-            create_test_node(21),
-            create_test_node(22),
-            create_test_node(23),
-        ];
+        let children_nodes = vec![create_test_node(), create_test_node(), create_test_node()];
         let child_ids = graph.append_children(children_nodes, Parent::NodeId(parent_id.clone()));
 
         assert_eq!(child_ids.len(), 3);
@@ -617,9 +609,9 @@ mod tests {
         let id_b = 2;
         let id_c = 3;
 
-        let node_a = create_test_node(id_a);
-        let node_b = create_test_node(id_b);
-        let node_c = create_test_node(id_c);
+        let node_a = create_test_node();
+        let node_b = create_test_node();
+        let node_c = create_test_node();
 
         let node_pairs = vec![(id_a, node_a), (id_b, node_b), (id_c, node_c)];
         let mut links = HashMap::new();
@@ -649,10 +641,10 @@ mod tests {
         let id_b = 2;
         let id_c = 3;
 
-        let node_root = create_test_node(id_root);
-        let node_a = create_test_node(id_a);
-        let node_b = create_test_node(id_b);
-        let node_c = create_test_node(id_c);
+        let node_root = create_test_node();
+        let node_a = create_test_node();
+        let node_b = create_test_node();
+        let node_c = create_test_node();
 
         let node_pairs = vec![
             (id_root, node_root),

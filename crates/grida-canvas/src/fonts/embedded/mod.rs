@@ -8,7 +8,7 @@ thread_local! {
   pub static TYPEFACE_GEISTMONO: Typeface = typeface(geistmono::BYTES);
 }
 
-#[deprecated(note = "will be removed")]
+// #[deprecated(note = "will be removed")]
 pub fn typeface(bytes: &[u8]) -> Typeface {
     // FIXME: should not make fntmgr each time
     let font_mgr = FontMgr::new();

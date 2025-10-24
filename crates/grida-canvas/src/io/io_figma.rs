@@ -9,6 +9,7 @@ use figma_api::models::type_style::{
     TextDecoration as FigmaTextDecoration,
 };
 use figma_api::models::vector::Vector;
+use figma_api::models::vector_node::LayoutPositioning as FigmaLayoutPositioning;
 use figma_api::models::{
     BooleanOperationNode as FigmaBooleanOperationNode, CanvasNode, ComponentNode, ComponentSetNode,
     DocumentNode, Effect, FrameNode, GroupNode, InstanceNode, LineNode as FigmaLineNode,
@@ -204,6 +205,60 @@ impl From<&FigmaTextDecoration> for TextDecorationLine {
             FigmaTextDecoration::None => TextDecorationLine::None,
             FigmaTextDecoration::Underline => TextDecorationLine::Underline,
             FigmaTextDecoration::Strikethrough => TextDecorationLine::LineThrough,
+        }
+    }
+}
+
+impl From<&FigmaLayoutPositioning> for LayoutPositioning {
+    fn from(position: &FigmaLayoutPositioning) -> Self {
+        match position {
+            FigmaLayoutPositioning::Auto => LayoutPositioning::Auto,
+            FigmaLayoutPositioning::Absolute => LayoutPositioning::Absolute,
+        }
+    }
+}
+
+// Additional From implementations for LayoutPositioning from different Figma node types
+impl From<&figma_api::models::component_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::component_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::component_node::LayoutPositioning::Auto => LayoutPositioning::Auto,
+            figma_api::models::component_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
+        }
+    }
+}
+
+impl From<&figma_api::models::instance_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::instance_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::instance_node::LayoutPositioning::Auto => LayoutPositioning::Auto,
+            figma_api::models::instance_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
+        }
+    }
+}
+
+impl From<&figma_api::models::section_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::section_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::section_node::LayoutPositioning::Auto => LayoutPositioning::Auto,
+            figma_api::models::section_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
+        }
+    }
+}
+
+impl From<&figma_api::models::frame_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::frame_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::frame_node::LayoutPositioning::Auto => LayoutPositioning::Auto,
+            figma_api::models::frame_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
         }
     }
 }
@@ -635,8 +690,7 @@ impl FigmaConverter {
             opacity: Self::convert_opacity(component.visible),
             blend_mode: Self::convert_blend_mode(component.blend_mode),
             mask: None,
-            transform,
-            size,
+            rotation: transform.rotation(),
             corner_radius: Self::convert_corner_radius(
                 component.corner_radius,
                 component.rectangle_corner_radii.as_ref(),
@@ -657,13 +711,32 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&component.effects),
             clip: component.clips_content,
-            layout_mode: LayoutMode::default(),
-            layout_direction: Axis::default(),
-            layout_wrap: LayoutWrap::default(),
-            layout_main_axis_alignment: MainAxisAlignment::default(),
-            layout_cross_axis_alignment: CrossAxisAlignment::default(),
-            layout_gap: LayoutGap::default(),
-            padding: EdgeInsets::default(),
+            position: CGPoint::new(transform.x(), transform.y()).into(),
+            layout_container: LayoutContainerStyle {
+                layout_mode: LayoutMode::Normal,
+                layout_direction: Axis::Horizontal,
+                layout_wrap: None,
+                layout_main_axis_alignment: None,
+                layout_cross_axis_alignment: None,
+                layout_padding: None,
+                layout_gap: None,
+            },
+            layout_dimensions: LayoutDimensionStyle {
+                width: Some(size.width),
+                height: Some(size.height),
+                min_width: None,
+                max_width: None,
+                min_height: None,
+                max_height: None,
+            },
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: component
+                    .layout_positioning
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         }))
     }
 
@@ -734,8 +807,7 @@ impl FigmaConverter {
             opacity: Self::convert_opacity(instance.visible),
             blend_mode: Self::convert_blend_mode(instance.blend_mode),
             mask: None,
-            transform,
-            size,
+            rotation: transform.rotation(),
             corner_radius: Self::convert_corner_radius(
                 instance.corner_radius,
                 instance.rectangle_corner_radii.as_ref(),
@@ -756,13 +828,32 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&instance.effects),
             clip: instance.clips_content,
-            layout_mode: LayoutMode::default(),
-            layout_direction: Axis::default(),
-            layout_wrap: LayoutWrap::default(),
-            layout_main_axis_alignment: MainAxisAlignment::default(),
-            layout_cross_axis_alignment: CrossAxisAlignment::default(),
-            layout_gap: LayoutGap::default(),
-            padding: EdgeInsets::default(),
+            position: CGPoint::new(transform.x(), transform.y()).into(),
+            layout_container: LayoutContainerStyle {
+                layout_mode: LayoutMode::Normal,
+                layout_direction: Axis::Horizontal,
+                layout_wrap: None,
+                layout_main_axis_alignment: None,
+                layout_cross_axis_alignment: None,
+                layout_padding: None,
+                layout_gap: None,
+            },
+            layout_dimensions: LayoutDimensionStyle {
+                width: Some(size.width),
+                height: Some(size.height),
+                min_width: None,
+                max_width: None,
+                min_height: None,
+                max_height: None,
+            },
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: instance
+                    .layout_positioning
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         }))
     }
 
@@ -782,29 +873,51 @@ impl FigmaConverter {
             self.links.insert(node_id.clone(), children);
         }
 
-        Ok(Node::Container(ContainerNodeRec {
-            active: section.visible.unwrap_or(true),
-            opacity: Self::convert_opacity(section.visible),
-            blend_mode: LayerBlendMode::PassThrough,
-            mask: None,
-            transform: Self::convert_transform(section.relative_transform.as_ref()),
-            size: Self::convert_size(section.size.as_ref()),
-            corner_radius: RectangularCornerRadius::zero(),
-            fills: self.convert_fills(Some(&section.fills.as_ref())),
-            strokes: Paints::default(),
-            stroke_width: 0.0,
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            effects: LayerEffects::default(),
-            clip: false,
-            layout_mode: LayoutMode::default(),
-            layout_direction: Axis::default(),
-            layout_wrap: LayoutWrap::default(),
-            layout_main_axis_alignment: MainAxisAlignment::default(),
-            layout_cross_axis_alignment: CrossAxisAlignment::default(),
-            layout_gap: LayoutGap::default(),
-            padding: EdgeInsets::default(),
-        }))
+        {
+            let transform = Self::convert_transform(section.relative_transform.as_ref());
+            let size = Self::convert_size(section.size.as_ref());
+            Ok(Node::Container(ContainerNodeRec {
+                active: section.visible.unwrap_or(true),
+                opacity: Self::convert_opacity(section.visible),
+                blend_mode: LayerBlendMode::PassThrough,
+                mask: None,
+                rotation: transform.rotation(),
+                corner_radius: RectangularCornerRadius::zero(),
+                fills: self.convert_fills(Some(&section.fills.as_ref())),
+                strokes: Paints::default(),
+                stroke_width: 0.0,
+                stroke_align: StrokeAlign::Inside,
+                stroke_dash_array: None,
+                effects: LayerEffects::default(),
+                clip: false,
+                position: CGPoint::new(transform.x(), transform.y()).into(),
+                layout_container: LayoutContainerStyle {
+                    layout_mode: LayoutMode::Normal,
+                    layout_direction: Axis::Horizontal,
+                    layout_wrap: None,
+                    layout_main_axis_alignment: None,
+                    layout_cross_axis_alignment: None,
+                    layout_padding: None,
+                    layout_gap: None,
+                },
+                layout_dimensions: LayoutDimensionStyle {
+                    width: Some(size.width),
+                    height: Some(size.height),
+                    min_width: None,
+                    max_width: None,
+                    min_height: None,
+                    max_height: None,
+                },
+                layout_child: Some(LayoutChildStyle {
+                    layout_positioning: section
+                        .layout_positioning
+                        .as_ref()
+                        .map(Into::into)
+                        .unwrap_or_default(),
+                    layout_grow: 0.0,
+                }),
+            }))
+        }
     }
 
     /// Convert Figma's link to our LinkUnfurlNode
@@ -912,8 +1025,7 @@ impl FigmaConverter {
             opacity: Self::convert_opacity(origin.visible),
             blend_mode: Self::convert_blend_mode(origin.blend_mode),
             mask: None,
-            transform,
-            size,
+            rotation: transform.rotation(),
             corner_radius: Self::convert_corner_radius(
                 origin.corner_radius,
                 origin.rectangle_corner_radii.as_ref(),
@@ -934,13 +1046,32 @@ impl FigmaConverter {
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             effects: Self::convert_effects(&origin.effects),
             clip: origin.clips_content,
-            layout_mode: LayoutMode::default(),
-            layout_direction: Axis::default(),
-            layout_wrap: LayoutWrap::default(),
-            layout_main_axis_alignment: MainAxisAlignment::default(),
-            layout_cross_axis_alignment: CrossAxisAlignment::default(),
-            layout_gap: LayoutGap::default(),
-            padding: EdgeInsets::default(),
+            position: CGPoint::new(transform.x(), transform.y()).into(),
+            layout_container: LayoutContainerStyle {
+                layout_mode: LayoutMode::Normal,
+                layout_direction: Axis::Horizontal,
+                layout_wrap: None,
+                layout_main_axis_alignment: None,
+                layout_cross_axis_alignment: None,
+                layout_padding: None,
+                layout_gap: None,
+            },
+            layout_dimensions: LayoutDimensionStyle {
+                width: Some(size.width),
+                height: Some(size.height),
+                min_width: None,
+                max_width: None,
+                min_height: None,
+                max_height: None,
+            },
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: origin
+                    .layout_positioning
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         }))
     }
 
@@ -1074,7 +1205,6 @@ impl FigmaConverter {
 
     fn convert_vector(&mut self, origin: &Box<VectorNode>) -> Result<Node, String> {
         let mut children = Vec::new();
-        let mut path_index = 0;
 
         // Convert fill geometries to path nodes
         if let Some(fill_geometries) = &origin.fill_geometry {
@@ -1094,7 +1224,6 @@ impl FigmaConverter {
                     stroke_dash_array: None,
                 });
                 children.push(self.repository.insert(path_node));
-                path_index += 1;
             }
         }
 
@@ -1117,34 +1246,55 @@ impl FigmaConverter {
                     stroke_dash_array: None,
                 });
                 children.push(self.repository.insert(path_node));
-                path_index += 1;
             }
         }
 
         // Create a group node containing all the path nodes
-        Ok(Node::Container(ContainerNodeRec {
-            active: origin.visible.unwrap_or(true),
-            opacity: Self::convert_opacity(origin.visible),
-            blend_mode: Self::convert_blend_mode(origin.blend_mode),
-            mask: None,
-            transform: Self::convert_transform(origin.relative_transform.as_ref()),
-            size: Self::convert_size(origin.size.as_ref()),
-            corner_radius: RectangularCornerRadius::zero(),
-            fills: Paints::new([TRANSPARENT]),
-            strokes: Paints::default(),
-            stroke_width: 0.0,
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            effects: LayerEffects::default(),
-            clip: false,
-            layout_mode: LayoutMode::default(),
-            layout_direction: Axis::default(),
-            layout_wrap: LayoutWrap::default(),
-            layout_main_axis_alignment: MainAxisAlignment::default(),
-            layout_cross_axis_alignment: CrossAxisAlignment::default(),
-            padding: EdgeInsets::default(),
-            layout_gap: LayoutGap::default(),
-        }))
+        {
+            let transform = Self::convert_transform(origin.relative_transform.as_ref());
+            let size = Self::convert_size(origin.size.as_ref());
+            Ok(Node::Container(ContainerNodeRec {
+                active: origin.visible.unwrap_or(true),
+                opacity: Self::convert_opacity(origin.visible),
+                blend_mode: Self::convert_blend_mode(origin.blend_mode),
+                mask: None,
+                rotation: transform.rotation(),
+                corner_radius: RectangularCornerRadius::zero(),
+                fills: Paints::new([TRANSPARENT]),
+                strokes: Paints::default(),
+                stroke_width: 0.0,
+                stroke_align: StrokeAlign::Inside,
+                stroke_dash_array: None,
+                effects: LayerEffects::default(),
+                clip: false,
+                position: CGPoint::new(transform.x(), transform.y()).into(),
+                layout_container: LayoutContainerStyle {
+                    layout_mode: LayoutMode::Normal,
+                    layout_direction: Axis::Horizontal,
+                    layout_wrap: None,
+                    layout_main_axis_alignment: None,
+                    layout_cross_axis_alignment: None,
+                    layout_padding: None,
+                    layout_gap: None,
+                },
+                layout_dimensions: LayoutDimensionStyle {
+                    width: Some(size.width),
+                    height: Some(size.height),
+                    min_width: None,
+                    max_width: None,
+                    min_height: None,
+                    max_height: None,
+                },
+                layout_child: Some(LayoutChildStyle {
+                    layout_positioning: origin
+                        .layout_positioning
+                        .as_ref()
+                        .map(Into::into)
+                        .unwrap_or_default(),
+                    layout_grow: 0.0,
+                }),
+            }))
+        }
     }
 
     fn convert_boolean_operation(
