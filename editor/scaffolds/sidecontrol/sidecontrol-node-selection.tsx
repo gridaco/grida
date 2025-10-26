@@ -1049,10 +1049,11 @@ function ModeNodeProperties({
                   direction: layout === "flex" ? direction : undefined,
                 }}
                 onValueChange={(value) => {
-                  actions.layout(value.layoutMode);
-                  if (value.direction) {
-                    actions.direction(value.direction);
-                  }
+                  instance.commands.reLayout(node_id, value.key);
+                  // actions.layout(value.layoutMode);
+                  // if (value.direction) {
+                  //   actions.direction(value.direction);
+                  // }
                 }}
               />
             </PropertyLine>

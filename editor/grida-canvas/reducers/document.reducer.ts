@@ -1249,30 +1249,27 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       break;
     }
     case "autolayout": {
-      const { target } = action;
-      const target_node_ids = target === "selection" ? state.selection : target;
+      const { contain } = action;
 
-      // group by parent, including root nodes
-      const groups = Object.groupBy(
-        target_node_ids,
-        (node_id) =>
-          dq.getParentId(state.document_ctx, node_id) ?? state.scene_id!
-      );
+      // [contain: false] - apply layout to existing container
+      if (!contain) {
+        const container_id = action.target;
+        const container_node = dq.__getNodeById(state, container_id);
+        assert(
+          container_node.type === "container",
+          `autolayout with contain: false requires a container node, got ${container_node.type}`
+        );
 
-      const layouts = Object.keys(groups).map((parent_id) => {
-        const g = groups[parent_id]!;
-        const is_scene = parent_id === state.scene_id;
-
-        let delta: cmath.Vector2;
-        if (is_scene) {
-          delta = [0, 0];
-        } else {
-          const parent_rect =
-            context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
-          delta = [-parent_rect.x, -parent_rect.y];
+        const children = dq.getChildren(state.document_ctx, container_id);
+        if (children.length === 0) {
+          return state; // no-op if no children
         }
 
-        const rects = g
+        const container_rect =
+          context.geometry.getNodeAbsoluteBoundingRect(container_id)!;
+        const delta: cmath.Vector2 = [-container_rect.x, -container_rect.y];
+
+        const rects = children
           .map(
             (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
           )
@@ -1283,49 +1280,24 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         // guess the layout
         const lay = layout.flex.guess(rects);
 
-        return {
-          parent: is_scene ? null : parent_id,
-          layout: lay,
-          children: g,
-        };
-      });
-
-      return updateState(state, (draft) => {
-        const insertions: grida.program.nodes.NodeID[] = [];
-        layouts.forEach(({ parent, layout, children }) => {
-          const container_prototype: grida.program.nodes.NodePrototype = {
-            type: "container",
-            // layout
-            layout: "flex",
-            width: "auto",
-            height: "auto",
-            top: cmath.quantize(layout.union.y, 1),
-            left: cmath.quantize(layout.union.x, 1),
-            direction: layout.direction,
-            mainAxisGap: cmath.quantize(layout.spacing, 1),
-            crossAxisGap: cmath.quantize(layout.spacing, 1),
-            mainAxisAlignment: layout.mainAxisAlignment,
-            crossAxisAlignment: layout.crossAxisAlignment,
-            padding: children.length === 1 ? 16 : 0,
-            // children (empty when init)
-            children: [],
-            // position
-            position: "absolute",
-          };
-
-          const container_id = self_insertSubDocument(
+        return updateState(state, (draft) => {
+          const container = dq.__getNodeById(
             draft,
-            parent,
-            grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-              container_prototype,
-              () => context.idgen.next()
-            )
-          )[0];
+            container_id
+          ) as grida.program.nodes.ContainerNode;
 
-          // [move children to container]
-          const ordered = layout.orders.map((i) => children[i]);
-          ordered.forEach((child_id) => {
-            self_moveNode(draft, child_id, container_id);
+          // Apply flex layout properties to the existing container
+          container.layout = "flex";
+          container.direction = lay.direction;
+          container.mainAxisGap = cmath.quantize(lay.spacing, 1);
+          container.crossAxisGap = cmath.quantize(lay.spacing, 1);
+          container.mainAxisAlignment = lay.mainAxisAlignment;
+          container.crossAxisAlignment = lay.crossAxisAlignment;
+
+          // [reorder children according to guessed layout]
+          const ordered = lay.orders.map((i) => children[i]);
+          ordered.forEach((child_id, index) => {
+            self_moveNode(draft, child_id, container_id, index);
           });
 
           // [reset children position]
@@ -1343,11 +1315,113 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             };
           });
 
-          insertions.push(container_id);
+          self_selectNode(draft, "reset", container_id);
+        });
+      }
+      // [contain: true] - wrap nodes in new container(s)
+      else {
+        const { target } = action;
+        const target_node_ids =
+          target === "selection" ? state.selection : target;
+
+        // group by parent, including root nodes
+        const groups = Object.groupBy(
+          target_node_ids,
+          (node_id) =>
+            dq.getParentId(state.document_ctx, node_id) ?? state.scene_id!
+        );
+
+        const layouts = Object.keys(groups).map((parent_id) => {
+          const g = groups[parent_id]!;
+          const is_scene = parent_id === state.scene_id;
+
+          let delta: cmath.Vector2;
+          if (is_scene) {
+            delta = [0, 0];
+          } else {
+            const parent_rect =
+              context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
+            delta = [-parent_rect.x, -parent_rect.y];
+          }
+
+          const rects = g
+            .map(
+              (node_id) =>
+                context.geometry.getNodeAbsoluteBoundingRect(node_id)!
+            )
+            // make the rects relative to the parent
+            .map((rect) => cmath.rect.translate(rect, delta))
+            .map((rect) => cmath.rect.quantize(rect, 1));
+
+          // guess the layout
+          const lay = layout.flex.guess(rects);
+
+          return {
+            parent: is_scene ? null : parent_id,
+            layout: lay,
+            children: g,
+          };
         });
 
-        self_selectNode(draft, "reset", ...insertions);
-      });
+        return updateState(state, (draft) => {
+          const insertions: grida.program.nodes.NodeID[] = [];
+          layouts.forEach(({ parent, layout, children }) => {
+            const container_prototype: grida.program.nodes.NodePrototype = {
+              type: "container",
+              // layout
+              layout: "flex",
+              width: "auto",
+              height: "auto",
+              top: cmath.quantize(layout.union.y, 1),
+              left: cmath.quantize(layout.union.x, 1),
+              direction: layout.direction,
+              mainAxisGap: cmath.quantize(layout.spacing, 1),
+              crossAxisGap: cmath.quantize(layout.spacing, 1),
+              mainAxisAlignment: layout.mainAxisAlignment,
+              crossAxisAlignment: layout.crossAxisAlignment,
+              padding: children.length === 1 ? 16 : 0,
+              // children (empty when init)
+              children: [],
+              // position
+              position: "absolute",
+            };
+
+            const container_id = self_insertSubDocument(
+              draft,
+              parent,
+              grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+                container_prototype,
+                () => context.idgen.next()
+              )
+            )[0];
+
+            // [move children to container]
+            const ordered = layout.orders.map((i) => children[i]);
+            ordered.forEach((child_id) => {
+              self_moveNode(draft, child_id, container_id);
+            });
+
+            // [reset children position]
+            ordered.forEach((child_id) => {
+              const child = dq.__getNodeById(draft, child_id);
+              (draft.document.nodes[
+                child_id
+              ] as grida.program.nodes.i.IPositioning) = {
+                ...child,
+                position: "relative",
+                top: undefined,
+                right: undefined,
+                bottom: undefined,
+                left: undefined,
+              };
+            });
+
+            insertions.push(container_id);
+          });
+
+          self_selectNode(draft, "reset", ...insertions);
+        });
+      }
 
       break;
     }

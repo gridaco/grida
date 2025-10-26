@@ -905,7 +905,7 @@ function SingleSelectionOverlay({
                   editor.surface.surfaceStartGapGesture(node_id, axis);
                 }}
               />
-              {padding && (
+              {padding !== undefined && (
                 <PaddingOverlay
                   containerRect={object.boundingRect}
                   padding={

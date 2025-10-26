@@ -197,8 +197,8 @@ function PaddingEdgeRegion({
       {isHovered && (
         <svg className="absolute inset-0 overflow-visible pointer-events-none">
           <rect
-            x={0}
-            y={0}
+            x="0"
+            y="0"
             width={rect.width}
             height={rect.height}
             fill="url(#padding-diagonal-stripes)"

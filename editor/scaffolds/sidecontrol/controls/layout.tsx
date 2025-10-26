@@ -26,7 +26,14 @@ export function LayoutControl({
   onValueChange,
 }: {
   value?: PartialLayoutProperties;
-  onValueChange?: (value: PartialLayoutProperties) => void;
+  onValueChange?: (
+    value: PartialLayoutProperties & {
+      /**
+       * when you need this, we expose internal option value to you.
+       */
+      key: Option;
+    }
+  ) => void;
 }) {
   const op: Option =
     value?.layoutMode === "flex"
@@ -37,11 +44,19 @@ export function LayoutControl({
 
   const _onValueChange = (value: Option) => {
     if (value === "normal") {
-      onValueChange?.({ layoutMode: "flow" });
+      onValueChange?.({ layoutMode: "flow", key: value });
     } else if (value === "flex-row") {
-      onValueChange?.({ layoutMode: "flex", direction: "horizontal" });
+      onValueChange?.({
+        layoutMode: "flex",
+        direction: "horizontal",
+        key: value,
+      });
     } else if (value === "flex-column") {
-      onValueChange?.({ layoutMode: "flex", direction: "vertical" });
+      onValueChange?.({
+        layoutMode: "flex",
+        direction: "vertical",
+        key: value,
+      });
     }
   };
 

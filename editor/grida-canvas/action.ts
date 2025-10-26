@@ -525,10 +525,26 @@ export interface EditorDistributeEvenlyAction {
   axis: "x" | "y";
 }
 
-export interface EditorAutoLayoutAction {
+export type EditorAutoLayoutAction = {
   type: "autolayout";
-  target: NodeID[] | "selection";
-}
+} & (
+  | {
+      /**
+       * if true, the nodes will be wrapped into a new container.
+       * if false, the target is expected to be exactly one, and needs to be a container.
+       */
+      contain: true;
+      target: NodeID[] | "selection";
+    }
+  | {
+      /**
+       * if true, the nodes will be wrapped into a new container.
+       * if false, the target is expected to be exactly one, and needs to be a container.
+       */
+      contain: false;
+      target: NodeID;
+    }
+);
 
 export interface EditorContainAction {
   type: "contain";
