@@ -8,21 +8,18 @@ use taffy::prelude::*;
 /// ## Key differences from Taffy's defaults:
 /// - `flex_shrink: 0.0` (instead of 1.0) - prevents children from automatically shrinking
 ///   when they overflow their flex container
-/// - `align_content: Some(AlignContent::Start)` - prevents wrapped rows from stretching
-///   and distributing extra vertical space, ensuring gap values are respected exactly
 ///
 /// ## Rationale:
 /// In design tools like Grida, users expect fixed-size elements to maintain their specified
-/// dimensions and spacing. Taffy's default `flex_shrink: 1.0` causes elements to shrink,
-/// and `align_content: None` (which behaves like Stretch) causes wrapped rows to distribute
-/// extra space, both of which are unexpected behaviors for a design canvas.
+/// dimensions. Taffy's default `flex_shrink: 1.0` causes elements to shrink when the container
+/// is too small, which is unexpected behavior for a design canvas. Users should explicitly
+/// opt-in to shrinking behavior if needed.
 ///
 /// This is a zero-cost abstraction - the compiler inlines this function.
 #[inline]
 fn grida_style_default() -> Style {
     Style {
         flex_shrink: 0.0,
-        align_content: Some(AlignContent::Start),
         overflow: taffy::Point {
             x: taffy::Overflow::Clip,
             y: taffy::Overflow::Clip,
@@ -74,6 +71,19 @@ impl From<CrossAxisAlignment> for AlignItems {
             CrossAxisAlignment::End => AlignItems::End,
             CrossAxisAlignment::Center => AlignItems::Center,
             CrossAxisAlignment::Stretch => AlignItems::Stretch,
+        }
+    }
+}
+
+/// Convert schema CrossAxisAlignment to Taffy AlignContent
+/// This controls how wrapped flex lines are aligned in the cross axis
+impl From<CrossAxisAlignment> for AlignContent {
+    fn from(alignment: CrossAxisAlignment) -> Self {
+        match alignment {
+            CrossAxisAlignment::Start => AlignContent::Start,
+            CrossAxisAlignment::End => AlignContent::End,
+            CrossAxisAlignment::Center => AlignContent::Center,
+            CrossAxisAlignment::Stretch => AlignContent::Stretch,
         }
     }
 }
@@ -174,6 +184,19 @@ impl From<UniformNodeLayout> for Style {
                 // Cross axis alignment (align items)
                 if let Some(alignment) = layout.layout_cross_axis_alignment {
                     style.align_items = Some(alignment.into());
+                }
+
+                // align_content: Controls how wrapped flex lines are aligned in the cross axis
+                // Only relevant when flex-wrap is enabled
+                if layout.layout_wrap == Some(LayoutWrap::Wrap) {
+                    if let Some(alignment) = layout.layout_cross_axis_alignment {
+                        // User specified alignment - use it for line distribution
+                        style.align_content = Some(alignment.into());
+                    } else {
+                        // No alignment specified - use Start to prevent Taffy's default
+                        // stretch behavior from expanding gaps between wrapped lines
+                        style.align_content = Some(AlignContent::Start);
+                    }
                 }
 
                 // Gap - convert with direction awareness
@@ -287,6 +310,7 @@ fn icb_to_taffy_style(icb: &crate::node::schema::InitialContainerNodeRec) -> Sty
         flex_wrap: icb.layout_wrap.into(),
         justify_content: Some(icb.layout_main_axis_alignment.into()),
         align_items: Some(icb.layout_cross_axis_alignment.into()),
+        align_content: Some(icb.layout_cross_axis_alignment.into()),
         gap: layout_gap_to_taffy(icb.layout_gap, icb.layout_direction),
         padding: icb.padding.into(),
         // Size will be set by the layout engine for root ICB nodes

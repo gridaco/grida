@@ -154,7 +154,9 @@ impl LayoutEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cg::types::{Axis, LayoutGap, LayoutMode, LayoutWrap};
+    use crate::cg::types::{
+        Axis, CrossAxisAlignment, LayoutGap, LayoutMode, LayoutWrap, MainAxisAlignment,
+    };
     use crate::node::factory::NodeFactory;
     use crate::node::scene_graph::{Parent, SceneGraph};
     use crate::node::schema::*;
@@ -717,5 +719,65 @@ mod tests {
         // Both items should be at x=0 (start of their respective rows)
         assert_eq!(layout1.x, 0.0);
         assert_eq!(layout2.x, 0.0);
+    }
+
+    #[test]
+    fn test_flex_wrap_with_center_alignment() {
+        // Verify that wrap + center alignment works correctly
+        // Even with a single child that doesn't actually wrap
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Create a 1000x1000 container with center alignment and wrap
+        let mut container = nf.create_container_node();
+        container.layout_container = LayoutContainerStyle {
+            layout_mode: LayoutMode::Flex,
+            layout_direction: Axis::Horizontal,
+            layout_wrap: Some(LayoutWrap::Wrap),
+            layout_main_axis_alignment: Some(MainAxisAlignment::Center),
+            layout_cross_axis_alignment: Some(CrossAxisAlignment::Center),
+            ..Default::default()
+        };
+        container.layout_dimensions.width = Some(1000.0);
+        container.layout_dimensions.height = Some(1000.0);
+        let container_id = graph.append_child(Node::Container(container), Parent::Root);
+
+        // Add a single 100x100 child
+        let mut rect = nf.create_rectangle_node();
+        rect.size = Size {
+            width: 100.0,
+            height: 100.0,
+        };
+        let child_id = graph.append_child(Node::Rectangle(rect), Parent::NodeId(container_id));
+
+        // Compute layout
+        let scene = Scene {
+            name: "test".to_string(),
+            graph,
+            background_color: None,
+        };
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 1200.0,
+                height: 1200.0,
+            },
+        );
+
+        // Get layout
+        let layout = result.get(&child_id).expect("Child should have layout");
+
+        // Child should be centered in both axes
+        // Main axis (horizontal): x = (1000 - 100) / 2 = 450
+        // Cross axis (vertical): y = (1000 - 100) / 2 = 450
+        assert_eq!(
+            layout.x, 450.0,
+            "Child should be centered horizontally (main axis)"
+        );
+        assert_eq!(
+            layout.y, 450.0,
+            "Child should be centered vertically (cross axis)"
+        );
     }
 }
