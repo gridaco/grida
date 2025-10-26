@@ -433,7 +433,7 @@ impl GeometryCache {
                         (n.transform, rect.width, rect.height)
                     }
                     Node::SVGPath(n) => {
-                        let rect = path_bounds(&n.data);
+                        let rect = n.rect();
                         (n.transform, rect.width, rect.height)
                     }
                     Node::Vector(n) => {
@@ -537,25 +537,6 @@ impl GeometryCache {
 
 fn transform_rect(rect: &Rectangle, t: &AffineTransform) -> Rectangle {
     rect::transform(*rect, t)
-}
-
-fn path_bounds(data: &str) -> Rectangle {
-    if let Some(path) = skia_safe::path::Path::from_svg(data) {
-        let b = path.compute_tight_bounds();
-        Rectangle {
-            x: b.left(),
-            y: b.top(),
-            width: b.width(),
-            height: b.height(),
-        }
-    } else {
-        Rectangle {
-            x: 0.0,
-            y: 0.0,
-            width: 0.0,
-            height: 0.0,
-        }
-    }
 }
 
 fn inflate_rect(rect: Rectangle, delta: f32) -> Rectangle {

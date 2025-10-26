@@ -47,7 +47,7 @@ use crate::layout::cache::LayoutResult;
 use crate::layout::tree::LayoutTree;
 use crate::layout::ComputedLayout;
 use crate::node::scene_graph::SceneGraph;
-use crate::node::schema::{Node, NodeId, Size};
+use crate::node::schema::{Node, NodeId, NodeRectMixin, Size};
 use taffy::prelude::*;
 
 /// Universal Layout Engine
@@ -110,6 +110,43 @@ impl LayoutEngine {
         &self.result
     }
 
+    /// Extract schema width, height from any node type
+    fn get_schema_size(node: &Node) -> (f32, f32) {
+        match node {
+            Node::Container(n) => (
+                n.layout_dimensions.width.unwrap_or(0.0),
+                n.layout_dimensions.height.unwrap_or(0.0),
+            ),
+            Node::Rectangle(n) => (n.size.width, n.size.height),
+            Node::Ellipse(n) => (n.size.width, n.size.height),
+            Node::Image(n) => (n.size.width, n.size.height),
+            Node::Line(n) => (n.size.width, n.size.height),
+            Node::Polygon(n) => {
+                let rect = n.rect();
+                (rect.width, rect.height)
+            }
+            Node::RegularPolygon(n) => (n.size.width, n.size.height),
+            Node::RegularStarPolygon(n) => (n.size.width, n.size.height),
+            Node::TextSpan(n) => (n.width.unwrap_or(0.0), n.height.unwrap_or(0.0)),
+            Node::Vector(n) => {
+                let rect = n.network.bounds();
+                (rect.width, rect.height)
+            }
+            Node::SVGPath(n) => {
+                // Use NodeRectMixin::rect() to compute bounds from path data
+                // Note: This involves SVG parsing and is not cached - avoid in tight loops
+                let rect = n.rect();
+                (rect.width, rect.height)
+            }
+            Node::Group(_) | Node::BooleanOperation(_) => {
+                // Size derived from children bounds (dynamic)
+                (0.0, 0.0)
+            }
+            Node::Error(n) => (n.size.width, n.size.height),
+            Node::InitialContainer(_) => (0.0, 0.0), // Size set by viewport
+        }
+    }
+
     /// Extract schema x, y position from any node type
     ///
     /// Used for infinite canvas support: root nodes use their schema positions
@@ -120,7 +157,11 @@ impl LayoutEngine {
     /// - ICB (InitialContainerBlock) always returns (0, 0)
     fn get_schema_position(node: &Node) -> (f32, f32) {
         match node {
+            // Container nodes use position field
+            Node::InitialContainer(_) => (0.0, 0.0), // ICB always at origin
             Node::Container(n) => (n.position.x().unwrap_or(0.0), n.position.y().unwrap_or(0.0)),
+
+            // Leaf nodes with transform field
             Node::Rectangle(n) => (n.transform.x(), n.transform.y()),
             Node::Ellipse(n) => (n.transform.x(), n.transform.y()),
             Node::Image(n) => (n.transform.x(), n.transform.y()),
@@ -129,19 +170,53 @@ impl LayoutEngine {
             Node::RegularPolygon(n) => (n.transform.x(), n.transform.y()),
             Node::RegularStarPolygon(n) => (n.transform.x(), n.transform.y()),
             Node::TextSpan(n) => (n.transform.x(), n.transform.y()),
+            Node::Vector(n) => (n.transform.x(), n.transform.y()),
+            Node::SVGPath(n) => (n.transform.x(), n.transform.y()),
+            Node::Error(n) => (n.transform.x(), n.transform.y()),
+
+            // Complex nodes with optional transform
             Node::Group(n) => {
                 let t = n.transform.unwrap_or_default();
                 (t.x(), t.y())
             }
-            Node::InitialContainer(_) => (0.0, 0.0), // ICB always at origin
-            _ => (0.0, 0.0),
+            Node::BooleanOperation(n) => {
+                let t = n.transform.unwrap_or_default();
+                (t.x(), t.y())
+            }
         }
+    }
+
+    /// Check if a node should participate in Taffy layout
+    ///
+    /// Nodes that should be in Taffy tree:
+    /// - Layout containers (Container, ICB) - need to lay out children
+    /// - Nodes with layout_child field - can participate as flex children
+    ///
+    /// Nodes skipped from Taffy (use manual schema layout):
+    /// - Vector, SVGPath, Group, BooleanOperation, Error - no layout_child support
+    fn should_participate_in_taffy(node: &Node) -> bool {
+        matches!(
+            node,
+            Node::Container(_)
+                | Node::InitialContainer(_)
+                | Node::Rectangle(_)
+                | Node::Ellipse(_)
+                | Node::Image(_)
+                | Node::Line(_)
+                | Node::Polygon(_)
+                | Node::RegularPolygon(_)
+                | Node::RegularStarPolygon(_)
+                | Node::TextSpan(_)
+        )
     }
 
     /// Recursively build Taffy tree for a node and its descendants
     ///
     /// This universal method handles all node types without switch-case logic.
     /// Each node gets an appropriate Taffy style based on its type and properties.
+    ///
+    /// Nodes without layout_child support are skipped from Taffy tree but still
+    /// get layout results created manually from their schema.
     fn build_taffy_subtree(
         &mut self,
         node_id: &NodeId,
@@ -149,6 +224,12 @@ impl LayoutEngine {
         viewport_size: Size,
     ) -> Option<taffy::NodeId> {
         let node = graph.get_node(node_id).ok()?;
+
+        // Nodes that don't participate in Taffy layout (Vector, SVGPath, Group, etc.)
+        // are skipped and get manual layout results created in extract_all_layouts()
+        if !Self::should_participate_in_taffy(node) {
+            return None; // Skip Taffy, use manual layout result from schema
+        }
 
         // Get style for this node (universal mapping)
         // Note: Absolutely positioned children are still included in the tree,
@@ -197,6 +278,9 @@ impl LayoutEngine {
     /// For infinite canvas support, we override root positions with their schema positions
     /// so multiple artboards/nodes can be positioned anywhere in the viewport.
     ///
+    /// **Non-Layout Nodes**: Nodes without layout_child field (Vector, SVGPath, Group, etc.)
+    /// are skipped from Taffy tree. We create manual layout results from their schema here.
+    ///
     /// Child nodes use Taffy's computed positions unchanged (correct flex/absolute layout).
     fn extract_all_layouts(&mut self, id: &NodeId, graph: &SceneGraph) {
         // Extract this node's layout if it exists in the Taffy tree
@@ -213,6 +297,23 @@ impl LayoutEngine {
             }
 
             self.result.insert(*id, computed);
+        } else {
+            // Node not in Taffy tree (skipped due to no layout_child support)
+            // Create manual layout result from schema
+            if let Ok(node) = graph.get_node(id) {
+                let (x, y) = Self::get_schema_position(node);
+                let (width, height) = Self::get_schema_size(node);
+
+                self.result.insert(
+                    *id,
+                    ComputedLayout {
+                        x,
+                        y,
+                        width,
+                        height,
+                    },
+                );
+            }
         }
 
         // Recurse for children

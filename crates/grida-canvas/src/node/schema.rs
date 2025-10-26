@@ -1440,6 +1440,32 @@ impl NodeTransformMixin for SVGPathNodeRec {
     }
 }
 
+impl NodeRectMixin for SVGPathNodeRec {
+    /// Compute bounding rectangle from SVG path data
+    ///
+    /// **Performance Note**: This is NOT cached and involves parsing the SVG path string
+    /// and computing tight bounds via Skia. Avoid calling this in tight loops.
+    /// The result should be cached by the caller if needed repeatedly.
+    fn rect(&self) -> Rectangle {
+        if let Some(path) = skia_safe::path::Path::from_svg(&self.data) {
+            let bounds = path.compute_tight_bounds();
+            Rectangle {
+                x: bounds.left(),
+                y: bounds.top(),
+                width: bounds.width(),
+                height: bounds.height(),
+            }
+        } else {
+            Rectangle {
+                x: 0.0,
+                y: 0.0,
+                width: 0.0,
+                height: 0.0,
+            }
+        }
+    }
+}
+
 /// A polygon shape defined by a list of absolute 2D points, following the SVG `<polygon>` model.
 ///
 /// ## Characteristics
