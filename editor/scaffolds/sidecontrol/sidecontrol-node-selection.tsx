@@ -1326,9 +1326,13 @@ function SectionPosition({ node_id }: { node_id: string }) {
   const instance = useCurrentEditor();
   const document_ctx = useEditorState(instance, (state) => state.document_ctx);
   const scene = useCurrentSceneState();
-  const top_id = dq.getTopId(document_ctx, node_id)!;
-  // FIXME: the top id returns scene id - this is flawed due to recent changes, need to fix this via scene hook? (e.g. scene.roots)
-  const is_root = node_id === top_id;
+  const scene_id = scene.id;
+  const top_scene_node_id = dq.getTopIdWithinScene(
+    document_ctx,
+    node_id,
+    scene_id
+  );
+  const is_root = node_id === (top_scene_node_id ?? scene_id);
   const is_single_mode_root =
     scene.constraints.children === "single" && is_root;
 

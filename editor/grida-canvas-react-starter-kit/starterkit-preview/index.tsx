@@ -61,7 +61,7 @@ export function PreviewProvider({
 
   const getPreviewNode = (node_id?: string) => {
     function tryGetTopPreviewNode(node_id: string) {
-      const topid = dq.getTopId(document_ctx, node_id);
+      const topid = dq.getTopIdWithinScene(document_ctx, node_id, scene.id);
       if (!topid) return null;
       const top = document.nodes[topid];
       if (!top) return null;

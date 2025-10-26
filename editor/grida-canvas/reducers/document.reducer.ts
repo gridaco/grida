@@ -1149,8 +1149,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       if (target_node_ids.length === 1) {
         // if a single node is selected, align it with its container. (if not root)
         const node_id = target_node_ids[0];
-        const top_id = dq.getTopId(state.document_ctx, node_id);
-        if (node_id !== top_id) {
+        const top_id = dq.getTopIdWithinScene(
+          state.document_ctx,
+          node_id,
+          state.scene_id
+        );
+        if (top_id && node_id !== top_id) {
           const parent_node_id = dq.getParentId(state.document_ctx, node_id);
           assert(parent_node_id, "parent node not found");
 

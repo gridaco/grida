@@ -464,17 +464,82 @@ export namespace dq {
     return context.lu_parent[node_id] ?? null;
   }
 
-  export function getTopId(
+  /**
+   * @deprecated you won't need this. will be removed.
+   * use this only, when explicitly need to get the top node id, that includes the scene itself.
+   */
+  export function getRootId(
     context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string
   ): NodeID | null {
-    // veryfi if exists
+    // veryfy if exists
     if (context.lu_keys.includes(node_id)) {
       const ancestors = getAncestors(context, node_id);
       return ancestors[0] ?? node_id;
     } else {
       return null;
     }
+  }
+
+  /**
+   * Retrieves the top-level node within a scene's hierarchy for a given node.
+   *
+   * This function finds the highest-level ancestor of a node that is still a direct child
+   * of the specified scene. It's useful for identifying which root-level node within a
+   * scene contains a deeply nested node.
+   *
+   * @param context - The runtime hierarchy context containing node relationships.
+   * @param node_id - The ID of the node to query.
+   * @param scene_id - The ID of the scene to scope the query within.
+   * @returns The top-level node ID within the scene, or `null` if:
+   *          - The node doesn't exist
+   *          - The node is the scene itself
+   *
+   * @example
+   * ```ts
+   * // Hierarchy: scene -> containerA -> containerB -> textNode
+   * const context = {
+   *   lu_keys: ["scene", "containerA", "containerB", "textNode"],
+   *   lu_parent: {
+   *     "scene": null,
+   *     "containerA": "scene",
+   *     "containerB": "containerA",
+   *     "textNode": "containerB"
+   *   }
+   * };
+   *
+   * // Get top node for deeply nested textNode
+   * const topId = getTopIdWithinScene(context, "textNode", "scene");
+   * console.log(topId); // "containerA" (direct child of scene)
+   *
+   * // Get top node for root-level node
+   * const topId = getTopIdWithinScene(context, "containerA", "scene");
+   * console.log(topId); // "containerA" (already at top)
+   *
+   * // Node is the scene itself
+   * const topId = getTopIdWithinScene(context, "scene", "scene");
+   * console.log(topId); // null
+   * ```
+   */
+  export function getTopIdWithinScene(
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
+    node_id: string,
+    scene_id: string
+  ): NodeID | null {
+    if (!context.lu_keys.includes(node_id) || node_id === scene_id) {
+      return null;
+    }
+
+    const ancestors = getAncestors(context, node_id);
+    const sceneIndex = ancestors.indexOf(scene_id);
+
+    // If scene is not an ancestor, node is at root level
+    if (sceneIndex === -1) {
+      return node_id;
+    }
+
+    // Return the child of the scene (next node after scene in ancestors)
+    return ancestors[sceneIndex + 1] ?? node_id;
   }
 
   /**

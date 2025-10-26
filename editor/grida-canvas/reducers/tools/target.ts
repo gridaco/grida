@@ -41,7 +41,13 @@ export function getRayTarget(
   const filtered = hits
     .filter((node_id) => {
       const node = nodes[node_id];
-      const top_id = dq.getTopId(context.document_ctx, node_id);
+      const top_id = context.scene_id
+        ? dq.getTopIdWithinScene(
+            context.document_ctx,
+            node_id,
+            context.scene_id
+          )
+        : dq.getRootId(context.document_ctx, node_id);
       const maybeichildren = context.document.links[node_id];
 
       // Check if this is a root node with children that should be ignored
@@ -127,7 +133,9 @@ export function getMarqueeSelection(
   // 2. shall not be a locked node
   // 3. the parent of this node shall also be hit by the marquee (unless it's the root node)
   const target_node_ids = hits.filter((hit_id) => {
-    const root_id = dq.getTopId(document_ctx, hit_id)!;
+    const root_id = state.scene_id
+      ? dq.getTopIdWithinScene(document_ctx, hit_id, state.scene_id)
+      : dq.getRootId(document_ctx, hit_id);
     const hit = dq.__getNodeById(state, hit_id);
 
     // (1) shall not be a root node (if configured)
@@ -147,19 +155,23 @@ export function getMarqueeSelection(
     if (hit.locked) return false;
 
     // (3). the parent of this node shall also be hit by the marquee (unless it's the root node)
-    const parent_id = dq.getParentId(document_ctx, hit_id)!;
+    const parent_id = dq.getParentId(document_ctx, hit_id);
 
-    // root node
-    if (parent_id === null) {
+    // Direct child of scene (root level) - always include
+    if (parent_id === null || parent_id === state.scene_id) {
       return true;
-    } else {
-      if (parent_id === root_id) return true;
-      if (!hits.includes(parent_id)) return false;
     }
 
-    const parent = dq.__getNodeById(state, parent_id!);
-    if (!parent) return false;
-    if (parent.locked) return false;
+    // Nested node - parent must also be hit
+    if (!hits.includes(parent_id)) {
+      return false;
+    }
+
+    // Check if parent is locked
+    const parent = dq.__getNodeById(state, parent_id);
+    if (!parent || parent.locked) {
+      return false;
+    }
 
     return true;
   });
