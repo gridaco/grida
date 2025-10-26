@@ -24,6 +24,7 @@ export function PropertyLineLabelWithNumberGesture({
     sensitivity,
     onValueChange: onValueChange,
     axisForValue: "x",
+    uxPointerLock: false,
   });
 
   return (

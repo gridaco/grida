@@ -156,6 +156,7 @@ function Radius4Control({
             type="number"
             value={topLeft}
             onValueCommit={(v) => onCommit(v, 0)}
+            min={0}
           />
         </PropertyInputContainer>
         <PropertyInputContainer>
@@ -165,6 +166,7 @@ function Radius4Control({
             type="number"
             value={topRight}
             onValueCommit={(v) => onCommit(v, 1)}
+            min={0}
           />
         </PropertyInputContainer>
       </div>
@@ -176,6 +178,7 @@ function Radius4Control({
             type="number"
             value={bottomLeft}
             onValueCommit={(v) => onCommit(v, 3)}
+            min={0}
           />
         </PropertyInputContainer>
         <PropertyInputContainer>
@@ -185,6 +188,7 @@ function Radius4Control({
             type="number"
             value={bottomRight}
             onValueCommit={(v) => onCommit(v, 2)}
+            min={0}
           />
         </PropertyInputContainer>
       </div>
