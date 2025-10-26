@@ -1525,31 +1525,22 @@ class EditorDocumentStore
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.UnknwonNode;
-    const allCornerRadius = {
-      cornerRadius: node.cornerRadius,
-      cornerRadiusTopLeft: node.cornerRadiusTopLeft,
-      cornerRadiusTopRight: node.cornerRadiusTopRight,
-      cornerRadiusBottomRight: node.cornerRadiusBottomRight,
-      cornerRadiusBottomLeft: node.cornerRadiusBottomLeft,
+
+    const applyDelta = (
+      currentValue: number | undefined,
+      delta: number
+    ): number => {
+      const startValue = currentValue ?? 0;
+      const newValue = startValue + delta;
+      return Math.max(0, newValue);
     };
 
     const next = {
-      ...allCornerRadius,
-      cornerRadius: allCornerRadius.cornerRadius
-        ? allCornerRadius.cornerRadius + delta
-        : undefined,
-      cornerRadiusTopLeft: allCornerRadius.cornerRadiusTopLeft
-        ? allCornerRadius.cornerRadiusTopLeft + delta
-        : undefined,
-      cornerRadiusTopRight: allCornerRadius.cornerRadiusTopRight
-        ? allCornerRadius.cornerRadiusTopRight + delta
-        : undefined,
-      cornerRadiusBottomRight: allCornerRadius.cornerRadiusBottomRight
-        ? allCornerRadius.cornerRadiusBottomRight + delta
-        : undefined,
-      cornerRadiusBottomLeft: allCornerRadius.cornerRadiusBottomLeft
-        ? allCornerRadius.cornerRadiusBottomLeft + delta
-        : undefined,
+      cornerRadius: applyDelta(node.cornerRadius, delta),
+      cornerRadiusTopLeft: applyDelta(node.cornerRadiusTopLeft, delta),
+      cornerRadiusTopRight: applyDelta(node.cornerRadiusTopRight, delta),
+      cornerRadiusBottomRight: applyDelta(node.cornerRadiusBottomRight, delta),
+      cornerRadiusBottomLeft: applyDelta(node.cornerRadiusBottomLeft, delta),
     };
 
     this.dispatch({
@@ -4102,7 +4093,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
     });
   }
 
-  public changeRotation(change: editor.api.NumberChange) {
+  public changeRotation = (change: editor.api.NumberChange) => {
     const value = resolveNumberChangeValue(
       this.doc.getNodeSnapshotById(
         this.node_id
