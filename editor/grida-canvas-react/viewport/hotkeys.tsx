@@ -379,6 +379,7 @@ export function useEditorHotKeys() {
         "off"
       );
       editor.surface.surfaceConfigureRotateWithQuantizeModifier("off");
+      editor.surface.surfaceConfigurePaddingWithMirroringModifier("off");
       setAltKey(false);
       editor.surface.surfaceSetTool({ type: "cursor" }, "window blur");
     };
@@ -421,6 +422,7 @@ export function useEditorHotKeys() {
           editor.surface.surfaceConfigureTransformWithCenterOriginModifier(
             "on"
           );
+          editor.surface.surfaceConfigurePaddingWithMirroringModifier("on");
           setAltKey(true);
           // NOTE: on some systems, the alt key focuses to the browser menu, so we need to prevent that. (e.g. alt key on windows/chrome)
           e.preventDefault();
@@ -462,6 +464,7 @@ export function useEditorHotKeys() {
           editor.surface.surfaceConfigureTransformWithCenterOriginModifier(
             "off"
           );
+          editor.surface.surfaceConfigurePaddingWithMirroringModifier("off");
           setAltKey(false);
           break;
         case "Shift":

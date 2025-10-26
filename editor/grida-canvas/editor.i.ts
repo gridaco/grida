@@ -407,6 +407,7 @@ export namespace editor.config {
     path_keep_projecting: "off",
     rotate_with_quantize: "off",
     curve_tangent_mirroring: "auto",
+    padding_with_axis_mirroring: "off",
   };
 
   export const DEFAULT_BRUSH: state.CurrentBrush = {
@@ -790,6 +791,18 @@ export namespace editor.state {
      * @default "auto"
      */
     curve_tangent_mirroring: vn.TangentMirroringMode;
+    /**
+     * Mirror padding changes across the same axis
+     *
+     * When on, changing one padding side also updates its opposite side:
+     * - left ↔ right (horizontal mirroring)
+     * - top ↔ bottom (vertical mirroring)
+     *
+     * Typically toggled when the alt/option key is pressed
+     *
+     * @default "off"
+     */
+    padding_with_axis_mirroring: "on" | "off";
   };
 
   export interface IViewportTransformState {
@@ -3181,6 +3194,18 @@ export namespace editor.api {
      */
     surfaceConfigurePathKeepProjectingModifier(
       path_keep_projecting: "on" | "off"
+    ): void;
+    /**
+     * Toggles whether padding gestures mirror changes across the same axis.
+     *
+     * When set to `"on"`, changing one padding side also updates its opposite:
+     * - Changing left also changes right (horizontal mirroring)
+     * - Changing top also changes bottom (vertical mirroring)
+     *
+     * Typically toggled when the alt/option key is pressed during a padding gesture.
+     */
+    surfaceConfigurePaddingWithMirroringModifier(
+      padding_with_axis_mirroring: "on" | "off"
     ): void;
     //
   }

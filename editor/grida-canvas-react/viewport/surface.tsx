@@ -813,6 +813,8 @@ function get_cursor_tooltip_value(gesture: editor.gesture.GestureState) {
   switch (gesture.type) {
     case "gap":
       return cmath.ui.formatNumber(gesture.gap, 1);
+    case "padding":
+      return cmath.ui.formatNumber(gesture.padding, 1);
     case "rotate":
       return cmath.ui.formatNumber(gesture.rotation, 1) + "°";
     case "translate":
@@ -872,7 +874,9 @@ function SingleSelectionOverlay({
       <div className="group">
         {node.meta.is_flex_parent &&
           distribution &&
-          (gesture.type === "idle" || gesture.type === "gap") &&
+          (gesture.type === "idle" ||
+            gesture.type === "gap" ||
+            gesture.type === "padding") &&
           // TODO: support rotated surface
           rotation === 0 && (
             <>

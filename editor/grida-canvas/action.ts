@@ -561,7 +561,8 @@ export type EditorConfigAction =
   | EditorConfigureModifier_TransformWithPreserveAspectRatio
   | EditorConfigureModifier_RotateWithQuantize
   | EditorConfigureModifier_PathKeepProjecting
-  | EditorConfigureModifier_CurveTangentMirroring;
+  | EditorConfigureModifier_CurveTangentMirroring
+  | EditorConfigureModifier_PaddingWithMirroring;
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
@@ -610,6 +611,11 @@ export interface EditorConfigureModifier_PathKeepProjecting {
 export interface EditorConfigureModifier_CurveTangentMirroring {
   type: "config/modifiers/curve-tangent-mirroring";
   curve_tangent_mirroring: vn.TangentMirroringMode;
+}
+
+export interface EditorConfigureModifier_PaddingWithMirroring {
+  type: "config/modifiers/padding-with-mirroring";
+  padding_with_axis_mirroring: "on" | "off";
 }
 
 /**

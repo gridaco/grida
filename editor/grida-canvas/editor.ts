@@ -3365,6 +3365,15 @@ export class EditorSurface
     });
   }
 
+  public surfaceConfigurePaddingWithMirroringModifier(
+    padding_with_axis_mirroring: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/padding-with-mirroring",
+      padding_with_axis_mirroring,
+    });
+  }
+
   // #region IPixelGridActions implementation
   surfaceConfigurePixelGrid(state: "on" | "off") {
     this.dispatch({

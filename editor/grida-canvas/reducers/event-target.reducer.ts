@@ -794,19 +794,34 @@ function __self_evt_on_drag(
             };
           }
 
+          const mirroringEnabled =
+            draft.gesture_modifiers.padding_with_axis_mirroring === "on";
+
           // Update the specific side
           switch (side) {
             case "top":
               newPadding.paddingTop = padding;
+              if (mirroringEnabled) {
+                newPadding.paddingBottom = padding;
+              }
               break;
             case "right":
               newPadding.paddingRight = padding;
+              if (mirroringEnabled) {
+                newPadding.paddingLeft = padding;
+              }
               break;
             case "bottom":
               newPadding.paddingBottom = padding;
+              if (mirroringEnabled) {
+                newPadding.paddingTop = padding;
+              }
               break;
             case "left":
               newPadding.paddingLeft = padding;
+              if (mirroringEnabled) {
+                newPadding.paddingRight = padding;
+              }
               break;
           }
 
