@@ -1,6 +1,7 @@
 use crate::cg::types::*;
 use crate::node::scene_graph::SceneGraph;
-use crate::node::schema::{LayoutPositioningBasis, Node, NodeId, UniformNodeLayout};
+use crate::node::schema::{LayoutPositioningBasis, Node, NodeId, NodeRectMixin, UniformNodeLayout};
+use math2::transform::AffineTransform;
 use taffy::prelude::*;
 
 /// Create a Taffy Style with Grida's preferred defaults.
@@ -270,78 +271,194 @@ impl From<UniformNodeLayout> for Style {
 /// All node types are handled here, providing a unified approach to layout computation.
 pub fn node_to_taffy_style(node: &Node, _graph: &SceneGraph, _node_id: &NodeId) -> Style {
     match node {
-        Node::Container(n) => container_to_taffy_style(n),
-        Node::InitialContainer(icb) => icb_to_taffy_style(icb),
-        Node::Rectangle(n) => static_node_style(n.size.width, n.size.height),
-        Node::Ellipse(n) => static_node_style(n.size.width, n.size.height),
-        Node::TextSpan(n) => text_node_style(n),
-        Node::Image(n) => static_node_style(n.size.width, n.size.height),
-        Node::Line(n) => static_node_style(n.size.width, n.size.height),
-        Node::Group(_) => {
-            // Groups don't have size, use Grida defaults
-            grida_style_default()
-        }
-        Node::Error(_) => grida_style_default(), // Error nodes have no dimensions
-        // TODO: Add support for other node types as they are implemented
-        _ => grida_style_default(), // Fallback for unimplemented node types
+        Node::Container(n) => n.into(),
+        Node::InitialContainer(n) => n.into(),
+        Node::Rectangle(n) => n.into(),
+        Node::Ellipse(n) => n.into(),
+        Node::TextSpan(n) => n.into(),
+        Node::Image(n) => n.into(),
+        Node::Line(n) => n.into(),
+        Node::Polygon(n) => n.into(),
+        Node::RegularPolygon(n) => n.into(),
+        Node::RegularStarPolygon(n) => n.into(),
+        Node::Group(_) => grida_style_default(),
+        Node::Error(_) => grida_style_default(),
+        _ => grida_style_default(),
     }
 }
 
-/// Convert ContainerNodeRec to Taffy Style using existing UniformNodeLayout conversion
-fn container_to_taffy_style(container: &crate::node::schema::ContainerNodeRec) -> Style {
-    // Use our predictable LayoutStyle -> Style conversion
-    let mut style: Style = container.layout().into();
+/// Helper to apply layout_child properties to a style
+/// Also requires the node's transform to set inset for absolute positioning
+fn apply_layout_child(
+    mut style: Style,
+    layout_child: &Option<crate::node::schema::LayoutChildStyle>,
+    transform: AffineTransform,
+) -> Style {
+    if let Some(child_style) = layout_child {
+        style.position = child_style.layout_positioning.into();
+        style.flex_grow = child_style.layout_grow;
 
-    // Set display based on layout mode
-    style.display = if container.layout().layout_mode == LayoutMode::Flex {
-        Display::Flex
-    } else {
-        Display::Block
-    };
-
+        // For absolute positioning, set inset from transform
+        if child_style.layout_positioning == crate::cg::types::LayoutPositioning::Absolute {
+            style.inset = Rect {
+                left: LengthPercentageAuto::length(transform.x()),
+                top: LengthPercentageAuto::length(transform.y()),
+                right: LengthPercentageAuto::auto(),
+                bottom: LengthPercentageAuto::auto(),
+            };
+        }
+    }
     style
+}
+
+/// Convert ContainerNodeRec to Taffy Style
+impl From<&crate::node::schema::ContainerNodeRec> for Style {
+    fn from(container: &crate::node::schema::ContainerNodeRec) -> Self {
+        let mut style: Style = container.layout().into();
+
+        // Set display based on layout mode
+        style.display = if container.layout().layout_mode == LayoutMode::Flex {
+            Display::Flex
+        } else {
+            Display::Block
+        };
+
+        style
+    }
 }
 
 /// Convert InitialContainerNodeRec to Taffy Style
-fn icb_to_taffy_style(icb: &crate::node::schema::InitialContainerNodeRec) -> Style {
-    Style {
-        display: Display::Flex,
-        flex_direction: icb.layout_direction.into(),
-        flex_wrap: icb.layout_wrap.into(),
-        justify_content: Some(icb.layout_main_axis_alignment.into()),
-        align_items: Some(icb.layout_cross_axis_alignment.into()),
-        align_content: Some(icb.layout_cross_axis_alignment.into()),
-        gap: layout_gap_to_taffy(icb.layout_gap, icb.layout_direction),
-        padding: icb.padding.into(),
-        // Size will be set by the layout engine for root ICB nodes
-        ..grida_style_default()
+impl From<&crate::node::schema::InitialContainerNodeRec> for Style {
+    fn from(icb: &crate::node::schema::InitialContainerNodeRec) -> Self {
+        Style {
+            display: Display::Flex,
+            flex_direction: icb.layout_direction.into(),
+            flex_wrap: icb.layout_wrap.into(),
+            justify_content: Some(icb.layout_main_axis_alignment.into()),
+            align_items: Some(icb.layout_cross_axis_alignment.into()),
+            align_content: Some(icb.layout_cross_axis_alignment.into()),
+            gap: layout_gap_to_taffy(icb.layout_gap, icb.layout_direction),
+            padding: icb.padding.into(),
+            // Size will be set by the layout engine for root ICB nodes
+            ..grida_style_default()
+        }
     }
 }
 
-/// Create a static leaf node style for nodes with fixed dimensions
-fn static_node_style(width: f32, height: f32) -> Style {
-    Style {
-        size: Size {
-            width: Dimension::length(width),
-            height: Dimension::length(height),
-        },
-        ..grida_style_default()
+/// Convert RectangleNodeRec to Taffy Style
+impl From<&crate::node::schema::RectangleNodeRec> for Style {
+    fn from(node: &crate::node::schema::RectangleNodeRec) -> Self {
+        let style = Style {
+            size: Size {
+                width: Dimension::length(node.size.width),
+                height: Dimension::length(node.size.height),
+            },
+            ..grida_style_default()
+        };
+        apply_layout_child(style, &node.layout_child, node.transform)
     }
 }
 
-/// Create a style for text nodes with optional width constraints
-fn text_node_style(text: &crate::node::schema::TextSpanNodeRec) -> Style {
-    let mut style = grida_style_default();
-
-    // Set width if specified, otherwise auto
-    if let Some(width) = text.width {
-        style.size.width = Dimension::length(width);
-    } else {
-        style.size.width = Dimension::auto();
+/// Convert EllipseNodeRec to Taffy Style
+impl From<&crate::node::schema::EllipseNodeRec> for Style {
+    fn from(node: &crate::node::schema::EllipseNodeRec) -> Self {
+        let style = Style {
+            size: Size {
+                width: Dimension::length(node.size.width),
+                height: Dimension::length(node.size.height),
+            },
+            ..grida_style_default()
+        };
+        apply_layout_child(style, &node.layout_child, node.transform)
     }
+}
 
-    // Height is auto for text (will be determined by content)
-    style.size.height = Dimension::auto();
+/// Convert ImageNodeRec to Taffy Style
+impl From<&crate::node::schema::ImageNodeRec> for Style {
+    fn from(node: &crate::node::schema::ImageNodeRec) -> Self {
+        let style = Style {
+            size: Size {
+                width: Dimension::length(node.size.width),
+                height: Dimension::length(node.size.height),
+            },
+            ..grida_style_default()
+        };
+        apply_layout_child(style, &node.layout_child, node.transform)
+    }
+}
 
-    style
+/// Convert LineNodeRec to Taffy Style
+impl From<&crate::node::schema::LineNodeRec> for Style {
+    fn from(node: &crate::node::schema::LineNodeRec) -> Self {
+        let style = Style {
+            size: Size {
+                width: Dimension::length(node.size.width),
+                height: Dimension::length(node.size.height),
+            },
+            ..grida_style_default()
+        };
+        apply_layout_child(style, &node.layout_child, node.transform)
+    }
+}
+
+/// Convert PolygonNodeRec to Taffy Style
+impl From<&crate::node::schema::PolygonNodeRec> for Style {
+    fn from(node: &crate::node::schema::PolygonNodeRec) -> Self {
+        let bounds = node.rect();
+        let style = Style {
+            size: Size {
+                width: Dimension::length(bounds.width),
+                height: Dimension::length(bounds.height),
+            },
+            ..grida_style_default()
+        };
+        apply_layout_child(style, &node.layout_child, node.transform)
+    }
+}
+
+/// Convert RegularPolygonNodeRec to Taffy Style
+impl From<&crate::node::schema::RegularPolygonNodeRec> for Style {
+    fn from(node: &crate::node::schema::RegularPolygonNodeRec) -> Self {
+        let style = Style {
+            size: Size {
+                width: Dimension::length(node.size.width),
+                height: Dimension::length(node.size.height),
+            },
+            ..grida_style_default()
+        };
+        apply_layout_child(style, &node.layout_child, node.transform)
+    }
+}
+
+/// Convert RegularStarPolygonNodeRec to Taffy Style
+impl From<&crate::node::schema::RegularStarPolygonNodeRec> for Style {
+    fn from(node: &crate::node::schema::RegularStarPolygonNodeRec) -> Self {
+        let style = Style {
+            size: Size {
+                width: Dimension::length(node.size.width),
+                height: Dimension::length(node.size.height),
+            },
+            ..grida_style_default()
+        };
+        apply_layout_child(style, &node.layout_child, node.transform)
+    }
+}
+
+/// Convert TextSpanNodeRec to Taffy Style
+impl From<&crate::node::schema::TextSpanNodeRec> for Style {
+    fn from(node: &crate::node::schema::TextSpanNodeRec) -> Self {
+        let mut style = grida_style_default();
+
+        // Set width if specified, otherwise auto
+        if let Some(width) = node.width {
+            style.size.width = Dimension::length(width);
+        } else {
+            style.size.width = Dimension::auto();
+        }
+
+        // Height is auto for text (will be determined by content)
+        style.size.height = Dimension::auto();
+
+        apply_layout_child(style, &node.layout_child, node.transform)
+    }
 }

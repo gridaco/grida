@@ -65,6 +65,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             effects: LayerEffects::default(),
+            layout_child: None,
         }
     }
 
@@ -87,6 +88,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             corner_radius: None,
+            layout_child: None,
         }
     }
 
@@ -107,6 +109,7 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             _data_stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
+            layout_child: None,
         }
     }
 
@@ -120,6 +123,7 @@ impl NodeFactory {
             effects: LayerEffects::default(),
             transform: AffineTransform::identity(),
             width: None,
+            layout_child: None,
             height: None,
             max_lines: None,
             ellipsis: None,
@@ -236,6 +240,7 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
+            layout_child: None,
         }
     }
 
@@ -256,6 +261,7 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
+            layout_child: None,
         }
     }
 
@@ -274,6 +280,7 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
+            layout_child: None,
         }
     }
 
@@ -294,6 +301,7 @@ impl NodeFactory {
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             image: ResourceRef::RID(String::new()),
+            layout_child: None,
         }
     }
 }

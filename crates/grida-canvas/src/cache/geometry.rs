@@ -71,25 +71,18 @@ impl GeometryCache {
         paragraph_cache: &mut ParagraphCache,
         fonts: &FontRepository,
     ) -> Self {
-        let empty_layout = crate::layout::cache::LayoutResult::new();
         let default_viewport = crate::node::schema::Size {
             width: 1920.0,
             height: 1080.0,
         };
-        Self::from_scene_with_layout(
-            scene,
-            paragraph_cache,
-            fonts,
-            &empty_layout,
-            default_viewport,
-        )
+        Self::from_scene_with_layout(scene, paragraph_cache, fonts, None, default_viewport)
     }
 
     pub fn from_scene_with_layout(
         scene: &Scene,
         paragraph_cache: &mut ParagraphCache,
         fonts: &FontRepository,
-        layout_result: &crate::layout::cache::LayoutResult,
+        layout_result: Option<&crate::layout::cache::LayoutResult>,
         viewport_size: crate::node::schema::Size,
     ) -> Self {
         let mut cache = Self::new();
@@ -120,7 +113,7 @@ impl GeometryCache {
         cache: &mut GeometryCache,
         paragraph_cache: &mut ParagraphCache,
         fonts: &FontRepository,
-        layout_result: &crate::layout::cache::LayoutResult,
+        layout_result: Option<&crate::layout::cache::LayoutResult>,
         context: &GeometryBuildContext,
     ) -> Rectangle {
         let node = graph
@@ -310,42 +303,23 @@ impl GeometryCache {
                 entry.absolute_bounding_box
             }
             Node::Container(n) => {
-                // Transform resolution with rotation - NO FALLBACKS (except root init)
-                //
-                // Position handling:
-                // - Root nodes (parent_id.is_none()): Always use direct x, y fields
-                //   This is "preview mode" where root xy is respected for positioning
-                //   multiple canvases or artboards in a scene.
-                // - Child nodes: Use computed layout position from LayoutEngine
-                //   The layout engine computes positions based on flex/layout rules.
-                //
-                // Note: In "pure runtime" mode (single window), root xy would be ignored,
-                // but we don't have a use case for this currently.
-                let (x, y) = if parent_id.is_none() {
-                    // Root node: preserve original x, y (preview mode)
-                    (n.position.x().unwrap_or(0.0), n.position.y().unwrap_or(0.0))
-                } else {
-                    // Child node: must have computed layout position
-                    let computed = layout_result
+                // All containers use computed layout (roots have position corrected by LayoutEngine)
+                let (x, y, width, height) = if let Some(result) = layout_result {
+                    // Layout engine is active: use computed layout
+                    let computed = result
                         .get(id)
-                        .expect("Container child must have layout result");
-                    (computed.x, computed.y)
+                        .expect("Container must have layout result when layout engine is used");
+                    (computed.x, computed.y, computed.width, computed.height)
+                } else {
+                    // No layout engine: use schema directly (backward compatibility)
+                    (
+                        n.position.x().unwrap_or(0.0),
+                        n.position.y().unwrap_or(0.0),
+                        n.layout_dimensions.width.unwrap_or(0.0),
+                        n.layout_dimensions.height.unwrap_or(0.0),
+                    )
                 };
                 let local_transform = AffineTransform::new(x, y, n.rotation);
-
-                // Size resolution - prefer computed; fallback to layout dimensions for root only
-                let (width, height) = {
-                    if let Some(computed) = layout_result.get(id) {
-                        (computed.width, computed.height)
-                    } else if parent_id.is_none() {
-                        (
-                            n.layout_dimensions.width.unwrap_or(0.0),
-                            n.layout_dimensions.height.unwrap_or(0.0),
-                        )
-                    } else {
-                        panic!("Container with auto-sizing must have layout result");
-                    }
-                };
 
                 let local_bounds = Rectangle {
                     x: 0.0,
@@ -446,8 +420,8 @@ impl GeometryCache {
                 intrinsic_bounds
             }
             _ => {
-                // V1 nodes - use schema transform and size directly
-                let (local_transform, width, height) = match node {
+                // Leaf nodes - check layout result first, fallback to schema transform
+                let (rec_transform, schema_width, schema_height) = match node {
                     Node::Rectangle(n) => (n.transform, n.size.width, n.size.height),
                     Node::Ellipse(n) => (n.transform, n.size.width, n.size.height),
                     Node::Image(n) => (n.transform, n.size.width, n.size.height),
@@ -470,6 +444,25 @@ impl GeometryCache {
                     // V2/special nodes handled above
                     _ => unreachable!("Has dedicated case above"),
                 };
+
+                // Position and size resolution:
+                // - If layout result exists: Use computed position/size (participating in flex layout)
+                // - If no layout result: Use schema transform (no layout engine, or non-participating nodes)
+                let (x, y, width, height) =
+                    if let Some(result) = layout_result.and_then(|r| r.get(id)) {
+                        // Has computed layout: use layout position and size
+                        (result.x, result.y, result.width, result.height)
+                    } else {
+                        // No layout: use schema transform
+                        (
+                            rec_transform.x(),
+                            rec_transform.y(),
+                            schema_width,
+                            schema_height,
+                        )
+                    };
+
+                let local_transform = AffineTransform::new(x, y, rec_transform.rotation());
 
                 let local_bounds = Rectangle {
                     x: 0.0,

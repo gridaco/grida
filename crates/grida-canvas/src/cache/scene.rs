@@ -76,7 +76,7 @@ impl SceneCache {
             scene,
             &mut self.paragraph.borrow_mut(),
             fonts,
-            layout_result,
+            Some(layout_result),
             viewport_size,
         );
     }

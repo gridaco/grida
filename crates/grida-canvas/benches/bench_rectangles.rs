@@ -39,6 +39,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                 } else {
                     LayerEffects::default()
                 },
+                layout_child: None,
             })
         })
         .collect();

@@ -731,6 +731,10 @@ pub trait NodeTransformMixin {
     fn y(&self) -> f32;
 }
 
+pub trait NodeLayoutChildMixin {
+    fn layout_child_style(&self) -> LayoutChildStyle;
+}
+
 pub trait NodeGeometryMixin {
     /// if there is any valud stroke that should be taken into account for rendering, return true.
     /// stroke_width > 0.0 and at least one stroke with opacity > 0.0.
@@ -950,6 +954,9 @@ pub struct RectangleNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub effects: LayerEffects,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 }
 
 impl RectangleNodeRec {
@@ -1036,6 +1043,9 @@ pub struct LineNodeRec {
     pub stroke_width: f32,
     pub _data_stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 }
 
 impl LineNodeRec {
@@ -1074,6 +1084,9 @@ pub struct ImageNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub image: ResourceRef,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 }
 
 impl NodeStrokesMixin for ImageNodeRec {
@@ -1171,6 +1184,9 @@ pub struct EllipseNodeRec {
     pub angle: Option<f32>,
 
     pub corner_radius: Option<f32>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 }
 
 impl NodeFillsMixin for EllipseNodeRec {
@@ -1462,6 +1478,9 @@ pub struct PolygonNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 }
 
 impl NodeFillsMixin for PolygonNodeRec {
@@ -1581,6 +1600,9 @@ pub struct RegularPolygonNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 }
 
 impl NodeFillsMixin for RegularPolygonNodeRec {
@@ -1709,6 +1731,9 @@ pub struct RegularStarPolygonNodeRec {
     pub stroke_align: StrokeAlign,
     /// Overall node opacity (0.0–1.0)
     pub stroke_dash_array: Option<Vec<f32>>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 }
 
 impl NodeFillsMixin for RegularStarPolygonNodeRec {
@@ -1797,6 +1822,9 @@ pub struct TextSpanNodeRec {
 
     /// Layout bounds (used for wrapping and alignment).
     pub width: Option<f32>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 
     /// Height of the text container box.
     ///

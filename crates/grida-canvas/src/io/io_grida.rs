@@ -1246,6 +1246,14 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 node.base.rotation,
             ),
             width,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
             height,
             max_lines: node.max_lines,
             ellipsis: None,
@@ -1343,6 +1351,14 @@ impl From<JSONEllipseNode> for Node {
             inner_radius: node.inner_radius,
             start_angle: node.angle_offset.unwrap_or(0.0),
             angle: node.angle,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
             corner_radius: node
                 .base
                 .corner_radius
@@ -1383,6 +1399,14 @@ impl From<JSONRectangleNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -1473,6 +1497,14 @@ impl From<JSONImageNode> for Node {
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             image: fill.image.clone(),
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1514,6 +1546,14 @@ impl From<JSONRegularPolygonNode> for Node {
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             point_count: node.point_count,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1556,6 +1596,14 @@ impl From<JSONRegularStarPolygonNode> for Node {
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             point_count: node.point_count,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1629,6 +1677,14 @@ impl From<JSONLineNode> for Node {
             stroke_width: node.base.stroke_width,
             _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
             stroke_dash_array: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }

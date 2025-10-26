@@ -220,6 +220,7 @@ impl<'a> NodePainter<'a> {
             stroke_align: node.stroke_align,
             effects: node.effects.clone(),
             stroke_dash_array: node.stroke_dash_array.clone(),
+            layout_child: node.layout_child.clone(),
         };
 
         self.draw_polygon_node(&polygon);
@@ -243,6 +244,7 @@ impl<'a> NodePainter<'a> {
             stroke_align: node.stroke_align,
             effects: node.effects.clone(),
             stroke_dash_array: node.stroke_dash_array.clone(),
+            layout_child: node.layout_child.clone(),
         };
 
         self.draw_polygon_node(&polygon);

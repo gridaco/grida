@@ -207,6 +207,22 @@ impl SceneGraph {
         &self.roots
     }
 
+    /// Check if a node is a root node
+    pub fn is_root(&self, id: &NodeId) -> bool {
+        self.roots.contains(id)
+    }
+
+    /// Get the parent of a node
+    /// Returns None if the node is a root or not found
+    pub fn get_parent(&self, id: &NodeId) -> Option<NodeId> {
+        for (parent_id, children) in &self.links {
+            if children.contains(id) {
+                return Some(*parent_id);
+            }
+        }
+        None
+    }
+
     // -------------------------------------------------------------------------
     // Node Data Methods
     // -------------------------------------------------------------------------

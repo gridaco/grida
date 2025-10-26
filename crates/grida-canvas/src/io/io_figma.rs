@@ -263,6 +263,74 @@ impl From<&figma_api::models::frame_node::LayoutPositioning> for LayoutPositioni
     }
 }
 
+impl From<&figma_api::models::text_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::text_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::text_node::LayoutPositioning::Auto => LayoutPositioning::Auto,
+            figma_api::models::text_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
+        }
+    }
+}
+
+impl From<&figma_api::models::star_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::star_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::star_node::LayoutPositioning::Auto => LayoutPositioning::Auto,
+            figma_api::models::star_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
+        }
+    }
+}
+
+impl From<&figma_api::models::line_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::line_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::line_node::LayoutPositioning::Auto => LayoutPositioning::Auto,
+            figma_api::models::line_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
+        }
+    }
+}
+
+impl From<&figma_api::models::ellipse_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::ellipse_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::ellipse_node::LayoutPositioning::Auto => LayoutPositioning::Auto,
+            figma_api::models::ellipse_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
+        }
+    }
+}
+
+impl From<&figma_api::models::regular_polygon_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::regular_polygon_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::regular_polygon_node::LayoutPositioning::Auto => {
+                LayoutPositioning::Auto
+            }
+            figma_api::models::regular_polygon_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
+        }
+    }
+}
+
+impl From<&figma_api::models::rectangle_node::LayoutPositioning> for LayoutPositioning {
+    fn from(position: &figma_api::models::rectangle_node::LayoutPositioning) -> Self {
+        match position {
+            figma_api::models::rectangle_node::LayoutPositioning::Auto => LayoutPositioning::Auto,
+            figma_api::models::rectangle_node::LayoutPositioning::Absolute => {
+                LayoutPositioning::Absolute
+            }
+        }
+    }
+}
+
 fn map_option<'a, T, U>(value: Option<&'a T>) -> Option<U>
 where
     U: From<&'a T>,
@@ -1129,6 +1197,14 @@ impl FigmaConverter {
                 .size
                 .as_ref()
                 .map_or(None, |size| Some(size.x as f32)),
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: origin
+                    .layout_positioning
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
             height: origin
                 .size
                 .as_ref()
@@ -1389,6 +1465,14 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: origin
+                    .layout_positioning
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         }))
     }
 
@@ -1421,6 +1505,14 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: origin
+                    .layout_positioning
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         }))
     }
 
@@ -1462,6 +1554,14 @@ impl FigmaConverter {
             ),
             start_angle: origin.arc_data.starting_angle.to_degrees() as f32,
             corner_radius: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: origin
+                    .layout_positioning
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         }))
     }
 
@@ -1496,6 +1596,14 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: origin
+                    .layout_positioning
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         }))
     }
 
@@ -1529,6 +1637,14 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: origin
+                    .layout_positioning
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         }))
     }
 

@@ -11,10 +11,35 @@
 //! - **ICB-less support**: Works with or without InitialContainerBlock, supports any node as root
 //! - **Future-proof**: Clear path to support layout on all node types
 //!
+//! ## Infinite Canvas Support
+//!
+//! Grida is an infinite canvas with layout capabilities. Root nodes can be positioned anywhere
+//! in the viewport (like artboards in design tools), while their children participate in flex layout.
+//!
+//! ### The Challenge
+//!
+//! Taffy (our layout library) cannot position tree roots using `position: absolute` with `inset`
+//! because roots have no containing block. Taffy always computes root nodes at (0, 0).
+//!
+//! ### The Solution
+//!
+//! **Post-processing in `extract_all_layouts()`**:
+//! 1. Taffy computes all layouts (roots at 0,0, children correctly positioned)
+//! 2. `extract_all_layouts()` detects root nodes via `graph.is_root()`
+//! 3. Root positions are overridden with schema positions via `get_schema_position()`
+//! 4. GeometryCache consumes corrected layout results (no special cases needed)
+//!
+//! This keeps **all infinite canvas logic in LayoutEngine**, maintaining clean separation:
+//! - **LayoutEngine**: Owns layout computation AND infinite canvas positioning
+//! - **GeometryCache**: Transforms layout results to geometry (no layout concerns)
+//!
+//! See `test_root_positioning_integration()` for the full pipeline verification.
+//!
 //! ## Pipeline Guarantees
 //!
 //! This module guarantees:
 //! - Every node gets a layout result (either computed or static)
+//! - Root node positions are corrected to schema positions (infinite canvas)
 //! - Layout results are complete before Geometry phase begins
 //! - Missing layout results indicate a bug in the layout engine
 
@@ -85,6 +110,34 @@ impl LayoutEngine {
         &self.result
     }
 
+    /// Extract schema x, y position from any node type
+    ///
+    /// Used for infinite canvas support: root nodes use their schema positions
+    /// instead of Taffy's computed (0, 0) position.
+    ///
+    /// - Container nodes use `position.x()` / `position.y()`
+    /// - Leaf nodes (Rectangle, Ellipse, etc.) use `transform.x()` / `transform.y()`
+    /// - ICB (InitialContainerBlock) always returns (0, 0)
+    fn get_schema_position(node: &Node) -> (f32, f32) {
+        match node {
+            Node::Container(n) => (n.position.x().unwrap_or(0.0), n.position.y().unwrap_or(0.0)),
+            Node::Rectangle(n) => (n.transform.x(), n.transform.y()),
+            Node::Ellipse(n) => (n.transform.x(), n.transform.y()),
+            Node::Image(n) => (n.transform.x(), n.transform.y()),
+            Node::Line(n) => (n.transform.x(), n.transform.y()),
+            Node::Polygon(n) => (n.transform.x(), n.transform.y()),
+            Node::RegularPolygon(n) => (n.transform.x(), n.transform.y()),
+            Node::RegularStarPolygon(n) => (n.transform.x(), n.transform.y()),
+            Node::TextSpan(n) => (n.transform.x(), n.transform.y()),
+            Node::Group(n) => {
+                let t = n.transform.unwrap_or_default();
+                (t.x(), t.y())
+            }
+            Node::InitialContainer(_) => (0.0, 0.0), // ICB always at origin
+            _ => (0.0, 0.0),
+        }
+    }
+
     /// Recursively build Taffy tree for a node and its descendants
     ///
     /// This universal method handles all node types without switch-case logic.
@@ -98,7 +151,12 @@ impl LayoutEngine {
         let node = graph.get_node(node_id).ok()?;
 
         // Get style for this node (universal mapping)
+        // Note: Absolutely positioned children are still included in the tree,
+        // Taffy handles them specially (removes them from flex flow but computes their position)
         let mut style = crate::layout::into_taffy::node_to_taffy_style(node, graph, node_id);
+
+        // Note: Root nodes are laid out by Taffy at (0,0)
+        // extract_all_layouts() post-processes to apply schema positions
 
         // Special handling for root ICB nodes - use viewport size
         if let Node::InitialContainer(_) = node {
@@ -113,15 +171,11 @@ impl LayoutEngine {
 
         if let Some(children) = children {
             if !children.is_empty() {
-                // Build children recursively
-                let mut taffy_children = Vec::new();
-                for child_id in children {
-                    if let Some(child_taffy) =
-                        self.build_taffy_subtree(child_id, graph, viewport_size)
-                    {
-                        taffy_children.push(child_taffy);
-                    }
-                }
+                // Build children recursively, filtering out those that shouldn't participate
+                let taffy_children: Vec<taffy::NodeId> = children
+                    .iter()
+                    .filter_map(|child_id| self.build_taffy_subtree(child_id, graph, viewport_size))
+                    .collect();
 
                 // Create parent with children
                 return self
@@ -136,10 +190,29 @@ impl LayoutEngine {
     }
 
     /// Recursively extract all computed layouts from the Taffy tree
+    ///
+    /// **Infinite Canvas Support**: Root nodes have their positions corrected here.
+    ///
+    /// Taffy computes all tree roots at (0, 0) because they have no containing block.
+    /// For infinite canvas support, we override root positions with their schema positions
+    /// so multiple artboards/nodes can be positioned anywhere in the viewport.
+    ///
+    /// Child nodes use Taffy's computed positions unchanged (correct flex/absolute layout).
     fn extract_all_layouts(&mut self, id: &NodeId, graph: &SceneGraph) {
         // Extract this node's layout if it exists in the Taffy tree
         if let Some(layout) = self.tree.get_layout(id) {
-            self.result.insert(*id, ComputedLayout::from(layout));
+            let mut computed = ComputedLayout::from(layout);
+
+            // Apply schema position for root nodes (Taffy computes roots at 0,0)
+            if graph.is_root(id) {
+                if let Ok(node) = graph.get_node(id) {
+                    let (schema_x, schema_y) = Self::get_schema_position(node);
+                    computed.x = schema_x;
+                    computed.y = schema_y;
+                }
+            }
+
+            self.result.insert(*id, computed);
         }
 
         // Recurse for children
@@ -155,11 +228,12 @@ impl LayoutEngine {
 mod tests {
     use super::*;
     use crate::cg::types::{
-        Axis, CrossAxisAlignment, LayoutGap, LayoutMode, LayoutWrap, MainAxisAlignment,
+        Axis, CGPoint, CrossAxisAlignment, LayoutGap, LayoutMode, LayoutWrap, MainAxisAlignment,
     };
     use crate::node::factory::NodeFactory;
     use crate::node::scene_graph::{Parent, SceneGraph};
     use crate::node::schema::*;
+    use math2::transform::AffineTransform;
 
     /// Test 1: Flex container with mixed node types
     #[test]
@@ -779,5 +853,384 @@ mod tests {
             layout.y, 450.0,
             "Child should be centered vertically (cross axis)"
         );
+    }
+
+    #[test]
+    fn test_absolute_positioned_child_not_in_flex_flow() {
+        // Verify that absolutely positioned children don't affect flex layout flow
+        // but still get positioned by Taffy
+        use crate::cg::types::LayoutPositioning;
+        use crate::node::schema::LayoutChildStyle;
+
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Create a flex container
+        let mut container = nf.create_container_node();
+        container.layout_container = LayoutContainerStyle {
+            layout_mode: LayoutMode::Flex,
+            layout_direction: Axis::Horizontal,
+            layout_gap: Some(LayoutGap::uniform(10.0)),
+            ..Default::default()
+        };
+        container.layout_dimensions.width = Some(400.0);
+        container.layout_dimensions.height = Some(200.0);
+        let container_id = graph.append_child(Node::Container(container), Parent::Root);
+
+        // Add a normal (relative) child
+        let mut rect1 = nf.create_rectangle_node();
+        rect1.size = Size {
+            width: 100.0,
+            height: 100.0,
+        };
+        let child1_id = graph.append_child(Node::Rectangle(rect1), Parent::NodeId(container_id));
+
+        // Add an absolutely positioned child at (50, 75)
+        let mut rect2 = nf.create_rectangle_node();
+        rect2.size = Size {
+            width: 100.0,
+            height: 100.0,
+        };
+        rect2.transform = AffineTransform::new(50.0, 75.0, 0.0);
+        rect2.layout_child = Some(LayoutChildStyle {
+            layout_positioning: LayoutPositioning::Absolute,
+            layout_grow: 0.0,
+        });
+        let child2_id = graph.append_child(Node::Rectangle(rect2), Parent::NodeId(container_id));
+
+        // Add another normal child
+        let mut rect3 = nf.create_rectangle_node();
+        rect3.size = Size {
+            width: 100.0,
+            height: 100.0,
+        };
+        let child3_id = graph.append_child(Node::Rectangle(rect3), Parent::NodeId(container_id));
+
+        // Compute layout
+        let scene = Scene {
+            name: "test".to_string(),
+            graph,
+            background_color: None,
+        };
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+        );
+
+        // Verify all children get layout results (Taffy computes absolute positioned ones too)
+        let layout1 = result
+            .get(&child1_id)
+            .expect("Relative child 1 should have layout");
+        let layout2 = result
+            .get(&child2_id)
+            .expect("Absolute child 2 should have layout from Taffy");
+        let layout3 = result
+            .get(&child3_id)
+            .expect("Relative child 3 should have layout");
+
+        // Verify that relative children are positioned as if absolute child doesn't exist in flex flow
+        // child1 at x=0, child3 at x=110 (100 + 10 gap)
+        assert_eq!(layout1.x, 0.0, "First relative child at x=0");
+        assert_eq!(
+            layout3.x, 110.0,
+            "Second relative child at x=110 (ignoring absolute child in flex flow)"
+        );
+
+        // Verify absolute child is positioned at its inset coordinates (50, 75)
+        assert_eq!(layout2.x, 50.0, "Absolute child at x=50 (from inset)");
+        assert_eq!(layout2.y, 75.0, "Absolute child at y=75 (from inset)");
+    }
+
+    #[test]
+    fn test_root_container_respects_position() {
+        // Verify that root containers at non-zero positions work correctly
+        // LayoutEngine post-processes Taffy results to apply schema positions
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Create a root container at position (100, 50)
+        let mut container = nf.create_container_node();
+        container.position = LayoutPositioningBasis::Cartesian(CGPoint::new(100.0, 50.0));
+        container.layout_dimensions.width = Some(200.0);
+        container.layout_dimensions.height = Some(150.0);
+        let container_id = graph.append_child(Node::Container(container), Parent::Root);
+
+        let scene = Scene {
+            name: "test".to_string(),
+            graph,
+            background_color: None,
+        };
+
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+        );
+
+        let layout = result
+            .get(&container_id)
+            .expect("Root container should have layout");
+
+        // LayoutEngine corrects root positions after Taffy computation
+        assert_eq!(layout.x, 100.0, "Root container x from schema");
+        assert_eq!(layout.y, 50.0, "Root container y from schema");
+        assert_eq!(layout.width, 200.0);
+        assert_eq!(layout.height, 150.0);
+    }
+
+    #[test]
+    fn test_root_node_always_gets_layout_even_if_marked_absolute() {
+        // Verify that root nodes always participate in layout,
+        // even if they somehow have layout_child with Absolute positioning
+        use crate::cg::types::LayoutPositioning;
+        use crate::node::schema::LayoutChildStyle;
+
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Create a root rectangle marked as "absolute" (shouldn't matter for roots)
+        let mut rect = nf.create_rectangle_node();
+        rect.size = Size {
+            width: 200.0,
+            height: 150.0,
+        };
+        rect.transform = AffineTransform::new(100.0, 50.0, 0.0);
+        rect.layout_child = Some(LayoutChildStyle {
+            layout_positioning: LayoutPositioning::Absolute,
+            layout_grow: 0.0,
+        });
+        let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
+
+        // Compute layout
+        let scene = Scene {
+            name: "test".to_string(),
+            graph,
+            background_color: None,
+        };
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+        );
+
+        // Root node MUST get layout result, even if marked absolute
+        let layout = result
+            .get(&rect_id)
+            .expect("Root node must ALWAYS have layout result, even if marked absolute");
+
+        // Verify it has its dimensions
+        assert_eq!(layout.width, 200.0);
+        assert_eq!(layout.height, 150.0);
+    }
+
+    #[test]
+    fn test_mixed_absolute_and_relative_children() {
+        // Complex scenario: flex container with mix of absolute and relative children
+        use crate::cg::types::LayoutPositioning;
+        use crate::node::schema::LayoutChildStyle;
+
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Create flex container
+        let mut container = nf.create_container_node();
+        container.layout_container = LayoutContainerStyle {
+            layout_mode: LayoutMode::Flex,
+            layout_direction: Axis::Vertical,
+            layout_gap: Some(LayoutGap::uniform(20.0)),
+            ..Default::default()
+        };
+        container.layout_dimensions.width = Some(300.0);
+        container.layout_dimensions.height = Some(500.0);
+        let container_id = graph.append_child(Node::Container(container), Parent::Root);
+
+        // Relative child 1
+        let mut rect1 = nf.create_rectangle_node();
+        rect1.size = Size {
+            width: 100.0,
+            height: 50.0,
+        };
+        let child1_id = graph.append_child(Node::Rectangle(rect1), Parent::NodeId(container_id));
+
+        // Absolute child (should be excluded)
+        let mut rect2 = nf.create_rectangle_node();
+        rect2.size = Size {
+            width: 80.0,
+            height: 80.0,
+        };
+        rect2.layout_child = Some(LayoutChildStyle {
+            layout_positioning: LayoutPositioning::Absolute,
+            layout_grow: 0.0,
+        });
+        let child2_id = graph.append_child(Node::Rectangle(rect2), Parent::NodeId(container_id));
+
+        // Relative child 2
+        let mut rect3 = nf.create_rectangle_node();
+        rect3.size = Size {
+            width: 100.0,
+            height: 50.0,
+        };
+        let child3_id = graph.append_child(Node::Rectangle(rect3), Parent::NodeId(container_id));
+
+        // Absolute child (should be excluded)
+        let mut rect4 = nf.create_rectangle_node();
+        rect4.size = Size {
+            width: 60.0,
+            height: 60.0,
+        };
+        rect4.layout_child = Some(LayoutChildStyle {
+            layout_positioning: LayoutPositioning::Absolute,
+            layout_grow: 0.0,
+        });
+        let child4_id = graph.append_child(Node::Rectangle(rect4), Parent::NodeId(container_id));
+
+        // Relative child 3
+        let mut rect5 = nf.create_rectangle_node();
+        rect5.size = Size {
+            width: 100.0,
+            height: 50.0,
+        };
+        let child5_id = graph.append_child(Node::Rectangle(rect5), Parent::NodeId(container_id));
+
+        // Compute layout
+        let scene = Scene {
+            name: "test".to_string(),
+            graph,
+            background_color: None,
+        };
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+        );
+
+        // Verify all children get layout results (Taffy handles both relative and absolute)
+        assert!(
+            result.get(&child1_id).is_some(),
+            "Relative child 1 should have layout"
+        );
+        assert!(
+            result.get(&child2_id).is_some(),
+            "Absolute child 2 should have layout (Taffy positions it)"
+        );
+        assert!(
+            result.get(&child3_id).is_some(),
+            "Relative child 3 should have layout"
+        );
+        assert!(
+            result.get(&child4_id).is_some(),
+            "Absolute child 4 should have layout (Taffy positions it)"
+        );
+        assert!(
+            result.get(&child5_id).is_some(),
+            "Relative child 5 should have layout"
+        );
+
+        // Verify vertical layout for relative children (absolute children don't affect flex flow)
+        let layout1 = result.get(&child1_id).unwrap();
+        let layout3 = result.get(&child3_id).unwrap();
+        let layout5 = result.get(&child5_id).unwrap();
+
+        // Vertical positioning: y=0, y=70 (50+20), y=140 (50+20+50+20)
+        // Absolute children are ignored in flex flow calculations
+        assert_eq!(layout1.y, 0.0, "First relative child at y=0");
+        assert_eq!(
+            layout3.y, 70.0,
+            "Second relative child at y=70 (50 + 20 gap, ignoring absolute in flow)"
+        );
+        assert_eq!(
+            layout5.y, 140.0,
+            "Third relative child at y=140 (50 + 20 + 50 + 20, ignoring absolute in flow)"
+        );
+    }
+
+    #[test]
+    fn test_root_positioning_integration() {
+        // Test: SceneGraph + LayoutEngine + GeometryCache integration
+        // Verifies root containers and rectangles respect schema positions
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Root container at (100, 50)
+        let mut container = nf.create_container_node();
+        container.position = LayoutPositioningBasis::Cartesian(CGPoint::new(100.0, 50.0));
+        container.layout_dimensions.width = Some(200.0);
+        container.layout_dimensions.height = Some(100.0);
+        let container_id = graph.append_child(Node::Container(container), Parent::Root);
+
+        // Root rectangle at (300, 150)
+        let mut rect = nf.create_rectangle_node();
+        rect.transform = AffineTransform::new(300.0, 150.0, 0.0);
+        rect.size = Size {
+            width: 100.0,
+            height: 80.0,
+        };
+        let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
+
+        let scene = Scene {
+            name: "test".to_string(),
+            graph,
+            background_color: None,
+        };
+
+        // Compute layout
+        let mut engine = LayoutEngine::new();
+        let layout_result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+        );
+
+        // Verify: Layout results have corrected positions
+        let container_layout = layout_result.get(&container_id).unwrap();
+        assert_eq!(container_layout.x, 100.0, "Root container x from schema");
+        assert_eq!(container_layout.y, 50.0, "Root container y from schema");
+
+        let rect_layout = layout_result.get(&rect_id).unwrap();
+        assert_eq!(rect_layout.x, 300.0, "Root rectangle x from schema");
+        assert_eq!(rect_layout.y, 150.0, "Root rectangle y from schema");
+
+        // Verify: GeometryCache uses corrected positions
+        use crate::cache::paragraph::ParagraphCache;
+        use crate::resources::ByteStore;
+        use crate::runtime::font_repository::FontRepository;
+        use std::sync::{Arc, Mutex};
+
+        let store = Arc::new(Mutex::new(ByteStore::new()));
+        let fonts = FontRepository::new(store);
+        let mut para_cache = ParagraphCache::new();
+        let geom = crate::cache::geometry::GeometryCache::from_scene_with_layout(
+            &scene,
+            &mut para_cache,
+            &fonts,
+            Some(layout_result),
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+        );
+
+        let container_transform = geom.get_transform(&container_id).unwrap();
+        assert_eq!(container_transform.x(), 100.0);
+        assert_eq!(container_transform.y(), 50.0);
+
+        let rect_transform = geom.get_transform(&rect_id).unwrap();
+        assert_eq!(rect_transform.x(), 300.0);
+        assert_eq!(rect_transform.y(), 150.0);
     }
 }
