@@ -62,7 +62,11 @@ import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
 import { useFollowPlugin } from "../plugins/use-follow";
 import { SurfaceVariableWidthEditor } from "./ui/surface-varwidth-editor";
-import { MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE } from "../ui-config";
+import {
+  MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE,
+  MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE,
+  MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE,
+} from "../ui-config";
 import {
   NodeOverlayCornerRadiusHandle,
   NodeOverlayRectangularCornerRadiusHandles,
@@ -869,71 +873,85 @@ function SingleSelectionOverlay({
 }) {
   const editor = useCurrentEditor();
   const { gesture, is_node_translating } = useGestureState();
+  const { scaleX, scaleY } = useTransformState();
   const data = useSingleSelection(node_id);
   if (!data) return <></>;
 
-  const {
-    node,
-    distribution,
-    rotation,
-    style,
-    boundingSurfaceRect,
-    size,
-    object,
-  } = data;
+  const { node, distribution, rotation, boundingSurfaceRect, size, object } =
+    data;
 
   // Get padding if this is a container
   const padding =
     node.type === "container" && "padding" in node ? node.padding : undefined;
 
+  // Calculate measurement rect for visibility checks
+  const measurement_rect = {
+    x: 0,
+    y: 0,
+    width: size[0] * scaleX,
+    height: size[1] * scaleY,
+  };
+
+  const show_gap_overlay =
+    measurement_rect.width >= MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE &&
+    measurement_rect.height >= MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE;
+
+  const show_padding_overlay =
+    measurement_rect.width >= MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE &&
+    measurement_rect.height >= MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE;
+
   return (
     <>
       <div className="group">
-        {node.meta.is_flex_parent &&
-          distribution &&
-          (gesture.type === "idle" ||
-            gesture.type === "gap" ||
-            gesture.type === "padding") &&
-          // TODO: support rotated surface
-          rotation === 0 && (
-            <>
-              <GapOverlay
-                offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
-                distribution={distribution}
-                style={style}
-                onGapGestureStart={(axis) => {
-                  editor.surface.surfaceStartGapGesture(node_id, axis);
-                }}
-              />
-              {padding !== undefined && (
-                <PaddingOverlay
-                  containerRect={object.boundingRect}
-                  padding={
-                    typeof padding === "number"
-                      ? {
-                          top: padding,
-                          right: padding,
-                          bottom: padding,
-                          left: padding,
-                        }
-                      : {
-                          top: padding.paddingTop,
-                          right: padding.paddingRight,
-                          bottom: padding.paddingBottom,
-                          left: padding.paddingLeft,
-                        }
-                  }
-                  offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
-                  style={style}
-                  onPaddingGestureStart={(side) => {
-                    editor.surface.surfaceStartPaddingGesture(node_id, side);
-                  }}
-                />
-              )}
-            </>
-          )}
         <SurfaceFragmentGroup hidden={is_node_translating}>
-          <NodeOverlay node_id={node_id} readonly={readonly} focused />
+          <NodeOverlay node_id={node_id} readonly={readonly} focused>
+            {node.meta.is_flex_parent &&
+              distribution &&
+              (gesture.type === "idle" ||
+                gesture.type === "gap" ||
+                gesture.type === "padding") &&
+              // TODO: support rotated surface
+              rotation === 0 && (
+                <>
+                  {show_gap_overlay && (
+                    <GapOverlay
+                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                      distribution={distribution}
+                      onGapGestureStart={(axis) => {
+                        editor.surface.surfaceStartGapGesture(node_id, axis);
+                      }}
+                    />
+                  )}
+                  {show_padding_overlay && padding !== undefined && (
+                    <PaddingOverlay
+                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                      containerRect={object.boundingRect}
+                      padding={
+                        typeof padding === "number"
+                          ? {
+                              top: padding,
+                              right: padding,
+                              bottom: padding,
+                              left: padding,
+                            }
+                          : {
+                              top: padding.paddingTop,
+                              right: padding.paddingRight,
+                              bottom: padding.paddingBottom,
+                              left: padding.paddingLeft,
+                            }
+                      }
+                      onPaddingGestureStart={(side) => {
+                        editor.surface.surfaceStartPaddingGesture(
+                          node_id,
+                          side
+                        );
+                      }}
+                    />
+                  )}
+                </>
+              )}
+          </NodeOverlay>
         </SurfaceFragmentGroup>
       </div>
     </>
@@ -1066,14 +1084,15 @@ function NodeOverlay({
   focused,
   borderColor,
   borderWidth,
-}: {
+  children,
+}: React.PropsWithChildren<{
   node_id: string;
   readonly?: boolean;
   zIndex?: number;
   focused?: boolean;
   borderColor?: string;
   borderWidth?: number;
-}) {
+}>) {
   const { scaleX, scaleY } = useTransformState();
   const backend = useBackendState();
   const tool = useToolState();
@@ -1091,13 +1110,7 @@ function NodeOverlay({
         }
       },
     },
-    {
-      drag: {
-        enabled,
-        threshold: DRAG_THRESHOLD,
-        keyboardDisplacement: 0,
-      },
-    }
+    { enabled }
   );
 
   const data = useSingleSelection(node_id);
@@ -1120,9 +1133,7 @@ function NodeOverlay({
     measurement_rect.width >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE &&
     measurement_rect.height >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE;
 
-  {
-    /* TODO: resize for bitmap is not supported */
-  }
+  // TODO: resize for bitmap is not supported */
   const is_resizable_node = node.type !== "bitmap";
 
   return (
@@ -1187,6 +1198,7 @@ function NodeOverlay({
             className="bg-workbench-accent-sky group-data-[layer-is-component-consumer='true']:bg-workbench-accent-violet text-white"
           />
         )}
+        {children}
       </LayerOverlay>
     </>
   );
@@ -1260,7 +1272,7 @@ function LayerOverlayResizeHandle({
 }) {
   const editor = useCurrentEditor();
 
-  const zIndex = ["n", "e", "s", "w"].includes(anchor) ? 12 : 11;
+  const zIndex = ["n", "e", "s", "w"].includes(anchor) ? 11 : 21;
 
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {

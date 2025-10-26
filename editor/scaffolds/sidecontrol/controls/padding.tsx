@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from "react";
 import InputPropertyNumber from "../ui/number";
 import { WorkbenchUI } from "@/components/workbench";
-import grida from "@grida/schema";
-import { cn } from "@/components/lib/utils";
-import { SquareIcon, SquareDashedIcon } from "lucide-react";
+import { AllSidesIcon } from "@radix-ui/react-icons";
 import { Toggle } from "@/components/ui/toggle";
+import { cn } from "@/components/lib/utils";
+import grida from "@grida/schema";
 
 type Padding = grida.program.nodes.i.IPadding["padding"];
 
@@ -96,9 +96,9 @@ export function PaddingControl({
             variant="outline"
             pressed={showIndividual}
             onPressedChange={setShowIndividual}
-            className="shadow-sm size-6 min-w-6 px-0 data-[state=on]:*:[svg]:text-workbench-accent-sky"
+            className="bg-transparent border-none shadow-none size-6 min-w-6 px-0 data-[state=on]:*:[svg]:text-workbench-accent-sky"
           >
-            <SquareIcon className="size-3.5 text-muted-foreground" />
+            <AllSidesIcon className="size-3.5 text-muted-foreground" />
           </Toggle>
         </div>
       </div>

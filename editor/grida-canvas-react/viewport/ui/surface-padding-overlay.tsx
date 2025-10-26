@@ -45,7 +45,7 @@ export function PaddingOverlay({
       cmath.rect.getOppositeSide(hoveredSide) === side
     );
 
-  // Transform container rect to surface space
+  // Transform container rect to surface space for scaling
   const surfaceRect = useMemo(
     () => cmath.rect.transform(containerRect, transform),
     [containerRect, transform]
@@ -59,14 +59,21 @@ export function PaddingOverlay({
 
     const { top = 0, right = 0, bottom = 0, left = 0 } = padding;
 
+    // When inside LayerOverlay, position relative to (0,0)
+    // Calculate the base rect - either use offset adjustment or position from containerRect
+    const baseX = offset ? surfaceRect.x - offset[0] : 0;
+    const baseY = offset ? surfaceRect.y - offset[1] : 0;
+    const width = surfaceRect.width;
+    const height = surfaceRect.height;
+
     // Only show padding if it's greater than 0
     if (top > 0) {
       rects.push({
         side: "top",
         rect: {
-          x: surfaceRect.x,
-          y: surfaceRect.y,
-          width: surfaceRect.width,
+          x: baseX,
+          y: baseY,
+          width: width,
           height: top * transform[1][1], // Scale by transform
         },
       });
@@ -76,10 +83,10 @@ export function PaddingOverlay({
       rects.push({
         side: "right",
         rect: {
-          x: surfaceRect.x + surfaceRect.width - right * transform[0][0],
-          y: surfaceRect.y,
+          x: baseX + width - right * transform[0][0],
+          y: baseY,
           width: right * transform[0][0],
-          height: surfaceRect.height,
+          height: height,
         },
       });
     }
@@ -88,9 +95,9 @@ export function PaddingOverlay({
       rects.push({
         side: "bottom",
         rect: {
-          x: surfaceRect.x,
-          y: surfaceRect.y + surfaceRect.height - bottom * transform[1][1],
-          width: surfaceRect.width,
+          x: baseX,
+          y: baseY + height - bottom * transform[1][1],
+          width: width,
           height: bottom * transform[1][1],
         },
       });
@@ -100,21 +107,12 @@ export function PaddingOverlay({
       rects.push({
         side: "left",
         rect: {
-          x: surfaceRect.x,
-          y: surfaceRect.y,
+          x: baseX,
+          y: baseY,
           width: left * transform[0][0],
-          height: surfaceRect.height,
+          height: height,
         },
       });
-    }
-
-    // Apply offset if provided
-    if (offset) {
-      const invertedOffset = cmath.vector2.invert(offset);
-      return rects.map((r) => ({
-        ...r,
-        rect: cmath.rect.translate(r.rect, invertedOffset),
-      }));
     }
 
     return rects;

@@ -165,36 +165,33 @@ function GapWithHandle({
         }}
         data-is-gesture={is_gesture}
         data-highlighted={highlighted}
-        className={cn(
-          "group/gap pointer-events-auto bg-transparent data-[is-gesture='true']:bg-workbench-accent-red/20",
-          className
-        )}
+        className={cn("group/gap pointer-events-none", className)}
         {...props}
       >
-        {/* highlight pattern - only shown when gap is hovered, but hidden while dragging */}
-        <svg className="absolute inset-0 overflow-visible pointer-events-none invisible group-data-[highlighted='true']/gap:visible group-data-[is-gesture='true']/gap:invisible">
+        <svg className="absolute inset-0 overflow-visible pointer-events-none">
           <SVGPatternDiagonalStripe
             id="gap-diagonal-stripes"
             className="text-workbench-accent-pink/50"
             patternWidth={1}
             patternSpacing={5}
           />
+          {/* highlight pattern - only shown when gap is hovered, but hidden while dragging */}
+          {/* while dragging, tinted fill is applied */}
           <rect
             x={0}
             y={0}
             width={r.width}
             height={r.height}
-            fill={`url(#gap-diagonal-stripes)`}
+            className="fill-transparent group-data-[is-gesture=true]/gap:fill-workbench-accent-pink/20 group-data-[highlighted=true]/gap:fill-[url(#gap-diagonal-stripes)]"
           />
         </svg>
         <div
-          data-is-gesture={is_gesture}
           style={{
             position: "absolute",
             top: "50%",
             left: "50%",
           }}
-          className="opacity-100 data-[is-gesture='true']:opacity-0"
+          className="opacity-100 group-data-[is-gesture='true']/gap:opacity-0"
         >
           <GapHandle axis={axis} onGapGestureStart={onGapGestureStart} />
         </div>
