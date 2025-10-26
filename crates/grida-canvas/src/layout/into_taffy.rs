@@ -281,9 +281,17 @@ pub fn node_to_taffy_style(node: &Node, _graph: &SceneGraph, _node_id: &NodeId) 
         Node::Polygon(n) => n.into(),
         Node::RegularPolygon(n) => n.into(),
         Node::RegularStarPolygon(n) => n.into(),
+        Node::Vector(n) => n.into(),
+        Node::SVGPath(n) => n.into(),
+        Node::Error(n) => Style {
+            size: Size {
+                width: Dimension::length(n.size.width),
+                height: Dimension::length(n.size.height),
+            },
+            ..grida_style_default()
+        },
         Node::Group(_) => grida_style_default(),
-        Node::Error(_) => grida_style_default(),
-        _ => grida_style_default(),
+        Node::BooleanOperation(_) => grida_style_default(),
     }
 }
 
@@ -460,5 +468,66 @@ impl From<&crate::node::schema::TextSpanNodeRec> for Style {
         style.size.height = Dimension::auto();
 
         apply_layout_child(style, &node.layout_child, node.transform)
+    }
+}
+
+/// Convert VectorNodeRec to Taffy Style
+impl From<&crate::node::schema::VectorNodeRec> for Style {
+    fn from(node: &crate::node::schema::VectorNodeRec) -> Self {
+        let bounds = node.network.bounds();
+        let mut style = Style {
+            size: Size {
+                width: Dimension::length(bounds.width),
+                height: Dimension::length(bounds.height),
+            },
+            ..grida_style_default()
+        };
+
+        // Apply layout_child if present
+        style = apply_layout_child(style, &node.layout_child, node.transform);
+
+        // If no layout_child is set, apply transform position as absolute positioning
+        if node.layout_child.is_none() {
+            style.position = Position::Absolute;
+            style.inset = Rect {
+                left: LengthPercentageAuto::length(node.transform.x()),
+                top: LengthPercentageAuto::length(node.transform.y()),
+                right: LengthPercentageAuto::auto(),
+                bottom: LengthPercentageAuto::auto(),
+            };
+        }
+
+        style
+    }
+}
+
+/// Convert SVGPathNodeRec to Taffy Style
+impl From<&crate::node::schema::SVGPathNodeRec> for Style {
+    fn from(node: &crate::node::schema::SVGPathNodeRec) -> Self {
+        let rect = node.rect();
+        let mut style = Style {
+            size: Size {
+                width: Dimension::length(rect.width),
+                height: Dimension::length(rect.height),
+            },
+            ..grida_style_default()
+        };
+
+        // Apply layout_child if present
+        style = apply_layout_child(style, &node.layout_child, node.transform);
+
+        // If no layout_child is set, apply transform position as absolute positioning
+        // This ensures SVGPath nodes with transform coordinates are positioned correctly
+        if node.layout_child.is_none() {
+            style.position = Position::Absolute;
+            style.inset = Rect {
+                left: LengthPercentageAuto::length(node.transform.x()),
+                top: LengthPercentageAuto::length(node.transform.y()),
+                right: LengthPercentageAuto::auto(),
+                bottom: LengthPercentageAuto::auto(),
+            };
+        }
+
+        style
     }
 }

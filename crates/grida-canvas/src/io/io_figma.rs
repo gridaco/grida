@@ -1298,6 +1298,7 @@ impl FigmaConverter {
                     stroke_width: 0.0,
                     stroke_align: StrokeAlign::Inside,
                     stroke_dash_array: None,
+                    layout_child: None,
                 });
                 children.push(self.repository.insert(path_node));
             }
@@ -1320,6 +1321,7 @@ impl FigmaConverter {
                     stroke_width: 0.0,
                     stroke_align: StrokeAlign::Inside,
                     stroke_dash_array: None,
+                    layout_child: None,
                 });
                 children.push(self.repository.insert(path_node));
             }

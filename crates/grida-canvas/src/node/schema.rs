@@ -1342,6 +1342,9 @@ pub struct VectorNodeRec {
     /// alignments are treated as `Center`.
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 }
 
 impl NodeFillsMixin for VectorNodeRec {
@@ -1408,6 +1411,9 @@ pub struct SVGPathNodeRec {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
 }
 
 impl NodeFillsMixin for SVGPathNodeRec {

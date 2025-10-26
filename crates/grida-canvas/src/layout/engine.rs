@@ -193,7 +193,7 @@ impl LayoutEngine {
     /// - Nodes with layout_child field - can participate as flex children
     ///
     /// Nodes skipped from Taffy (use manual schema layout):
-    /// - Vector, SVGPath, Group, BooleanOperation, Error - no layout_child support
+    /// - Group, BooleanOperation - no layout_child support (size derived from children)
     fn should_participate_in_taffy(node: &Node) -> bool {
         matches!(
             node,
@@ -207,6 +207,9 @@ impl LayoutEngine {
                 | Node::RegularPolygon(_)
                 | Node::RegularStarPolygon(_)
                 | Node::TextSpan(_)
+                | Node::Error(_)
+                | Node::Vector(_)
+                | Node::SVGPath(_)
         )
     }
 
@@ -1333,5 +1336,112 @@ mod tests {
         let rect_transform = geom.get_transform(&rect_id).unwrap();
         assert_eq!(rect_transform.x(), 300.0);
         assert_eq!(rect_transform.y(), 150.0);
+    }
+
+    #[test]
+    fn test_svgpath_positioning() {
+        // Verify that SVGPath nodes without layout_child are positioned using their transform
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Create an SVGPath node with transform coordinates
+        let mut svgpath = nf.create_path_node();
+        svgpath.data = "M 0 0 L 100 0 L 100 100 L 0 100 Z".to_string();
+        svgpath.transform = AffineTransform::new(200.0, 150.0, 0.0);
+        // layout_child is None by default
+
+        let svgpath_id = graph.append_child(Node::SVGPath(svgpath), Parent::Root);
+
+        let scene = Scene {
+            name: "SVGPath positioning test".to_string(),
+            graph,
+            background_color: None,
+        };
+
+        // Compute layout
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 1000.0,
+                height: 1000.0,
+            },
+        );
+
+        // Verify position is correct
+        let layout = result.get(&svgpath_id).expect("SVGPath should have layout");
+        assert_eq!(
+            layout.x, 200.0,
+            "SVGPath should be positioned at transform.x"
+        );
+        assert_eq!(
+            layout.y, 150.0,
+            "SVGPath should be positioned at transform.y"
+        );
+    }
+
+    #[test]
+    fn test_vector_positioning() {
+        // Verify that Vector nodes without layout_child are positioned using their transform
+        use crate::node::schema::{LayerEffects, VectorNodeRec};
+        use crate::vectornetwork::{VectorNetwork, VectorNetworkSegment};
+        let mut graph = SceneGraph::new();
+
+        // Create a Vector node with transform coordinates
+        let vector_node = VectorNodeRec {
+            active: true,
+            opacity: 1.0,
+            blend_mode: crate::cg::types::LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
+            transform: AffineTransform::new(300.0, 250.0, 0.0),
+            network: VectorNetwork {
+                vertices: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
+                segments: vec![
+                    VectorNetworkSegment::ab(0, 1),
+                    VectorNetworkSegment::ab(1, 2),
+                    VectorNetworkSegment::ab(2, 3),
+                    VectorNetworkSegment::ab(3, 0),
+                ],
+                regions: vec![],
+            },
+            corner_radius: 0.0,
+            fills: crate::cg::types::Paints::default(),
+            strokes: crate::cg::types::Paints::default(),
+            stroke_width: 0.0,
+            stroke_width_profile: None,
+            stroke_align: crate::cg::types::StrokeAlign::Inside,
+            stroke_dash_array: None,
+            layout_child: None,
+        };
+
+        let vector_id = graph.append_child(Node::Vector(vector_node), Parent::Root);
+
+        let scene = Scene {
+            name: "Vector positioning test".to_string(),
+            graph,
+            background_color: None,
+        };
+
+        // Compute layout
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 1000.0,
+                height: 1000.0,
+            },
+        );
+
+        // Verify position is correct
+        let layout = result.get(&vector_id).expect("Vector should have layout");
+        assert_eq!(
+            layout.x, 300.0,
+            "Vector should be positioned at transform.x"
+        );
+        assert_eq!(
+            layout.y, 250.0,
+            "Vector should be positioned at transform.y"
+        );
     }
 }

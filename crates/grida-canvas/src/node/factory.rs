@@ -220,6 +220,7 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
+            layout_child: None,
         }
     }
 

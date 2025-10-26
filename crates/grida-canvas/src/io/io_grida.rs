@@ -1643,6 +1643,14 @@ impl From<JSONSVGPathNode> for Node {
             stroke_width: 0.0,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1729,6 +1737,14 @@ impl From<JSONVectorNode> for Node {
             stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
