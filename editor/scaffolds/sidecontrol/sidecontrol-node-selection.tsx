@@ -1368,6 +1368,10 @@ function SectionPosition({ node_id }: { node_id: string }) {
               right,
               bottom,
             }}
+            disabled={{
+              right: is_root,
+              bottom: is_root,
+            }}
             onValueCommit={actions.positioning}
           />
         </PropertyLine>
