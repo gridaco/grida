@@ -1571,6 +1571,7 @@ export namespace editor.gesture {
     | GestureTranslate
     | GestureSort
     | GestureGap
+    | GesturePadding
     | GestureInsertAndResize
     | GestureScale
     | GestureRotate
@@ -1728,6 +1729,18 @@ export namespace editor.gesture {
      * the current layout - this changes as the movement changes
      */
     layout: LayoutSnapshot;
+  };
+
+  export type GesturePadding = IGesture & {
+    readonly type: "padding";
+
+    readonly node_id: string;
+    readonly side: "top" | "right" | "bottom" | "left";
+
+    readonly min_padding: number;
+    readonly initial_padding: number;
+
+    padding: number;
   };
 
   export type GestureScale = IGesture & {
@@ -3046,6 +3059,10 @@ export namespace editor.api {
       node_id: string
     ): void;
     surfaceStartGapGesture(selection: string | string[], axis: "x" | "y"): void;
+    surfaceStartPaddingGesture(
+      node_id: string,
+      side: "top" | "right" | "bottom" | "left"
+    ): void;
     surfaceStartCornerRadiusGesture(
       selection: string,
       anchor?: cmath.IntercardinalDirection

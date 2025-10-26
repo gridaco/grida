@@ -75,6 +75,7 @@ import {
   DistributeButton,
   GapOverlay,
 } from "./ui/surface-distribution-overlay";
+import { PaddingOverlay } from "./ui/surface-padding-overlay";
 import cmath from "@grida/cmath";
 
 const DRAG_THRESHOLD = 2;
@@ -852,7 +853,19 @@ function SingleSelectionOverlay({
   const data = useSingleSelection(node_id);
   if (!data) return <></>;
 
-  const { node, distribution, rotation, style, boundingSurfaceRect } = data;
+  const {
+    node,
+    distribution,
+    rotation,
+    style,
+    boundingSurfaceRect,
+    size,
+    object,
+  } = data;
+
+  // Get padding if this is a container
+  const padding =
+    node.type === "container" && "padding" in node ? node.padding : undefined;
 
   return (
     <>
@@ -871,6 +884,31 @@ function SingleSelectionOverlay({
                   editor.surface.surfaceStartGapGesture(node_id, axis);
                 }}
               />
+              {padding && (
+                <PaddingOverlay
+                  containerRect={object.boundingRect}
+                  padding={
+                    typeof padding === "number"
+                      ? {
+                          top: padding,
+                          right: padding,
+                          bottom: padding,
+                          left: padding,
+                        }
+                      : {
+                          top: padding.paddingTop,
+                          right: padding.paddingRight,
+                          bottom: padding.paddingBottom,
+                          left: padding.paddingLeft,
+                        }
+                  }
+                  offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                  style={style}
+                  onPaddingGestureStart={(side) => {
+                    editor.surface.surfaceStartPaddingGesture(node_id, side);
+                  }}
+                />
+              )}
             </>
           )}
         <SurfaceGroup hidden={is_node_translating}>

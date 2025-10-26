@@ -96,6 +96,7 @@ export function VectorRegion({
       }}
     >
       <SVGPatternDiagonalStripe
+        id="vector-region-diagonal-stripes"
         color="var(--color-workbench-accent-sky)"
         patternWidth={1.5}
       />
@@ -105,7 +106,7 @@ export function VectorRegion({
           disabled
             ? "transparent"
             : hovered
-              ? `url(#${SVGPatternDiagonalStripe.id})`
+              ? `url(#vector-region-diagonal-stripes)`
               : "transparent"
         }
         stroke="transparent"

@@ -3558,6 +3558,20 @@ export class EditorSurface
     });
   }
 
+  surfaceStartPaddingGesture(
+    node_id: string,
+    side: "top" | "right" | "bottom" | "left"
+  ) {
+    this._editor.doc.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "padding",
+        node_id,
+        side,
+      },
+    });
+  }
+
   // #region drag resize handle
   surfaceStartCornerRadiusGesture(
     selection: string,

@@ -815,6 +815,51 @@ function __self_start_gesture(
 
       break;
     }
+    case "padding": {
+      const { node_id, side } = gesture;
+
+      const container = dq.__getNodeById(draft, node_id);
+      assert(
+        container && container.type === "container" && "padding" in container,
+        "the selection is not a container with padding"
+      );
+
+      const currentPadding = container.padding;
+      let currentValue: number;
+
+      if (typeof currentPadding === "number") {
+        currentValue = currentPadding;
+      } else {
+        switch (side) {
+          case "top":
+            currentValue = currentPadding.paddingTop;
+            break;
+          case "right":
+            currentValue = currentPadding.paddingRight;
+            break;
+          case "bottom":
+            currentValue = currentPadding.paddingBottom;
+            break;
+          case "left":
+            currentValue = currentPadding.paddingLeft;
+            break;
+        }
+      }
+
+      draft.gesture = {
+        type: "padding",
+        node_id,
+        side,
+        min_padding: 0,
+        initial_padding: currentValue,
+        padding: currentValue,
+        movement: cmath.vector2.zero,
+        first: cmath.vector2.zero,
+        last: cmath.vector2.zero,
+      };
+
+      break;
+    }
   }
 }
 

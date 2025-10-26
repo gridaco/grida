@@ -174,7 +174,8 @@ function GapWithHandle({
         {/* highlight pattern - only shown when gap is hovered, but hidden while dragging */}
         <svg className="absolute inset-0 overflow-visible pointer-events-none invisible group-data-[highlighted='true']/gap:visible group-data-[is-gesture='true']/gap:invisible">
           <SVGPatternDiagonalStripe
-            color="var(--color-workbench-accent-pink)"
+            id="gap-diagonal-stripes"
+            className="text-workbench-accent-pink/50"
             patternWidth={1}
             patternSpacing={5}
           />
@@ -183,7 +184,7 @@ function GapWithHandle({
             y={0}
             width={r.width}
             height={r.height}
-            fill={`url(#${SVGPatternDiagonalStripe.id})`}
+            fill={`url(#gap-diagonal-stripes)`}
           />
         </svg>
         <div
