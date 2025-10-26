@@ -77,6 +77,7 @@ import {
 } from "./ui/surface-distribution-overlay";
 import { PaddingOverlay } from "./ui/surface-padding-overlay";
 import cmath from "@grida/cmath";
+import { cn } from "@/components/lib/utils";
 
 const DRAG_THRESHOLD = 2;
 
@@ -97,21 +98,37 @@ function SurfaceTransformContextProvider({
 }
  */
 
+/**
+ * similar to SurfaceGroup, but for ones that should have own event target, non-blocking.
+ */
+function SurfaceFragmentGroup({
+  children,
+  hidden,
+}: React.PropsWithChildren<{ className?: string; hidden?: boolean }>) {
+  if (hidden) return null;
+  return <>{children}</>;
+}
+
 function SurfaceGroup({
   hidden,
   children,
   dontRenderWhenHidden,
+  className,
 }: React.PropsWithChildren<{
   hidden?: boolean;
   /**
    * completely remove from render tree, use this when the content is expensive and worth destroying.
    */
   dontRenderWhenHidden?: boolean;
+  className?: string;
 }>) {
   return (
     <div
       data-ux-hidden={hidden}
-      className="opacity-100 data-[ux-hidden='true']:opacity-0 transition-colors"
+      className={cn(
+        "opacity-100 data-[ux-hidden='true']:opacity-0 transition-colors",
+        className
+      )}
     >
       {hidden && dontRenderWhenHidden ? null : children}
     </div>
@@ -915,9 +932,9 @@ function SingleSelectionOverlay({
               )}
             </>
           )}
-        <SurfaceGroup hidden={is_node_translating}>
+        <SurfaceFragmentGroup hidden={is_node_translating}>
           <NodeOverlay node_id={node_id} readonly={readonly} focused />
-        </SurfaceGroup>
+        </SurfaceFragmentGroup>
       </div>
     </>
   );
@@ -1327,7 +1344,7 @@ function LayerOverlayResizeSide({
         background: "transparent",
         cursor: cursors.resize_handle_cursor_map[anchor],
         touchAction: "none",
-        zIndex: 10,
+        zIndex: 20,
         ...positionalStyle,
       }}
     />

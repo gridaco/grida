@@ -6,6 +6,7 @@ import cmath from "@grida/cmath";
 import { cn } from "@/components/lib/utils";
 import { useSurfaceGesture } from "../hooks/use-surface-gesture";
 import { SVGPatternDiagonalStripe } from "./svg-fill-patterns";
+import { useCurrentEditor, useEditorState } from "../../use-editor";
 
 export function PaddingOverlay({
   containerRect,
@@ -23,12 +24,26 @@ export function PaddingOverlay({
   };
   offset?: cmath.Vector2;
   style?: React.CSSProperties;
-  onPaddingGestureStart?: (side: "top" | "right" | "bottom" | "left") => void;
+  onPaddingGestureStart?: (side: cmath.RectangleSide) => void;
 }) {
+  const editor = useCurrentEditor();
   const { transform } = useTransformState();
   const [hoveredSide, setHoveredSide] = useState<
-    "top" | "right" | "bottom" | "left" | undefined
+    cmath.RectangleSide | undefined
   >(undefined);
+
+  const padding_with_axis_mirroring_on = useEditorState(
+    editor,
+    (state) => state.gesture_modifiers.padding_with_axis_mirroring === "on"
+  );
+
+  const isHighlighted = (side: cmath.RectangleSide): boolean =>
+    side === hoveredSide ||
+    !!(
+      padding_with_axis_mirroring_on &&
+      hoveredSide &&
+      cmath.rect.getOppositeSide(hoveredSide) === side
+    );
 
   // Transform container rect to surface space
   const surfaceRect = useMemo(
@@ -39,7 +54,7 @@ export function PaddingOverlay({
   const paddingRects = useMemo(() => {
     const rects: Array<{
       rect: cmath.Rectangle;
-      side: "top" | "right" | "bottom" | "left";
+      side: cmath.RectangleSide;
     }> = [];
 
     const { top = 0, right = 0, bottom = 0, left = 0 } = padding;
@@ -110,10 +125,10 @@ export function PaddingOverlay({
   return (
     <div
       style={style}
-      className="pointer-events-none z-40 invisible group-hover:visible"
+      className="pointer-events-none invisible group-hover:visible z-10"
     >
       {/* Define pattern once for all padding edges to avoid SVG pattern ID conflicts */}
-      <svg className="absolute w-0 h-0 pointer-events-none" aria-hidden="true">
+      <svg className="sr-only" aria-hidden="true">
         <defs>
           <SVGPatternDiagonalStripe
             id="padding-diagonal-stripes"
@@ -124,35 +139,47 @@ export function PaddingOverlay({
         </defs>
       </svg>
 
-      {paddingRects.map((item, i) => (
-        <PaddingEdgeInset
-          key={`${item.side}-${i}`}
-          side={item.side}
-          rect={item.rect}
-          isHovered={hoveredSide === item.side}
-          onPointerEnter={() => setHoveredSide(item.side)}
-          onPointerLeave={() => setHoveredSide(undefined)}
-          onPaddingGestureStart={onPaddingGestureStart}
-        />
-      ))}
+      <>
+        {/* Render regions (backgrounds + patterns) - lower z-index */}
+        {paddingRects.map((item, i) => (
+          <PaddingEdgeRegion
+            key={`${item.side}-region-${i}`}
+            side={item.side}
+            rect={item.rect}
+            isHovered={isHighlighted(item.side)}
+            onPointerEnter={() => setHoveredSide(item.side)}
+            onPointerLeave={() => setHoveredSide(undefined)}
+          />
+        ))}
+      </>
+
+      <>
+        {/* Render handles - higher z-index to always be accessible */}
+        {paddingRects.map((item, i) => (
+          <PaddingHandle
+            key={`${item.side}-handle-${i}`}
+            side={item.side}
+            rect={item.rect}
+            isHovered={isHighlighted(item.side)}
+            onPointerEnter={() => setHoveredSide(item.side)}
+            onPointerLeave={() => setHoveredSide(undefined)}
+            onPaddingGestureStart={onPaddingGestureStart}
+          />
+        ))}
+      </>
     </div>
   );
 }
 
-function PaddingEdgeInset({
+function PaddingEdgeRegion({
   side,
   rect,
   isHovered,
-  onPointerEnter,
-  onPointerLeave,
-  onPaddingGestureStart,
-}: {
-  side: "top" | "right" | "bottom" | "left";
+  ...props
+}: React.ComponentProps<"div"> & {
+  side: cmath.RectangleSide;
   rect: cmath.Rectangle;
   isHovered: boolean;
-  onPointerEnter: () => void;
-  onPointerLeave: () => void;
-  onPaddingGestureStart?: (side: "top" | "right" | "bottom" | "left") => void;
 }) {
   return (
     <div
@@ -163,29 +190,20 @@ function PaddingEdgeInset({
         width: rect.width,
         height: rect.height,
       }}
-      data-highlighted={isHovered ? "true" : "false"}
-      className="group/padding pointer-events-auto bg-transparent"
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
+      className="pointer-events-auto bg-transparent"
+      {...props}
     >
       {/* SVG Pattern - only visible when hovered */}
-      <svg className="absolute inset-0 overflow-visible pointer-events-none invisible group-data-[highlighted='true']/padding:visible">
-        <rect
-          x={0}
-          y={0}
-          width={rect.width}
-          height={rect.height}
-          fill={`url(#padding-diagonal-stripes)`}
-        />
-      </svg>
-
-      {onPaddingGestureStart && (
-        <PaddingHandle
-          side={side}
-          rect={rect}
-          isHovered={isHovered}
-          onPaddingGestureStart={onPaddingGestureStart}
-        />
+      {isHovered && (
+        <svg className="absolute inset-0 overflow-visible pointer-events-none">
+          <rect
+            x={0}
+            y={0}
+            width={rect.width}
+            height={rect.height}
+            fill="url(#padding-diagonal-stripes)"
+          />
+        </svg>
       )}
     </div>
   );
@@ -196,11 +214,12 @@ function PaddingHandle({
   rect,
   isHovered,
   onPaddingGestureStart,
-}: {
-  side: "top" | "right" | "bottom" | "left";
+  ...props
+}: React.ComponentProps<"button"> & {
+  side: cmath.RectangleSide;
   rect: cmath.Rectangle;
   isHovered?: boolean;
-  onPaddingGestureStart?: (side: "top" | "right" | "bottom" | "left") => void;
+  onPaddingGestureStart?: (side: cmath.RectangleSide) => void;
 }) {
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
@@ -212,13 +231,14 @@ function PaddingHandle({
     },
   });
 
-  // Calculate center position of the padding rect
-  const centerX = rect.width / 2;
-  const centerY = rect.height / 2;
+  // Calculate absolute center position of the padding rect
+  const centerX = rect.x + rect.width / 2;
+  const centerY = rect.y + rect.height / 2;
 
   return (
     <button
       {...bind()}
+      {...props}
       className="absolute p-1 pointer-events-auto"
       style={{
         top: centerY,

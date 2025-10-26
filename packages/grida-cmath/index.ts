@@ -158,6 +158,7 @@ namespace cmath {
   };
 
   export type RectangleSide = "top" | "right" | "bottom" | "left";
+
   export type RectangleDimension = "width" | "height";
 
   export type CardinalDirection =
@@ -1184,6 +1185,14 @@ namespace cmath {
   }
 
   export namespace rect {
+    const __opposite_side_map: Readonly<Record<RectangleSide, RectangleSide>> =
+      {
+        top: "bottom",
+        right: "left",
+        bottom: "top",
+        left: "right",
+      } as const;
+
     const __axis_map = {
       dimension: {
         x: "width",
@@ -1203,6 +1212,10 @@ namespace cmath {
      */
     export function getAxisDimension(rect: Rectangle, axis: Axis): number {
       return rect[__axis_map.dimension[axis]];
+    }
+
+    export function getOppositeSide(side: RectangleSide): RectangleSide {
+      return __opposite_side_map[side];
     }
 
     /**
