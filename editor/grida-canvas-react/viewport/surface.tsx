@@ -1102,11 +1102,26 @@ function NodeOverlay({
 
   const bind = useSurfaceGesture(
     {
+      // FIXME: need better event handling - completely remove this in the future, use bbh query to handle the logic, purely mathmatical without binding events to this.
+      // basically, below block is required to prevent the current selection from de-selecting, when user tries to drag it.
+      // but this causes,
+      // 1. the ui (input) to not blur from panel
+      // 2. the inner content from being selected
       onPointerDown: ({ event }) => {
-        if (tool.type !== "insert" && tool.type !== "draw" && !event.shiftKey) {
+        if (
+          tool.type !== "insert" &&
+          tool.type !== "draw" &&
+          !event.shiftKey &&
+          !event.metaKey
+        ) {
           // prevent default to keep selection when clicking empty overlay
           // but allow shift+click to fall through for deselection
           event.preventDefault();
+
+          // blur inputs manually
+          try {
+            (document.activeElement as HTMLInputElement)?.blur();
+          } catch {}
         }
       },
     },

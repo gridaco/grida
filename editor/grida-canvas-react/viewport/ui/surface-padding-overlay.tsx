@@ -32,9 +32,13 @@ export function PaddingOverlay({
     cmath.RectangleSide | undefined
   >(undefined);
 
-  const padding_with_axis_mirroring_on = useEditorState(
+  const { padding_with_axis_mirroring_on, isDragging } = useEditorState(
     editor,
-    (state) => state.gesture_modifiers.padding_with_axis_mirroring === "on"
+    (state) => ({
+      padding_with_axis_mirroring_on:
+        state.gesture_modifiers.padding_with_axis_mirroring === "on",
+      isDragging: state.gesture.type === "padding",
+    })
   );
 
   const isHighlighted = (side: cmath.RectangleSide): boolean =>
@@ -123,7 +127,8 @@ export function PaddingOverlay({
   return (
     <div
       style={style}
-      className="pointer-events-none invisible group-hover:visible z-10"
+      data-is-gesture={isDragging}
+      className="group/padding pointer-events-auto invisible group-hover:visible data-[is-gesture='true']:visible z-10"
     >
       {/* Define pattern once for all padding edges to avoid SVG pattern ID conflicts */}
       <svg className="sr-only" aria-hidden="true">
@@ -145,6 +150,7 @@ export function PaddingOverlay({
             side={item.side}
             rect={item.rect}
             isHovered={isHighlighted(item.side)}
+            className="group-data-[is-gesture='true']/padding:pointer-events-none"
             onPointerEnter={() => setHoveredSide(item.side)}
             onPointerLeave={() => setHoveredSide(undefined)}
           />
@@ -152,18 +158,22 @@ export function PaddingOverlay({
       </>
 
       <>
-        {/* Render handles - higher z-index to always be accessible */}
-        {paddingRects.map((item, i) => (
-          <PaddingHandle
-            key={`${item.side}-handle-${i}`}
-            side={item.side}
-            rect={item.rect}
-            isHovered={isHighlighted(item.side)}
-            onPointerEnter={() => setHoveredSide(item.side)}
-            onPointerLeave={() => setHoveredSide(undefined)}
-            onPaddingGestureStart={onPaddingGestureStart}
-          />
-        ))}
+        {!isDragging && (
+          <>
+            {/* Render handles - higher z-index to always be accessible */}
+            {paddingRects.map((item, i) => (
+              <PaddingHandle
+                key={`${item.side}-handle-${i}`}
+                side={item.side}
+                rect={item.rect}
+                isHovered={isHighlighted(item.side)}
+                onPointerEnter={() => setHoveredSide(item.side)}
+                onPointerLeave={() => setHoveredSide(undefined)}
+                onPaddingGestureStart={onPaddingGestureStart}
+              />
+            ))}
+          </>
+        )}
       </>
     </div>
   );

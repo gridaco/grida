@@ -165,7 +165,7 @@ function GapWithHandle({
         }}
         data-is-gesture={is_gesture}
         data-highlighted={highlighted}
-        className={cn("group/gap pointer-events-none", className)}
+        className={cn("group/gap pointer-events-auto", className)}
         {...props}
       >
         <svg className="absolute inset-0 overflow-visible pointer-events-none">
