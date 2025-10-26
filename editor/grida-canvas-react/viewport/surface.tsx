@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
+import { useGesture } from "@use-gesture/react";
+import { useSurfaceGesture } from "./hooks/use-surface-gesture";
 import {
   useBackendState,
   useBrushState,
@@ -39,17 +40,13 @@ import { MeasurementGuide } from "./ui/measurement";
 import { VectorMeasurementGuide } from "./ui/vector-measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
-import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
-import cmath from "@grida/cmath";
 import { cursors } from "../../components/cursor/cursor-data";
-import { FakePointerCursorSVG } from "@/components/cursor/cursor-fake";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
 import { SurfaceImageEditor } from "./ui/surface-image-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { RedDotHandle } from "./ui/reddot";
-import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler/react";
 import { PixelGrid } from "@grida/pixel-grid/react";
 import { Rule } from "./ui/rule";
@@ -74,6 +71,11 @@ import {
   FakeCursorPosition,
   FakeForeignCursor,
 } from "@/components/multiplayer/cursor";
+import {
+  DistributeButton,
+  GapOverlay,
+} from "./ui/surface-distribution-overlay";
+import cmath from "@grida/cmath";
 
 const DRAG_THRESHOLD = 2;
 
@@ -93,49 +95,6 @@ function SurfaceTransformContextProvider({
   );
 }
  */
-
-function useSurfaceGesture(
-  {
-    onClick,
-    onDoubleClick,
-    onDragStart,
-    onDragEnd,
-    ...handlers
-  }: Parameters<typeof __useGesture>[0],
-  config?: Parameters<typeof __useGesture>[1]
-) {
-  // click / double click triggers when drag ends (if double pointer down) - it might be a better idea to prevent it with the displacement, not by delayed flag
-  const should_prevent_click = useRef(false);
-
-  return __useGesture(
-    {
-      onClick: (e) => {
-        if (should_prevent_click.current) {
-          return;
-        }
-        onClick?.(e);
-      },
-      onDoubleClick: (e) => {
-        if (should_prevent_click.current) {
-          return;
-        }
-        onDoubleClick?.(e);
-      },
-      ...handlers,
-      onDragStart: (e) => {
-        onDragStart?.(e);
-        should_prevent_click.current = true;
-      },
-      onDragEnd: (e) => {
-        onDragEnd?.(e);
-        setTimeout(() => {
-          should_prevent_click.current = false;
-        }, 100);
-      },
-    },
-    config
-  );
-}
 
 function SurfaceGroup({
   hidden,
@@ -1429,229 +1388,6 @@ function RedDotSortHandle({
   });
 
   return <RedDotHandle {...bind()} />;
-}
-
-function GapOverlay({
-  onGapGestureStart,
-  offset,
-  style,
-  distribution,
-}: {
-  distribution: ObjectsDistributionAnalysis;
-  offset?: cmath.Vector2;
-  style?: React.CSSProperties;
-} & {
-  onGapGestureStart?: (axis: cmath.Axis) => void;
-}) {
-  const { transform } = useTransformState();
-
-  const { x, y, rects: _rects } = distribution;
-
-  // rects in surface space
-  const rects = useMemo(
-    () => _rects.map((r) => cmath.rect.transform(r, transform)),
-    [_rects, transform]
-  );
-
-  return (
-    <div style={style} className="pointer-events-none z-50">
-      <div>
-        {_rects.length >= 2 && (
-          <>
-            {x && x.gap !== undefined && (
-              <>
-                {Array.from({ length: x.gaps.length }).map((_, i) => {
-                  const axis = "x";
-                  const x_sorted = rects.sort((a, b) => a.x - b.x);
-                  const a = x_sorted[i];
-                  const b = x_sorted[i + 1];
-
-                  return (
-                    <GapWithHandle
-                      key={i}
-                      a={a}
-                      b={b}
-                      axis={axis}
-                      offset={offset}
-                      onGapGestureStart={onGapGestureStart}
-                    />
-                  );
-                })}
-              </>
-            )}
-            {y && y.gap !== undefined && (
-              <>
-                {Array.from({ length: y.gaps.length }).map((_, i) => {
-                  const axis = "y";
-                  const y_sorted = rects.sort((a, b) => a.y - b.y);
-                  const a = y_sorted[i];
-                  const b = y_sorted[i + 1];
-
-                  return (
-                    <GapWithHandle
-                      key={i}
-                      a={a}
-                      b={b}
-                      axis={axis}
-                      offset={offset}
-                      onGapGestureStart={onGapGestureStart}
-                    />
-                  );
-                })}
-              </>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function GapWithHandle({
-  a,
-  b,
-  axis,
-  offset = cmath.vector2.zero,
-  onGapGestureStart,
-}: {
-  a: cmath.Rectangle;
-  b: cmath.Rectangle;
-  axis: cmath.Axis;
-  offset?: cmath.Vector2;
-  onGapGestureStart?: (axis: cmath.Axis) => void;
-}) {
-  const { gesture } = useGestureState();
-
-  const r = useMemo(() => {
-    const intersection = cmath.rect.axisProjectionIntersection([a, b], axis)!;
-
-    if (!intersection) return null;
-
-    let rect: cmath.Rectangle;
-    if (axis === "x") {
-      const x1 = a.x + a.width;
-      const y1 = intersection[0];
-      const x2 = b.x;
-      const y2 = intersection[1];
-
-      rect = cmath.rect.fromPoints([
-        [x1, y1],
-        [x2, y2],
-      ]);
-    } else {
-      const x1 = intersection[0];
-      const y1 = a.y + a.height;
-      const x2 = intersection[1];
-      const y2 = b.y;
-
-      rect = cmath.rect.fromPoints([
-        [x1, y1],
-        [x2, y2],
-      ]);
-    }
-
-    return cmath.rect.translate(rect, cmath.vector2.invert(offset));
-  }, [a, b, axis, offset]);
-
-  const is_gesture = gesture.type === "gap";
-
-  if (!r) return null;
-
-  return (
-    <>
-      <div
-        style={{
-          position: "absolute",
-          top: r.y,
-          left: r.x,
-          width: r.width,
-          height: r.height,
-        }}
-        data-is-gesture={is_gesture}
-        className="pointer-events-none bg-transparent data-[is-gesture='true']:bg-workbench-accent-red/20"
-      >
-        <div
-          data-is-gesture={is_gesture}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-          }}
-          className="opacity-100 data-[is-gesture='true']:opacity-0"
-        >
-          <GapHandle axis={axis} onGapGestureStart={onGapGestureStart} />
-        </div>
-      </div>
-    </>
-  );
-}
-
-function GapHandle({
-  axis,
-  onGapGestureStart,
-}: {
-  axis: cmath.Axis;
-  onGapGestureStart?: (axis: cmath.Axis) => void;
-}) {
-  const bind = useSurfaceGesture({
-    onPointerDown: ({ event }) => {
-      event.preventDefault();
-    },
-    onDragStart: ({ event }) => {
-      event.preventDefault();
-      onGapGestureStart?.(axis);
-    },
-  });
-
-  return (
-    <button
-      {...bind()}
-      className="p-1 pointer-events-auto"
-      style={{
-        transform:
-          "translate(-50%, -50%) " + (axis === "y" ? "rotate(90deg)" : ""),
-        touchAction: "none",
-        cursor: axis === "x" ? "ew-resize" : "ns-resize",
-      }}
-    >
-      <div
-        className="
-      w-0.5 h-4 invisible
-      group-hover:visible
-      border border-pink-500
-      hover:bg-pink-500
-      ring-1 ring-white
-      pointer-events-auto
-      "
-      />
-    </button>
-  );
-}
-
-function DistributeButton({
-  axis,
-  onClick,
-}: {
-  axis: cmath.Axis | undefined;
-  onClick?: (axis: cmath.Axis) => void;
-}) {
-  if (!axis) {
-    return <></>;
-  }
-
-  return (
-    <div className="absolute hidden group-hover:block bottom-1 right-1 z-50 pointer-events-auto">
-      <button
-        className="p-1 bg-workbench-accent-sky text-white rounded-sm pointer-events-auto"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick?.(axis);
-        }}
-      >
-        {axis === "x" ? <ColumnsIcon /> : <RowsIcon />}
-      </button>
-    </div>
-  );
 }
 
 function PixelGridOverlay() {

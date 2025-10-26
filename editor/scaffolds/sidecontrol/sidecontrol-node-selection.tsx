@@ -1327,6 +1327,7 @@ function SectionPosition({ node_id }: { node_id: string }) {
   const document_ctx = useEditorState(instance, (state) => state.document_ctx);
   const scene = useCurrentSceneState();
   const top_id = dq.getTopId(document_ctx, node_id)!;
+  // FIXME: the top id returns scene id - this is flawed due to recent changes, need to fix this via scene hook? (e.g. scene.roots)
   const is_root = node_id === top_id;
   const is_single_mode_root =
     scene.constraints.children === "single" && is_root;
@@ -1366,7 +1367,7 @@ function SectionPosition({ node_id }: { node_id: string }) {
             onValueCommit={actions.positioning}
           />
         </PropertyLine>
-        <PropertyLine>
+        <PropertyLine hidden={is_root}>
           <PropertyLineLabel>Mode</PropertyLineLabel>
           <PositioningModeControl
             value={position}

@@ -3,7 +3,7 @@ import { useGesture } from "@use-gesture/react";
 import cmath from "@grida/cmath";
 import { svg } from "@/grida-canvas-utils/svg";
 import { SVGPathData, SVGCommand } from "svg-pathdata";
-import { DiagonalStripe } from "./svg-fill-patterns";
+import { SVGPatternDiagonalStripe } from "./svg-fill-patterns";
 import type { VectorContentEditor } from "@/grida-canvas-react/use-sub-vector-network-editor";
 
 interface RegionSegment {
@@ -95,14 +95,17 @@ export function VectorRegion({
         pointerEvents: disabled ? "none" : "auto",
       }}
     >
-      <DiagonalStripe />
+      <SVGPatternDiagonalStripe
+        color="var(--color-workbench-accent-sky)"
+        patternWidth={1.5}
+      />
       <path
         d={path}
         fill={
           disabled
             ? "transparent"
             : hovered
-              ? "url(#diagonalStripes)"
+              ? `url(#${SVGPatternDiagonalStripe.id})`
               : "transparent"
         }
         stroke="transparent"
