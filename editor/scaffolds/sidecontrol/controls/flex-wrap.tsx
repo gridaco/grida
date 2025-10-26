@@ -12,8 +12,10 @@ export function FlexWrapControl({
       id="flex-wrap"
       type="single"
       size="sm"
+      defaultValue="nowrap"
       value={value}
-      onValueChange={onValueChange}
+      // toggle group can callback with "" when de-selecting, will prevent this.
+      onValueChange={(v) => v !== "" && onValueChange?.(v as "wrap" | "nowrap")}
     >
       <ToggleGroupItem value="wrap" className="text-xs">
         Yes
