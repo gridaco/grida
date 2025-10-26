@@ -89,6 +89,7 @@ export function PaddingControl({
           step={1}
           className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "flex-1")}
           onValueCommit={handleUniformChange}
+          aria-label="Padding all sides"
         />
         <div className="flex gap-1">
           <Toggle
@@ -97,8 +98,12 @@ export function PaddingControl({
             pressed={showIndividual}
             onPressedChange={setShowIndividual}
             className="bg-transparent border-none shadow-none size-6 min-w-6 px-0 data-[state=on]:*:[svg]:text-workbench-accent-sky"
+            aria-label="Toggle individual padding controls"
           >
-            <AllSidesIcon className="size-3.5 text-muted-foreground" />
+            <AllSidesIcon
+              className="size-3.5 text-muted-foreground"
+              aria-hidden="true"
+            />
           </Toggle>
         </div>
       </div>
@@ -117,8 +122,9 @@ export function PaddingControl({
               step={1}
               className="w-full h-7 rounded-none rounded-l-md border-r-0"
               onValueCommit={(v) => handleIndividualChange("left", v)}
+              aria-label="Padding left"
             />
-            <span className="text-[8px] text-muted-foreground pt-0.5">L</span>
+            <Label>L</Label>
           </div>
           {/* Separator */}
           <hr className="w-px h-10" />
@@ -133,8 +139,9 @@ export function PaddingControl({
               step={1}
               className="w-full h-7 rounded-none border-x-0"
               onValueCommit={(v) => handleIndividualChange("top", v)}
+              aria-label="Padding top"
             />
-            <span className="text-[8px] text-muted-foreground pt-0.5">T</span>
+            <Label>T</Label>
           </div>
           {/* Separator */}
           <hr className="w-px h-10" />
@@ -149,8 +156,9 @@ export function PaddingControl({
               step={1}
               className="w-full h-7 rounded-none border-x-0"
               onValueCommit={(v) => handleIndividualChange("right", v)}
+              aria-label="Padding right"
             />
-            <span className="text-[8px] text-muted-foreground pt-0.5">R</span>
+            <Label>R</Label>
           </div>
           {/* Separator */}
           <hr className="w-px h-10" />
@@ -165,11 +173,23 @@ export function PaddingControl({
               step={1}
               className="w-full h-7 rounded-none rounded-r-md border-l-0"
               onValueCommit={(v) => handleIndividualChange("bottom", v)}
+              aria-label="Padding bottom"
             />
-            <span className="text-[8px] text-muted-foreground pt-0.5">B</span>
+            <Label>B</Label>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+const Label = ({ children }: React.PropsWithChildren) => {
+  return (
+    <span
+      className="text-[8px] text-muted-foreground pt-0.5"
+      aria-hidden="true"
+    >
+      {children}
+    </span>
+  );
+};

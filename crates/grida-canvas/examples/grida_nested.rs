@@ -29,7 +29,6 @@ async fn demo_nested() -> Scene {
         let mut container = nf.create_container_node();
 
         // Each level is centered in its parent with rotation
-        container.layout_container = container.layout_container;
         container.position = CGPoint::new(current_size * 0.075, current_size * 0.075).into();
         container.rotation = rotation;
         container.layout_dimensions.width = Some(current_size);

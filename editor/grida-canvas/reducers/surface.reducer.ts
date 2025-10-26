@@ -820,28 +820,32 @@ function __self_start_gesture(
 
       const container = dq.__getNodeById(draft, node_id);
       assert(
-        container && container.type === "container" && "padding" in container,
-        "the selection is not a container with padding"
+        container && container.type === "container",
+        "the selection is not a container"
       );
 
       const currentPadding = container.padding;
-      let currentValue: number;
+      let currentValue: number = 0; // Default to 0 if padding is undefined
 
-      if (typeof currentPadding === "number") {
+      if (currentPadding === undefined || currentPadding === null) {
+        // Padding is not defined, use default
+        currentValue = 0;
+      } else if (typeof currentPadding === "number") {
         currentValue = currentPadding;
       } else {
+        // Padding is an object with per-side values
         switch (side) {
           case "top":
-            currentValue = currentPadding.paddingTop;
+            currentValue = currentPadding.paddingTop ?? 0;
             break;
           case "right":
-            currentValue = currentPadding.paddingRight;
+            currentValue = currentPadding.paddingRight ?? 0;
             break;
           case "bottom":
-            currentValue = currentPadding.paddingBottom;
+            currentValue = currentPadding.paddingBottom ?? 0;
             break;
           case "left":
-            currentValue = currentPadding.paddingLeft;
+            currentValue = currentPadding.paddingLeft ?? 0;
             break;
         }
       }
@@ -851,8 +855,8 @@ function __self_start_gesture(
         node_id,
         side,
         min_padding: 0,
-        initial_padding: currentValue,
-        padding: currentValue,
+        initial_padding: Math.max(0, currentValue),
+        padding: Math.max(0, currentValue),
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,

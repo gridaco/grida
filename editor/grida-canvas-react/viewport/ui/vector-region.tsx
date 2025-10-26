@@ -97,7 +97,7 @@ export function VectorRegion({
     >
       <SVGPatternDiagonalStripe
         id="vector-region-diagonal-stripes"
-        color="var(--color-workbench-accent-sky)"
+        className="text-workbench-accent-sky"
         patternWidth={1.5}
       />
       <path

@@ -6,7 +6,7 @@ use taffy::prelude::*;
 ///
 /// Maps our NodeId (u64) to Taffy's layout system, enabling
 /// flex layout computation while preserving scene graph structure.
-pub struct LayoutTree {
+pub(crate) struct LayoutTree {
     /// Taffy tree for layout computation
     taffy: TaffyTree,
     /// Map from our SceneGraph NodeId to Taffy's NodeId
@@ -16,7 +16,7 @@ pub struct LayoutTree {
 }
 
 impl LayoutTree {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             taffy: TaffyTree::new(),
             scene_to_taffy: HashMap::new(),
@@ -27,34 +27,52 @@ impl LayoutTree {
     /// Create a leaf node in the layout tree
     ///
     /// Maps the scene node ID to a taffy node ID and returns it
-    pub fn new_leaf(
+    pub(crate) fn new_leaf(
         &mut self,
         scene_node_id: NodeId,
         style: Style,
     ) -> Result<taffy::NodeId, taffy::TaffyError> {
         let taffy_id = self.taffy.new_leaf(style)?;
-        self.scene_to_taffy.insert(scene_node_id, taffy_id);
-        self.taffy_to_scene.insert(taffy_id, scene_node_id);
+
+        // Clean up any existing mapping for this scene_node_id
+        if let Some(old_taffy_id) = self.scene_to_taffy.insert(scene_node_id, taffy_id) {
+            self.taffy_to_scene.remove(&old_taffy_id);
+        }
+
+        // Clean up any existing mapping for this taffy_id
+        if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
+            self.scene_to_taffy.remove(&old_scene_id);
+        }
+
         Ok(taffy_id)
     }
 
     /// Create a container node with children
     ///
     /// Maps the scene node ID to a taffy node ID and returns it
-    pub fn new_with_children(
+    pub(crate) fn new_with_children(
         &mut self,
         scene_node_id: NodeId,
         style: Style,
         children: &[taffy::NodeId],
     ) -> Result<taffy::NodeId, taffy::TaffyError> {
         let taffy_id = self.taffy.new_with_children(style, children)?;
-        self.scene_to_taffy.insert(scene_node_id, taffy_id);
-        self.taffy_to_scene.insert(taffy_id, scene_node_id);
+
+        // Clean up any existing mapping for this scene_node_id
+        if let Some(old_taffy_id) = self.scene_to_taffy.insert(scene_node_id, taffy_id) {
+            self.taffy_to_scene.remove(&old_taffy_id);
+        }
+
+        // Clean up any existing mapping for this taffy_id
+        if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
+            self.scene_to_taffy.remove(&old_scene_id);
+        }
+
         Ok(taffy_id)
     }
 
     /// Compute layout for the tree
-    pub fn compute_layout(
+    pub(crate) fn compute_layout(
         &mut self,
         root: taffy::NodeId,
         available_space: Size<AvailableSpace>,
@@ -63,48 +81,55 @@ impl LayoutTree {
     }
 
     /// Get computed layout for a scene node
-    pub fn get_layout(&self, scene_node_id: &NodeId) -> Option<&Layout> {
+    pub(crate) fn get_layout(&self, scene_node_id: &NodeId) -> Option<&Layout> {
         self.scene_to_taffy
             .get(scene_node_id)
             .and_then(|taffy_id| self.taffy.layout(*taffy_id).ok())
     }
 
     /// Get the taffy NodeId for a scene NodeId
-    pub fn get_taffy_id(&self, scene_node_id: &NodeId) -> Option<taffy::NodeId> {
+    #[cfg(test)]
+    pub(crate) fn get_taffy_id(&self, scene_node_id: &NodeId) -> Option<taffy::NodeId> {
         self.scene_to_taffy.get(scene_node_id).copied()
     }
 
     /// Get the scene NodeId for a taffy NodeId
-    pub fn get_scene_id(&self, taffy_id: &taffy::NodeId) -> Option<NodeId> {
+    #[cfg(test)]
+    pub(crate) fn get_scene_id(&self, taffy_id: &taffy::NodeId) -> Option<NodeId> {
         self.taffy_to_scene.get(taffy_id).copied()
     }
 
     /// Clear the tree
-    pub fn clear(&mut self) {
+    #[allow(dead_code)]
+    pub(crate) fn clear(&mut self) {
         self.taffy.clear();
         self.scene_to_taffy.clear();
         self.taffy_to_scene.clear();
     }
 
     /// Get number of nodes in the layout tree
-    pub fn len(&self) -> usize {
+    #[allow(dead_code)]
+    pub(crate) fn len(&self) -> usize {
         self.scene_to_taffy.len()
     }
 
     /// Check if the layout tree is empty
-    pub fn is_empty(&self) -> bool {
+    #[allow(dead_code)]
+    pub(crate) fn is_empty(&self) -> bool {
         self.scene_to_taffy.is_empty()
     }
 
     /// Access the underlying taffy tree directly
     ///
     /// Use this when you need to perform operations not wrapped by LayoutTree
-    pub fn taffy(&self) -> &TaffyTree {
+    #[allow(dead_code)]
+    pub(crate) fn taffy(&self) -> &TaffyTree {
         &self.taffy
     }
 
     /// Mutable access to the underlying taffy tree
-    pub fn taffy_mut(&mut self) -> &mut TaffyTree {
+    #[allow(dead_code)]
+    pub(crate) fn taffy_mut(&mut self) -> &mut TaffyTree {
         &mut self.taffy
     }
 }
@@ -224,5 +249,97 @@ mod tests {
         assert_eq!(layout.size.height, 200.0);
         assert_eq!(layout.location.x, 0.0);
         assert_eq!(layout.location.y, 0.0);
+    }
+
+    #[test]
+    fn test_mapping_cleanup_on_reinsertion() {
+        let mut tree = LayoutTree::new();
+
+        let scene_id: NodeId = 1;
+        let style = Style {
+            size: Size {
+                width: Dimension::length(100.0),
+                height: Dimension::length(100.0),
+            },
+            ..Default::default()
+        };
+
+        // First insertion
+        let taffy_id1 = tree.new_leaf(scene_id, style.clone()).unwrap();
+
+        // Verify initial mapping
+        assert_eq!(tree.get_taffy_id(&scene_id), Some(taffy_id1));
+        assert_eq!(tree.get_scene_id(&taffy_id1), Some(scene_id));
+        assert_eq!(tree.len(), 1);
+
+        // Re-insert the same scene_id with a new style
+        let new_style = Style {
+            size: Size {
+                width: Dimension::length(200.0),
+                height: Dimension::length(200.0),
+            },
+            ..Default::default()
+        };
+        let taffy_id2 = tree.new_leaf(scene_id, new_style).unwrap();
+
+        // Verify the old taffy_id is no longer mapped
+        assert_eq!(tree.get_scene_id(&taffy_id1), None);
+
+        // Verify the new taffy_id is correctly mapped
+        assert_eq!(tree.get_taffy_id(&scene_id), Some(taffy_id2));
+        assert_eq!(tree.get_scene_id(&taffy_id2), Some(scene_id));
+
+        // Should still have only one mapping
+        assert_eq!(tree.len(), 1);
+    }
+
+    #[test]
+    fn test_mapping_cleanup_with_different_scene_ids() {
+        let mut tree = LayoutTree::new();
+
+        let scene_id1: NodeId = 1;
+        let scene_id2: NodeId = 2;
+        let style = Style {
+            size: Size {
+                width: Dimension::length(100.0),
+                height: Dimension::length(100.0),
+            },
+            ..Default::default()
+        };
+
+        // Create first mapping
+        let taffy_id1 = tree.new_leaf(scene_id1, style.clone()).unwrap();
+
+        // Create second mapping with different scene_id
+        let taffy_id2 = tree.new_leaf(scene_id2, style.clone()).unwrap();
+
+        // Verify both mappings exist
+        assert_eq!(tree.get_taffy_id(&scene_id1), Some(taffy_id1));
+        assert_eq!(tree.get_taffy_id(&scene_id2), Some(taffy_id2));
+        assert_eq!(tree.len(), 2);
+
+        // Now re-insert scene_id2 with a new style (this should clean up the old mapping for scene_id2)
+        let new_style = Style {
+            size: Size {
+                width: Dimension::length(200.0),
+                height: Dimension::length(200.0),
+            },
+            ..Default::default()
+        };
+        let taffy_id3 = tree.new_leaf(scene_id2, new_style).unwrap();
+
+        // scene_id1 should still be mapped to taffy_id1
+        assert_eq!(tree.get_taffy_id(&scene_id1), Some(taffy_id1));
+        assert_eq!(tree.get_scene_id(&taffy_id1), Some(scene_id1));
+
+        // scene_id2 should now be mapped to taffy_id3 (not taffy_id2)
+        assert_eq!(tree.get_taffy_id(&scene_id2), Some(taffy_id3));
+        assert_eq!(tree.get_scene_id(&taffy_id3), Some(scene_id2));
+
+        // taffy_id2 should no longer be mapped to anything
+        assert_eq!(tree.get_scene_id(&taffy_id2), None);
+
+        // Should still have two mappings
+        assert_eq!(tree.len(), 2);
     }
 }

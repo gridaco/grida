@@ -472,7 +472,7 @@ export namespace dq {
     context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string
   ): NodeID | null {
-    // veryfy if exists
+    // verify if exists
     if (context.lu_keys.includes(node_id)) {
       const ancestors = getAncestors(context, node_id);
       return ancestors[0] ?? node_id;
@@ -533,10 +533,8 @@ export namespace dq {
     const ancestors = getAncestors(context, node_id);
     const sceneIndex = ancestors.indexOf(scene_id);
 
-    // If scene is not an ancestor, node is at root level
-    if (sceneIndex === -1) {
-      return node_id;
-    }
+    // Not under scene: no top id within this scene
+    if (sceneIndex === -1) return null;
 
     // Return the child of the scene (next node after scene in ancestors)
     return ancestors[sceneIndex + 1] ?? node_id;

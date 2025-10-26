@@ -46,7 +46,7 @@ export function GapOverlay({
       b: cmath.Rectangle;
     }> = [];
 
-    if (x && x.gap !== undefined) {
+    if (x && x.gaps && x.gaps.length > 0) {
       const x_sorted = [...rects].sort((a, b) => a.x - b.x);
       for (let i = 0; i < x.gaps.length; i++) {
         result.push({
@@ -57,7 +57,7 @@ export function GapOverlay({
       }
     }
 
-    if (y && y.gap !== undefined) {
+    if (y && y.gaps && y.gaps.length > 0) {
       const y_sorted = [...rects].sort((a, b) => a.y - b.y);
       for (let i = 0; i < y.gaps.length; i++) {
         result.push({
