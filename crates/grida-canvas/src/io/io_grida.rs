@@ -231,9 +231,9 @@ pub struct CSSBorder {
 #[derive(Debug, Deserialize)]
 pub struct JSONSVGPath {
     pub d: String,
-    #[serde(rename = "fillRule")]
+    #[serde(rename = "fillRule", default)]
     pub fill_rule: FillRule,
-    pub fill: String,
+    pub fill: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -570,6 +570,16 @@ pub struct JSONSceneNode {
 pub enum JSONCornerRadius {
     Uniform(f32),
     PerCorner(Vec<f32>),
+    PerCornerObject {
+        #[serde(rename = "topLeftRadius")]
+        top_left_radius: f32,
+        #[serde(rename = "topRightRadius")]
+        top_right_radius: f32,
+        #[serde(rename = "bottomRightRadius")]
+        bottom_right_radius: f32,
+        #[serde(rename = "bottomLeftRadius")]
+        bottom_left_radius: f32,
+    },
 }
 
 impl JSONCornerRadius {
@@ -603,6 +613,17 @@ impl JSONCornerRadius {
                     }
                 }
             }
+            JSONCornerRadius::PerCornerObject {
+                top_left_radius,
+                top_right_radius,
+                bottom_right_radius,
+                bottom_left_radius,
+            } => RectangularCornerRadius {
+                tl: Radius::circular(top_left_radius),
+                tr: Radius::circular(top_right_radius),
+                br: Radius::circular(bottom_right_radius),
+                bl: Radius::circular(bottom_left_radius),
+            },
         }
     }
 
@@ -617,6 +638,22 @@ impl JSONCornerRadius {
                     .all(|&value| (value - values[0]).abs() < f32::EPSILON)
                 {
                     Some(values[0])
+                } else {
+                    None
+                }
+            }
+            JSONCornerRadius::PerCornerObject {
+                top_left_radius,
+                top_right_radius,
+                bottom_right_radius,
+                bottom_left_radius,
+            } => {
+                // Check if all corners have the same radius
+                if (top_left_radius - top_right_radius).abs() < f32::EPSILON
+                    && (top_right_radius - bottom_right_radius).abs() < f32::EPSILON
+                    && (bottom_right_radius - bottom_left_radius).abs() < f32::EPSILON
+                {
+                    Some(top_left_radius)
                 } else {
                     None
                 }
@@ -738,7 +775,7 @@ pub struct JSONUnknownNodeProperties {
 pub enum JSONNode {
     #[serde(rename = "group")]
     Group(JSONGroupNode),
-    #[serde(rename = "container")]
+    #[serde(rename = "container", alias = "component")]
     Container(JSONContainerNode),
     #[serde(rename = "svgpath")]
     SVGPath(JSONSVGPathNode),

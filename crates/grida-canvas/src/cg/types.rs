@@ -352,6 +352,12 @@ pub enum FillRule {
     EvenOdd,
 }
 
+impl Default for FillRule {
+    fn default() -> Self {
+        FillRule::NonZero
+    }
+}
+
 /// Stroke alignment.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  

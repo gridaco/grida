@@ -48,6 +48,34 @@ cargo build
 cargo run --example <example-name>
 ```
 
+## Tools
+
+### `tool_io_grida` - Grida File Validator
+
+A CLI tool for validating `.grida` files and debugging parsing issues.
+
+**Usage:**
+
+```sh
+cargo run --example tool_io_grida <path-to-grida-file>
+```
+
+**Features:**
+
+- Validates `.grida` file structure and parses all nodes
+- Reports total node count, scene references, and entry scene
+- Provides node type breakdown (container, text, image, etc.)
+- Detects parsing errors with detailed error messages
+- Handles legacy file formats gracefully (missing fields, typos, etc.)
+
+**Example:**
+
+```sh
+cargo run --example tool_io_grida ../../editor/public/examples/canvas/instagram-post-01.grida
+```
+
+See [examples/tool_io_grida.rs](./examples/tool_io_grida.rs) for full documentation.
+
 ## Package Docs
 
 ```sh
