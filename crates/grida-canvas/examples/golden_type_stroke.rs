@@ -28,6 +28,7 @@ async fn scene() -> Scene {
         blend_mode: LayerBlendMode::default(),
         mask: None,
         effects: LayerEffects::default(),
+        layout_child: None,
     };
 
     // Text with Center stroke alignment
@@ -50,6 +51,7 @@ async fn scene() -> Scene {
         blend_mode: LayerBlendMode::default(),
         mask: None,
         effects: LayerEffects::default(),
+        layout_child: None,
     };
 
     // Text with Inside stroke alignment
@@ -72,6 +74,7 @@ async fn scene() -> Scene {
         blend_mode: LayerBlendMode::default(),
         mask: None,
         effects: LayerEffects::default(),
+        layout_child: None,
     };
 
     // Add all text nodes as root children in one operation

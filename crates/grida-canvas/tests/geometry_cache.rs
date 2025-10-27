@@ -1,4 +1,5 @@
 use cg::cache::geometry::GeometryCache;
+use cg::cg::types::*;
 use cg::node::{
     factory::NodeFactory,
     scene_graph::{Parent, SceneGraph},
@@ -19,7 +20,8 @@ fn geometry_cache_builds_recursively() {
     let mut group1 = nf.create_group_node();
     group1.transform = Some(AffineTransform::new(5.0, 5.0, 0.0));
     let mut container = nf.create_container_node();
-    container.transform = AffineTransform::new(10.0, 20.0, 0.0);
+    container.position = CGPoint::new(10.0, 20.0).into();
+    container.rotation = 0.0;
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(4.0, 6.0, 0.0);
 
@@ -55,10 +57,8 @@ fn container_world_bounds_include_children() {
     let mut graph = SceneGraph::new();
 
     let mut container = nf.create_container_node();
-    container.size = Size {
-        width: 100.0,
-        height: 100.0,
-    };
+    container.layout_dimensions.width = Some(100.0);
+    container.layout_dimensions.height = Some(100.0);
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(50.0, 50.0, 0.0);
     rect.size = Size {

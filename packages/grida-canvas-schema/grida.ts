@@ -1090,7 +1090,7 @@ export namespace grida.program.css {
       | "overflow"
       //
       // | "margin"
-      | "flexWrap"
+      // | "flexWrap"
       //
     >
   >;
@@ -1516,6 +1516,14 @@ export namespace grida.program.nodes {
        * @default "horizontal"
        */
       direction: cg.Axis;
+
+      /**
+       *
+       * the flex model wrap behavior - takes effect when layout is set to `flex`
+       *
+       * @default "nowrap"
+       */
+      layoutWrap?: "wrap" | "nowrap";
 
       /**
        *

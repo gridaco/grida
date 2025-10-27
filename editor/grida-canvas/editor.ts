@@ -1157,8 +1157,152 @@ class EditorDocumentStore
   public autoLayout(target: "selection" | editor.NodeID[]) {
     this.dispatch({
       type: "autolayout",
+      contain: true,
       target,
     });
+  }
+
+  public reLayout(
+    node_id: string,
+    layout: "normal" | "flex-row" | "flex-column"
+  ): void {
+    const node = this.getNodeSnapshotById(node_id);
+    assert(
+      node.type === "container",
+      `reLayout requires a container node, got ${node.type}`
+    );
+
+    // cases
+    // none: no changes to be made
+    // clear: any => no layout (make things absolute)
+    // flex: non-flex => flex (apply flex layout, use autoLayout)
+    // flex-direction-switch: flex => flex { direction } (change only the direction)
+    type RelayoutAction =
+      | { type: "none" }
+      | { type: "clear" }
+      | { type: "flex"; direction: "horizontal" | "vertical" }
+      | { type: "flex-direction-switch"; direction: "horizontal" | "vertical" };
+
+    const currentLayout = (node as grida.program.nodes.ContainerNode).layout;
+    const currentDirection = (node as grida.program.nodes.ContainerNode)
+      .direction;
+
+    // Compute the action type
+    const action: RelayoutAction = (() => {
+      // Check if layout is already applied
+      const isAlreadyApplied =
+        (layout === "normal" && currentLayout !== "flex") ||
+        (layout === "flex-row" &&
+          currentLayout === "flex" &&
+          currentDirection === "horizontal") ||
+        (layout === "flex-column" &&
+          currentLayout === "flex" &&
+          currentDirection === "vertical");
+
+      if (isAlreadyApplied) {
+        return { type: "none" };
+      }
+
+      // Converting to normal layout (clearing flex)
+      if (layout === "normal") {
+        return { type: "clear" };
+      }
+
+      // Converting to flex layout
+      const direction = layout === "flex-row" ? "horizontal" : "vertical";
+
+      // If already flex, just switching direction
+      if (currentLayout === "flex") {
+        return { type: "flex-direction-switch", direction };
+      }
+
+      // Converting from non-flex to flex
+      return { type: "flex", direction };
+    })();
+
+    // Handle each action type
+    switch (action.type) {
+      case "none":
+        // No-op if already in desired state
+        return;
+
+      case "clear": {
+        // [layout => no layout] - convert flex to absolute positioning
+        const children = dq.getChildren(this.state.document_ctx, node_id);
+
+        // Get current absolute positions of all children
+        const childrenWithRects = children
+          .map((child_id) => {
+            const rect = this.geometry.getNodeAbsoluteBoundingRect(child_id);
+            return rect ? { id: child_id, rect } : null;
+          })
+          .filter((item): item is NonNullable<typeof item> => item !== null);
+
+        // Get parent's absolute position to calculate relative offsets
+        const parentRect = this.geometry.getNodeAbsoluteBoundingRect(node_id);
+        assert(parentRect, "Parent rect not found");
+
+        // Update parent to remove flex layout
+        this.dispatch([
+          {
+            type: "node/change/*",
+            node_id: node_id,
+            layout: "flow",
+            direction: undefined,
+            mainAxisGap: undefined,
+            crossAxisGap: undefined,
+            mainAxisAlignment: undefined,
+            crossAxisAlignment: undefined,
+            layoutWrap: undefined,
+          },
+        ]);
+
+        // Update each child to absolute positioning with calculated positions
+        childrenWithRects.forEach(({ id, rect }) => {
+          // Calculate position relative to parent
+          const relativeLeft = rect.x - parentRect.x;
+          const relativeTop = rect.y - parentRect.y;
+
+          this.changeNodePropertyPositioning(id, {
+            position: "absolute",
+            left: cmath.quantize(relativeLeft, 1),
+            top: cmath.quantize(relativeTop, 1),
+            right: undefined,
+            bottom: undefined,
+          });
+        });
+        break;
+      }
+
+      case "flex": {
+        // [no layout => layout] - use autoLayout
+        const children = dq.getChildren(this.state.document_ctx, node_id);
+
+        if (children.length === 0) {
+          // If no children, just set the layout properties
+          this.changeContainerNodeLayout(node_id, "flex");
+          this.changeFlexContainerNodeDirection(node_id, action.direction);
+          return;
+        }
+
+        // Use autoLayout with contain: false to apply layout to existing container
+        this.dispatch({
+          type: "autolayout",
+          contain: false,
+          target: node_id,
+        });
+
+        // Ensure the direction matches the requested layout
+        // (autolayout guesses the direction, but we want to enforce the specific one)
+        this.changeFlexContainerNodeDirection(node_id, action.direction);
+        break;
+      }
+
+      case "flex-direction-switch":
+        // Just switch the direction
+        this.changeFlexContainerNodeDirection(node_id, action.direction);
+        break;
+    }
   }
 
   public contain(target: "selection" | editor.NodeID[]) {
@@ -1979,6 +2123,13 @@ class EditorDocumentStore
       node_id: node_id,
       mainAxisGap: typeof gap === "number" ? gap : gap.mainAxisGap,
       crossAxisGap: typeof gap === "number" ? gap : gap.crossAxisGap,
+    });
+  }
+  changeFlexContainerNodeWrap(node_id: string, layoutWrap: "wrap" | "nowrap") {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      layoutWrap,
     });
   }
   //
@@ -3349,6 +3500,15 @@ export class EditorSurface
     });
   }
 
+  public surfaceConfigurePaddingWithMirroringModifier(
+    padding_with_axis_mirroring: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/padding-with-mirroring",
+      padding_with_axis_mirroring,
+    });
+  }
+
   // #region IPixelGridActions implementation
   surfaceConfigurePixelGrid(state: "on" | "off") {
     this.dispatch({
@@ -3538,6 +3698,20 @@ export class EditorSurface
         type: "gap",
         selection: selection,
         axis,
+      },
+    });
+  }
+
+  surfaceStartPaddingGesture(
+    node_id: string,
+    side: "top" | "right" | "bottom" | "left"
+  ) {
+    this._editor.doc.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "padding",
+        node_id,
+        side,
       },
     });
   }

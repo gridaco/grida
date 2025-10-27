@@ -3,6 +3,16 @@ use crate::cache::geometry::GeometryCache;
 use crate::cg::types::*;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
+use math2::rect::Rectangle;
+
+/// Dummy bounds for V1 nodes that use schema sizing
+/// V1 nodes ignore the bounds parameter and use their schema values
+const DUMMY_BOUNDS: Rectangle = Rectangle {
+    x: 0.0,
+    y: 0.0,
+    width: 0.0,
+    height: 0.0,
+};
 
 /// A painter specifically for drawing nodes, using the main Painter for operations.
 /// This separates node-specific drawing logic from the main Painter while maintaining
@@ -20,7 +30,8 @@ impl<'a> NodePainter<'a> {
     /// Draw a RectangleNode, respecting its transform, effect, fill, stroke, blend mode, opacity
     pub fn draw_rect_node(&self, node: &RectangleNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Rectangle(node.clone()));
+            let node_enum = Node::Rectangle(node.clone());
+            let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
@@ -42,7 +53,8 @@ impl<'a> NodePainter<'a> {
     /// Draw an ImageNode, respecting transform, effect, rounded corners, blend mode, opacity
     pub fn draw_image_node(&self, node: &ImageNodeRec) -> bool {
         self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Image(node.clone()));
+            let node_enum = Node::Image(node.clone());
+            let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
 
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
@@ -73,7 +85,8 @@ impl<'a> NodePainter<'a> {
     /// Draw an EllipseNode
     pub fn draw_ellipse_node(&self, node: &EllipseNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Ellipse(node.clone()));
+            let node_enum = Node::Ellipse(node.clone());
+            let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
@@ -95,7 +108,8 @@ impl<'a> NodePainter<'a> {
     /// Draw a LineNode
     pub fn draw_line_node(&self, node: &LineNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Line(node.clone()));
+            let node_enum = Node::Line(node.clone());
+            let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
 
             self.painter.with_opacity(node.opacity, || {
                 self.painter.with_blendmode(node.blend_mode, || {
@@ -206,6 +220,7 @@ impl<'a> NodePainter<'a> {
             stroke_align: node.stroke_align,
             effects: node.effects.clone(),
             stroke_dash_array: node.stroke_dash_array.clone(),
+            layout_child: node.layout_child.clone(),
         };
 
         self.draw_polygon_node(&polygon);
@@ -229,6 +244,7 @@ impl<'a> NodePainter<'a> {
             stroke_align: node.stroke_align,
             effects: node.effects.clone(),
             stroke_dash_array: node.stroke_dash_array.clone(),
+            layout_child: node.layout_child.clone(),
         };
 
         self.draw_polygon_node(&polygon);
@@ -265,68 +281,10 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a ContainerNode (background + stroke + children)
-    pub fn draw_container_node_recursively(
-        &self,
-        id: &NodeId,
-        node: &ContainerNodeRec,
-        graph: &SceneGraph,
-        cache: &GeometryCache,
-    ) {
-        self.painter.with_transform(&node.transform.matrix, || {
-            self.painter.with_opacity(node.opacity, || {
-                let shape = build_shape(&IntrinsicSizeNode::Container(node.clone()));
-
-                // Draw effects, fills, children (with optional clipping), then strokes last
-                self.painter
-                    .draw_shape_with_effects(&node.effects, &shape, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            // Paint fills first
-                            self.painter.draw_fills(&shape, &node.fills);
-
-                            // Children are drawn next; if `clip` is enabled we push
-                            // a clip region for the container's shape so that
-                            // descendants are clipped but the container's own stroke
-                            // remains unaffected.
-                            if let Some(children) = graph.get_children(id) {
-                                if node.clip {
-                                    self.painter.with_clip(&shape, || {
-                                        for child_id in children {
-                                            if let Ok(child) = graph.get_node(child_id) {
-                                                self.draw_node_recursively(
-                                                    child_id, child, graph, cache,
-                                                );
-                                            }
-                                        }
-                                    });
-                                } else {
-                                    for child_id in children {
-                                        if let Ok(child) = graph.get_node(child_id) {
-                                            self.draw_node_recursively(
-                                                child_id, child, graph, cache,
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Finally paint the stroke so it is not clipped by the
-                            // container's own clip and always renders above children.
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        });
-                    });
-            });
-        });
-    }
-
     pub fn draw_error_node(&self, node: &ErrorNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
-            let shape = build_shape(&IntrinsicSizeNode::Error(node.clone()));
+            let node_enum = Node::Error(node.clone());
+            let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
 
             // Create a red fill paint
             let fill = Paint::Solid(SolidPaint {
@@ -449,7 +407,74 @@ impl<'a> NodePainter<'a> {
         match node {
             Node::Error(n) => self.draw_error_node(n),
             Node::Group(n) => self.draw_group_node_recursively(id, n, graph, cache),
-            Node::Container(n) => self.draw_container_node_recursively(id, n, graph, cache),
+            Node::Container(n) => {
+                // Get pre-computed local transform from geometry cache
+                let local_transform = cache
+                    .get_transform(id)
+                    .expect("Geometry must exist - pipeline bug");
+
+                self.painter.with_transform(&local_transform.matrix, || {
+                    self.painter.with_opacity(n.opacity, || {
+                        // Geometry guaranteed to exist - no Option
+                        let bounds = cache
+                            .get_world_bounds(id)
+                            .expect("Geometry must exist - pipeline bug");
+                        let shape = build_shape(node, &bounds);
+
+                        // Draw effects, fills, children (with optional clipping), then strokes last
+                        self.painter
+                            .draw_shape_with_effects(&n.effects, &shape, || {
+                                self.painter.with_blendmode(n.blend_mode, || {
+                                    // Paint fills first
+                                    self.painter.draw_fills(&shape, &n.fills);
+
+                                    // Children are drawn next; if `clip` is enabled we push
+                                    // a clip region for the container's shape
+                                    if let Some(children) = graph.get_children(id) {
+                                        if n.clip {
+                                            self.painter.with_clip(&shape, || {
+                                                for child_id in children {
+                                                    if let Ok(child) = graph.get_node(child_id) {
+                                                        self.draw_node_recursively(
+                                                            child_id, child, graph, cache,
+                                                        );
+                                                    }
+                                                }
+                                            });
+                                        } else {
+                                            for child_id in children {
+                                                if let Ok(child) = graph.get_node(child_id) {
+                                                    self.draw_node_recursively(
+                                                        child_id, child, graph, cache,
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Finally paint the stroke
+                                    self.painter.draw_strokes(
+                                        &shape,
+                                        &n.strokes,
+                                        n.stroke_width,
+                                        n.stroke_align,
+                                        n.stroke_dash_array.as_ref(),
+                                    );
+                                });
+                            });
+                    });
+                });
+            }
+            Node::InitialContainer(_) => {
+                // ICB is invisible - only render children
+                if let Some(children) = graph.get_children(id) {
+                    for child_id in children {
+                        if let Ok(child_node) = graph.get_node(child_id) {
+                            self.draw_node_recursively(child_id, child_node, graph, cache);
+                        }
+                    }
+                }
+            }
             Node::Rectangle(n) => self.draw_rect_node(n),
             Node::Ellipse(n) => self.draw_ellipse_node(n),
             Node::Polygon(n) => self.draw_polygon_node(n),

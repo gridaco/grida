@@ -1,9 +1,9 @@
 use cg::cg::types::*;
-use cg::layout::tmp_example::{compute_flex_layout_for_container, ContainerWithStyle};
-use cg::layout::{ComputedLayout, LayoutStyle};
-use cg::node::schema::{ContainerNodeRec, Size as SchemaSize};
+use cg::layout::engine::LayoutEngine;
+use cg::layout::ComputedLayout;
+use cg::node::scene_graph::{Parent, SceneGraph};
+use cg::node::schema::*;
 use skia_safe::{surfaces, Color, Font, FontMgr, Paint, Rect};
-use taffy::prelude::*;
 
 fn create_container(id: &str, width: f32, height: f32) -> ContainerNodeRec {
     create_container_with_padding(id, width, height, 0.0)
@@ -20,36 +20,106 @@ fn create_container_with_padding(
     use std::hash::{Hash, Hasher};
     let mut hasher = DefaultHasher::new();
     id.hash(&mut hasher);
-    let id_u64 = hasher.finish();
+    let _ = hasher.finish(); // Generate ID but don't store it since it's not used
 
     ContainerNodeRec {
         active: true,
         opacity: 1.0,
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
-        transform: math2::transform::AffineTransform::identity(),
-        size: SchemaSize { width, height },
-        corner_radius: RectangularCornerRadius::default(),
-        fills: Paints::new([]),
-        strokes: Paints::new([]),
+        rotation: 0.0,
+        position: Default::default(),
+        corner_radius: Default::default(),
+        fills: Default::default(),
+        strokes: Default::default(),
         stroke_width: 0.0,
         stroke_align: StrokeAlign::Center,
         stroke_dash_array: None,
-        effects: cg::node::schema::LayerEffects::default(),
-        clip: ContainerClipFlag::default(),
-        layout_mode: LayoutMode::Flex,
-        layout_direction: Axis::Horizontal,
-        layout_wrap: LayoutWrap::NoWrap,
-        layout_main_axis_alignment: MainAxisAlignment::Start,
-        layout_cross_axis_alignment: CrossAxisAlignment::Start,
-        padding: EdgeInsets {
-            left: padding,
-            right: padding,
-            top: padding,
-            bottom: padding,
+        effects: Default::default(),
+        clip: Default::default(),
+        layout_container: LayoutContainerStyle {
+            layout_mode: LayoutMode::Flex,
+            layout_direction: Axis::Horizontal,
+            layout_wrap: Some(LayoutWrap::NoWrap),
+            layout_main_axis_alignment: Some(MainAxisAlignment::Start),
+            layout_cross_axis_alignment: Some(CrossAxisAlignment::Start),
+            layout_padding: Some(EdgeInsets {
+                left: padding,
+                right: padding,
+                top: padding,
+                bottom: padding,
+            }),
+            layout_gap: None,
         },
-        layout_gap: LayoutGap::default(),
+        layout_dimensions: LayoutDimensionStyle {
+            width: Some(width),
+            height: Some(height),
+            min_width: None,
+            max_width: None,
+            min_height: None,
+            max_height: None,
+        },
+        layout_child: None,
     }
+}
+
+/// Build scene and compute layout using production pipeline
+fn compute_layout_with_production_pipeline(
+    icb_config: ContainerNodeRec,
+    children: Vec<ContainerNodeRec>,
+    viewport_size: Size,
+) -> Vec<ComputedLayout> {
+    let mut graph = SceneGraph::new();
+
+    // Create ICB from config (convert to InitialContainer)
+    let icb = cg::node::schema::InitialContainerNodeRec {
+        active: icb_config.active,
+        layout_mode: icb_config.layout_container.layout_mode,
+        layout_direction: icb_config.layout_container.layout_direction,
+        layout_wrap: icb_config
+            .layout_container
+            .layout_wrap
+            .unwrap_or(LayoutWrap::NoWrap),
+        layout_main_axis_alignment: icb_config
+            .layout_container
+            .layout_main_axis_alignment
+            .unwrap_or(MainAxisAlignment::Start),
+        layout_cross_axis_alignment: icb_config
+            .layout_container
+            .layout_cross_axis_alignment
+            .unwrap_or(CrossAxisAlignment::Start),
+        padding: icb_config
+            .layout_container
+            .layout_padding
+            .unwrap_or(EdgeInsets::default()),
+        layout_gap: icb_config
+            .layout_container
+            .layout_gap
+            .unwrap_or(LayoutGap::default()),
+    };
+    let icb_id = graph.append_child(Node::InitialContainer(icb), Parent::Root);
+
+    // Add children with Inset location for flex layout
+    for child in children {
+        // Position is now handled by layout field
+        graph.append_child(Node::Container(child), Parent::NodeId(icb_id));
+    }
+
+    // Compute layout
+    let scene = Scene {
+        name: String::new(),
+        graph,
+        background_color: None,
+    };
+    let mut layout_engine = LayoutEngine::new();
+    let layout_result = layout_engine.compute(&scene, viewport_size);
+
+    // Extract layouts
+    let children_ids = scene.graph.get_children(&icb_id).unwrap();
+    children_ids
+        .iter()
+        .map(|id| layout_result.get(id).cloned().unwrap())
+        .collect()
 }
 
 fn main() {
@@ -94,30 +164,20 @@ fn main() {
 
     // Scenario 1: Fixed container + No padding + Fixed children
     {
-        let container =
-            ContainerWithStyle::from_container(create_container("scenario-1", 400.0, 120.0))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(400.0),
-                    height: Dimension::length(120.0),
-                    flex_grow: 0.0,
-                });
+        let container = create_container("scenario-1", 400.0, 120.0);
 
-        let children: Vec<ContainerWithStyle> = (0..4)
-            .map(|i| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-1-{}", i),
-                    80.0,
-                    80.0,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(80.0),
-                    height: Dimension::length(80.0),
-                    ..Default::default()
-                })
-            })
+        let children: Vec<ContainerNodeRec> = (0..4)
+            .map(|i| create_container(&format!("child-1-{}", i), 80.0, 80.0))
             .collect();
 
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
+        let layouts = compute_layout_with_production_pipeline(
+            container,
+            children,
+            Size {
+                width: 400.0,
+                height: 120.0,
+            },
+        );
 
         let height_used = render_scenario(
             canvas,
@@ -137,34 +197,20 @@ fn main() {
 
     // Scenario 2: Fixed container + Padding + Fixed children
     {
-        let container = ContainerWithStyle::from_container(create_container_with_padding(
-            "scenario-2",
-            400.0,
-            120.0,
-            20.0,
-        ))
-        .with_layout(LayoutStyle {
-            width: Dimension::length(400.0),
-            height: Dimension::length(120.0),
-            flex_grow: 0.0,
-        });
+        let container = create_container_with_padding("scenario-2", 400.0, 120.0, 20.0);
 
-        let children: Vec<ContainerWithStyle> = (0..4)
-            .map(|i| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-2-{}", i),
-                    80.0,
-                    80.0,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(80.0),
-                    height: Dimension::length(80.0),
-                    ..Default::default()
-                })
-            })
+        let children: Vec<ContainerNodeRec> = (0..4)
+            .map(|i| create_container(&format!("child-2-{}", i), 80.0, 80.0))
             .collect();
 
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
+        let layouts = compute_layout_with_production_pipeline(
+            container,
+            children,
+            Size {
+                width: 400.0,
+                height: 120.0,
+            },
+        );
 
         let _height_used = render_scenario_with_padding(
             canvas,
@@ -185,30 +231,20 @@ fn main() {
 
     // Scenario 3: Auto container + No padding + Fixed children
     {
-        let container =
-            ContainerWithStyle::from_container(create_container("scenario-3", 320.0, 80.0))
-                .with_layout(LayoutStyle {
-                    width: Dimension::auto(),
-                    height: Dimension::auto(),
-                    flex_grow: 0.0,
-                });
+        let container = create_container("scenario-3", 320.0, 80.0);
 
-        let children: Vec<ContainerWithStyle> = (0..4)
-            .map(|i| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-3-{}", i),
-                    80.0,
-                    80.0,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(80.0),
-                    height: Dimension::length(80.0),
-                    ..Default::default()
-                })
-            })
+        let children: Vec<ContainerNodeRec> = (0..4)
+            .map(|i| create_container(&format!("child-3-{}", i), 80.0, 80.0))
             .collect();
 
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
+        let layouts = compute_layout_with_production_pipeline(
+            container,
+            children,
+            Size {
+                width: 320.0,
+                height: 80.0,
+            },
+        );
 
         let _height_used = render_scenario(
             canvas,
@@ -228,34 +264,20 @@ fn main() {
 
     // Scenario 4: Auto container + Padding + Fixed children
     {
-        let container = ContainerWithStyle::from_container(create_container_with_padding(
-            "scenario-4",
-            360.0,
-            120.0,
-            20.0,
-        ))
-        .with_layout(LayoutStyle {
-            width: Dimension::auto(),
-            height: Dimension::auto(),
-            flex_grow: 0.0,
-        });
+        let container = create_container_with_padding("scenario-4", 360.0, 120.0, 20.0);
 
-        let children: Vec<ContainerWithStyle> = (0..4)
-            .map(|i| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-4-{}", i),
-                    80.0,
-                    80.0,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(80.0),
-                    height: Dimension::length(80.0),
-                    ..Default::default()
-                })
-            })
+        let children: Vec<ContainerNodeRec> = (0..4)
+            .map(|i| create_container(&format!("child-4-{}", i), 80.0, 80.0))
             .collect();
 
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
+        let layouts = compute_layout_with_production_pipeline(
+            container,
+            children,
+            Size {
+                width: 360.0,
+                height: 120.0,
+            },
+        );
 
         let height_used = render_scenario_with_padding(
             canvas,
@@ -276,31 +298,20 @@ fn main() {
 
     // Scenario 5: Fixed container + No padding + Flexible children
     {
-        let container =
-            ContainerWithStyle::from_container(create_container("scenario-5", 400.0, 120.0))
-                .with_layout(LayoutStyle {
-                    width: Dimension::length(400.0),
-                    height: Dimension::length(120.0),
-                    flex_grow: 0.0,
-                });
+        let container = create_container("scenario-5", 400.0, 120.0);
 
-        let children: Vec<ContainerWithStyle> = (0..4)
-            .map(|i| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-5-{}", i),
-                    100.0,
-                    80.0,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::auto(),
-                    height: Dimension::length(80.0),
-                    flex_grow: 1.0,
-                    ..Default::default()
-                })
-            })
+        let children: Vec<ContainerNodeRec> = (0..4)
+            .map(|i| create_container(&format!("child-5-{}", i), 100.0, 80.0))
             .collect();
 
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
+        let layouts = compute_layout_with_production_pipeline(
+            container,
+            children,
+            Size {
+                width: 400.0,
+                height: 120.0,
+            },
+        );
 
         let height_used = render_scenario(
             canvas,
@@ -320,35 +331,20 @@ fn main() {
 
     // Scenario 6: Fixed container + Padding + Flexible children
     {
-        let container = ContainerWithStyle::from_container(create_container_with_padding(
-            "scenario-6",
-            400.0,
-            120.0,
-            20.0,
-        ))
-        .with_layout(LayoutStyle {
-            width: Dimension::length(400.0),
-            height: Dimension::length(120.0),
-            flex_grow: 0.0,
-        });
+        let container = create_container_with_padding("scenario-6", 400.0, 120.0, 20.0);
 
-        let children: Vec<ContainerWithStyle> = (0..4)
-            .map(|i| {
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-6-{}", i),
-                    90.0,
-                    80.0,
-                ))
-                .with_layout(LayoutStyle {
-                    width: Dimension::auto(),
-                    height: Dimension::length(80.0),
-                    flex_grow: 1.0,
-                    ..Default::default()
-                })
-            })
+        let children: Vec<ContainerNodeRec> = (0..4)
+            .map(|i| create_container(&format!("child-6-{}", i), 90.0, 80.0))
             .collect();
 
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
+        let layouts = compute_layout_with_production_pipeline(
+            container,
+            children,
+            Size {
+                width: 400.0,
+                height: 120.0,
+            },
+        );
 
         let height_used = render_scenario_with_padding(
             canvas,
@@ -369,17 +365,7 @@ fn main() {
 
     // Scenario 7: Mixed children (fixed + flexible) + padding
     {
-        let container = ContainerWithStyle::from_container(create_container_with_padding(
-            "scenario-7",
-            500.0,
-            120.0,
-            20.0,
-        ))
-        .with_layout(LayoutStyle {
-            width: Dimension::length(500.0),
-            height: Dimension::length(120.0),
-            flex_grow: 0.0,
-        });
+        let container = create_container_with_padding("scenario-7", 500.0, 120.0, 20.0);
 
         let child_configs = vec![
             (100.0, 80.0, false), // Fixed
@@ -388,32 +374,31 @@ fn main() {
             (120.0, 80.0, true),  // Flexible
         ];
 
-        let children: Vec<ContainerWithStyle> = child_configs
+        let children: Vec<ContainerNodeRec> = child_configs
             .iter()
             .enumerate()
             .map(|(i, (w, h, flexible))| {
-                let mut layout = LayoutStyle {
-                    width: if *flexible {
-                        Dimension::auto()
-                    } else {
-                        Dimension::length(*w)
-                    },
-                    height: Dimension::length(*h),
-                    ..Default::default()
-                };
+                let mut container = create_container(&format!("child-7-{}", i), *w, *h);
                 if *flexible {
-                    layout.flex_grow = 1.0;
+                    // Auto width to allow flex-grow - set width to None to indicate auto
+                    container.layout_dimensions.width = None;
+                    container.layout_child = Some(LayoutChildStyle {
+                        layout_grow: 1.0,
+                        layout_positioning: LayoutPositioning::Auto,
+                    });
                 }
-                ContainerWithStyle::from_container(create_container(
-                    &format!("child-7-{}", i),
-                    *w,
-                    *h,
-                ))
-                .with_layout(layout)
+                container
             })
             .collect();
 
-        let layouts = compute_flex_layout_for_container(&container, children.iter().collect());
+        let layouts = compute_layout_with_production_pipeline(
+            container,
+            children,
+            Size {
+                width: 500.0,
+                height: 120.0,
+            },
+        );
 
         let _height_used = render_scenario_with_padding(
             canvas,
@@ -435,13 +420,12 @@ fn main() {
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode png");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/layout_padding.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    // Use cargo env to get the correct output directory
+    let output_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let output_path = format!("{}/goldens/layout_padding.png", output_dir);
+    std::fs::write(&output_path, data.as_bytes()).unwrap();
 
-    println!("✓ Generated goldens/layout_padding.png");
+    println!("✓ Generated {}", output_path);
 }
 
 /// Render a single layout scenario and return the total height used

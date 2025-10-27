@@ -12,10 +12,8 @@ async fn demo_vectors() -> Scene {
 
     // Root container
     let mut root = nf.create_container_node();
-    root.size = Size {
-        width: 1200.0,
-        height: 800.0,
-    };
+    root.layout_dimensions.width = Some(1200.0);
+    root.layout_dimensions.height = Some(800.0);
 
     let root_id = graph.append_child(Node::Container(root), Parent::Root);
     let spacing = 200.0;
@@ -46,6 +44,7 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
+                layout_child: None,
             };
 
             graph.append_child(
@@ -78,6 +77,7 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
+                layout_child: None,
             };
 
             graph.append_child(
@@ -111,6 +111,7 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
+                layout_child: None,
             };
 
             graph.append_child(Node::Vector(vector_node_3), Parent::NodeId(root_id.clone()));
@@ -140,6 +141,7 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
+                layout_child: None,
             };
 
             graph.append_child(Node::Vector(vector_node_4), Parent::NodeId(root_id.clone()));
@@ -172,6 +174,7 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
+                layout_child: None,
             };
 
             graph.append_child(
@@ -213,6 +216,7 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
+                layout_child: None,
             };
 
             graph.append_child(Node::Vector(vector_node_5), Parent::NodeId(root_id.clone()));
@@ -243,6 +247,7 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
+                layout_child: None,
             };
 
             graph.append_child(
@@ -283,6 +288,7 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
+                layout_child: None,
             };
 
             graph.append_child(Node::Vector(vector_node_6), Parent::NodeId(root_id.clone()));
@@ -318,6 +324,7 @@ async fn demo_vectors() -> Scene {
                 stroke_width_profile: None,
                 stroke_align: StrokeAlign::Center,
                 stroke_dash_array: None,
+                layout_child: None,
             };
 
             graph.append_child(Node::Vector(vector_node_7), Parent::NodeId(root_id.clone()));

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
+import { useGesture } from "@use-gesture/react";
+import { useSurfaceGesture } from "./hooks/use-surface-gesture";
 import {
   useBackendState,
   useBrushState,
@@ -39,17 +40,13 @@ import { MeasurementGuide } from "./ui/measurement";
 import { VectorMeasurementGuide } from "./ui/vector-measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
-import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
-import cmath from "@grida/cmath";
 import { cursors } from "../../components/cursor/cursor-data";
-import { FakePointerCursorSVG } from "@/components/cursor/cursor-fake";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
 import { SurfaceImageEditor } from "./ui/surface-image-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { RedDotHandle } from "./ui/reddot";
-import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler/react";
 import { PixelGrid } from "@grida/pixel-grid/react";
 import { Rule } from "./ui/rule";
@@ -65,7 +62,11 @@ import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
 import { useFollowPlugin } from "../plugins/use-follow";
 import { SurfaceVariableWidthEditor } from "./ui/surface-varwidth-editor";
-import { MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE } from "../ui-config";
+import {
+  MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE,
+  MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE,
+  MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE,
+} from "../ui-config";
 import {
   NodeOverlayCornerRadiusHandle,
   NodeOverlayRectangularCornerRadiusHandles,
@@ -74,6 +75,13 @@ import {
   FakeCursorPosition,
   FakeForeignCursor,
 } from "@/components/multiplayer/cursor";
+import {
+  DistributeButton,
+  GapOverlay,
+} from "./ui/surface-distribution-overlay";
+import { PaddingOverlay } from "./ui/surface-padding-overlay";
+import cmath from "@grida/cmath";
+import { cn } from "@/components/lib/utils";
 
 const DRAG_THRESHOLD = 2;
 
@@ -94,64 +102,37 @@ function SurfaceTransformContextProvider({
 }
  */
 
-function useSurfaceGesture(
-  {
-    onClick,
-    onDoubleClick,
-    onDragStart,
-    onDragEnd,
-    ...handlers
-  }: Parameters<typeof __useGesture>[0],
-  config?: Parameters<typeof __useGesture>[1]
-) {
-  // click / double click triggers when drag ends (if double pointer down) - it might be a better idea to prevent it with the displacement, not by delayed flag
-  const should_prevent_click = useRef(false);
-
-  return __useGesture(
-    {
-      onClick: (e) => {
-        if (should_prevent_click.current) {
-          return;
-        }
-        onClick?.(e);
-      },
-      onDoubleClick: (e) => {
-        if (should_prevent_click.current) {
-          return;
-        }
-        onDoubleClick?.(e);
-      },
-      ...handlers,
-      onDragStart: (e) => {
-        onDragStart?.(e);
-        should_prevent_click.current = true;
-      },
-      onDragEnd: (e) => {
-        onDragEnd?.(e);
-        setTimeout(() => {
-          should_prevent_click.current = false;
-        }, 100);
-      },
-    },
-    config
-  );
+/**
+ * similar to SurfaceGroup, but for ones that should have own event target, non-blocking.
+ */
+function SurfaceFragmentGroup({
+  children,
+  hidden,
+}: React.PropsWithChildren<{ className?: string; hidden?: boolean }>) {
+  if (hidden) return null;
+  return <>{children}</>;
 }
 
 function SurfaceGroup({
   hidden,
   children,
   dontRenderWhenHidden,
+  className,
 }: React.PropsWithChildren<{
   hidden?: boolean;
   /**
    * completely remove from render tree, use this when the content is expensive and worth destroying.
    */
   dontRenderWhenHidden?: boolean;
+  className?: string;
 }>) {
   return (
     <div
       data-ux-hidden={hidden}
-      className="opacity-100 data-[ux-hidden='true']:opacity-0 transition-colors"
+      className={cn(
+        "opacity-100 data-[ux-hidden='true']:opacity-0 transition-colors",
+        className
+      )}
     >
       {hidden && dontRenderWhenHidden ? null : children}
     </div>
@@ -853,6 +834,8 @@ function get_cursor_tooltip_value(gesture: editor.gesture.GestureState) {
   switch (gesture.type) {
     case "gap":
       return cmath.ui.formatNumber(gesture.gap, 1);
+    case "padding":
+      return cmath.ui.formatNumber(gesture.padding, 1);
     case "rotate":
       return cmath.ui.formatNumber(gesture.rotation, 1) + "°";
     case "translate":
@@ -890,33 +873,86 @@ function SingleSelectionOverlay({
 }) {
   const editor = useCurrentEditor();
   const { gesture, is_node_translating } = useGestureState();
+  const { scaleX, scaleY } = useTransformState();
   const data = useSingleSelection(node_id);
   if (!data) return <></>;
 
-  const { node, distribution, rotation, style, boundingSurfaceRect } = data;
+  const { node, distribution, rotation, boundingSurfaceRect, size, object } =
+    data;
+
+  // Get padding if this is a container
+  const padding =
+    node.type === "container" && "padding" in node ? node.padding : undefined;
+
+  // Calculate measurement rect for visibility checks
+  const measurement_rect = {
+    x: 0,
+    y: 0,
+    width: size[0] * scaleX,
+    height: size[1] * scaleY,
+  };
+
+  const show_gap_overlay =
+    measurement_rect.width >= MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE &&
+    measurement_rect.height >= MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE;
+
+  const show_padding_overlay =
+    measurement_rect.width >= MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE &&
+    measurement_rect.height >= MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE;
 
   return (
     <>
       <div className="group">
-        {node.meta.is_flex_parent &&
-          distribution &&
-          (gesture.type === "idle" || gesture.type === "gap") &&
-          // TODO: support rotated surface
-          rotation === 0 && (
-            <>
-              <GapOverlay
-                offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
-                distribution={distribution}
-                style={style}
-                onGapGestureStart={(axis) => {
-                  editor.surface.surfaceStartGapGesture(node_id, axis);
-                }}
-              />
-            </>
-          )}
-        <SurfaceGroup hidden={is_node_translating}>
-          <NodeOverlay node_id={node_id} readonly={readonly} focused />
-        </SurfaceGroup>
+        <SurfaceFragmentGroup hidden={is_node_translating}>
+          <NodeOverlay node_id={node_id} readonly={readonly} focused>
+            {node.meta.is_flex_parent &&
+              distribution &&
+              (gesture.type === "idle" ||
+                gesture.type === "gap" ||
+                gesture.type === "padding") &&
+              // TODO: support rotated surface
+              rotation === 0 && (
+                <>
+                  {show_gap_overlay && (
+                    <GapOverlay
+                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                      distribution={distribution}
+                      onGapGestureStart={(axis) => {
+                        editor.surface.surfaceStartGapGesture(node_id, axis);
+                      }}
+                    />
+                  )}
+                  {show_padding_overlay && padding !== undefined && (
+                    <PaddingOverlay
+                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                      containerRect={object.boundingRect}
+                      padding={
+                        typeof padding === "number"
+                          ? {
+                              top: padding,
+                              right: padding,
+                              bottom: padding,
+                              left: padding,
+                            }
+                          : {
+                              top: padding.paddingTop,
+                              right: padding.paddingRight,
+                              bottom: padding.paddingBottom,
+                              left: padding.paddingLeft,
+                            }
+                      }
+                      onPaddingGestureStart={(side) => {
+                        editor.surface.surfaceStartPaddingGesture(
+                          node_id,
+                          side
+                        );
+                      }}
+                    />
+                  )}
+                </>
+              )}
+          </NodeOverlay>
+        </SurfaceFragmentGroup>
       </div>
     </>
   );
@@ -1048,14 +1084,15 @@ function NodeOverlay({
   focused,
   borderColor,
   borderWidth,
-}: {
+  children,
+}: React.PropsWithChildren<{
   node_id: string;
   readonly?: boolean;
   zIndex?: number;
   focused?: boolean;
   borderColor?: string;
   borderWidth?: number;
-}) {
+}>) {
   const { scaleX, scaleY } = useTransformState();
   const backend = useBackendState();
   const tool = useToolState();
@@ -1065,21 +1102,30 @@ function NodeOverlay({
 
   const bind = useSurfaceGesture(
     {
+      // FIXME: need better event handling - completely remove this in the future, use bbh query to handle the logic, purely mathmatical without binding events to this.
+      // basically, below block is required to prevent the current selection from de-selecting, when user tries to drag it.
+      // but this causes,
+      // 1. the ui (input) to not blur from panel
+      // 2. the inner content from being selected
       onPointerDown: ({ event }) => {
-        if (tool.type !== "insert" && tool.type !== "draw" && !event.shiftKey) {
+        if (
+          tool.type !== "insert" &&
+          tool.type !== "draw" &&
+          !event.shiftKey &&
+          !event.metaKey
+        ) {
           // prevent default to keep selection when clicking empty overlay
           // but allow shift+click to fall through for deselection
           event.preventDefault();
+
+          // blur inputs manually
+          try {
+            (document.activeElement as HTMLInputElement)?.blur();
+          } catch {}
         }
       },
     },
-    {
-      drag: {
-        enabled,
-        threshold: DRAG_THRESHOLD,
-        keyboardDisplacement: 0,
-      },
-    }
+    { enabled }
   );
 
   const data = useSingleSelection(node_id);
@@ -1102,9 +1148,7 @@ function NodeOverlay({
     measurement_rect.width >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE &&
     measurement_rect.height >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE;
 
-  {
-    /* TODO: resize for bitmap is not supported */
-  }
+  // TODO: resize for bitmap is not supported */
   const is_resizable_node = node.type !== "bitmap";
 
   return (
@@ -1169,6 +1213,7 @@ function NodeOverlay({
             className="bg-workbench-accent-sky group-data-[layer-is-component-consumer='true']:bg-workbench-accent-violet text-white"
           />
         )}
+        {children}
       </LayerOverlay>
     </>
   );
@@ -1242,7 +1287,7 @@ function LayerOverlayResizeHandle({
 }) {
   const editor = useCurrentEditor();
 
-  const zIndex = ["n", "e", "s", "w"].includes(anchor) ? 12 : 11;
+  const zIndex = ["n", "e", "s", "w"].includes(anchor) ? 11 : 21;
 
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
@@ -1326,7 +1371,7 @@ function LayerOverlayResizeSide({
         background: "transparent",
         cursor: cursors.resize_handle_cursor_map[anchor],
         touchAction: "none",
-        zIndex: 10,
+        zIndex: 20,
         ...positionalStyle,
       }}
     />
@@ -1429,229 +1474,6 @@ function RedDotSortHandle({
   });
 
   return <RedDotHandle {...bind()} />;
-}
-
-function GapOverlay({
-  onGapGestureStart,
-  offset,
-  style,
-  distribution,
-}: {
-  distribution: ObjectsDistributionAnalysis;
-  offset?: cmath.Vector2;
-  style?: React.CSSProperties;
-} & {
-  onGapGestureStart?: (axis: cmath.Axis) => void;
-}) {
-  const { transform } = useTransformState();
-
-  const { x, y, rects: _rects } = distribution;
-
-  // rects in surface space
-  const rects = useMemo(
-    () => _rects.map((r) => cmath.rect.transform(r, transform)),
-    [_rects, transform]
-  );
-
-  return (
-    <div style={style} className="pointer-events-none z-50">
-      <div>
-        {_rects.length >= 2 && (
-          <>
-            {x && x.gap !== undefined && (
-              <>
-                {Array.from({ length: x.gaps.length }).map((_, i) => {
-                  const axis = "x";
-                  const x_sorted = rects.sort((a, b) => a.x - b.x);
-                  const a = x_sorted[i];
-                  const b = x_sorted[i + 1];
-
-                  return (
-                    <GapWithHandle
-                      key={i}
-                      a={a}
-                      b={b}
-                      axis={axis}
-                      offset={offset}
-                      onGapGestureStart={onGapGestureStart}
-                    />
-                  );
-                })}
-              </>
-            )}
-            {y && y.gap !== undefined && (
-              <>
-                {Array.from({ length: y.gaps.length }).map((_, i) => {
-                  const axis = "y";
-                  const y_sorted = rects.sort((a, b) => a.y - b.y);
-                  const a = y_sorted[i];
-                  const b = y_sorted[i + 1];
-
-                  return (
-                    <GapWithHandle
-                      key={i}
-                      a={a}
-                      b={b}
-                      axis={axis}
-                      offset={offset}
-                      onGapGestureStart={onGapGestureStart}
-                    />
-                  );
-                })}
-              </>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function GapWithHandle({
-  a,
-  b,
-  axis,
-  offset = cmath.vector2.zero,
-  onGapGestureStart,
-}: {
-  a: cmath.Rectangle;
-  b: cmath.Rectangle;
-  axis: cmath.Axis;
-  offset?: cmath.Vector2;
-  onGapGestureStart?: (axis: cmath.Axis) => void;
-}) {
-  const { gesture } = useGestureState();
-
-  const r = useMemo(() => {
-    const intersection = cmath.rect.axisProjectionIntersection([a, b], axis)!;
-
-    if (!intersection) return null;
-
-    let rect: cmath.Rectangle;
-    if (axis === "x") {
-      const x1 = a.x + a.width;
-      const y1 = intersection[0];
-      const x2 = b.x;
-      const y2 = intersection[1];
-
-      rect = cmath.rect.fromPoints([
-        [x1, y1],
-        [x2, y2],
-      ]);
-    } else {
-      const x1 = intersection[0];
-      const y1 = a.y + a.height;
-      const x2 = intersection[1];
-      const y2 = b.y;
-
-      rect = cmath.rect.fromPoints([
-        [x1, y1],
-        [x2, y2],
-      ]);
-    }
-
-    return cmath.rect.translate(rect, cmath.vector2.invert(offset));
-  }, [a, b, axis, offset]);
-
-  const is_gesture = gesture.type === "gap";
-
-  if (!r) return null;
-
-  return (
-    <>
-      <div
-        style={{
-          position: "absolute",
-          top: r.y,
-          left: r.x,
-          width: r.width,
-          height: r.height,
-        }}
-        data-is-gesture={is_gesture}
-        className="pointer-events-none bg-transparent data-[is-gesture='true']:bg-workbench-accent-red/20"
-      >
-        <div
-          data-is-gesture={is_gesture}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-          }}
-          className="opacity-100 data-[is-gesture='true']:opacity-0"
-        >
-          <GapHandle axis={axis} onGapGestureStart={onGapGestureStart} />
-        </div>
-      </div>
-    </>
-  );
-}
-
-function GapHandle({
-  axis,
-  onGapGestureStart,
-}: {
-  axis: cmath.Axis;
-  onGapGestureStart?: (axis: cmath.Axis) => void;
-}) {
-  const bind = useSurfaceGesture({
-    onPointerDown: ({ event }) => {
-      event.preventDefault();
-    },
-    onDragStart: ({ event }) => {
-      event.preventDefault();
-      onGapGestureStart?.(axis);
-    },
-  });
-
-  return (
-    <button
-      {...bind()}
-      className="p-1 pointer-events-auto"
-      style={{
-        transform:
-          "translate(-50%, -50%) " + (axis === "y" ? "rotate(90deg)" : ""),
-        touchAction: "none",
-        cursor: axis === "x" ? "ew-resize" : "ns-resize",
-      }}
-    >
-      <div
-        className="
-      w-0.5 h-4 invisible
-      group-hover:visible
-      border border-pink-500
-      hover:bg-pink-500
-      ring-1 ring-white
-      pointer-events-auto
-      "
-      />
-    </button>
-  );
-}
-
-function DistributeButton({
-  axis,
-  onClick,
-}: {
-  axis: cmath.Axis | undefined;
-  onClick?: (axis: cmath.Axis) => void;
-}) {
-  if (!axis) {
-    return <></>;
-  }
-
-  return (
-    <div className="absolute hidden group-hover:block bottom-1 right-1 z-50 pointer-events-auto">
-      <button
-        className="p-1 bg-workbench-accent-sky text-white rounded-sm pointer-events-auto"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick?.(axis);
-        }}
-      >
-        {axis === "x" ? <ColumnsIcon /> : <RowsIcon />}
-      </button>
-    </div>
-  );
 }
 
 function PixelGridOverlay() {

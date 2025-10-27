@@ -4,6 +4,24 @@ All notable changes to the grida-canvas crate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.0.0-local.2] - 2025-10-19
+
+### Added
+
+- **Infinite Canvas + Flex Layout**: Root nodes (artboards) can be positioned anywhere in the viewport while their children participate in flex layout
+- **Universal Flex Layout Support**: All node types (Rectangle, Ellipse, Image, Text, etc.) can now participate in flex layout with `layout_positioning` and `layout_grow` properties
+- **Figma Layout Import**: Automatically map Figma's `layoutPositioning` to internal layout properties for all node types
+- **Root Node Positioning**: Containers and shapes now respect their x, y coordinates when used as root nodes (infinite canvas)
+- **Flex Layout Stacking**: Children are now properly positioned horizontally/vertically instead of stacking at (0, 0)
+- **Gap Stretching**: Vertical gap no longer incorrectly grows when parent container height increases
+- **Wrap Alignment**: Center alignment now works correctly with flex wrapping enabled
+- **Absolute Positioning**: Absolutely positioned children are correctly excluded from flex flow and positioned relative to parent
+- **Fixed-size Elements**: Elements maintain their specified dimensions instead of automatically shrinking when overflowing (flex_shrink: 0.0 default)
+
+### Changed
+
+- **Non-uniform Padding**: Support for CSS-style padding with individual values per side (`paddingTop`, `paddingRight`, `paddingBottom`, `paddingLeft`)
+
 ## [0.0.0-local.1] - 2025-10-16
 
 ### Added

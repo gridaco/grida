@@ -10,10 +10,8 @@ async fn demo_strokes() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.size = Size {
-        width: 1000.0,
-        height: 1200.0,
-    };
+    root_container_node.layout_dimensions.width = Some(1000.0);
+    root_container_node.layout_dimensions.height = Some(1200.0);
 
     let mut graph = SceneGraph::new();
 

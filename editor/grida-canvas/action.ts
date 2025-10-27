@@ -525,10 +525,26 @@ export interface EditorDistributeEvenlyAction {
   axis: "x" | "y";
 }
 
-export interface EditorAutoLayoutAction {
+export type EditorAutoLayoutAction = {
   type: "autolayout";
-  target: NodeID[] | "selection";
-}
+} & (
+  | {
+      /**
+       * if true, the nodes will be wrapped into a new container.
+       * if false, the target is expected to be exactly one, and needs to be a container.
+       */
+      contain: true;
+      target: NodeID[] | "selection";
+    }
+  | {
+      /**
+       * if true, the nodes will be wrapped into a new container.
+       * if false, the target is expected to be exactly one, and needs to be a container.
+       */
+      contain: false;
+      target: NodeID;
+    }
+);
 
 export interface EditorContainAction {
   type: "contain";
@@ -561,7 +577,8 @@ export type EditorConfigAction =
   | EditorConfigureModifier_TransformWithPreserveAspectRatio
   | EditorConfigureModifier_RotateWithQuantize
   | EditorConfigureModifier_PathKeepProjecting
-  | EditorConfigureModifier_CurveTangentMirroring;
+  | EditorConfigureModifier_CurveTangentMirroring
+  | EditorConfigureModifier_PaddingWithMirroring;
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
@@ -610,6 +627,11 @@ export interface EditorConfigureModifier_PathKeepProjecting {
 export interface EditorConfigureModifier_CurveTangentMirroring {
   type: "config/modifiers/curve-tangent-mirroring";
   curve_tangent_mirroring: vn.TangentMirroringMode;
+}
+
+export interface EditorConfigureModifier_PaddingWithMirroring {
+  type: "config/modifiers/padding-with-mirroring";
+  padding_with_axis_mirroring: "on" | "off";
 }
 
 /**
@@ -820,6 +842,7 @@ export type EditorSurface_StartGesture = {
     | (Pick<editor.gesture.GestureGap, "type" | "axis"> & {
         selection: string | string[];
       })
+    | Pick<editor.gesture.GesturePadding, "type" | "node_id" | "side">
     | Pick<editor.gesture.GestureCornerRadius, "type" | "node_id" | "anchor">
     | Pick<
         editor.gesture.GestureCurve,

@@ -237,8 +237,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeContainerNodeLayout(node_id, value),
       direction: (value: cg.Axis) =>
         instance.commands.changeFlexContainerNodeDirection(node_id, value),
-      // flexWrap: (value?: string) =>
-      //   changeNodeStyle(node_id, "flexWrap", value),
+      layoutWrap: (value: "wrap" | "nowrap") =>
+        instance.commands.changeFlexContainerNodeWrap(node_id, value),
       mainAxisAlignment: (value: cg.MainAxisAlignment) =>
         instance.commands.changeFlexContainerNodeMainAxisAlignment(
           node_id,
@@ -604,8 +604,7 @@ export function useGestureState(): UseGestureState {
   const is_node_translating =
     gesture.type === "translate" ||
     gesture.type === "sort" ||
-    gesture.type === "nudge" ||
-    gesture.type === "gap";
+    gesture.type === "nudge";
   const is_node_scaling = gesture.type === "scale";
 
   return {

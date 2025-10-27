@@ -407,6 +407,7 @@ export namespace editor.config {
     path_keep_projecting: "off",
     rotate_with_quantize: "off",
     curve_tangent_mirroring: "auto",
+    padding_with_axis_mirroring: "off",
   };
 
   export const DEFAULT_BRUSH: state.CurrentBrush = {
@@ -790,6 +791,18 @@ export namespace editor.state {
      * @default "auto"
      */
     curve_tangent_mirroring: vn.TangentMirroringMode;
+    /**
+     * Mirror padding changes across the same axis
+     *
+     * When on, changing one padding side also updates its opposite side:
+     * - left ↔ right (horizontal mirroring)
+     * - top ↔ bottom (vertical mirroring)
+     *
+     * Typically toggled when the alt/option key is pressed
+     *
+     * @default "off"
+     */
+    padding_with_axis_mirroring: "on" | "off";
   };
 
   export interface IViewportTransformState {
@@ -1571,6 +1584,7 @@ export namespace editor.gesture {
     | GestureTranslate
     | GestureSort
     | GestureGap
+    | GesturePadding
     | GestureInsertAndResize
     | GestureScale
     | GestureRotate
@@ -1728,6 +1742,18 @@ export namespace editor.gesture {
      * the current layout - this changes as the movement changes
      */
     layout: LayoutSnapshot;
+  };
+
+  export type GesturePadding = IGesture & {
+    readonly type: "padding";
+
+    readonly node_id: string;
+    readonly side: "top" | "right" | "bottom" | "left";
+
+    readonly min_padding: number;
+    readonly initial_padding: number;
+
+    padding: number;
   };
 
   export type GestureScale = IGesture & {
@@ -2658,7 +2684,135 @@ export namespace editor.api {
 
     //
     distributeEvenly(target: "selection" | NodeID[], axis: "x" | "y"): void;
+
+    /**
+     * Wraps selected nodes into new flex containers with automatically detected layout properties.
+     *
+     * This command analyzes the spatial arrangement of the selected nodes and creates flex containers
+     * that preserve their visual appearance while enabling responsive layout behavior. Nodes are grouped
+     * by their parent, and each group gets its own container.
+     *
+     * **Key Behavior:**
+     * - **Automatic detection**: Analyzes node positions to determine flex direction, spacing, and alignment
+     * - **Parent grouping**: Nodes with different parents are wrapped into separate containers
+     * - **Visual preservation**: Maintains the exact visual appearance after wrapping
+     * - **Smart defaults**: Applies contextual padding (16px for single child, 0 for multiple)
+     *
+     * **Bound to**: SHIFT+A
+     *
+     * @param target - The nodes to wrap:
+     *   - `"selection"` - Wraps currently selected nodes
+     *   - `NodeID[]` - Wraps specific node IDs
+     *
+     * @example
+     * ```typescript
+     * // Wrap currently selected nodes into flex containers
+     * editor.commands.autoLayout("selection");
+     *
+     * // Wrap specific nodes
+     * editor.commands.autoLayout(["node-1", "node-2", "node-3"]);
+     * ```
+     *
+     * @remarks
+     * **Layout Detection Algorithm:**
+     * The command analyzes the bounding rectangles of selected nodes to determine:
+     * - **Direction**: Horizontal or vertical based on primary alignment axis
+     * - **Spacing**: Gap between nodes (mainAxisGap and crossAxisGap)
+     * - **Alignment**: Main and cross axis alignment based on distribution
+     * - **Order**: Maintains visual order of nodes within the container
+     *
+     * **Parent Grouping:**
+     * Nodes are automatically grouped by their parent container. For example:
+     * - Nodes A, B under parent X → Container 1 in X
+     * - Nodes C, D under parent Y → Container 2 in Y
+     * - Root nodes E, F → Container 3 at root
+     *
+     * **Container Properties:**
+     * Each created container has:
+     * - `layout: "flex"`
+     * - `width: "auto"`, `height: "auto"`
+     * - Auto-detected `direction`, `mainAxisGap`, `crossAxisGap`
+     * - Auto-detected `mainAxisAlignment`, `crossAxisAlignment`
+     * - `padding: 16` (single child) or `0` (multiple children)
+     * - `position: "absolute"`
+     *
+     * **Child Updates:**
+     * All wrapped children are updated to:
+     * - `position: "relative"`
+     * - `top`, `right`, `bottom`, `left` are cleared (undefined)
+     *
+     * @see {@link reLayout} - To change an existing container's layout mode
+     * @see {@link contain} - To wrap nodes in a basic container without auto-layout
+     */
     autoLayout(target: "selection" | NodeID[]): void;
+
+    /**
+     * Re-applies layout mode to an existing container and automatically configures its children.
+     *
+     * Similar to {@link autoLayout}, but operates on an existing container instead of creating a new one.
+     * While `autoLayout` wraps selected nodes into a new flex container, `reLayout` changes an
+     * existing container's layout and updates its children accordingly.
+     *
+     * Unlike {@link changeContainerNodeLayout}, which only updates the parent's layout property,
+     * this method also configures the positioning and constraints of all direct children to ensure
+     * visual consistency is maintained during the layout transition.
+     *
+     * **Key Behavior:**
+     * - **Idempotent**: No-op if the layout is already in the desired state
+     * - **Visual preservation**: Maintains exact visual appearance during transitions
+     * - **Container-only**: Requires the target node to be a container type
+     *
+     * @param node_id - The container node to re-layout (must be type "container")
+     * @param layout - The layout mode to apply:
+     *   - `"normal"` - Absolute positioning (flow layout)
+     *   - `"flex-row"` - Horizontal flexbox layout
+     *   - `"flex-column"` - Vertical flexbox layout
+     *
+     * @throws {AssertionError} If the target node is not a container
+     *
+     * @example
+     * ```typescript
+     * // Convert a normal container to horizontal flex layout
+     * editor.commands.reLayout("container-id", "flex-row");
+     *
+     * // Convert to vertical flex layout
+     * editor.commands.reLayout("container-id", "flex-column");
+     *
+     * // Convert a flex container back to normal (flow) layout
+     * editor.commands.reLayout("container-id", "normal");
+     *
+     * // No-op - already in desired state
+     * editor.commands.reLayout("container-id", "flex-row"); // Already flex-row
+     * editor.commands.reLayout("container-id", "flex-row"); // Does nothing
+     * ```
+     *
+     * @remarks
+     * **When changing from normal to flex layout (`"flex-row"` or `"flex-column"`):**
+     * - Internally calls {@link autoLayout} on the container's children
+     * - Analyzes spatial arrangement to detect optimal flex properties
+     * - Applies auto-detected gap, alignment, and direction to the container
+     * - Converts children to relative positioning
+     * - Preserves exact visual appearance
+     *
+     * **When changing from flex to normal layout (`"normal"`):**
+     * - Captures current absolute positions of all children
+     * - Removes all flex-related properties from the container (`layout`, `direction`, `mainAxisGap`, `crossAxisGap`, `mainAxisAlignment`, `crossAxisAlignment`, `layoutWrap`)
+     * - Converts children to absolute positioning with calculated positions
+     * - Positions are relative to parent's bounding box
+     * - Preserves exact visual appearance
+     *
+     * **Visual Consistency:**
+     * Both transitions ensure that the rendered output remains visually identical
+     * before and after the operation. Only the internal layout mechanism changes.
+     *
+     * @see {@link autoLayout} - To wrap nodes into a new flex container
+     * @see {@link changeContainerNodeLayout} - To only change the layout property
+     */
+    reLayout(
+      node_id: NodeID,
+      layout: "normal" | "flex-row" | "flex-column"
+    ): void;
+
     contain(target: "selection" | NodeID[]): void;
 
     /**
@@ -2834,6 +2988,7 @@ export namespace editor.api {
       node_id: NodeID,
       layout: grida.program.nodes.i.IFlexContainer["layout"]
     ): void;
+
     changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis): void;
     changeFlexContainerNodeMainAxisAlignment(
       node_id: string,
@@ -2847,6 +3002,7 @@ export namespace editor.api {
       node_id: string,
       gap: number | { mainAxisGap: number; crossAxisGap: number }
     ): void;
+    changeFlexContainerNodeWrap(node_id: string, wrap: "wrap" | "nowrap"): void;
 
     changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
     changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;
@@ -3045,6 +3201,10 @@ export namespace editor.api {
       node_id: string
     ): void;
     surfaceStartGapGesture(selection: string | string[], axis: "x" | "y"): void;
+    surfaceStartPaddingGesture(
+      node_id: string,
+      side: "top" | "right" | "bottom" | "left"
+    ): void;
     surfaceStartCornerRadiusGesture(
       selection: string,
       anchor?: cmath.IntercardinalDirection
@@ -3163,6 +3323,18 @@ export namespace editor.api {
      */
     surfaceConfigurePathKeepProjectingModifier(
       path_keep_projecting: "on" | "off"
+    ): void;
+    /**
+     * Toggles whether padding gestures mirror changes across the same axis.
+     *
+     * When set to `"on"`, changing one padding side also updates its opposite:
+     * - Changing left also changes right (horizontal mirroring)
+     * - Changing top also changes bottom (vertical mirroring)
+     *
+     * Typically toggled when the alt/option key is pressed during a padding gesture.
+     */
+    surfaceConfigurePaddingWithMirroringModifier(
+      padding_with_axis_mirroring: "on" | "off"
     ): void;
     //
   }

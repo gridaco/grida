@@ -11,7 +11,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
 
     // Create rectangles
     let rectangles: Vec<Node> = (0..count)
-        .map(|i| {
+        .map(|_i| {
             Node::Rectangle(RectangleNodeRec {
                 active: true,
                 opacity: 1.0,
@@ -39,6 +39,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                 } else {
                     LayerEffects::default()
                 },
+                layout_child: None,
             })
         })
         .collect();

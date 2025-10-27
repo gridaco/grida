@@ -141,4 +141,18 @@ describe("query selectors", () => {
       expect(dq.querySelector(ctx, ["c"], ["a", "b"])).toEqual(["a", "b"]);
     });
   });
+
+  describe("getTopSceneContentNode", () => {
+    test("returns the direct child when node is under scene", () => {
+      expect(dq.getTopIdWithinScene(ctx, "a", "root")).toBe("a");
+    });
+
+    test("returns highest ancestor that is still under the scene", () => {
+      expect(dq.getTopIdWithinScene(ctx, "a1", "root")).toBe("a");
+    });
+
+    test("returns null when querying the scene itself", () => {
+      expect(dq.getTopIdWithinScene(ctx, "root", "root")).toBeNull();
+    });
+  });
 });

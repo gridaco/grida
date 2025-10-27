@@ -187,6 +187,12 @@ function _reducer<S extends editor.state.IEditorState>(
           action.curve_tangent_mirroring;
       });
     }
+    case "config/modifiers/padding-with-mirroring": {
+      return updateState(state, (draft: Draft<S>) => {
+        draft.gesture_modifiers.padding_with_axis_mirroring =
+          action.padding_with_axis_mirroring;
+      });
+    }
     case "config/modifiers/path-keep-projecting": {
       return updateState(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.path_keep_projecting =

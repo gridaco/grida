@@ -758,6 +758,84 @@ function __self_evt_on_drag(
 
         break;
       }
+      case "padding": {
+        const { node_id, side, initial_padding, min_padding } = draft.gesture;
+        const delta = movement[side === "top" || side === "bottom" ? 1 : 0];
+
+        const padding = cmath.quantize(
+          Math.max(initial_padding + delta, min_padding),
+          1
+        );
+
+        const container = dq.__getNodeById(draft, node_id);
+        if (
+          container &&
+          container.type === "container" &&
+          "padding" in container
+        ) {
+          const currentPadding = container.padding;
+          let newPadding: grida.program.nodes.i.IPadding["padding"];
+
+          if (typeof currentPadding === "number") {
+            // Convert uniform padding to individual sides
+            newPadding = {
+              paddingTop: currentPadding,
+              paddingRight: currentPadding,
+              paddingBottom: currentPadding,
+              paddingLeft: currentPadding,
+            };
+          } else {
+            // Use existing individual padding values
+            newPadding = {
+              paddingTop: currentPadding.paddingTop,
+              paddingRight: currentPadding.paddingRight,
+              paddingBottom: currentPadding.paddingBottom,
+              paddingLeft: currentPadding.paddingLeft,
+            };
+          }
+
+          const mirroringEnabled =
+            draft.gesture_modifiers.padding_with_axis_mirroring === "on";
+
+          // Update the specific side
+          switch (side) {
+            case "top":
+              newPadding.paddingTop = padding;
+              if (mirroringEnabled) {
+                newPadding.paddingBottom = padding;
+              }
+              break;
+            case "right":
+              newPadding.paddingRight = padding;
+              if (mirroringEnabled) {
+                newPadding.paddingLeft = padding;
+              }
+              break;
+            case "bottom":
+              newPadding.paddingBottom = padding;
+              if (mirroringEnabled) {
+                newPadding.paddingTop = padding;
+              }
+              break;
+            case "left":
+              newPadding.paddingLeft = padding;
+              if (mirroringEnabled) {
+                newPadding.paddingRight = padding;
+              }
+              break;
+          }
+
+          draft.document.nodes[node_id] = nodeReducer(container, {
+            type: "node/change/*",
+            node_id: node_id,
+            padding: newPadding,
+          });
+
+          draft.gesture.padding = padding;
+        }
+
+        break;
+      }
     }
   }
 }

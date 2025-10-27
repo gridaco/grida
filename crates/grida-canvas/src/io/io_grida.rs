@@ -1,6 +1,6 @@
 use crate::cg::varwidth::{VarWidthProfile, WidthStop};
 use crate::cg::{types::*, Alignment};
-use crate::io::io_css::{de_css_dimension, default_height_css, default_width_css, CSSDimension};
+use crate::io::io_css::*;
 use crate::node::schema::*;
 use crate::vectornetwork::*;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
@@ -231,9 +231,9 @@ pub struct CSSBorder {
 #[derive(Debug, Deserialize)]
 pub struct JSONSVGPath {
     pub d: String,
-    #[serde(rename = "fillRule")]
+    #[serde(rename = "fillRule", default)]
     pub fill_rule: FillRule,
-    pub fill: String,
+    pub fill: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -518,6 +518,29 @@ impl From<JSONVarWidthStop> for WidthStop {
     }
 }
 
+/// Converts JSON positioning fields to LayoutPositioningBasis
+/// - If right/bottom are present, uses Inset basis (preserves all four edges)
+/// - Otherwise, uses Cartesian basis (x,y)
+fn json_position_to_layout_basis(
+    left: Option<f32>,
+    top: Option<f32>,
+    right: Option<f32>,
+    bottom: Option<f32>,
+) -> LayoutPositioningBasis {
+    if right.is_some() || bottom.is_some() {
+        // Inset basis: preserve all four edges (missing edges default to 0.0)
+        LayoutPositioningBasis::Inset(EdgeInsets {
+            top: top.unwrap_or(0.0),
+            right: right.unwrap_or(0.0),
+            bottom: bottom.unwrap_or(0.0),
+            left: left.unwrap_or(0.0),
+        })
+    } else {
+        // Cartesian basis (x,y)
+        LayoutPositioningBasis::Cartesian(CGPoint::new(left.unwrap_or(0.0), top.unwrap_or(0.0)))
+    }
+}
+
 /// Utility function to merge single and multiple paint properties according to the specified logic:
 /// - if paint and no paints, use [paint]
 /// - if no paint and no paints, use []
@@ -570,6 +593,16 @@ pub struct JSONSceneNode {
 pub enum JSONCornerRadius {
     Uniform(f32),
     PerCorner(Vec<f32>),
+    PerCornerObject {
+        #[serde(rename = "topLeftRadius")]
+        top_left_radius: f32,
+        #[serde(rename = "topRightRadius")]
+        top_right_radius: f32,
+        #[serde(rename = "bottomRightRadius")]
+        bottom_right_radius: f32,
+        #[serde(rename = "bottomLeftRadius")]
+        bottom_left_radius: f32,
+    },
 }
 
 impl JSONCornerRadius {
@@ -603,6 +636,17 @@ impl JSONCornerRadius {
                     }
                 }
             }
+            JSONCornerRadius::PerCornerObject {
+                top_left_radius,
+                top_right_radius,
+                bottom_right_radius,
+                bottom_left_radius,
+            } => RectangularCornerRadius {
+                tl: Radius::circular(top_left_radius),
+                tr: Radius::circular(top_right_radius),
+                br: Radius::circular(bottom_right_radius),
+                bl: Radius::circular(bottom_left_radius),
+            },
         }
     }
 
@@ -617,6 +661,22 @@ impl JSONCornerRadius {
                     .all(|&value| (value - values[0]).abs() < f32::EPSILON)
                 {
                     Some(values[0])
+                } else {
+                    None
+                }
+            }
+            JSONCornerRadius::PerCornerObject {
+                top_left_radius,
+                top_right_radius,
+                bottom_right_radius,
+                bottom_left_radius,
+            } => {
+                // Check if all corners have the same radius
+                if (top_left_radius - top_right_radius).abs() < f32::EPSILON
+                    && (top_right_radius - bottom_right_radius).abs() < f32::EPSILON
+                    && (bottom_right_radius - bottom_left_radius).abs() < f32::EPSILON
+                {
+                    Some(top_left_radius)
                 } else {
                     None
                 }
@@ -645,11 +705,11 @@ pub struct JSONUnknownNodeProperties {
     pub z_index: i32,
     // css
     #[serde(rename = "position")]
-    pub position: Option<String>,
+    pub position: Option<CSSPosition>,
     #[serde(rename = "left")]
-    pub left: f32,
+    pub left: Option<f32>,
     #[serde(rename = "top")]
-    pub top: f32,
+    pub top: Option<f32>,
     #[serde(rename = "right")]
     pub right: Option<f32>,
     #[serde(rename = "bottom")]
@@ -738,7 +798,7 @@ pub struct JSONUnknownNodeProperties {
 pub enum JSONNode {
     #[serde(rename = "group")]
     Group(JSONGroupNode),
-    #[serde(rename = "container")]
+    #[serde(rename = "container", alias = "component")]
     Container(JSONContainerNode),
     #[serde(rename = "svgpath")]
     SVGPath(JSONSVGPathNode),
@@ -765,6 +825,95 @@ pub enum JSONNode {
     Unknown(JSONUnknownNodeProperties),
 }
 
+/// JSON representation of LayoutMode for deserialization
+#[derive(Debug, Deserialize, Clone, Copy)]
+pub enum JSONLayoutMode {
+    /// Legacy - will be removed, replaced with Normal
+    #[serde(rename = "flow")]
+    Flow,
+    #[serde(rename = "flex")]
+    Flex,
+    #[serde(rename = "normal")]
+    Normal,
+}
+
+impl Default for JSONLayoutMode {
+    fn default() -> Self {
+        JSONLayoutMode::Normal
+    }
+}
+
+impl From<JSONLayoutMode> for LayoutMode {
+    fn from(mode: JSONLayoutMode) -> Self {
+        match mode {
+            JSONLayoutMode::Flow => LayoutMode::Normal,
+            JSONLayoutMode::Normal => LayoutMode::Normal,
+            JSONLayoutMode::Flex => LayoutMode::Flex,
+        }
+    }
+}
+
+/// JSON representation of Axis for deserialization
+#[derive(Debug, Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum JSONAxis {
+    Horizontal,
+    Vertical,
+}
+
+impl Default for JSONAxis {
+    fn default() -> Self {
+        JSONAxis::Horizontal
+    }
+}
+
+impl From<JSONAxis> for Axis {
+    fn from(axis: JSONAxis) -> Self {
+        match axis {
+            JSONAxis::Horizontal => Axis::Horizontal,
+            JSONAxis::Vertical => Axis::Vertical,
+        }
+    }
+}
+
+/// JSON representation of padding - supports both uniform and non-uniform values
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
+#[serde(untagged)]
+pub enum JSONPadding {
+    /// Uniform padding (all sides equal)
+    Uniform(f32),
+    /// Non-uniform padding with individual sides
+    NonUniform {
+        #[serde(rename = "paddingTop")]
+        padding_top: f32,
+        #[serde(rename = "paddingRight")]
+        padding_right: f32,
+        #[serde(rename = "paddingBottom")]
+        padding_bottom: f32,
+        #[serde(rename = "paddingLeft")]
+        padding_left: f32,
+    },
+}
+
+impl From<JSONPadding> for EdgeInsets {
+    fn from(padding: JSONPadding) -> Self {
+        match padding {
+            JSONPadding::Uniform(value) => EdgeInsets::all(value),
+            JSONPadding::NonUniform {
+                padding_top,
+                padding_right,
+                padding_bottom,
+                padding_left,
+            } => EdgeInsets {
+                top: padding_top,
+                right: padding_right,
+                bottom: padding_bottom,
+                left: padding_left,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct JSONContainerNode {
     #[serde(flatten)]
@@ -774,17 +923,21 @@ pub struct JSONContainerNode {
     pub expanded: Option<bool>,
 
     // layout
-    pub layout: Option<String>,
-    pub padding: Option<serde_json::Value>,
-    pub direction: Option<String>,
+    #[serde(default)]
+    pub layout: JSONLayoutMode,
+    pub padding: Option<JSONPadding>,
+    #[serde(default)]
+    pub direction: JSONAxis,
+    #[serde(rename = "layoutWrap")]
+    pub layout_wrap: Option<LayoutWrap>,
     #[serde(rename = "mainAxisAlignment")]
-    pub main_axis_alignment: Option<String>,
+    pub main_axis_alignment: Option<MainAxisAlignment>,
     #[serde(rename = "crossAxisAlignment")]
-    pub cross_axis_alignment: Option<String>,
-    #[serde(rename = "mainAxisGap")]
-    pub main_axis_gap: Option<f32>,
-    #[serde(rename = "crossAxisGap")]
-    pub cross_axis_gap: Option<f32>,
+    pub cross_axis_alignment: Option<CrossAxisAlignment>,
+    #[serde(rename = "mainAxisGap", default)]
+    pub main_axis_gap: f32,
+    #[serde(rename = "crossAxisGap", default)]
+    pub cross_axis_gap: f32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1033,8 +1186,8 @@ pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
 impl From<JSONGroupNode> for GroupNodeRec {
     fn from(node: JSONGroupNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1054,19 +1207,25 @@ impl From<JSONGroupNode> for GroupNodeRec {
 
 impl From<JSONContainerNode> for ContainerNodeRec {
     fn from(node: JSONContainerNode) -> Self {
+        // For containers, preserve Auto vs explicit size distinction
+        let width = match node.base.width {
+            CSSDimension::Auto => None,
+            CSSDimension::LengthPX(length) => Some(length),
+        };
+        let height = match node.base.height {
+            CSSDimension::Auto => None,
+            CSSDimension::LengthPX(length) => Some(length),
+        };
+
         ContainerNodeRec {
             active: node.base.active,
-            transform: AffineTransform::from_box_center(
+            rotation: node.base.rotation,
+            position: json_position_to_layout_basis(
                 node.base.left,
                 node.base.top,
-                node.base.width.length(0.0),
-                node.base.height.length(0.0),
-                node.base.rotation,
+                node.base.right,
+                node.base.bottom,
             ),
-            size: Size {
-                width: node.base.width.length(0.0),
-                height: node.base.height.length(0.0),
-            },
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
                 node.base.corner_radius_top_left,
@@ -1090,13 +1249,38 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             // Children populated from links after conversion
             clip: true,
             mask: node.base.mask.map(|m| m.into()),
-            layout_mode: LayoutMode::default(),
-            layout_direction: Axis::default(),
-            layout_wrap: LayoutWrap::default(),
-            layout_main_axis_alignment: MainAxisAlignment::default(),
-            layout_cross_axis_alignment: CrossAxisAlignment::default(),
-            layout_gap: LayoutGap::default(),
-            padding: EdgeInsets::default(),
+            layout_container: LayoutContainerStyle {
+                layout_mode: node.layout.into(),
+                layout_direction: node.direction.into(),
+                layout_wrap: node.layout_wrap,
+                layout_main_axis_alignment: node.main_axis_alignment,
+                layout_cross_axis_alignment: node.cross_axis_alignment,
+                layout_padding: node.padding.map(|p| p.into()),
+                layout_gap: if node.main_axis_gap > 0.0 || node.cross_axis_gap > 0.0 {
+                    Some(LayoutGap {
+                        main_axis_gap: node.main_axis_gap,
+                        cross_axis_gap: node.cross_axis_gap,
+                    })
+                } else {
+                    None
+                },
+            },
+            layout_dimensions: LayoutDimensionStyle {
+                width,
+                height,
+                min_width: None,
+                max_width: None,
+                min_height: None,
+                max_height: None,
+            },
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         }
     }
 }
@@ -1117,13 +1301,21 @@ impl From<JSONTextNode> for TextSpanNodeRec {
         TextSpanNodeRec {
             active: node.base.active,
             transform: AffineTransform::from_box_center(
-                node.base.left,
-                node.base.top,
+                node.base.left.unwrap_or(0.0),
+                node.base.top.unwrap_or(0.0),
                 node.base.width.length(0.0),
                 node.base.height.length(0.0),
                 node.base.rotation,
             ),
             width,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
             height,
             max_lines: node.max_lines,
             ellipsis: None,
@@ -1189,8 +1381,8 @@ impl From<JSONTextNode> for TextSpanNodeRec {
 impl From<JSONEllipseNode> for Node {
     fn from(node: JSONEllipseNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1221,6 +1413,14 @@ impl From<JSONEllipseNode> for Node {
             inner_radius: node.inner_radius,
             start_angle: node.angle_offset.unwrap_or(0.0),
             angle: node.angle,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
             corner_radius: node
                 .base
                 .corner_radius
@@ -1232,8 +1432,8 @@ impl From<JSONEllipseNode> for Node {
 impl From<JSONRectangleNode> for Node {
     fn from(node: JSONRectangleNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1261,6 +1461,14 @@ impl From<JSONRectangleNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
             effects: merge_effects(
                 node.base.fe_shadows,
                 node.base.fe_blur,
@@ -1274,8 +1482,8 @@ impl From<JSONRectangleNode> for Node {
 impl From<JSONImageNode> for Node {
     fn from(node: JSONImageNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1351,6 +1559,14 @@ impl From<JSONImageNode> for Node {
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             image: fill.image.clone(),
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1358,8 +1574,8 @@ impl From<JSONImageNode> for Node {
 impl From<JSONRegularPolygonNode> for Node {
     fn from(node: JSONRegularPolygonNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1392,6 +1608,14 @@ impl From<JSONRegularPolygonNode> for Node {
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             point_count: node.point_count,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1399,8 +1623,8 @@ impl From<JSONRegularPolygonNode> for Node {
 impl From<JSONRegularStarPolygonNode> for Node {
     fn from(node: JSONRegularStarPolygonNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1434,6 +1658,14 @@ impl From<JSONRegularStarPolygonNode> for Node {
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
             point_count: node.point_count,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1441,8 +1673,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
 impl From<JSONSVGPathNode> for Node {
     fn from(node: JSONSVGPathNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1473,6 +1705,14 @@ impl From<JSONSVGPathNode> for Node {
             stroke_width: 0.0,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1480,8 +1720,8 @@ impl From<JSONSVGPathNode> for Node {
 impl From<JSONLineNode> for Node {
     fn from(node: JSONLineNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1507,6 +1747,14 @@ impl From<JSONLineNode> for Node {
             stroke_width: node.base.stroke_width,
             _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
             stroke_dash_array: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1514,8 +1762,8 @@ impl From<JSONLineNode> for Node {
 impl From<JSONVectorNode> for Node {
     fn from(node: JSONVectorNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1551,6 +1799,14 @@ impl From<JSONVectorNode> for Node {
             stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_dash_array: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .position
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -1559,8 +1815,8 @@ impl From<JSONBooleanOperationNode> for Node {
     fn from(node: JSONBooleanOperationNode) -> Self {
         // TODO: boolean operation's transform should be handled differently
         let transform = AffineTransform::from_box_center(
-            node.base.left,
-            node.base.top,
+            node.base.left.unwrap_or(0.0),
+            node.base.top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1753,6 +2009,134 @@ mod corner_radius_tests {
     }
 }
 
+#[cfg(test)]
+mod padding_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_uniform_padding_deserialize() {
+        let json = json!(20.0);
+        let padding: JSONPadding = serde_json::from_value(json).unwrap();
+
+        let edge_insets: EdgeInsets = padding.into();
+        assert_eq!(edge_insets.top, 20.0);
+        assert_eq!(edge_insets.right, 20.0);
+        assert_eq!(edge_insets.bottom, 20.0);
+        assert_eq!(edge_insets.left, 20.0);
+    }
+
+    #[test]
+    fn test_non_uniform_padding_deserialize() {
+        let json = json!({
+            "paddingTop": 10.0,
+            "paddingRight": 20.0,
+            "paddingBottom": 30.0,
+            "paddingLeft": 40.0
+        });
+        let padding: JSONPadding = serde_json::from_value(json).unwrap();
+
+        let edge_insets: EdgeInsets = padding.into();
+        assert_eq!(edge_insets.top, 10.0);
+        assert_eq!(edge_insets.right, 20.0);
+        assert_eq!(edge_insets.bottom, 30.0);
+        assert_eq!(edge_insets.left, 40.0);
+    }
+
+    #[test]
+    fn test_container_with_uniform_padding() {
+        let json = json!({
+            "type": "container",
+            "id": "container-1",
+            "name": "Container",
+            "active": true,
+            "locked": false,
+            "opacity": 1.0,
+            "blendMode": "normal",
+            "zIndex": 0,
+            "position": "absolute",
+            "left": 0,
+            "top": 0,
+            "rotation": 0,
+            "width": 200,
+            "height": 200,
+            "padding": 16.0,
+            "layout": "flex"
+        });
+
+        let container: JSONContainerNode = serde_json::from_value(json).unwrap();
+        let container_rec: ContainerNodeRec = container.into();
+
+        let padding = container_rec.layout_container.layout_padding.unwrap();
+        assert_eq!(padding.top, 16.0);
+        assert_eq!(padding.right, 16.0);
+        assert_eq!(padding.bottom, 16.0);
+        assert_eq!(padding.left, 16.0);
+    }
+
+    #[test]
+    fn test_container_with_non_uniform_padding() {
+        let json = json!({
+            "type": "container",
+            "id": "container-2",
+            "name": "Container",
+            "active": true,
+            "locked": false,
+            "opacity": 1.0,
+            "blendMode": "normal",
+            "zIndex": 0,
+            "position": "absolute",
+            "left": 0,
+            "top": 0,
+            "rotation": 0,
+            "width": 200,
+            "height": 200,
+            "padding": {
+                "paddingTop": 10.0,
+                "paddingRight": 15.0,
+                "paddingBottom": 20.0,
+                "paddingLeft": 25.0
+            },
+            "layout": "flex"
+        });
+
+        let container: JSONContainerNode = serde_json::from_value(json).unwrap();
+        let container_rec: ContainerNodeRec = container.into();
+
+        let padding = container_rec.layout_container.layout_padding.unwrap();
+        assert_eq!(padding.top, 10.0);
+        assert_eq!(padding.right, 15.0);
+        assert_eq!(padding.bottom, 20.0);
+        assert_eq!(padding.left, 25.0);
+    }
+
+    #[test]
+    fn test_container_without_padding() {
+        let json = json!({
+            "type": "container",
+            "id": "container-3",
+            "name": "Container",
+            "active": true,
+            "locked": false,
+            "opacity": 1.0,
+            "blendMode": "normal",
+            "zIndex": 0,
+            "position": "absolute",
+            "left": 0,
+            "top": 0,
+            "rotation": 0,
+            "width": 200,
+            "height": 200,
+            "layout": "flex"
+        });
+
+        let container: JSONContainerNode = serde_json::from_value(json).unwrap();
+        let container_rec: ContainerNodeRec = container.into();
+
+        assert!(container_rec.layout_container.layout_padding.is_none());
+    }
+}
+
 fn merge_effects(
     fe_shadows: Option<Vec<JSONFeShadow>>,
     fe_blur: Option<JSONFeBlur>,
@@ -1904,8 +2288,8 @@ mod tests {
                     Some("Boolean Operation".to_string())
                 );
                 assert_eq!(boolean_node.op, BooleanPathOperation::Union);
-                assert_eq!(boolean_node.base.left, 100.0);
-                assert_eq!(boolean_node.base.top, 100.0);
+                assert_eq!(boolean_node.base.left, Some(100.0));
+                assert_eq!(boolean_node.base.top, Some(100.0));
                 assert_eq!(boolean_node.base.width, CSSDimension::LengthPX(200.0));
                 assert_eq!(boolean_node.base.height, CSSDimension::LengthPX(200.0));
             }
@@ -3256,6 +3640,368 @@ mod tests {
                     }
                     _ => panic!("Expected Gaussian blur for backdrop blur"),
                 }
+            }
+            _ => panic!("Expected Container node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_container_with_layout_properties() {
+        // Test that layout and direction are correctly typed and deserialized
+        let json = r#"{
+            "id": "container-layout",
+            "name": "Container with Layout",
+            "type": "container",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 400.0,
+            "height": 300.0,
+            "layout": "flex",
+            "direction": "vertical"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize container with layout properties");
+
+        match node {
+            JSONNode::Container(container) => {
+                // Verify typed enums
+                assert!(matches!(container.layout, JSONLayoutMode::Flex));
+                assert!(matches!(container.direction, JSONAxis::Vertical));
+
+                // Verify conversion
+                let converted: ContainerNodeRec = container.into();
+                assert!(matches!(
+                    converted.layout_container.layout_mode,
+                    LayoutMode::Flex
+                ));
+                assert!(matches!(
+                    converted.layout_container.layout_direction,
+                    Axis::Vertical
+                ));
+            }
+            _ => panic!("Expected Container node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_container_with_alignment_properties() {
+        // Test that alignment properties are correctly typed and deserialized
+        let json = r#"{
+            "id": "container-aligned",
+            "name": "Container with Alignments",
+            "type": "container",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 600.0,
+            "height": 400.0,
+            "layout": "flex",
+            "direction": "horizontal",
+            "mainAxisAlignment": "space-between",
+            "crossAxisAlignment": "center"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize container with alignment properties");
+
+        match node {
+            JSONNode::Container(container) => {
+                // Verify typed enums
+                assert!(matches!(
+                    container.main_axis_alignment,
+                    Some(MainAxisAlignment::SpaceBetween)
+                ));
+                assert!(matches!(
+                    container.cross_axis_alignment,
+                    Some(CrossAxisAlignment::Center)
+                ));
+
+                // Verify conversion
+                let converted: ContainerNodeRec = container.into();
+                assert!(matches!(
+                    converted.layout_container.layout_main_axis_alignment,
+                    Some(MainAxisAlignment::SpaceBetween)
+                ));
+                assert!(matches!(
+                    converted.layout_container.layout_cross_axis_alignment,
+                    Some(CrossAxisAlignment::Center)
+                ));
+            }
+            _ => panic!("Expected Container node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_container_with_padding() {
+        // Test that padding is correctly typed and deserialized as uniform value
+        let json = r#"{
+            "id": "container-padded",
+            "name": "Container with Padding",
+            "type": "container",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 400.0,
+            "height": 300.0,
+            "layout": "flex",
+            "padding": 20.0
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("failed to deserialize container with padding");
+
+        match node {
+            JSONNode::Container(container) => {
+                // Verify padding field
+                assert_eq!(container.padding, Some(JSONPadding::Uniform(20.0)));
+
+                // Verify conversion to EdgeInsets
+                let converted: ContainerNodeRec = container.into();
+                assert!(converted.layout_container.layout_padding.is_some());
+
+                let padding = converted.layout_container.layout_padding.unwrap();
+                assert_eq!(padding.top, 20.0);
+                assert_eq!(padding.right, 20.0);
+                assert_eq!(padding.bottom, 20.0);
+                assert_eq!(padding.left, 20.0);
+            }
+            _ => panic!("Expected Container node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_container_with_complete_layout() {
+        // Test a container with all layout properties
+        let json = r#"{
+            "id": "container-complete",
+            "name": "Complete Layout Container",
+            "type": "container",
+            "left": 50.0,
+            "top": 50.0,
+            "width": 500.0,
+            "height": 400.0,
+            "layout": "flex",
+            "direction": "vertical",
+            "padding": 15.0,
+            "mainAxisAlignment": "center",
+            "crossAxisAlignment": "stretch"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize container with complete layout");
+
+        match node {
+            JSONNode::Container(container) => {
+                // Verify all properties
+                assert!(matches!(container.layout, JSONLayoutMode::Flex));
+                assert!(matches!(container.direction, JSONAxis::Vertical));
+                assert_eq!(container.padding, Some(JSONPadding::Uniform(15.0)));
+                assert!(matches!(
+                    container.main_axis_alignment,
+                    Some(MainAxisAlignment::Center)
+                ));
+                assert!(matches!(
+                    container.cross_axis_alignment,
+                    Some(CrossAxisAlignment::Stretch)
+                ));
+
+                // Verify conversion
+                let converted: ContainerNodeRec = container.into();
+                assert!(matches!(
+                    converted.layout_container.layout_mode,
+                    LayoutMode::Flex
+                ));
+                assert!(matches!(
+                    converted.layout_container.layout_direction,
+                    Axis::Vertical
+                ));
+                assert!(converted.layout_container.layout_padding.is_some());
+
+                let padding = converted.layout_container.layout_padding.unwrap();
+                assert_eq!(padding.top, 15.0);
+                assert_eq!(padding.right, 15.0);
+                assert_eq!(padding.bottom, 15.0);
+                assert_eq!(padding.left, 15.0);
+            }
+            _ => panic!("Expected Container node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_container_with_gap() {
+        // Test that gap properties are correctly deserialized
+        let json = r#"{
+            "id": "container-gap",
+            "name": "Container with Gap",
+            "type": "container",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 400.0,
+            "height": 300.0,
+            "layout": "flex",
+            "mainAxisGap": 20.0,
+            "crossAxisGap": 10.0
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("failed to deserialize container with gap");
+
+        match node {
+            JSONNode::Container(container) => {
+                // Verify gap fields (non-optional now)
+                assert_eq!(container.main_axis_gap, 20.0);
+                assert_eq!(container.cross_axis_gap, 10.0);
+
+                // Verify conversion to LayoutGap
+                let converted: ContainerNodeRec = container.into();
+                assert!(converted.layout_container.layout_gap.is_some());
+
+                let gap = converted.layout_container.layout_gap.unwrap();
+                assert_eq!(gap.main_axis_gap, 20.0);
+                assert_eq!(gap.cross_axis_gap, 10.0);
+            }
+            _ => panic!("Expected Container node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_container_with_layout_wrap() {
+        // Test that layoutWrap is correctly deserialized
+        let json_wrap = r#"{
+            "id": "container-wrap",
+            "name": "Container with Wrap",
+            "type": "container",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 400.0,
+            "height": 300.0,
+            "layout": "flex",
+            "layoutWrap": "wrap"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json_wrap).expect("failed to deserialize container with wrap");
+
+        match node {
+            JSONNode::Container(container) => {
+                assert!(matches!(container.layout_wrap, Some(LayoutWrap::Wrap)));
+
+                let converted: ContainerNodeRec = container.into();
+                assert!(matches!(
+                    converted.layout_container.layout_wrap,
+                    Some(LayoutWrap::Wrap)
+                ));
+            }
+            _ => panic!("Expected Container node"),
+        }
+
+        // Test nowrap
+        let json_nowrap = r#"{
+            "id": "container-nowrap",
+            "name": "Container with NoWrap",
+            "type": "container",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 400.0,
+            "height": 300.0,
+            "layout": "flex",
+            "layoutWrap": "nowrap"
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json_nowrap).expect("failed to deserialize container with nowrap");
+
+        match node {
+            JSONNode::Container(container) => {
+                assert!(matches!(container.layout_wrap, Some(LayoutWrap::NoWrap)));
+
+                let converted: ContainerNodeRec = container.into();
+                assert!(matches!(
+                    converted.layout_container.layout_wrap,
+                    Some(LayoutWrap::NoWrap)
+                ));
+            }
+            _ => panic!("Expected Container node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_container_with_all_layout_properties() {
+        // Test a container with all layout properties including gap and wrap
+        let json = r#"{
+            "id": "container-all",
+            "name": "All Layout Properties",
+            "type": "container",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 600.0,
+            "height": 500.0,
+            "layout": "flex",
+            "direction": "horizontal",
+            "layoutWrap": "wrap",
+            "padding": 20.0,
+            "mainAxisGap": 30.0,
+            "crossAxisGap": 15.0,
+            "mainAxisAlignment": "space-between",
+            "crossAxisAlignment": "center"
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize container with all layout properties");
+
+        match node {
+            JSONNode::Container(container) => {
+                // Verify all properties
+                assert!(matches!(container.layout, JSONLayoutMode::Flex));
+                assert!(matches!(container.direction, JSONAxis::Horizontal));
+                assert!(matches!(container.layout_wrap, Some(LayoutWrap::Wrap)));
+                assert_eq!(container.padding, Some(JSONPadding::Uniform(20.0)));
+                assert_eq!(container.main_axis_gap, 30.0);
+                assert_eq!(container.cross_axis_gap, 15.0);
+                assert!(matches!(
+                    container.main_axis_alignment,
+                    Some(MainAxisAlignment::SpaceBetween)
+                ));
+                assert!(matches!(
+                    container.cross_axis_alignment,
+                    Some(CrossAxisAlignment::Center)
+                ));
+
+                // Verify conversion
+                let converted: ContainerNodeRec = container.into();
+                assert!(matches!(
+                    converted.layout_container.layout_mode,
+                    LayoutMode::Flex
+                ));
+                assert!(matches!(
+                    converted.layout_container.layout_direction,
+                    Axis::Horizontal
+                ));
+                assert!(matches!(
+                    converted.layout_container.layout_wrap,
+                    Some(LayoutWrap::Wrap)
+                ));
+
+                // Verify padding
+                let padding = converted.layout_container.layout_padding.unwrap();
+                assert_eq!(padding.top, 20.0);
+                assert_eq!(padding.right, 20.0);
+                assert_eq!(padding.bottom, 20.0);
+                assert_eq!(padding.left, 20.0);
+
+                // Verify gap
+                let gap = converted.layout_container.layout_gap.unwrap();
+                assert_eq!(gap.main_axis_gap, 30.0);
+                assert_eq!(gap.cross_axis_gap, 15.0);
+
+                // Verify alignments
+                assert!(matches!(
+                    converted.layout_container.layout_main_axis_alignment,
+                    Some(MainAxisAlignment::SpaceBetween)
+                ));
+                assert!(matches!(
+                    converted.layout_container.layout_cross_axis_alignment,
+                    Some(CrossAxisAlignment::Center)
+                ));
             }
             _ => panic!("Expected Container node"),
         }

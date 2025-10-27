@@ -64,6 +64,23 @@ impl SceneCache {
         );
     }
 
+    /// Rebuild geometry cache with layout results and viewport context
+    pub fn update_geometry_with_layout(
+        &mut self,
+        scene: &Scene,
+        fonts: &FontRepository,
+        layout_result: &crate::layout::cache::LayoutResult,
+        viewport_size: crate::node::schema::Size,
+    ) {
+        self.geometry = GeometryCache::from_scene_with_layout(
+            scene,
+            &mut self.paragraph.borrow_mut(),
+            fonts,
+            Some(layout_result),
+            viewport_size,
+        );
+    }
+
     pub fn update_layers(&mut self, scene: &Scene) {
         self.layers = LayerList::from_scene(scene, self);
         self.layers

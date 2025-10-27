@@ -60,7 +60,7 @@ export const Knob = React.forwardRef(function Knob(
         left: anchorPosition.left,
         cursor: readonly ? "default" : cursors.resize_handle_cursor_map[anchor],
         touchAction: "none",
-        zIndex: zIndex ?? 11,
+        zIndex: zIndex ?? 99,
         ...transform,
       }}
     >

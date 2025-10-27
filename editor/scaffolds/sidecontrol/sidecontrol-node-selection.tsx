@@ -20,8 +20,8 @@ import {
 import { BorderControl } from "./controls/border";
 import { PaddingControl } from "./controls/padding";
 import { GapControl } from "./controls/gap";
-import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
-import { MainAxisAlignmentControl } from "./controls/main-axis-alignment";
+import { FlexAlignControl } from "./controls/flex-align";
+import { FlexWrapControl } from "./controls/flex-wrap";
 import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
@@ -43,7 +43,6 @@ import { NameControl } from "./controls/name";
 import { UserDataControl } from "./controls/x-userdata";
 import { LengthPercentageControl } from "./controls/length-percentage";
 import { LayoutControl } from "./controls/layout";
-import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
 import { BlendModeDropdown } from "./controls/blend-mode";
 import {
@@ -382,25 +381,98 @@ function ModeMixedNodeProperties({
         </SidebarMenuSectionContent>
       </SidebarSection>
       {config.position !== "off" && <SectionMixedPosition mp={mp} />}
-      <SidebarSection hidden={config.size === "off"} className="border-b pb-4">
+      <SidebarSection
+        hidden={config.layout === "off"}
+        className="border-b pb-4"
+      >
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+          <PropertyLine hidden={config.size === "off"}>
             <PropertyLineLabel>Width</PropertyLineLabel>
             <LengthPercentageControl
               value={width?.value}
               onValueCommit={change.width}
             />
           </PropertyLine>
-          <PropertyLine>
+          <PropertyLine hidden={config.size === "off"}>
             <PropertyLineLabel>Height</PropertyLineLabel>
             <LengthPercentageControl
               value={height?.value}
               onValueCommit={change.height}
             />
           </PropertyLine>
+          {types.has("container") && (
+            <PropertyLine>
+              <PropertyLineLabel>Flow</PropertyLineLabel>
+              <LayoutControl
+                value={
+                  layout?.value === grida.mixed ||
+                  direction?.value === grida.mixed ||
+                  layout?.value === undefined ||
+                  (layout?.value === "flex" && direction?.value === undefined)
+                    ? undefined
+                    : {
+                        layoutMode: layout?.value ?? "flow",
+                        direction:
+                          layout?.value === "flex"
+                            ? direction?.value
+                            : undefined,
+                      }
+                }
+                onValueChange={(value) => {
+                  change.layout(value.layoutMode);
+                  if (value.direction) {
+                    change.direction(value.direction);
+                  }
+                }}
+              />
+            </PropertyLine>
+          )}
+          <PropertyLine hidden={!has_flex_container}>
+            <PropertyLineLabel>Alignment</PropertyLineLabel>
+            <FlexAlignControl
+              className="w-full"
+              direction={
+                direction?.value === grida.mixed
+                  ? "horizontal"
+                  : (direction?.value ?? "horizontal")
+              }
+              value={
+                mainAxisAlignment?.value === grida.mixed ||
+                crossAxisAlignment?.value === grida.mixed ||
+                mainAxisAlignment?.value === undefined ||
+                crossAxisAlignment?.value === undefined
+                  ? undefined
+                  : {
+                      mainAxisAlignment: mainAxisAlignment.value,
+                      crossAxisAlignment: crossAxisAlignment.value,
+                    }
+              }
+              onValueChange={(value) => {
+                change.mainAxisAlignment(value.mainAxisAlignment);
+                change.crossAxisAlignment(value.crossAxisAlignment);
+              }}
+            />
+          </PropertyLine>
+          {/* <PropertyLine hidden={!has_flex_container}>
+              <PropertyLineLabel>Gap</PropertyLineLabel>
+              <GapControl
+                value={{
+                  mainAxisGap: mainAxisGap!,
+                  crossAxisGap: crossAxisGap!,
+                }}
+                onValueChange={actions.gap}
+              />
+            </PropertyLine> */}
+          {/* <PropertyLine hidden={!has_flex_container}>
+              <PropertyLineLabel>Padding</PropertyLineLabel>
+              <PaddingControl
+                value={padding!}
+                onValueChange={actions.padding}
+              />
+            </PropertyLine> */}
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
@@ -592,68 +664,83 @@ function ModeMixedNodeProperties({
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      {types.has("container") && (
-        <SidebarSection
-          hidden={config.layout === "off"}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
+      <SidebarSection
+        hidden={config.layout === "off"}
+        className="border-b pb-4"
+      >
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine hidden={config.size === "off"}>
+            <PropertyLineLabel>Width</PropertyLineLabel>
+            <LengthPercentageControl
+              value={width?.value}
+              onValueCommit={change.width}
+            />
+          </PropertyLine>
+          <PropertyLine hidden={config.size === "off"}>
+            <PropertyLineLabel>Height</PropertyLineLabel>
+            <LengthPercentageControl
+              value={height?.value}
+              onValueCommit={change.height}
+            />
+          </PropertyLine>
+          {types.has("container") && (
             <PropertyLine>
-              <PropertyLineLabel>Type</PropertyLineLabel>
+              <PropertyLineLabel>Flow</PropertyLineLabel>
               <LayoutControl
-                value={layout?.value}
-                onValueChange={change.layout}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!has_flex_container}>
-              <PropertyLineLabel>Direction</PropertyLineLabel>
-              <AxisControl
-                value={direction?.value}
-                onValueChange={change.direction}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!has_flex_container}>
-              <PropertyLineLabel>Distribute</PropertyLineLabel>
-              <MainAxisAlignmentControl
-                value={mainAxisAlignment?.value}
-                onValueChange={change.mainAxisAlignment}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!has_flex_container}>
-              <PropertyLineLabel>Align</PropertyLineLabel>
-              <CrossAxisAlignmentControl
-                value={crossAxisAlignment?.value}
-                direction={
-                  direction?.value !== grida.mixed
-                    ? direction?.value
-                    : undefined
+                value={
+                  layout?.value === grida.mixed ||
+                  direction?.value === grida.mixed ||
+                  layout?.value === undefined ||
+                  (layout?.value === "flex" && direction?.value === undefined)
+                    ? undefined
+                    : {
+                        layoutMode: layout?.value ?? "flow",
+                        direction:
+                          layout?.value === "flex"
+                            ? direction?.value
+                            : undefined,
+                      }
                 }
-                onValueChange={change.crossAxisAlignment}
+                onValueChange={(value) => {
+                  change.layout(value.layoutMode);
+                  if (value.direction) {
+                    change.direction(value.direction);
+                  }
+                }}
               />
             </PropertyLine>
-            {/* <PropertyLine hidden={!has_flex_container}>
-                <PropertyLineLabel>Gap</PropertyLineLabel>
-                <GapControl
-                  value={{
-                    mainAxisGap: mainAxisGap!,
-                    crossAxisGap: crossAxisGap!,
-                  }}
-                  onValueChange={actions.gap}
-                />
-              </PropertyLine> */}
-            {/* <PropertyLine hidden={!has_flex_container}>
-                <PropertyLineLabel>Padding</PropertyLineLabel>
-                <PaddingControl
-                  value={padding!}
-                  onValueChange={actions.padding}
-                />
-              </PropertyLine> */}
-          </SidebarMenuSectionContent>
-        </SidebarSection>
-      )}
+          )}
+          <PropertyLine hidden={!has_flex_container}>
+            <PropertyLineLabel>Alignment</PropertyLineLabel>
+            <FlexAlignControl
+              className="w-full"
+              direction={
+                direction?.value === grida.mixed
+                  ? "horizontal"
+                  : (direction?.value ?? "horizontal")
+              }
+              value={
+                mainAxisAlignment?.value === grida.mixed ||
+                crossAxisAlignment?.value === grida.mixed ||
+                mainAxisAlignment?.value === undefined ||
+                crossAxisAlignment?.value === undefined
+                  ? undefined
+                  : {
+                      mainAxisAlignment: mainAxisAlignment.value,
+                      crossAxisAlignment: crossAxisAlignment.value,
+                    }
+              }
+              onValueChange={(value) => {
+                change.mainAxisAlignment(value.mainAxisAlignment);
+                change.crossAxisAlignment(value.crossAxisAlignment);
+              }}
+            />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
 
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
@@ -825,6 +912,7 @@ function ModeNodeProperties({
     crossAxisAlignment: node.crossAxisAlignment,
     mainAxisGap: node.mainAxisGap,
     crossAxisGap: node.crossAxisGap,
+    layoutWrap: node.layoutWrap,
 
     //
     href: node.href,
@@ -866,6 +954,7 @@ function ModeNodeProperties({
     crossAxisAlignment,
     mainAxisGap,
     crossAxisGap,
+    layoutWrap,
 
     //
     href,
@@ -922,7 +1011,6 @@ function ModeNodeProperties({
         </SidebarMenuSectionContent>
       </SidebarSection>
       {config.position !== "off" && <SectionPosition node_id={node_id} />}
-      {config.size !== "off" && <SectionDimension node_id={node_id} />}
 
       <SidebarSection
         hidden={config.template === "off" || !is_templateinstance}
@@ -943,6 +1031,78 @@ function ModeNodeProperties({
       )}
 
       <SectionMask node_id={node_id} editor={instance} />
+
+      <SidebarSection
+        hidden={config.layout === "off"}
+        className="border-b pb-4"
+      >
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          {is_container && (
+            <PropertyLine>
+              <PropertyLineLabel>Flow</PropertyLineLabel>
+              <LayoutControl
+                value={{
+                  layoutMode: layout ?? "flow",
+                  direction: layout === "flex" ? direction : undefined,
+                }}
+                onValueChange={(value) => {
+                  instance.commands.reLayout(node_id, value.key);
+                  // actions.layout(value.layoutMode);
+                  // if (value.direction) {
+                  //   actions.direction(value.direction);
+                  // }
+                }}
+              />
+            </PropertyLine>
+          )}
+          {config.size !== "off" && <SectionDimension node_id={node_id} />}
+          <PropertyLine hidden={!is_flex_container}>
+            <PropertyLineLabel>Alignment</PropertyLineLabel>
+            <FlexAlignControl
+              className="w-full"
+              direction={direction ?? "horizontal"}
+              value={
+                mainAxisAlignment !== undefined &&
+                crossAxisAlignment !== undefined
+                  ? {
+                      mainAxisAlignment,
+                      crossAxisAlignment,
+                    }
+                  : undefined
+              }
+              onValueChange={(value) => {
+                actions.mainAxisAlignment(value.mainAxisAlignment);
+                actions.crossAxisAlignment(value.crossAxisAlignment);
+              }}
+            />
+          </PropertyLine>
+          <PropertyLine hidden={!is_flex_container}>
+            <PropertyLineLabel>Wrap</PropertyLineLabel>
+            <FlexWrapControl
+              value={layoutWrap}
+              onValueChange={actions.layoutWrap}
+            />
+          </PropertyLine>
+          <PropertyLine hidden={!is_flex_container}>
+            <PropertyLineLabel>Gap</PropertyLineLabel>
+            <GapControl
+              mode={layoutWrap === "wrap" ? "multiple" : "single"}
+              value={{
+                mainAxisGap: mainAxisGap!,
+                crossAxisGap: crossAxisGap,
+              }}
+              onValueCommit={actions.gap}
+            />
+          </PropertyLine>
+          <PropertyLine hidden={!is_flex_container}>
+            <PropertyLineLabel>Padding</PropertyLineLabel>
+            <PaddingControl value={padding!} onValueCommit={actions.padding} />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
 
       <SidebarSection hidden={!is_stylable} className="border-b pb-4">
         <SidebarSectionHeaderItem>
@@ -1068,75 +1228,6 @@ function ModeNodeProperties({
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      {is_container && (
-        <SidebarSection
-          hidden={config.layout === "off"}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Type</PropertyLineLabel>
-              <LayoutControl value={layout!} onValueChange={actions.layout} />
-            </PropertyLine>
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Direction</PropertyLineLabel>
-              <AxisControl
-                value={direction!}
-                onValueChange={actions.direction}
-              />
-            </PropertyLine>
-            {/* <PropertyLine>
-              <PropertyLineLabel>Wrap</PropertyLineLabel>
-              <FlexWrapControl
-                value={flexWrap as any}
-                onValueChange={actions.flexWrap}
-              />
-            </PropertyLine> */}
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Distribute</PropertyLineLabel>
-              <MainAxisAlignmentControl
-                value={mainAxisAlignment!}
-                onValueChange={actions.mainAxisAlignment}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Align</PropertyLineLabel>
-              <CrossAxisAlignmentControl
-                value={crossAxisAlignment!}
-                direction={direction}
-                onValueChange={actions.crossAxisAlignment}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Gap</PropertyLineLabel>
-              <GapControl
-                value={{
-                  mainAxisGap: mainAxisGap!,
-                  crossAxisGap: crossAxisGap!,
-                }}
-                onValueCommit={actions.gap}
-              />
-            </PropertyLine>
-            {/* <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Margin</PropertyLineLabel>
-              <MarginControl
-                value={margin as any}
-                onValueChange={actions.margin}
-              />
-            </PropertyLine> */}
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Padding</PropertyLineLabel>
-              <PaddingControl
-                value={padding!}
-                onValueCommit={actions.padding}
-              />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
-      )}
 
       <SectionFills node_id={node_id} />
       {supports.stroke(node.type, { backend }) && (
@@ -1236,8 +1327,13 @@ function SectionPosition({ node_id }: { node_id: string }) {
   const instance = useCurrentEditor();
   const document_ctx = useEditorState(instance, (state) => state.document_ctx);
   const scene = useCurrentSceneState();
-  const top_id = dq.getTopId(document_ctx, node_id)!;
-  const is_root = node_id === top_id;
+  const scene_id = scene.id;
+  const top_scene_node_id = dq.getTopIdWithinScene(
+    document_ctx,
+    node_id,
+    scene_id
+  );
+  const is_root = node_id === (top_scene_node_id ?? scene_id);
   const is_single_mode_root =
     scene.constraints.children === "single" && is_root;
 
@@ -1273,10 +1369,14 @@ function SectionPosition({ node_id }: { node_id: string }) {
               right,
               bottom,
             }}
+            disabled={{
+              right: is_root,
+              bottom: is_root,
+            }}
             onValueCommit={actions.positioning}
           />
         </PropertyLine>
-        <PropertyLine>
+        <PropertyLine hidden={is_root}>
           <PropertyLineLabel>Mode</PropertyLineLabel>
           <PositioningModeControl
             value={position}
@@ -1541,27 +1641,19 @@ function SectionDimension({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
 
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <PropertyLine>
-          <PropertyLineLabel>Width</PropertyLineLabel>
-          <LengthPercentageControl
-            value={width}
-            onValueCommit={actions.width}
-          />
-        </PropertyLine>
-        <PropertyLine>
-          <PropertyLineLabel>Height</PropertyLineLabel>
-          <LengthPercentageControl
-            value={height}
-            onValueCommit={actions.height}
-          />
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+    <>
+      <PropertyLine>
+        <PropertyLineLabel>Width</PropertyLineLabel>
+        <LengthPercentageControl value={width} onValueCommit={actions.width} />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabel>Height</PropertyLineLabel>
+        <LengthPercentageControl
+          value={height}
+          onValueCommit={actions.height}
+        />
+      </PropertyLine>
+    </>
   );
 }
 
@@ -1726,7 +1818,7 @@ function SelectionColors() {
   const should_display = ids.length > 1 || paints.length > 1;
 
   if (!should_display) {
-    return <></>;
+    return null;
   }
 
   return (

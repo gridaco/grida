@@ -1,9 +1,10 @@
 use cg::cg::types::*;
-use cg::layout::tmp_example::{compute_flex_layout_for_container, ContainerWithStyle};
-use cg::layout::LayoutStyle;
-use cg::node::schema::{ContainerNodeRec, Size};
-use skia_safe::{Canvas, Color, Font, Paint, Rect};
-use taffy::prelude::*;
+use cg::layout::engine::LayoutEngine;
+use cg::layout::ComputedLayout;
+use cg::node::factory::NodeFactory;
+use cg::node::scene_graph::{Parent, SceneGraph};
+use cg::node::schema::*;
+use skia_safe::{Color, Paint, Rect};
 
 fn main() {
     // Create a surface for rendering
@@ -13,93 +14,97 @@ fn main() {
     // Clear background
     canvas.clear(Color::from_argb(255, 255, 255, 255));
 
-    // Create base container
-    let base_container = ContainerNodeRec {
-        active: true,
-        opacity: 1.0,
-        blend_mode: LayerBlendMode::PassThrough,
-        mask: None,
-        transform: math2::transform::AffineTransform::identity(),
-        size: Size {
+    // Build scene graph with production pipeline
+    let nf = NodeFactory::new();
+    let mut graph = SceneGraph::new();
+
+    // Create ICB with flex layout and padding
+    let mut icb = nf.create_initial_container_node();
+    icb.layout_mode = LayoutMode::Flex;
+    icb.layout_direction = Axis::Horizontal;
+    icb.layout_wrap = LayoutWrap::Wrap;
+    icb.layout_main_axis_alignment = MainAxisAlignment::Start;
+    icb.layout_cross_axis_alignment = CrossAxisAlignment::Start;
+    icb.padding = EdgeInsets {
+        left: 20.0,
+        right: 20.0,
+        top: 20.0,
+        bottom: 20.0,
+    };
+    icb.layout_gap = LayoutGap {
+        main_axis_gap: 10.0,
+        cross_axis_gap: 10.0,
+    };
+    let icb_id = graph.append_child(Node::InitialContainer(icb), Parent::Root);
+
+    // Add child containers
+    for i in 1..=4 {
+        let child = create_child_container(&format!("child-{}", i), 100.0, 80.0);
+        // Position is now handled by layout field
+        graph.append_child(Node::Container(child), Parent::NodeId(icb_id));
+    }
+
+    // Compute layout using production pipeline
+    let scene = Scene {
+        name: String::new(),
+        graph,
+        background_color: None,
+    };
+    let mut layout_engine = LayoutEngine::new();
+    let layout_result = layout_engine.compute(
+        &scene,
+        Size {
             width: 400.0,
             height: 200.0,
         },
-        corner_radius: RectangularCornerRadius::default(),
-        fills: Paints::new([]),
-        strokes: Paints::new([]),
-        stroke_width: 0.0,
-        stroke_align: StrokeAlign::Center,
-        stroke_dash_array: None,
-        effects: cg::node::schema::LayerEffects::default(),
-        clip: ContainerClipFlag::default(),
-        layout_mode: LayoutMode::Flex,
-        layout_direction: Axis::Horizontal,
-        layout_wrap: LayoutWrap::Wrap,
-        layout_main_axis_alignment: MainAxisAlignment::Start,
-        layout_cross_axis_alignment: CrossAxisAlignment::Start,
-        padding: EdgeInsets {
-            left: 20.0,
-            right: 20.0,
-            top: 20.0,
-            bottom: 20.0,
-        },
-        layout_gap: LayoutGap {
-            main_axis_gap: 10.0,
-            cross_axis_gap: 10.0,
-        },
-    };
+    );
 
-    // Create container with layout style
-    let container_with_style =
-        ContainerWithStyle::from_container(base_container).with_layout(LayoutStyle {
-            width: Dimension::length(400.0),
-            height: Dimension::length(200.0),
-            flex_grow: 0.0,
-        });
-
-    // Create child containers
-    let child_containers = vec![
-        create_child_container("child-1", 100.0, 80.0),
-        create_child_container("child-2", 100.0, 80.0),
-        create_child_container("child-3", 100.0, 80.0),
-        create_child_container("child-4", 100.0, 80.0),
-    ];
-
-    // Create children with layout styles
-    let children_with_styles: Vec<ContainerWithStyle> = child_containers
-        .into_iter()
-        .map(|child| {
-            ContainerWithStyle::from_container(child).with_layout(LayoutStyle {
-                width: Dimension::length(100.0),
-                height: Dimension::length(80.0),
-                flex_grow: 1.0,
-                ..Default::default()
-            })
-        })
+    // Extract layouts
+    let children_ids = scene.graph.get_children(&icb_id).unwrap();
+    let layouts: Vec<ComputedLayout> = children_ids
+        .iter()
+        .map(|id| layout_result.get(id).cloned().unwrap())
         .collect();
 
-    // Compute layout
-    let layouts = compute_flex_layout_for_container(
-        &container_with_style,
-        children_with_styles.iter().collect(),
-    );
+    // Render the demo (simplified - just show the layouts work)
+    // Note: render_demo function expects ContainerNodeRec which we don't have anymore
+    // For now, let's just draw the computed layouts directly
+    let colors = [
+        CGColor::from_rgb(239, 68, 68),  // red
+        CGColor::from_rgb(59, 130, 246), // blue
+        CGColor::from_rgb(34, 197, 94),  // green
+        CGColor::from_rgb(234, 179, 8),  // yellow
+    ];
 
-    // Render the demo
-    render_demo(
-        canvas,
-        &container_with_style,
-        &children_with_styles,
-        &layouts,
-    );
+    for (i, layout) in layouts.iter().enumerate() {
+        let mut paint = Paint::default();
+        paint.set_anti_alias(true);
+        let color = colors[i % colors.len()];
+        paint.set_color(Color::from_argb(255, color.r(), color.g(), color.b()));
+        paint.set_style(skia_safe::PaintStyle::Fill);
+
+        // Offset by base position and padding
+        let rect = Rect::from_xywh(
+            50.0 + layout.x,
+            50.0 + layout.y,
+            layout.width,
+            layout.height,
+        );
+        canvas.draw_rect(&rect, &paint);
+    }
 
     // Save the result
     let image = surface.image_snapshot();
     let data = image
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .unwrap();
-    std::fs::write("goldens/layout_flex_padding.png", data.as_bytes()).unwrap();
 
-    println!("✓ Generated goldens/layout_flex_padding.png");
+    // Use cargo env to get the correct output directory
+    let output_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let output_path = format!("{}/goldens/layout_flex_padding.png", output_dir);
+    std::fs::write(&output_path, data.as_bytes()).unwrap();
+
+    println!("✓ Generated {}", output_path);
 }
 
 fn create_child_container(id: &str, width: f32, height: f32) -> ContainerNodeRec {
@@ -108,139 +113,40 @@ fn create_child_container(id: &str, width: f32, height: f32) -> ContainerNodeRec
     use std::hash::{Hash, Hasher};
     let mut hasher = DefaultHasher::new();
     id.hash(&mut hasher);
-    let id_u64 = hasher.finish();
+    let _ = hasher.finish(); // Generate ID but don't store it since it's not used
 
     ContainerNodeRec {
         active: true,
         opacity: 1.0,
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
-        transform: math2::transform::AffineTransform::identity(),
-        size: Size { width, height },
-        corner_radius: RectangularCornerRadius::default(),
-        fills: Paints::new([]),
-        strokes: Paints::new([]),
+        rotation: 0.0,
+        position: Default::default(),
+        corner_radius: Default::default(),
+        fills: Default::default(),
+        strokes: Default::default(),
         stroke_width: 0.0,
         stroke_align: StrokeAlign::Center,
         stroke_dash_array: None,
-        effects: cg::node::schema::LayerEffects::default(),
-        clip: ContainerClipFlag::default(),
-        layout_mode: LayoutMode::Normal,
-        layout_direction: Axis::Horizontal,
-        layout_wrap: LayoutWrap::NoWrap,
-        layout_main_axis_alignment: MainAxisAlignment::Start,
-        layout_cross_axis_alignment: CrossAxisAlignment::Start,
-        padding: EdgeInsets::default(),
-        layout_gap: LayoutGap::default(),
+        effects: Default::default(),
+        clip: Default::default(),
+        layout_container: LayoutContainerStyle {
+            layout_mode: LayoutMode::Normal,
+            layout_direction: Axis::Horizontal,
+            layout_wrap: None,
+            layout_main_axis_alignment: None,
+            layout_cross_axis_alignment: None,
+            layout_padding: None,
+            layout_gap: None,
+        },
+        layout_dimensions: LayoutDimensionStyle {
+            width: Some(width),
+            height: Some(height),
+            min_width: None,
+            max_width: None,
+            min_height: None,
+            max_height: None,
+        },
+        layout_child: None,
     }
-}
-
-fn render_demo(
-    canvas: &Canvas,
-    container: &ContainerWithStyle,
-    children: &[ContainerWithStyle],
-    layouts: &[cg::layout::ComputedLayout],
-) {
-    let base_x = 50.0;
-    let base_y = 50.0;
-
-    // Draw container outline
-    let mut container_paint = Paint::default();
-    container_paint.set_anti_alias(true);
-    container_paint.set_color(Color::from_argb(100, 0, 0, 0));
-    container_paint.set_style(skia_safe::PaintStyle::Stroke);
-    container_paint.set_stroke_width(2.0);
-
-    let container_rect = Rect::from_xywh(
-        base_x,
-        base_y,
-        container.available_size().0,
-        container.available_size().1,
-    );
-    canvas.draw_rect(&container_rect, &container_paint);
-
-    // Draw padding area
-    let mut padding_paint = Paint::default();
-    padding_paint.set_anti_alias(true);
-    padding_paint.set_color(Color::from_argb(50, 0, 0, 255));
-    padding_paint.set_style(skia_safe::PaintStyle::Fill);
-
-    let padding_rect = Rect::from_xywh(
-        base_x + 20.0,                       // padding left
-        base_y + 20.0,                       // padding top
-        container.available_size().0 - 40.0, // width - padding
-        container.available_size().1 - 40.0, // height - padding
-    );
-    canvas.draw_rect(&padding_rect, &padding_paint);
-
-    // Draw children
-    let colors = [
-        Color::from_argb(200, 255, 0, 0),   // Red
-        Color::from_argb(200, 0, 255, 0),   // Green
-        Color::from_argb(200, 0, 0, 255),   // Blue
-        Color::from_argb(200, 255, 255, 0), // Yellow
-    ];
-
-    for (i, layout) in layouts.iter().enumerate() {
-        let color = colors[i % colors.len()];
-        let mut paint = Paint::default();
-        paint.set_anti_alias(true);
-        paint.set_color(color);
-
-        let child_rect = Rect::from_xywh(
-            base_x + layout.x,
-            base_y + layout.y,
-            layout.width,
-            layout.height,
-        );
-
-        // Draw rounded rectangle
-        let rrect = skia_safe::RRect::new_rect_radii(
-            child_rect,
-            &[
-                skia_safe::Point::new(6.0, 6.0),
-                skia_safe::Point::new(6.0, 6.0),
-                skia_safe::Point::new(6.0, 6.0),
-                skia_safe::Point::new(6.0, 6.0),
-            ],
-        );
-        canvas.draw_rrect(&rrect, &paint);
-
-        // Draw border
-        let mut border_paint = Paint::default();
-        border_paint.set_anti_alias(true);
-        border_paint.set_color(Color::from_argb(80, 0, 0, 0));
-        border_paint.set_style(skia_safe::PaintStyle::Stroke);
-        border_paint.set_stroke_width(1.5);
-        canvas.draw_rrect(&rrect, &border_paint);
-
-        // Draw child number
-        let typeface = cg::fonts::embedded::TYPEFACE_GEISTMONO.with(|t| t.clone());
-        let font = Font::new(typeface, 16.0);
-        let mut text_paint = Paint::default();
-        text_paint.set_anti_alias(true);
-        text_paint.set_color(Color::from_argb(255, 0, 0, 0));
-
-        let text = format!("{}", i + 1);
-        canvas.draw_str(
-            &text,
-            (base_x + layout.x + 5.0, base_y + layout.y + 20.0),
-            &font,
-            &text_paint,
-        );
-    }
-
-    // Draw title
-    let typeface = cg::fonts::embedded::TYPEFACE_GEISTMONO.with(|t| t.clone());
-    let title_font = Font::new(typeface, 20.0);
-    let mut title_paint = Paint::default();
-    title_paint.set_anti_alias(true);
-    title_paint.set_color(Color::from_argb(255, 0, 0, 0));
-
-    canvas.draw_str(
-        "ContainerWithStyle Demo - Flex Layout with Padding",
-        (base_x, base_y - 30.0),
-        &title_font,
-        &title_paint,
-    );
 }
