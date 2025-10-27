@@ -518,6 +518,29 @@ impl From<JSONVarWidthStop> for WidthStop {
     }
 }
 
+/// Converts JSON positioning fields to LayoutPositioningBasis
+/// - If right/bottom are present, uses Inset basis (preserves all four edges)
+/// - Otherwise, uses Cartesian basis (x,y)
+fn json_position_to_layout_basis(
+    left: Option<f32>,
+    top: Option<f32>,
+    right: Option<f32>,
+    bottom: Option<f32>,
+) -> LayoutPositioningBasis {
+    if right.is_some() || bottom.is_some() {
+        // Inset basis: preserve all four edges (missing edges default to 0.0)
+        LayoutPositioningBasis::Inset(EdgeInsets {
+            top: top.unwrap_or(0.0),
+            right: right.unwrap_or(0.0),
+            bottom: bottom.unwrap_or(0.0),
+            left: left.unwrap_or(0.0),
+        })
+    } else {
+        // Cartesian basis (x,y)
+        LayoutPositioningBasis::Cartesian(CGPoint::new(left.unwrap_or(0.0), top.unwrap_or(0.0)))
+    }
+}
+
 /// Utility function to merge single and multiple paint properties according to the specified logic:
 /// - if paint and no paints, use [paint]
 /// - if no paint and no paints, use []
@@ -1197,10 +1220,12 @@ impl From<JSONContainerNode> for ContainerNodeRec {
         ContainerNodeRec {
             active: node.base.active,
             rotation: node.base.rotation,
-            position: LayoutPositioningBasis::Cartesian(CGPoint::new(
-                node.base.left.unwrap_or(0.0),
-                node.base.top.unwrap_or(0.0),
-            )),
+            position: json_position_to_layout_basis(
+                node.base.left,
+                node.base.top,
+                node.base.right,
+                node.base.bottom,
+            ),
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
                 node.base.corner_radius_top_left,
