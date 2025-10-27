@@ -1,7 +1,7 @@
 {
   "name": "@grida/canvas-wasm",
   "description": "WASM bindings for Grida Canvas",
-  "version": "0.0.80-canary.2",
+  "version": "0.0.80-canary.3",
   "keywords": [
     "grida",
     "canvas",
