@@ -15,7 +15,7 @@ import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { GridaLogo } from "@/components/grida-logo";
 import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SlashIcon } from "@radix-ui/react-icons";
+import { CaretLeftIcon, SlashIcon } from "@radix-ui/react-icons";
 import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
 import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
 import Link from "next/link";
@@ -59,6 +59,7 @@ export function EditorSidebar() {
                 prefetch={false}
               >
                 <DropdownMenuItem className="text-xs">
+                  <CaretLeftIcon />
                   Back to Dashboard
                 </DropdownMenuItem>
               </Link>
