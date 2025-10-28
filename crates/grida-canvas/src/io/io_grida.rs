@@ -1456,6 +1456,7 @@ impl From<JSONRectangleNode> for Node {
                 node.base.corner_radius_bottom_right,
                 node.base.corner_radius_bottom_left,
             ),
+            corner_smoothing: Default::default(),
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,

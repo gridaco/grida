@@ -59,6 +59,7 @@ impl NodeFactory {
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
+            corner_smoothing: Default::default(),
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             strokes: Paints::default(),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,

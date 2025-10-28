@@ -948,6 +948,7 @@ pub struct RectangleNodeRec {
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
+    pub corner_smoothing: CornerSmoothing,
     pub fills: Paints,
     pub strokes: Paints,
     pub stroke_width: f32,
