@@ -151,6 +151,7 @@ export function CornerRadius4Control({
             <InputPropertyNumber
               mode="fixed"
               type="number"
+              disabled={disabled}
               value={cornerValues[0]}
               placeholder="0"
               min={0}
@@ -170,6 +171,7 @@ export function CornerRadius4Control({
             <InputPropertyNumber
               mode="fixed"
               type="number"
+              disabled={disabled}
               value={cornerValues[1]}
               placeholder="0"
               min={0}
@@ -189,6 +191,7 @@ export function CornerRadius4Control({
             <InputPropertyNumber
               mode="fixed"
               type="number"
+              disabled={disabled}
               value={cornerValues[2]}
               placeholder="0"
               min={0}
@@ -208,6 +211,7 @@ export function CornerRadius4Control({
             <InputPropertyNumber
               mode="fixed"
               type="number"
+              disabled={disabled}
               value={cornerValues[3]}
               placeholder="0"
               min={0}
