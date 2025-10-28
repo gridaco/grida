@@ -48,9 +48,17 @@ import { SurfaceImageEditor } from "./ui/surface-image-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { RedDotHandle } from "./ui/reddot";
 import { AxisRuler, Tick } from "@grida/ruler/react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { PixelGrid } from "@grida/pixel-grid/react";
 import { Rule } from "./ui/rule";
 import type { BitmapEditorBrush } from "@grida/bitmap";
+import { toast } from "sonner";
 import {
   FloatingBar,
   FloatingBarContent,
@@ -1552,62 +1560,66 @@ function RulerGuideOverlay() {
 
   return (
     <div className="fixed w-full h-full pointer-events-none z-50">
-      <div
-        {...bindX()}
-        className="z-30 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
-      >
-        <AxisRuler
-          axis="x"
-          width={viewport?.clientWidth ?? 0}
-          height={20}
-          overlapThreshold={80}
-          textSideOffset={10}
-          zoom={scaleX}
-          offset={tx}
-          ranges={ranges.x}
-          marks={marks.y.map(
-            (m) =>
-              ({
-                pos: m,
-                text: m.toString(),
-                textAlign: "start",
-                textAlignOffset: 8,
-                strokeColor: "red",
-                strokeWidth: 0.5,
-                strokeHeight: 24,
-                color: "red",
-              }) satisfies Tick
-          )}
-        />
-      </div>
-      <div
-        {...bindY()}
-        className="z-20 fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
-      >
-        <AxisRuler
-          axis="y"
-          width={20}
-          height={viewport?.clientHeight ?? 0}
-          overlapThreshold={80}
-          textSideOffset={10}
-          zoom={scaleY}
-          offset={ty}
-          ranges={ranges.y}
-          marks={marks.x.map(
-            (m) =>
-              ({
-                pos: m,
-                text: m.toString(),
-                textAlign: "end",
-                textAlignOffset: 8,
-                strokeColor: "red",
-                strokeWidth: 0.5,
-                strokeHeight: 24,
-                color: "red",
-              }) satisfies Tick
-          )}
-        />
-      </div>
+      <RulerContextMenu editor={editor}>
+        <div
+          {...bindX()}
+          className="z-30 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
+        >
+          <AxisRuler
+            axis="x"
+            width={viewport?.clientWidth ?? 0}
+            height={20}
+            overlapThreshold={80}
+            textSideOffset={10}
+            zoom={scaleX}
+            offset={tx}
+            ranges={ranges.x}
+            marks={marks.y.map(
+              (m) =>
+                ({
+                  pos: m,
+                  text: m.toString(),
+                  textAlign: "start",
+                  textAlignOffset: 8,
+                  strokeColor: "red",
+                  strokeWidth: 0.5,
+                  strokeHeight: 24,
+                  color: "red",
+                }) satisfies Tick
+            )}
+          />
+        </div>
+      </RulerContextMenu>
+      <RulerContextMenu editor={editor}>
+        <div
+          {...bindY()}
+          className="z-20 fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
+        >
+          <AxisRuler
+            axis="y"
+            width={20}
+            height={viewport?.clientHeight ?? 0}
+            overlapThreshold={80}
+            textSideOffset={10}
+            zoom={scaleY}
+            offset={ty}
+            ranges={ranges.y}
+            marks={marks.x.map(
+              (m) =>
+                ({
+                  pos: m,
+                  text: m.toString(),
+                  textAlign: "end",
+                  textAlignOffset: 8,
+                  strokeColor: "red",
+                  strokeWidth: 0.5,
+                  strokeHeight: 24,
+                  color: "red",
+                }) satisfies Tick
+            )}
+          />
+        </div>
+      </RulerContextMenu>
       {/* Guides */}
       <div className="z-10">
         {guides.map((g, i) => {
@@ -1617,6 +1629,32 @@ function RulerGuideOverlay() {
     </div>
   );
   //
+}
+
+function RulerContextMenu({
+  editor,
+  children,
+}: {
+  editor: ReturnType<typeof useCurrentEditor>;
+  children: React.ReactNode;
+}) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem
+          className="text-xs"
+          onSelect={() => {
+            editor.surface.surfaceConfigureRuler("off");
+            toast.success("Ruler off");
+          }}
+        >
+          Hide ruler
+          <ContextMenuShortcut>⇧R</ContextMenuShortcut>
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
 }
 
 function Guide({

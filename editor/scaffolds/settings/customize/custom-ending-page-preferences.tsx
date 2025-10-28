@@ -48,7 +48,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useEditorState } from "@/scaffolds/editor";
 import { useForm, Controller } from "react-hook-form";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 export function EndingPagePreferences() {
   const [state] = useEditorState();

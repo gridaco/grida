@@ -10,7 +10,7 @@ import { useImageActions } from "../hooks/use-image-actions";
 import { blobUrlToBase64, randomId } from "../../../utils";
 import { InfoCircledIcon, TrashIcon } from "@radix-ui/react-icons";
 import { ImageOverlay } from "./image-overlay";
-import { Spinner } from "../../../components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import type { UploadReturnType } from "../image";
 
 const MAX_HEIGHT = 600;

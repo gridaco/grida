@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 type Step = "email" | "otp";
 

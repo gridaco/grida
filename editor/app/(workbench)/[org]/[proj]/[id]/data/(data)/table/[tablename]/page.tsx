@@ -21,7 +21,7 @@ import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { DGResponseRow } from "@/scaffolds/grid/types";
 import assert from "assert";
 import { useMemo, use } from "react";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 
 export default function SchemaTablePage(props: {

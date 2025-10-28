@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CampaignCard } from "./campaign-card";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Platform } from "@/lib/platform";
 import { Button } from "@/components/ui/button";
 import EmptyWelcome from "@/components/empty";

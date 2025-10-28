@@ -277,7 +277,12 @@ function __self_update_gesture_transform_translate(
       current_selection.forEach((node_id) => {
         //
         const prev_parent_id = dq.getParentId(draft.document_ctx, node_id);
-        if (prev_parent_id === new_parent_id) return;
+
+        // Normalize parent IDs for comparison (null means scene)
+        const effective_prev_parent = prev_parent_id ?? draft.scene_id!;
+        const effective_new_parent = new_parent_id ?? draft.scene_id!;
+
+        if (effective_prev_parent === effective_new_parent) return;
 
         // Check if the current parent allows hierarchy changes
         if (prev_parent_id) {

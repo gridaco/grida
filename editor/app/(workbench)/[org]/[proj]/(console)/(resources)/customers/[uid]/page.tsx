@@ -20,7 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
 import useSWR, { mutate } from "swr";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { ClockIcon, Cross1Icon, Link2Icon } from "@radix-ui/react-icons";
 import {
   ArrowLeft,

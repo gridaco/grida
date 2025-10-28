@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useEditorState } from "@/scaffolds/editor";

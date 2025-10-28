@@ -10,7 +10,7 @@ import XSBReferencedRowLookupProvider, {
 } from "@/scaffolds/data-xsb-referenced-row-lookup";
 import { Data } from "@/lib/data";
 import { useSchemaName } from "@/scaffolds/data-query";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { useEditorState } from "@/scaffolds/editor";
 import { DataCard } from "@/scaffolds/data-card/card";
 import {

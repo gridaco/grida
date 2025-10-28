@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   SidebarMenuSectionContent,
@@ -71,11 +71,7 @@ import { BrowseStartPageTemplatesDialog } from "../form-templates/startpage-temp
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { PropsControl } from "./controls/props";
-import {
-  useDocumentState,
-  useNode,
-  useTemplateDefinition,
-} from "@/grida-canvas-react/provider";
+import { useNode, useTemplateDefinition } from "@/grida-canvas-react/provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,7 +87,7 @@ import { useCurrentEditor } from "@/grida-canvas-react";
 const { default: all, ...variants } = _variants;
 
 export function SideControlGlobal() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
   const { selected_page_id } = state;
 
@@ -113,7 +109,8 @@ export function SideControlGlobal() {
           <AppearanceControl />
         </SidebarMenuSectionContent>
       </SidebarSection>
-      {selected_page_id === "form/startpage" && <FormStartPageControl />}
+      {/* FEATURE DISABLED */}
+      {/* {selected_page_id === "form/startpage" && <_FormStartPageControl />} */}
       {selected_page_id === "form" && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
@@ -154,7 +151,7 @@ export function SideControlGlobal() {
   );
 }
 
-function FormStartPageControl() {
+function _FormStartPageControl() {
   const editor = useCurrentEditor();
 
   // FIXME: 250303 UNKNOWN

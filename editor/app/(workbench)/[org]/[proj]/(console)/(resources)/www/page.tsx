@@ -14,7 +14,7 @@ import { createBrowserWWWClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { useCallback, useMemo } from "react";
 import useSWR, { mutate } from "swr";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { useForm } from "react-hook-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FaviconEditor } from "@/scaffolds/www-theme-config/components/favicon";

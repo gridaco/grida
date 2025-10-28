@@ -20,7 +20,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useEditorState } from "@/scaffolds/editor";
 import { SupabaseLogo } from "@/components/logos";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { PrivateEditorApi } from "@/lib/private";
 import { ContextVariablesTable } from "@/scaffolds/template-editor/about-variable-table";
 

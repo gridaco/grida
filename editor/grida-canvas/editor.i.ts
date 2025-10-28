@@ -1509,7 +1509,7 @@ export namespace editor.state {
         last_modified: null,
       },
       gesture_modifiers: editor.config.DEFAULT_GESTURE_MODIFIERS,
-      ruler: "off",
+      ruler: "on",
       pixelgrid: "on",
       when_not_removable: "deactivate",
       document_ctx: new tree.graph.Graph(doc).lut,

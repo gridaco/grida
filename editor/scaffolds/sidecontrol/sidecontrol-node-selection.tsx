@@ -134,14 +134,14 @@ function FontStyleControlScaffold({ selection }: { selection: string[] }) {
   return <FontStyleControl onValueChange={handleChange} />;
 }
 
-function Align() {
+function Align({ disabled }: { disabled?: boolean }) {
   const editor = useCurrentEditor();
   const { selection } = useSelectionState();
   const has_selection = selection.length >= 1;
 
   return (
     <_AlignControl
-      disabled={!has_selection}
+      disabled={!has_selection || disabled}
       onAlign={(alignment) => {
         editor.commands.align("selection", alignment);
       }}
@@ -1358,7 +1358,7 @@ function SectionPosition({ node_id }: { node_id: string }) {
       </SidebarSectionHeaderItem>
       <SidebarMenuSectionContent className="space-y-2">
         <div className="pb-2 border-b">
-          <Align />
+          <Align disabled={is_root} />
         </div>
         <PropertyLine>
           <PositioningConstraintsControl

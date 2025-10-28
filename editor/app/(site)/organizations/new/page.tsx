@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDebounce } from "@uidotdev/usehooks";
 import Link from "next/link";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 const checkname = async (name: string) => {
   const res = await fetch("/private/accounts/organizations/check-name", {

@@ -33,8 +33,11 @@ function createLayoutSnapshot(
   let parent: grida.program.nodes.Node | null = null;
   if (group) {
     parent = dq.__getNodeById(state, group);
-    const parent_rect = context.geometry.getNodeAbsoluteBoundingRect(group)!;
-    reldelta = [-parent_rect.x, -parent_rect.y];
+    const parent_rect = context.geometry.getNodeAbsoluteBoundingRect(group);
+    // Gracefully handle root nodes (where parent is scene and has no bounding rect)
+    if (parent_rect) {
+      reldelta = [-parent_rect.x, -parent_rect.y];
+    }
   }
 
   const objects: editor.gesture.LayoutSnapshot["objects"] = items.map(
@@ -699,12 +702,7 @@ function __self_start_gesture(
         return;
       }
 
-      const layout = createLayoutSnapshot(
-        draft,
-        parent_id!,
-        selection,
-        context
-      );
+      const layout = createLayoutSnapshot(draft, parent_id, selection, context);
       const initial_index = layout.objects.findIndex((it) => it.id === node_id);
 
       const initial_placement = {

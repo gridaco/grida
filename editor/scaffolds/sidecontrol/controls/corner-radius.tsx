@@ -1,10 +1,5 @@
-import { Button } from "@/components/ui/button";
+import React, { useMemo, useState } from "react";
 import InputPropertyNumber from "../ui/number";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { WorkbenchUI } from "@/components/workbench";
 import cg from "@grida/cg";
 import {
@@ -14,9 +9,9 @@ import {
   CornerBottomLeftIcon,
   CornersIcon,
 } from "@radix-ui/react-icons";
-import { PropertyInputContainer } from "../ui";
 import grida from "@grida/schema";
-import { useMemo } from "react";
+import { Toggle } from "@/components/ui/toggle";
+import { cn } from "@/components/lib/utils";
 
 function isUniform(value: grida.program.nodes.i.IRectangularCornerRadius) {
   const _tl = value.cornerRadiusTopLeft;
@@ -67,6 +62,8 @@ export function CornerRadius4Control({
   value?: grida.program.nodes.i.IRectangularCornerRadius;
   onValueCommit?: (value: cg.CornerRadius) => void;
 }) {
+  const [showIndividual, setShowIndividual] = useState(false);
+
   const mode = useMemo(() => {
     if (!value) return "all";
     return isUniform(value) ? "all" : "each";
@@ -78,120 +75,168 @@ export function CornerRadius4Control({
     return value.cornerRadiusTopLeft; // asserted uniform, use top left
   }, [value]);
 
-  return (
-    <Popover modal={false}>
-      <div className="flex flex-col gap-2">
-        <div
-          className={WorkbenchUI.inputVariants({
-            variant: "container",
-            size: "xs",
-          })}
-        >
-          <InputPropertyNumber
-            mode="fixed"
-            disabled={disabled}
-            type="number"
-            value={mode === "all" ? (uniformValue ?? "") : ""}
-            placeholder={mode === "all" ? "-" : "mixed"}
-            min={0}
-            step={1}
-            onValueCommit={onValueCommit}
-          />
-          <PopoverTrigger asChild>
-            <Button
-              disabled={disabled}
-              variant={mode === "each" ? "secondary" : "ghost"}
-              size="icon"
-              className="size-8 min-w-8"
-            >
-              <CornersIcon />
-            </Button>
-          </PopoverTrigger>
-        </div>
-      </div>
-      <PopoverContent>
-        <Radius4Control
-          value={[
-            value?.cornerRadiusTopLeft ?? 0,
-            value?.cornerRadiusTopRight ?? 0,
-            value?.cornerRadiusBottomRight ?? 0,
-            value?.cornerRadiusBottomLeft ?? 0,
-          ]}
-          onValueCommit={(v) => {
-            if (cg.cornerRadius4Identical(v)) {
-              onValueCommit?.(v[0]);
-              return;
-            }
-            onValueCommit?.(v);
-          }}
-        />
-      </PopoverContent>
-    </Popover>
-  );
-}
+  const cornerValues = useMemo(() => {
+    return [
+      value?.cornerRadiusTopLeft ?? 0,
+      value?.cornerRadiusTopRight ?? 0,
+      value?.cornerRadiusBottomRight ?? 0,
+      value?.cornerRadiusBottomLeft ?? 0,
+    ] as cg.CornerRadius4;
+  }, [value]);
 
-function Radius4Control({
-  value,
-  onValueCommit,
-}: {
-  value: cg.CornerRadius4;
-  onValueCommit?: (value: cg.CornerRadius4) => void;
-}) {
-  const [topLeft, topRight, bottomRight, bottomLeft] = value;
+  const placeholder = useMemo(() => {
+    if (mode === "all") return String(uniformValue ?? 0);
+    return cornerValues.join(", ");
+  }, [mode, uniformValue, cornerValues]);
 
-  const onCommit = (v: number, index: number) => {
-    const newValue = [...value];
-    const n = v || 0;
-    newValue[index] = n;
-    onValueCommit?.(newValue as cg.CornerRadius4);
+  const handleUniformChange = (newValue: number | undefined) => {
+    if (newValue === undefined) return;
+    onValueCommit?.(newValue);
+  };
+
+  const handleIndividualChange = (
+    index: number,
+    newValue: number | undefined
+  ) => {
+    if (newValue === undefined) return;
+    const newCorners = [...cornerValues];
+    newCorners[index] = newValue || 0;
+
+    if (cg.cornerRadius4Identical(newCorners as cg.CornerRadius4)) {
+      onValueCommit?.(newCorners[0]);
+      return;
+    }
+    onValueCommit?.(newCorners as cg.CornerRadius4);
   };
 
   return (
-    <div className="grid gap-2">
+    <div className="flex flex-col gap-2">
+      {/* First Row: Uniform Input + Toggle Button */}
       <div className="flex items-center gap-2">
-        <PropertyInputContainer>
-          <CornerTopLeftIcon className="size-3" />
-          <InputPropertyNumber
-            mode="fixed"
-            type="number"
-            value={topLeft}
-            onValueCommit={(v) => onCommit(v, 0)}
-            min={0}
-          />
-        </PropertyInputContainer>
-        <PropertyInputContainer>
-          <CornerTopRightIcon className="size-3" />
-          <InputPropertyNumber
-            mode="fixed"
-            type="number"
-            value={topRight}
-            onValueCommit={(v) => onCommit(v, 1)}
-            min={0}
-          />
-        </PropertyInputContainer>
+        <InputPropertyNumber
+          mode="fixed"
+          disabled={disabled}
+          type="number"
+          value={mode === "all" ? uniformValue : undefined}
+          placeholder={placeholder}
+          min={0}
+          step={1}
+          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "flex-1")}
+          onValueCommit={handleUniformChange}
+          aria-label="Corner radius all corners"
+        />
+        <div className="flex gap-1">
+          <Toggle
+            size="sm"
+            variant="outline"
+            disabled={disabled}
+            pressed={showIndividual}
+            onPressedChange={setShowIndividual}
+            className="bg-transparent border-none shadow-none size-6 min-w-6 px-0 data-[state=on]:*:[svg]:text-workbench-accent-sky"
+            aria-label="Toggle individual corner radius controls"
+          >
+            <CornersIcon
+              className="size-3.5 text-muted-foreground"
+              aria-hidden="true"
+            />
+          </Toggle>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <PropertyInputContainer>
-          <CornerBottomLeftIcon className="size-3" />
-          <InputPropertyNumber
-            mode="fixed"
-            type="number"
-            value={bottomLeft}
-            onValueCommit={(v) => onCommit(v, 3)}
-            min={0}
-          />
-        </PropertyInputContainer>
-        <PropertyInputContainer>
-          <CornerBottomRightIcon className="size-3" />
-          <InputPropertyNumber
-            mode="fixed"
-            type="number"
-            value={bottomRight}
-            onValueCommit={(v) => onCommit(v, 2)}
-            min={0}
-          />
-        </PropertyInputContainer>
-      </div>
+
+      {/* Second Row: Individual Corner Radius Controls */}
+      {showIndividual && (
+        <div className="flex items-center">
+          {/* Top Left */}
+          <div className="flex flex-col items-center flex-1">
+            <InputPropertyNumber
+              mode="fixed"
+              type="number"
+              disabled={disabled}
+              value={cornerValues[0]}
+              placeholder="0"
+              min={0}
+              step={1}
+              className="w-full h-7 rounded-none rounded-l-md border-r-0"
+              onValueCommit={(v) => handleIndividualChange(0, v)}
+              aria-label="Corner radius top left"
+            />
+            <Label>
+              <CornerTopLeftIcon className="size-3" />
+            </Label>
+          </div>
+          {/* Separator */}
+          <hr className="w-px h-10" />
+          {/* Top Right */}
+          <div className="flex flex-col items-center flex-1">
+            <InputPropertyNumber
+              mode="fixed"
+              type="number"
+              disabled={disabled}
+              value={cornerValues[1]}
+              placeholder="0"
+              min={0}
+              step={1}
+              className="w-full h-7 rounded-none border-x-0"
+              onValueCommit={(v) => handleIndividualChange(1, v)}
+              aria-label="Corner radius top right"
+            />
+            <Label>
+              <CornerTopRightIcon className="size-3" />
+            </Label>
+          </div>
+          {/* Separator */}
+          <hr className="w-px h-10" />
+          {/* Bottom Right */}
+          <div className="flex flex-col items-center flex-1">
+            <InputPropertyNumber
+              mode="fixed"
+              type="number"
+              disabled={disabled}
+              value={cornerValues[2]}
+              placeholder="0"
+              min={0}
+              step={1}
+              className="w-full h-7 rounded-none border-x-0"
+              onValueCommit={(v) => handleIndividualChange(2, v)}
+              aria-label="Corner radius bottom right"
+            />
+            <Label>
+              <CornerBottomRightIcon className="size-3" />
+            </Label>
+          </div>
+          {/* Separator */}
+          <hr className="w-px h-10" />
+          {/* Bottom Left */}
+          <div className="flex flex-col items-center flex-1">
+            <InputPropertyNumber
+              mode="fixed"
+              type="number"
+              disabled={disabled}
+              value={cornerValues[3]}
+              placeholder="0"
+              min={0}
+              step={1}
+              className="w-full h-7 rounded-none rounded-r-md border-l-0"
+              onValueCommit={(v) => handleIndividualChange(3, v)}
+              aria-label="Corner radius bottom left"
+            />
+            <Label>
+              <CornerBottomLeftIcon className="size-3" />
+            </Label>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const Label = ({ children }: React.PropsWithChildren) => {
+  return (
+    <span
+      className="text-[8px] text-muted-foreground pt-0.5"
+      aria-hidden="true"
+    >
+      {children}
+    </span>
+  );
+};

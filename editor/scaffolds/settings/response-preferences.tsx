@@ -23,7 +23,7 @@ import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { useForm, Controller } from "react-hook-form";
 import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { editorlink } from "@/host/url";
 import { useEditorState } from "../editor";
 

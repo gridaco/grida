@@ -8,7 +8,7 @@ import Link from "next/link";
 import { usePropsEditor } from "@/scaffolds/props-editor";
 import { CMSImageField, CMSRichText } from "@/components/formfield-cms";
 import { Button } from "@/components/ui-editor/button";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { useProject } from "@/scaffolds/workspace";
 import { useCampaign } from "../store";
 import { Platform } from "@/lib/platform";

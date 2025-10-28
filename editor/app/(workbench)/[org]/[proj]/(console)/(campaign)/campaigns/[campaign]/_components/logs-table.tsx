@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import useSWR from "swr";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Platform } from "@/lib/platform";
 import { useCampaign } from "../store";
 

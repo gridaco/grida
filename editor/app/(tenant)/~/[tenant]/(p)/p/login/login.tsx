@@ -18,7 +18,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { template } from "@/utils/template";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";

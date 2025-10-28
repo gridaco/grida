@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { useEditorState } from "../editor";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 export function SavingIndicator() {
   const [state] = useEditorState();

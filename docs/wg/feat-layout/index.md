@@ -177,29 +177,29 @@ To ensure stability and gradual adoption, the layout system will be rolled out i
 ## 9. References
 
 - **CSS Anchor Positioning Module Level 1** — W3C Working Draft (2024–2025)  
-  <https://www.w3.org/TR/css-anchor-position-1/>
+  https://www.w3.org/TR/css-anchor-position-1/
 - **Chrome Developers: Anchor Positioning API** — Overview and examples  
-  <https://developer.chrome.com/blog/anchor-positioning-api/>
+  https://developer.chrome.com/blog/anchor-positioning-api/
 - **MDN Web Docs: CSS Anchor Positioning** — Syntax and browser support  
-  <https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_anchor_positioning>
+  https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_anchor_positioning
 - **OddBird Blog: Anchor Positioning Updates (2025)** — Practical insights from spec contributors  
-  <https://www.oddbird.net/2025/10/13/anchor-position-area-update/>
+  https://www.oddbird.net/2025/10/13/anchor-position-area-update/
 
 ---
 
 ### Cross‑Domain Anchoring & Constraint Examples
 
-- **Unity UI Anchors & RectTransform** — Unity’s `RectTransform` component supports parent‑relative anchors and stretching behavior similar to inset and anchor models, forming the foundation of its responsive UI system.  
-  <https://docs.unity3d.com/Manual/UIBasicLayout.html>
+- **Unity UI Anchors & RectTransform** — Unity's `RectTransform` component supports parent‑relative anchors and stretching behavior similar to inset and anchor models, forming the foundation of its responsive UI system.  
+  https://docs.unity3d.com/Manual/UIBasicLayout.html
 
-- **Godot Control Nodes** — Godot’s `Control` nodes implement an anchor/margin system that allows constraint‑based UI placement in both 2D and 3D scenes.  
-  <https://docs.godotengine.org/en/stable/tutorials/gui/gui_containers.html>
+- **Godot Control Nodes** — Godot's `Control` nodes implement an anchor/margin system that allows constraint‑based UI placement in both 2D and 3D scenes.  
+  https://docs.godotengine.org/en/stable/tutorials/gui/gui_containers.html
 
-- **Figma Auto Layout & Constraints** — Figma’s constraint model (top, left, right, bottom, center) operates on the same principle as anchors, enabling adaptive, rule‑based positioning in a 2D design environment.  
-  <https://help.figma.com/hc/en-us/articles/360039957734-Apply-constraints-to-define-how-layers-resize>
+- **Figma Auto Layout & Constraints** — Figma's constraint model (top, left, right, bottom, center) operates on the same principle as anchors, enabling adaptive, rule‑based positioning in a 2D design environment.  
+  https://help.figma.com/hc/en-us/articles/360039957734-Apply-constraints-to-define-how-layers-resize
 
 - **CAD / Parametric Modeling** — Tools like AutoCAD and SolveSpace use constraint graphs to define positional relationships between points, edges, and objects—an abstract yet mathematically identical anchor system.  
-  <https://en.wikipedia.org/wiki/Constraint_(computer-aided_design)>
+  https://en.wikipedia.org/wiki/Constraint_(computer-aided_design)
 
 These references illustrate that anchor‑style positional constraints are not unique to CSS—they represent a universal paradigm across 2D, 3D, and CAD domains.
 

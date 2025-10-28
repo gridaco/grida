@@ -22,7 +22,7 @@ import {
   PlayIcon,
 } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Menubar } from "@/components/ui/menubar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
