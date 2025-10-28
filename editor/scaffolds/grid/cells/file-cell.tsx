@@ -48,7 +48,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SignedUploadUrlData } from "@/types/private/api";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFileRefs } from "../providers";
 

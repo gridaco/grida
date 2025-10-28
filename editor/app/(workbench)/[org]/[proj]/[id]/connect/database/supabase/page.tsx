@@ -57,7 +57,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { PrivateEditorApi } from "@/lib/private";
 import {
   Dialog,

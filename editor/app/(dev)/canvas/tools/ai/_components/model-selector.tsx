@@ -40,7 +40,7 @@ export function ModelSelector({ ...props }: ModelSelectorProps) {
           role="combobox"
           aria-expanded={open}
           aria-label="Select a model"
-          className="w-full justify-between"
+          className="w-auto justify-between"
         >
           {selectedModel ? selectedModel.id : "Select a model..."}
           <ChevronsUpDown className="opacity-50 size-4" />

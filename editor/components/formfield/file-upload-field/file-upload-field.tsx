@@ -9,7 +9,7 @@ import {
   FileUploaderItem,
   UploadedFileValue,
 } from "@/components/extension/file-upload";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Card } from "@/components/ui/card";
 import { ExclamationTriangleIcon, FileIcon } from "@radix-ui/react-icons";
 import { DropzoneOptions } from "react-dropzone";

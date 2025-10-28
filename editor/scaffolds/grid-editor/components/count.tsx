@@ -1,4 +1,4 @@
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { txt_n_plural } from "@/utils/plural";
 
 export function GridQueryCount({

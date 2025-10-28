@@ -1,6 +1,6 @@
 import React from "react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,

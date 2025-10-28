@@ -8,7 +8,7 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 import { BlockKeys } from "./block-keys";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { JSONValue } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

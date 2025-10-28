@@ -2,7 +2,7 @@
 
 import React from "react";
 import { createBrowserWWWClient } from "@/lib/supabase/client";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { GDocumentType } from "@/types";
 
 type WWWLayout = {

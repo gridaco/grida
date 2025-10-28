@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useForm, Controller } from "react-hook-form";
 import { useEditorState } from "@/scaffolds/editor";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { PrivateEditorApi } from "@/lib/private";
 import { toast } from "sonner";
 

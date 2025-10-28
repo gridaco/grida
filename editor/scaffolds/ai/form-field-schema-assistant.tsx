@@ -6,7 +6,7 @@ import { LightningBoltIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import { draftid } from "@/utils/id";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 export function FormFieldAssistant({
   onSuggestion,

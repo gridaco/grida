@@ -49,7 +49,7 @@ import { MediaLoadPluginProvider } from "./mediaload";
 import { FormAgentMessagingInterfaceProvider } from "./interface";
 import { FormAgentMessagingInterface } from "./emit";
 import { useValue } from "@/lib/spock";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { PhoneFieldDefaultCountryProvider } from "@/components/formfield/phone-field";
 import type { FormAgentGeo } from "@/grida-forms/formstate/core/geo";
 

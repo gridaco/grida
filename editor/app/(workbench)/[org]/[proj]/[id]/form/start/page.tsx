@@ -48,7 +48,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import {
   StandaloneDocumentEditor,
   ViewportRoot,

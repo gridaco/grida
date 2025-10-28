@@ -12,7 +12,7 @@ import useSWR, { mutate } from "swr";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { PublicUrls } from "@/services/public-urls";
 import { EditorApiResponse } from "@/types/private/api";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import type {
   GDocument,
   OrganizationWithAvatar,

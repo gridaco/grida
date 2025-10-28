@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/tooltip";
 import dynamic from "next/dynamic";
 import { motion } from "motion/react";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 const Masonry: ComponentType<MasonryProps<ObjectDetail>> = dynamic(
   () => import("masonic").then((mod) => mod.Masonry),

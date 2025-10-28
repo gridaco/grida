@@ -31,7 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import {
   NewDocumentRequest,
   NewDocumentResponse,

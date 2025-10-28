@@ -19,7 +19,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { CodeIcon } from "@radix-ui/react-icons";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDummyPublicUpload } from "@/scaffolds/platform/storage";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { GridaLogo } from "@/components/grida-logo";
 
 const systemmsg = (system: string, template?: string, context?: string) => {

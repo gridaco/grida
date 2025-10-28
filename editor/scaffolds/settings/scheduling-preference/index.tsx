@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { useTimestampTZ } from "@/hooks/use-timestamptz";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { toZonedTime, format as tzFormat, fromZonedTime } from "date-fns-tz";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { PrivateEditorApi } from "@/lib/private";
 import { CalendarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { DatePicker, TZPicker, TimePicker } from "./pickers";

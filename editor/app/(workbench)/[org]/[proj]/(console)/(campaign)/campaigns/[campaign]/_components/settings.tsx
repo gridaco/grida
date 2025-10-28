@@ -51,7 +51,7 @@ import {
 import { toast } from "sonner";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
-import { Spinner } from "@/components/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
