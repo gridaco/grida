@@ -67,6 +67,16 @@ impl From<BlendMode> for skia_safe::BlendMode {
     }
 }
 
+impl Into<skia_safe::PaintCap> for StrokeCap {
+    fn into(self) -> skia_safe::PaintCap {
+        match self {
+            StrokeCap::Butt => skia_safe::PaintCap::Butt,
+            StrokeCap::Round => skia_safe::PaintCap::Round,
+            StrokeCap::Square => skia_safe::PaintCap::Square,
+        }
+    }
+}
+
 impl From<TextDecorationLine> for skia_safe::textlayout::TextDecoration {
     fn from(mode: TextDecorationLine) -> Self {
         match mode {

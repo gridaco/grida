@@ -514,6 +514,101 @@ impl std::ops::DerefMut for StrokeDashArray {
     }
 }
 
+/// Defines the shape of stroke endpoints (line caps).
+///
+/// `StrokeCap` determines how the ends of open paths are rendered when stroked.
+/// This only applies to open paths - closed paths join their endpoints seamlessly
+/// and do not use line caps.
+///
+/// # Variants
+///
+/// ## Butt
+/// The stroke ends exactly at the path endpoint with a flat edge perpendicular
+/// to the path direction. This is the default and most common cap style.
+///
+/// ```text
+/// ──────────
+/// ```
+///
+/// ## Round
+/// The stroke extends beyond the endpoint by half the stroke width, forming
+/// a semicircular cap. This creates smooth, rounded line endings.
+///
+/// ```text
+/// ──────────)
+/// ```
+///
+/// ## Square
+/// The stroke extends beyond the endpoint by half the stroke width with a
+/// rectangular cap. Similar to round but with square corners.
+///
+/// ```text
+/// ──────────┐
+/// ```
+///
+/// # Visual Comparison
+///
+/// For a horizontal line with 10px stroke width:
+/// - **Butt**: Line ends exactly at endpoint
+/// - **Round**: Line extends 5px beyond endpoint with semicircle
+/// - **Square**: Line extends 5px beyond endpoint with rectangle
+///
+/// # Common Use Cases
+///
+/// - **Butt**: Default for most graphics, clean joins with adjacent segments
+/// - **Round**: Smooth, friendly appearance for UI elements and illustrations
+/// - **Square**: Technical drawings, diagrams requiring precise rectangular caps
+///
+/// # Cross-Platform Equivalents
+///
+/// - **SVG**: [`stroke-linecap`](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linecap) attribute
+/// - **Canvas API**: [`CanvasRenderingContext2D.lineCap`](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineCap)
+/// - **Skia**: [`SkPaint::Cap`](https://api.skia.org/classSkPaint.html#a0f78de8559b795defba93171f6cb6333)
+/// - **Flutter**: [`StrokeCap`](https://api.flutter.dev/flutter/dart-ui/StrokeCap.html)
+/// - **Figma**: [`strokeCap`](https://www.figma.com/plugin-docs/api/properties/nodes-strokecap/)
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::StrokeCap;
+///
+/// // Default cap style
+/// let default_cap = StrokeCap::default();
+/// assert_eq!(default_cap, StrokeCap::Butt);
+///
+/// // Round caps for smooth appearance
+/// let smooth = StrokeCap::Round;
+/// ```
+///
+/// # Implementation Notes
+///
+/// - Only affects **open paths** (lines, polylines, arcs)
+/// - Has **no effect** on closed paths (rectangles, ellipses, closed polygons)
+/// - Applied during stroke geometry computation or direct Skia rendering
+///
+/// # See Also
+///
+/// - [`StrokeAlign`] - Controls stroke positioning relative to path
+/// - [`StrokeDashArray`] - Defines dash patterns for strokes
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+pub enum StrokeCap {
+    /// Flat edge perpendicular to the stroke direction (default)
+    #[serde(rename = "butt", alias = "none")]
+    Butt,
+    /// Semicircular cap extending beyond the endpoint
+    #[serde(rename = "round")]
+    Round,
+    /// Rectangular cap extending beyond the endpoint
+    #[serde(rename = "square")]
+    Square,
+}
+
+impl Default for StrokeCap {
+    fn default() -> Self {
+        StrokeCap::Butt
+    }
+}
+
 /// Stroke alignment.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
