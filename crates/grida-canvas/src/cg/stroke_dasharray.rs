@@ -17,7 +17,7 @@
 /// # Common Patterns
 ///
 /// ```rust
-/// use cg::cg::types::StrokeDashArray;
+/// use cg::cg::prelude::*;
 ///
 /// // Solid line (empty array = no dashing)
 /// let solid = StrokeDashArray(vec![]);
@@ -57,7 +57,7 @@
 /// # Example: Complex Pattern
 ///
 /// ```rust
-/// use cg::cg::types::StrokeDashArray;
+/// use cg::cg::prelude::*;
 ///
 /// // Railroad track pattern: long-short-long with gaps
 /// let railroad = StrokeDashArray(vec![
@@ -124,9 +124,9 @@ impl StrokeDashArray {
     /// # Examples
     ///
     /// ```
-    /// # use cg::cg::types::StrokeDashArray;
+    /// use cg::cg::prelude::*;
     /// // Empty → solid
-    /// assert_eq!(StrokeDashArray(vec![]).normalized(), vec![]);
+    /// assert_eq!(StrokeDashArray(vec![]).normalized(), Vec::<f32>::new());
     ///
     /// // Even-length pattern → unchanged
     /// assert_eq!(StrokeDashArray(vec![10.0, 5.0]).normalized(), vec![10.0, 5.0]);
@@ -139,12 +139,12 @@ impl StrokeDashArray {
     /// );
     ///
     /// // Invalid (negative) → empty
-    /// assert_eq!(StrokeDashArray(vec![-1.0, 4.0]).normalized(), vec![]);
-    /// assert_eq!(StrokeDashArray(vec![4.0, -1.0]).normalized(), vec![]);
+    /// assert_eq!(StrokeDashArray(vec![-1.0, 4.0]).normalized(), Vec::<f32>::new());
+    /// assert_eq!(StrokeDashArray(vec![4.0, -1.0]).normalized(), Vec::<f32>::new());
     ///
     /// // All-zero dashes → invisible (empty)
-    /// assert_eq!(StrokeDashArray(vec![0.0, 4.0]).normalized(), vec![]);
-    /// assert_eq!(StrokeDashArray(vec![0.0, 2.0, 0.0]).normalized(), vec![]);
+    /// assert_eq!(StrokeDashArray(vec![0.0, 4.0]).normalized(), Vec::<f32>::new());
+    /// assert_eq!(StrokeDashArray(vec![0.0, 2.0, 0.0]).normalized(), Vec::<f32>::new());
     ///
     /// // Zero gaps → valid (solid regions)
     /// assert_eq!(StrokeDashArray(vec![4.0, 0.0]).normalized(), vec![4.0, 0.0]);
