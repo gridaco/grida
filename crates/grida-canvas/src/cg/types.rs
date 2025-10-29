@@ -993,6 +993,11 @@ impl CornerSmoothing {
     pub fn value(self) -> f32 {
         self.0
     }
+
+    #[inline]
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
 }
 
 impl Default for CornerSmoothing {

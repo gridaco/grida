@@ -23,6 +23,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                     height: 100.0,
                 },
                 corner_radius: RectangularCornerRadius::zero(),
+                corner_smoothing: CornerSmoothing::default(),
                 fills: Paints::new([Paint::from(CGColor(255, 0, 0, 255))]),
                 strokes: Paints::default(),
                 stroke_width: 1.0,

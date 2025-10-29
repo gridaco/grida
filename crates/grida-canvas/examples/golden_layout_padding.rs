@@ -30,6 +30,7 @@ fn create_container_with_padding(
         rotation: 0.0,
         position: Default::default(),
         corner_radius: Default::default(),
+        corner_smoothing: Default::default(),
         fills: Default::default(),
         strokes: Default::default(),
         stroke_width: 0.0,

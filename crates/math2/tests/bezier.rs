@@ -1,16 +1,5 @@
 use math2::bezier_a2c;
 
-/// Converts the output of `bezier_a2c` to an SVG path string.
-fn a2c_to_svg_path(x1: f32, y1: f32, data: &[f32]) -> String {
-    let mut path = format!("M {} {}", x1, y1);
-    for chunk in data.chunks(6) {
-        if let [c1x, c1y, c2x, c2y, x, y] = *chunk {
-            path.push_str(&format!(" C {} {}, {} {}, {} {}", c1x, c1y, c2x, c2y, x, y));
-        }
-    }
-    path
-}
-
 /// Helper to prepend the start point to the cubic bezier points.
 fn get_bezier_points(x1: f32, y1: f32, data: &[f32]) -> Vec<f32> {
     let mut out = Vec::with_capacity(2 + data.len());
@@ -19,6 +8,17 @@ fn get_bezier_points(x1: f32, y1: f32, data: &[f32]) -> Vec<f32> {
     out.extend_from_slice(data);
     out
 }
+
+// /// Converts the output of `bezier_a2c` to an SVG path string.
+// fn a2c_to_svg_path(x1: f32, y1: f32, data: &[f32]) -> String {
+//     let mut path = format!("M {} {}", x1, y1);
+//     for chunk in data.chunks(6) {
+//         if let [c1x, c1y, c2x, c2y, x, y] = *chunk {
+//             path.push_str(&format!(" C {} {}, {} {}, {} {}", c1x, c1y, c2x, c2y, x, y));
+//         }
+//     }
+//     path
+// }
 
 // enable this later. for some reason, the output path data has percision differences in different machines.
 // #[test]

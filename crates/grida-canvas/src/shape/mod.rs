@@ -8,6 +8,7 @@ pub mod rect;
 pub mod regular_polygon;
 pub mod regular_star;
 pub mod rrect;
+pub mod srrect_orthogonal;
 pub mod stroke;
 pub mod stroke_varwidth;
 pub mod vector;
@@ -22,6 +23,7 @@ pub use rect::*;
 pub use regular_polygon::*;
 pub use regular_star::*;
 pub use rrect::*;
+pub use srrect_orthogonal::*;
 pub use stroke::*;
 pub use stroke_varwidth::*;
 pub use vector::*;
@@ -29,7 +31,9 @@ pub use vector::*;
 use crate::vectornetwork::*;
 
 pub enum Shape {
+    Rect(RectShape),
     RRect(RRectShape),
+    OrthogonalSmoothRRect(OrthogonalSmoothRRectShape),
     SimplePolygon(SimplePolygonShape),
     Ellipse(EllipseShape),
     EllipticalRingSector(EllipticalRingSectorShape),
@@ -42,7 +46,9 @@ pub enum Shape {
 impl Into<skia_safe::Path> for &Shape {
     fn into(self) -> skia_safe::Path {
         match self {
+            Shape::Rect(shape) => shape.into(),
             Shape::RRect(shape) => build_rrect_path(&shape),
+            Shape::OrthogonalSmoothRRect(shape) => build_orthogonal_smooth_rrect_path(&shape),
             Shape::SimplePolygon(shape) => build_simple_polygon_path(&shape),
             Shape::Ellipse(shape) => build_ellipse_path(&shape),
             Shape::EllipticalRingSector(shape) => build_ring_sector_path(&shape),
@@ -54,11 +60,14 @@ impl Into<skia_safe::Path> for &Shape {
     }
 }
 
-impl Shape {
-    /// Convert this shape into a [`VectorNetwork`].
-    pub fn to_vector_network(&self) -> VectorNetwork {
+impl Into<VectorNetwork> for &Shape {
+    fn into(self) -> VectorNetwork {
         match self {
+            Shape::Rect(shape) => build_rect_vector_network(shape),
             Shape::RRect(shape) => build_rrect_vector_network(shape),
+            Shape::OrthogonalSmoothRRect(shape) => {
+                build_orthogonal_smooth_rrect_vector_network(shape)
+            }
             Shape::SimplePolygon(shape) => build_simple_polygon_vector_network(shape),
             Shape::Ellipse(shape) => build_ellipse_vector_network(shape),
             Shape::EllipticalRingSector(_shape) => {

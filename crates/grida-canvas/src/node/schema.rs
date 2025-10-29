@@ -6,7 +6,6 @@ use crate::shape::*;
 use crate::vectornetwork::*;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
-
 // Re-export the ID types from the id module
 pub use crate::node::id::{NodeId, NodeIdGenerator, UserNodeId};
 
@@ -850,6 +849,7 @@ pub struct ContainerNodeRec {
     pub layout_child: Option<LayoutChildStyle>,
 
     pub corner_radius: RectangularCornerRadius,
+    pub corner_smoothing: CornerSmoothing,
     pub fills: Paints,
     pub strokes: Paints,
     pub stroke_width: f32,
@@ -960,16 +960,6 @@ pub struct RectangleNodeRec {
     pub layout_child: Option<LayoutChildStyle>,
 }
 
-impl RectangleNodeRec {
-    pub fn to_own_shape(&self) -> RRectShape {
-        RRectShape {
-            width: self.size.width,
-            height: self.size.height,
-            corner_radius: self.corner_radius,
-        }
-    }
-}
-
 impl NodeFillsMixin for RectangleNodeRec {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = Paints::new([fill]);
@@ -1017,15 +1007,33 @@ impl NodeGeometryMixin for RectangleNodeRec {
 
 impl NodeShapeMixin for RectangleNodeRec {
     fn to_shape(&self) -> Shape {
-        Shape::RRect(self.to_own_shape())
+        if self.corner_radius.is_zero() {
+            return Shape::Rect(RectShape {
+                width: self.size.width,
+                height: self.size.height,
+            });
+        }
+        if self.corner_smoothing.is_zero() {
+            return Shape::RRect(RRectShape {
+                width: self.size.width,
+                height: self.size.height,
+                corner_radius: self.corner_radius,
+            });
+        }
+        return Shape::OrthogonalSmoothRRect(OrthogonalSmoothRRectShape {
+            width: self.size.width,
+            height: self.size.height,
+            corner_radius: self.corner_radius,
+            corner_smoothing: self.corner_smoothing,
+        });
     }
 
     fn to_path(&self) -> skia_safe::Path {
-        build_rrect_path(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_rrect_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 
@@ -1077,6 +1085,7 @@ pub struct ImageNodeRec {
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
+    pub corner_smoothing: CornerSmoothing,
     /// Single image fill - intentionally not supporting multiple fills to align with
     /// web development patterns where `<img>` elements have one image source.
     pub fill: ImagePaint,
@@ -1240,7 +1249,7 @@ impl NodeShapeMixin for EllipseNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        self.to_shape().to_vector_network()
+        (&self.to_shape()).into()
     }
 }
 
