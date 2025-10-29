@@ -6,6 +6,7 @@ import { PaintControl } from "../controls/paint";
 import { StrokeWidthControl } from "../controls/stroke-width";
 import { StrokeAlignControl } from "../controls/stroke-align";
 import { StrokeCapControl } from "../controls/stroke-cap";
+import { StrokeClassControl, StrokeClass } from "../controls/stroke-class";
 import { StrokeDashArrayControl } from "../controls/stroke-dasharray";
 import {
   useBackendState,
@@ -58,6 +59,28 @@ export function SectionStrokes({
       : [];
   const has_stroke_paint = paints.length > 0;
   const actions = useNodeActions(node_id)!;
+
+  // Derive stroke class from dash array
+  const strokeClass: StrokeClass =
+    strokeDashArray &&
+    Array.isArray(strokeDashArray) &&
+    strokeDashArray.length > 0
+      ? "dashed"
+      : "solid";
+
+  // Handle stroke class change
+  const handleStrokeClassChange = React.useCallback(
+    (newClass: StrokeClass) => {
+      if (newClass === "solid") {
+        // Solid → clear dash array
+        actions.strokeDashArray(undefined);
+      } else {
+        // Dashed → set default pattern
+        actions.strokeDashArray([2]);
+      }
+    },
+    [actions]
+  );
 
   const handleAddStroke = React.useCallback(() => {
     const paint: cg.Paint = {
@@ -118,6 +141,13 @@ export function SectionStrokes({
         <StrokeCapControl value={strokeCap} onValueChange={actions.strokeCap} />
       </PropertyLine>
       <PropertyLine>
+        <PropertyLineLabel>Style</PropertyLineLabel>
+        <StrokeClassControl
+          value={strokeClass}
+          onValueChange={handleStrokeClassChange}
+        />
+      </PropertyLine>
+      <PropertyLine hidden={!strokeDashArray || strokeDashArray.length === 0}>
         <PropertyLineLabel>Dash</PropertyLineLabel>
         <StrokeDashArrayControl
           value={strokeDashArray}
