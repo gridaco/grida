@@ -1622,6 +1622,17 @@ class EditorDocumentStore
     });
   }
 
+  changeNodePropertyStrokeDashArray(
+    node_id: string,
+    strokeDashArray: number[] | undefined
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeDashArray,
+    });
+  }
+
   changeNodePropertyFit(node_id: string, fit: cg.BoxFit) {
     this.dispatch({
       type: "node/change/*",

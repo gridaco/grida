@@ -434,6 +434,22 @@ const safe_properties: Partial<
       (draft as UN).strokeCap = value;
     },
   }),
+  strokeDashArray: defineNodeProperty<"strokeDashArray">({
+    assert: (node) =>
+      node.type === "vector" ||
+      node.type === "line" ||
+      node.type === "rectangle" ||
+      node.type === "ellipse" ||
+      node.type === "polygon" ||
+      node.type === "star" ||
+      node.type === "svgpath" ||
+      node.type === "image" ||
+      node.type === "container" ||
+      node.type === "boolean",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeDashArray = value;
+    },
+  }),
   feShadows: defineNodeProperty<"feShadows">({
     apply: (draft, value, prev) => {
       (draft as UN).feShadows = value?.map((s) => ({

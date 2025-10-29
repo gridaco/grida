@@ -2968,6 +2968,10 @@ export namespace editor.api {
       node_id: NodeID,
       strokeAlign: cg.StrokeAlign
     ): void;
+    changeNodePropertyStrokeDashArray(
+      node_id: NodeID,
+      strokeDashArray: number[] | undefined
+    ): void;
     changeNodePropertyFit(node_id: NodeID, fit: cg.BoxFit): void;
 
     addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;

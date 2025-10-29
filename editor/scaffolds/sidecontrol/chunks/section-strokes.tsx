@@ -6,6 +6,7 @@ import { PaintControl } from "../controls/paint";
 import { StrokeWidthControl } from "../controls/stroke-width";
 import { StrokeAlignControl } from "../controls/stroke-align";
 import { StrokeCapControl } from "../controls/stroke-cap";
+import { StrokeDashArrayControl } from "../controls/stroke-dasharray";
 import {
   useBackendState,
   useNodeActions,
@@ -26,15 +27,23 @@ export function SectionStrokes({
   };
 }) {
   const backend = useBackendState();
-  const { stroke, strokes, strokeWidth, strokeAlign, strokeCap, type } =
-    useNodeState(node_id, (node) => ({
-      stroke: node.stroke,
-      strokes: node.strokes,
-      strokeWidth: node.strokeWidth,
-      strokeAlign: node.strokeAlign,
-      strokeCap: node.strokeCap,
-      type: node.type,
-    }));
+  const {
+    stroke,
+    strokes,
+    strokeWidth,
+    strokeAlign,
+    strokeCap,
+    strokeDashArray,
+    type,
+  } = useNodeState(node_id, (node) => ({
+    stroke: node.stroke,
+    strokes: node.strokes,
+    strokeWidth: node.strokeWidth,
+    strokeAlign: node.strokeAlign,
+    strokeCap: node.strokeCap,
+    strokeDashArray: node.strokeDashArray,
+    type: node.type,
+  }));
 
   const is_text_node = type === "text";
   const isCanvasBackend = backend === "canvas";
@@ -107,6 +116,13 @@ export function SectionStrokes({
       <PropertyLine hidden={config.stroke_cap === "off"}>
         <PropertyLineLabel>Cap</PropertyLineLabel>
         <StrokeCapControl value={strokeCap} onValueChange={actions.strokeCap} />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabel>Dash</PropertyLineLabel>
+        <StrokeDashArrayControl
+          value={strokeDashArray}
+          onValueCommit={actions.strokeDashArray}
+        />
       </PropertyLine>
     </div>
   );
