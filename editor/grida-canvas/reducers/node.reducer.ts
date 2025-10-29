@@ -329,6 +329,11 @@ const safe_properties: Partial<
       (draft as UN).cornerRadiusBottomLeft = value;
     },
   }),
+  cornerSmoothing: defineNodeProperty<"cornerSmoothing">({
+    apply: (draft, value, prev) => {
+      (draft as UN).cornerSmoothing = value;
+    },
+  }),
   pointCount: defineNodeProperty<"pointCount">({
     assert: (node) => typeof node.pointCount === "number",
     apply: (draft, value, prev) => {

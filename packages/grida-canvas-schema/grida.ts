@@ -1479,6 +1479,7 @@ export namespace grida.program.nodes {
       cornerRadiusTopRight?: number;
       cornerRadiusBottomLeft?: number;
       cornerRadiusBottomRight?: number;
+      cornerSmoothing?: number;
     }
 
     /**

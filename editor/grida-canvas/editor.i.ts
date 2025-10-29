@@ -2940,6 +2940,10 @@ export namespace editor.api {
       node_id: NodeID,
       cornerRadius: cg.CornerRadius
     ): void;
+    changeNodePropertyCornerSmoothing(
+      node_id: NodeID,
+      cornerSmoothing: number
+    ): void;
     changeNodePropertyCornerRadiusWithDelta(
       node_id: NodeID,
       delta: number

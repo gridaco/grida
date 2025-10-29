@@ -1662,6 +1662,17 @@ class EditorDocumentStore
     }
   }
 
+  changeNodePropertyCornerSmoothing(
+    node_id: editor.NodeID,
+    cornerSmoothing: number
+  ): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      cornerSmoothing,
+    });
+  }
+
   changeNodePropertyCornerRadiusWithDelta(
     node_id: string,
     delta: number
@@ -4280,7 +4291,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
       node_id: this.node_id,
       rotation: value,
     });
-  }
+  };
 
   /**
    * {@link grida.program.nodes.UnknwonNode#opacity}
