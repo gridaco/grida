@@ -84,65 +84,90 @@ impl StrokeDashArray {
 
     /// Returns an **SVG-compatible, render-ready** dash pattern derived from this array.
     ///
-    /// The returned vector is safe to pass to low-level stroke dash APIs (e.g. Skia's
-    /// `PathEffect::dash`) and follows SVG's normalization rules:
+    /// This method normalizes the dash array following SVG `stroke-dasharray` rules,
+    /// producing a pattern safe to pass to Skia's `PathEffect::dash` or similar APIs.
     ///
-    /// ### Normalization rules
-    /// 1. **Filter negative values**: Only negative values are removed (zeros are valid).
-    ///    - Rationale: Negative lengths are invalid; zeros represent invisible dashes or no gaps per SVG spec.
-    /// 2. **Empty after filtering ⇒ solid**: If no values remain, returns an empty
-    ///    vector (`[]`), which conventionally means "no dashing" (solid stroke).
-    /// 3. **All-zero dashes ⇒ invisible**: If all dash lengths (even indices) are zero, returns `[]` (no visible stroke).
-    /// 4. **Odd-length duplication**: If the resulting list has an **odd** count, it is
-    ///    **concatenated with itself once** to make the count **even**.
-    ///    - Examples:
-    ///      - `[5.0]` → `[5.0, 5.0]` (5 on, 5 off)
-    ///      - `[10.0, 5.0, 2.0]` → `[10.0, 5.0, 2.0, 10.0, 5.0, 2.0]`
+    /// # Normalization Rules
     ///
-    /// These rules mirror the SVG `stroke-dasharray` behavior and produce a pattern with
-    /// a stable **on/off alternation**, which many rasterizers (including Skia) require.
+    /// 1. **Invalid input → empty (solid)**: If any value is negative, returns `[]` (renders as solid).
+    ///    - Rationale: Per SVG spec, negative values are invalid and disable dashing.
     ///
-    /// ### Notes
-    /// - This method **does not modify** the original `StrokeDashArray`.
-    /// - The returned values are **absolute logical pixels**. If your renderer expects a
-    ///   different unit system (e.g., scaled by stroke width), convert accordingly.
-    /// - If you also manage a *dash offset / phase*, normalize it separately with the sum
-    ///   of this returned pattern's values.
+    /// 2. **Empty input → empty output**: `[]` → `[]` (solid stroke, no dashing).
     ///
-    /// ### Examples
+    /// 3. **All-zero dashes → empty (invisible)**: If all dash lengths (even indices) are zero,
+    ///    returns `[]` (no visible segments).
+    ///    - Example: `[0, 4]` → `[]` (0-length dashes = invisible)
+    ///    - Example: `[0, 2, 0]` → `[]` after odd-duplication would be `[0, 2, 0, 0, 2, 0]`, all dashes zero
+    ///
+    /// 4. **Odd-length → duplicate**: Odd-length arrays are concatenated with themselves.
+    ///    - Example: `[5]` → `[5, 5]` (5px dash, 5px gap)
+    ///    - Example: `[10, 5, 2]` → `[10, 5, 2, 10, 5, 2]`
+    ///    - Rationale: SVG/Canvas require even-length patterns for dash/gap alternation.
+    ///
+    /// # Zero Handling (SVG-compliant)
+    ///
+    /// Zeros are **valid** per SVG specification:
+    /// - **Zero dash length** (even index): Invisible segment, contributes to pattern rhythm
+    /// - **Zero gap length** (odd index): No gap between dashes (effectively solid in that region)
+    ///
+    /// Examples:
+    /// - `[4, 0]` → `[4, 0]` = solid stroke (4px dash, no gap)
+    /// - `[0, 4]` → `[]` = invisible (all dashes are zero-length)
+    /// - `[10, 0, 2, 5]` → `[10, 0, 2, 5]` = 10px dash, no gap, 2px dash, 5px gap
+    ///
+    /// # Performance Notes
+    ///
+    /// - Does not modify the original `StrokeDashArray`
+    /// - Allocates a new `Vec<f32>` for the normalized pattern
+    /// - Typically called once per stroke during rendering
+    ///
+    /// # Examples
+    ///
     /// ```
     /// # use cg::cg::types::StrokeDashArray;
-    /// // Solid stroke: empty input stays empty
+    /// // Empty → solid
     /// assert_eq!(StrokeDashArray(vec![]).normalized(), vec![]);
     ///
-    /// // Positive even-length pattern passes through
+    /// // Even-length pattern → unchanged
     /// assert_eq!(StrokeDashArray(vec![10.0, 5.0]).normalized(), vec![10.0, 5.0]);
     ///
-    /// // Single value duplicates to make an even on/off pair
+    /// // Odd-length → duplicate
     /// assert_eq!(StrokeDashArray(vec![8.0]).normalized(), vec![8.0, 8.0]);
-    ///
-    /// // Odd-length list is duplicated once
     /// assert_eq!(
     ///     StrokeDashArray(vec![10.0, 5.0, 2.0]).normalized(),
     ///     vec![10.0, 5.0, 2.0, 10.0, 5.0, 2.0]
     /// );
     ///
-    /// // Negatives are dropped; all-zero dashes → invisible
-    /// assert_eq!(StrokeDashArray(vec![0.0, -1.0]).normalized(), vec![]);
+    /// // Invalid (negative) → empty
+    /// assert_eq!(StrokeDashArray(vec![-1.0, 4.0]).normalized(), vec![]);
+    /// assert_eq!(StrokeDashArray(vec![4.0, -1.0]).normalized(), vec![]);
     ///
-    /// // Zeros with positive values → kept and normalized
+    /// // All-zero dashes → invisible (empty)
+    /// assert_eq!(StrokeDashArray(vec![0.0, 4.0]).normalized(), vec![]);
     /// assert_eq!(StrokeDashArray(vec![0.0, 2.0, 0.0]).normalized(), vec![]);
+    ///
+    /// // Zero gaps → valid (solid regions)
+    /// assert_eq!(StrokeDashArray(vec![4.0, 0.0]).normalized(), vec![4.0, 0.0]);
     /// ```
+    ///
+    /// # See Also
+    ///
+    /// - [SVG stroke-dasharray specification](https://www.w3.org/TR/SVG2/painting.html#StrokeDashing)
+    /// - [MDN stroke-dasharray](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray)
     pub fn normalized(&self) -> Vec<f32> {
-        // 1) Filter only negatives (zeros are valid per SVG spec)
-        let mut v: Vec<f32> = self.0.iter().copied().filter(|x| *x >= 0.0).collect();
+        // 1) Reject any negative values (invalid per SVG spec)
+        if self.0.iter().any(|&x| x < 0.0) {
+            return vec![]; // Invalid input → solid stroke
+        }
+
+        let mut v = self.0.clone();
 
         // 2) Empty → solid stroke
         if v.is_empty() {
             return v;
         }
 
-        // 3) Optimization: if all dash lengths (even indices) are zero, return empty (invisible)
+        // 3) If all dash lengths (even indices) are zero → invisible (empty)
         if v.iter().step_by(2).all(|&x| x == 0.0) {
             return vec![];
         }
@@ -225,5 +250,148 @@ impl std::ops::Deref for StrokeDashArray {
 impl std::ops::DerefMut for StrokeDashArray {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_array() {
+        // Empty array → solid stroke (no normalization needed)
+        assert_eq!(StrokeDashArray(vec![]).normalized(), Vec::<f32>::new());
+    }
+
+    #[test]
+    fn test_even_length_positive_values() {
+        // Even-length arrays with positive values pass through unchanged
+        assert_eq!(
+            StrokeDashArray(vec![10.0, 5.0]).normalized(),
+            vec![10.0, 5.0]
+        );
+        assert_eq!(
+            StrokeDashArray(vec![4.0, 2.0, 8.0, 3.0]).normalized(),
+            vec![4.0, 2.0, 8.0, 3.0]
+        );
+    }
+
+    #[test]
+    fn test_odd_length_duplication() {
+        // Single value → duplicate to [value, value]
+        assert_eq!(StrokeDashArray(vec![5.0]).normalized(), vec![5.0, 5.0]);
+        assert_eq!(StrokeDashArray(vec![8.0]).normalized(), vec![8.0, 8.0]);
+
+        // Odd-length (3) → duplicate to (6)
+        assert_eq!(
+            StrokeDashArray(vec![10.0, 5.0, 2.0]).normalized(),
+            vec![10.0, 5.0, 2.0, 10.0, 5.0, 2.0]
+        );
+
+        // Odd-length (5) → duplicate to (10)
+        assert_eq!(
+            StrokeDashArray(vec![1.0, 2.0, 3.0, 4.0, 5.0]).normalized(),
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+        );
+    }
+
+    #[test]
+    fn test_negative_values_invalid() {
+        // Any negative value → invalid → empty (solid)
+        let empty: Vec<f32> = vec![];
+        assert_eq!(StrokeDashArray(vec![-1.0]).normalized(), empty);
+        assert_eq!(StrokeDashArray(vec![-1.0, 4.0]).normalized(), empty);
+        assert_eq!(StrokeDashArray(vec![4.0, -1.0]).normalized(), empty);
+        assert_eq!(StrokeDashArray(vec![10.0, 5.0, -2.0]).normalized(), empty);
+        assert_eq!(StrokeDashArray(vec![-1.0, -2.0, -3.0]).normalized(), empty);
+    }
+
+    #[test]
+    fn test_zero_dash_lengths_invisible() {
+        // All dash lengths (even indices) are zero → invisible → empty
+        let empty: Vec<f32> = vec![];
+        assert_eq!(StrokeDashArray(vec![0.0, 4.0]).normalized(), empty);
+        assert_eq!(StrokeDashArray(vec![0.0, 10.0]).normalized(), empty);
+
+        // Odd-length: [0, 2, 0] would duplicate to [0, 2, 0, 0, 2, 0]
+        // All even indices (0, 2, 4) are zero → invisible
+        assert_eq!(StrokeDashArray(vec![0.0, 2.0, 0.0]).normalized(), empty);
+
+        // Even all zeros → invisible
+        assert_eq!(StrokeDashArray(vec![0.0, 0.0]).normalized(), empty);
+        assert_eq!(
+            StrokeDashArray(vec![0.0, 5.0, 0.0, 10.0]).normalized(),
+            empty
+        );
+    }
+
+    #[test]
+    fn test_zero_gaps_valid() {
+        // Zero gaps (odd indices) are valid → creates solid regions
+        // [4, 0] is even-length, stays as-is (no duplication)
+        assert_eq!(StrokeDashArray(vec![4.0, 0.0]).normalized(), vec![4.0, 0.0]);
+        assert_eq!(
+            StrokeDashArray(vec![10.0, 0.0, 2.0, 5.0]).normalized(),
+            vec![10.0, 0.0, 2.0, 5.0]
+        );
+
+        // Mixed: some gaps zero, some not
+        assert_eq!(
+            StrokeDashArray(vec![8.0, 0.0, 4.0, 2.0]).normalized(),
+            vec![8.0, 0.0, 4.0, 2.0]
+        );
+
+        // Odd-length with zero gap → duplicates
+        assert_eq!(
+            StrokeDashArray(vec![5.0, 0.0, 3.0]).normalized(),
+            vec![5.0, 0.0, 3.0, 5.0, 0.0, 3.0]
+        );
+    }
+
+    #[test]
+    fn test_mixed_zeros_and_positives() {
+        // Zero as first gap (odd index after duplication)
+        assert_eq!(
+            StrokeDashArray(vec![5.0, 0.0, 3.0]).normalized(),
+            vec![5.0, 0.0, 3.0, 5.0, 0.0, 3.0]
+        );
+
+        // Some dashes zero, some positive → as long as ANY dash > 0, it's visible
+        assert_eq!(
+            StrokeDashArray(vec![0.0, 4.0, 8.0, 2.0]).normalized(),
+            vec![0.0, 4.0, 8.0, 2.0]
+        );
+    }
+
+    #[test]
+    fn test_ui_common_patterns() {
+        // UI sends single value → duplicate for dash-gap pair
+        assert_eq!(StrokeDashArray(vec![5.0]).normalized(), vec![5.0, 5.0]);
+
+        // UI sends dash and gap separately
+        assert_eq!(
+            StrokeDashArray(vec![10.0, 5.0]).normalized(),
+            vec![10.0, 5.0]
+        );
+
+        // User clears dash → invalid/empty
+        assert_eq!(StrokeDashArray(vec![]).normalized(), Vec::<f32>::new());
+    }
+
+    #[test]
+    fn test_svg_spec_edge_cases() {
+        let empty: Vec<f32> = vec![];
+
+        // SVG spec: "0 0" → all dashes zero → invisible
+        assert_eq!(StrokeDashArray(vec![0.0, 0.0]).normalized(), empty);
+
+        // SVG spec: "5 0" → solid (no gaps), even-length stays as-is
+        assert_eq!(StrokeDashArray(vec![5.0, 0.0]).normalized(), vec![5.0, 0.0]);
+
+        // SVG spec: "0 5" → invisible (zero-length dashes)
+        assert_eq!(StrokeDashArray(vec![0.0, 5.0]).normalized(), empty);
+
+        // SVG spec: "5" → "5 5" (odd-length duplicates)
+        assert_eq!(StrokeDashArray(vec![5.0]).normalized(), vec![5.0, 5.0]);
     }
 }
