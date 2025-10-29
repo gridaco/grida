@@ -23,7 +23,7 @@
 //! // MyNode { width: CSSDimension::Auto, height: CSSDimension::LengthPX(100.0) }
 //! ```
 
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
 

@@ -2,7 +2,7 @@ use super::geometry::{
     boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes, PainterShape,
 };
 use crate::cache::scene::SceneCache;
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use crate::shape::*;

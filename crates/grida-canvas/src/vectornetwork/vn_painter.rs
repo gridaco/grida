@@ -1,4 +1,4 @@
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::cg::varwidth::*;
 use crate::painter::paint;
 use crate::runtime::image_repository::ImageRepository;
