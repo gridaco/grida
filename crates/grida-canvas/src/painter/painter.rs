@@ -449,7 +449,7 @@ impl<'a> Painter<'a> {
         strokes: &[Paint],
         stroke_width: f32,
         stroke_align: StrokeAlign,
-        stroke_dash_array: Option<&Vec<f32>>,
+        stroke_dash_array: Option<&StrokeDashArray>,
     ) {
         if stroke_width <= 0.0 || strokes.is_empty() {
             return;

@@ -49,7 +49,7 @@ async fn demo_lines() -> Scene {
     };
     line_dashed.strokes = Paints::new([Paint::from(CGColor(0, 0, 255, 255))]);
     line_dashed.stroke_width = 4.0;
-    line_dashed.stroke_dash_array = Some(vec![10.0, 5.0]);
+    line_dashed.stroke_dash_array = Some([10.0, 5.0].into());
 
     // Gradient stroke line
     let mut line_gradient = nf.create_line_node();

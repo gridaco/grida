@@ -73,7 +73,18 @@ impl Default for LayerEffects {
 pub struct StrokeStyle {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
+}
+
+pub struct RectangularStrokeStyle {
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<StrokeDashArray>,
+
+    pub stroke_width: Option<f32>,
+    pub stroke_top_width: Option<f32>,
+    pub stroke_right_width: Option<f32>,
+    pub stroke_bottom_width: Option<f32>,
+    pub stroke_left_width: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -143,7 +154,7 @@ pub struct UnknownNodeProperties {
     /// The stroke align used to outline the shape.
     pub stroke_align: StrokeAlign,
     /// The stroke dash array used to outline the shape.
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// The effects applied to the shape.
     pub effects: LayerEffects,
@@ -854,7 +865,7 @@ pub struct ContainerNodeRec {
     pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 
     pub effects: LayerEffects,
     /// Content-only clipping switch.
@@ -953,7 +964,7 @@ pub struct RectangleNodeRec {
     pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
     pub effects: LayerEffects,
 
     /// Layout style for this node when it is a child of a layout container.
@@ -1051,7 +1062,7 @@ pub struct LineNodeRec {
     pub strokes: Paints,
     pub stroke_width: f32,
     pub _data_stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
@@ -1092,7 +1103,7 @@ pub struct ImageNodeRec {
     pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
     pub image: ResourceRef,
 
     /// Layout style for this node when it is a child of a layout container.
@@ -1181,7 +1192,7 @@ pub struct EllipseNodeRec {
     pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// inner radius - 0 ~ 1
     pub inner_radius: Option<f32>,
@@ -1304,7 +1315,7 @@ pub struct BooleanPathOperationNodeRec {
     pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 }
 
 impl NodeFillsMixin for BooleanPathOperationNodeRec {
@@ -1351,7 +1362,7 @@ pub struct VectorNodeRec {
     /// Requested stroke alignment. For open paths, `Inside` and `Outside`
     /// alignments are treated as `Center`.
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
@@ -1420,7 +1431,7 @@ pub struct SVGPathNodeRec {
     pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
@@ -1519,7 +1530,7 @@ pub struct PolygonNodeRec {
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
@@ -1641,7 +1652,7 @@ pub struct RegularPolygonNodeRec {
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
@@ -1735,6 +1746,7 @@ impl NodeShapeMixin for RegularPolygonNodeRec {
 pub struct RegularStarPolygonNodeRec {
     pub active: bool,
 
+    /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: LayerBlendMode,
     pub mask: Option<LayerMaskType>,
@@ -1771,8 +1783,7 @@ pub struct RegularStarPolygonNodeRec {
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
-    /// Overall node opacity (0.0–1.0)
-    pub stroke_dash_array: Option<Vec<f32>>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,

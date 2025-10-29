@@ -203,10 +203,10 @@ async fn demo_strokes() -> Scene {
 
         // Add different dash patterns
         rect.stroke_dash_array = match i {
-            0 => Some(vec![5.0, 5.0]),           // Basic dashed line
-            1 => Some(vec![10.0, 5.0]),          // Longer dashes
-            2 => Some(vec![5.0, 5.0, 1.0, 5.0]), // Dash-dot pattern
-            3 => Some(vec![1.0, 1.0]),           // Dotted line
+            0 => Some([5.0, 5.0].into()),           // Basic dashed line
+            1 => Some([10.0, 5.0].into()),          // Longer dashes
+            2 => Some([5.0, 5.0, 1.0, 5.0].into()), // Dash-dot pattern
+            3 => Some([1.0, 1.0].into()),           // Dotted line
             _ => unreachable!(),
         };
 
@@ -326,7 +326,7 @@ async fn demo_strokes() -> Scene {
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
         rect.strokes = Paints::new([Paint::from(CGColor(255, 128, 0, 255))]);
         rect.stroke_width = 8.0;
-        rect.stroke_dash_array = Some(vec![20.0, 10.0, 5.0, 10.0]); // Complex dash pattern
+        rect.stroke_dash_array = Some([20.0, 10.0, 5.0, 10.0].into()); // Complex dash pattern
         graph.append_child(
             Node::Rectangle(rect),
             Parent::NodeId(root_container_id.clone()),
@@ -484,7 +484,7 @@ async fn demo_strokes() -> Scene {
             }),
         ]);
         polygon.stroke_width = 15.0; // Very thick to show all layers
-        polygon.stroke_dash_array = Some(vec![8.0, 4.0]); // Dashed pattern
+        polygon.stroke_dash_array = Some([8.0, 4.0].into()); // Dashed pattern
         graph.append_child(
             Node::RegularPolygon(polygon),
             Parent::NodeId(root_container_id.clone()),
