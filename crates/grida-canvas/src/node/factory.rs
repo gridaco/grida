@@ -62,9 +62,11 @@ impl NodeFactory {
             corner_smoothing: Default::default(),
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             strokes: Paints::default(),
-            stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: Self::DEFAULT_STROKE_WIDTH,
+                stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_dash_array: None,
+            },
             effects: LayerEffects::default(),
             layout_child: None,
         }
@@ -85,9 +87,11 @@ impl NodeFactory {
             angle: None,
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             strokes: Paints::default(),
-            stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: Self::DEFAULT_STROKE_WIDTH,
+                stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_dash_array: None,
+            },
             corner_radius: None,
             layout_child: None,
         }
@@ -163,9 +167,11 @@ impl NodeFactory {
             corner_smoothing: Default::default(),
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             strokes: Default::default(),
-            stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: Self::DEFAULT_STROKE_WIDTH,
+                stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_dash_array: None,
+            },
             effects: Default::default(),
             clip: true,
             layout_container: LayoutContainerStyle {
@@ -219,9 +225,11 @@ impl NodeFactory {
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             data: String::new(),
             strokes: Paints::default(),
-            stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: Self::DEFAULT_STROKE_WIDTH,
+                stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_dash_array: None,
+            },
             layout_child: None,
         }
     }
@@ -240,9 +248,11 @@ impl NodeFactory {
             corner_radius: 0.0,
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             strokes: Paints::default(),
-            stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: Self::DEFAULT_STROKE_WIDTH,
+                stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_dash_array: None,
+            },
             layout_child: None,
         }
     }
@@ -261,9 +271,11 @@ impl NodeFactory {
             corner_radius: 0.0,
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             strokes: Paints::default(),
-            stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: Self::DEFAULT_STROKE_WIDTH,
+                stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_dash_array: None,
+            },
             layout_child: None,
         }
     }
@@ -280,9 +292,11 @@ impl NodeFactory {
             corner_radius: 0.0,
             fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
             strokes: Paints::default(),
-            stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: Self::DEFAULT_STROKE_WIDTH,
+                stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_dash_array: None,
+            },
             layout_child: None,
         }
     }
@@ -301,9 +315,11 @@ impl NodeFactory {
             corner_smoothing: Default::default(),
             fill: Self::default_image_paint(),
             strokes: Paints::new([Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR)]),
-            stroke_width: Self::DEFAULT_STROKE_WIDTH,
-            stroke_align: Self::DEFAULT_STROKE_ALIGN,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: Self::DEFAULT_STROKE_WIDTH,
+                stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_dash_array: None,
+            },
             image: ResourceRef::RID(String::new()),
             layout_child: None,
         }

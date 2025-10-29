@@ -134,7 +134,7 @@ async fn demo_paints() -> Scene {
             50 + (i * 20) as u8,
             255,
         ))]);
-        rect.stroke_width = 4.0; // Consistent stroke width
+        rect.stroke_style.stroke_width = 4.0; // Consistent stroke width
 
         graph.append_child(
             Node::Rectangle(rect),
@@ -175,7 +175,7 @@ async fn demo_paints() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         })]);
-        rect.stroke_width = 4.0; // Consistent stroke width
+        rect.stroke_style.stroke_width = 4.0; // Consistent stroke width
 
         graph.append_child(
             Node::Rectangle(rect),
@@ -217,7 +217,7 @@ async fn demo_paints() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         })]);
-        rect.stroke_width = 4.0; // Consistent stroke width
+        rect.stroke_style.stroke_width = 4.0; // Consistent stroke width
 
         graph.append_child(
             Node::Rectangle(rect),

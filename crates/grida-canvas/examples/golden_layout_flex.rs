@@ -4,7 +4,7 @@ use cg::layout::ComputedLayout;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::{
-    ContainerNodeRec, LayoutContainerStyle, LayoutDimensionStyle, Node, Scene, Size,
+    ContainerNodeRec, LayoutContainerStyle, LayoutDimensionStyle, Node, Scene, Size, StrokeStyle,
 };
 use skia_safe::{surfaces, Color, Font, FontMgr, Paint, Rect};
 
@@ -31,9 +31,11 @@ fn create_container_with_gap(id: &str, width: f32, height: f32, gap: f32) -> Con
         corner_smoothing: Default::default(),
         fills: Default::default(),
         strokes: Default::default(),
-        stroke_width: 0.0,
-        stroke_align: StrokeAlign::Center,
-        stroke_dash_array: None,
+        stroke_style: StrokeStyle {
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::Center,
+            stroke_dash_array: None,
+        },
         effects: Default::default(),
         clip: Default::default(),
         layout_container: LayoutContainerStyle {

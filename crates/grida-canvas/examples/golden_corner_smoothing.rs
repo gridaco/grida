@@ -37,8 +37,8 @@ async fn create_scene() -> Scene {
     rect_circular.corner_smoothing = CornerSmoothing::new(0.0); // Circular
     rect_circular.fills = Paints::default(); // No fill
     rect_circular.strokes = Paints::new([Paint::from(CGColor::from_rgb(255, 50, 50))]);
-    rect_circular.stroke_width = 3.0;
-    rect_circular.stroke_align = StrokeAlign::Center;
+    rect_circular.stroke_style.stroke_width = 3.0;
+    rect_circular.stroke_style.stroke_align = StrokeAlign::Center;
 
     graph.append_child(Node::Rectangle(rect_circular), Parent::Root);
 
@@ -53,8 +53,8 @@ async fn create_scene() -> Scene {
     rect_smoothed.corner_smoothing = CornerSmoothing::new(1.0); // Maximum smoothing
     rect_smoothed.fills = Paints::default(); // No fill
     rect_smoothed.strokes = Paints::new([Paint::from(CGColor::from_rgb(50, 150, 255))]);
-    rect_smoothed.stroke_width = 3.0;
-    rect_smoothed.stroke_align = StrokeAlign::Center;
+    rect_smoothed.stroke_style.stroke_width = 3.0;
+    rect_smoothed.stroke_style.stroke_align = StrokeAlign::Center;
 
     graph.append_child(Node::Rectangle(rect_smoothed), Parent::Root);
 

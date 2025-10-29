@@ -33,7 +33,7 @@ async fn demo_fills() -> Scene {
         Paint::from(CGColor(0, 255, 0, 255)),
         Paint::from(CGColor(0, 0, 255, 255)),
     ]);
-    multi_solid_rect.stroke_width = 3.0;
+    multi_solid_rect.stroke_style.stroke_width = 3.0;
     graph.append_child(
         Node::Rectangle(multi_solid_rect),
         Parent::NodeId(root_id.clone()),
@@ -66,7 +66,7 @@ async fn demo_fills() -> Scene {
             active: true,
         }),
     ]);
-    solid_gradient_rect.stroke_width = 3.0;
+    solid_gradient_rect.stroke_style.stroke_width = 3.0;
     graph.append_child(
         Node::Rectangle(solid_gradient_rect),
         Parent::NodeId(root_id.clone()),
@@ -103,7 +103,7 @@ async fn demo_fills() -> Scene {
             active: true,
         }),
     ]);
-    solid_radial_rect.stroke_width = 3.0;
+    solid_radial_rect.stroke_style.stroke_width = 3.0;
     graph.append_child(
         Node::Rectangle(solid_radial_rect),
         Parent::NodeId(root_id.clone()),
@@ -153,7 +153,7 @@ async fn demo_fills() -> Scene {
             active: true,
         }),
     ]);
-    gradient_gradient_rect.stroke_width = 3.0;
+    gradient_gradient_rect.stroke_style.stroke_width = 3.0;
     graph.append_child(
         Node::Rectangle(gradient_gradient_rect),
         Parent::NodeId(root_id.clone()),
@@ -216,7 +216,7 @@ async fn demo_fills() -> Scene {
             active: true,
         }),
     ]);
-    multi_radial_ellipse.stroke_width = 3.0;
+    multi_radial_ellipse.stroke_style.stroke_width = 3.0;
     graph.append_child(
         Node::Ellipse(multi_radial_ellipse),
         Parent::NodeId(root_id.clone()),
@@ -273,7 +273,7 @@ async fn demo_fills() -> Scene {
             active: true,
         }),
     ]);
-    complex_fill_polygon.stroke_width = 4.0;
+    complex_fill_polygon.stroke_style.stroke_width = 4.0;
     graph.append_child(
         Node::Polygon(complex_fill_polygon),
         Parent::NodeId(root_id.clone()),
@@ -338,7 +338,7 @@ async fn demo_fills() -> Scene {
             active: true,
         }),
     ]);
-    multi_linear_polygon.stroke_width = 3.0;
+    multi_linear_polygon.stroke_style.stroke_width = 3.0;
     graph.append_child(
         Node::RegularPolygon(multi_linear_polygon),
         Parent::NodeId(root_id.clone()),
@@ -372,7 +372,7 @@ async fn demo_fills() -> Scene {
             active: true,
         }),
     ]);
-    multi_fill_container.stroke_width = 3.0;
+    multi_fill_container.stroke_style.stroke_width = 3.0;
     graph.append_child(
         Node::Container(multi_fill_container),
         Parent::NodeId(root_id.clone()),

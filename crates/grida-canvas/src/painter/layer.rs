@@ -292,12 +292,12 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
+                let stroke_path = if !n.strokes.is_empty() && n.stroke_style.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        n.stroke_style.stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -348,12 +348,13 @@ impl LayerList {
             Node::BooleanOperation(n) => {
                 let opacity = parent_opacity * n.opacity;
                 if let Some(shape) = boolean_operation_shape(id, n, graph, scene_cache.geometry()) {
-                    let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
+                    let stroke_path = if !n.strokes.is_empty() && n.stroke_style.stroke_width > 0.0
+                    {
                         Some(stroke_geometry(
                             &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
+                            n.stroke_style.stroke_width,
+                            n.stroke_style.stroke_align,
+                            n.stroke_style.stroke_dash_array.as_ref(),
                         ))
                     } else {
                         None
@@ -401,12 +402,12 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_path = if n.stroke_style.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        n.stroke_style.stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -441,12 +442,12 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_path = if n.stroke_style.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        n.stroke_style.stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -481,12 +482,12 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_path = if n.stroke_style.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        n.stroke_style.stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -521,12 +522,12 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_path = if n.stroke_style.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        n.stroke_style.stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -561,12 +562,12 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_path = if n.stroke_style.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        n.stroke_style.stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -705,12 +706,12 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_path = if n.stroke_style.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        n.stroke_style.stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -779,12 +780,12 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_path = if n.stroke_style.stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        n.stroke_style.stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None

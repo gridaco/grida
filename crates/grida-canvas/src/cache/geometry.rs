@@ -280,11 +280,11 @@ impl GeometryCache {
                 let render_bounds = compute_render_bounds_from_style(
                     world_bounds,
                     if !n.strokes.is_empty() {
-                        n.stroke_width
+                        n.stroke_style.stroke_width
                     } else {
                         0.0
                     },
-                    n.stroke_align,
+                    n.stroke_style.stroke_align,
                     &n.effects,
                 );
 
@@ -334,11 +334,11 @@ impl GeometryCache {
                 let render_bounds = compute_render_bounds_from_style(
                     world_bounds,
                     if n.has_stroke_geometry() {
-                        n.stroke_width
+                        n.stroke_style.stroke_width
                     } else {
                         0.0
                     },
-                    n.stroke_align,
+                    n.stroke_style.stroke_align,
                     &n.effects,
                 );
 
@@ -633,38 +633,38 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
     match node {
         Node::Rectangle(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_width,
-            n.stroke_align,
+            n.stroke_style.stroke_width,
+            n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::Ellipse(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_width,
-            n.stroke_align,
+            n.stroke_style.stroke_width,
+            n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::Polygon(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_width,
-            n.stroke_align,
+            n.stroke_style.stroke_width,
+            n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::RegularPolygon(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_width,
-            n.stroke_align,
+            n.stroke_style.stroke_width,
+            n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::RegularStarPolygon(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_width,
-            n.stroke_align,
+            n.stroke_style.stroke_width,
+            n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::SVGPath(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_width,
-            n.stroke_align,
+            n.stroke_style.stroke_width,
+            n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::Vector(n) => compute_render_bounds_from_style(
@@ -675,8 +675,8 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
         ),
         Node::Image(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_width,
-            n.stroke_align,
+            n.stroke_style.stroke_width,
+            n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::Line(n) => compute_render_bounds_from_style(
@@ -694,11 +694,11 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
         Node::Container(n) => compute_render_bounds_from_style(
             world_bounds,
             if n.has_stroke_geometry() {
-                n.stroke_width
+                n.stroke_style.stroke_width
             } else {
                 0.0
             },
-            n.stroke_align,
+            n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::Error(_) => world_bounds,

@@ -36,10 +36,10 @@ async fn demo_strokes() -> Scene {
 
         // Solid color stroke
         rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-        rect.stroke_width = 8.0; // Thick stroke to make alignment visible
+        rect.stroke_style.stroke_width = 8.0; // Thick stroke to make alignment visible
 
         // Set different alignments
-        rect.stroke_align = match i {
+        rect.stroke_style.stroke_align = match i {
             0 => StrokeAlign::Inside,
             1 => StrokeAlign::Center,
             2 => StrokeAlign::Outside,
@@ -67,8 +67,8 @@ async fn demo_strokes() -> Scene {
 
         // Solid color stroke
         rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-        rect.stroke_width = (i + 1) as f32 * 2.0; // Increasing stroke width
-        rect.stroke_align = StrokeAlign::Center;
+        rect.stroke_style.stroke_width = (i + 1) as f32 * 2.0; // Increasing stroke width
+        rect.stroke_style.stroke_align = StrokeAlign::Center;
 
         graph.append_child(
             Node::Rectangle(rect),
@@ -88,7 +88,7 @@ async fn demo_strokes() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
         rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-        rect.stroke_width = 4.0;
+        rect.stroke_style.stroke_width = 4.0;
         graph.append_child(
             Node::Rectangle(rect),
             Parent::NodeId(root_container_id.clone()),
@@ -103,7 +103,7 @@ async fn demo_strokes() -> Scene {
         };
         ellipse.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
         ellipse.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-        ellipse.stroke_width = 4.0;
+        ellipse.stroke_style.stroke_width = 4.0;
         graph.append_child(
             Node::Ellipse(ellipse),
             Parent::NodeId(root_container_id.clone()),
@@ -119,7 +119,7 @@ async fn demo_strokes() -> Scene {
         polygon.point_count = 6;
         polygon.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
         polygon.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-        polygon.stroke_width = 4.0;
+        polygon.stroke_style.stroke_width = 4.0;
         graph.append_child(
             Node::RegularPolygon(polygon),
             Parent::NodeId(root_container_id.clone()),
@@ -136,7 +136,7 @@ async fn demo_strokes() -> Scene {
         star.inner_radius = 0.4;
         star.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 0))]);
         star.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-        star.stroke_width = 4.0;
+        star.stroke_style.stroke_width = 4.0;
         graph.append_child(
             Node::RegularStarPolygon(star),
             Parent::NodeId(root_container_id.clone()),
@@ -158,7 +158,7 @@ async fn demo_strokes() -> Scene {
 
         // Solid color stroke
         rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-        rect.stroke_width = 4.0;
+        rect.stroke_style.stroke_width = 4.0;
 
         // Add different effects
         rect.effects = match i {
@@ -199,10 +199,10 @@ async fn demo_strokes() -> Scene {
 
         // Solid color stroke
         rect.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-        rect.stroke_width = 4.0;
+        rect.stroke_style.stroke_width = 4.0;
 
         // Add different dash patterns
-        rect.stroke_dash_array = match i {
+        rect.stroke_style.stroke_dash_array = match i {
             0 => Some([5.0, 5.0].into()),           // Basic dashed line
             1 => Some([10.0, 5.0].into()),          // Longer dashes
             2 => Some([5.0, 5.0, 1.0, 5.0].into()), // Dash-dot pattern
@@ -243,7 +243,7 @@ async fn demo_strokes() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         })]);
-        rect.stroke_width = 8.0;
+        rect.stroke_style.stroke_width = 8.0;
         graph.append_child(
             Node::Rectangle(rect),
             Parent::NodeId(root_container_id.clone()),
@@ -274,7 +274,7 @@ async fn demo_strokes() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         })]);
-        rect.stroke_width = 8.0;
+        rect.stroke_style.stroke_width = 8.0;
         graph.append_child(
             Node::Rectangle(rect),
             Parent::NodeId(root_container_id.clone()),
@@ -309,7 +309,7 @@ async fn demo_strokes() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         })]);
-        rect.stroke_width = 8.0;
+        rect.stroke_style.stroke_width = 8.0;
         graph.append_child(
             Node::Rectangle(rect),
             Parent::NodeId(root_container_id.clone()),
@@ -325,8 +325,8 @@ async fn demo_strokes() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
         rect.strokes = Paints::new([Paint::from(CGColor(255, 128, 0, 255))]);
-        rect.stroke_width = 8.0;
-        rect.stroke_dash_array = Some([20.0, 10.0, 5.0, 10.0].into()); // Complex dash pattern
+        rect.stroke_style.stroke_width = 8.0;
+        rect.stroke_style.stroke_dash_array = Some([20.0, 10.0, 5.0, 10.0].into()); // Complex dash pattern
         graph.append_child(
             Node::Rectangle(rect),
             Parent::NodeId(root_container_id.clone()),
@@ -349,7 +349,7 @@ async fn demo_strokes() -> Scene {
             Paint::from(CGColor(0, 255, 0, 255)),
             Paint::from(CGColor(0, 0, 255, 255)),
         ]);
-        rect.stroke_width = 12.0; // Thick stroke to show layering
+        rect.stroke_style.stroke_width = 12.0; // Thick stroke to show layering
         graph.append_child(
             Node::Rectangle(rect),
             Parent::NodeId(root_container_id.clone()),
@@ -383,7 +383,7 @@ async fn demo_strokes() -> Scene {
                 active: true,
             }),
         ]);
-        rect.stroke_width = 10.0;
+        rect.stroke_style.stroke_width = 10.0;
         graph.append_child(
             Node::Rectangle(rect),
             Parent::NodeId(root_container_id.clone()),
@@ -431,7 +431,7 @@ async fn demo_strokes() -> Scene {
                 active: true,
             }),
         ]);
-        ellipse.stroke_width = 12.0;
+        ellipse.stroke_style.stroke_width = 12.0;
         graph.append_child(
             Node::Ellipse(ellipse),
             Parent::NodeId(root_container_id.clone()),
@@ -483,8 +483,8 @@ async fn demo_strokes() -> Scene {
                 active: true,
             }),
         ]);
-        polygon.stroke_width = 15.0; // Very thick to show all layers
-        polygon.stroke_dash_array = Some([8.0, 4.0].into()); // Dashed pattern
+        polygon.stroke_style.stroke_width = 15.0; // Very thick to show all layers
+        polygon.stroke_style.stroke_dash_array = Some([8.0, 4.0].into()); // Dashed pattern
         graph.append_child(
             Node::RegularPolygon(polygon),
             Parent::NodeId(root_container_id.clone()),

@@ -26,9 +26,11 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                 corner_smoothing: CornerSmoothing::default(),
                 fills: Paints::new([Paint::from(CGColor(255, 0, 0, 255))]),
                 strokes: Paints::default(),
-                stroke_width: 1.0,
-                stroke_align: StrokeAlign::Inside,
-                stroke_dash_array: None,
+                stroke_style: StrokeStyle {
+                    stroke_width: 1.0,
+                    stroke_align: StrokeAlign::Inside,
+                    stroke_dash_array: None,
+                },
                 effects: if with_effects {
                     LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
                         dx: 2.0,

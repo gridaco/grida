@@ -40,9 +40,9 @@ impl<'a> NodePainter<'a> {
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
+                                node.stroke_style.stroke_width,
+                                node.stroke_style.stroke_align,
+                                node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
                     });
@@ -70,9 +70,9 @@ impl<'a> NodePainter<'a> {
                                 self.painter.draw_strokes(
                                     &shape,
                                     &node.strokes,
-                                    node.stroke_width,
-                                    node.stroke_align,
-                                    node.stroke_dash_array.as_ref(),
+                                    node.stroke_style.stroke_width,
+                                    node.stroke_style.stroke_align,
+                                    node.stroke_style.stroke_dash_array.as_ref(),
                                 );
                             }
                         });
@@ -95,9 +95,9 @@ impl<'a> NodePainter<'a> {
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
+                                node.stroke_style.stroke_width,
+                                node.stroke_style.stroke_align,
+                                node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
                     });
@@ -168,9 +168,9 @@ impl<'a> NodePainter<'a> {
                                 self.painter.draw_strokes(
                                     &shape,
                                     &node.strokes,
-                                    node.stroke_width,
-                                    node.stroke_align,
-                                    node.stroke_dash_array.as_ref(),
+                                    node.stroke_style.stroke_width,
+                                    node.stroke_style.stroke_align,
+                                    node.stroke_style.stroke_dash_array.as_ref(),
                                 );
                             }
                         });
@@ -192,9 +192,9 @@ impl<'a> NodePainter<'a> {
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
+                                node.stroke_style.stroke_width,
+                                node.stroke_style.stroke_align,
+                                node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
                     });
@@ -216,10 +216,8 @@ impl<'a> NodePainter<'a> {
             corner_radius: node.corner_radius,
             fills: node.fills.clone(),
             strokes: node.strokes.clone(),
-            stroke_width: node.stroke_width,
-            stroke_align: node.stroke_align,
+            stroke_style: node.stroke_style.clone(),
             effects: node.effects.clone(),
-            stroke_dash_array: node.stroke_dash_array.clone(),
             layout_child: node.layout_child.clone(),
         };
 
@@ -240,10 +238,8 @@ impl<'a> NodePainter<'a> {
             corner_radius: node.corner_radius,
             fills: node.fills.clone(),
             strokes: node.strokes.clone(),
-            stroke_width: node.stroke_width,
-            stroke_align: node.stroke_align,
+            stroke_style: node.stroke_style.clone(),
             effects: node.effects.clone(),
-            stroke_dash_array: node.stroke_dash_array.clone(),
             layout_child: node.layout_child.clone(),
         };
 
@@ -352,9 +348,9 @@ impl<'a> NodePainter<'a> {
                                     self.painter.draw_strokes(
                                         &shape,
                                         &node.strokes,
-                                        node.stroke_width,
-                                        node.stroke_align,
-                                        node.stroke_dash_array.as_ref(),
+                                        node.stroke_style.stroke_width,
+                                        node.stroke_style.stroke_align,
+                                        node.stroke_style.stroke_dash_array.as_ref(),
                                     );
                                 }
                             });
@@ -456,9 +452,9 @@ impl<'a> NodePainter<'a> {
                                     self.painter.draw_strokes(
                                         &shape,
                                         &n.strokes,
-                                        n.stroke_width,
-                                        n.stroke_align,
-                                        n.stroke_dash_array.as_ref(),
+                                        n.stroke_style.stroke_width,
+                                        n.stroke_style.stroke_align,
+                                        n.stroke_style.stroke_dash_array.as_ref(),
                                     );
                                 });
                             });

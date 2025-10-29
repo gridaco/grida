@@ -61,9 +61,11 @@ async fn demo_booleans() -> Scene {
             corner_radius: None,
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
-            stroke_width: 2.0,
-            stroke_align: StrokeAlign::Center,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: 2.0,
+                stroke_align: StrokeAlign::Center,
+                stroke_dash_array: None,
+            },
         };
 
         // Add boolean operation to root, then add operands to it
@@ -121,9 +123,11 @@ async fn demo_booleans() -> Scene {
             corner_radius: None,
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
-            stroke_width: 2.0,
-            stroke_align: StrokeAlign::Center,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: 2.0,
+                stroke_align: StrokeAlign::Center,
+                stroke_dash_array: None,
+            },
         };
 
         // Collect IDs before moving nodes
@@ -182,9 +186,11 @@ async fn demo_booleans() -> Scene {
             corner_radius: None,
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
-            stroke_width: 2.0,
-            stroke_align: StrokeAlign::Center,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: 2.0,
+                stroke_align: StrokeAlign::Center,
+                stroke_dash_array: None,
+            },
         };
 
         // Collect IDs before moving nodes
@@ -243,9 +249,11 @@ async fn demo_booleans() -> Scene {
             corner_radius: None,
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
-            stroke_width: 2.0,
-            stroke_align: StrokeAlign::Center,
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_width: 2.0,
+                stroke_align: StrokeAlign::Center,
+                stroke_dash_array: None,
+            },
         };
 
         // Collect IDs before moving nodes

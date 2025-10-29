@@ -69,11 +69,50 @@ impl Default for LayerEffects {
     }
 }
 
+/// common stroke style
+/// not used for special node types,
+/// - line
+/// - vector
+/// - text
 #[derive(Debug, Clone)]
 pub struct StrokeStyle {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
+    // pub stroke_cap: StrokeCap,
     pub stroke_dash_array: Option<StrokeDashArray>,
+}
+
+impl Default for StrokeStyle {
+    fn default() -> Self {
+        Self {
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::default(),
+            // stroke_cap: StrokeCap::default(),
+            stroke_dash_array: None,
+        }
+    }
+}
+
+impl StrokeStyle {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_width(&mut self, width: f32) {
+        self.stroke_width = width;
+    }
+
+    pub fn set_align(&mut self, align: StrokeAlign) {
+        self.stroke_align = align;
+    }
+
+    // pub fn set_cap(&mut self, cap: StrokeCap) {
+    //     self.stroke_cap = cap;
+    // }
+
+    pub fn set_dash_array(&mut self, dash_array: Option<impl Into<StrokeDashArray>>) {
+        self.stroke_dash_array = dash_array.map(|d| d.into());
+    }
 }
 
 pub struct RectangularStrokeStyle {
@@ -149,13 +188,7 @@ pub struct UnknownNodeProperties {
 
     /// The stroke paint used to outline the shape.
     pub strokes: Paints,
-    /// The stroke width used to outline the shape.
-    pub stroke_width: f32,
-    /// The stroke align used to outline the shape.
-    pub stroke_align: StrokeAlign,
-    /// The stroke dash array used to outline the shape.
-    pub stroke_dash_array: Option<StrokeDashArray>,
-
+    pub stroke_style: StrokeStyle,
     /// The effects applied to the shape.
     pub effects: LayerEffects,
 
@@ -863,10 +896,7 @@ pub struct ContainerNodeRec {
     pub corner_smoothing: CornerSmoothing,
     pub fills: Paints,
     pub strokes: Paints,
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
-
+    pub stroke_style: StrokeStyle,
     pub effects: LayerEffects,
     /// Content-only clipping switch.
     ///
@@ -915,12 +945,12 @@ impl NodeFillsMixin for ContainerNodeRec {
 
 impl NodeGeometryMixin for ContainerNodeRec {
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+        self.stroke_style.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
         if self.has_stroke_geometry() {
-            self.stroke_width
+            self.stroke_style.stroke_width
         } else {
             0.0
         }
@@ -962,9 +992,7 @@ pub struct RectangleNodeRec {
     pub corner_smoothing: CornerSmoothing,
     pub fills: Paints,
     pub strokes: Paints,
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
+    pub stroke_style: StrokeStyle,
     pub effects: LayerEffects,
 
     /// Layout style for this node when it is a child of a layout container.
@@ -1004,12 +1032,12 @@ impl NodeRectMixin for RectangleNodeRec {
 
 impl NodeGeometryMixin for RectangleNodeRec {
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+        self.stroke_style.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
         if self.has_stroke_geometry() {
-            self.stroke_width
+            self.stroke_style.stroke_width
         } else {
             0.0
         }
@@ -1061,8 +1089,8 @@ pub struct LineNodeRec {
     pub size: Size, // height is always 0 (ignored)
     pub strokes: Paints,
     pub stroke_width: f32,
-    pub _data_stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<StrokeDashArray>,
+    pub _data_stroke_align: StrokeAlign,
 
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
@@ -1101,9 +1129,7 @@ pub struct ImageNodeRec {
     /// web development patterns where `<img>` elements have one image source.
     pub fill: ImagePaint,
     pub strokes: Paints,
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
+    pub stroke_style: StrokeStyle,
     pub image: ResourceRef,
 
     /// Layout style for this node when it is a child of a layout container.
@@ -1153,12 +1179,12 @@ impl NodeRectMixin for ImageNodeRec {
 
 impl NodeGeometryMixin for ImageNodeRec {
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+        self.stroke_style.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
         if self.has_stroke_geometry() {
-            self.stroke_width
+            self.stroke_style.stroke_width
         } else {
             0.0
         }
@@ -1190,10 +1216,7 @@ pub struct EllipseNodeRec {
     pub size: Size,
     pub fills: Paints,
     pub strokes: Paints,
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
-
+    pub stroke_style: StrokeStyle,
     /// inner radius - 0 ~ 1
     pub inner_radius: Option<f32>,
 
@@ -1287,12 +1310,12 @@ impl NodeRectMixin for EllipseNodeRec {
 
 impl NodeGeometryMixin for EllipseNodeRec {
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+        self.stroke_style.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
         if self.has_stroke_geometry() {
-            self.stroke_width
+            self.stroke_style.stroke_width
         } else {
             0.0
         }
@@ -1313,9 +1336,7 @@ pub struct BooleanPathOperationNodeRec {
     pub corner_radius: Option<f32>,
     pub fills: Paints,
     pub strokes: Paints,
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
+    pub stroke_style: StrokeStyle,
 }
 
 impl NodeFillsMixin for BooleanPathOperationNodeRec {
@@ -1429,10 +1450,7 @@ pub struct SVGPathNodeRec {
     pub fills: Paints,
     pub data: String,
     pub strokes: Paints,
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
-
+    pub stroke_style: StrokeStyle,
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
 }
@@ -1526,12 +1544,7 @@ pub struct PolygonNodeRec {
 
     /// The stroke paint used to outline the polygon.
     pub strokes: Paints,
-
-    /// The stroke width used to outline the polygon.
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
-
+    pub stroke_style: StrokeStyle,
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
 }
@@ -1564,12 +1577,12 @@ impl NodeRectMixin for PolygonNodeRec {
 
 impl NodeGeometryMixin for PolygonNodeRec {
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+        self.stroke_style.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
         if self.has_stroke_geometry() {
-            self.stroke_width
+            self.stroke_style.stroke_width
         } else {
             0.0
         }
@@ -1648,12 +1661,7 @@ pub struct RegularPolygonNodeRec {
 
     /// The stroke paint used to outline the polygon.
     pub strokes: Paints,
-
-    /// The stroke width used to outline the polygon.
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
-
+    pub stroke_style: StrokeStyle,
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
 }
@@ -1691,12 +1699,12 @@ impl NodeRectMixin for RegularPolygonNodeRec {
 
 impl NodeGeometryMixin for RegularPolygonNodeRec {
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+        self.stroke_style.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
         if self.has_stroke_geometry() {
-            self.stroke_width
+            self.stroke_style.stroke_width
         } else {
             0.0
         }
@@ -1779,12 +1787,7 @@ pub struct RegularStarPolygonNodeRec {
 
     /// The stroke paint used to outline the polygon.
     pub strokes: Paints,
-
-    /// The stroke width used to outline the polygon.
-    pub stroke_width: f32,
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
-
+    pub stroke_style: StrokeStyle,
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
 }
@@ -1822,12 +1825,12 @@ impl NodeRectMixin for RegularStarPolygonNodeRec {
 
 impl NodeGeometryMixin for RegularStarPolygonNodeRec {
     fn has_stroke_geometry(&self) -> bool {
-        self.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
+        self.stroke_style.stroke_width > 0.0 && self.strokes.iter().any(|s| s.opacity() > 0.0)
     }
 
     fn render_bounds_stroke_width(&self) -> f32 {
         if self.has_stroke_geometry() {
-            self.stroke_width
+            self.stroke_style.stroke_width
         } else {
             0.0
         }

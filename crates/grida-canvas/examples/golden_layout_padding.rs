@@ -33,9 +33,11 @@ fn create_container_with_padding(
         corner_smoothing: Default::default(),
         fills: Default::default(),
         strokes: Default::default(),
-        stroke_width: 0.0,
-        stroke_align: StrokeAlign::Center,
-        stroke_dash_array: None,
+        stroke_style: StrokeStyle {
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::Center,
+            stroke_dash_array: None,
+        },
         effects: Default::default(),
         clip: Default::default(),
         layout_container: LayoutContainerStyle {
