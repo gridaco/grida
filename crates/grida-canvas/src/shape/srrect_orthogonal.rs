@@ -212,12 +212,10 @@ pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) ->
 pub fn build_orthogonal_smooth_rrect_vector_network(
     _shape: &OrthogonalSmoothRRectShape,
 ) -> VectorNetwork {
-    // TODO: Implement vector network representation
-    VectorNetwork {
-        vertices: vec![],
-        segments: vec![],
-        regions: vec![],
-    }
+    // Fallback: build path and convert to VN (keeps editor/export functional).
+    // Later: emit structured quarter-corner segments.
+    let path = build_orthogonal_smooth_rrect_path(_shape);
+    VectorNetwork::from(&path)
 }
 
 #[cfg(test)]
