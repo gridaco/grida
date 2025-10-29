@@ -760,6 +760,8 @@ pub struct JSONUnknownNodeProperties {
         deserialize_with = "de_radius_option"
     )]
     pub corner_radius_bottom_left: Option<Radius>,
+    #[serde(rename = "cornerSmoothing", default)]
+    pub corner_smoothing: Option<f32>,
 
     // fill
     #[serde(rename = "fill")]
@@ -1233,6 +1235,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 node.base.corner_radius_bottom_right,
                 node.base.corner_radius_bottom_left,
             ),
+            corner_smoothing: CornerSmoothing::new(node.base.corner_smoothing.unwrap_or(0.0)),
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
@@ -1456,6 +1459,7 @@ impl From<JSONRectangleNode> for Node {
                 node.base.corner_radius_bottom_right,
                 node.base.corner_radius_bottom_left,
             ),
+            corner_smoothing: CornerSmoothing::new(node.base.corner_smoothing.unwrap_or(0.0)),
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
@@ -1553,6 +1557,7 @@ impl From<JSONImageNode> for Node {
                 node.base.corner_radius_bottom_right,
                 node.base.corner_radius_bottom_left,
             ),
+            corner_smoothing: CornerSmoothing::new(node.base.corner_smoothing.unwrap_or(0.0)),
             fill: fill.clone(),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
@@ -3921,6 +3926,99 @@ mod tests {
                 ));
             }
             _ => panic!("Expected Container node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_rectangle_with_corner_smoothing() {
+        let json = r#"{
+            "id": "rect-smooth",
+            "name": "Smooth Rectangle",
+            "type": "rectangle",
+            "left": 100.0,
+            "top": 100.0,
+            "width": 200.0,
+            "height": 200.0,
+            "cornerRadius": 50.0,
+            "cornerSmoothing": 0.6
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize rectangle with corner smoothing");
+
+        match node {
+            JSONNode::Rectangle(rect) => {
+                assert_eq!(rect.base.corner_smoothing, Some(0.6));
+
+                let converted: Node = rect.into();
+                if let Node::Rectangle(rect_rec) = converted {
+                    assert_eq!(rect_rec.corner_smoothing.value(), 0.6);
+                } else {
+                    panic!("Expected Rectangle node");
+                }
+            }
+            _ => panic!("Expected Rectangle node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_container_with_corner_smoothing() {
+        let json = r#"{
+            "id": "container-smooth",
+            "name": "Smooth Container",
+            "type": "container",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 300.0,
+            "height": 300.0,
+            "cornerRadius": 40.0,
+            "cornerSmoothing": 1.0
+        }"#;
+
+        let node: JSONNode = serde_json::from_str(json)
+            .expect("failed to deserialize container with corner smoothing");
+
+        match node {
+            JSONNode::Container(container) => {
+                assert_eq!(container.base.corner_smoothing, Some(1.0));
+
+                let converted: ContainerNodeRec = container.into();
+                assert_eq!(converted.corner_smoothing.value(), 1.0);
+            }
+            _ => panic!("Expected Container node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_image_with_corner_smoothing() {
+        let json = r#"{
+            "id": "image-smooth",
+            "name": "Smooth Image",
+            "type": "image",
+            "src": "test.png",
+            "left": 0.0,
+            "top": 0.0,
+            "width": 250.0,
+            "height": 250.0,
+            "cornerRadius": 30.0,
+            "cornerSmoothing": 0.8
+        }"#;
+
+        let node: JSONNode =
+            serde_json::from_str(json).expect("failed to deserialize image with corner smoothing");
+
+        match node {
+            JSONNode::Image(image) => {
+                assert_eq!(image.base.corner_smoothing, Some(0.8));
+
+                let converted: Node = image.into();
+                if let Node::Image(image_rec) = converted {
+                    assert_eq!(image_rec.corner_smoothing.value(), 0.8);
+                } else {
+                    panic!("Expected Image node");
+                }
+            }
+            _ => panic!("Expected Image node"),
         }
     }
 

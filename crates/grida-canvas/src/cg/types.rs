@@ -960,6 +960,51 @@ impl Default for RectangularCornerRadius {
     }
 }
 
+/// A normalized curvature-continuous (G²) corner smoothing factor.
+///
+/// `CornerSmoothing` controls how sharply or smoothly corners are blended
+/// when joining edges, transitioning from circular fillets (G¹) to
+/// curvature-continuous blends (G²).
+///
+/// # Range
+/// - `0.0` — standard rounded corners (circular arcs)
+/// - `1.0` — fully smoothed, continuous-curvature corners (Apple-/Figma-style)
+///
+/// The mathematical foundation is described in
+/// https://grida.co/docs/math/g2-curve-blending
+///
+/// # Examples
+/// ```rust
+/// use cg::cg::types::CornerSmoothing;
+/// let smooth = CornerSmoothing::new(0.6);
+/// assert!(smooth.value() > 0.0 && smooth.value() <= 1.0);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct CornerSmoothing(pub f32);
+
+impl CornerSmoothing {
+    /// Creates a new `CornerSmoothing` value, clamped to `[0.0, 1.0]`.
+    pub fn new(value: f32) -> Self {
+        Self(value.clamp(0.0, 1.0))
+    }
+
+    /// Returns the raw normalized value.
+    #[inline]
+    pub fn value(self) -> f32 {
+        self.0
+    }
+
+    #[inline]
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
+}
+
+impl Default for CornerSmoothing {
+    fn default() -> Self {
+        Self(0.0)
+    }
+}
 // #region text
 
 /// Text Transform (Text Case)

@@ -85,6 +85,10 @@ impl PainterShape {
             Shape::Ellipse(shape) => {
                 PainterShape::from_oval(Rect::from_xywh(0.0, 0.0, shape.width, shape.height))
             }
+            Shape::Rect(shape) => {
+                PainterShape::from_rect(Rect::from_xywh(0.0, 0.0, shape.width, shape.height))
+            }
+            Shape::RRect(shape) => PainterShape::from_rrect(shape.into()),
             _ => PainterShape::from_path(shape.into()),
         }
     }
@@ -183,14 +187,8 @@ pub fn build_shape(node: &Node, bounds: &Rectangle) -> PainterShape {
             PainterShape::from_shape(&shape)
         }
         Node::Rectangle(n) => {
-            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-            let r = n.corner_radius;
-            if !r.is_zero() {
-                let rrect = build_rrect(&n.to_own_shape());
-                PainterShape::from_rrect(rrect)
-            } else {
-                PainterShape::from_rect(rect)
-            }
+            let shape = n.to_shape();
+            PainterShape::from_shape(&shape)
         }
         Node::Container(n) => {
             // ALWAYS use resolved bounds from GeometryCache
@@ -199,14 +197,23 @@ pub fn build_shape(node: &Node, bounds: &Rectangle) -> PainterShape {
 
             let r = n.corner_radius;
             if !r.is_zero() {
-                // Build RRect with resolved dimensions
-                let shape = RRectShape {
-                    width,
-                    height,
-                    corner_radius: n.corner_radius,
-                };
-                let rrect = build_rrect(&shape);
-                PainterShape::from_rrect(rrect)
+                // Check if corner smoothing is enabled
+                if n.corner_smoothing.value() > 0.0 {
+                    let smooth = OrthogonalSmoothRRectShape {
+                        width,
+                        height,
+                        corner_radius: n.corner_radius,
+                        corner_smoothing: n.corner_smoothing,
+                    };
+                    PainterShape::from_path(build_orthogonal_smooth_rrect_path(&smooth))
+                } else {
+                    let rrect = build_rrect(&RRectShape {
+                        width,
+                        height,
+                        corner_radius: n.corner_radius,
+                    });
+                    PainterShape::from_rrect(rrect)
+                }
             } else {
                 let rect = Rect::from_xywh(0.0, 0.0, width, height);
                 PainterShape::from_rect(rect)
@@ -215,8 +222,19 @@ pub fn build_shape(node: &Node, bounds: &Rectangle) -> PainterShape {
         Node::Image(n) => {
             let r = n.corner_radius;
             if !r.is_zero() {
-                let rrect = build_rrect(&n.to_own_shape());
-                PainterShape::from_rrect(rrect)
+                // Check if corner smoothing is enabled
+                if n.corner_smoothing.value() > 0.0 {
+                    let smooth = OrthogonalSmoothRRectShape {
+                        width: n.size.width,
+                        height: n.size.height,
+                        corner_radius: r,
+                        corner_smoothing: n.corner_smoothing,
+                    };
+                    PainterShape::from_path(build_orthogonal_smooth_rrect_path(&smooth))
+                } else {
+                    let rrect = build_rrect(&n.to_own_shape());
+                    PainterShape::from_rrect(rrect)
+                }
             } else {
                 let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
                 PainterShape::from_rect(rect)

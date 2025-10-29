@@ -28,6 +28,7 @@ fn create_container_with_gap(id: &str, width: f32, height: f32, gap: f32) -> Con
         rotation: 0.0,
         position: Default::default(),
         corner_radius: Default::default(),
+        corner_smoothing: Default::default(),
         fills: Default::default(),
         strokes: Default::default(),
         stroke_width: 0.0,

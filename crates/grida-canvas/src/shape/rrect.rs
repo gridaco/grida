@@ -11,6 +11,12 @@ pub struct RRectShape {
     pub corner_radius: RectangularCornerRadius,
 }
 
+impl Into<skia_safe::RRect> for &RRectShape {
+    fn into(self) -> skia_safe::RRect {
+        build_rrect(self)
+    }
+}
+
 pub fn build_rrect(shape: &RRectShape) -> skia_safe::RRect {
     let irect = skia_safe::Rect::from_xywh(0.0, 0.0, shape.width, shape.height);
 
