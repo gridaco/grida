@@ -777,6 +777,8 @@ pub struct JSONUnknownNodeProperties {
     pub stroke_align: Option<StrokeAlign>,
     #[serde(rename = "strokeCap")]
     pub stroke_cap: Option<String>,
+    #[serde(rename = "strokeDashArray", alias = "strokeDasharray")]
+    pub stroke_dash_array: Option<Vec<f32>>,
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
     #[serde(rename = "strokes")]
@@ -1240,7 +1242,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             blend_mode: node.base.blend_mode.into(),
             opacity: node.base.opacity,
             effects: merge_effects(
@@ -1411,7 +1413,7 @@ impl From<JSONEllipseNode> for Node {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
 
             inner_radius: node.inner_radius,
             start_angle: node.angle_offset.unwrap_or(0.0),
@@ -1464,7 +1466,7 @@ impl From<JSONRectangleNode> for Node {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1562,7 +1564,7 @@ impl From<JSONImageNode> for Node {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             image: fill.image.clone(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
@@ -1611,7 +1613,7 @@ impl From<JSONRegularPolygonNode> for Node {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             point_count: node.point_count,
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
@@ -1661,7 +1663,7 @@ impl From<JSONRegularStarPolygonNode> for Node {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             point_count: node.point_count,
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
@@ -1709,7 +1711,7 @@ impl From<JSONSVGPathNode> for Node {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: 0.0,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1751,7 +1753,7 @@ impl From<JSONLineNode> for Node {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1803,7 +1805,7 @@ impl From<JSONVectorNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1849,7 +1851,7 @@ impl From<JSONBooleanOperationNode> for Node {
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
         })
     }
 }

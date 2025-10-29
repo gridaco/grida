@@ -1641,6 +1641,19 @@ export namespace grida.program.nodes {
       strokeAlign?: cg.StrokeAlign;
 
       /**
+       * stroke dash pattern - array of dash and gap lengths
+       *
+       * The pattern defines alternating lengths of dashes and gaps.
+       * - Even indices (0, 2, 4, ...): dash lengths
+       * - Odd indices (1, 3, 5, ...): gap lengths
+       *
+       * @example [5, 5] - 5px dash, 5px gap
+       * @example [10, 5, 2, 5] - 10px dash, 5px gap, 2px dot, 5px gap
+       * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray
+       */
+      strokeDashArray?: number[];
+
+      /**
        * @default "butt"
        */
       strokeCap: cg.StrokeCap;
