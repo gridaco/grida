@@ -4,7 +4,7 @@ use super::paint;
 use super::shadow;
 use super::text_stroke;
 use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::node::schema::*;
 use crate::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use crate::shape::*;

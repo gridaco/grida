@@ -1,5 +1,5 @@
 use crate::cg;
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 pub use crate::cg::types::{FontFeature, FontVariation};
 use crate::node::scene_graph::SceneGraph;
 use crate::shape::*;
