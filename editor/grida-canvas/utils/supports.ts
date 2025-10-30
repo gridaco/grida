@@ -20,6 +20,8 @@ type NodeFeatureProperty =
   | "strokes"
   | "feDropShadow"
   | "strokeCap"
+  | "strokeWidth"
+  | "strokeWidth4"
   | "pointCount"
   | "boolean";
 
@@ -87,6 +89,28 @@ const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   children: ["container", "component", "instance"],
   stroke: ["vector", "line", "rectangle", "ellipse", "polygon", "star"],
   strokes: [],
+  strokeWidth: [
+    "rectangle",
+    "image",
+    "video",
+    "container",
+    "component",
+    "instance",
+    "vector",
+    "line",
+    "rectangle",
+    "ellipse",
+    "polygon",
+    "star",
+  ],
+  strokeWidth4: [
+    "rectangle",
+    "image",
+    "video",
+    "container",
+    "component",
+    "instance",
+  ],
   feDropShadow: ["container", "component", "instance"],
   /**
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
@@ -166,6 +190,29 @@ const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
     "component",
     "instance",
     "boolean",
+  ],
+  strokeWidth: [
+    "container",
+    "rectangle",
+    "image",
+    "video",
+    "vector",
+    "line",
+    "ellipse",
+    "polygon",
+    "star",
+    "text",
+    "component",
+    "instance",
+    "boolean",
+  ],
+  strokeWidth4: [
+    "container",
+    "rectangle",
+    "image",
+    "video",
+    "component",
+    "instance",
   ],
   strokeCap: [
     "container",
@@ -280,6 +327,22 @@ export namespace supports {
         return dom_supports.strokes.includes(type);
       case "canvas":
         return canvas_supports.strokes.includes(type);
+    }
+  };
+  export const strokeWidth = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.strokeWidth.includes(type);
+      case "canvas":
+        return canvas_supports.strokeWidth.includes(type);
+    }
+  };
+  export const strokeWidth4 = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.strokeWidth4.includes(type);
+      case "canvas":
+        return canvas_supports.strokeWidth4.includes(type);
     }
   };
   export const strokeCap = (type: NodeType, context: Context) => {

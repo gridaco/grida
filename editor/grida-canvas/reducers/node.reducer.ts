@@ -418,6 +418,30 @@ const safe_properties: Partial<
       );
     },
   }),
+  strokeTopWidth: defineNodeProperty<"strokeTopWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeTopWidth = value;
+    },
+  }),
+  strokeRightWidth: defineNodeProperty<"strokeRightWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeRightWidth = value;
+    },
+  }),
+  strokeBottomWidth: defineNodeProperty<"strokeBottomWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeBottomWidth = value;
+    },
+  }),
+  strokeLeftWidth: defineNodeProperty<"strokeLeftWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeLeftWidth = value;
+    },
+  }),
   strokeAlign: defineNodeProperty<"strokeAlign">({
     assert: (node) =>
       node.type === "vector" ||

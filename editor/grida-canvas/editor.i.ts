@@ -2963,7 +2963,22 @@ export namespace editor.api {
       node_id: NodeID,
       strokeWidth: editor.api.NumberChange
     ): void;
-    changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodePropertyStrokeTopWidth(
+      node_id: NodeID,
+      strokeTopWidth: number
+    ): void;
+    changeNodePropertyStrokeRightWidth(
+      node_id: NodeID,
+      strokeRightWidth: number
+    ): void;
+    changeNodePropertyStrokeBottomWidth(
+      node_id: NodeID,
+      strokeBottomWidth: number
+    ): void;
+    changeNodePropertyStrokeLeftWidth(
+      node_id: NodeID,
+      strokeLeftWidth: number
+    ): void;
     changeNodePropertyStrokeAlign(
       node_id: NodeID,
       strokeAlign: cg.StrokeAlign
@@ -2972,6 +2987,7 @@ export namespace editor.api {
       node_id: NodeID,
       strokeDashArray: number[] | undefined
     ): void;
+    changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
     changeNodePropertyFit(node_id: NodeID, fit: cg.BoxFit): void;
 
     addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;

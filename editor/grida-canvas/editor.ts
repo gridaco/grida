@@ -1606,6 +1606,50 @@ class EditorDocumentStore
     }
   }
 
+  changeNodePropertyStrokeTopWidth(
+    node_id: editor.NodeID,
+    strokeTopWidth: number
+  ): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeTopWidth,
+    });
+  }
+
+  changeNodePropertyStrokeRightWidth(
+    node_id: editor.NodeID,
+    strokeRightWidth: number
+  ): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeRightWidth,
+    });
+  }
+
+  changeNodePropertyStrokeBottomWidth(
+    node_id: editor.NodeID,
+    strokeBottomWidth: number
+  ): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeBottomWidth,
+    });
+  }
+
+  changeNodePropertyStrokeLeftWidth(
+    node_id: editor.NodeID,
+    strokeLeftWidth: number
+  ): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeLeftWidth,
+    });
+  }
+
   changeNodePropertyStrokeAlign(node_id: string, strokeAlign: cg.StrokeAlign) {
     this.dispatch({
       type: "node/change/*",

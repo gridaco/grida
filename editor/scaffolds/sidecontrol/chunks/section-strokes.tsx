@@ -3,7 +3,10 @@
 import React from "react";
 import { PropertyLine, PropertyLineLabel } from "../ui";
 import { PaintControl } from "../controls/paint";
-import { StrokeWidthControl } from "../controls/stroke-width";
+import {
+  StrokeWidthControl,
+  StrokeWidth4Control,
+} from "../controls/stroke-width";
 import { StrokeAlignControl } from "../controls/stroke-align";
 import { StrokeCapControl } from "../controls/stroke-cap";
 import { StrokeClassControl, StrokeClass } from "../controls/stroke-class";
@@ -15,6 +18,7 @@ import {
 } from "@/grida-canvas-react/provider";
 import cg from "@grida/cg";
 import { ChunkPaints } from "./chunk-paints";
+import { supports } from "@/grida-canvas/utils/supports";
 
 export function SectionStrokes({
   node_id,
@@ -32,6 +36,10 @@ export function SectionStrokes({
     stroke,
     strokes,
     strokeWidth,
+    strokeTopWidth,
+    strokeRightWidth,
+    strokeBottomWidth,
+    strokeLeftWidth,
     strokeAlign,
     strokeCap,
     strokeDashArray,
@@ -40,6 +48,10 @@ export function SectionStrokes({
     stroke: node.stroke,
     strokes: node.strokes,
     strokeWidth: node.strokeWidth,
+    strokeTopWidth: node.strokeTopWidth,
+    strokeRightWidth: node.strokeRightWidth,
+    strokeBottomWidth: node.strokeBottomWidth,
+    strokeLeftWidth: node.strokeLeftWidth,
     strokeAlign: node.strokeAlign,
     strokeCap: node.strokeCap,
     strokeDashArray: node.strokeDashArray,
@@ -48,6 +60,35 @@ export function SectionStrokes({
 
   const is_text_node = type === "text";
   const isCanvasBackend = backend === "canvas";
+  const supportsStrokeWidth4 = supports.strokeWidth4(type, { backend });
+
+  // Compute stroke width value for the control
+  const strokeWidthValue = React.useMemo(() => {
+    // Check if any individual side widths are defined
+    const hasIndividualWidths =
+      strokeTopWidth !== undefined ||
+      strokeRightWidth !== undefined ||
+      strokeBottomWidth !== undefined ||
+      strokeLeftWidth !== undefined;
+
+    if (hasIndividualWidths) {
+      const fallbackWidth = strokeWidth ?? 1;
+      return {
+        top: strokeTopWidth ?? fallbackWidth,
+        right: strokeRightWidth ?? fallbackWidth,
+        bottom: strokeBottomWidth ?? fallbackWidth,
+        left: strokeLeftWidth ?? fallbackWidth,
+      };
+    }
+
+    return strokeWidth ?? 1;
+  }, [
+    strokeWidth,
+    strokeTopWidth,
+    strokeRightWidth,
+    strokeBottomWidth,
+    strokeLeftWidth,
+  ]);
   const paints = isCanvasBackend
     ? Array.isArray(strokes) && strokes.length > 0
       ? strokes
@@ -124,10 +165,33 @@ export function SectionStrokes({
     <div className="mt-4 space-y-2">
       <PropertyLine>
         <PropertyLineLabel>Width</PropertyLineLabel>
-        <StrokeWidthControl
-          value={strokeWidth}
-          onValueCommit={actions.strokeWidth}
-        />
+        {supportsStrokeWidth4 ? (
+          <StrokeWidth4Control
+            value={strokeWidthValue}
+            onValueCommit={(v) => {
+              if (typeof v === "number") {
+                // Uniform value - set strokeWidth
+                actions.strokeWidth({ type: "set", value: v });
+                // Also set all individual widths to the same value
+                actions.strokeTopWidth(v);
+                actions.strokeRightWidth(v);
+                actions.strokeBottomWidth(v);
+                actions.strokeLeftWidth(v);
+              } else {
+                // Individual values - set each side
+                actions.strokeTopWidth(v.top);
+                actions.strokeRightWidth(v.right);
+                actions.strokeBottomWidth(v.bottom);
+                actions.strokeLeftWidth(v.left);
+              }
+            }}
+          />
+        ) : (
+          <StrokeWidthControl
+            value={strokeWidth}
+            onValueCommit={actions.strokeWidth}
+          />
+        )}
       </PropertyLine>
       <PropertyLine>
         <PropertyLineLabel>Align</PropertyLineLabel>

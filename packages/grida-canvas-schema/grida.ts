@@ -1660,6 +1660,28 @@ export namespace grida.program.nodes {
     }
 
     /**
+     * Rectangular node (rectangle, image, video, container) specific stroke width properties
+     */
+    export interface IRectangularStrokeWidth {
+      /**
+       * sets or overrides the top stroke width
+       */
+      strokeTopWidth?: number;
+      /**
+       * sets or overrides the right stroke width
+       */
+      strokeRightWidth?: number;
+      /**
+       * sets or overrides the bottom stroke width
+       */
+      strokeBottomWidth?: number;
+      /**
+       * sets or overrides the left stroke width
+       */
+      strokeLeftWidth?: number;
+    }
+
+    /**
      * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
      */
     export interface ITextStroke {
@@ -2061,6 +2083,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
+      i.IRectangularStrokeWidth,
       i.ISourceValue {
     readonly type: "image";
     alt?: string;
@@ -2108,6 +2131,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
+      i.IRectangularStrokeWidth,
       i.ISourceValue {
     readonly type: "video";
 
@@ -2135,6 +2159,7 @@ export namespace grida.program.nodes {
       i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
+      i.IRectangularStrokeWidth,
       i.IPadding,
       i.IFlexContainer {
     readonly type: "container";
@@ -2351,6 +2376,7 @@ export namespace grida.program.nodes {
       i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke,
+      i.IRectangularStrokeWidth,
       i.IEffects,
       i.ICornerRadius,
       i.IRectangularCornerRadius {
