@@ -1,5 +1,4 @@
 use crate::cg::prelude::*;
-use crate::cg::varwidth::*;
 use crate::painter::paint;
 use crate::runtime::image_repository::ImageRepository;
 use crate::shape::build_corner_radius_path;

@@ -1795,6 +1795,10 @@ impl Paints {
         self.paints.is_empty()
     }
 
+    pub fn is_visible(&self) -> bool {
+        self.paints.iter().any(|paint| paint.opacity() > 0.0)
+    }
+
     /// Number of paints in the stack.
     pub fn len(&self) -> usize {
         self.paints.len()

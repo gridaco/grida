@@ -13,11 +13,11 @@
 //!    - Mirrors the schema structure with optional fields
 //!    - Can be resolved to different variants based on node type
 //!
-//! 2. **[`StrokeWidth`]** - Resolved stroke width enum
-//!    - Type-safe representation of stroke width after resolution
-//!    - `None` - No stroke
-//!    - `Uniform(f32)` - Same width on all sides (for lines, circles, etc.)
-//!    - `Rectangular(RectangularStrokeWidth)` - Per-side widths (for rectangles, containers)
+//! 2. **Type-specific wrappers**:
+//!    - **[`StrokeWidth`]** - For rectangular nodes (containers, rectangles, images)
+//!      - Enum with `None`, `Uniform(f32)`, or `Rectangular(RectangularStrokeWidth)`
+//!    - **[`SingularStrokeWidth`]** - For simple nodes (circles, polygons, SVG paths)
+//!      - Simple `Option<f32>` wrapper, ignores per-side values
 //!
 //! 3. **[`RectangularStrokeWidth`]** - Concrete per-side values
 //!    - Used for rendering rectangular shapes with per-side strokes
@@ -28,9 +28,9 @@
 //!
 //! The `UnknownStrokeWidth` input format is resolved based on node type:
 //!
-//! - **Rectangles, Containers**: Resolved to `StrokeWidth::Rectangular`
-//! - **Lines, Vectors**: Resolved to `StrokeWidth::Uniform`
-//! - **No stroke**: Resolved to `StrokeWidth::None`
+//! - **Rectangles, Containers, Images**: `UnknownStrokeWidth` → `StrokeWidth`
+//! - **Circles, Polygons, SVG Paths**: `UnknownStrokeWidth` → `SingularStrokeWidth` (only uses base `stroke_width`)
+//! - **Lines, Vectors, Text**: Direct `f32` usage (special handling)
 //!
 //! # Example
 //!
@@ -44,13 +44,13 @@
 //!     stroke_left_width: None,
 //! };
 //!
-//! // For a rectangle: resolve to per-side variant
-//! let rect_stroke = StrokeWidth::Rectangular(unknown.clone().into());
-//! // rect_stroke has: top=4.0, right=2.0, bottom=2.0, left=2.0
+//! // For a rectangle: resolve to StrokeWidth enum
+//! let rect_stroke: StrokeWidth = unknown.clone().into();
+//! // rect_stroke = Rectangular(top=4.0, right=2.0, bottom=2.0, left=2.0)
 //!
-//! // For a line: resolve to uniform variant (use base width)
-//! let line_stroke = StrokeWidth::Uniform(unknown.stroke_width.unwrap_or(0.0));
-//! // line_stroke has: 2.0
+//! // For a circle: resolve to singular (ignores per-side values)
+//! let circle_stroke: SingularStrokeWidth = unknown.clone().into();
+//! // circle_stroke = SingularStrokeWidth(Some(2.0))
 //! ```
 
 /// Resolved stroke width representation after processing [`UnknownStrokeWidth`].
@@ -103,6 +103,61 @@ pub enum StrokeWidth {
     Rectangular(RectangularStrokeWidth),
 }
 
+impl StrokeWidth {
+    /// Checks if the stroke width is effectively none (zero or absent).
+    ///
+    /// Returns `true` if:
+    /// - The variant is `None`
+    /// - The variant is `Uniform(0.0)`
+    /// - The variant is `Rectangular` with all sides at 0.0
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// assert!(StrokeWidth::None.is_none());
+    /// assert!(StrokeWidth::Uniform(0.0).is_none());
+    /// assert!(!StrokeWidth::Uniform(2.0).is_none());
+    /// ```
+    pub fn is_none(&self) -> bool {
+        match self {
+            StrokeWidth::None => true,
+            StrokeWidth::Uniform(width) => *width == 0.0,
+            StrokeWidth::Rectangular(rect) => rect.is_none(),
+        }
+    }
+
+    /// Returns the maximum stroke width value.
+    ///
+    /// For `Uniform`, returns the single width value.
+    /// For `Rectangular`, returns the maximum of all four sides.
+    /// For `None`, returns 0.0.
+    ///
+    /// This is useful for calculating bounding boxes and layout calculations
+    /// where you need to account for the thickest stroke.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let uniform = StrokeWidth::Uniform(3.0);
+    /// assert_eq!(uniform.max(), 3.0);
+    ///
+    /// let rect = StrokeWidth::Rectangular(RectangularStrokeWidth {
+    ///     stroke_top_width: 1.0,
+    ///     stroke_right_width: 4.0,
+    ///     stroke_bottom_width: 2.0,
+    ///     stroke_left_width: 3.0,
+    /// });
+    /// assert_eq!(rect.max(), 4.0);
+    /// ```
+    pub fn max(&self) -> f32 {
+        match self {
+            StrokeWidth::None => 0.0,
+            StrokeWidth::Uniform(width) => *width,
+            StrokeWidth::Rectangular(rect) => rect.max(),
+        }
+    }
+}
+
 /// Universal input format for stroke width values (CSS-like).
 ///
 /// This is the storage/serialization format that serves as the universal input
@@ -152,7 +207,7 @@ pub enum StrokeWidth {
 /// // For rectangle → Rectangular(top=2, right=4, bottom=2, left=4)
 /// // For line → Uniform(2.0)
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct UnknownStrokeWidth {
     pub stroke_width: Option<f32>,
     pub stroke_top_width: Option<f32>,
@@ -191,6 +246,139 @@ impl From<UnknownStrokeWidth> for RectangularStrokeWidth {
             stroke_right_width: val.stroke_right_width.unwrap_or(base),
             stroke_bottom_width: val.stroke_bottom_width.unwrap_or(base),
             stroke_left_width: val.stroke_left_width.unwrap_or(base),
+        }
+    }
+}
+
+/// Simple singular stroke width wrapper for node types that only support single-value strokes.
+///
+/// This is a newtype wrapper around `Option<f32>` used internally in the schema for
+/// node types that don't support per-side stroke widths (circles, polygons, SVG paths, etc.).
+///
+/// Unlike [`UnknownStrokeWidth`] which can have per-side values, this explicitly
+/// represents only a single uniform stroke width.
+///
+/// # Conversion from UnknownStrokeWidth
+///
+/// When converting from `UnknownStrokeWidth`, only the base `stroke_width` field is used.
+/// All per-side width fields (top, right, bottom, left) are ignored.
+///
+/// # Example
+///
+/// ```ignore
+/// // Direct construction
+/// let stroke = SingularStrokeWidth(Some(2.0));
+/// assert!(!stroke.is_none());
+/// assert_eq!(stroke.value_or_zero(), 2.0);
+///
+/// // From unknown (ignores per-side values)
+/// let unknown = UnknownStrokeWidth {
+///     stroke_width: Some(2.0),
+///     stroke_top_width: Some(5.0),  // Ignored
+///     ..Default::default()
+/// };
+/// let singular: SingularStrokeWidth = unknown.into();
+/// assert_eq!(singular.value_or_zero(), 2.0);  // Uses base width only
+///
+/// // No stroke
+/// let no_stroke = SingularStrokeWidth(None);
+/// assert!(no_stroke.is_none());
+/// assert_eq!(no_stroke.value_or_zero(), 0.0);
+/// ```
+#[derive(Debug, Clone)]
+pub struct SingularStrokeWidth(pub Option<f32>);
+
+impl SingularStrokeWidth {
+    /// Returns `true` if the stroke width is absent or zero.
+    pub fn is_none(&self) -> bool {
+        self.0.is_none() || self.0.unwrap() == 0.0
+    }
+
+    /// Returns the stroke width value, or 0.0 if absent.
+    pub fn value_or_zero(&self) -> f32 {
+        self.0.unwrap_or_default()
+    }
+}
+
+/// Converts from universal input format to singular stroke width, ignoring per-side values.
+///
+/// Only the base `stroke_width` field is used. All per-side width fields are ignored.
+/// This is the expected behavior for node types that don't support per-side strokes.
+///
+/// # Example
+///
+/// ```ignore
+/// let unknown = UnknownStrokeWidth {
+///     stroke_width: Some(3.0),
+///     stroke_top_width: Some(10.0),  // Ignored
+///     stroke_right_width: Some(5.0), // Ignored
+///     ..Default::default()
+/// };
+/// let singular: SingularStrokeWidth = unknown.into();
+/// assert_eq!(singular.value_or_zero(), 3.0);
+/// ```
+impl From<UnknownStrokeWidth> for SingularStrokeWidth {
+    fn from(val: UnknownStrokeWidth) -> Self {
+        SingularStrokeWidth(val.stroke_width)
+    }
+}
+
+/// Converts a singular stroke width to the resolved [`StrokeWidth`] enum.
+///
+/// Maps `Some(width)` to `StrokeWidth::Uniform(width)` and `None` to `StrokeWidth::None`.
+impl From<SingularStrokeWidth> for StrokeWidth {
+    fn from(val: SingularStrokeWidth) -> Self {
+        if let Some(width) = val.0 {
+            StrokeWidth::Uniform(width)
+        } else {
+            StrokeWidth::None
+        }
+    }
+}
+
+/// Converts from universal input format to the resolved stroke width enum.
+///
+/// This conversion handles both uniform and per-side stroke widths:
+/// - If any per-side values are defined, converts to `StrokeWidth::Rectangular`
+/// - Otherwise, converts base `stroke_width` to `StrokeWidth::Uniform` or `StrokeWidth::None`
+///
+/// # Example
+///
+/// ```ignore
+/// // Uniform stroke
+/// let uniform = UnknownStrokeWidth {
+///     stroke_width: Some(2.0),
+///     ..Default::default()
+/// };
+/// let stroke: StrokeWidth = uniform.into();
+/// // stroke = StrokeWidth::Uniform(2.0)
+///
+/// // Per-side stroke
+/// let per_side = UnknownStrokeWidth {
+///     stroke_width: Some(2.0),
+///     stroke_top_width: Some(4.0),
+///     ..Default::default()
+/// };
+/// let stroke: StrokeWidth = per_side.into();
+/// // stroke = StrokeWidth::Rectangular(...)
+/// ```
+impl From<UnknownStrokeWidth> for StrokeWidth {
+    fn from(val: UnknownStrokeWidth) -> Self {
+        // Check if any per-side values are defined
+        let has_per_side = val.stroke_top_width.is_some()
+            || val.stroke_right_width.is_some()
+            || val.stroke_bottom_width.is_some()
+            || val.stroke_left_width.is_some();
+
+        if has_per_side {
+            // Convert to rectangular (handles fallback to base width)
+            StrokeWidth::Rectangular(val.into())
+        } else {
+            // Use base width only
+            match val.stroke_width {
+                Some(width) if width > 0.0 => StrokeWidth::Uniform(width),
+                _ => StrokeWidth::None,
+            }
         }
     }
 }
@@ -278,5 +466,36 @@ impl RectangularStrokeWidth {
             && self.stroke_right_width == 0.0
             && self.stroke_bottom_width == 0.0
             && self.stroke_left_width == 0.0
+    }
+
+    /// Returns the maximum stroke width among all four sides.
+    ///
+    /// This is useful for calculating bounding boxes, determining the maximum
+    /// stroke extent, or finding the thickest stroke side for layout calculations.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let rect = RectangularStrokeWidth {
+    ///     stroke_top_width: 1.0,
+    ///     stroke_right_width: 4.0,
+    ///     stroke_bottom_width: 2.0,
+    ///     stroke_left_width: 3.0,
+    /// };
+    /// assert_eq!(rect.max(), 4.0);
+    ///
+    /// let uniform = RectangularStrokeWidth {
+    ///     stroke_top_width: 2.5,
+    ///     stroke_right_width: 2.5,
+    ///     stroke_bottom_width: 2.5,
+    ///     stroke_left_width: 2.5,
+    /// };
+    /// assert_eq!(uniform.max(), 2.5);
+    /// ```
+    pub fn max(&self) -> f32 {
+        self.stroke_top_width
+            .max(self.stroke_right_width)
+            .max(self.stroke_bottom_width)
+            .max(self.stroke_left_width)
     }
 }
