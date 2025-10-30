@@ -228,6 +228,43 @@ pub struct UnknownStrokeWidth {
     pub stroke_left_width: Option<f32>,
 }
 
+impl UnknownStrokeWidth {
+    pub fn uniform_value(&self) -> Option<f32> {
+        // terms:
+        // all: all 5 properties
+        // all sides: all 4 side properties
+
+        // logic:
+        // 1. if all values are identical (set or not set), return stroke_width (even for None)
+        // 2. if only stroke_width is set, return stroke_width
+        // (RETURN)
+        // 3. (so) if all sides are set and identical, but stroke_width is not set, return None. (dont expliclity handle)
+        //
+
+        // (1)
+        if (self.stroke_width == self.stroke_top_width)
+            && (self.stroke_width == self.stroke_right_width)
+            && (self.stroke_width == self.stroke_bottom_width)
+            && (self.stroke_width == self.stroke_left_width)
+        {
+            return self.stroke_width;
+        }
+
+        // (2)
+        if self.stroke_width.is_some()
+            && self.stroke_top_width.is_none()
+            && self.stroke_right_width.is_none()
+            && self.stroke_bottom_width.is_none()
+            && self.stroke_left_width.is_none()
+        {
+            return self.stroke_width;
+        }
+
+        // (3)
+        return None;
+    }
+}
+
 /// Converts from the universal input format to the concrete rectangular stroke width format.
 ///
 /// This implementation resolves all optional values to concrete f32 values by:
@@ -394,20 +431,23 @@ impl From<SingularStrokeWidth> for StrokeWidth {
 /// ```
 impl From<UnknownStrokeWidth> for StrokeWidth {
     fn from(val: UnknownStrokeWidth) -> Self {
-        // Check if any per-side values are defined
-        let has_per_side = val.stroke_top_width.is_some()
-            || val.stroke_right_width.is_some()
-            || val.stroke_bottom_width.is_some()
-            || val.stroke_left_width.is_some();
-
-        if has_per_side {
-            // Convert to rectangular (handles fallback to base width)
-            StrokeWidth::Rectangular(val.into())
+        // Check if this can be represented as a uniform value
+        if let Some(uniform) = val.uniform_value() {
+            // All values are identical (or only base is set)
+            if uniform > 0.0 {
+                StrokeWidth::Uniform(uniform)
+            } else {
+                StrokeWidth::None
+            }
         } else {
-            // Use base width only
-            match val.stroke_width {
-                Some(width) if width > 0.0 => StrokeWidth::Uniform(width),
-                _ => StrokeWidth::None,
+            // Has per-side values that differ → use Rectangular
+            // (will handle fallback logic via From<UnknownStrokeWidth> for RectangularStrokeWidth)
+            let rect: RectangularStrokeWidth = val.into();
+            // If all resolved to 0, return None instead
+            if rect.is_none() {
+                StrokeWidth::None
+            } else {
+                StrokeWidth::Rectangular(rect)
             }
         }
     }
@@ -527,5 +567,316 @@ impl RectangularStrokeWidth {
             .max(self.stroke_right_width)
             .max(self.stroke_bottom_width)
             .max(self.stroke_left_width)
+    }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unknown_to_rectangular_base_none_all_none() {
+        // Base is None, all sides None → all should be 0.0
+        let unknown = UnknownStrokeWidth {
+            stroke_width: None,
+            stroke_top_width: None,
+            stroke_right_width: None,
+            stroke_bottom_width: None,
+            stroke_left_width: None,
+        };
+        let rect: RectangularStrokeWidth = unknown.into();
+        assert_eq!(rect.stroke_top_width, 0.0);
+        assert_eq!(rect.stroke_right_width, 0.0);
+        assert_eq!(rect.stroke_bottom_width, 0.0);
+        assert_eq!(rect.stroke_left_width, 0.0);
+    }
+
+    #[test]
+    fn test_unknown_to_rectangular_base_4_all_none() {
+        // Base is 4.0, all sides None → all should fallback to 4.0
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(4.0),
+            stroke_top_width: None,
+            stroke_right_width: None,
+            stroke_bottom_width: None,
+            stroke_left_width: None,
+        };
+        let rect: RectangularStrokeWidth = unknown.into();
+        assert_eq!(rect.stroke_top_width, 4.0);
+        assert_eq!(rect.stroke_right_width, 4.0);
+        assert_eq!(rect.stroke_bottom_width, 4.0);
+        assert_eq!(rect.stroke_left_width, 4.0);
+    }
+
+    #[test]
+    fn test_unknown_to_rectangular_base_4_left_0() {
+        // Base is 4.0, left is explicitly 0.0 → left should be 0.0 (NOT fallback)
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(4.0),
+            stroke_top_width: None,
+            stroke_right_width: None,
+            stroke_bottom_width: None,
+            stroke_left_width: Some(0.0), // Explicit 0
+        };
+        let rect: RectangularStrokeWidth = unknown.into();
+        assert_eq!(rect.stroke_top_width, 4.0); // Fallback to base
+        assert_eq!(rect.stroke_right_width, 4.0); // Fallback to base
+        assert_eq!(rect.stroke_bottom_width, 4.0); // Fallback to base
+        assert_eq!(rect.stroke_left_width, 0.0); // Explicit 0, NOT 4.0
+    }
+
+    #[test]
+    fn test_unknown_to_rectangular_base_4_top_1_others_0() {
+        // Your production scenario: base=4, top=1, others=0 (explicit)
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(4.0),
+            stroke_top_width: Some(1.0),
+            stroke_right_width: Some(0.0),  // Explicit 0
+            stroke_bottom_width: Some(0.0), // Explicit 0
+            stroke_left_width: Some(0.0),   // Explicit 0
+        };
+        let rect: RectangularStrokeWidth = unknown.into();
+        assert_eq!(rect.stroke_top_width, 1.0);
+        assert_eq!(rect.stroke_right_width, 0.0); // Should be 0, not 4
+        assert_eq!(rect.stroke_bottom_width, 0.0); // Should be 0, not 4
+        assert_eq!(rect.stroke_left_width, 0.0); // Should be 0, not 4
+    }
+
+    #[test]
+    fn test_unknown_to_rectangular_mixed_explicit_and_fallback() {
+        // Mix of explicit values and fallbacks
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(10.0),
+            stroke_top_width: Some(2.0),    // Explicit override
+            stroke_right_width: None,       // Fallback to base (10.0)
+            stroke_bottom_width: Some(0.0), // Explicit 0
+            stroke_left_width: Some(5.0),   // Explicit override
+        };
+        let rect: RectangularStrokeWidth = unknown.into();
+        assert_eq!(rect.stroke_top_width, 2.0);
+        assert_eq!(rect.stroke_right_width, 10.0); // Fallback to base
+        assert_eq!(rect.stroke_bottom_width, 0.0); // Explicit 0
+        assert_eq!(rect.stroke_left_width, 5.0);
+    }
+
+    // --- Tests for UnknownStrokeWidth => StrokeWidth conversion ---
+
+    #[test]
+    fn test_unknown_to_strokewidth_all_none() {
+        // No per-side values, base is None → StrokeWidth::None
+        let unknown = UnknownStrokeWidth {
+            stroke_width: None,
+            ..Default::default()
+        };
+        let stroke: StrokeWidth = unknown.into();
+        assert!(matches!(stroke, StrokeWidth::None));
+    }
+
+    #[test]
+    fn test_unknown_to_strokewidth_all_zero() {
+        // All explicitly 0 → StrokeWidth::None (uniform 0)
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(0.0),
+            stroke_top_width: Some(0.0),
+            stroke_right_width: Some(0.0),
+            stroke_bottom_width: Some(0.0),
+            stroke_left_width: Some(0.0),
+        };
+        let stroke: StrokeWidth = unknown.into();
+        // uniform_value() returns Some(0.0), but then converted to None
+        assert!(matches!(stroke, StrokeWidth::None));
+    }
+
+    #[test]
+    fn test_unknown_to_strokewidth_base_only() {
+        // Only base value, no per-side → StrokeWidth::Uniform
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(5.0),
+            ..Default::default()
+        };
+        let stroke: StrokeWidth = unknown.into();
+        match stroke {
+            StrokeWidth::Uniform(w) => assert_eq!(w, 5.0),
+            _ => panic!("Expected Uniform variant"),
+        }
+    }
+
+    #[test]
+    fn test_unknown_to_strokewidth_base_zero_only() {
+        // Base is 0, no per-side → StrokeWidth::None
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(0.0),
+            ..Default::default()
+        };
+        let stroke: StrokeWidth = unknown.into();
+        assert!(matches!(stroke, StrokeWidth::None));
+    }
+
+    #[test]
+    fn test_unknown_to_strokewidth_all_same_value() {
+        // All 5 properties explicitly set to same value → Uniform
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(6.0),
+            stroke_top_width: Some(6.0),
+            stroke_right_width: Some(6.0),
+            stroke_bottom_width: Some(6.0),
+            stroke_left_width: Some(6.0),
+        };
+        let stroke: StrokeWidth = unknown.into();
+        match stroke {
+            StrokeWidth::Uniform(w) => assert_eq!(w, 6.0),
+            _ => panic!("Expected Uniform variant when all are identical"),
+        }
+    }
+
+    #[test]
+    fn test_unknown_to_strokewidth_production_case() {
+        // Production case: base=4, top=1, others=0 (explicit) → Rectangular
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(4.0),
+            stroke_top_width: Some(1.0),
+            stroke_right_width: Some(0.0),
+            stroke_bottom_width: Some(0.0),
+            stroke_left_width: Some(0.0),
+        };
+        let stroke: StrokeWidth = unknown.into();
+        match stroke {
+            StrokeWidth::Rectangular(rect) => {
+                assert_eq!(rect.stroke_top_width, 1.0);
+                assert_eq!(rect.stroke_right_width, 0.0); // Must be 0, not 4
+                assert_eq!(rect.stroke_bottom_width, 0.0); // Must be 0, not 4
+                assert_eq!(rect.stroke_left_width, 0.0); // Must be 0, not 4
+            }
+            _ => panic!("Expected Rectangular variant"),
+        }
+    }
+
+    #[test]
+    fn test_unknown_to_strokewidth_partial_sides_fallback() {
+        // Base=4, top=1, others=None (should fallback to 4) → Rectangular
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(4.0),
+            stroke_top_width: Some(1.0),
+            stroke_right_width: None,  // Fallback to 4
+            stroke_bottom_width: None, // Fallback to 4
+            stroke_left_width: None,   // Fallback to 4
+        };
+        let stroke: StrokeWidth = unknown.into();
+        match stroke {
+            StrokeWidth::Rectangular(rect) => {
+                assert_eq!(rect.stroke_top_width, 1.0);
+                assert_eq!(rect.stroke_right_width, 4.0); // Fallback
+                assert_eq!(rect.stroke_bottom_width, 4.0); // Fallback
+                assert_eq!(rect.stroke_left_width, 4.0); // Fallback
+            }
+            _ => panic!("Expected Rectangular variant"),
+        }
+    }
+
+    #[test]
+    fn test_unknown_to_strokewidth_mixed_resolved_uniform() {
+        // Base=3, top=Some(3), others=None → all resolve to 3, but NOT uniform due to different Options
+        // This is conservative: it uses Rectangular even though values resolve to same number
+        let unknown = UnknownStrokeWidth {
+            stroke_width: Some(3.0),
+            stroke_top_width: Some(3.0), // Explicit, same as base
+            stroke_right_width: None,    // Would fallback to 3
+            stroke_bottom_width: None,   // Would fallback to 3
+            stroke_left_width: None,     // Would fallback to 3
+        };
+        let stroke: StrokeWidth = unknown.into();
+        // Not uniform by Option comparison, so uses Rectangular path
+        match stroke {
+            StrokeWidth::Rectangular(rect) => {
+                // But after resolution, all are 3.0
+                assert_eq!(rect.stroke_top_width, 3.0);
+                assert_eq!(rect.stroke_right_width, 3.0);
+                assert_eq!(rect.stroke_bottom_width, 3.0);
+                assert_eq!(rect.stroke_left_width, 3.0);
+                assert!(rect.is_uniform()); // They're uniform after resolution
+            }
+            _ => panic!("Expected Rectangular variant (conservative choice)"),
+        }
+    }
+
+    #[test]
+    fn test_rectangular_is_none() {
+        let all_zero = RectangularStrokeWidth {
+            stroke_top_width: 0.0,
+            stroke_right_width: 0.0,
+            stroke_bottom_width: 0.0,
+            stroke_left_width: 0.0,
+        };
+        assert!(all_zero.is_none());
+
+        let has_stroke = RectangularStrokeWidth {
+            stroke_top_width: 1.0,
+            stroke_right_width: 0.0,
+            stroke_bottom_width: 0.0,
+            stroke_left_width: 0.0,
+        };
+        assert!(!has_stroke.is_none());
+    }
+
+    #[test]
+    fn test_rectangular_is_uniform() {
+        let uniform = RectangularStrokeWidth {
+            stroke_top_width: 3.0,
+            stroke_right_width: 3.0,
+            stroke_bottom_width: 3.0,
+            stroke_left_width: 3.0,
+        };
+        assert!(uniform.is_uniform());
+
+        let not_uniform = RectangularStrokeWidth {
+            stroke_top_width: 3.0,
+            stroke_right_width: 3.0,
+            stroke_bottom_width: 3.0,
+            stroke_left_width: 4.0,
+        };
+        assert!(!not_uniform.is_uniform());
+    }
+
+    #[test]
+    fn test_rectangular_max() {
+        let rect = RectangularStrokeWidth {
+            stroke_top_width: 1.0,
+            stroke_right_width: 5.0,
+            stroke_bottom_width: 3.0,
+            stroke_left_width: 2.0,
+        };
+        assert_eq!(rect.max(), 5.0);
+    }
+
+    #[test]
+    fn test_to_insets_center() {
+        let rect = RectangularStrokeWidth {
+            stroke_top_width: 10.0,
+            stroke_right_width: 20.0,
+            stroke_bottom_width: 30.0,
+            stroke_left_width: 40.0,
+        };
+        let (top, right, bottom, left) = rect.to_insets_center();
+        assert_eq!(top, 5.0);
+        assert_eq!(right, 10.0);
+        assert_eq!(bottom, 15.0);
+        assert_eq!(left, 20.0);
+    }
+
+    #[test]
+    fn test_to_inner_rect_center() {
+        let rect_stroke = RectangularStrokeWidth {
+            stroke_top_width: 4.0,
+            stroke_right_width: 8.0,
+            stroke_bottom_width: 12.0,
+            stroke_left_width: 6.0,
+        };
+        let outer = skia_safe::Rect::from_xywh(0.0, 0.0, 100.0, 100.0);
+        let inner = rect_stroke.to_inner_rect_center(outer);
+
+        // Inner rect should be inset by half-widths
+        assert_eq!(inner.left, 0.0 + 3.0); // left half-width
+        assert_eq!(inner.top, 0.0 + 2.0); // top half-width
+        assert_eq!(inner.right, 100.0 - 4.0); // right half-width
+        assert_eq!(inner.bottom, 100.0 - 6.0); // bottom half-width
     }
 }
