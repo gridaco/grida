@@ -107,7 +107,7 @@ async fn demo_gradients() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         })]);
-        rect.stroke_style.stroke_width = 8.0;
+        rect.stroke_width = 8.0.into();
         graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
 
@@ -140,7 +140,7 @@ async fn demo_gradients() -> Scene {
             blend_mode: BlendMode::Normal,
             active: true,
         })]);
-        rect.stroke_style.stroke_width = 8.0;
+        rect.stroke_width = 8.0.into();
         graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
 

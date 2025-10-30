@@ -15,7 +15,7 @@ fn stroke_affects_render_bounds() {
     let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
-    rect.stroke_style.stroke_width = 10.0;
+    rect.stroke_width = 10.0.into();
     rect.stroke_style.stroke_align = StrokeAlign::Outside;
 
     let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);

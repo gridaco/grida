@@ -21,7 +21,7 @@ async fn demo_basic() -> Scene {
         height: 200.0,
     };
     image_node.corner_radius = RectangularCornerRadius::circular(20.0);
-    image_node.stroke_style.stroke_width = 2.0;
+    image_node.stroke_width = 2.0.into();
     image_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 4.0,
         dy: 4.0,
@@ -40,7 +40,7 @@ async fn demo_basic() -> Scene {
     };
     rect_node.corner_radius = RectangularCornerRadius::circular(10.0);
     rect_node.set_fill(Paint::from(CGColor(255, 0, 0, 255)));
-    rect_node.stroke_style.stroke_width = 2.0;
+    rect_node.stroke_width = 2.0.into();
     rect_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 4.0,
         dy: 4.0,
@@ -77,7 +77,7 @@ async fn demo_basic() -> Scene {
         blend_mode: BlendMode::Normal,
         active: true,
     })]);
-    ellipse_node.stroke_style.stroke_width = 6.0;
+    ellipse_node.stroke_width = 6.0.into();
 
     // Create a test polygon node (pentagon)
     let pentagon_points = (0..5)
@@ -96,7 +96,7 @@ async fn demo_basic() -> Scene {
     polygon_node.points = pentagon_points;
     polygon_node.fills = Paints::new([Paint::from(CGColor(255, 200, 0, 255))]);
     polygon_node.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-    polygon_node.stroke_style.stroke_width = 5.0;
+    polygon_node.stroke_width = 5.0.into();
 
     // Create a test regular polygon node (hexagon)
     let mut regular_polygon_node = nf.create_regular_polygon_node();
@@ -108,7 +108,7 @@ async fn demo_basic() -> Scene {
     };
     regular_polygon_node.point_count = 6; // hexagon
     regular_polygon_node.fills = Paints::new([Paint::from(CGColor(0, 200, 255, 255))]);
-    regular_polygon_node.stroke_style.stroke_width = 4.0;
+    regular_polygon_node.stroke_width = 4.0.into();
     regular_polygon_node.opacity = 0.5;
 
     // Create a test text span node
@@ -127,7 +127,7 @@ async fn demo_basic() -> Scene {
     path_node.transform = AffineTransform::new(550.0, 300.0, 0.0);
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
     path_node.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
-    path_node.stroke_style.stroke_width = 4.0;
+    path_node.stroke_width = 4.0.into();
 
     // Create a test line node with solid color
     let mut line_node = nf.create_line_node();

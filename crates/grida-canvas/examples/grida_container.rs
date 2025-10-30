@@ -25,7 +25,7 @@ async fn demo_clip() -> Scene {
         color: CGColor(0, 0, 0, 255),
     })]);
     container.clip = true;
-    container.stroke_style.stroke_width = 2.0;
+    container.stroke_width = 2.0.into();
 
     // Create an ellipse
     let mut ellipse = nf.create_ellipse_node();
@@ -36,7 +36,7 @@ async fn demo_clip() -> Scene {
     };
     ellipse.fills = Paints::new([Paint::from(CGColor(100, 200, 100, 255))]);
     ellipse.strokes = Paints::new([Paint::from(CGColor(50, 150, 50, 255))]);
-    ellipse.stroke_style.stroke_width = 2.0;
+    ellipse.stroke_width = 2.0.into();
 
     // Build scene graph
     let mut graph = SceneGraph::new();

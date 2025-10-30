@@ -158,6 +158,18 @@ impl StrokeWidth {
     }
 }
 
+impl From<f32> for StrokeWidth {
+    fn from(val: f32) -> Self {
+        StrokeWidth::Uniform(val)
+    }
+}
+
+impl Default for StrokeWidth {
+    fn default() -> Self {
+        StrokeWidth::None
+    }
+}
+
 /// Universal input format for stroke width values (CSS-like).
 ///
 /// This is the storage/serialization format that serves as the universal input
@@ -297,6 +309,24 @@ impl SingularStrokeWidth {
     /// Returns the stroke width value, or 0.0 if absent.
     pub fn value_or_zero(&self) -> f32 {
         self.0.unwrap_or_default()
+    }
+}
+
+impl From<f32> for SingularStrokeWidth {
+    fn from(val: f32) -> Self {
+        SingularStrokeWidth(Some(val))
+    }
+}
+
+impl From<Option<f32>> for SingularStrokeWidth {
+    fn from(val: Option<f32>) -> Self {
+        SingularStrokeWidth(val)
+    }
+}
+
+impl From<Option<f64>> for SingularStrokeWidth {
+    fn from(val: Option<f64>) -> Self {
+        SingularStrokeWidth(val.map(|v| v as f32))
     }
 }
 

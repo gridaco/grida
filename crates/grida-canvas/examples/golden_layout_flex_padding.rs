@@ -127,10 +127,10 @@ fn create_child_container(id: &str, width: f32, height: f32) -> ContainerNodeRec
         fills: Default::default(),
         strokes: Default::default(),
         stroke_style: StrokeStyle {
-            stroke_width: 0.0,
             stroke_align: StrokeAlign::Center,
             stroke_dash_array: None,
         },
+        stroke_width: Default::default(),
         effects: Default::default(),
         clip: Default::default(),
         layout_container: LayoutContainerStyle {

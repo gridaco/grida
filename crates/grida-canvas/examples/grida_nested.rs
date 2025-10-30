@@ -43,7 +43,7 @@ async fn demo_nested() -> Scene {
 
         // Add stroke to show boundaries
         container.strokes = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
-        container.stroke_style.stroke_width = 2.0;
+        container.stroke_width = 2.0.into();
 
         let container_id = graph.append_child(Node::Container(container), current_parent);
 
@@ -71,7 +71,7 @@ async fn demo_nested() -> Scene {
     star.inner_radius = 0.4;
     star.set_fill(Paint::from(CGColor(255, 255, 0, 255)));
     star.strokes = Paints::new([Paint::from(CGColor(255, 200, 0, 255))]);
-    star.stroke_style.stroke_width = 3.0;
+    star.stroke_width = 3.0.into();
     graph.append_child(Node::RegularStarPolygon(star), current_parent);
 
     Scene {
