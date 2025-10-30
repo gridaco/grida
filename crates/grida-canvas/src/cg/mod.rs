@@ -1,6 +1,7 @@
 pub mod alignment;
 pub mod prelude;
 pub mod stroke_dasharray;
+pub mod stroke_width;
 pub mod types;
 pub mod varwidth;
 

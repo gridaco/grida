@@ -772,6 +772,14 @@ pub struct JSONUnknownNodeProperties {
     pub stroke_width: f32,
     #[serde(rename = "strokeWidthProfile")]
     pub stroke_width_profile: Option<JSONVariableWidthProfile>,
+    #[serde(rename = "strokeLeftWidth")]
+    pub stroke_left_width: Option<f32>,
+    #[serde(rename = "strokeTopWidth")]
+    pub stroke_top_width: Option<f32>,
+    #[serde(rename = "strokeRightWidth")]
+    pub stroke_right_width: Option<f32>,
+    #[serde(rename = "strokeBottomWidth")]
+    pub stroke_bottom_width: Option<f32>,
     #[serde(rename = "strokeAlign")]
     pub stroke_align: Option<StrokeAlign>,
     #[serde(rename = "strokeCap")]

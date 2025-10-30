@@ -115,17 +115,6 @@ impl StrokeStyle {
     }
 }
 
-pub struct RectangularStrokeStyle {
-    pub stroke_align: StrokeAlign,
-    pub stroke_dash_array: Option<StrokeDashArray>,
-
-    pub stroke_width: Option<f32>,
-    pub stroke_top_width: Option<f32>,
-    pub stroke_right_width: Option<f32>,
-    pub stroke_bottom_width: Option<f32>,
-    pub stroke_left_width: Option<f32>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Size {
     pub width: f32,
