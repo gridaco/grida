@@ -279,11 +279,7 @@ impl GeometryCache {
 
                 let render_bounds = compute_render_bounds_from_style(
                     world_bounds,
-                    if !n.strokes.is_empty() {
-                        n.stroke_style.stroke_width
-                    } else {
-                        0.0
-                    },
+                    n.stroke_width.value_or_zero(),
                     n.stroke_style.stroke_align,
                     &n.effects,
                 );
@@ -333,11 +329,7 @@ impl GeometryCache {
                 let mut union_world_bounds = world_bounds;
                 let render_bounds = compute_render_bounds_from_style(
                     world_bounds,
-                    if n.has_stroke_geometry() {
-                        n.stroke_style.stroke_width
-                    } else {
-                        0.0
-                    },
+                    n.render_bounds_stroke_width(),
                     n.stroke_style.stroke_align,
                     &n.effects,
                 );
@@ -629,41 +621,104 @@ fn compute_render_bounds_from_style(
     bounds
 }
 
+/// Computes render bounds for nodes with per-side stroke widths.
+///
+/// Handles all three stroke alignments:
+/// - **Center**: Inflate by half-widths (stroke extends inward and outward)
+/// - **Inside**: No inflation (stroke is entirely inside node bounds)
+/// - **Outside**: Inflate by full-widths (stroke extends entirely outward)
+fn compute_render_bounds_with_rectangular_stroke(
+    world_bounds: Rectangle,
+    rect_stroke: &RectangularStrokeWidth,
+    stroke_align: StrokeAlign,
+    effects: &LayerEffects,
+) -> Rectangle {
+    let mut bounds = world_bounds;
+
+    // Inflate based on stroke alignment
+    match stroke_align {
+        StrokeAlign::Center => {
+            // Center: inflate by half the stroke width on each side
+            bounds = rect::inflate(
+                bounds,
+                rect::Sides {
+                    top: rect_stroke.stroke_top_width / 2.0,
+                    right: rect_stroke.stroke_right_width / 2.0,
+                    bottom: rect_stroke.stroke_bottom_width / 2.0,
+                    left: rect_stroke.stroke_left_width / 2.0,
+                },
+            );
+        }
+        StrokeAlign::Inside => {
+            // Inside: no inflation - stroke is entirely inside the node bounds
+            // bounds remain unchanged
+        }
+        StrokeAlign::Outside => {
+            // Outside: inflate by full stroke width on each side
+            bounds = rect::inflate(
+                bounds,
+                rect::Sides {
+                    top: rect_stroke.stroke_top_width,
+                    right: rect_stroke.stroke_right_width,
+                    bottom: rect_stroke.stroke_bottom_width,
+                    left: rect_stroke.stroke_left_width,
+                },
+            );
+        }
+    }
+
+    bounds = compute_render_bounds_from_effects(bounds, effects);
+
+    bounds
+}
+
 fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
     match node {
-        Node::Rectangle(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.stroke_style.stroke_width,
-            n.stroke_style.stroke_align,
-            &n.effects,
-        ),
+        Node::Rectangle(n) => {
+            // Check if this node has per-side stroke widths
+            if let Some(rect_stroke) = n.rectangular_stroke_width() {
+                compute_render_bounds_with_rectangular_stroke(
+                    world_bounds,
+                    &rect_stroke,
+                    n.stroke_style.stroke_align,
+                    &n.effects,
+                )
+            } else {
+                compute_render_bounds_from_style(
+                    world_bounds,
+                    n.render_bounds_stroke_width(),
+                    n.stroke_style.stroke_align,
+                    &n.effects,
+                )
+            }
+        }
         Node::Ellipse(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_style.stroke_width,
+            n.render_bounds_stroke_width(),
             n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::Polygon(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_style.stroke_width,
+            n.render_bounds_stroke_width(),
             n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::RegularPolygon(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_style.stroke_width,
+            n.render_bounds_stroke_width(),
             n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::RegularStarPolygon(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_style.stroke_width,
+            n.render_bounds_stroke_width(),
             n.stroke_style.stroke_align,
             &n.effects,
         ),
         Node::SVGPath(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_style.stroke_width,
+            n.stroke_width.value_or_zero(),
             n.stroke_style.stroke_align,
             &n.effects,
         ),
@@ -675,7 +730,7 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
         ),
         Node::Image(n) => compute_render_bounds_from_style(
             world_bounds,
-            n.stroke_style.stroke_width,
+            n.render_bounds_stroke_width(),
             n.stroke_style.stroke_align,
             &n.effects,
         ),
@@ -691,16 +746,24 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
             n.stroke_align,
             &LayerEffects::default(),
         ),
-        Node::Container(n) => compute_render_bounds_from_style(
-            world_bounds,
-            if n.has_stroke_geometry() {
-                n.stroke_style.stroke_width
+        Node::Container(n) => {
+            // Check if this node has per-side stroke widths
+            if let Some(rect_stroke) = n.rectangular_stroke_width() {
+                compute_render_bounds_with_rectangular_stroke(
+                    world_bounds,
+                    &rect_stroke,
+                    n.stroke_style.stroke_align,
+                    &n.effects,
+                )
             } else {
-                0.0
-            },
-            n.stroke_style.stroke_align,
-            &n.effects,
-        ),
+                compute_render_bounds_from_style(
+                    world_bounds,
+                    n.render_bounds_stroke_width(),
+                    n.stroke_style.stroke_align,
+                    &n.effects,
+                )
+            }
+        }
         Node::Error(_) => world_bounds,
         Node::Group(_) | Node::BooleanOperation(_) | Node::InitialContainer(_) => world_bounds,
     }

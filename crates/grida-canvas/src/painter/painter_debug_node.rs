@@ -37,10 +37,11 @@ impl<'a> NodePainter<'a> {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
                             self.painter.draw_fills(&shape, &node.fills);
+                            let stroke_width = node.render_bounds_stroke_width();
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
-                                node.stroke_style.stroke_width,
+                                stroke_width,
                                 node.stroke_style.stroke_align,
                                 node.stroke_style.stroke_dash_array.as_ref(),
                             );
@@ -67,10 +68,11 @@ impl<'a> NodePainter<'a> {
                             self.painter
                                 .draw_fills(&shape, std::slice::from_ref(&image_paint));
                             if !node.strokes.is_empty() {
+                                let stroke_width = node.render_bounds_stroke_width();
                                 self.painter.draw_strokes(
                                     &shape,
                                     &node.strokes,
-                                    node.stroke_style.stroke_width,
+                                    stroke_width,
                                     node.stroke_style.stroke_align,
                                     node.stroke_style.stroke_dash_array.as_ref(),
                                 );
@@ -95,7 +97,7 @@ impl<'a> NodePainter<'a> {
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
-                                node.stroke_style.stroke_width,
+                                node.stroke_width.value_or_zero(),
                                 node.stroke_style.stroke_align,
                                 node.stroke_style.stroke_dash_array.as_ref(),
                             );
@@ -168,7 +170,7 @@ impl<'a> NodePainter<'a> {
                                 self.painter.draw_strokes(
                                     &shape,
                                     &node.strokes,
-                                    node.stroke_style.stroke_width,
+                                    node.stroke_width.value_or_zero(),
                                     node.stroke_style.stroke_align,
                                     node.stroke_style.stroke_dash_array.as_ref(),
                                 );
@@ -192,7 +194,7 @@ impl<'a> NodePainter<'a> {
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
-                                node.stroke_style.stroke_width,
+                                node.stroke_width.value_or_zero(),
                                 node.stroke_style.stroke_align,
                                 node.stroke_style.stroke_dash_array.as_ref(),
                             );
@@ -217,6 +219,7 @@ impl<'a> NodePainter<'a> {
             fills: node.fills.clone(),
             strokes: node.strokes.clone(),
             stroke_style: node.stroke_style.clone(),
+            stroke_width: node.stroke_width.clone(),
             effects: node.effects.clone(),
             layout_child: node.layout_child.clone(),
         };
@@ -239,6 +242,7 @@ impl<'a> NodePainter<'a> {
             fills: node.fills.clone(),
             strokes: node.strokes.clone(),
             stroke_style: node.stroke_style.clone(),
+            stroke_width: node.stroke_width.clone(),
             effects: node.effects.clone(),
             layout_child: node.layout_child.clone(),
         };
@@ -348,7 +352,7 @@ impl<'a> NodePainter<'a> {
                                     self.painter.draw_strokes(
                                         &shape,
                                         &node.strokes,
-                                        node.stroke_style.stroke_width,
+                                        node.stroke_width.value_or_zero(),
                                         node.stroke_style.stroke_align,
                                         node.stroke_style.stroke_dash_array.as_ref(),
                                     );
@@ -449,10 +453,11 @@ impl<'a> NodePainter<'a> {
                                     }
 
                                     // Finally paint the stroke
+                                    let stroke_width = n.render_bounds_stroke_width();
                                     self.painter.draw_strokes(
                                         &shape,
                                         &n.strokes,
-                                        n.stroke_style.stroke_width,
+                                        stroke_width,
                                         n.stroke_style.stroke_align,
                                         n.stroke_style.stroke_dash_array.as_ref(),
                                     );

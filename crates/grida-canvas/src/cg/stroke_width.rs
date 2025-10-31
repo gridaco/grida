@@ -568,6 +568,7 @@ impl RectangularStrokeWidth {
             .max(self.stroke_bottom_width)
             .max(self.stroke_left_width)
     }
+}
 
 #[cfg(test)]
 mod tests {
@@ -845,38 +846,5 @@ mod tests {
             stroke_left_width: 2.0,
         };
         assert_eq!(rect.max(), 5.0);
-    }
-
-    #[test]
-    fn test_to_insets_center() {
-        let rect = RectangularStrokeWidth {
-            stroke_top_width: 10.0,
-            stroke_right_width: 20.0,
-            stroke_bottom_width: 30.0,
-            stroke_left_width: 40.0,
-        };
-        let (top, right, bottom, left) = rect.to_insets_center();
-        assert_eq!(top, 5.0);
-        assert_eq!(right, 10.0);
-        assert_eq!(bottom, 15.0);
-        assert_eq!(left, 20.0);
-    }
-
-    #[test]
-    fn test_to_inner_rect_center() {
-        let rect_stroke = RectangularStrokeWidth {
-            stroke_top_width: 4.0,
-            stroke_right_width: 8.0,
-            stroke_bottom_width: 12.0,
-            stroke_left_width: 6.0,
-        };
-        let outer = skia_safe::Rect::from_xywh(0.0, 0.0, 100.0, 100.0);
-        let inner = rect_stroke.to_inner_rect_center(outer);
-
-        // Inner rect should be inset by half-widths
-        assert_eq!(inner.left, 0.0 + 3.0); // left half-width
-        assert_eq!(inner.top, 0.0 + 2.0); // top half-width
-        assert_eq!(inner.right, 100.0 - 4.0); // right half-width
-        assert_eq!(inner.bottom, 100.0 - 6.0); // bottom half-width
     }
 }

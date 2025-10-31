@@ -769,6 +769,18 @@ pub trait NodeGeometryMixin {
     fn has_stroke_geometry(&self) -> bool;
 
     fn render_bounds_stroke_width(&self) -> f32;
+
+    /// Returns the rectangular stroke width if this node supports per-side strokes.
+    ///
+    /// For nodes that support per-side stroke widths (Rectangle, Container), this returns
+    /// `Some(RectangularStrokeWidth)` if the stroke is rectangular (non-uniform sides).
+    /// For uniform strokes or nodes that don't support per-side widths, returns `None`.
+    ///
+    /// This is used by the painter to determine whether to render a per-side stroke
+    /// or fall back to uniform stroke rendering.
+    fn rectangular_stroke_width(&self) -> Option<RectangularStrokeWidth> {
+        None // Default implementation for nodes that don't support per-side strokes
+    }
 }
 
 pub trait NodeRectMixin {
@@ -941,6 +953,13 @@ impl NodeGeometryMixin for ContainerNodeRec {
             0.0
         }
     }
+
+    fn rectangular_stroke_width(&self) -> Option<RectangularStrokeWidth> {
+        match &self.stroke_width {
+            StrokeWidth::Rectangular(rect_stroke) => Some(rect_stroke.clone()),
+            _ => None,
+        }
+    }
 }
 
 /// Initial Container Block - Viewport-filling flex container
@@ -1027,6 +1046,13 @@ impl NodeGeometryMixin for RectangleNodeRec {
             self.stroke_width.max()
         } else {
             0.0
+        }
+    }
+
+    fn rectangular_stroke_width(&self) -> Option<RectangularStrokeWidth> {
+        match &self.stroke_width {
+            StrokeWidth::Rectangular(rect_stroke) => Some(rect_stroke.clone()),
+            _ => None,
         }
     }
 }
