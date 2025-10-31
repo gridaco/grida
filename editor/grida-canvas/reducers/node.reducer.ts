@@ -418,6 +418,30 @@ const safe_properties: Partial<
       );
     },
   }),
+  strokeTopWidth: defineNodeProperty<"strokeTopWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeTopWidth = value;
+    },
+  }),
+  strokeRightWidth: defineNodeProperty<"strokeRightWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeRightWidth = value;
+    },
+  }),
+  strokeBottomWidth: defineNodeProperty<"strokeBottomWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeBottomWidth = value;
+    },
+  }),
+  strokeLeftWidth: defineNodeProperty<"strokeLeftWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeLeftWidth = value;
+    },
+  }),
   strokeAlign: defineNodeProperty<"strokeAlign">({
     assert: (node) =>
       node.type === "vector" ||
@@ -432,6 +456,22 @@ const safe_properties: Partial<
   strokeCap: defineNodeProperty<"strokeCap">({
     apply: (draft, value, prev) => {
       (draft as UN).strokeCap = value;
+    },
+  }),
+  strokeDashArray: defineNodeProperty<"strokeDashArray">({
+    assert: (node) =>
+      node.type === "vector" ||
+      node.type === "line" ||
+      node.type === "rectangle" ||
+      node.type === "ellipse" ||
+      node.type === "polygon" ||
+      node.type === "star" ||
+      node.type === "svgpath" ||
+      node.type === "image" ||
+      node.type === "container" ||
+      node.type === "boolean",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeDashArray = value;
     },
   }),
   feShadows: defineNodeProperty<"feShadows">({

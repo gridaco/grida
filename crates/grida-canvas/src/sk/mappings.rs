@@ -1,4 +1,4 @@
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use skia_safe;
 
 impl From<CGColor> for skia_safe::Color {
@@ -63,6 +63,16 @@ impl From<BlendMode> for skia_safe::BlendMode {
             BlendMode::Saturation => Saturation,
             BlendMode::Color => Color,
             BlendMode::Luminosity => Luminosity,
+        }
+    }
+}
+
+impl Into<skia_safe::PaintCap> for StrokeCap {
+    fn into(self) -> skia_safe::PaintCap {
+        match self {
+            StrokeCap::Butt => skia_safe::PaintCap::Butt,
+            StrokeCap::Round => skia_safe::PaintCap::Round,
+            StrokeCap::Square => skia_safe::PaintCap::Square,
         }
     }
 }

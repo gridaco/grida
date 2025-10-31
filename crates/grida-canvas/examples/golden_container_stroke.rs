@@ -13,8 +13,8 @@ async fn scene() -> Scene {
     let mut container = nf.create_container_node();
     container.layout_dimensions.width = Some(400.0);
     container.layout_dimensions.height = Some(400.0);
-    container.stroke_width = 10.0;
-    container.stroke_align = StrokeAlign::Outside;
+    container.stroke_width = 10.0.into();
+    container.stroke_style.stroke_align = StrokeAlign::Outside;
     container.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
     container.set_fill(Paint::from(CGColor(255, 255, 255, 255)));
     // Center the container in the 800x800 canvas

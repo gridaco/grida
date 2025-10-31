@@ -711,6 +711,31 @@ pub fn pad(rect: Rectangle, padding: impl Into<Sides>) -> Rectangle {
     }
 }
 
+/// Inflates the rectangle by different amounts on each side.
+///
+/// Unlike `pad()` which keeps the center fixed, this expands the rectangle
+/// outward from its edges, moving the top-left corner.
+///
+/// # Example
+///
+/// ```ignore
+/// let rect = Rectangle::from_xywh(10.0, 20.0, 100.0, 50.0);
+/// let inflated = rect.inflate(Sides { top: 5.0, right: 10.0, bottom: 5.0, left: 10.0 });
+/// // inflated.x = 0.0 (10 - 10)
+/// // inflated.y = 15.0 (20 - 5)
+/// // inflated.width = 120.0 (100 + 10 + 10)
+/// // inflated.height = 60.0 (50 + 5 + 5)
+/// ```
+pub fn inflate(rect: Rectangle, sides: impl Into<Sides>) -> Rectangle {
+    let s = sides.into();
+    Rectangle {
+        x: rect.x - s.left,
+        y: rect.y - s.top,
+        width: rect.width + s.left + s.right,
+        height: rect.height + s.top + s.bottom,
+    }
+}
+
 /// Insets the rectangle by the given margin while keeping its center.
 pub fn inset(rect: Rectangle, margin: impl Into<Sides>) -> Rectangle {
     let m = margin.into();

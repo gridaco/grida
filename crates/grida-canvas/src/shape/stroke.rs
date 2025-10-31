@@ -1,4 +1,4 @@
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use skia_safe::{path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, StrokeRec};
 
 /// Computes the stroke geometry path for a given input `Path`, enabling rich stroke
@@ -51,7 +51,7 @@ pub fn stroke_geometry(
     source_path: &Path,
     stroke_width: f32,
     stroke_align: StrokeAlign,
-    stroke_dash_array: Option<&Vec<f32>>,
+    stroke_dash_array: Option<&StrokeDashArray>,
 ) -> Path {
     use StrokeAlign::*;
 
@@ -76,7 +76,7 @@ pub fn stroke_geometry(
     // Apply dash effect if provided
     let mut path_to_stroke = source_path.clone();
     if let Some(dashes) = stroke_dash_array {
-        if let Some(pe) = PathEffect::dash(dashes, 0.0) {
+        if let Some(pe) = PathEffect::dash(&dashes.normalized(), 0.0) {
             if let Some((dashed, _)) =
                 pe.filter_path(source_path, &stroke_rec, source_path.bounds())
             {

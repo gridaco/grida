@@ -8,7 +8,7 @@
 //! - V1 nodes (fixed schema) use schema values (bounds parameter for future migration)
 //! - Missing bounds when accessed is a PANIC (pipeline bug)
 
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use crate::shape::*;

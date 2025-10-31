@@ -1,5 +1,5 @@
 use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::node::{scene_graph::SceneGraph, schema::*};
 use crate::painter::Painter;
 use crate::runtime::counter::FrameCounter;

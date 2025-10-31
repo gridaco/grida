@@ -9,7 +9,7 @@ fn dashed_stroke_has_more_segments() {
     path.line_to((100.0, 0.0));
 
     let solid = stroke_geometry(&path, 10.0, StrokeAlign::Center, None);
-    let dashed = stroke_geometry(&path, 10.0, StrokeAlign::Center, Some(&vec![10.0, 10.0]));
+    let dashed = stroke_geometry(&path, 10.0, StrokeAlign::Center, Some(&[10.0, 10.0].into()));
 
     assert!(dashed.count_verbs() > solid.count_verbs());
 }

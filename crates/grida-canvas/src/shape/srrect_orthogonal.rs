@@ -10,7 +10,7 @@
 //! - Cannot generalize to arbitrary shapes
 
 use super::vn::VectorNetwork;
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 
 /// Rectangular shape with smooth corners optimized for orthogonal (90°) angles.
 ///
