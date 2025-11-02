@@ -123,6 +123,7 @@ describe("archive comprehensive", () => {
           zIndex: 0,
           strokeWidth: 0,
           strokeCap: "butt",
+          strokeJoin: "miter",
           fill: {
             type: "solid",
             color: { r: 255, g: 0, b: 0, a: 1 },

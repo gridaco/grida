@@ -1657,6 +1657,11 @@ export namespace grida.program.nodes {
        * @default "butt"
        */
       strokeCap: cg.StrokeCap;
+
+      /**
+       * @default "miter"
+       */
+      strokeJoin: cg.StrokeJoin;
     }
 
     /**
@@ -2563,6 +2568,7 @@ export namespace grida.program.nodes {
             cornerRadiusBottomRight: 0,
             strokeWidth: 0,
             strokeCap: "butt",
+            strokeJoin: "miter",
             ...prototype,
             id: id,
           } satisfies RectangleNode;

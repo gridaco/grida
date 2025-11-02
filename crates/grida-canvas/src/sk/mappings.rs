@@ -77,6 +77,16 @@ impl Into<skia_safe::PaintCap> for StrokeCap {
     }
 }
 
+impl Into<skia_safe::PaintJoin> for StrokeJoin {
+    fn into(self) -> skia_safe::PaintJoin {
+        match self {
+            StrokeJoin::Miter => skia_safe::PaintJoin::Miter,
+            StrokeJoin::Round => skia_safe::PaintJoin::Round,
+            StrokeJoin::Bevel => skia_safe::PaintJoin::Bevel,
+        }
+    }
+}
+
 impl From<TextDecorationLine> for skia_safe::textlayout::TextDecoration {
     fn from(mode: TextDecorationLine) -> Self {
         match mode {

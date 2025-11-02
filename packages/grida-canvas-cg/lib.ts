@@ -212,6 +212,18 @@ export namespace cg {
   export type StrokeCap = "butt" | "round" | "square";
 
   /**
+   * Supported stroke join modes
+   *
+   * - `miter`
+   * - `round`
+   * - `bevel`
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin
+   * @see https://api.flutter.dev/flutter/dart-ui/StrokeJoin.html
+   */
+  export type StrokeJoin = "miter" | "round" | "bevel";
+
+  /**
    * @see https://www.figma.com/plugin-docs/api/properties/nodes-strokealign/
    * @see https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html
    */

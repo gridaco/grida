@@ -67,6 +67,7 @@ function createDocument(): grida.program.document.Document {
         cornerRadius: 0,
         strokeWidth: 0,
         strokeCap: "butt",
+        strokeJoin: "miter",
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
@@ -90,6 +91,7 @@ function createDocument(): grida.program.document.Document {
         cornerRadius: 0,
         strokeWidth: 0,
         strokeCap: "butt",
+        strokeJoin: "miter",
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
