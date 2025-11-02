@@ -63,6 +63,7 @@ fn main() {
             stroke_align: *align,
             stroke_cap: StrokeCap::default(),
             stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
             paints: Paints::new([Paint::from(stroke_color)]),
             width_profile: None,
             stroke_dash_array: None,

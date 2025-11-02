@@ -17,6 +17,7 @@ pub struct StrokeOptions {
     pub stroke_align: StrokeAlign,
     pub stroke_cap: StrokeCap,
     pub stroke_join: StrokeJoin,
+    pub stroke_miter_limit: StrokeMiterLimit,
     pub stroke_dash_array: Option<StrokeDashArray>,
 }
 
@@ -133,6 +134,7 @@ impl<'a> VNPainter<'a> {
                     stroke_opts.stroke_align,
                     stroke_opts.stroke_cap,
                     stroke_opts.stroke_join,
+                    stroke_opts.stroke_miter_limit,
                     stroke_opts.stroke_dash_array.as_ref(),
                 );
                 self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
@@ -148,6 +150,7 @@ impl<'a> VNPainter<'a> {
                         stroke_opts.stroke_align,
                         stroke_opts.stroke_cap,
                         stroke_opts.stroke_join,
+                        stroke_opts.stroke_miter_limit,
                         stroke_opts.stroke_dash_array.as_ref(),
                     );
                     self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
@@ -189,6 +192,7 @@ impl<'a> VNPainter<'a> {
                             stroke_opts.stroke_align,
                             stroke_opts.stroke_cap,
                             stroke_opts.stroke_join,
+                            stroke_opts.stroke_miter_limit,
                             stroke_opts.stroke_dash_array.as_ref(),
                         );
                         self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
@@ -402,6 +406,7 @@ mod tests {
             stroke_align: StrokeAlign::Center,
             stroke_cap: StrokeCap::default(),
             stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
             paints: Paints::new([Paint::Image(ImagePaint {
                 image: ResourceRef::RID("stroke_img".to_string()),
                 quarter_turns: 0,

@@ -1,4 +1,4 @@
-use cg::cg::types::{StrokeAlign, StrokeCap, StrokeJoin};
+use cg::cg::types::{StrokeAlign, StrokeCap, StrokeJoin, StrokeMiterLimit};
 use cg::shape::stroke::stroke_geometry;
 use skia_safe::Path;
 
@@ -14,6 +14,7 @@ fn open_path_uses_center_alignment_for_inside_outside() {
         StrokeAlign::Center,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         None,
     );
     let inside = stroke_geometry(
@@ -22,6 +23,7 @@ fn open_path_uses_center_alignment_for_inside_outside() {
         StrokeAlign::Inside,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         None,
     );
     let outside = stroke_geometry(
@@ -30,6 +32,7 @@ fn open_path_uses_center_alignment_for_inside_outside() {
         StrokeAlign::Outside,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         None,
     );
 

@@ -234,6 +234,7 @@ fn compute_centerline_rrect(
 /// - `rect_stroke`: The per-side stroke widths
 /// - `corner_radius`: Per-corner radii
 /// - `stroke_align`: Stroke alignment (Center, Inside, or Outside)
+/// - `stroke_miter_limit`: Miter limit for Miter joins (only affects dashed strokes)
 /// - `stroke_dash_array`: Optional dash pattern
 ///
 /// # Returns
@@ -244,6 +245,7 @@ pub fn stroke_geometry_rectangular(
     rect_stroke: &RectangularStrokeWidth,
     corner_radius: &RectangularCornerRadius,
     stroke_align: StrokeAlign,
+    stroke_miter_limit: StrokeMiterLimit,
     stroke_dash_array: Option<&StrokeDashArray>,
 ) -> Path {
     // Check if all widths are zero (no stroke)
@@ -278,6 +280,7 @@ pub fn stroke_geometry_rectangular(
             rect_stroke,
             corner_radius,
             stroke_align,
+            stroke_miter_limit,
             rr_outer,
             rr_inner,
             stroke_dash_array.unwrap(),
@@ -300,6 +303,7 @@ fn stroke_geometry_rectangular_dashed_rrect(
     rect_stroke: &RectangularStrokeWidth,
     corner_radius: &RectangularCornerRadius,
     stroke_align: StrokeAlign,
+    stroke_miter_limit: StrokeMiterLimit,
     rr_outer: RRect,
     rr_inner: RRect,
     stroke_dash_array: &StrokeDashArray,
@@ -319,6 +323,11 @@ fn stroke_geometry_rectangular_dashed_rrect(
     let max_width = rect_stroke.max();
     let mut stroke_rec = StrokeRec::new(InitStyle::Hairline);
     stroke_rec.set_stroke_style(max_width, false);
+    stroke_rec.set_stroke_params(
+        StrokeCap::default().into(),
+        StrokeJoin::default().into(),
+        stroke_miter_limit.value(),
+    );
 
     // Apply dash effect
     let mut path_to_stroke = centerline_path.clone();

@@ -62,10 +62,11 @@ async fn demo_booleans() -> Scene {
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_style: StrokeStyle {
-                stroke_align: StrokeAlign::Center,
-                stroke_cap: StrokeCap::default(),
-                stroke_join: StrokeJoin::default(),
-                stroke_dash_array: None,
+            stroke_align: StrokeAlign::Center,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
+            stroke_dash_array: None,
             },
             stroke_width: 2.0.into(),
         };
@@ -126,10 +127,11 @@ async fn demo_booleans() -> Scene {
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_style: StrokeStyle {
-                stroke_align: StrokeAlign::Center,
-                stroke_cap: StrokeCap::default(),
-                stroke_join: StrokeJoin::default(),
-                stroke_dash_array: None,
+            stroke_align: StrokeAlign::Center,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
+            stroke_dash_array: None,
             },
             stroke_width: 2.0.into(),
         };
@@ -191,10 +193,11 @@ async fn demo_booleans() -> Scene {
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_style: StrokeStyle {
-                stroke_align: StrokeAlign::Center,
-                stroke_cap: StrokeCap::default(),
-                stroke_join: StrokeJoin::default(),
-                stroke_dash_array: None,
+            stroke_align: StrokeAlign::Center,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
+            stroke_dash_array: None,
             },
             stroke_width: 2.0.into(),
         };
@@ -256,10 +259,11 @@ async fn demo_booleans() -> Scene {
             fills: Paints::new([Paint::from(CGColor(100, 100, 200, 255))]),
             strokes: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
             stroke_style: StrokeStyle {
-                stroke_align: StrokeAlign::Center,
-                stroke_cap: StrokeCap::default(),
-                stroke_join: StrokeJoin::default(),
-                stroke_dash_array: None,
+            stroke_align: StrokeAlign::Center,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
+            stroke_dash_array: None,
             },
             stroke_width: 2.0.into(),
         };

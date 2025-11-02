@@ -31,6 +31,7 @@ fn create_child_container(id: &str, width: f32, height: f32) -> ContainerNodeRec
             stroke_align: StrokeAlign::Center,
             stroke_cap: StrokeCap::default(),
             stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
             stroke_dash_array: None,
         },
         stroke_width: Default::default(),

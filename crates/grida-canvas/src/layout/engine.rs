@@ -1404,6 +1404,7 @@ mod tests {
             stroke_align: StrokeAlign::Inside,
             stroke_cap: StrokeCap::default(),
             stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
             stroke_dash_array: None,
             layout_child: None,
         };

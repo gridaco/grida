@@ -45,6 +45,7 @@ impl<'a> NodePainter<'a> {
                                 node.stroke_style.stroke_align,
                                 node.stroke_style.stroke_cap,
                                 node.stroke_style.stroke_join,
+                                node.stroke_style.stroke_miter_limit,
                                 node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
@@ -78,6 +79,7 @@ impl<'a> NodePainter<'a> {
                                     node.stroke_style.stroke_align,
                                     node.stroke_style.stroke_cap,
                                     node.stroke_style.stroke_join,
+                                    node.stroke_style.stroke_miter_limit,
                                     node.stroke_style.stroke_dash_array.as_ref(),
                                 );
                             }
@@ -105,6 +107,7 @@ impl<'a> NodePainter<'a> {
                                 node.stroke_style.stroke_align,
                                 node.stroke_style.stroke_cap,
                                 node.stroke_style.stroke_join,
+                                node.stroke_style.stroke_miter_limit,
                                 node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
@@ -128,6 +131,7 @@ impl<'a> NodePainter<'a> {
                         node.get_stroke_align(),
                         node.stroke_cap,
                         StrokeJoin::default(), // Join not applicable for single line
+                        node.stroke_miter_limit,
                         node.stroke_dash_array.as_ref(),
                     );
                 });
@@ -154,6 +158,7 @@ impl<'a> NodePainter<'a> {
                                 stroke_align,
                                 node.stroke_cap,
                                 node.stroke_join,
+                                node.stroke_miter_limit,
                                 node.stroke_dash_array.as_ref(),
                             );
                         });
@@ -184,6 +189,7 @@ impl<'a> NodePainter<'a> {
                                     node.stroke_style.stroke_align,
                                     node.stroke_style.stroke_cap,
                                     node.stroke_style.stroke_join,
+                                    node.stroke_style.stroke_miter_limit,
                                     node.stroke_style.stroke_dash_array.as_ref(),
                                 );
                             }
@@ -210,6 +216,7 @@ impl<'a> NodePainter<'a> {
                                 node.stroke_style.stroke_align,
                                 node.stroke_style.stroke_cap,
                                 node.stroke_style.stroke_join,
+                                node.stroke_style.stroke_miter_limit,
                                 node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
@@ -321,6 +328,7 @@ impl<'a> NodePainter<'a> {
                     StrokeAlign::Inside,
                     StrokeCap::default(),
                     StrokeJoin::default(),
+                    StrokeMiterLimit::default(),
                     None,
                 );
             });
@@ -372,6 +380,7 @@ impl<'a> NodePainter<'a> {
                                         node.stroke_style.stroke_align,
                                         node.stroke_style.stroke_cap,
                                         node.stroke_style.stroke_join,
+                                        node.stroke_style.stroke_miter_limit,
                                         node.stroke_style.stroke_dash_array.as_ref(),
                                     );
                                 }
@@ -479,6 +488,7 @@ impl<'a> NodePainter<'a> {
                                         n.stroke_style.stroke_align,
                                         n.stroke_style.stroke_cap,
                                         n.stroke_style.stroke_join,
+                                        n.stroke_style.stroke_miter_limit,
                                         n.stroke_style.stroke_dash_array.as_ref(),
                                     );
                                 });

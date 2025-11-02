@@ -45,6 +45,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
                 layout_child: None,
             };
@@ -80,6 +81,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
                 layout_child: None,
             };
@@ -116,6 +118,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
                 layout_child: None,
             };
@@ -148,6 +151,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
                 layout_child: None,
             };
@@ -183,6 +187,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
                 layout_child: None,
             };
@@ -227,6 +232,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
                 layout_child: None,
             };
@@ -260,6 +266,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
                 layout_child: None,
             };
@@ -303,6 +310,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
                 layout_child: None,
             };
@@ -341,6 +349,7 @@ async fn demo_vectors() -> Scene {
                 stroke_align: StrokeAlign::Center,
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
                 layout_child: None,
             };

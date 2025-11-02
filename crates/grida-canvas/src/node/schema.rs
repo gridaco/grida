@@ -79,6 +79,7 @@ pub struct StrokeStyle {
     pub stroke_align: StrokeAlign,
     pub stroke_cap: StrokeCap,
     pub stroke_join: StrokeJoin,
+    pub stroke_miter_limit: StrokeMiterLimit,
     pub stroke_dash_array: Option<StrokeDashArray>,
 }
 
@@ -88,6 +89,7 @@ impl Default for StrokeStyle {
             stroke_align: StrokeAlign::default(),
             stroke_cap: StrokeCap::default(),
             stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
             stroke_dash_array: None,
         }
     }
@@ -108,6 +110,10 @@ impl StrokeStyle {
 
     pub fn set_join(&mut self, join: StrokeJoin) {
         self.stroke_join = join;
+    }
+
+    pub fn set_miter_limit(&mut self, limit: impl Into<StrokeMiterLimit>) {
+        self.stroke_miter_limit = limit.into();
     }
 
     pub fn set_dash_array(&mut self, dash_array: Option<impl Into<StrokeDashArray>>) {
@@ -1108,6 +1114,7 @@ pub struct LineNodeRec {
     pub strokes: Paints,
     pub stroke_width: f32,
     pub stroke_cap: StrokeCap,
+    pub stroke_miter_limit: StrokeMiterLimit,
     pub stroke_dash_array: Option<StrokeDashArray>,
     pub _data_stroke_align: StrokeAlign,
 
@@ -1403,6 +1410,7 @@ pub struct VectorNodeRec {
     pub stroke_align: StrokeAlign,
     pub stroke_cap: StrokeCap,
     pub stroke_join: StrokeJoin,
+    pub stroke_miter_limit: StrokeMiterLimit,
     pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// Layout style for this node when it is a child of a layout container.

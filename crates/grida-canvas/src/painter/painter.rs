@@ -451,6 +451,7 @@ impl<'a> Painter<'a> {
         stroke_align: StrokeAlign,
         stroke_cap: StrokeCap,
         stroke_join: StrokeJoin,
+        stroke_miter_limit: StrokeMiterLimit,
         stroke_dash_array: Option<&StrokeDashArray>,
     ) {
         if stroke_width <= 0.0 || strokes.is_empty() {
@@ -462,6 +463,7 @@ impl<'a> Painter<'a> {
             stroke_align,
             stroke_cap,
             stroke_join,
+            stroke_miter_limit,
             stroke_dash_array,
         );
         self.draw_stroke_path(shape, &stroke_path, strokes);
@@ -793,6 +795,7 @@ impl<'a> Painter<'a> {
                                         stroke_align: vector_layer.stroke_align,
                                         stroke_cap: vector_layer.stroke_cap,
                                         stroke_join: vector_layer.stroke_join,
+                                        stroke_miter_limit: vector_layer.stroke_miter_limit,
                                         paints: vector_layer.strokes.clone(),
                                         width_profile: vector_layer.stroke_width_profile.clone(),
                                         stroke_dash_array: vector_layer.stroke_dash_array.clone(),

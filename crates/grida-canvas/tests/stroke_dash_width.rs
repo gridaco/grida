@@ -28,6 +28,7 @@ fn test_horizontal_line_dashed_vs_solid_stroke_width() {
         StrokeAlign::Center,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         None,
     );
     let solid_bounds = solid.compute_tight_bounds();
@@ -38,6 +39,7 @@ fn test_horizontal_line_dashed_vs_solid_stroke_width() {
         StrokeAlign::Center,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         Some(&StrokeDashArray::from(vec![10.0, 5.0])),
     );
     let dashed_bounds = dashed.compute_tight_bounds();
@@ -64,6 +66,7 @@ fn test_vertical_line_dashed_vs_solid_stroke_width() {
         StrokeAlign::Center,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         None,
     );
     let solid_bounds = solid.compute_tight_bounds();
@@ -74,6 +77,7 @@ fn test_vertical_line_dashed_vs_solid_stroke_width() {
         StrokeAlign::Center,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         Some(&StrokeDashArray::from(vec![10.0, 5.0])),
     );
     let dashed_bounds = dashed.compute_tight_bounds();
@@ -102,6 +106,7 @@ fn test_multiple_stroke_widths() {
             StrokeAlign::Center,
             StrokeCap::default(),
             StrokeJoin::default(),
+            StrokeMiterLimit::default(),
             None,
         );
         let solid_height = solid.compute_tight_bounds().height();
@@ -112,6 +117,7 @@ fn test_multiple_stroke_widths() {
             StrokeAlign::Center,
             StrokeCap::default(),
             StrokeJoin::default(),
+            StrokeMiterLimit::default(),
             Some(&StrokeDashArray::from(vec![10.0, 5.0])),
         );
         let dashed_height = dashed.compute_tight_bounds().height();

@@ -123,6 +123,7 @@ fn draw_rectangular_stroke(canvas: &Canvas, config: &DemoConfig, align: StrokeAl
         &config.widths,
         &config.radii,
         align,
+        StrokeMiterLimit::default(),
         dash_array.as_ref(),
     );
 

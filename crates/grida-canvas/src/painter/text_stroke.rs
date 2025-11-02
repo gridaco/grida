@@ -1,4 +1,4 @@
-use crate::cg::types::{Paint, StrokeAlign, StrokeCap, StrokeJoin};
+use crate::cg::types::{Paint, StrokeAlign, StrokeCap, StrokeJoin, StrokeMiterLimit};
 use crate::painter::paint;
 use crate::runtime::image_repository::ImageRepository;
 use crate::shape::stroke::stroke_geometry;
@@ -43,6 +43,7 @@ pub fn draw_text_stroke(
         stroke_align,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         None,
     );
     if stroke_path.is_empty() {

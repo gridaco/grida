@@ -14,6 +14,7 @@ fn dashed_stroke_has_more_segments() {
         StrokeAlign::Center,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         None,
     );
     let dashed = stroke_geometry(
@@ -22,6 +23,7 @@ fn dashed_stroke_has_more_segments() {
         StrokeAlign::Center,
         StrokeCap::default(),
         StrokeJoin::default(),
+        StrokeMiterLimit::default(),
         Some(&[10.0, 10.0].into()),
     );
 

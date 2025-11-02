@@ -18,6 +18,7 @@ use skia_safe::{path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, St
 ///   - `StrokeAlign::Outside`: Stroke lies entirely outside the path boundary.
 /// - `stroke_cap`: End cap style (Butt/Round/Square) for open paths.
 /// - `stroke_join`: Corner join style (Miter/Round/Bevel) where path segments meet.
+/// - `stroke_miter_limit`: Miter limit for Miter joins (default 4.0).
 /// - `stroke_dash_array`: Optional dash pattern (e.g., `[10.0, 4.0]` for 10 on, 4 off).
 ///
 /// # Returns
@@ -55,6 +56,7 @@ pub fn stroke_geometry(
     stroke_align: StrokeAlign,
     stroke_cap: StrokeCap,
     stroke_join: StrokeJoin,
+    stroke_miter_limit: StrokeMiterLimit,
     stroke_dash_array: Option<&StrokeDashArray>,
 ) -> Path {
     use StrokeAlign::*;
@@ -76,7 +78,11 @@ pub fn stroke_geometry(
     // Create a stroke record with the adjusted width
     let mut stroke_rec = StrokeRec::new(InitStyle::Hairline);
     stroke_rec.set_stroke_style(adjusted_width, false);
-    stroke_rec.set_stroke_params(stroke_cap.into(), stroke_join.into(), 4.0); // miter_limit=4
+    stroke_rec.set_stroke_params(
+        stroke_cap.into(),
+        stroke_join.into(),
+        stroke_miter_limit.value(),
+    );
 
     // Apply dash effect if provided
     let mut path_to_stroke = source_path.clone();

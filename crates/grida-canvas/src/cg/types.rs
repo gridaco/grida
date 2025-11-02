@@ -560,6 +560,87 @@ impl Default for StrokeJoin {
     }
 }
 
+/// Miter limit for stroke joins.
+///
+/// Controls when a miter join falls back to a bevel join based on the ratio
+/// of miter length to stroke width. Common default is 4.0 (standard across
+/// Skia, SVG, Canvas API).
+///
+/// Only affects `StrokeJoin::Miter` joins. When two path segments meet at a sharp
+/// angle, the miter join extends the outer edges until they meet. The miter limit
+/// prevents excessively long spikes by switching to a bevel join when:
+///
+/// ```text
+/// miter_length / stroke_width > miter_limit
+/// ```
+///
+/// # Default Value
+///
+/// The default miter limit is **4.0**, which is the standard across:
+/// - Skia: Default miter limit
+/// - SVG: Default `stroke-miterlimit` attribute
+/// - Canvas API: Default `miterLimit` property
+/// - PDF: Default miter limit
+///
+/// A limit of 4.0 means angles less than approximately 29° will bevel.
+///
+/// # Common Values
+///
+/// - **1.0**: Only very obtuse angles remain mitered (> ~90°)
+/// - **4.0**: Standard default, bevels acute angles (< ~29°)
+/// - **10.0**: Allows sharper miters, bevels very acute angles (< ~11°)
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::StrokeMiterLimit;
+///
+/// let default_limit = StrokeMiterLimit::default();
+/// assert_eq!(default_limit.value(), 4.0);
+///
+/// let custom_limit = StrokeMiterLimit::new(10.0);
+/// assert_eq!(custom_limit.value(), 10.0);
+/// ```
+///
+/// # See Also
+///
+/// - [`StrokeJoin`] - The join style that miter limit applies to
+/// - [MDN miterLimit](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/miterLimit)
+/// - [SVG stroke-miterlimit](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-miterlimit)
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub struct StrokeMiterLimit(#[serde(default = "StrokeMiterLimit::default_value")] pub f32);
+
+impl StrokeMiterLimit {
+    pub const DEFAULT_VALUE: f32 = 4.0;
+
+    /// Creates a new miter limit with the specified value.
+    pub const fn new(limit: f32) -> Self {
+        Self(limit)
+    }
+
+    /// Returns the default miter limit value (4.0).
+    fn default_value() -> f32 {
+        Self::DEFAULT_VALUE
+    }
+
+    /// Returns the miter limit value.
+    pub fn value(&self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for StrokeMiterLimit {
+    fn default() -> Self {
+        Self(4.0)
+    }
+}
+
+impl From<f32> for StrokeMiterLimit {
+    fn from(value: f32) -> Self {
+        Self(value)
+    }
+}
+
 /// Stroke alignment.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  

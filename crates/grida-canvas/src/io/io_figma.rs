@@ -789,6 +789,7 @@ impl FigmaConverter {
                 ),
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: component
                     .stroke_dashes
                     .clone()
@@ -912,6 +913,7 @@ impl FigmaConverter {
                 ),
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: instance
                     .stroke_dashes
                     .clone()
@@ -983,6 +985,7 @@ impl FigmaConverter {
                     stroke_align: StrokeAlign::Inside,
                     stroke_cap: StrokeCap::default(),
                     stroke_join: StrokeJoin::default(),
+                    stroke_miter_limit: StrokeMiterLimit::default(),
                     stroke_dash_array: None,
                 },
                 stroke_width: StrokeWidth::None,
@@ -1141,6 +1144,7 @@ impl FigmaConverter {
                 ),
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1334,6 +1338,7 @@ impl FigmaConverter {
                         stroke_align: StrokeAlign::Inside,
                         stroke_cap: StrokeCap::default(),
                         stroke_join: StrokeJoin::default(),
+                        stroke_miter_limit: StrokeMiterLimit::default(),
                         stroke_dash_array: None,
                     },
                     stroke_width: SingularStrokeWidth(None),
@@ -1361,6 +1366,7 @@ impl FigmaConverter {
                         stroke_align: StrokeAlign::Inside,
                         stroke_cap: StrokeCap::default(),
                         stroke_join: StrokeJoin::default(),
+                        stroke_miter_limit: StrokeMiterLimit::default(),
                         stroke_dash_array: None,
                     },
                     stroke_width: SingularStrokeWidth(None),
@@ -1388,6 +1394,7 @@ impl FigmaConverter {
                     stroke_align: StrokeAlign::Inside,
                     stroke_cap: StrokeCap::default(),
                     stroke_join: StrokeJoin::default(),
+                    stroke_miter_limit: StrokeMiterLimit::default(),
                     stroke_dash_array: None,
                 },
                 stroke_width: StrokeWidth::None,
@@ -1480,6 +1487,7 @@ impl FigmaConverter {
                 ),
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1517,6 +1525,7 @@ impl FigmaConverter {
                 ),
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1553,6 +1562,7 @@ impl FigmaConverter {
                 .collect(),
             stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_cap: StrokeCap::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
             _data_stroke_align: Self::convert_stroke_align(
                 origin
                     .stroke_align
@@ -1603,6 +1613,7 @@ impl FigmaConverter {
                 ),
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1655,6 +1666,7 @@ impl FigmaConverter {
                 ),
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1701,6 +1713,7 @@ impl FigmaConverter {
                 ),
                 stroke_cap: StrokeCap::default(),
                 stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()

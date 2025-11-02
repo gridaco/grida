@@ -189,6 +189,7 @@ pub struct PainterPictureVectorLayer {
     pub stroke_align: StrokeAlign,
     pub stroke_cap: StrokeCap,
     pub stroke_join: StrokeJoin,
+    pub stroke_miter_limit: StrokeMiterLimit,
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
     pub stroke_dash_array: Option<StrokeDashArray>,
     pub corner_radius: f32,
@@ -258,6 +259,7 @@ impl LayerList {
                         stroke_style.stroke_align,
                         stroke_style.stroke_cap,
                         stroke_style.stroke_join,
+                        stroke_style.stroke_miter_limit,
                         stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -273,6 +275,7 @@ impl LayerList {
                     rect_stroke,
                     corner_radius,
                     stroke_style.stroke_align,
+                    stroke_style.stroke_miter_limit,
                     stroke_style.stroke_dash_array.as_ref(),
                 ))
             }
@@ -415,6 +418,7 @@ impl LayerList {
                             n.stroke_style.stroke_align,
                             n.stroke_style.stroke_cap,
                             n.stroke_style.stroke_join,
+                            n.stroke_style.stroke_miter_limit,
                             n.stroke_style.stroke_dash_array.as_ref(),
                         ))
                     } else {
@@ -508,6 +512,7 @@ impl LayerList {
                         n.stroke_style.stroke_align,
                         n.stroke_style.stroke_cap,
                         n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -551,6 +556,7 @@ impl LayerList {
                         n.stroke_style.stroke_align,
                         n.stroke_style.stroke_cap,
                         n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -594,6 +600,7 @@ impl LayerList {
                         n.stroke_style.stroke_align,
                         n.stroke_style.stroke_cap,
                         n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -637,6 +644,7 @@ impl LayerList {
                         n.stroke_style.stroke_align,
                         n.stroke_style.stroke_cap,
                         n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -679,6 +687,7 @@ impl LayerList {
                         n.get_stroke_align(),
                         n.stroke_cap,
                         StrokeJoin::default(), // Join not applicable for single line
+                        n.stroke_miter_limit,
                         n.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -786,6 +795,7 @@ impl LayerList {
                         n.stroke_style.stroke_align,
                         n.stroke_style.stroke_cap,
                         n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -839,6 +849,7 @@ impl LayerList {
                     stroke_align: n.get_stroke_align(),
                     stroke_cap: n.stroke_cap,
                     stroke_join: n.stroke_join,
+                    stroke_miter_limit: n.stroke_miter_limit,
                     stroke_width_profile: n.stroke_width_profile.clone(),
                     stroke_dash_array: n.stroke_dash_array.clone(),
                     corner_radius: n.corner_radius,
@@ -866,6 +877,7 @@ impl LayerList {
                         n.stroke_style.stroke_align,
                         n.stroke_style.stroke_cap,
                         n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {

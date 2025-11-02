@@ -50,9 +50,10 @@ fn main() {
 
         let stroke_options = StrokeOptions {
             stroke_width: 2.0,
-            stroke_align: cg::cg::types::StrokeAlign::Center,
+            stroke_align: StrokeAlign::Center,
             stroke_cap: StrokeCap::Round,
             stroke_join: StrokeJoin::Round,
+            stroke_miter_limit: StrokeMiterLimit::default(),
             paints: Paints::new([Paint::from(color)]),
             width_profile: None,
             stroke_dash_array: dash_array,
