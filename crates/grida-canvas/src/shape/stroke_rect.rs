@@ -323,8 +323,11 @@ fn stroke_geometry_rectangular_dashed_rrect(
     // Apply dash effect
     let mut path_to_stroke = centerline_path.clone();
     if let Some(pe) = PathEffect::dash(&intervals, 0.0) {
+        // Use a hairline StrokeRec for filtering to avoid double-width application
+        let filter_rec = StrokeRec::new(InitStyle::Hairline);
+
         if let Some((dashed, _)) =
-            pe.filter_path(&centerline_path, &stroke_rec, centerline_path.bounds())
+            pe.filter_path(&centerline_path, &filter_rec, centerline_path.bounds())
         {
             path_to_stroke = dashed.snapshot();
         }

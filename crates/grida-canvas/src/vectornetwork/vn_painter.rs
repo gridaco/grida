@@ -15,6 +15,7 @@ pub struct StrokeOptions {
     pub align: StrokeAlign,
     pub paints: Paints,
     pub width_profile: Option<VarWidthProfile>,
+    pub dash_array: Option<StrokeDashArray>,
 }
 
 /// Painter for [`VectorNetwork`]s that renders region-specific fills.
@@ -124,8 +125,12 @@ impl<'a> VNPainter<'a> {
                 // For outside alignment, use the unioned path as the base
                 let merged = vn.to_union_path();
                 let merged = self.path_with_corner(&merged, corner_radius);
-                let stroke_path =
-                    stroke_geometry(merged.as_ref(), stroke_opts.width, stroke_opts.align, None);
+                let stroke_path = stroke_geometry(
+                    merged.as_ref(),
+                    stroke_opts.width,
+                    stroke_opts.align,
+                    stroke_opts.dash_array.as_ref(),
+                );
                 self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
             }
             Center | Inside => {
@@ -133,8 +138,12 @@ impl<'a> VNPainter<'a> {
                 let paths = vn.to_paths();
                 for path in paths.iter() {
                     let path = self.path_with_corner(path, corner_radius);
-                    let stroke_path =
-                        stroke_geometry(path.as_ref(), stroke_opts.width, stroke_opts.align, None);
+                    let stroke_path = stroke_geometry(
+                        path.as_ref(),
+                        stroke_opts.width,
+                        stroke_opts.align,
+                        stroke_opts.dash_array.as_ref(),
+                    );
                     self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
                 }
             }
@@ -172,7 +181,7 @@ impl<'a> VNPainter<'a> {
                             &rounded_path,
                             stroke_opts.width,
                             stroke_opts.align,
-                            None,
+                            stroke_opts.dash_array.as_ref(),
                         );
                         self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
                     }
@@ -394,6 +403,7 @@ mod tests {
                 active: true,
             })]),
             width_profile: None,
+            dash_array: None,
         };
         painter.draw(&vn, &[], Some(&stroke), 0.0);
 

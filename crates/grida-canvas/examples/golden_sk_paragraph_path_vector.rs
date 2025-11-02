@@ -12,10 +12,8 @@
 //! - Vector network integration with fills and strokes
 //! - Typography showcase with rich content
 
-use cg::{
-    cg::types::*,
-    vectornetwork::{StrokeOptions, VNPainter, VectorNetwork},
-};
+use cg::cg::prelude::*;
+use cg::vectornetwork::{StrokeOptions, VNPainter, VectorNetwork};
 use skia_safe::{
     self as sk,
     font_style::{Slant, Weight, Width},
@@ -209,6 +207,7 @@ fn scenario_geist(canvas: &sk::Canvas, y_offset: f32) -> f32 {
                 align: StrokeAlign::Center,
                 paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 100))]),
                 width_profile: None,
+                dash_array: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
@@ -296,6 +295,7 @@ fn scenario_roboto_flex(canvas: &sk::Canvas, y_offset: f32) -> f32 {
                 align: StrokeAlign::Center,
                 paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 100))]),
                 width_profile: None,
+                dash_array: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
@@ -400,6 +400,7 @@ fn scenario_multiscript(canvas: &sk::Canvas, y_offset: f32) -> f32 {
                 align: StrokeAlign::Center,
                 paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 80))]),
                 width_profile: None,
+                dash_array: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
@@ -476,6 +477,7 @@ fn scenario_variable_fonts(canvas: &sk::Canvas, y_offset: f32) -> f32 {
                 align: StrokeAlign::Center,
                 paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 120))]),
                 width_profile: None,
+                dash_array: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }

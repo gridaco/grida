@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::vectornetwork::*;
 use skia_safe::{surfaces, Color};
 
@@ -63,6 +63,7 @@ fn main() {
             align: *align,
             paints: Paints::new([Paint::from(stroke_color)]),
             width_profile: None,
+            dash_array: None,
         };
         painter.draw(&network, &[], Some(&options), 0.0);
         canvas.restore();

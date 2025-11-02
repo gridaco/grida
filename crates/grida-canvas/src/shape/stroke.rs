@@ -77,8 +77,10 @@ pub fn stroke_geometry(
     let mut path_to_stroke = source_path.clone();
     if let Some(dashes) = stroke_dash_array {
         if let Some(pe) = PathEffect::dash(&dashes.normalized(), 0.0) {
+            // Use a hairline StrokeRec for filtering to avoid double-width application
+            let filter_rec = StrokeRec::new(InitStyle::Hairline);
             if let Some((dashed, _)) =
-                pe.filter_path(source_path, &stroke_rec, source_path.bounds())
+                pe.filter_path(source_path, &filter_rec, source_path.bounds())
             {
                 path_to_stroke = dashed.snapshot();
             }

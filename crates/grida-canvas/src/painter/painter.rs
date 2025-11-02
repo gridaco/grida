@@ -789,6 +789,7 @@ impl<'a> Painter<'a> {
                                         align: vector_layer.stroke_align,
                                         paints: vector_layer.strokes.clone(),
                                         width_profile: vector_layer.stroke_width_profile.clone(),
+                                        dash_array: vector_layer.stroke_dash_array.clone(),
                                     })
                                 } else {
                                     None

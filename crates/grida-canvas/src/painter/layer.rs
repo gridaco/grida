@@ -188,6 +188,7 @@ pub struct PainterPictureVectorLayer {
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
     pub corner_radius: f32,
 }
 
@@ -819,6 +820,7 @@ impl LayerList {
                     stroke_width: n.stroke_width,
                     stroke_align: n.get_stroke_align(),
                     stroke_width_profile: n.stroke_width_profile.clone(),
+                    stroke_dash_array: n.stroke_dash_array.clone(),
                     corner_radius: n.corner_radius,
                 });
                 out.push(LayerEntry {
