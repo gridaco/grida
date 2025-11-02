@@ -453,6 +453,113 @@ impl Default for StrokeCap {
     }
 }
 
+/// Defines how corners (path segment joins) are rendered when stroked.
+///
+/// `StrokeJoin` determines the appearance of corners where two path segments meet.
+/// This applies to all path types (open and closed) wherever segments join at an angle.
+///
+/// # Variants
+///
+/// ## Miter
+/// Extends the outer edges of the stroke until they meet at a point, creating a sharp corner.
+/// The extension is limited by the miter limit to prevent excessive spikes on acute angles.
+///
+/// [Video](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/miter_4_join.mp4)
+///
+/// When the miter limit is exceeded (very acute angles), the join automatically falls back
+/// to a bevel join to prevent the spike from extending too far.
+///
+/// ## Round
+/// Joins path segments with a circular arc, creating smooth, rounded corners.
+/// The radius of the arc is equal to half the stroke width.
+///
+/// [Video](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/round_join.mp4)
+///
+/// ## Bevel
+/// Joins path segments with a straight line connecting the outer corners, creating
+/// a flattened or chamfered corner.
+///
+/// [Video](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/bevel_join.mp4)
+///
+/// # Visual Comparison
+///
+/// For two path segments meeting at 90°:
+/// - **Miter**: Sharp pointed corner extending beyond the join point
+/// - **Round**: Smooth circular arc connecting the segments
+/// - **Bevel**: Straight diagonal line connecting the outer edges
+///
+/// # Common Use Cases
+///
+/// - **Miter**: Technical drawings, architectural diagrams, sharp geometric shapes
+/// - **Round**: Smooth UI elements, organic shapes, friendly illustrations
+/// - **Bevel**: Chamfered corners, industrial designs, beveled frames
+///
+/// # Miter Limit Behavior
+///
+/// The **miter limit** controls when a miter join falls back to a bevel join.
+/// It's defined as the ratio of miter length to stroke width:
+///
+/// ```text
+/// miter_limit = miter_length / stroke_width
+/// ```
+///
+/// When this ratio exceeds the limit, the join becomes a bevel. Common default is 4.0.
+/// Very acute angles (< ~29° for limit=4.0) will automatically bevel.
+///
+/// # Cross-Platform Equivalents
+///
+/// - **SVG**: [`stroke-linejoin`](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin) attribute
+/// - **Canvas API**: [`CanvasRenderingContext2D.lineJoin`](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineJoin)
+/// - **Skia**: [`SkPaint::Join`](https://api.skia.org/classSkPaint.html#ac582b0cbf59909c9056de34a6b977cca)
+/// - **Flutter**: [`StrokeJoin`](https://api.flutter.dev/flutter/dart-ui/StrokeJoin.html)
+/// - **Figma**: [`strokeJoin`](https://www.figma.com/plugin-docs/api/properties/nodes-strokejoin/)
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::StrokeJoin;
+///
+/// // Default join style
+/// let default_join = StrokeJoin::default();
+/// assert_eq!(default_join, StrokeJoin::Miter);
+///
+/// // Round joins for smooth appearance
+/// let smooth = StrokeJoin::Round;
+///
+/// // Bevel joins for chamfered corners
+/// let chamfered = StrokeJoin::Bevel;
+/// ```
+///
+/// # Implementation Notes
+///
+/// - Applies to **all path types** where segments join (open and closed paths)
+/// - Miter joins require a **miter limit** parameter (typically 4.0) to prevent excessive spikes
+/// - Round joins may affect performance on complex paths with many segments
+/// - The join style interacts with stroke width - wider strokes make joins more prominent
+///
+/// # See Also
+///
+/// - [`StrokeCap`] - Controls stroke endpoints for open paths
+/// - [`StrokeAlign`] - Controls stroke positioning relative to path
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum StrokeJoin {
+    /// Sharp pointed corner with miter limit fallback (default)
+    #[serde(rename = "miter")]
+    Miter,
+    /// Circular arc connecting path segments
+    #[serde(rename = "round")]
+    Round,
+    /// Straight diagonal line connecting outer edges
+    #[serde(rename = "bevel")]
+    Bevel,
+}
+
+impl Default for StrokeJoin {
+    fn default() -> Self {
+        StrokeJoin::Miter
+    }
+}
+
 /// Stroke alignment.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
