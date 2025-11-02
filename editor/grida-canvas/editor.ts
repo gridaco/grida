@@ -1666,6 +1666,14 @@ class EditorDocumentStore
     });
   }
 
+  changeNodePropertyStrokeJoin(node_id: string, strokeJoin: cg.StrokeJoin) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeJoin,
+    });
+  }
+
   changeNodePropertyStrokeDashArray(
     node_id: string,
     strokeDashArray: number[] | undefined

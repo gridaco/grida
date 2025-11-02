@@ -1234,6 +1234,7 @@ function ModeNodeProperties({
         <SectionStrokes
           node_id={node_id}
           config={{
+            stroke_join: "on",
             stroke_cap: !supports.strokeCap(node.type, { backend })
               ? "off"
               : "on",

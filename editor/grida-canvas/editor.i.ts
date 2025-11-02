@@ -2988,6 +2988,10 @@ export namespace editor.api {
       strokeDashArray: number[] | undefined
     ): void;
     changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodePropertyStrokeJoin(
+      node_id: NodeID,
+      strokeJoin: cg.StrokeJoin
+    ): void;
     changeNodePropertyFit(node_id: NodeID, fit: cg.BoxFit): void;
 
     addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;

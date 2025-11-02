@@ -458,6 +458,11 @@ const safe_properties: Partial<
       (draft as UN).strokeCap = value;
     },
   }),
+  strokeJoin: defineNodeProperty<"strokeJoin">({
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeJoin = value;
+    },
+  }),
   strokeDashArray: defineNodeProperty<"strokeDashArray">({
     assert: (node) =>
       node.type === "vector" ||

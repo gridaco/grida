@@ -159,6 +159,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyStrokeAlign(node_id, value),
       strokeCap: (value: cg.StrokeCap) =>
         instance.commands.changeNodePropertyStrokeCap(node_id, value),
+      strokeJoin: (value: cg.StrokeJoin) =>
+        instance.commands.changeNodePropertyStrokeJoin(node_id, value),
       strokeDashArray: (value: number[] | undefined) =>
         instance.commands.changeNodePropertyStrokeDashArray(node_id, value),
       fit: (value: cg.BoxFit) =>

@@ -9,6 +9,7 @@ import {
 } from "../controls/stroke-width";
 import { StrokeAlignControl } from "../controls/stroke-align";
 import { StrokeCapControl } from "../controls/stroke-cap";
+import { StrokeJoinControl } from "../controls/stroke-join";
 import { StrokeClassControl, StrokeClass } from "../controls/stroke-class";
 import { StrokeDashArrayControl } from "../controls/stroke-dasharray";
 import {
@@ -24,11 +25,13 @@ export function SectionStrokes({
   node_id,
   config = {
     stroke_cap: "on",
+    stroke_join: "on",
   },
 }: {
   node_id: string;
   config?: {
     stroke_cap: "on" | "off";
+    stroke_join: "on" | "off";
   };
 }) {
   const backend = useBackendState();
@@ -42,6 +45,7 @@ export function SectionStrokes({
     strokeLeftWidth,
     strokeAlign,
     strokeCap,
+    strokeJoin,
     strokeDashArray,
     type,
   } = useNodeState(node_id, (node) => ({
@@ -54,6 +58,7 @@ export function SectionStrokes({
     strokeLeftWidth: node.strokeLeftWidth,
     strokeAlign: node.strokeAlign,
     strokeCap: node.strokeCap,
+    strokeJoin: node.strokeJoin,
     strokeDashArray: node.strokeDashArray,
     type: node.type,
   }));
@@ -203,6 +208,13 @@ export function SectionStrokes({
       <PropertyLine hidden={config.stroke_cap === "off"}>
         <PropertyLineLabel>Cap</PropertyLineLabel>
         <StrokeCapControl value={strokeCap} onValueChange={actions.strokeCap} />
+      </PropertyLine>
+      <PropertyLine hidden={config.stroke_join === "off"}>
+        <PropertyLineLabel>Join</PropertyLineLabel>
+        <StrokeJoinControl
+          value={strokeJoin}
+          onValueChange={actions.strokeJoin}
+        />
       </PropertyLine>
       <PropertyLine>
         <PropertyLineLabel>Style</PropertyLineLabel>
